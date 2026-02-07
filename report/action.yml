@@ -1,0 +1,23 @@
+name: Report
+description: Show proxy communication logs and fail if blocked connections detected
+
+inputs:
+  fail_on_blocked:
+    description: "Fail the step if blocked connections are detected"
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Show proxy report
+      shell: bash
+      env:
+        COMPOSE_FILE: ${{ github.action_path }}/../setup/compose.yml
+        FAIL_ON_BLOCKED: ${{ inputs.fail_on_blocked }}
+      run: |
+        "${{ github.action_path }}/report.sh" || {
+          if [ "$FAIL_ON_BLOCKED" = "true" ]; then
+            exit 1
+          fi
+        }

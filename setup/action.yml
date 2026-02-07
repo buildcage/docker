@@ -1,0 +1,42 @@
+name: Setup Builder
+description: Start buildcage builder container
+
+inputs:
+  buildcage_image:
+    description: "Docker image name (e.g. ghcr.io/dash14/buildcage, dash14/buildcage)"
+    required: false
+    default: 'ghcr.io/dash14/buildcage'
+  buildcage_version:
+    description: "Image tag"
+    required: false
+    default: 'latest'
+  proxy_mode:
+    description: "audit or restrict"
+    required: false
+    default: 'restrict'
+  allowed_http_domains:
+    description: "Comma-separated allowed HTTP domains"
+    required: false
+    default: ''
+  allowed_https_domains:
+    description: "Comma-separated allowed HTTPS domains"
+    required: false
+    default: ''
+
+outputs:
+  endpoint:
+    description: "BuildKit endpoint for docker buildx create --driver remote"
+    value: tcp://localhost:1234
+
+runs:
+  using: composite
+  steps:
+    - name: Start builder
+      shell: bash
+      env:
+        PROXY_MODE: ${{ inputs.proxy_mode }}
+        ALLOWED_HTTP_DOMAINS: ${{ inputs.allowed_http_domains }}
+        ALLOWED_HTTPS_DOMAINS: ${{ inputs.allowed_https_domains }}
+        BUILDCAGE_IMAGE: ${{ inputs.buildcage_image }}
+        BUILDCAGE_VERSION: ${{ inputs.buildcage_version }}
+      run: docker compose -f ${{ github.action_path }}/compose.yml up -d --pull always --no-build --wait

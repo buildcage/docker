@@ -1,0 +1,17 @@
+debug = true
+
+[dns]
+nameservers = ["172.20.0.1"]
+
+[worker.oci]
+enabled = true
+platforms = ["linux/amd64", "linux/arm64"]
+snapshotter = "auto"
+networkMode = "cni"
+cniConfigPath = "/etc/buildkit/cni.conflist"
+cniPoolSize = 16
+# Enable IP forwarding for CNI networks
+cniPortForward = true
+
+[[worker.oci.gcpolicy]]
+all = true

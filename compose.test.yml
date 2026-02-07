@@ -1,0 +1,32 @@
+services:
+  # Point builder's resolver to test-dns + configure test domains
+  builder:
+    environment:
+      - EXTERNAL_RESOLVER=10.200.0.53 valid=300s
+      - ALLOWED_HTTP_DOMAINS=allowed.example.com,*.wildcard.example.com
+      - ALLOWED_HTTPS_DOMAINS=allowed.example.com,*.wildcard.example.com
+      - HTTP_PORTS=80,8080
+      - HTTPS_PORTS=443,8443
+    networks:
+      default:
+      test-net:
+
+  # Test HTTP server (with self-signed certificate)
+  test-server:
+    build: test/test-server
+    networks:
+      test-net:
+        ipv4_address: 10.200.0.100
+
+  # DNS used by builder (resolves all domains to test-server)
+  test-dns:
+    build: test/test-dns
+    networks:
+      test-net:
+        ipv4_address: 10.200.0.53
+
+networks:
+  test-net:
+    ipam:
+      config:
+        - subnet: 10.200.0.0/24

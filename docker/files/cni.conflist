@@ -1,0 +1,27 @@
+{
+  "cniVersion": "1.0.0",
+  "name": "isolated-net",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "buildkit0",
+      "isGateway": true,
+      "ipMasq": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [[{
+          "subnet": "172.20.0.0/24",
+          "rangeStart": "172.20.0.100",
+          "rangeEnd": "172.20.0.200",
+          "gateway": "172.20.0.1"
+        }]],
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ]
+      },
+      "dns": {
+        "nameservers": ["172.20.0.1"]
+      }
+    }
+  ]
+}

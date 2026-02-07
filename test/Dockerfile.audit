@@ -1,0 +1,35 @@
+FROM alpine:latest
+
+# DNS check
+RUN echo "=== DNS Configuration ===" && \
+    cat /etc/resolv.conf
+
+# [HTTPS - any domain]
+RUN echo "=== [HTTPS - any domain] ===" && \
+    echo "Testing blocked.example.com (HTTPS, should be allowed in audit mode)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://blocked.example.com/ && echo "✓ blocked.example.com: OK") || (echo "✗ blocked.example.com: FAILED" && exit 1)
+
+# [HTTP - any domain]
+RUN echo "=== [HTTP - any domain] ===" && \
+    echo "Testing blocked.example.com (HTTP, should be allowed in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=10 http://blocked.example.com/ && echo "✓ blocked.example.com HTTP: OK") || (echo "✗ blocked.example.com HTTP: FAILED" && exit 1)
+
+# [Port 8443 - any domain]
+RUN echo "=== [Port 8443 - any domain] ===" && \
+    echo "Testing blocked.example.com:8443 (HTTPS, should be allowed in audit mode)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://blocked.example.com:8443/ && echo "✓ blocked.example.com:8443: OK") || (echo "✗ blocked.example.com:8443: FAILED" && exit 1)
+
+# [Port 8080 - any domain]
+RUN echo "=== [Port 8080 - any domain] ===" && \
+    echo "Testing blocked.example.com:8080 (HTTP, should be allowed in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=10 http://blocked.example.com:8080/ && echo "✓ blocked.example.com:8080: OK") || (echo "✗ blocked.example.com:8080: FAILED" && exit 1)
+
+# [Direct IP - blocked (iptables FORWARD DROP, mode-independent)]
+RUN echo "=== [Direct IP - blocked] ===" && \
+    echo "Testing direct IP access to 10.200.0.100 (should be blocked by iptables even in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by iptables (expected)"
+
+# Network configuration check
+RUN echo "=== Network Configuration ===" && \
+    ip route show && \
+    echo "=== End of test ==="

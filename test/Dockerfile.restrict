@@ -1,0 +1,60 @@
+FROM alpine:latest
+
+# DNS check
+RUN echo "=== DNS Configuration ===" && \
+    cat /etc/resolv.conf
+
+# [HTTPS - allowed - exact match]
+RUN echo "=== [HTTPS - allowed - exact match] ===" && \
+    echo "Testing allowed.example.com (HTTPS)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://allowed.example.com/ && echo "✓ allowed.example.com: OK") || (echo "✗ allowed.example.com: FAILED" && exit 1)
+
+# [HTTPS - allowed - wildcard]
+RUN echo "=== [HTTPS - allowed - wildcard] ===" && \
+    echo "Testing sub.wildcard.example.com (HTTPS)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://sub.wildcard.example.com/ && echo "✓ sub.wildcard.example.com: OK") || (echo "✗ sub.wildcard.example.com: FAILED" && exit 1)
+
+# [HTTPS - blocked]
+RUN echo "=== [HTTPS - blocked] ===" && \
+    echo "Testing blocked.example.com (HTTPS, should be blocked)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://blocked.example.com/ && echo "✗ blocked.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com: BLOCKED (expected)"
+
+# [HTTP - allowed]
+RUN echo "=== [HTTP - allowed] ===" && \
+    echo "Testing allowed.example.com (HTTP)..." && \
+    (wget -q -O /dev/null --timeout=10 http://allowed.example.com/ && echo "✓ allowed.example.com HTTP: OK") || (echo "✗ allowed.example.com HTTP: FAILED" && exit 1)
+
+# [HTTP - blocked]
+RUN echo "=== [HTTP - blocked] ===" && \
+    echo "Testing blocked.example.com (HTTP, should be blocked)..." && \
+    (wget -q -O /dev/null --timeout=5 http://blocked.example.com/ && echo "✗ blocked.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com HTTP: BLOCKED (expected)"
+
+# [Port 8443 - allowed]
+RUN echo "=== [Port 8443 - allowed] ===" && \
+    echo "Testing allowed.example.com:8443 (HTTPS)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://allowed.example.com:8443/ && echo "✓ allowed.example.com:8443: OK") || (echo "✗ allowed.example.com:8443: FAILED" && exit 1)
+
+# [Port 8080 - allowed]
+RUN echo "=== [Port 8080 - allowed] ===" && \
+    echo "Testing allowed.example.com:8080 (HTTP)..." && \
+    (wget -q -O /dev/null --timeout=10 http://allowed.example.com:8080/ && echo "✓ allowed.example.com:8080: OK") || (echo "✗ allowed.example.com:8080: FAILED" && exit 1)
+
+# [Port 8443 - blocked]
+RUN echo "=== [Port 8443 - blocked] ===" && \
+    echo "Testing blocked.example.com:8443 (HTTPS, should be blocked)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://blocked.example.com:8443/ && echo "✗ blocked.example.com:8443: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com:8443: BLOCKED (expected)"
+
+# [Port 8080 - blocked]
+RUN echo "=== [Port 8080 - blocked] ===" && \
+    echo "Testing blocked.example.com:8080 (HTTP, should be blocked)..." && \
+    (wget -q -O /dev/null --timeout=5 http://blocked.example.com:8080/ && echo "✗ blocked.example.com:8080: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com:8080: BLOCKED (expected)"
+
+# [Direct IP - blocked (iptables FORWARD DROP)]
+RUN echo "=== [Direct IP - blocked] ===" && \
+    echo "Testing direct IP access to 10.200.0.100 (should be blocked by iptables)..." && \
+    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by iptables (expected)"
+
+# Network configuration check
+RUN echo "=== Network Configuration ===" && \
+    ip route show && \
+    echo "=== End of test ==="
