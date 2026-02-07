@@ -26,17 +26,8 @@ inputs:
 outputs:
   endpoint:
     description: "BuildKit endpoint for docker buildx create --driver remote"
-    value: tcp://localhost:1234
 
 runs:
-  using: composite
-  steps:
-    - name: Start builder
-      shell: bash
-      env:
-        PROXY_MODE: ${{ inputs.proxy_mode }}
-        ALLOWED_HTTP_DOMAINS: ${{ inputs.allowed_http_domains }}
-        ALLOWED_HTTPS_DOMAINS: ${{ inputs.allowed_https_domains }}
-        BUILDCAGE_IMAGE: ${{ inputs.buildcage_image }}
-        BUILDCAGE_VERSION: ${{ inputs.buildcage_version }}
-      run: docker compose -f ${{ github.action_path }}/compose.yml up -d --pull always --no-build --wait
+  using: node24
+  main: main.mjs
+  post: post.mjs
