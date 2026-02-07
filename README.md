@@ -105,7 +105,7 @@ The internal proxy server inspects the SNI field (for HTTPS) or the Host header 
   id: buildcage
   uses: dash14/buildcage/setup@v1
   with:
-    proxy_mode: restrict
+    proxy_mode: audit
     allowed_https_domains: registry.npmjs.org
 ```
 
