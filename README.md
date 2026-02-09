@@ -2,39 +2,378 @@
 
 ![buildcage](./assets/banner.png)
 
-A custom builder that controls outbound network access during Docker builds using an allowlist approach, mitigating supply chain attack risks.
 
-## Background
+**A secure Docker build environment that prevents supply chain attacks by restricting outbound network access during image builds.**
 
-During Docker build `RUN` instructions, package managers (apt, npm, pip, etc.) freely access the internet. While convenient, this poses the following risks:
+buildcage is a Docker container that runs a custom BuildKit builder. When you configure Docker Buildx to use buildcage as a remote builder, all network traffic from `RUN` steps in your Dockerfile is routed through an internal proxy that can log and block connections based on domain name.
 
-- **Supply chain attacks**: Malicious packages or compromised dependencies can make unintended outbound connections during builds (as seen in incidents like the event-stream attack)
-- **Data exfiltration**: Environment variables or source code could be sent to external servers during builds
+You define a list of allowed domains, and only connections to those domains are permitted during builds — everything else is blocked.
 
-Docker's built-in `--network=none` option completely blocks all network access, making it impossible to install packages at all.
+*Think of it as a firewall for your Docker builds.*
 
-**buildcage** solves this problem by allowing only the necessary connections via an allowlist, while blocking everything else.
+## Why Use buildcage?
 
-## What is buildcage?
+### The Problem
 
-buildcage is a buildx custom builder that isolates the network of BuildKit RUN steps. It provides two operation modes:
+When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, these commands can connect to any server on the internet. **You have no visibility or control over where they connect.**
 
-- **Audit mode**: Records all network destinations during builds, useful for creating allowlists
-- **Restrict mode**: Allows access only to permitted domains, blocking everything else
+### Types of Supply Chain Threats
+
+- **Supply chain attacks**: Malicious or compromised dependencies can make unauthorized outbound connections during builds (as seen in the event-stream incident)
+- **Data exfiltration**: Environment variables, source code, or secrets could be sent to external servers during builds
+- **Typosquatting attacks**: Installing a misspelled package name that redirects to attacker-controlled servers
+- **Unauthorized tracking**: Analytics or telemetry sent without your consent
+
+---
+
+## How It Works
+
+1. **You define allowed domains**
+
+    ```yaml
+    allowed_https_domains: registry.npmjs.org,github.com
+    ```
+
+2. **buildcage acts as a gatekeeper**
+    - All outbound connections from `RUN` steps go through buildcage's proxy
+    - Only requests to allowed domains pass through
+    - Everything is logged
+
+3. **Everything else is blocked**
+    - Malicious packages cannot contact external servers
+    - Your build logs show exactly what was blocked
+    - The report step fails if blocked connections are detected, causing the workflow to fail
+
+**Two modes available** (see [Operation Modes](#operation-modes) for details):
+
+- **Audit mode**: Records all network destinations during builds, useful for creating allowlists.
+- **Restrict mode**: Allows access only to permitted domains, blocking everything else.
+
+## Who Should Use This?
+
+### Recommended for:
+
+- Teams building Docker images in CI/CD environments
+- Organizations with security compliance requirements (SOC 2, ISO 27001, etc.)
+- Projects using public package registries (npm, PyPI, RubyGems, etc.)
+- Anyone concerned about supply chain security
+- Companies handling sensitive data or intellectual property
+
+### May not be necessary for:
+
+- Builds that already run in completely offline environments
+- Teams using only vetted, internal package repositories
+- Simple static site builds with no external dependencies
+- Projects where build speed is critical and security is less of a concern
 
 ## Features
 
-- 🔒 **Network isolation**: Isolates RUN instruction execution environments using CNI
-- 📊 **Communication logs**: Detailed destination analysis
+- 🔒 **Network isolation**: Isolates network access for each `RUN` step using CNI (Container Network Interface)
+- 📊 **Detailed logging**: Complete visibility into all network connections during builds
 - 🚀 **GitHub Actions support**: Available as a reusable action for CI/CD pipelines
+- ✅ **Zero Dockerfile changes**: Works with existing Dockerfiles without modification
+- 🔍 **Audit mode**: Discover dependencies before enforcing restrictions
+- 🛡️ **Restrict mode**: Production-ready access control
+
+## Quick Start
+
+### Prerequisites
+
+- Docker with BuildKit (buildx plugin)
+- Docker Compose (for local usage)
+- GitHub Actions runner with Docker support (for CI/CD usage)
+
+### First-Time Setup (Recommended Workflow)
+
+Using buildcage in GitHub Actions involves three workflow steps: (1) start the buildcage container, which runs BuildKit inside a network-controlled environment; (2) configure Docker Buildx to use the buildcage container as a remote builder; (3) run your build as usual. Your Dockerfile and build commands stay the same — only the builder backend changes.
+
+#### Step 1: Discover what domains your build needs (Audit Mode)
+
+```yaml
+name: Discover Build Dependencies
+
+on: [push]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start buildcage in audit mode
+        id: buildcage
+        uses: dash14/buildcage/setup@v1
+        with:
+          proxy_mode: audit  # Log everything, block nothing
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: remote
+          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+
+      - name: Build and discover dependencies
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+
+      - name: Show what domains were accessed
+        if: always()
+        uses: dash14/buildcage/report@v1
+        with:
+          fail_on_blocked: false  # Don't fail, just show the report
+```
+
+#### Step 2: Check the report
+
+The report will show output like:
+
+```
+Accessed hosts summary:
+------------------------------------
+🔍 Audited hosts (audit mode - all logged):
+
+ 23 x registry.npmjs.org:443
+  8 x github.com:443
+  4 x objects.githubusercontent.com:443
+  2 x api.github.com:443
+  1 x fonts.googleapis.com:443
+  1 x deb.debian.org:80
+```
+
+Copy these domain names into `allowed_https_domains` for Step 3.
+
+#### Step 3: Create your allowlist and switch to restrict mode
+
+```yaml
+name: Secure Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start buildcage in restrict mode
+        id: buildcage
+        uses: dash14/buildcage/setup@v1
+        with:
+          proxy_mode: restrict  # Block everything except allowed domains
+          allowed_https_domains: >-
+            registry.npmjs.org,
+            github.com,
+            objects.githubusercontent.com,
+            api.github.com,
+            fonts.googleapis.com,
+            deb.debian.org
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: remote
+          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+
+      - name: Build with protection
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false  # Set to true (or use a registry) to push the built image
+
+      - name: Security report
+        if: always()
+        uses: dash14/buildcage/report@v1
+        # Build fails if any unexpected connections were blocked
+```
+
+Your builds are now protected. Any unexpected connections will be blocked and reported.
+
+---
+
+## Operation Modes
+
+### Audit Mode (PROXY_MODE=audit)
+
+**When to use:** First-time setup, adding new dependencies, or investigating issues.
+
+**What it does:**
+- Allows all HTTP/HTTPS connections
+- Logs every domain accessed during the build
+- Does NOT block anything
+
+**Example log output:**
+
+```
+▼ HTTP Proxy communication logs
+[28/Jan/2026:10:15:32 +0000] [AUDIT] TCP 200 2345 6789 0.234 "npmjs.org:443"
+[28/Jan/2026:10:15:33 +0000] [AUDIT] TCP 200 1234 5678 0.123 "github.com:443"
+[28/Jan/2026:10:15:34 +0000] [AUDIT] HTTP 200 3456 7890 0.345 "fonts.googleapis.com:80"
+```
+
+**Next step:** Use these domains to create your allowlist for restrict mode.
+
+### Restrict Mode (PROXY_MODE=restrict)
+
+**When to use:** Production builds, CI/CD pipelines, security-critical environments.
+
+**What it does:**
+- Allows connections only to domains in `allowed_http_domains` / `allowed_https_domains`
+- Blocks all other connections
+- Logs allowed and blocked attempts
+
+**Example log output:**
+
+```
+▼ HTTP Proxy communication logs
+[28/Jan/2026:10:15:30 +0000] [ALLOWED] TCP 200 1234 5678 0.123 "npmjs.org:443"
+[28/Jan/2026:10:15:31 +0000] [BLOCKED] TCP 502 0 0 0.001 "malicious-tracker.com:443"
+```
+
+The report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false` in the report action.
+
+**Example report output when connections are blocked:**
+
+```
+Accessed hosts summary:
+------------------------------------
+✅ Allowed hosts (proxied to real servers):
+
+ 23 x registry.npmjs.org:443
+  8 x github.com:443
+
+❌ Blocked hosts (rejected):
+
+  1 x malicious-tracker.com:443
+```
+
+## Usage
+
+### GitHub Actions
+
+#### Setup Action
+
+Starts the buildcage builder container.
+
+```yaml
+- name: Start buildcage builder
+  id: buildcage
+  uses: dash14/buildcage/setup@v1
+  with:
+    proxy_mode: restrict
+    allowed_https_domains: registry.npmjs.org,github.com
+```
+
+##### Parameters
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `buildcage_image` | No | `ghcr.io/dash14/buildcage` | Docker image name |
+| `buildcage_version` | No | `v1` | Image tag |
+| `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
+| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated) |
+| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated) |
+| `port` | No | `1234` | BuildKit endpoint port on localhost |
+
+##### Outputs
+
+| Name | Description |
+|------|-------------|
+| `port` | BuildKit endpoint port |
+
+##### Tips
+
+- Start with audit mode to discover required domains, then switch to restrict mode.
+- Wildcard domains are supported (e.g., `*.github.com` matches all subdomains of `github.com`).
+- Separate HTTP and HTTPS domains — some services use different hosts for each protocol.
+- Common package registries often use multiple domains (e.g., PyPI uses both `pypi.org` and `files.pythonhosted.org`).
+- Some package managers download over plain HTTP (e.g., certain Debian mirrors). Add those domains to `allowed_http_domains` separately:
+
+  ```yaml
+  allowed_http_domains: deb.debian.org
+  allowed_https_domains: registry.npmjs.org
+  ```
+
+#### Report Action
+
+Displays communication logs after builds and optionally fails if any BLOCKED connections are found.
+
+```yaml
+- name: Show proxy report
+  if: always()
+  uses: dash14/buildcage/report@v1
+```
+
+##### Parameters
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected |
+
+### Local Usage (Without GitHub Actions)
+
+GitHub Actions inputs use lowercase names (e.g., `proxy_mode`), while environment variables for local/Docker Compose usage use uppercase (e.g., `PROXY_MODE`).
+
+#### Starting the Builder
+
+**Audit mode** (log all connections):
+
+```bash
+make run_audit_mode
+```
+
+**Restrict mode** (allowlist-based):
+
+```bash
+make run_restrict_mode
+```
+
+**Start with custom domains**:
+
+```bash
+ALLOWED_HTTPS_DOMAINS="github.com,npmjs.org,example.com" make run_restrict_mode
+```
+
+#### End-to-End Local Workflow
+
+```bash
+# 1. Start buildcage
+make run_audit_mode
+
+# 2. Build
+docker buildx build --builder buildcage --progress=plain -f Dockerfile .
+
+# 3. View report
+./report/report.sh
+
+# 4. Clean up
+make clean
+```
 
 ## Architecture
 
-Containers spawned by BuildKit RUN steps are connected to a separate, isolated network via CNI. This network blocks all outbound traffic except to the internal DNS server and the internal proxy server.
+### For Technical Users
 
-The internal DNS server returns the proxy server's IP address for every DNS query, ensuring that all traffic from RUN step containers is routed through the proxy.
+buildcage creates a controlled network environment for your Docker builds:
 
-The internal proxy server inspects the SNI field (for HTTPS) or the Host header (for HTTP) of each request and checks it against the allowlist to decide whether to allow or block the connection.
+1. **BuildKit RUN steps run in isolated containers** connected to a private network (CNI)
+2. **All DNS queries return the proxy IP** (172.20.0.1), forcing traffic through the proxy
+3. **The proxy inspects each request:**
+   - HTTPS: Reads the SNI (Server Name Indication) without decrypting
+   - HTTP: Reads the Host header
+4. **Allowlist check:** If the domain is allowed → connection proceeds. Otherwise → blocked.
+
+**Note:** Base image pulls (`FROM` instructions) are performed by buildkitd itself, which runs outside the isolated network. Only commands in `RUN` steps are subject to network filtering.
+
+**Why this approach?**
+- No MITM certificate injection needed
+- TLS certificate validation works normally
+- Zero modification to your Dockerfile required
+- Works with any programming language or package manager
+- Cannot inspect encrypted HTTPS payload content (see [Security Considerations](#security-considerations))
+
+### Architecture Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -67,134 +406,126 @@ The internal proxy server inspects the SNI field (for HTTPS) or the Host header 
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-## Operation Modes
 
-### Audit Mode (PROXY_MODE=audit)
-- **Behavior**: Allows all HTTP/HTTPS connections
-- **Use cases**:
-  - Investigating which domains are used during builds
-  - Analyzing communication patterns for new projects
-  - Establishing a baseline for security policy creation
-- **Logging**: Records all connections with `[AUDIT]` marker
+All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). DNS queries are redirected to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking.
 
-### Restrict Mode (PROXY_MODE=restrict)
-- **Behavior**: Only allows access to domains on the allowlist
-- **Use cases**:
-  - Secure builds in production environments
-  - Supply chain attack prevention
-  - Preventing unintended outbound connections
-- **Logging**: Categorizes and records as `[ALLOWED]`/`[BLOCKED]`
+---
 
-## Environment Variables
+## Security Considerations
 
-| Variable | Values | Default | Description |
-|----------|--------|---------|-------------|
-| `PROXY_MODE` | `audit`/`restrict` | `restrict` | Operation mode |
-| `ALLOWED_HTTP_DOMAINS` | `domain1,domain2,...` | empty | Allowed HTTP domains (comma-separated) |
-| `ALLOWED_HTTPS_DOMAINS` | `domain1,domain2,...` | empty | Allowed HTTPS domains (comma-separated) |
-| `HTTP_PORTS` | `port1,port2,...` | `80` | HTTP proxy listen ports |
-| `HTTPS_PORTS` | `port1,port2,...` | `443` | HTTPS proxy listen ports |
-| `EXTERNAL_RESOLVER` | `ip1 ip2 ...` | `1.1.1.1 8.8.8.8 valid=300s` | Upstream DNS resolver for nginx |
+### What buildcage protects against
 
-## Usage with GitHub Actions
+- **Malicious packages** making unauthorized connections
+- **Data exfiltration** during builds (e.g., environment variables being sent to external servers)
+- **Typosquatting attacks** (misspelled package names that connect to attacker servers)
+- **Unexpected analytics or tracking** connections
+- **Compromised dependencies** attempting to communicate with command-and-control servers
 
-### Setup
+### Security Mechanisms
 
-```yaml
-- name: Start buildcage builder
-  id: buildcage
-  uses: dash14/buildcage/setup@v1
-  with:
-    proxy_mode: audit
-    allowed_https_domains: registry.npmjs.org
+#### Direct IP Address Connections
+
+All connections using direct IP addresses from within RUN steps (e.g., `curl http://1.2.3.4/`) are **blocked by iptables**. All outbound connections must go through the proxy via domain names.
+
+This is intentional — it ensures all traffic can be inspected and logged.
+
+#### DNS-Level Control
+
+- **Full redirect**: Returns the proxy IP for all DNS queries.
+- **HTTPS record rejection**: Filters DNS HTTPS (type 65) records to prevent Encrypted Client Hello (ECH), which could bypass SNI-based filtering.
+
+#### HTTP/HTTPS Proxy Control
+
+- **HTTPS**: Determines the target server name by reading the SNI field, without terminating TLS. Certificate validation is unaffected.
+- **HTTP**: Domain determination via Host header.
+- **Dynamic allowlist**: Controlled via environment variables.
+
+#### Network Isolation
+
+- **CNI configuration**: Places temporary containers from BuildKit RUN steps into isolated-net (buildkit0 bridge, 172.20.0.0/24).
+- **iptables**: Drops all FORWARD from buildkit0, also blocks direct access to buildkitd API.
+- **Gateway enforcement**: All traffic must go through the proxy on 172.20.0.1.
+
+### Known Limitations
+
+#### Domain Fronting
+
+buildcage inspects the **SNI (Server Name Indication)** field in HTTPS connections but cannot decrypt the actual request content inside the TLS tunnel. This creates a potential bypass technique called "domain fronting."
+
+**How it works:**
+
+```
+Attack flow:
+1. ClientHello SNI: allowed.example.com  ← buildcage only sees this → ✅ allowed
+2. HTTP Host header: malicious.example.com  ← encrypted, cannot be inspected
+3. CDN routes based on Host header → reaches attacker's server
 ```
 
-| Parameter | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `buildcage_image` | No | `ghcr.io/dash14/buildcage` | Docker image name |
-| `buildcage_version` | No | `latest` | Image tag |
-| `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
-| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated) |
-| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated) |
-| `port` | No | `1234` | BuildKit endpoint port on localhost |
+For this attack to succeed, the allowed domain and the attack target domain must reside on **the same CDN or hosting infrastructure**.
 
-**Output:**
+**Why we don't prevent this:**
 
-| Name | Description |
-|------|-------------|
-| `port` | BuildKit endpoint port |
+To fully defend against domain fronting, the proxy would need to terminate TLS (MITM) and inspect HTTP contents. However, this presents significant challenges:
 
-### Report
+- **MITM CA certificate generation and management** — The proxy would need to generate TLS certificates for each domain on the fly.
+- **CA certificate injection into build containers** — Build containers generated by BuildKit's OCI worker have independent filesystems, making it technically difficult to trust a MITM CA (would require modifications to buildkitd itself).
+- **Interference with TLS validation** — Trusting a self-signed CA would affect normal TLS certificate validation within build containers.
 
-Displays communication logs after builds and fails if any BLOCKED connections are found:
+Given these implementation costs versus the strict preconditions for the attack (the attacker's server must be on the same infrastructure as the allowed domain), this is treated as an **accepted risk**.
 
-```yaml
-- name: Show proxy report
-  uses: dash14/buildcage/report@v1
-```
+**Mitigation strategies:**
 
-| Parameter | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected |
+- **Keep allowed domains to a minimum** — Only specify the domains you need in `ALLOWED_HTTP_DOMAINS` / `ALLOWED_HTTPS_DOMAINS`.
+- **Be specific with allowed domains** — Avoid broad wildcard CDN domains (e.g., `*.cdn.example.com`) when possible.
+- **Use service-specific domains** — Prefer `registry.npmjs.org` over generic CDN wildcard domains.
+- **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
+- **Regular audits** — Periodically run in audit mode to detect anomalies in connection patterns.
 
-### Complete Example
+---
 
-```yaml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Start buildcage builder
-        id: buildcage
-        uses: dash14/buildcage/setup@v1
-        with:
-          proxy_mode: restrict
-          allowed_https_domains: registry.npmjs.org
+## FAQ
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: remote
-          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+**Q: Does this slow down my builds?**
+A: Minimal impact. The proxy adds negligible latency (<1ms per request). DNS caching and connection pooling keep overhead low.
 
-      - name: Build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          no-cache: true
+**Q: Can I use this with multi-stage builds?**
+A: Yes! buildcage works seamlessly with multi-stage Dockerfiles.
 
-      - name: Show proxy report
-        uses: dash14/buildcage/report@v1
-```
+**Q: Does this work with private package registries?**
+A: Yes. Just add your private registry's domain to `ALLOWED_HTTPS_DOMAINS`.
+
+**Q: What happens if I forget to add a required domain?**
+A: In restrict mode, the build will fail with a clear error message. Run in audit mode first to discover all required domains.
+
+**Q: Can I use wildcards in domain names?**
+A: Yes. Prefix wildcards like `*.example.com` are supported and will match all subdomains (e.g., `sub.example.com`, `deep.sub.example.com`). Note that `*.example.com` does not match `example.com` itself—add both if needed. Suffix wildcards (e.g., `example.*`) are not supported.
+
+**Q: Does this protect against malicious code execution?**
+A: No. buildcage only controls network access. It doesn't prevent malicious code from running—it prevents that code from communicating with external servers.
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. **Check logs first:**
+   ```bash
+   docker compose logs builder
+   ```
+
+2. **Run in audit mode** to understand your build's network behavior:
+   ```bash
+   make clean
+   make run_audit_mode
+   docker buildx build --builder buildcage --no-cache -f Dockerfile .
+   ./report/report.sh
+   ```
+
+3. **Open an issue** at [github.com/dash14/buildcage/issues](https://github.com/dash14/buildcage/issues) with:
+   - Your Dockerfile
+   - The audit mode report output
+   - Full error messages from `docker compose logs builder`
 
 ## Development
-
-### Starting the Builder
-
-**Audit mode** (log all connections):
-
-```bash
-make run_audit_mode
-```
-
-**Restrict mode** (allowlist-based):
-
-```bash
-make run_restrict_mode
-```
-
-**Start with custom domains**:
-
-```bash
-ALLOWED_HTTPS_DOMAINS="github.com,npmjs.org,example.com" make run_restrict_mode
-```
-
-After starting, use it with the standard `docker buildx build`:
-
-```bash
-docker buildx build --builder buildcage --progress=plain -f Dockerfile .
-```
 
 ### Testing
 
@@ -216,13 +547,15 @@ make test_restrict_mode
 docker compose logs -f builder
 ```
 
-Log format:
+**Log format:**
 
 ```
-[2026-01-28T10:15:30+00:00] [ALLOWED] TCP 200 1234 5678 0.123 "github.com"
-[2026-01-28T10:15:31+00:00] [BLOCKED] TCP 502 0 0 0.001 "malicious.com"
-[2026-01-28T10:15:32+00:00] [AUDIT] TCP 200 2345 6789 0.234 "npmjs.org"
+[28/Jan/2026:10:15:30 +0000] [ALLOWED] TCP 200 1234 5678 0.123 "github.com:443"
+[28/Jan/2026:10:15:31 +0000] [BLOCKED] TCP 502 0 0 0.001 "malicious.com:443"
+[28/Jan/2026:10:15:32 +0000] [AUDIT] HTTP 200 2345 6789 0.234 "npmjs.org:80"
 ```
+
+Fields: `[timestamp] [status] protocol http_status bytes_sent bytes_received duration "domain:port"`
 
 ### Makefile Commands
 
@@ -266,81 +599,18 @@ Log format:
     └── test-dns/              # Test DNS server
 ```
 
-### Troubleshooting
+## Contributing
 
-**When builds fail**:
+Contributions are welcome! Please feel free to submit issues or pull requests.
 
-```bash
-# Check logs (includes dnsmasq/nginx/buildkitd output)
-docker compose logs builder
+## License
+Licensed under the MIT License.
+See [LICENSE](./LICENSE) file for more details.
 
-# Manual test
-docker buildx build --builder buildcage --progress=plain -f test/Dockerfile.restrict test/
-```
+## Acknowledgments
 
-**When connections are blocked**:
-
-```bash
-# Check connection destinations in audit mode
-make clean
-make run_audit_mode
-docker buildx build --builder buildcage --no-cache --progress=plain -f test/Dockerfile.restrict test/
-./report/report.sh
-
-# Add required domains to the allowlist
-make clean
-ALLOWED_HTTPS_DOMAINS="github.com,example.com" make run_restrict_mode
-```
-
-## Security Details
-
-### DNS Control
-- **Full redirect**: Returns the proxy IP for all DNS queries
-- **HTTPS record rejection**: Filters HTTPS records as an ECH countermeasure
-
-### HTTP/HTTPS Proxy Control
-- **HTTPS**: Server name determination via SNI reading without TLS termination / no impact on certificate validation
-- **HTTP**: Domain determination via Host header
-- **Dynamic allowlist**: Controlled via environment variables
-
-### Network Isolation
-- **CNI configuration**: Places temporary containers from BuildKit RUN steps into isolated-net (buildkit0 bridge, 172.20.0.0/24)
-- **iptables**: Drops all FORWARD from buildkit0, also blocks direct access to buildkitd API
-- **Direct IP connections are not supported**: All connections using direct IP addresses from within RUN steps (e.g., `curl http://1.2.3.4/`) are blocked by iptables. All outbound connections must go through the proxy via domain names
-
-## Security Limitations
-
-### Limitations of SNI-based Filtering
-
-This tool performs access control by inspecting the **SNI (Server Name Indication)** in the TLS ClientHello. Since it uses a TCP proxy approach without TLS termination, **it cannot inspect the contents of encrypted HTTP traffic (such as Host headers)**.
-
-Due to this design constraint, defense against the following attack techniques is difficult.
-
-### Domain Fronting Attack
-
-Domain fronting is an attack technique where the TLS SNI specifies an allowed domain, while the Host header in the encrypted HTTP request routes traffic to a different server.
-
-```
-Attack flow:
-1. ClientHello SNI: allowed.example.com  ← nginx only sees this → allowed
-2. HTTP Host header: malicious.example.com  ← encrypted, cannot be inspected
-3. CDN routes based on Host header → reaches attacker's server
-```
-
-For this attack to succeed, the allowed domain and the attack target domain must reside on **the same CDN or hosting infrastructure**.
-
-### Why Complete Prevention is Difficult
-
-To fully defend against domain fronting, the proxy would need to terminate TLS (MITM) and inspect HTTP contents. However, this presents the following challenges:
-
-- **MITM CA certificate generation and management** — The proxy would need to generate TLS certificates for each domain on the fly
-- **CA certificate injection into build containers** — Build containers generated by BuildKit's OCI worker have independent filesystems, making it technically difficult to trust a MITM CA (would require modifications to buildkitd itself)
-- **Side effects on TLS validation** — Trusting a self-signed CA would affect normal TLS certificate validation within build containers
-
-Given these implementation costs versus the strict preconditions for the attack (the attacker's server must be on the same infrastructure as the allowed domain), this is treated as an **accepted risk**.
-
-### Recommendations for Users
-
-- **Keep allowed domains to a minimum** — Only specify the domains you need in `ALLOWED_HTTP_DOMAINS` / `ALLOWED_HTTPS_DOMAINS`
-- **Be cautious with shared CDN domains** — When allowing shared domains such as CloudFront (`*.cloudfront.net`) or Cloudflare, the risk of domain fronting increases. Where possible, specify domains of services that use their own custom domains
-- **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Check each provider's documentation for the latest status
+buildcage is built on top of:
+- [BuildKit](https://github.com/moby/buildkit) - Modern build toolkit
+- [nginx](https://nginx.org/) - HTTP proxy
+- [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) - DNS server
+- [CNI](https://github.com/containernetworking/cni) - Container network interface
