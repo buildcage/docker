@@ -486,21 +486,27 @@ Given these implementation costs versus the strict preconditions for the attack 
 ## FAQ
 
 **Q: Does this slow down my builds?**
+
 A: Minimal impact. The proxy adds negligible latency (<1ms per request). DNS caching and connection pooling keep overhead low.
 
 **Q: Can I use this with multi-stage builds?**
+
 A: Yes! buildcage works seamlessly with multi-stage Dockerfiles.
 
 **Q: Does this work with private package registries?**
+
 A: Yes. Just add your private registry's domain to `ALLOWED_HTTPS_DOMAINS`.
 
 **Q: What happens if I forget to add a required domain?**
+
 A: In restrict mode, the build will fail with a clear error message. Run in audit mode first to discover all required domains.
 
 **Q: Can I use wildcards in domain names?**
+
 A: Yes. Prefix wildcards like `*.example.com` are supported and will match all subdomains (e.g., `sub.example.com`, `deep.sub.example.com`). Note that `*.example.com` does not match `example.com` itself—add both if needed. Suffix wildcards (e.g., `example.*`) are not supported.
 
 **Q: Does this protect against malicious code execution?**
+
 A: No. buildcage only controls network access. It doesn't prevent malicious code from running—it prevents that code from communicating with external servers.
 
 ## Troubleshooting
