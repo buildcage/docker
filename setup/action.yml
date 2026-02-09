@@ -9,7 +9,7 @@ inputs:
   buildcage_version:
     description: "Image tag"
     required: false
-    default: 'latest'
+    default: '1'
   proxy_mode:
     description: "audit or restrict"
     required: false

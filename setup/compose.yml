@@ -1,6 +1,6 @@
 services:
   builder:
-    image: ${BUILDCAGE_IMAGE:-ghcr.io/dash14/buildcage}:${BUILDCAGE_VERSION:-latest}
+    image: ${BUILDCAGE_IMAGE:-ghcr.io/dash14/buildcage}:${BUILDCAGE_VERSION:-1}
     privileged: true
     ports:
       - "${PORT:-1234}:1234"

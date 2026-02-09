@@ -270,7 +270,7 @@ Starts the buildcage builder container.
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
 | `buildcage_image` | No | `ghcr.io/dash14/buildcage` | Docker image name |
-| `buildcage_version` | No | `v1` | Image tag |
+| `buildcage_version` | No | `1` | Image tag |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
 | `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated) |
 | `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated) |
