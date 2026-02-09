@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     privileged: true
     ports:
-      - "1234:1234"
+      - "${PORT:-1234}:1234"
     environment:
       - PROXY_MODE=${PROXY_MODE:-restrict}
       - ALLOWED_HTTP_DOMAINS=${ALLOWED_HTTP_DOMAINS:-}
