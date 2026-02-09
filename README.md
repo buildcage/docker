@@ -116,12 +116,13 @@ The internal proxy server inspects the SNI field (for HTTPS) or the Host header 
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
 | `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated) |
 | `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated) |
+| `port` | No | `1234` | BuildKit endpoint port on localhost |
 
 **Output:**
 
 | Name | Description |
 |------|-------------|
-| `endpoint` | BuildKit endpoint to pass to `docker buildx create --driver remote` |
+| `port` | BuildKit endpoint port |
 
 ### Report
 
@@ -154,7 +155,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: remote
-          endpoint: ${{ steps.buildcage.outputs.endpoint }}
+          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
 
       - name: Build
         uses: docker/build-push-action@v6

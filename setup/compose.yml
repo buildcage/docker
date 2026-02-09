@@ -3,7 +3,7 @@ services:
     image: ${BUILDCAGE_IMAGE:-ghcr.io/dash14/buildcage}:${BUILDCAGE_VERSION:-latest}
     privileged: true
     ports:
-      - "1234:1234"
+      - "${PORT:-1234}:1234"
     environment:
       - PROXY_MODE=${PROXY_MODE:-restrict}
       - ALLOWED_HTTP_DOMAINS=${ALLOWED_HTTP_DOMAINS:-}

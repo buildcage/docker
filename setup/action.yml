@@ -22,10 +22,14 @@ inputs:
     description: "Comma-separated allowed HTTPS domains"
     required: false
     default: ''
+  port:
+    description: "BuildKit endpoint port on localhost"
+    required: false
+    default: '1234'
 
 outputs:
-  endpoint:
-    description: "BuildKit endpoint for docker buildx create --driver remote"
+  port:
+    description: "BuildKit endpoint port"
 
 runs:
   using: node24

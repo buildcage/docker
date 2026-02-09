@@ -21,9 +21,11 @@ execFileSync(
       ALLOWED_HTTPS_DOMAINS: process.env.INPUT_ALLOWED_HTTPS_DOMAINS || "",
       BUILDCAGE_IMAGE: process.env.INPUT_BUILDCAGE_IMAGE || "ghcr.io/dash14/buildcage",
       BUILDCAGE_VERSION: process.env.INPUT_BUILDCAGE_VERSION || "latest",
+      PORT: process.env.INPUT_PORT || "1234",
     },
   }
 );
 
 // Set action output
-appendFileSync(process.env.GITHUB_OUTPUT, "endpoint=tcp://localhost:1234\n");
+const port = process.env.INPUT_PORT || "1234";
+appendFileSync(process.env.GITHUB_OUTPUT, `port=${port}\n`);
