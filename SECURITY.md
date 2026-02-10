@@ -47,3 +47,7 @@ This project is maintained by a single developer. Realistic timelines:
 - **Fix release**: varies by severity and complexity; critical issues are prioritized
 
 I'll credit reporters in the security advisory unless they prefer to remain anonymous.
+
+## Code Auditing
+
+All code is public and I welcome security reviews. If you prefer to audit or control the code yourself, feel free to fork and self-host.
