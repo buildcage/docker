@@ -59,6 +59,10 @@ jobs:
 
       - name: Build test image
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: test
           file: ${{ matrix.test_dockerfile }}
