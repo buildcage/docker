@@ -19,7 +19,7 @@ execFileSync(
       PROXY_MODE: process.env.INPUT_PROXY_MODE || "restrict",
       ALLOWED_HTTP_DOMAINS: process.env.INPUT_ALLOWED_HTTP_DOMAINS || "",
       ALLOWED_HTTPS_DOMAINS: process.env.INPUT_ALLOWED_HTTPS_DOMAINS || "",
-      BUILDCAGE_IMAGE: process.env.INPUT_BUILDCAGE_IMAGE || "ghcr.io/dash14/buildcage",
+      BUILDCAGE_IMAGE: process.env.INPUT_BUILDCAGE_IMAGE || `ghcr.io/${process.env.GITHUB_REPOSITORY}`.toLowerCase(),
       BUILDCAGE_VERSION: process.env.INPUT_BUILDCAGE_VERSION || "1",
       PORT: process.env.INPUT_PORT || "1234",
     },
