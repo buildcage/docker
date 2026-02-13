@@ -4,12 +4,19 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const composeFile = join(__dirname, "compose.yml");
+
+execFileSync(
+  "docker",
+  ["compose", "-f", composeFile, "down"],
+  { stdio: "inherit" }
+);
 
 execFileSync(
   "docker",
   [
     "compose",
-    "-f", join(__dirname, "compose.yml"),
+    "-f", composeFile,
     "up", "-d", "--pull", "always", "--no-build", "--wait",
   ],
   {
