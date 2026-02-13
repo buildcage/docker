@@ -126,6 +126,8 @@ jobs:
           fail_on_blocked: false  # Don't fail, just show the report
 ```
 
+See the [complete example workflow](.github/workflows/example-audit.yml).
+
 #### Step 2: Check the report
 
 The report action outputs a Job Summary showing every domain your build contacted:
@@ -174,6 +176,8 @@ jobs:
         # Build fails if any unexpected connections were blocked
 ```
 
+See the [complete example workflow](.github/workflows/example-restrict.yml).
+
 Your builds are now protected. Any unexpected connections will be blocked and reported.
 
 ## Usage with GitHub Actions
@@ -190,26 +194,6 @@ Starts the buildcage builder container.
     proxy_mode: restrict
     allowed_https_domains: registry.npmjs.org,github.com
 ```
-
-#### Operation Modes
-
-##### Audit Mode (`proxy_mode: audit`)
-
-**When to use:** First-time setup, adding new dependencies, or investigating issues.
-
-**What it does:**
-- Allows all HTTP/HTTPS connections
-- Logs every domain accessed during the build
-- Does NOT block anything
-
-##### Restrict Mode (`proxy_mode: restrict`)
-
-**When to use:** Production builds, CI/CD pipelines, security-critical environments.
-
-**What it does:**
-- Allows connections only to domains in `allowed_http_domains` / `allowed_https_domains`
-- Blocks all other connections
-- Logs allowed and blocked attempts
 
 #### Parameters
 
@@ -237,6 +221,26 @@ Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup
     driver: remote
     endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
 ```
+
+#### Operation Modes
+
+##### Audit Mode (`proxy_mode: audit`)
+
+**When to use:** First-time setup, adding new dependencies, or investigating issues.
+
+**What it does:**
+- Allows all HTTP/HTTPS connections
+- Logs every domain accessed during the build
+- Does NOT block anything
+
+##### Restrict Mode (`proxy_mode: restrict`)
+
+**When to use:** Production builds, CI/CD pipelines, security-critical environments.
+
+**What it does:**
+- Allows connections only to domains in `allowed_http_domains` / `allowed_https_domains`
+- Blocks all other connections
+- Logs allowed and blocked attempts
 
 #### Tips
 
