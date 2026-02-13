@@ -53,18 +53,15 @@ When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, these c
 
 ### Recommended for:
 
-- Teams building Docker images in CI/CD environments
-- Organizations with security compliance requirements (SOC 2, ISO 27001, etc.)
-- Projects using public package registries (npm, PyPI, RubyGems, etc.)
-- Anyone concerned about supply chain security
-- Companies handling sensitive data or intellectual property
+- **CI/CD pipelines pulling from public registries** — if your builds download packages from npm, PyPI, RubyGems, or other public sources, buildcage limits the blast radius of compromised packages
+- **Builds that handle secrets** — if your Dockerfiles use build secrets, tokens, or credentials, buildcage prevents them from being exfiltrated to unauthorized servers
+- **Teams that need network visibility** — if you need to know exactly which external services your builds contact, buildcage logs every outbound connection and can enforce an allowlist
 
 ### May not be necessary for:
 
-- Builds that already run in completely offline environments
-- Teams using only vetted, internal package repositories
-- Simple static site builds with no external dependencies
-- Projects where build speed is critical and security is less of a concern
+- **Fully offline builds** — if your builds run in an air-gapped environment with no external network access
+- **Internal-only registries** — if all dependencies come from vetted, internal repositories with no public package sources
+- **No-dependency builds** — if your Dockerfile only copies files and never runs commands that fetch external resources
 
 ## Features
 
@@ -80,8 +77,8 @@ When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, these c
 ### Prerequisites
 
 - Docker with BuildKit (buildx plugin)
-- Docker Compose (for local usage)
 - GitHub Actions runner with Docker support (for CI/CD usage)
+- Docker Compose (for local usage)
 
 ### First-Time Setup (Recommended Workflow)
 
