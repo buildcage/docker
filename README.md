@@ -413,13 +413,17 @@ All containers spawned by BuildKit `RUN` steps are placed on an isolated network
 
 ## Security Considerations
 
+> **Important:** buildcage controls *where* your builds can connect, not *what code* they run. If a malicious package is delivered through a legitimate repository (e.g., a compromised npm package hosted on `registry.npmjs.org`), buildcage cannot detect or prevent it — the connection goes to an allowed domain.
+>
+> Do not rely on buildcage as your sole supply chain security measure. Use it as one layer in a defense-in-depth strategy — a last line of defense that limits the blast radius of compromised dependencies by restricting their ability to communicate with external servers.
+
 ### What buildcage protects against
 
-- **Malicious packages** making unauthorized connections
-- **Data exfiltration** during builds (e.g., environment variables being sent to external servers)
-- **Typosquatting attacks** (misspelled package names that connect to attacker servers)
-- **Unexpected analytics or tracking** connections
-- **Compromised dependencies** attempting to communicate with command-and-control servers
+buildcage blocks outbound connections to domains not on your allowlist during Docker builds. This helps mitigate scenarios such as:
+
+- **Data exfiltration** — prevents build secrets (e.g., environment variables, tokens) from being sent to external servers
+- **Command-and-control (C2) communication** — blocks compromised dependencies from phoning home to attacker-controlled servers
+- **Unexpected telemetry** — stops analytics, tracking, or other undisclosed network calls that packages may make during installation
 
 ### Security Mechanisms
 
