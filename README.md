@@ -13,18 +13,10 @@ You define a list of allowed domains, and only connections to those domains are 
 
 ## Why Use buildcage?
 
-### The Problem
-
 When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, these commands can connect to any server on the internet. **You have no visibility or control over where they connect.**
 
-### Types of Supply Chain Threats
+buildcage solves this by restricting outbound network access during builds to only the domains you explicitly allow.
 
-- **Supply chain attacks**: Malicious or compromised dependencies can make unauthorized outbound connections during builds (as seen in the event-stream incident)
-- **Data exfiltration**: Environment variables, source code, or secrets could be sent to external servers during builds
-- **Typosquatting attacks**: Installing a misspelled package name that redirects to attacker-controlled servers
-- **Unauthorized tracking**: Analytics or telemetry sent without your consent
-
----
 
 ## How It Works
 
