@@ -44,7 +44,7 @@ When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, these c
     - Your build logs show exactly what was blocked
     - The report step fails if blocked connections are detected, causing the workflow to fail
 
-**Two modes available** (see [Operation Modes](#operation-modes) for details):
+**Two modes available** (see [Usage with GitHub Actions](#usage-with-github-actions) for details):
 
 - **Audit mode**: Records all network destinations during builds, useful for creating allowlists.
 - **Restrict mode**: Allows access only to permitted domains, blocking everything else.
@@ -82,7 +82,11 @@ When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, these c
 
 ### First-Time Setup (Recommended Workflow)
 
-Using buildcage in GitHub Actions involves three workflow steps: (1) start the buildcage container, which runs BuildKit inside a network-controlled environment; (2) configure Docker Buildx to use the buildcage container as a remote builder; (3) run your build as usual. Your Dockerfile and build commands stay the same — only the builder backend changes.
+Using buildcage in GitHub Actions involves three workflow steps:
+
+1. Start the buildcage container (runs BuildKit inside a network-controlled environment)
+2. Configure Docker Buildx to use the buildcage container as a remote builder
+3. Run your build as usual — your Dockerfile and build commands stay the same
 
 #### Step 1: Discover what domains your build needs (Audit Mode)
 
@@ -113,7 +117,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: false
+          push: false  # Set to true to push the built image
 
       - name: Show what domains were accessed
         if: always()
@@ -124,22 +128,11 @@ jobs:
 
 #### Step 2: Check the report
 
-The report will show output like:
+The report action outputs a Job Summary showing every domain your build contacted:
 
-```
-Accessed hosts summary:
-------------------------------------
-🔍 Audited hosts (audit mode - all logged):
+<img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="835">
 
- 23 x registry.npmjs.org:443
-  8 x github.com:443
-  4 x objects.githubusercontent.com:443
-  2 x api.github.com:443
-  1 x fonts.googleapis.com:443
-  1 x deb.debian.org:80
-```
-
-Copy these domain names into `allowed_https_domains` for Step 3.
+Copy these domain names into `allowed_https_domains` or `allowed_http_domains` for Step 3.
 
 #### Step 3: Create your allowlist and switch to restrict mode
 
@@ -161,11 +154,7 @@ jobs:
           proxy_mode: restrict  # Block everything except allowed domains
           allowed_https_domains: >-
             registry.npmjs.org,
-            github.com,
-            objects.githubusercontent.com,
-            api.github.com,
-            fonts.googleapis.com,
-            deb.debian.org
+            fonts.googleapis.com
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -177,7 +166,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: false  # Set to true (or use a registry) to push the built image
+          push: false  # Set to true to push the built image
 
       - name: Security report
         if: always()
@@ -187,69 +176,9 @@ jobs:
 
 Your builds are now protected. Any unexpected connections will be blocked and reported.
 
----
+## Usage with GitHub Actions
 
-## Operation Modes
-
-### Audit Mode (PROXY_MODE=audit)
-
-**When to use:** First-time setup, adding new dependencies, or investigating issues.
-
-**What it does:**
-- Allows all HTTP/HTTPS connections
-- Logs every domain accessed during the build
-- Does NOT block anything
-
-**Example log output:**
-
-```
-▼ HTTP Proxy communication logs
-[28/Jan/2026:10:15:32 +0000] [AUDIT] TCP 200 2345 6789 0.234 "npmjs.org:443"
-[28/Jan/2026:10:15:33 +0000] [AUDIT] TCP 200 1234 5678 0.123 "github.com:443"
-[28/Jan/2026:10:15:34 +0000] [AUDIT] HTTP 200 3456 7890 0.345 "fonts.googleapis.com:80"
-```
-
-**Next step:** Use these domains to create your allowlist for restrict mode.
-
-### Restrict Mode (PROXY_MODE=restrict)
-
-**When to use:** Production builds, CI/CD pipelines, security-critical environments.
-
-**What it does:**
-- Allows connections only to domains in `allowed_http_domains` / `allowed_https_domains`
-- Blocks all other connections
-- Logs allowed and blocked attempts
-
-**Example log output:**
-
-```
-▼ HTTP Proxy communication logs
-[28/Jan/2026:10:15:30 +0000] [ALLOWED] TCP 200 1234 5678 0.123 "npmjs.org:443"
-[28/Jan/2026:10:15:31 +0000] [BLOCKED] TCP 502 0 0 0.001 "malicious-tracker.com:443"
-```
-
-The report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false` in the report action.
-
-**Example report output when connections are blocked:**
-
-```
-Accessed hosts summary:
-------------------------------------
-✅ Allowed hosts (proxied to real servers):
-
- 23 x registry.npmjs.org:443
-  8 x github.com:443
-
-❌ Blocked hosts (rejected):
-
-  1 x malicious-tracker.com:443
-```
-
-## Usage
-
-### GitHub Actions
-
-#### Setup Action
+### Setup Action
 
 Starts the buildcage builder container.
 
@@ -262,7 +191,27 @@ Starts the buildcage builder container.
     allowed_https_domains: registry.npmjs.org,github.com
 ```
 
-##### Parameters
+#### Operation Modes
+
+##### Audit Mode (`proxy_mode: audit`)
+
+**When to use:** First-time setup, adding new dependencies, or investigating issues.
+
+**What it does:**
+- Allows all HTTP/HTTPS connections
+- Logs every domain accessed during the build
+- Does NOT block anything
+
+##### Restrict Mode (`proxy_mode: restrict`)
+
+**When to use:** Production builds, CI/CD pipelines, security-critical environments.
+
+**What it does:**
+- Allows connections only to domains in `allowed_http_domains` / `allowed_https_domains`
+- Blocks all other connections
+- Logs allowed and blocked attempts
+
+#### Parameters
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
@@ -273,13 +222,23 @@ Starts the buildcage builder container.
 | `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated, without port) |
 | `port` | No | `1234` | BuildKit endpoint port on localhost |
 
-##### Outputs
+#### Outputs
 
 | Name | Description |
 |------|-------------|
 | `port` | BuildKit endpoint port |
 
-##### Tips
+Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup-buildx-action) to use buildcage as a remote builder:
+
+```yaml
+- name: Set up Docker Buildx
+  uses: docker/setup-buildx-action@v3
+  with:
+    driver: remote
+    endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+```
+
+#### Tips
 
 - Start with audit mode to discover required domains, then switch to restrict mode.
 - Wildcard domains are supported (e.g., `*.github.com` matches all subdomains of `github.com`).
@@ -292,7 +251,7 @@ Starts the buildcage builder container.
   allowed_https_domains: registry.npmjs.org
   ```
 
-#### Report Action
+### Report Action
 
 Displays communication logs after builds and optionally fails if any BLOCKED connections are found.
 
@@ -302,51 +261,27 @@ Displays communication logs after builds and optionally fails if any BLOCKED con
   uses: dash14/buildcage/report@v1
 ```
 
-##### Parameters
+#### Job Summary
+
+**Audit mode:**
+
+<img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="835">
+
+Use the domain names shown in the report to create your allowlist for restrict mode.
+
+**Restrict mode:**
+
+<img src="assets/report-restrict-mode.png" alt="Outbound Traffic Report - restrict mode" width="835">
+
+The report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false`.
+
+#### Parameters
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected |
 
-### Local Usage (Without GitHub Actions)
-
-GitHub Actions inputs use lowercase names (e.g., `proxy_mode`), while environment variables for local/Docker Compose usage use uppercase (e.g., `PROXY_MODE`).
-
-#### Starting the Builder
-
-**Audit mode** (log all connections):
-
-```bash
-make run_audit_mode
-```
-
-**Restrict mode** (allowlist-based):
-
-```bash
-make run_restrict_mode
-```
-
-**Start with custom domains**:
-
-```bash
-ALLOWED_HTTPS_DOMAINS="github.com,npmjs.org,example.com" make run_restrict_mode
-```
-
-#### End-to-End Local Workflow
-
-```bash
-# 1. Start buildcage
-make run_audit_mode
-
-# 2. Build
-docker buildx build --builder buildcage --progress=plain -f Dockerfile .
-
-# 3. View report
-docker compose logs builder
-
-# 4. Clean up
-make clean
-```
+---
 
 ## Architecture
 
@@ -476,7 +411,7 @@ Given these implementation costs versus the strict preconditions for the attack 
 
 **Mitigation strategies:**
 
-- **Keep allowed domains to a minimum** — Only specify the domains you need in `ALLOWED_HTTP_DOMAINS` / `ALLOWED_HTTPS_DOMAINS`.
+- **Keep allowed domains to a minimum** — Only specify the domains you need in `allowed_http_domains` / `allowed_https_domains`.
 - **Be specific with allowed domains** — Avoid broad wildcard CDN domains (e.g., `*.cdn.example.com`) when possible.
 - **Use service-specific domains** — Prefer `registry.npmjs.org` over generic CDN wildcard domains.
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
@@ -496,7 +431,7 @@ A: Yes! buildcage works seamlessly with multi-stage Dockerfiles.
 
 **Q: Does this work with private package registries?**
 
-A: Yes. Just add your private registry's domain to `ALLOWED_HTTPS_DOMAINS`.
+A: Yes. Just add your private registry's domain to `allowed_https_domains`.
 
 **Q: What happens if I forget to add a required domain?**
 
@@ -506,15 +441,19 @@ A: In restrict mode, the build will fail with a clear error message. Run in audi
 
 A: Yes. Prefix wildcards like `*.example.com` are supported and will match all subdomains (e.g., `sub.example.com`, `deep.sub.example.com`). Note that `*.example.com` does not match `example.com` itself—add both if needed. Suffix wildcards (e.g., `example.*`) are not supported.
 
+**Q: Do I need to clean up the buildcage container?**
+
+A: No. The container is automatically removed when the GitHub Actions job completes.
+
 **Q: Does this protect against malicious code execution?**
 
 A: No. buildcage only controls network access. It doesn't prevent malicious code from running—it prevents that code from communicating with external servers.
 
 ## Troubleshooting
 
-If you encounter issues:
+If you encounter issues, try reproducing the problem locally to get detailed logs:
 
-1. **Check logs first:**
+1. **Check logs:**
    ```bash
    docker compose logs builder
    ```
@@ -604,6 +543,46 @@ Fields: `[timestamp] [status] protocol http_status bytes_sent bytes_received dur
     ├── helpers.sh             # Test helpers
     ├── test-server/           # Test HTTP server
     └── test-dns/              # Test DNS server
+```
+
+### Local Usage (without GitHub Actions)
+
+GitHub Actions inputs use lowercase names (e.g., `proxy_mode`), while environment variables for local/Docker Compose usage use uppercase (e.g., `PROXY_MODE`).
+
+#### Starting the Builder
+
+**Audit mode** (log all connections):
+
+```bash
+make run_audit_mode
+```
+
+**Restrict mode** (allowlist-based):
+
+```bash
+make run_restrict_mode
+```
+
+**Start with custom domains**:
+
+```bash
+ALLOWED_HTTPS_DOMAINS="github.com,npmjs.org,example.com" make run_restrict_mode
+```
+
+#### End-to-End Local Workflow
+
+```bash
+# 1. Start buildcage
+make run_audit_mode
+
+# 2. Build
+docker buildx build --builder buildcage --progress=plain -f Dockerfile .
+
+# 3. View report
+docker compose logs builder
+
+# 4. Clean up
+make clean
 ```
 
 ## Contributing
