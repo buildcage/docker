@@ -272,8 +272,8 @@ Starts the buildcage builder container.
 | `buildcage_image` | No | `ghcr.io/dash14/buildcage` | Docker image name |
 | `buildcage_version` | No | `1` | Image tag |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
-| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated) |
-| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated) |
+| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated, without port) |
+| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated, without port) |
 | `port` | No | `1234` | BuildKit endpoint port on localhost |
 
 ##### Outputs
@@ -345,7 +345,7 @@ make run_audit_mode
 docker buildx build --builder buildcage --progress=plain -f Dockerfile .
 
 # 3. View report
-./report/report.sh
+docker compose logs builder
 
 # 4. Clean up
 make clean
@@ -523,7 +523,7 @@ If you encounter issues:
    make clean
    make run_audit_mode
    docker buildx build --builder buildcage --no-cache -f Dockerfile .
-   ./report/report.sh
+   docker compose logs builder
    ```
 
 3. **Open an issue** at [github.com/dash14/buildcage/issues](https://github.com/dash14/buildcage/issues) with:
@@ -547,7 +547,7 @@ make test_restrict_mode
 
 ```bash
 # All communication logs
-./report/report.sh
+docker compose logs builder
 
 # Real-time log monitoring
 docker compose logs -f builder
@@ -583,7 +583,7 @@ Fields: `[timestamp] [status] protocol http_status bytes_sent bytes_received dur
 │   └── compose.yml            # Compose config for GitHub Actions (with image tag)
 ├── report/
 │   ├── action.yml             # GitHub Action: dash14/buildcage/report@v1
-│   └── report.sh              # Log analysis script
+│   └── main.mjs               # Log analysis and Job Summary output
 ├── compose.yml                # Docker Compose config
 ├── compose.test.yml           # Test override config
 ├── Makefile                   # Operational commands

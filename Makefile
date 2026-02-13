@@ -47,7 +47,7 @@ test_restrict_mode: ## Run restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.restrict test/ \
 	  --load -t buildcage-test
-	@./report/report.sh || true
+	@node report/main.mjs ./compose.yml || true
 	@./test/assert-restrict-mode.sh
 	@$(MAKE) clean
 
@@ -61,6 +61,6 @@ test_audit_mode: ## Run audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.audit test/ \
 	  --load -t buildcage-test
-	@./report/report.sh || true
+	@node report/main.mjs ./compose.yml
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean

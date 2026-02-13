@@ -8,16 +8,5 @@ inputs:
     default: 'true'
 
 runs:
-  using: composite
-  steps:
-    - name: Show proxy report
-      shell: bash
-      env:
-        COMPOSE_FILE: ${{ github.action_path }}/../setup/compose.yml
-        FAIL_ON_BLOCKED: ${{ inputs.fail_on_blocked }}
-      run: |
-        "${{ github.action_path }}/report.sh" || {
-          if [ "$FAIL_ON_BLOCKED" = "true" ]; then
-            exit 1
-          fi
-        }
+  using: node24
+  main: main.mjs

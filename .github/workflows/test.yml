@@ -73,7 +73,7 @@ jobs:
 
       - name: Show logs
         if: always()
-        run: ./report/report.sh || true
+        run: node report/main.mjs ./compose.yml || true
 
       - name: Run assertions
         run: ${{ matrix.assert_script }}
