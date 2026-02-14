@@ -1,0 +1,51 @@
+name: Image Security Scan
+run-name: Image Security Scan (${{ github.event_name == 'schedule' && 'latest' || github.ref_name }})
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        if: github.event_name == 'workflow_dispatch'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        if: github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: docker
+          load: true
+          tags: buildcage:scan
+
+      - name: Scan image with Trivy
+        id: trivy-scan
+        uses: aquasecurity/trivy-action@0.34.0
+        with:
+          image-ref: ${{ github.event_name == 'schedule' && format('ghcr.io/{0}:latest', github.repository) || 'buildcage:scan' }}
+          ignore-unfixed: true
+          scanners: vuln
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif

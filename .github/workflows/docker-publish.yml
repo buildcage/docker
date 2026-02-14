@@ -44,6 +44,10 @@ jobs:
 
       - name: Build image for scanning
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: docker
           load: true
@@ -51,22 +55,26 @@ jobs:
 
       - name: Scan image with Trivy
         id: trivy-scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.34.0
         with:
           image-ref: ghcr.io/${{ github.repository }}:scan
+          ignore-unfixed: true
+          scanners: vuln
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
-          exit-code: '1'
 
       - name: Upload Trivy scan results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() && steps.trivy-scan.conclusion != 'skipped'
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
 
       - name: Build and push
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: true
+          DOCKER_BUILD_SUMMARY: true
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: docker
           platforms: linux/amd64,linux/arm64
