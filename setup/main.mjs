@@ -26,6 +26,8 @@ execFileSync(
       PROXY_MODE: process.env.INPUT_PROXY_MODE || "restrict",
       ALLOWED_HTTP_DOMAINS: process.env.INPUT_ALLOWED_HTTP_DOMAINS || "",
       ALLOWED_HTTPS_DOMAINS: process.env.INPUT_ALLOWED_HTTPS_DOMAINS || "",
+      HTTP_PORTS: process.env.INPUT_HTTP_PORTS || "80",
+      HTTPS_PORTS: process.env.INPUT_HTTPS_PORTS || "443",
       BUILDCAGE_IMAGE: process.env.INPUT_BUILDCAGE_IMAGE || `ghcr.io/${process.env.GITHUB_REPOSITORY}`.toLowerCase(),
       BUILDCAGE_VERSION: process.env.INPUT_BUILDCAGE_VERSION || "1",
       PORT: process.env.INPUT_PORT || "1234",

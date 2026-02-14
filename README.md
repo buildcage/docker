@@ -196,6 +196,8 @@ Starts the buildcage builder container.
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
 | `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated, without port) |
 | `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated, without port) |
+| `http_ports` | No | `80` | Comma-separated HTTP listen ports for the proxy |
+| `https_ports` | No | `443` | Comma-separated HTTPS listen ports for the proxy |
 | `port` | No | `1234` | BuildKit endpoint port on localhost |
 
 #### Outputs
@@ -245,6 +247,13 @@ Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup
   ```yaml
   allowed_http_domains: deb.debian.org
   allowed_https_domains: registry.npmjs.org
+  ```
+
+- If your build needs to listen on non-standard ports (e.g., an application server on port 8080), add them with `http_ports` / `https_ports`:
+
+  ```yaml
+  http_ports: "80,8080"
+  https_ports: "443,8443"
   ```
 
 ### Report Action

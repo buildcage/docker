@@ -22,6 +22,14 @@ inputs:
     description: "Comma-separated allowed HTTPS domains"
     required: false
     default: ''
+  http_ports:
+    description: "Comma-separated HTTP listen ports for the proxy (e.g. 80,8080)"
+    required: false
+    default: '80'
+  https_ports:
+    description: "Comma-separated HTTPS listen ports for the proxy (e.g. 443,8443)"
+    required: false
+    default: '443'
   port:
     description: "BuildKit endpoint port on localhost"
     required: false
