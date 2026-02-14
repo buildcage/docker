@@ -5,7 +5,7 @@
 
 **A secure Docker build environment that prevents supply chain attacks by restricting outbound network access during image builds.**
 
-buildcage is a Docker container that runs a custom BuildKit builder. When you configure Docker Buildx to use buildcage as a remote builder, all network traffic from `RUN` steps in your Dockerfile is routed through an internal proxy that can log and block connections based on domain name.
+buildcage is a GitHub Actions-ready Docker container that runs a custom BuildKit builder. When you configure Docker Buildx to use buildcage as a remote builder, all network traffic from `RUN` steps in your Dockerfile is routed through an internal proxy that can log and block connections based on domain name.
 
 You define a list of allowed domains, and only connections to those domains are permitted during builds — everything else is blocked.
 
@@ -20,23 +20,32 @@ buildcage solves this by restricting outbound network access during builds to on
 
 ## How It Works
 
-1. **You define allowed domains**
+buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drivers/remote/) for Docker Buildx. All `RUN` step containers are placed on an isolated network, and outbound traffic is routed through a proxy that enforces your allowlist.
 
-    ```yaml
-    allowed_https_domains: registry.npmjs.org,github.com
-    ```
+```
+┌─ Docker Buildx (remote driver) ───────────────────────────┐
+│                                                           │
+│  buildcage container                                      │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │                                                     │  │
+│  │  buildkitd ──→ internet (image pull only)           │  │
+│  │                                                     │  │
+│  │  ┌─────────────────┐    ┌───────────────────────┐   │  │
+│  │  │ RUN step        │───→│ Proxy (nginx)         │   │  │
+│  │  │ (isolated net)  │    │                       │   │  │
+│  │  │ npm install,    │    │ allowed domain?       │   │  │
+│  │  │ apt-get, etc.   │    │  ✅ → internet        │   │  │
+│  │  └─────────────────┘    │  ❌ → blocked + logged│   │  │
+│  │                         └───────────────────────┘   │  │
+│  └─────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────┘
+```
 
-2. **buildcage acts as a gatekeeper**
-    - All outbound connections from `RUN` steps go through buildcage's proxy
-    - Only requests to allowed domains pass through
-    - Everything is logged
+- HTTPS: SNI (Server Name Indication) for domain matching — TLS is not terminated
+- HTTP: Host header for domain matching
+- Direct IP access: blocked by iptables
 
-3. **Everything else is blocked**
-    - Malicious packages cannot contact external servers
-    - Your build logs show exactly what was blocked
-    - The report step fails if blocked connections are detected, causing the workflow to fail
-
-**Two modes available** (see [Usage with GitHub Actions](#usage-with-github-actions) for details):
+**Two modes available** (see [Reference](#reference) for details):
 
 - **Audit mode**: Records all network destinations during builds, useful for creating allowlists.
 - **Restrict mode**: Allows access only to permitted domains, blocking everything else.
@@ -57,12 +66,12 @@ buildcage solves this by restricting outbound network access during builds to on
 
 ## Features
 
-- 🔒 **Network isolation**: Isolates network access for each `RUN` step using CNI (Container Network Interface)
-- 📊 **Detailed logging**: Complete visibility into all network connections during builds
-- 🚀 **GitHub Actions support**: Available as a reusable action for CI/CD pipelines
+- 🚀 **GitHub Actions support**: Available as reusable actions for CI/CD pipelines
 - ✅ **Zero Dockerfile changes**: Works with existing Dockerfiles without modification
+- 🔒 **Network isolation**: Isolates network access for each `RUN` step using CNI (Container Network Interface)
 - 🔍 **Audit mode**: Discover dependencies before enforcing restrictions
 - 🛡️ **Restrict mode**: Production-ready access control
+- 📊 **Detailed logging**: Complete visibility into all network connections during builds
 
 ## Quick Start
 
@@ -172,9 +181,9 @@ See the [complete example workflow](.github/workflows/example-restrict.yml).
 
 Your builds are now protected. Any unexpected connections will be blocked and reported.
 
-## Usage with GitHub Actions
+## Reference
 
-### Setup Action
+### Setup Action (`dash14/buildcage/setup`)
 
 Starts the buildcage builder container.
 
@@ -256,7 +265,7 @@ Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup
   https_ports: "443,8443"
   ```
 
-### Report Action
+### Report Action (`dash14/buildcage/report`)
 
 Displays communication logs after builds and optionally fails if any BLOCKED connections are found.
 
