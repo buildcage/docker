@@ -14,6 +14,11 @@ RUN apk add --no-cache curl gettext && \
 # Final image
 FROM moby/buildkit:${BUILDKIT_VERSION}
 
+LABEL org.opencontainers.image.title="buildcage" \
+      org.opencontainers.image.description="Secure Docker build environment with network access control" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/dash14/buildcage"
+
 RUN apk add --no-cache \
       nginx nginx-mod-stream \
       dnsmasq \
