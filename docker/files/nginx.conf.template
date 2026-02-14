@@ -109,12 +109,10 @@ ${NGINX_HTTP_LISTEN_DEFAULT}
         }
     }
 
-    # Localhost-only server (for health checks)
+    # Health check (fixed port, localhost only)
     server {
-${NGINX_HTTP_LISTEN}
-        server_name localhost 127.0.0.1;
+        listen unix:/var/run/nginx-health.sock;
 
-        # Health check
         location /health {
             access_log off;
             return 200 "OK\n";

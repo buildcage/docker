@@ -15,7 +15,7 @@ services:
       - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-8.8.8.8 8.8.4.4 valid=300s}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget -qO /dev/null http://127.0.0.1/health && nc -z 127.0.0.1 1234"]
+      test: ["CMD", "sh", "-c", "curl -sf --unix-socket /var/run/nginx-health.sock http://localhost/health && nc -z 127.0.0.1 1234"]
       interval: 30s
       timeout: 5s
       retries: 10

@@ -17,7 +17,8 @@ FROM moby/buildkit:${BUILDKIT_VERSION}
 RUN apk add --no-cache \
       nginx nginx-mod-stream \
       dnsmasq \
-      iptables
+      iptables \
+      curl
 
 # envsubst
 COPY --from=deps /usr/bin/envsubst /usr/bin/envsubst
