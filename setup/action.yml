@@ -3,9 +3,8 @@ description: Start buildcage builder container
 
 inputs:
   buildcage_image:
-    description: "Docker image name (e.g. ghcr.io/dash14/buildcage, dash14/buildcage)"
+    description: "Docker image name (default: ghcr.io/<owner>/<repo>)"
     required: false
-    default: 'ghcr.io/dash14/buildcage'
   buildcage_version:
     description: "Image tag"
     required: false
