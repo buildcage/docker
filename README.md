@@ -22,7 +22,7 @@ buildcage solves this by restricting outbound network access during builds to on
 
 buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drivers/remote/) for Docker Buildx. All `RUN` step containers are placed on an isolated network, and outbound traffic is routed through a proxy that enforces your allowlist.
 
-```
+```text
 ┌─ Docker Buildx (remote driver) ───────────────────────────┐
 │                                                           │
 │  buildcage container                                      │
@@ -34,8 +34,8 @@ buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drive
 │  │  │ RUN step        │───→│ Proxy (nginx)         │   │  │
 │  │  │ (isolated net)  │    │                       │   │  │
 │  │  │ npm install,    │    │ allowed domain?       │   │  │
-│  │  │ apt-get, etc.   │    │  ✅ → internet        │   │  │
-│  │  └─────────────────┘    │  ❌ → blocked + logged│   │  │
+│  │  │ apt-get, etc.   │    │  Yes → internet       │   │  │
+│  │  └─────────────────┘    │  No  → blocked+logged │   │  │
 │  │                         └───────────────────────┘   │  │
 │  └─────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────┘
@@ -203,23 +203,22 @@ Starts the buildcage builder container.
 | `buildcage_image` | No | `ghcr.io/<owner>/<repo>` | Docker image name |
 | `buildcage_version` | No | `1` | Image tag |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
-| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated, without port). See [Domain matching patterns](#domain-matching-patterns) below |
-| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated, without port). See [Domain matching patterns](#domain-matching-patterns) below |
+| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated, without port) |
+| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated, without port) |
 | `http_ports` | No | `80` | Comma-separated HTTP listen ports for the proxy |
 | `https_ports` | No | `443` | Comma-separated HTTPS listen ports for the proxy |
 | `port` | No | `1234` | BuildKit endpoint port on localhost |
 
-##### Domain matching patterns
+**Domain matching patterns**
 
-Domain values use nginx's [`map`](https://nginx.org/en/docs/http/ngx_http_map_module.html) directive with the `hostnames` parameter, supporting several patterns:
+The following patterns are supported for domain values:
 
 | Pattern | Example | Matches |
 |---------|---------|---------|
-| Exact domain | `registry.npmjs.org` | Only `registry.npmjs.org` |
+| Exact domain | `www.example.com` | Only `www.example.com` |
 | Prefix wildcard | `*.example.com` | `sub.example.com`, `deep.sub.example.com` (not `example.com` itself) |
 | Dot-prefix shorthand | `.example.com` | Both `example.com` and `*.example.com` |
 | Suffix wildcard | `example.*` | `example.com`, `example.io`, `example.org`, etc. |
-| Regex | `~^.*\.amazonaws\.com$` | Full PCRE regex (prefix with `~`) |
 
 #### Outputs
 
@@ -332,7 +331,7 @@ buildcage creates a controlled network environment for your Docker builds:
 
 ### Architecture Diagram
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────┐
 │ Builder container (privileged, single container)                 │
 │                                                                  │
