@@ -203,11 +203,23 @@ Starts the buildcage builder container.
 | `buildcage_image` | No | `ghcr.io/<owner>/<repo>` | Docker image name |
 | `buildcage_version` | No | `1` | Image tag |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
-| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated, without port) |
-| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated, without port) |
+| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated, without port). See [Domain matching patterns](#domain-matching-patterns) below |
+| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated, without port). See [Domain matching patterns](#domain-matching-patterns) below |
 | `http_ports` | No | `80` | Comma-separated HTTP listen ports for the proxy |
 | `https_ports` | No | `443` | Comma-separated HTTPS listen ports for the proxy |
 | `port` | No | `1234` | BuildKit endpoint port on localhost |
+
+##### Domain matching patterns
+
+Domain values use nginx's [`map`](https://nginx.org/en/docs/http/ngx_http_map_module.html) directive with the `hostnames` parameter, supporting several patterns:
+
+| Pattern | Example | Matches |
+|---------|---------|---------|
+| Exact domain | `registry.npmjs.org` | Only `registry.npmjs.org` |
+| Prefix wildcard | `*.example.com` | `sub.example.com`, `deep.sub.example.com` (not `example.com` itself) |
+| Dot-prefix shorthand | `.example.com` | Both `example.com` and `*.example.com` |
+| Suffix wildcard | `example.*` | `example.com`, `example.io`, `example.org`, etc. |
+| Regex | `~^.*\.amazonaws\.com$` | Full PCRE regex (prefix with `~`) |
 
 #### Outputs
 
@@ -248,7 +260,6 @@ Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup
 #### Tips
 
 - Start with audit mode to discover required domains, then switch to restrict mode.
-- Wildcard domains are supported (e.g., `*.github.com` matches all subdomains of `github.com`).
 - Separate HTTP and HTTPS domains — some services use different hosts for each protocol.
 - Common package registries often use multiple domains (e.g., PyPI uses both `pypi.org` and `files.pythonhosted.org`).
 - Some package managers download over plain HTTP (e.g., certain Debian mirrors). Add those domains to `allowed_http_domains` separately:
@@ -450,10 +461,6 @@ A: Yes. Just add your private registry's domain to `allowed_https_domains`.
 **Q: What happens if I forget to add a required domain?**
 
 A: In restrict mode, the build will fail with a clear error message. Run in audit mode first to discover all required domains.
-
-**Q: Can I use wildcards in domain names?**
-
-A: Yes. Prefix wildcards like `*.example.com` are supported and will match all subdomains (e.g., `sub.example.com`, `deep.sub.example.com`). Note that `*.example.com` does not match `example.com` itself—add both if needed. Suffix wildcards (e.g., `example.*`) are not supported.
 
 **Q: Do I need to clean up the buildcage container?**
 
