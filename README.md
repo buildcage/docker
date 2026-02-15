@@ -22,24 +22,7 @@ buildcage solves this by restricting outbound network access during builds to on
 
 buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drivers/remote/) for Docker Buildx. All `RUN` step containers are placed on an isolated network, and outbound traffic is routed through a proxy that enforces your allowlist.
 
-```text
-┌─ Docker Buildx (remote driver) ───────────────────────────┐
-│                                                           │
-│  buildcage container                                      │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │                                                     │  │
-│  │  buildkitd ──→ internet (image pull only)           │  │
-│  │                                                     │  │
-│  │  ┌─────────────────┐    ┌───────────────────────┐   │  │
-│  │  │ RUN step        │───→│ Proxy (nginx)         │   │  │
-│  │  │ (isolated net)  │    │                       │   │  │
-│  │  │ npm install,    │    │ allowed domain?       │   │  │
-│  │  │ apt-get, etc.   │    │  Yes → internet       │   │  │
-│  │  └─────────────────┘    │  No  → blocked+logged │   │  │
-│  │                         └───────────────────────┘   │  │
-│  └─────────────────────────────────────────────────────┘  │
-└───────────────────────────────────────────────────────────┘
-```
+<img src="assets/diagram-overview.png" alt="How buildcage works" width="544" height="328">
 
 - HTTPS: SNI (Server Name Indication) for domain matching — TLS is not terminated
 - HTTP: Host header for domain matching
@@ -331,37 +314,7 @@ buildcage creates a controlled network environment for your Docker builds:
 
 ### Architecture Diagram
 
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│ Builder container (privileged, single container)                 │
-│                                                                  │
-│  ┌──────────────────────────┐                                    │
-│  │ buildkitd (PID 1)        │──→ internet (image pull)           │
-│  │ --oci-worker-net=cni     │                                    │
-│  └──────────────────────────┘                                    │
-│                                                                  │
-│  ┌──────────────────────────┐  ┌──────────────────────────────┐  │
-│  │ dnsmasq                  │  │ nginx                        │  │
-│  │ all domains → 172.20.0.1 │  │ HTTP proxy (port 80)         │  │
-│  │ port 53                  │  │ HTTPS stream proxy (port 443)│  │
-│  └──────────────────────────┘  │ Allow/Block based on         │  │
-│              ↑                 │   SNI (HTTPS) / Host (HTTP)  │  │
-│              │ DNS             │          ↓                   │  │
-│              │                 │ internet (allowed domains)   │  │
-│              │                 └──────────────────────────────┘  │
-│   ···········│·· buildkit0 bridge (172.20.0.1) ··················│
-│              │                    ↑                              │
-│  ┌───────────┴────────────────────┴────────┐                     │
-│  │ RUN Step containers (CNI isolated-net)  │                     │
-│  │ IP: 172.20.0.100 - 172.20.0.200         │                     │
-│  │                                         │                     │
-│  │ DNS → 172.20.0.1:53 (dnsmasq)           │                     │
-│  │ HTTP/HTTPS → 172.20.0.1 (nginx)         │                     │
-│  │ Other traffic → blocked (iptables)      │                     │
-│  └─────────────────────────────────────────┘                     │
-└──────────────────────────────────────────────────────────────────┘
-```
-
+<img src="assets/diagram-architecture.png" alt="buildcage architecture" width="611" height="544">
 
 All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). DNS queries are redirected to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking.
 
