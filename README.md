@@ -133,7 +133,7 @@ See the [complete example workflow](.github/workflows/example-audit.yml).
 
 The report action outputs a Job Summary showing every domain your build contacted:
 
-<img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="835">
+<img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="556">
 
 Copy these domain names into `allowed_https_domains` or `allowed_http_domains` for Step 3.
 
@@ -289,13 +289,13 @@ Displays communication logs after builds and optionally fails if any BLOCKED con
 
 **Audit mode:**
 
-<img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="835">
+<img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="556">
 
 Use the domain names shown in the report to create your allowlist for restrict mode.
 
 **Restrict mode:**
 
-<img src="assets/report-restrict-mode.png" alt="Outbound Traffic Report - restrict mode" width="835">
+<img src="assets/report-restrict-mode.png" alt="Outbound Traffic Report - restrict mode" width="556">
 
 The report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false`.
 
