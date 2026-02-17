@@ -6,6 +6,45 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "compose.yml");
 
+/**
+ * Determine the Docker image version to use.
+ * Priority: explicit input > action ref tag > fallback "1"
+ *
+ * When called as `dash14/buildcage/setup@v1.0`, GITHUB_ACTION_REF is "v1.0".
+ * Strip the "v" prefix if present, verify the image exists, then use it.
+ * For non-v refs (commit hash, branch), check image existence with raw ref.
+ * If the image doesn't exist, fall back to "1".
+ */
+function resolveVersion(image) {
+  if (process.env.INPUT_BUILDCAGE_VERSION) {
+    return process.env.INPUT_BUILDCAGE_VERSION;
+  }
+
+  const ref = process.env.GITHUB_ACTION_REF || "";
+  if (ref) {
+    // Full SHA (40 hex chars) → prefix with "sha-" to match image tag convention
+    const version = /^[0-9a-f]{40}$/i.test(ref) ? `sha-${ref.toLowerCase()}`
+      : ref.startsWith("v") ? ref.slice(1)
+      : ref;
+    try {
+      execFileSync("docker", ["manifest", "inspect", `${image}:${version}`], {
+        stdio: "pipe",
+      });
+      return version;
+    } catch {
+      // Image with this version doesn't exist; fall through
+    }
+  }
+
+  return "1";
+}
+
+const buildcageImage = (process.env.INPUT_BUILDCAGE_IMAGE
+  || `ghcr.io/${process.env.GITHUB_REPOSITORY}`).toLowerCase();
+const buildcageVersion = resolveVersion(buildcageImage);
+
+console.log(`buildcage image: ${buildcageImage}:${buildcageVersion}`);
+
 execFileSync(
   "docker",
   ["compose", "-f", composeFile, "down"],
@@ -28,8 +67,8 @@ execFileSync(
       ALLOWED_HTTPS_DOMAINS: process.env.INPUT_ALLOWED_HTTPS_DOMAINS || "",
       HTTP_PORTS: process.env.INPUT_HTTP_PORTS || "80",
       HTTPS_PORTS: process.env.INPUT_HTTPS_PORTS || "443",
-      BUILDCAGE_IMAGE: process.env.INPUT_BUILDCAGE_IMAGE || `ghcr.io/${process.env.GITHUB_REPOSITORY}`.toLowerCase(),
-      BUILDCAGE_VERSION: process.env.INPUT_BUILDCAGE_VERSION || "1",
+      BUILDCAGE_IMAGE: buildcageImage,
+      BUILDCAGE_VERSION: buildcageVersion,
       PORT: process.env.INPUT_PORT || "1234",
     },
   }
