@@ -6,17 +6,35 @@ on:
     tags:
       - "v*.*"
 
+  workflow_dispatch:
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-      security-events: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG=$(git tag --sort=-version:refname --list 'v*.*' | head -1)
+            if [ -z "$TAG" ]; then
+              echo "::error::No version tag found"
+              exit 1
+            fi
+            git checkout "$TAG"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -30,9 +48,9 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.tag }}
+            type=semver,pattern={{major}},value=${{ steps.version.outputs.tag }}
             type=raw,value=latest
 
       - name: Login to GHCR
@@ -41,33 +59,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image for scanning
-        uses: docker/build-push-action@v6
-        env:
-          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
-          DOCKER_BUILD_SUMMARY: false
-          DOCKER_BUILD_RECORD_UPLOAD: false
-        with:
-          context: docker
-          load: true
-          tags: ghcr.io/${{ github.repository }}:scan
-
-      - name: Scan image with Trivy
-        id: trivy-scan
-        uses: aquasecurity/trivy-action@0.34.0
-        with:
-          image-ref: ghcr.io/${{ github.repository }}:scan
-          ignore-unfixed: true
-          scanners: vuln
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-
-      - name: Upload Trivy scan results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: trivy-results.sarif
 
       - name: Build and push
         uses: docker/build-push-action@v6

@@ -3,6 +3,7 @@ run-name: Image Security Scan (${{ github.event_name == 'schedule' && 'latest' |
 
 on:
   schedule:
+    # Monthly on the 1st at 00:00 UTC
     - cron: '0 0 1 * *'
   workflow_dispatch:
 
