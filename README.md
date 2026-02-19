@@ -345,7 +345,7 @@ This is intentional — it ensures all traffic can be inspected and logged.
 #### DNS-Level Control
 
 - **Full redirect**: Returns the proxy IP for all DNS queries.
-- **HTTPS record rejection**: Filters DNS HTTPS (type 65) records to prevent Encrypted Client Hello (ECH), which could bypass SNI-based filtering.
+- **ECH prevention**: The internal DNS server operates without any upstream resolvers, so DNS HTTPS (type 65) records — required to initiate Encrypted Client Hello (ECH) — are never returned to build containers.
 
 #### HTTP/HTTPS Proxy Control
 
@@ -358,6 +358,44 @@ This is intentional — it ensures all traffic can be inspected and logged.
 - **CNI configuration**: Places temporary containers from BuildKit RUN steps into isolated-net (buildkit0 bridge, 172.20.0.0/24).
 - **iptables**: Drops all FORWARD from buildkit0, also blocks direct access to buildkitd API.
 - **Gateway enforcement**: All traffic must go through the proxy on 172.20.0.1.
+
+### Attack Resistance
+
+#### SNI Spoofing
+
+An attacker may attempt to set the SNI field in a TLS ClientHello to an allowed domain while actually trying to reach an unauthorized server.
+
+**Why this is prevented:** The proxy resolves the domain name presented in the SNI field using external DNS and forwards the connection to the resulting IP address. Regardless of what SNI value the client provides, the proxy always connects to the legitimate server for that domain — never to an attacker-controlled server.
+
+#### Encrypted Client Hello (ECH)
+
+TLS 1.3 Encrypted Client Hello (ECH) encrypts the true SNI, which could theoretically bypass SNI-based filtering.
+
+**Why this is prevented:** ECH requires the client to obtain ECHConfig public keys via DNS HTTPS (type 65) records. The internal DNS server has no upstream resolvers and cannot return these records, so build containers can never initiate an ECH handshake.
+
+#### DNS Tunneling
+
+An attacker may attempt to encode data into DNS queries to exfiltrate information or establish communication with external servers.
+
+**Why this is prevented:** The internal DNS server has no upstream resolvers and answers all queries locally. Additionally, iptables rules block direct DNS traffic to any external server. With no path for DNS queries to reach the outside, encoded data has no route to an attacker's infrastructure.
+
+#### Non-TCP Protocol Tunneling (ICMP, UDP, QUIC)
+
+An attacker may attempt to tunnel data using non-TCP protocols such as ICMP echo packets, raw UDP, or QUIC (HTTP/3) to bypass the proxy.
+
+**Why this is prevented:** The iptables FORWARD rule drops all traffic from the isolated network regardless of protocol — not just TCP. Since the proxy only handles TCP-based HTTP and HTTPS connections, there is no exit path for UDP or ICMP traffic. QUIC, which relies on UDP, is also blocked as a result.
+
+#### IPv6 Bypass
+
+An attacker may attempt to use IPv6 to circumvent IPv4-based iptables rules.
+
+**Why this is prevented:** Equivalent ip6tables rules drop all forwarded IPv6 traffic from the isolated network. Additionally, the internal DNS server returns an empty IPv6 address for all queries, effectively disabling IPv6 name resolution within build containers.
+
+#### Alternative DNS Transports (DoH / DoT)
+
+An attacker may attempt to use DNS over HTTPS (DoH) or DNS over TLS (DoT) to bypass the internal DNS server and resolve domains through encrypted channels.
+
+**Why this is prevented:** DoT uses port 853, which the proxy does not listen on — making it unreachable from the isolated network. DoH operates over HTTPS and is therefore subject to the same SNI-based allowlist check as any other HTTPS connection. Only DoH servers hosted on explicitly allowed domains could be reached, and exploiting them would require the same preconditions as domain fronting (the attacker must control infrastructure behind an allowed domain).
 
 ### Known Limitations
 
