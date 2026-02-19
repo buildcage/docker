@@ -40,7 +40,7 @@ function resolveVersion(image) {
 }
 
 const buildcageImage = (process.env.INPUT_BUILDCAGE_IMAGE
-  || `ghcr.io/${process.env.GITHUB_REPOSITORY}`).toLowerCase();
+  || `ghcr.io/${process.env.GITHUB_ACTION_REPOSITORY}`).toLowerCase();
 const buildcageVersion = resolveVersion(buildcageImage);
 
 console.log(`buildcage image: ${buildcageImage}:${buildcageVersion}`);
