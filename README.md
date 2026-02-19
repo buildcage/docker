@@ -2,6 +2,14 @@
 
 ![buildcage](./assets/banner.png)
 
+[![GitHub](https://img.shields.io/badge/GitHub-dash14%2Fbuildcage-blue?logo=github)](https://github.com/dash14/buildcage)
+![version](https://img.shields.io/github/v/release/dash14/buildcage
+)
+![build](https://img.shields.io/github/actions/workflow/status/dash14/buildcage/docker-publish.yml
+)
+![test](https://img.shields.io/github/actions/workflow/status/dash14/buildcage/test.yml?label=test)
+![license](https://img.shields.io/github/license/dash14/buildcage
+)
 
 **A secure Docker build environment that prevents supply chain attacks by restricting outbound network access during image builds.**
 
@@ -598,7 +606,7 @@ make clean
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+Contributions are welcome! Please feel free to submit issues or pull requests at [github.com/dash14/buildcage](https://github.com/dash14/buildcage).
 
 ## License
 Licensed under the MIT License.
