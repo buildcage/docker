@@ -110,7 +110,8 @@ if (isAudit) {
   }
 }
 
-markdown += "\n*Reported by [buildcage](https://github.com/dash14/buildcage)*\n";
+const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
+markdown += `\n*Reported by [buildcage](https://github.com/${actionRepo})*\n`;
 
 // Write Job Summary
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;
