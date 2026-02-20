@@ -444,33 +444,33 @@ Given these implementation costs versus the strict preconditions for the attack 
 
 ## FAQ
 
-**Q: Can I host buildcage in my own private repository?**
+- **Can I host buildcage in my own private repository?**
 
-A: Yes. You can import the repository into your organization and build the Docker image yourself. See the [Self-Hosting Guide](./docs/self-hosting.md) for details.
+  Yes. You can import the repository into your organization and build the Docker image yourself. See the [Self-Hosting Guide](./docs/self-hosting.md) for details.
 
-**Q: Does this slow down my builds?**
+- **Does this slow down my builds?**
 
-A: Minimal impact. The proxy adds negligible latency (<1ms per request). DNS caching and connection pooling keep overhead low.
+  Minimal impact. The proxy adds negligible latency (<1ms per request). DNS caching and connection pooling keep overhead low.
 
-**Q: Can I use this with multi-stage builds?**
+- **Can I use this with multi-stage builds?**
 
-A: Yes! buildcage works seamlessly with multi-stage Dockerfiles.
+  Yes. buildcage works seamlessly with multi-stage Dockerfiles.
 
-**Q: Does this work with private package registries?**
+- **Does this work with private package registries?**
 
-A: Yes. Just add your private registry's domain to `allowed_https_domains`.
+  Yes. Just add your private registry's domain to `allowed_https_domains`.
 
-**Q: What happens if I forget to add a required domain?**
+- **What happens if I forget to add a required domain?**
 
-A: In restrict mode, the build will fail with a clear error message. Run in audit mode first to discover all required domains.
+  In restrict mode, the build will fail with a clear error message. Run in audit mode first to discover all required domains.
 
-**Q: Do I need to clean up the buildcage container?**
+- **Do I need to clean up the buildcage container?**
 
-A: No. The container is automatically removed when the GitHub Actions job completes.
+  No. The container is automatically removed when the GitHub Actions job completes.
 
-**Q: Does this protect against malicious code execution?**
+- **Does this protect against malicious code execution?**
 
-A: No. buildcage only controls network access. It doesn't prevent malicious code from running—it prevents that code from communicating with external servers.
+  No. buildcage only controls network access. It doesn't prevent malicious code from running—it prevents that code from communicating with external servers.
 
 ## Troubleshooting
 
