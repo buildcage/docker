@@ -444,6 +444,10 @@ Given these implementation costs versus the strict preconditions for the attack 
 
 ## FAQ
 
+**Q: Can I host buildcage in my own private repository?**
+
+A: Yes. You can import the repository into your organization and build the Docker image yourself. See the [Self-Hosting Guide](./docs/self-hosting.md) for details.
+
 **Q: Does this slow down my builds?**
 
 A: Minimal impact. The proxy adds negligible latency (<1ms per request). DNS caching and connection pooling keep overhead low.
