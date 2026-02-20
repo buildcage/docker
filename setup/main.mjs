@@ -45,10 +45,22 @@ const buildcageVersion = resolveVersion(buildcageImage);
 
 console.log(`buildcage image: ${buildcageImage}:${buildcageVersion}`);
 
+const composeEnv = {
+  ...process.env,
+  PROXY_MODE: process.env.INPUT_PROXY_MODE || "restrict",
+  ALLOWED_HTTP_DOMAINS: process.env.INPUT_ALLOWED_HTTP_DOMAINS || "",
+  ALLOWED_HTTPS_DOMAINS: process.env.INPUT_ALLOWED_HTTPS_DOMAINS || "",
+  HTTP_PORTS: process.env.INPUT_HTTP_PORTS || "80",
+  HTTPS_PORTS: process.env.INPUT_HTTPS_PORTS || "443",
+  BUILDCAGE_IMAGE: buildcageImage,
+  BUILDCAGE_VERSION: buildcageVersion,
+  PORT: process.env.INPUT_PORT || "1234",
+};
+
 execFileSync(
   "docker",
   ["compose", "-f", composeFile, "down"],
-  { stdio: "inherit" }
+  { stdio: "inherit", env: composeEnv }
 );
 
 execFileSync(
@@ -58,20 +70,7 @@ execFileSync(
     "-f", composeFile,
     "up", "-d", "--pull", "always", "--no-build", "--wait",
   ],
-  {
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      PROXY_MODE: process.env.INPUT_PROXY_MODE || "restrict",
-      ALLOWED_HTTP_DOMAINS: process.env.INPUT_ALLOWED_HTTP_DOMAINS || "",
-      ALLOWED_HTTPS_DOMAINS: process.env.INPUT_ALLOWED_HTTPS_DOMAINS || "",
-      HTTP_PORTS: process.env.INPUT_HTTP_PORTS || "80",
-      HTTPS_PORTS: process.env.INPUT_HTTPS_PORTS || "443",
-      BUILDCAGE_IMAGE: buildcageImage,
-      BUILDCAGE_VERSION: buildcageVersion,
-      PORT: process.env.INPUT_PORT || "1234",
-    },
-  }
+  { stdio: "inherit", env: composeEnv }
 );
 
 // Set action output
