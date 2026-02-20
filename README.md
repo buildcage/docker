@@ -378,6 +378,10 @@ The only known bypass is **domain fronting** — a technique where an attacker s
 
   No. The container is automatically removed when the GitHub Actions job completes.
 
+- **Can I allow access to an IP address (e.g., `http://192.168.1.1`)?**
+
+  No. Currently, only domain-based URLs are supported in the allowlist. Direct IP address access is blocked. If there is demand for this feature, it may be considered in a future release.
+
 - **Does this protect against malicious code execution?**
 
   No. buildcage only controls network access. It doesn't prevent malicious code from running—it prevents that code from communicating with external servers.
