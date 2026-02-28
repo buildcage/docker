@@ -62,3 +62,7 @@ test_audit_mode: ## Run audit mode tests
 	@node report/main.mjs ./compose.yml || true
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean
+
+.PHONY: test_unit
+test_unit: ## Run unit tests
+	@node --test setup/rules.test.mjs
