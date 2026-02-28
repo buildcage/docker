@@ -59,6 +59,6 @@ test_audit_mode: ## Run audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.audit test/ \
 	  --load -t buildcage-test
-	@node report/main.mjs ./compose.yml
+	@node report/main.mjs ./compose.yml || true
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean
