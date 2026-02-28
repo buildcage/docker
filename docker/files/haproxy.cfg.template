@@ -107,8 +107,9 @@ backend http_filter_backend
 
     # Host header check
     acl has_host hdr(host) -m found
-    http-request set-var(sess.reason) str(missing-host-header) if !has_host
-    http-request deny deny_status 400 content-type "text/plain" string "Bad Request: Missing Host Header" if !has_host
+    acl host_not_empty hdr_len(host) gt 0
+    http-request set-var(sess.reason) str(missing-host-header) if !has_host or !host_not_empty
+    http-request deny deny_status 400 content-type "text/plain" string "Bad Request: Missing Host Header" if !has_host or !host_not_empty
 
     # Build host:port key
     http-request set-var(txn.host_only) hdr(host),regsub(:.*$,)
