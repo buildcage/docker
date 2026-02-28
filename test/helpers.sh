@@ -7,10 +7,17 @@ LOGS=$(docker compose logs --no-log-prefix builder 2>/dev/null)
 assert_log_contains() {
   local marker="$1"
   local host_port="$2"
-  if echo "$LOGS" | grep buildcage | grep -q "\[$marker\].*\"$host_port\""; then
-    echo "  PASS  [$marker] $host_port"
+  local reason="${3:-}"
+  local pattern="\[$marker\].*\"$host_port\""
+  local label="[$marker] $host_port"
+  if [ -n "$reason" ]; then
+    pattern="$pattern $reason"
+    label="$label $reason"
+  fi
+  if echo "$LOGS" | grep buildcage | grep -q "$pattern"; then
+    echo "  PASS  $label"
   else
-    echo "  FAIL  [$marker] $host_port  -- not found in logs"
+    echo "  FAIL  $label  -- not found in logs"
     FAILURES=$((FAILURES + 1))
   fi
 }
