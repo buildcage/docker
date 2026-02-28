@@ -13,7 +13,7 @@ jobs:
         uses: dash14/buildcage/setup@v1
         with:
           proxy_mode: restrict
-          allowed_https_domains: registry.npmjs.org
+          allowed_https_rules: registry.npmjs.org:443
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

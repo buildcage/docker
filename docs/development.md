@@ -25,7 +25,7 @@ make run_restrict_mode
 **Start with custom domains**:
 
 ```bash
-ALLOWED_HTTPS_DOMAINS="github.com,npmjs.org,example.com" make run_restrict_mode
+ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make run_restrict_mode
 ```
 
 ### End-to-End Workflow
@@ -67,12 +67,12 @@ docker compose logs -f builder
 **Log format:**
 
 ```
-[28/Jan/2026:10:15:30 +0000] [ALLOWED] TCP 200 1234 5678 0.123 "github.com:443"
-[28/Jan/2026:10:15:31 +0000] [BLOCKED] TCP 502 0 0 0.001 "malicious.com:443"
-[28/Jan/2026:10:15:32 +0000] [AUDIT] HTTP 200 2345 6789 0.234 "npmjs.org:80"
+[28/Feb/2026:10:15:30 +0000] buildcage [ALLOWED] "github.com:443" -
+[28/Feb/2026:10:15:31 +0000] buildcage [BLOCKED] "malicious.com:443" not-allowed
+[28/Feb/2026:10:15:32 +0000] buildcage [AUDIT] "npmjs.org:80" -
 ```
 
-Fields: `[timestamp] [status] protocol http_status bytes_sent bytes_received duration "domain:port"`
+Fields: `[timestamp] buildcage [status] "domain:port" reason`
 
 ## Makefile Commands
 
@@ -91,22 +91,30 @@ Fields: `[timestamp] [status] protocol http_status bytes_sent bytes_received dur
 .
 ├── setup/
 │   ├── action.yml             # GitHub Action: dash14/buildcage/setup@v1
-│   └── compose.yml            # Compose config for GitHub Actions (with image tag)
+│   ├── compose.yml            # Compose config for GitHub Actions (with image tag)
+│   ├── main.mjs               # Setup entrypoint (rule generation, compose up)
+│   ├── post.mjs               # Post-action cleanup
+│   ├── rules.mjs              # Rule parser (wildcards, regex, ports)
+│   └── rules.test.mjs         # Unit tests for rules.mjs
 ├── report/
 │   ├── action.yml             # GitHub Action: dash14/buildcage/report@v1
 │   └── main.mjs               # Log analysis and Job Summary output
-├── docs/                      # Documents
+├── docs/
+│   ├── rules.md               # Rule format reference
+│   ├── security.md            # Security design
+│   └── self-hosting.md        # Self-hosting guide
 ├── compose.yml                # Docker Compose config
 ├── compose.test.yml           # Test override config
 ├── Makefile                   # Operational commands
 ├── docker/
-│   ├── Dockerfile             # Multi-stage BuildKit + nginx + dnsmasq
+│   ├── Dockerfile             # Multi-stage BuildKit + haproxy + dnsmasq + s6-overlay
 │   └── files/                 # Builder container config files
-│       ├── entrypoint.sh      # iptables/dnsmasq/nginx/buildkitd startup
 │       ├── buildkitd.toml     # BuildKit config
 │       ├── cni.conflist       # CNI config (isolated-net)
 │       ├── dnsmasq.conf       # DNS config (all domains → gateway)
-│       └── nginx.conf.template # Dynamic nginx config (HTTP/HTTPS)
+│       ├── haproxy.cfg.template # Dynamic HAProxy config (HTTP/HTTPS)
+│       ├── s6-rc.d/           # s6-overlay service definitions
+│       └── s6-scripts/        # s6-overlay init scripts
 └── test/
     ├── Dockerfile.audit       # Audit mode test
     ├── Dockerfile.restrict    # Restrict mode test
