@@ -5,12 +5,14 @@ COMPOSE_FILE ?= compose.yml
 help:
 	@grep -E '^[a-zA-Z_0-9-]+(-%)?:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
+.PHONY: clean
 clean: ## Clean up all resources
 	@echo "Stopping and removing all containers..."
 	@docker buildx rm buildcage 2>/dev/null || true
 	@docker compose -f compose.yml -f compose.test.yml down -v --rmi all
 	@docker rmi buildcage-test 2>/dev/null || true
 
+.PHONY: run_audit_mode
 run_audit_mode: ## Start in audit mode
 	@echo "Starting buildcage in AUDIT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
@@ -22,6 +24,7 @@ run_audit_mode: ## Start in audit mode
 		--name buildcage \
 		--driver remote tcp://localhost:1234
 
+.PHONY: run_restrict_mode
 run_restrict_mode: ## Start in restrict mode
 	@echo "Starting buildcage in RESTRICT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
@@ -59,7 +62,7 @@ test_audit_mode: ## Run audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.audit test/ \
 	  --load -t buildcage-test
-	@node report/main.mjs ./compose.yml || true
+	@node report/main.mjs ./compose.yml
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean
 

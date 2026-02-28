@@ -107,6 +107,11 @@ if (isAudit) {
   if (audited.length > 0) {
     markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n";
   }
+  const blocked = aggregate(entries.filter((e) => e.decision === "BLOCKED"));
+  if (blocked.length > 0) {
+    if (audited.length > 0) markdown += "\n";
+    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n";
+  }
 } else {
   const allowed = aggregate(entries.filter((e) => e.decision === "ALLOWED"));
   const blocked = aggregate(entries.filter((e) => e.decision === "BLOCKED"));
@@ -135,16 +140,22 @@ if (summaryFile) {
 // 5. Error control for blocked connections
 const blockedCount = entries.filter((e) => e.decision === "BLOCKED").length;
 if (blockedCount > 0) {
-  const failOnBlocked =
-    (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
-  if (failOnBlocked) {
-    console.log(
-      `::error::${blockedCount} blocked connection(s) detected by buildcage proxy`
-    );
-    process.exitCode = 1;
-  } else {
+  if (isAudit) {
     console.log(
       `::notice::${blockedCount} blocked connection(s) detected by buildcage proxy`
     );
+  } else {
+    const failOnBlocked =
+      (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
+    if (failOnBlocked) {
+      console.log(
+        `::error::${blockedCount} blocked connection(s) detected by buildcage proxy`
+      );
+      process.exitCode = 1;
+    } else {
+      console.log(
+        `::notice::${blockedCount} blocked connection(s) detected by buildcage proxy`
+      );
+    }
   }
 }
