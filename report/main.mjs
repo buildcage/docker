@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // 1. Fetch proxy logs
+// Brief wait to ensure Docker log driver captures all HAProxy output
+await new Promise((resolve) => setTimeout(resolve, 500));
+
 const composeFile = process.argv[2] || join(__dirname, "..", "setup", "compose.yml");
 const logs = execFileSync(
   "docker",
