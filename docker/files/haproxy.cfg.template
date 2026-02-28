@@ -2,7 +2,10 @@ global
     log stdout format raw local0
     maxconn 2048
 
-${HAPROXY_RESOLVERS}
+resolvers my_dns
+${HAPROXY_NAMESERVERS}
+    hold valid 300s
+    accepted_payload_size 8192
 
 defaults
     log global

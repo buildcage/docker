@@ -31,7 +31,7 @@ PROXY_MODE=${PROXY_MODE:-"restrict"}
 ALLOWED_HTTPS_RULES=${ALLOWED_HTTPS_RULES:-""}
 ALLOWED_HTTP_RULES=${ALLOWED_HTTP_RULES:-""}
 ALLOWED_IP_RULES=${ALLOWED_IP_RULES:-""}
-EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-"1.1.1.1 8.8.8.8 valid=300s"}
+EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-"1.1.1.1,8.8.8.8"}
 
 echo "Proxy mode: $PROXY_MODE"
 echo "Allowed HTTPS rules: $ALLOWED_HTTPS_RULES"
@@ -66,29 +66,16 @@ else
     fi
 fi
 
-# Generate resolvers block from EXTERNAL_RESOLVER
-# Input format: "8.8.8.8 8.8.4.4 valid=300s" or "10.200.0.53 valid=300s"
-HAPROXY_RESOLVERS="resolvers my_dns"
+# Generate nameserver lines from EXTERNAL_RESOLVER (comma-separated IPs)
+HAPROXY_NAMESERVERS=""
 RESOLVER_IDX=1
-HOLD_VALID=""
-for token in $EXTERNAL_RESOLVER; do
-    case "$token" in
-        valid=*)
-            HOLD_VALID="${token#valid=}"
-            ;;
-        *)
-            HAPROXY_RESOLVERS="${HAPROXY_RESOLVERS}
-    nameserver ns${RESOLVER_IDX} ${token}:53"
-            RESOLVER_IDX=$((RESOLVER_IDX + 1))
-            ;;
-    esac
+IFS=','
+for ip in $EXTERNAL_RESOLVER; do
+    HAPROXY_NAMESERVERS="${HAPROXY_NAMESERVERS}
+    nameserver ns${RESOLVER_IDX} ${ip}:53"
+    RESOLVER_IDX=$((RESOLVER_IDX + 1))
 done
-if [ -n "$HOLD_VALID" ]; then
-    HAPROXY_RESOLVERS="${HAPROXY_RESOLVERS}
-    hold valid ${HOLD_VALID}"
-fi
-HAPROXY_RESOLVERS="${HAPROXY_RESOLVERS}
-    accepted_payload_size 8192"
+unset IFS
 
 # Set decision label and audit accept
 if [ "$PROXY_MODE" = "audit" ]; then
@@ -99,11 +86,11 @@ else
     HAPROXY_AUDIT_ACCEPT=""
 fi
 
-export HAPROXY_RESOLVERS HAPROXY_DECISION_LABEL HAPROXY_AUDIT_ACCEPT
+export HAPROXY_NAMESERVERS HAPROXY_DECISION_LABEL HAPROXY_AUDIT_ACCEPT
 
 # Generate config file from template
 echo "Generating haproxy.cfg from template..."
-envsubst '${HAPROXY_RESOLVERS} ${HAPROXY_DECISION_LABEL} ${HAPROXY_AUDIT_ACCEPT}' \
+envsubst '${HAPROXY_NAMESERVERS} ${HAPROXY_DECISION_LABEL} ${HAPROXY_AUDIT_ACCEPT}' \
   < /etc/haproxy/haproxy.cfg.template \
   > /etc/haproxy/haproxy.cfg
 

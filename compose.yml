@@ -11,7 +11,7 @@ services:
       - ALLOWED_HTTPS_RULES=${ALLOWED_HTTPS_RULES:-}
       - ALLOWED_HTTP_RULES=${ALLOWED_HTTP_RULES:-}
       - ALLOWED_IP_RULES=${ALLOWED_IP_RULES:-}
-      - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-8.8.8.8 8.8.4.4 valid=300s}
+      - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-1.1.1.1,8.8.8.8}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "sh", "-c", "curl -sf --unix-socket /var/run/haproxy-health.sock http://localhost/health && nc -z 127.0.0.1 1234"]
