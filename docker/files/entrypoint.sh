@@ -3,13 +3,19 @@ set -e
 
 echo "Builder entrypoint: configuring isolation..."
 
-# --- 1. iptables: Drop all FORWARD from buildkit0 ---
+# --- 1. iptables: REDIRECT for all TCP from buildkit0 ---
 # buildkit0 does not exist yet, but the rules take effect once the interface is created
+
+# All TCP from buildkit0: REDIRECT → haproxy:10024
+iptables -t nat -A PREROUTING -i buildkit0 -p tcp \
+  -j REDIRECT --to-ports 10024
+
+# Drop all FORWARD from buildkit0 (blocks non-TCP: UDP/ICMP)
 iptables -A FORWARD -i buildkit0 -j DROP
 ip6tables -A FORWARD -i buildkit0 -j DROP
-echo "iptables: FORWARD from buildkit0 blocked (IPv4/IPv6)"
+echo "iptables: REDIRECT configured, FORWARD from buildkit0 blocked (IPv4/IPv6)"
 
-# --- 1b. Block direct access to buildkitd API from buildkit0 ---
+# Block direct access to buildkitd API from buildkit0
 iptables -A INPUT -i buildkit0 -p tcp --dport 1234 -j DROP
 ip6tables -A INPUT -i buildkit0 -p tcp --dport 1234 -j DROP
 echo "iptables: INPUT to buildkitd API from buildkit0 blocked (IPv4/IPv6)"
@@ -18,105 +24,91 @@ echo "iptables: INPUT to buildkitd API from buildkit0 blocked (IPv4/IPv6)"
 dnsmasq --conf-file=/etc/dnsmasq.conf
 echo "dnsmasq: started"
 
-# --- 3. nginx: Generate config and start ---
+# --- 3. haproxy: Generate config and start ---
 
 # Set default values
 PROXY_MODE=${PROXY_MODE:-"restrict"}
-ALLOWED_HTTP_DOMAINS=${ALLOWED_HTTP_DOMAINS:-""}
-ALLOWED_HTTPS_DOMAINS=${ALLOWED_HTTPS_DOMAINS:-""}
-HTTP_PORTS=${HTTP_PORTS:-"80"}
-HTTPS_PORTS=${HTTPS_PORTS:-"443"}
+ALLOWED_HTTPS_RULES=${ALLOWED_HTTPS_RULES:-""}
+ALLOWED_HTTP_RULES=${ALLOWED_HTTP_RULES:-""}
+ALLOWED_IP_RULES=${ALLOWED_IP_RULES:-""}
 EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-"1.1.1.1 8.8.8.8 valid=300s"}
 
 echo "Proxy mode: $PROXY_MODE"
-echo "Allowed HTTP domains: $ALLOWED_HTTP_DOMAINS"
-echo "Allowed HTTPS domains: $ALLOWED_HTTPS_DOMAINS"
-echo "HTTP ports: $HTTP_PORTS"
-echo "HTTPS ports: $HTTPS_PORTS"
+echo "Allowed HTTPS rules: $ALLOWED_HTTPS_RULES"
+echo "Allowed HTTP rules: $ALLOWED_HTTP_RULES"
+echo "Allowed IP rules: $ALLOWED_IP_RULES"
 echo "Resolver: $EXTERNAL_RESOLVER"
 
-# Generate listen directives
-NGINX_HTTPS_LISTEN=""
-for port in $(echo "$HTTPS_PORTS" | tr ',' ' '); do
-    port=$(echo "$port" | xargs)
-    if [ -n "$port" ]; then
-        NGINX_HTTPS_LISTEN="${NGINX_HTTPS_LISTEN}        listen $port;
-"
-    fi
-done
-
-NGINX_HTTP_LISTEN=""
-NGINX_HTTP_LISTEN_DEFAULT=""
-first_http_port=1
-for port in $(echo "$HTTP_PORTS" | tr ',' ' '); do
-    port=$(echo "$port" | xargs)
-    if [ -n "$port" ]; then
-        if [ $first_http_port -eq 1 ]; then
-            NGINX_HTTP_LISTEN_DEFAULT="${NGINX_HTTP_LISTEN_DEFAULT}        listen $port default_server;
-"
-            first_http_port=0
-        else
-            NGINX_HTTP_LISTEN_DEFAULT="${NGINX_HTTP_LISTEN_DEFAULT}        listen $port;
-"
-        fi
-        NGINX_HTTP_LISTEN="${NGINX_HTTP_LISTEN}        listen $port;
-"
-    fi
-done
-
-# Generate allowed domain maps
-NGINX_HTTPS_ALLOWED_MAP=""
-NGINX_HTTP_ALLOWED_MAP=""
-
+# Generate lst files
+mkdir -p /etc/haproxy/rules
 if [ "$PROXY_MODE" = "audit" ]; then
     echo "Configuring audit mode (all connections allowed, logged only)..."
-    NGINX_HTTPS_DEFAULT_ALLOWED="1"
-    NGINX_HTTP_DEFAULT_ALLOWED="1"
+    echo ".*" > /etc/haproxy/rules/allowed_https.lst
+    echo ".*" > /etc/haproxy/rules/allowed_http.lst
+    echo ".*" > /etc/haproxy/rules/allowed_ips.lst
 else
-    echo "Configuring restrict mode (only allowed domains)..."
-    echo "Generating allowed HTTPS domain map..."
-    for domain in $(echo "$ALLOWED_HTTPS_DOMAINS" | tr ',' ' '); do
-        domain=$(echo "$domain" | xargs)
-        if [ -n "$domain" ]; then
-            echo "  Adding HTTPS domain: $domain"
-            NGINX_HTTPS_ALLOWED_MAP="${NGINX_HTTPS_ALLOWED_MAP}        $domain 1;
-"
-        fi
-    done
-    echo "Generating allowed HTTP domain map..."
-    for domain in $(echo "$ALLOWED_HTTP_DOMAINS" | tr ',' ' '); do
-        domain=$(echo "$domain" | xargs)
-        if [ -n "$domain" ]; then
-            echo "  Adding HTTP domain: $domain"
-            NGINX_HTTP_ALLOWED_MAP="${NGINX_HTTP_ALLOWED_MAP}        $domain 1;
-"
-        fi
-    done
-    NGINX_HTTPS_DEFAULT_ALLOWED="0"
-    NGINX_HTTP_DEFAULT_ALLOWED="0"
+    echo "Configuring restrict mode (only allowed rules)..."
+    # Convert comma-separated rules to newline-separated lst files
+    if [ -n "$ALLOWED_HTTPS_RULES" ]; then
+        echo "$ALLOWED_HTTPS_RULES" | tr ',' '\n' > /etc/haproxy/rules/allowed_https.lst
+    else
+        : > /etc/haproxy/rules/allowed_https.lst
+    fi
+    if [ -n "$ALLOWED_HTTP_RULES" ]; then
+        echo "$ALLOWED_HTTP_RULES" | tr ',' '\n' > /etc/haproxy/rules/allowed_http.lst
+    else
+        : > /etc/haproxy/rules/allowed_http.lst
+    fi
+    if [ -n "$ALLOWED_IP_RULES" ]; then
+        echo "$ALLOWED_IP_RULES" | tr ',' '\n' > /etc/haproxy/rules/allowed_ips.lst
+    else
+        : > /etc/haproxy/rules/allowed_ips.lst
+    fi
 fi
 
-# Set access decision label
+# Generate resolvers block from EXTERNAL_RESOLVER
+# Input format: "8.8.8.8 8.8.4.4 valid=300s" or "10.200.0.53 valid=300s"
+HAPROXY_RESOLVERS="resolvers my_dns"
+RESOLVER_IDX=1
+HOLD_VALID=""
+for token in $EXTERNAL_RESOLVER; do
+    case "$token" in
+        valid=*)
+            HOLD_VALID="${token#valid=}"
+            ;;
+        *)
+            HAPROXY_RESOLVERS="${HAPROXY_RESOLVERS}
+    nameserver ns${RESOLVER_IDX} ${token}:53"
+            RESOLVER_IDX=$((RESOLVER_IDX + 1))
+            ;;
+    esac
+done
+if [ -n "$HOLD_VALID" ]; then
+    HAPROXY_RESOLVERS="${HAPROXY_RESOLVERS}
+    hold valid ${HOLD_VALID}"
+fi
+HAPROXY_RESOLVERS="${HAPROXY_RESOLVERS}
+    accepted_payload_size 8192"
+
+# Set decision label and audit accept
 if [ "$PROXY_MODE" = "audit" ]; then
-    NGINX_ACCESS_DECISION="AUDIT"
+    HAPROXY_DECISION_LABEL="AUDIT"
+    HAPROXY_AUDIT_ACCEPT="tcp-request content accept if !is_dns_routed !is_ip_match"
 else
-    NGINX_ACCESS_DECISION="ALLOWED"
+    HAPROXY_DECISION_LABEL="ALLOWED"
+    HAPROXY_AUDIT_ACCEPT=""
 fi
 
-export PROXY_MODE ALLOWED_HTTP_DOMAINS ALLOWED_HTTPS_DOMAINS HTTP_PORTS HTTPS_PORTS
-export NGINX_HTTPS_LISTEN NGINX_HTTP_LISTEN NGINX_HTTP_LISTEN_DEFAULT
-export NGINX_HTTPS_ALLOWED_MAP NGINX_HTTPS_DEFAULT_ALLOWED
-export NGINX_HTTP_ALLOWED_MAP NGINX_HTTP_DEFAULT_ALLOWED
-export NGINX_ACCESS_DECISION EXTERNAL_RESOLVER
+export HAPROXY_RESOLVERS HAPROXY_DECISION_LABEL HAPROXY_AUDIT_ACCEPT
 
-# Generate config file from nginx.conf.template
-echo "Generating nginx.conf from template..."
-envsubst '$PROXY_MODE $ALLOWED_HTTP_DOMAINS $ALLOWED_HTTPS_DOMAINS $HTTP_PORTS $HTTPS_PORTS $NGINX_HTTPS_LISTEN $NGINX_HTTP_LISTEN $NGINX_HTTP_LISTEN_DEFAULT $NGINX_HTTPS_ALLOWED_MAP $NGINX_HTTPS_DEFAULT_ALLOWED $NGINX_HTTP_ALLOWED_MAP $NGINX_HTTP_DEFAULT_ALLOWED $NGINX_ACCESS_DECISION $EXTERNAL_RESOLVER' \
-  < /etc/nginx/nginx.conf.template \
-  > /etc/nginx/nginx.conf
+# Generate config file from template
+echo "Generating haproxy.cfg from template..."
+envsubst '${HAPROXY_RESOLVERS} ${HAPROXY_DECISION_LABEL} ${HAPROXY_AUDIT_ACCEPT}' \
+  < /etc/haproxy/haproxy.cfg.template \
+  > /etc/haproxy/haproxy.cfg
 
-nginx
-echo "nginx: started"
+haproxy -f /etc/haproxy/haproxy.cfg &
+echo "haproxy: started"
 
 # --- 4. buildkitd: Start as PID 1 ---
 echo "Starting buildkitd..."

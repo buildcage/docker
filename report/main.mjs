@@ -23,7 +23,7 @@ console.log();
 
 // 3. Parse log lines
 const logPattern =
-  /^\[.*?\]\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+(TCP|HTTP)\s+.*?"([^"]+)"/;
+  /^\[.*?\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+"([^"]+)"/;
 
 const entries = [];
 for (const line of logs.split("\n")) {

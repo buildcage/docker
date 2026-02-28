@@ -49,10 +49,10 @@ RUN echo "=== [Port 8080 - blocked] ===" && \
     echo "Testing blocked.example.com:8080 (HTTP, should be blocked)..." && \
     (wget -q -O /dev/null --timeout=5 http://blocked.example.com:8080/ && echo "✗ blocked.example.com:8080: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com:8080: BLOCKED (expected)"
 
-# [Direct IP - blocked (iptables FORWARD DROP)]
+# [Direct IP - blocked (haproxy rejects non-allowed IP)]
 RUN echo "=== [Direct IP - blocked] ===" && \
-    echo "Testing direct IP access to 10.200.0.100 (should be blocked by iptables)..." && \
-    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by iptables (expected)"
+    echo "Testing direct IP access to 10.200.0.100 (should be blocked by haproxy)..." && \
+    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by haproxy (expected)"
 
 # Network configuration check
 RUN echo "=== Network Configuration ===" && \

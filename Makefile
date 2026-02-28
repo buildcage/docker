@@ -15,8 +15,6 @@ run_audit_mode: ## Start in audit mode
 	@echo "Starting buildcage in AUDIT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=audit \
-	  ALLOWED_HTTP_DOMAINS="" \
-	  ALLOWED_HTTPS_DOMAINS="" \
 	  docker compose up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
@@ -28,8 +26,8 @@ run_restrict_mode: ## Start in restrict mode
 	@echo "Starting buildcage in RESTRICT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=restrict \
-	  ALLOWED_HTTP_DOMAINS="$${ALLOWED_HTTP_DOMAINS:-}" \
-	  ALLOWED_HTTPS_DOMAINS="$${ALLOWED_HTTPS_DOMAINS:-github.com,registry.npmjs.org,api.github.com,objects.githubusercontent.com,httpbin.org,deb.debian.org,*.githubusercontent.com}" \
+	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
+	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-^github\.com:443$$,^registry\.npmjs\.org:443$$,^api\.github\.com:443$$,^objects\.githubusercontent\.com:443$$,^httpbin\.org:443$$,^deb\.debian\.org:80$$,^.*\.githubusercontent\.com:443$$}" \
 	  docker compose up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."

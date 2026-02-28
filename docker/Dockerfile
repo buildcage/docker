@@ -20,7 +20,7 @@ LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage"
 
 RUN apk add --no-cache \
-      nginx nginx-mod-stream \
+      haproxy \
       dnsmasq \
       iptables \
       curl
@@ -40,8 +40,9 @@ COPY files/cni.conflist   /etc/buildkit/cni.conflist
 # DNS
 COPY files/dnsmasq.conf /etc/dnsmasq.conf
 
-# Nginx
-COPY files/nginx.conf.template /etc/nginx/nginx.conf.template
+# HAProxy
+RUN mkdir -p /etc/haproxy/rules
+COPY files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
 # Entrypoint
 COPY files/entrypoint.sh /entrypoint.sh

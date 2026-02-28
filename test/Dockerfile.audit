@@ -24,10 +24,10 @@ RUN echo "=== [Port 8080 - any domain] ===" && \
     echo "Testing blocked.example.com:8080 (HTTP, should be allowed in audit mode)..." && \
     (wget -q -O /dev/null --timeout=10 http://blocked.example.com:8080/ && echo "✓ blocked.example.com:8080: OK") || (echo "✗ blocked.example.com:8080: FAILED" && exit 1)
 
-# [Direct IP - blocked (iptables FORWARD DROP, mode-independent)]
-RUN echo "=== [Direct IP - blocked] ===" && \
-    echo "Testing direct IP access to 10.200.0.100 (should be blocked by iptables even in audit mode)..." && \
-    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by iptables (expected)"
+# [Direct IP - direct ip]
+RUN echo "=== [Direct IP - audit mode] ===" && \
+    echo "Testing direct IP access to 10.200.0.100 (routed through haproxy via TPROXY)..." && \
+    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✓ 10.200.0.100: OK") || (echo "✗ 10.200.0.100: FAILED" && exit 1)
 
 # Network configuration check
 RUN echo "=== Network Configuration ===" && \
