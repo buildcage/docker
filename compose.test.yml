@@ -3,8 +3,8 @@ services:
   builder:
     environment:
       - EXTERNAL_RESOLVER=10.200.0.53
-      - ALLOWED_HTTPS_RULES=^allowed\.example\.com:(443|8443)$$,^[^.]+\.wildcard\.example\.com:(443|8443)$$
-      - ALLOWED_HTTP_RULES=^allowed\.example\.com:(80|8080)$$,^[^.]+\.wildcard\.example\.com:(80|8080)$$
+      - ALLOWED_HTTPS_RULES=^allowed\.example\.com:(443|8443)$$ ^[^.]+\.wildcard\.example\.com:(443|8443)$$
+      - ALLOWED_HTTP_RULES=^allowed\.example\.com:(80|8080)$$ ^[^.]+\.wildcard\.example\.com:(80|8080)$$
     networks:
       default:
       test-net:

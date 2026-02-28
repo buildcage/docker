@@ -14,6 +14,11 @@ RUN echo "=== [HTTPS - allowed - wildcard] ===" && \
     echo "Testing sub.wildcard.example.com (HTTPS)..." && \
     (wget --no-check-certificate -q -O /dev/null --timeout=10 https://sub.wildcard.example.com/ && echo "✓ sub.wildcard.example.com: OK") || (echo "✗ sub.wildcard.example.com: FAILED" && exit 1)
 
+# [HTTPS - blocked - nested subdomain]
+RUN echo "=== [HTTPS - blocked - nested subdomain] ===" && \
+    echo "Testing deep.sub.wildcard.example.com (HTTPS, should be blocked)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://deep.sub.wildcard.example.com/ && echo "✗ deep.sub.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ deep.sub.wildcard.example.com: BLOCKED (expected)"
+
 # [HTTPS - blocked]
 RUN echo "=== [HTTPS - blocked] ===" && \
     echo "Testing blocked.example.com (HTTPS, should be blocked)..." && \
@@ -28,6 +33,11 @@ RUN echo "=== [HTTP - allowed] ===" && \
 RUN echo "=== [HTTP - blocked] ===" && \
     echo "Testing blocked.example.com (HTTP, should be blocked)..." && \
     (wget -q -O /dev/null --timeout=5 http://blocked.example.com/ && echo "✗ blocked.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com HTTP: BLOCKED (expected)"
+
+# [HTTP - allowed - wildcard]
+RUN echo "=== [HTTP - allowed - wildcard] ===" && \
+    echo "Testing sub.wildcard.example.com (HTTP)..." && \
+    (wget -q -O /dev/null --timeout=10 http://sub.wildcard.example.com/ && echo "✓ sub.wildcard.example.com HTTP: OK") || (echo "✗ sub.wildcard.example.com HTTP: FAILED" && exit 1)
 
 # [Port 8443 - allowed]
 RUN echo "=== [Port 8443 - allowed] ===" && \

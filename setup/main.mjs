@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildRules, buildLegacyRules } from "./rules.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "compose.yml");
@@ -45,13 +46,50 @@ const buildcageVersion = resolveVersion(buildcageImage);
 
 console.log(`buildcage image: ${buildcageImage}:${buildcageVersion}`);
 
+// New-style rules
+const httpsResult = buildRules(process.env.INPUT_ALLOWED_HTTPS_RULES || "");
+const httpResult = buildRules(process.env.INPUT_ALLOWED_HTTP_RULES || "");
+
+// Legacy rules
+const httpsLegacy = buildLegacyRules({
+  domainsInput: process.env.INPUT_ALLOWED_HTTPS_DOMAINS || "",
+  portsInput: process.env.INPUT_HTTPS_PORTS || "443",
+  defaultPort: 443,
+  protocol: "HTTPS",
+});
+const httpLegacy = buildLegacyRules({
+  domainsInput: process.env.INPUT_ALLOWED_HTTP_DOMAINS || "",
+  portsInput: process.env.INPUT_HTTP_PORTS || "80",
+  defaultPort: 80,
+  protocol: "HTTP",
+});
+
+// Merge and join
+const httpsRules = [...httpsResult.domainRules, ...httpsLegacy].join('\n');
+const httpRules = [...httpResult.domainRules, ...httpLegacy].join('\n');
+const ipRules = [...httpsResult.ipRules, ...httpResult.ipRules].join('\n');
+
+function logRules(label, rules) {
+  if (rules) {
+    console.log(`${label} rules:`);
+    for (const r of rules.split("\n")) console.log(`  ${r}`);
+  } else {
+    console.log(`${label} rules: (none)`);
+  }
+}
+
+console.log("::group::Configured ACL Rules");
+logRules("HTTPS", httpsRules);
+logRules("HTTP", httpRules);
+logRules("IP", ipRules);
+console.log("::endgroup::");
+
 const composeEnv = {
   ...process.env,
   PROXY_MODE: process.env.INPUT_PROXY_MODE || "restrict",
-  ALLOWED_HTTP_DOMAINS: process.env.INPUT_ALLOWED_HTTP_DOMAINS || "",
-  ALLOWED_HTTPS_DOMAINS: process.env.INPUT_ALLOWED_HTTPS_DOMAINS || "",
-  HTTP_PORTS: process.env.INPUT_HTTP_PORTS || "80",
-  HTTPS_PORTS: process.env.INPUT_HTTPS_PORTS || "443",
+  ALLOWED_HTTPS_RULES: httpsRules,
+  ALLOWED_HTTP_RULES: httpRules,
+  ALLOWED_IP_RULES: ipRules,
   BUILDCAGE_IMAGE: buildcageImage,
   BUILDCAGE_VERSION: buildcageVersion,
   PORT: process.env.INPUT_PORT || "1234",

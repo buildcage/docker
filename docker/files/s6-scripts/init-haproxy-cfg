@@ -25,19 +25,21 @@ if [ "$PROXY_MODE" = "audit" ]; then
     echo ".*" > /etc/haproxy/rules/allowed_ips.lst
 else
     echo "Configuring restrict mode (only allowed rules)..."
-    # Convert comma-separated rules to newline-separated lst files
+    # Convert whitespace-separated rules to newline-separated lst files
+    # Uses tr -s to squeeze any whitespace into single newlines, then grep to remove empty lines.
+    # Commas inside patterns (e.g. {80,8080}) are preserved.
     if [ -n "$ALLOWED_HTTPS_RULES" ]; then
-        echo "$ALLOWED_HTTPS_RULES" | tr ',' '\n' > /etc/haproxy/rules/allowed_https.lst
+        printf '%s' "$ALLOWED_HTTPS_RULES" | tr -s '[:space:]' '\n' | grep . > /etc/haproxy/rules/allowed_https.lst
     else
         : > /etc/haproxy/rules/allowed_https.lst
     fi
     if [ -n "$ALLOWED_HTTP_RULES" ]; then
-        echo "$ALLOWED_HTTP_RULES" | tr ',' '\n' > /etc/haproxy/rules/allowed_http.lst
+        printf '%s' "$ALLOWED_HTTP_RULES" | tr -s '[:space:]' '\n' | grep . > /etc/haproxy/rules/allowed_http.lst
     else
         : > /etc/haproxy/rules/allowed_http.lst
     fi
     if [ -n "$ALLOWED_IP_RULES" ]; then
-        echo "$ALLOWED_IP_RULES" | tr ',' '\n' > /etc/haproxy/rules/allowed_ips.lst
+        printf '%s' "$ALLOWED_IP_RULES" | tr -s '[:space:]' '\n' | grep . > /etc/haproxy/rules/allowed_ips.lst
     else
         : > /etc/haproxy/rules/allowed_ips.lst
     fi
