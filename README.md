@@ -419,6 +419,11 @@ See the [Development Guide](./docs/development.md) for local usage, testing, vie
 
 Contributions are welcome! Please feel free to submit issues or pull requests at [github.com/dash14/buildcage](https://github.com/dash14/buildcage).
 
+## Show Your Support
+
+Knowing that this project is useful to others gives me the motivation to keep working on it.
+If you find buildcage helpful, please consider giving it a star ⭐ on GitHub!
+
 ## Disclaimer
 
 This software is provided "as is", without warranty of any kind, express or implied. The authors and contributors are not liable for any damages, losses, or security incidents arising from the use of this software. Use at your own risk.
