@@ -69,3 +69,43 @@ test_audit_mode: ## Run audit mode tests
 .PHONY: test_unit
 test_unit: ## Run unit tests
 	@node --test setup/lib/rules.test.mjs
+
+.PHONY: test_audit_example
+run_audit_example: ## Run audit mode example tests
+	@echo "Running audit mode example tests..."
+	@$(MAKE) run_audit_mode
+	@mkdir -p /tmp/build-context
+	@printf '%s\n' \
+	  "FROM node:24-alpine" \
+	  "WORKDIR /app" \
+	  "RUN npm init -y && npm install express" \
+	  > /tmp/build-context/Dockerfile
+	docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
+	  --load -t buildcage-test
+	@node report/main.mjs ./compose.yml
+	@$(MAKE) clean
+	rm -fr /tmp/build-context
+
+.PHONY: run_restrict_example
+run_restrict_example: ## Run restrict mode example tests
+	@echo "Running restrict mode example tests..."
+	@ALLOWED_HTTPS_RULES="registry.npmjs.org:443" \
+	  $(MAKE) run_restrict_mode
+	@mkdir -p /tmp/build-context
+	@printf '%s\n' \
+	  "FROM node:24-alpine" \
+	  "WORKDIR /app" \
+	  "RUN npm init -y && npm install express" \
+	  "RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true" \
+	  > /tmp/build-context/Dockerfile
+	docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
+	  --load -t buildcage-test
+	@node report/main.mjs ./compose.yml || true
+	@$(MAKE) clean
+	rm -fr /tmp/build-context
