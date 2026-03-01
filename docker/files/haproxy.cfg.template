@@ -18,6 +18,7 @@ defaults
 frontend health
     bind /var/run/haproxy-health.sock mode 666
     mode http
+    no log
     monitor-uri /health
 
 # --- Frontend ---
