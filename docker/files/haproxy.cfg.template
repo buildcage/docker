@@ -35,6 +35,8 @@ frontend outbound_proxy
 
     # ACL: DNS-routed vs IP direct
     acl is_dns_routed dst 172.20.0.1
+    # Store DNS-routed state in variable (before set-dst may modify dst)
+    tcp-request content set-var(sess.dns_routed) str(true) if is_dns_routed
 
     # ACL: TLS/SNI
     acl is_tls req.ssl_hello_type 1
@@ -76,7 +78,7 @@ frontend outbound_proxy
     # ---------------------------------------------------------
     # 4. TLS DNS resolution, destination override & accept
     # ---------------------------------------------------------
-    tcp-request content do-resolve(sess.actual_ip,my_dns) var(sess.sni) if is_tls has_sni
+    tcp-request content do-resolve(sess.actual_ip,my_dns,ipv4) var(sess.sni) if is_tls has_sni
     tcp-request content set-var(sess.reason) str(dns-failed) if is_tls has_sni ! { var(sess.actual_ip) -m found }
     tcp-request content reject if is_tls has_sni ! { var(sess.actual_ip) -m found }
     tcp-request content set-dst var(sess.actual_ip) if is_tls has_sni
@@ -87,7 +89,7 @@ frontend outbound_proxy
     # 5. Non-TLS DNS-routed → HTTP backend
     # ---------------------------------------------------------
     # Routing
-    use_backend ip_passthrough if !is_dns_routed
+    use_backend ip_passthrough if !{ var(sess.dns_routed) -m found }
     use_backend tls_passthrough if is_tls
     default_backend http_filter_backend
 
@@ -128,7 +130,7 @@ backend http_filter_backend
     http-request deny deny_status 403 content-type "text/plain" string "Blocked by egress proxy" if !is_http_allowed
 
     # DNS resolution & destination override
-    http-request do-resolve(txn.actual_ip,my_dns) var(txn.host_only)
+    http-request do-resolve(txn.actual_ip,my_dns,ipv4) var(txn.host_only)
     http-request set-var(sess.reason) str(dns-failed) if ! { var(txn.actual_ip) -m found }
     http-request deny deny_status 503 content-type "text/plain" string "DNS Resolution Failed" if ! { var(txn.actual_ip) -m found }
 
