@@ -83,6 +83,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 | `make run_restrict_mode` | Start in restrict mode (default domains) |
 | `make test_audit_mode` | Run audit mode tests (start → build → verify → clean up) |
 | `make test_restrict_mode` | Run restrict mode tests (start → build → verify → clean up) |
+| `make test_unit` | Run unit tests |
 | `make clean` | Remove all resources |
 
 ## Directory Structure
@@ -102,6 +103,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │   ├── action.yml             # GitHub Action: dash14/buildcage/report@v1
 │   └── main.mjs               # Log analysis and Job Summary output
 ├── docs/
+│   ├── development.md         # Development guide
 │   ├── rules.md               # Rule format reference
 │   ├── security.md            # Security design
 │   └── self-hosting.md        # Self-hosting guide

@@ -6,30 +6,32 @@ For a high-level overview, see the [Security Considerations](../README.md#securi
 
 ## Security Mechanisms
 
-### Direct IP Address Connections
-
-- **Direct IP blocked by iptables**: Connections to raw IP addresses (e.g., `curl http://1.2.3.4/`) bypass DNS and attempt to reach the IP directly, which iptables drops. Connections using domain names go through the proxy and are checked against the allowlist via Host header (HTTP) or SNI (HTTPS).
-
-### DNS-Level Control
-
-- **Full redirect**: Returns the proxy IP for all DNS queries.
-- **ECH prevention**: The internal DNS server operates without any upstream resolvers, so DNS HTTPS (type 65) records — required to initiate Encrypted Client Hello (ECH) — are never returned to build containers.
-
-### HTTP/HTTPS Proxy Control
-
-- **HTTPS**: Determines the target server name by reading the SNI field, without terminating TLS. Certificate validation is unaffected.
-- **HTTP**: Domain determination via Host header.
-- **Dynamic allowlist**: Controlled via environment variables.
-
 ### Network Isolation
 
 - **CNI configuration**: Places temporary containers from BuildKit RUN steps into isolated-net (buildkit0 bridge, 172.20.0.0/24).
 - **iptables**: Drops all FORWARD from buildkit0, also blocks direct access to buildkitd API.
 - **Gateway enforcement**: All traffic must go through the proxy on 172.20.0.1.
 
+### DNS-Level Control
+
+- **Universal DNS redirect**: All domain name queries return the proxy IP (172.20.0.1), forcing all traffic through the proxy regardless of the requested domain.
+- **ECH prevention**: The internal DNS server operates without any upstream resolvers, so DNS HTTPS (type 65) records — required to initiate Encrypted Client Hello (ECH) — are never returned to build containers.
+
+### HTTP/HTTPS Proxy Control
+
+- **HTTPS**: Determines the target server name by reading the SNI field, without terminating TLS. Certificate validation is unaffected.
+- **HTTP**: Determines the target domain by inspecting the Host header, then checks it against the allowlist.
+- **Dynamic allowlist**: Controlled via `allowed_https_rules`, `allowed_http_rules`, and `allowed_ip_rules` environment variables.
+- **Missing Host header rejection**: HTTP requests without a valid Host header are rejected with HTTP 400, preventing requests that cannot be checked against the allowlist.
+
+### Direct IP Address Connections
+
+- **Traffic redirection**: All TCP traffic from the isolated network is redirected to HAProxy via an iptables `PREROUTING REDIRECT` rule.
+- **IP allowlist check**: Connections to raw IP addresses (e.g., `curl http://1.2.3.4/`) are checked against `allowed_ip_rules`. If no `allowed_ip_rules` are configured, all direct IP connections are blocked.
+
 ## Attack Resistance
 
-The following attack vectors are defended against by buildcage's architecture.
+buildcage's architecture defends against the following attack vectors.
 
 ### SNI Spoofing
 
@@ -47,7 +49,7 @@ TLS 1.3 Encrypted Client Hello (ECH) encrypts the true SNI, which could theoreti
 
 An attacker may attempt to encode data into DNS queries to exfiltrate information or establish communication with external servers.
 
-**Why this is prevented:** The internal DNS server has no upstream resolvers and answers all queries locally. Additionally, iptables rules block direct DNS traffic to any external server. With no path for DNS queries to reach the outside, encoded data has no route to an attacker's infrastructure.
+**Why this is prevented:** The internal DNS server has no upstream resolvers and answers all queries locally. Additionally, all forwarded traffic from the isolated network is dropped by iptables — including any attempt to reach external DNS servers directly. With no path for DNS queries to reach the outside, encoded data has no route to an attacker's infrastructure.
 
 ### Non-TCP Protocol Tunneling (ICMP, UDP, QUIC)
 
@@ -59,7 +61,7 @@ An attacker may attempt to tunnel data using non-TCP protocols such as ICMP echo
 
 An attacker may attempt to use IPv6 to circumvent IPv4-based iptables rules.
 
-**Why this is prevented:** Equivalent ip6tables rules drop all forwarded IPv6 traffic from the isolated network. Additionally, the internal DNS server returns an empty IPv6 address for all queries, effectively disabling IPv6 name resolution within build containers.
+**Why this is prevented:** Equivalent ip6tables rules drop all forwarded IPv6 traffic from the isolated network. Additionally, the internal DNS server returns the IPv6 unspecified address (::) for all queries, effectively disabling IPv6 name resolution within build containers.
 
 ### Alternative DNS Transports (DoH / DoT)
 
@@ -96,8 +98,8 @@ Given these implementation costs versus the strict preconditions for the attack 
 
 **Mitigation strategies:**
 
-- **Keep allowed domains to a minimum** — Only specify the domains you need in `allowed_http_domains` / `allowed_https_domains`.
+- **Keep allowed domains to a minimum** — Only specify the domains you need in `allowed_http_rules` / `allowed_https_rules`.
 - **Be specific with allowed domains** — Avoid broad wildcard CDN domains (e.g., `*.cdn.example.com`) when possible.
 - **Use service-specific domains** — Prefer `registry.npmjs.org` over generic CDN wildcard domains.
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
-- **Regular audits** — Periodically run in audit mode to detect anomalies in connection patterns.
+- **Regular audits** — Periodically run in [audit mode](../README.md#operation-modes) to detect anomalies in connection patterns.
