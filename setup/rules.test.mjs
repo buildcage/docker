@@ -1,84 +1,66 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  splitRules,
   wildcardToRegex,
   convertRule,
-  isIPRule,
   convertLegacyDomains,
   buildRules,
   buildLegacyRules,
 } from "./rules.mjs";
 
 // ---------------------------------------------------------------------------
-// splitRules
-// ---------------------------------------------------------------------------
-describe("splitRules", () => {
-  it("splits on whitespace", () => {
-    assert.deepEqual(splitRules("a.com:443 b.com:443\tc.com:443"), ["a.com:443", "b.com:443", "c.com:443"]);
-  });
-
-  it("splits on newlines", () => {
-    assert.deepEqual(splitRules("a.com:443\nb.com:443\n"), ["a.com:443", "b.com:443"]);
-  });
-
-  it("commas are NOT delimiters", () => {
-    assert.deepEqual(splitRules("a.com:443,b.com:443"), ["a.com:443,b.com:443"]);
-  });
-
-  it("preserves commas and whitespace inside {}", () => {
-    assert.deepEqual(
-      splitRules("~^a\\.com:{80, 8080}$ b.com:443"),
-      ["~^a\\.com:{80, 8080}$", "b.com:443"],
-    );
-  });
-
-  it("returns empty array for empty input", () => {
-    assert.deepEqual(splitRules(""), []);
-  });
-
-  it("returns empty array for whitespace-only input", () => {
-    assert.deepEqual(splitRules("   "), []);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // wildcardToRegex
 // ---------------------------------------------------------------------------
 describe("wildcardToRegex", () => {
   it("exact domain — dots escaped", () => {
-    assert.equal(wildcardToRegex("example.com"), "example\\.com");
+    assert.equal(wildcardToRegex("example.com:443"), "example\\.com:443");
   });
 
   it("single wildcard *", () => {
-    assert.equal(wildcardToRegex("*.example.com"), "[^.]+\\.example\\.com");
+    assert.equal(wildcardToRegex("*.example.com:443"), "[^.]+\\.example\\.com:443");
   });
 
   it("double wildcard **", () => {
-    assert.equal(wildcardToRegex("**.example.com"), ".+\\.example\\.com");
+    assert.equal(wildcardToRegex("**.example.com:443"), ".+\\.example\\.com:443");
   });
 
   it("question mark ?", () => {
-    assert.equal(wildcardToRegex("exampl?.com"), "exampl[^.]\\.com");
+    assert.equal(wildcardToRegex("exampl?.com:443"), "exampl[^.]\\.com:443");
   });
 
   it("multiple wildcards", () => {
     assert.equal(
-      wildcardToRegex("*.*.example.com"),
-      "[^.]+\\.[^.]+\\.example\\.com",
+      wildcardToRegex("*.*.example.com:443"),
+      "[^.]+\\.[^.]+\\.example\\.com:443",
     );
   });
 
   it("rejects mixed * in part", () => {
-    assert.throws(() => wildcardToRegex("w*.example.com"), /Invalid wildcard/);
+    assert.throws(() => wildcardToRegex("w*.example.com:443"), /Invalid wildcard/);
   });
 
   it("rejects mixed ** in part", () => {
-    assert.throws(() => wildcardToRegex("w**.example.com"), /Invalid wildcard/);
+    assert.throws(() => wildcardToRegex("w**.example.com:443"), /Invalid wildcard/);
   });
 
   it("escapes regex meta characters in domain", () => {
-    assert.equal(wildcardToRegex("example+site.com"), "example\\+site\\.com");
+    assert.equal(wildcardToRegex("example+site.com:443"), "example\\+site\\.com:443");
+  });
+
+  it("wildcard port *", () => {
+    assert.equal(wildcardToRegex("example.com:*"), "example\\.com:\\d+");
+  });
+
+  it("rejects missing port", () => {
+    assert.throws(() => wildcardToRegex("example.com"), /Invalid pattern/);
+  });
+
+  it("rejects non-numeric port", () => {
+    assert.throws(() => wildcardToRegex("example.com:abc"), /Invalid pattern/);
+  });
+
+  it("rejects multiple colons", () => {
+    assert.throws(() => wildcardToRegex("example.com:443:extra"), /Invalid pattern/);
   });
 });
 
@@ -86,10 +68,6 @@ describe("wildcardToRegex", () => {
 // convertRule
 // ---------------------------------------------------------------------------
 describe("convertRule", () => {
-  it("domain without port — throws error", () => {
-    assert.throws(() => convertRule("example.com"), /Port is required/);
-  });
-
   it("domain with explicit port", () => {
     assert.equal(convertRule("example.com:8443"), "^example\\.com:8443$");
   });
@@ -108,21 +86,10 @@ describe("convertRule", () => {
     );
   });
 
-  it("wildcard without port — throws error", () => {
-    assert.throws(() => convertRule("*.example.com"), /Port is required/);
-  });
-
   it("regex rule (~ prefix) — returned as-is without ~", () => {
     assert.equal(
       convertRule("~^custom\\.regex:443$"),
       "^custom\\.regex:443$",
-    );
-  });
-
-  it("regex rule without port — returned as-is without ~", () => {
-    assert.equal(
-      convertRule("~^custom\\.regex$"),
-      "^custom\\.regex$",
     );
   });
 });
@@ -162,38 +129,12 @@ describe("convertRule — regex behavior", () => {
     const re = new RegExp(convertRule("example.com:443"));
     assert.ok(!re.test("example.com:8443"));
   });
-});
 
-// ---------------------------------------------------------------------------
-// isIPRule
-// ---------------------------------------------------------------------------
-describe("isIPRule", () => {
-  it("IPv4 with port", () => {
-    assert.equal(isIPRule("192.168.1.1:443"), true);
-  });
-
-  it("IPv4 without port", () => {
-    assert.equal(isIPRule("10.0.0.1"), true);
-  });
-
-  it("domain with port is not IP", () => {
-    assert.equal(isIPRule("example.com:443"), false);
-  });
-
-  it("domain without port is not IP", () => {
-    assert.equal(isIPRule("example.com"), false);
-  });
-
-  it("regex rule is never IP", () => {
-    assert.equal(isIPRule("~^192\\.168\\.1\\.1:443$"), false);
-  });
-
-  it("wildcard is not IP", () => {
-    assert.equal(isIPRule("*.example.com:443"), false);
-  });
-
-  it("partial IP is not IP", () => {
-    assert.equal(isIPRule("192.168.1:443"), false);
+  it("wildcard port matches any port", () => {
+    const re = new RegExp(convertRule("example.com:*"));
+    assert.ok(re.test("example.com:443"));
+    assert.ok(re.test("example.com:8080"));
+    assert.ok(!re.test("example.com:abc"));
   });
 });
 
@@ -234,34 +175,22 @@ describe("convertLegacyDomains", () => {
 // buildRules
 // ---------------------------------------------------------------------------
 describe("buildRules", () => {
-  it("new rules only", () => {
+  it("converts multiple rules", () => {
     assert.deepEqual(
       buildRules("example.com:443 *.foo.com:8443"),
-      { domainRules: ["^example\\.com:443$", "^[^.]+\\.foo\\.com:8443$"], ipRules: [] },
+      ["^example\\.com:443$", "^[^.]+\\.foo\\.com:8443$"],
     );
   });
 
-  it("empty input → empty arrays", () => {
+  it("empty input → empty array", () => {
+    assert.deepEqual(buildRules(""), []);
+  });
+
+  it("regex rules (~ prefix)", () => {
     assert.deepEqual(
-      buildRules(""),
-      { domainRules: [], ipRules: [] },
+      buildRules("~^custom\\.regex:(443|8080)$ example.com:443"),
+      ["^custom\\.regex:(443|8080)$", "^example\\.com:443$"],
     );
-  });
-
-  it("IP rules are separated into ipRules", () => {
-    const result = buildRules("example.com:443 192.168.1.1:443 10.0.0.1:8080");
-    assert.deepEqual(result, {
-      domainRules: ["^example\\.com:443$"],
-      ipRules: ["^192\\.168\\.1\\.1:443$", "^10\\.0\\.0\\.1:8080$"],
-    });
-  });
-
-  it("regex rules (~ prefix) are included in domainRules", () => {
-    const result = buildRules("~^custom\\.regex:(443|8080)$ example.com:443");
-    assert.deepEqual(result, {
-      domainRules: ["^custom\\.regex:(443|8080)$", "^example\\.com:443$"],
-      ipRules: [],
-    });
   });
 });
 
@@ -271,8 +200,8 @@ describe("buildRules", () => {
 describe("buildLegacyRules", () => {
   it("converts legacy domains with deprecation warning", () => {
     const warnings = [];
-    const origWarn = console.warn;
-    console.warn = (msg) => warnings.push(msg);
+    const origLog = console.log;
+    console.log = (msg) => warnings.push(msg);
     try {
       const result = buildLegacyRules({
         domainsInput: "example.com",
@@ -284,7 +213,7 @@ describe("buildLegacyRules", () => {
       assert.equal(warnings.length, 1);
       assert.match(warnings[0], /Deprecated/i);
     } finally {
-      console.warn = origWarn;
+      console.log = origLog;
     }
   });
 

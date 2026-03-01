@@ -1,10 +1,10 @@
 # Rule Syntax
 
-buildcage uses `allowed_https_rules` and `allowed_http_rules` to control which domains are accessible during Docker builds.
+buildcage uses `allowed_https_rules`, `allowed_http_rules`, and `allowed_ip_rules` to control which destinations are accessible during Docker builds.
 
 ## Delimiters
 
-Rules are separated by **whitespace** (spaces, tabs, newlines). Whitespace inside `{…}` blocks is preserved, allowing regex alternation patterns like `~^example\.com:{80,8080}$`.
+Rules are separated by **whitespace** (spaces, tabs, newlines).
 
 ```yaml
 # These are equivalent:
@@ -34,17 +34,18 @@ Port is required. Append `:port` to every rule.
 |------|---------|
 | `example.com:443` | `example.com` on port 443 only |
 | `*.example.com:8443` | Any single-level subdomain of `example.com` on port 8443 only |
+| `example.com:*` | `example.com` on any port |
 
 ## IP Address Rules
 
-IPv4 address rules are supported. The IP address must include a port.
+Use `allowed_ip_rules` for direct IP address access. The IP address must include a port.
 
 | Rule | Matches |
 |------|---------|
 | `192.168.1.1:443` | `192.168.1.1` on port 443 only |
 | `10.0.0.1:8080` | `10.0.0.1` on port 8080 only |
 
-IP rules are automatically detected and separated from domain rules internally. CIDR notation is not supported.
+IP rules are handled separately from domain rules because direct IP access bypasses DNS resolution. CIDR notation is not supported.
 
 ## Regex Rules
 
@@ -80,6 +81,11 @@ Since the regex is tested against the `domain:port` string, include a port patte
     allowed_http_rules: >-
       deb.debian.org:80
       archive.ubuntu.com:8080
+
+    # IP address rules
+    allowed_ip_rules: >-
+      192.168.1.1:443
+      10.0.0.1:8080
 ```
 
 ```yaml

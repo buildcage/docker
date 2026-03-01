@@ -13,11 +13,15 @@ inputs:
     required: false
     default: 'restrict'
   allowed_https_rules:
-    description: "HTTPS allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '*.example.com:443 192.168.1.1:443 ~^custom\\.pattern:443$'"
+    description: "HTTPS allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '*.example.com:443 ~^custom\\.pattern:443$'"
     required: false
     default: ''
   allowed_http_rules:
-    description: "HTTP allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., 'example.com:80 192.168.1.1:8080'"
+    description: "HTTP allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., 'example.com:80'"
+    required: false
+    default: ''
+  allowed_ip_rules:
+    description: "IP address allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
     required: false
     default: ''
   # Deprecated

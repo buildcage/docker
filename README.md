@@ -196,6 +196,7 @@ Starts the buildcage builder container.
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
 | `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
+| `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 | `port` | No | `1234` | BuildKit endpoint port on localhost |
 
 **Rule syntax**
@@ -206,8 +207,10 @@ Starts the buildcage builder container.
 | Single-level wildcard | `*.example.com:443` | `sub.example.com` on port 443 (not `deep.sub.example.com`) |
 | Multi-level wildcard | `**.example.com:443` | `sub.example.com` and `deep.sub.example.com` on port 443 |
 | Single-char wildcard | `exampl?.com:443` | `example.com`, `examplx.com` on port 443 |
-| IP address | `192.168.1.1:443` | `192.168.1.1` on port 443 only |
+| Wildcard port | `example.com:*` | `example.com` on any port |
 | Regex | `~^custom\.pattern:\d+$` | Matched against `domain:port` |
+
+IP address rules (e.g., `192.168.1.1:443`) use the same syntax but go in `allowed_ip_rules`.
 
 For detailed syntax, see [Rule Syntax](./docs/rules.md).
 
@@ -380,7 +383,7 @@ The only known bypass is **domain fronting** — a technique where an attacker s
 
 - **Can I allow access to an IP address (e.g., `http://192.168.1.1`)?**
 
-  Yes. Add the IP address with a port to your rules (e.g., `192.168.1.1:443`). IP rules are automatically detected and handled separately from domain rules. Only IPv4 addresses are supported; CIDR notation is not supported.
+  Yes. Add the IP address with a port to `allowed_ip_rules` (e.g., `192.168.1.1:443`). Only IPv4 addresses are supported; CIDR notation is not supported.
 
 - **Does this protect against malicious code execution?**
 
