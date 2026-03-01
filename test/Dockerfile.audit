@@ -48,7 +48,7 @@ RUN echo "=== [HTTPS - missing-sni] ===" && \
 # [HTTP - missing-host-header (HTTP request without Host header)]
 RUN echo "=== [HTTP - missing-host-header] ===" && \
     echo "Testing HTTP request without Host header (should be blocked)..." && \
-    (printf 'GET / HTTP/1.0\r\n\r\n' | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
+    ((printf 'GET / HTTP/1.0\r\n\r\n'; sleep 1) | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
     echo "✓ missing-host-header: request sent (blocked expected in logs)"
 
 # Network configuration check
