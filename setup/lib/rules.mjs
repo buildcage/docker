@@ -13,7 +13,11 @@ export function buildRules(rulesInput) {
  */
 export function convertRule(rule) {
   if (rule.startsWith('~')) {
-    return rule.slice(1);
+    const regex = rule.slice(1);
+    try { new RegExp(regex); } catch (e) {
+      throw new Error(`Invalid regex in rule "${rule}": ${e.message}`);
+    }
+    return regex;
   }
   return `^${wildcardToRegex(rule)}$`;
 }
@@ -67,7 +71,7 @@ export function buildLegacyRules({ domainsInput, portsInput, defaultPort, protoc
     `::warning::Deprecated: allowed_${protocol.toLowerCase()}_domains / ${protocol.toLowerCase()}_ports inputs are deprecated. ` +
     `Use allowed_${protocol.toLowerCase()}_rules instead.`
   );
-  return convertLegacyDomains(domainsInput, portsInput || String(defaultPort));
+  return convertLegacyDomains(domainsInput, portsInput?.trim() || String(defaultPort));
 }
 
 /**

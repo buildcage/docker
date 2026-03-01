@@ -92,6 +92,10 @@ describe("convertRule", () => {
       "^custom\\.regex:443$",
     );
   });
+
+  it("rejects invalid regex (~ prefix)", () => {
+    assert.throws(() => convertRule("~^(unclosed"), /Invalid regex/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -228,8 +232,8 @@ describe("buildLegacyRules", () => {
   });
 
   it("falls back to defaultPort when portsInput is empty", () => {
-    const origWarn = console.warn;
-    console.warn = () => {};
+    const origLog = console.log;
+    console.log = () => {};
     try {
       const result = buildLegacyRules({
         domainsInput: "example.com",
@@ -239,7 +243,7 @@ describe("buildLegacyRules", () => {
       });
       assert.deepEqual(result, ["^example\\.com:443$"]);
     } finally {
-      console.warn = origWarn;
+      console.log = origLog;
     }
   });
 });
