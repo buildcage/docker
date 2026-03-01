@@ -1,6 +1,7 @@
 ARG BUILDKIT_VERSION=v0.27.1
 ARG CNI_VERSION=v1.9.0
 ARG ALPINE_RELEASE=3.23
+ARG S6_OVERLAY_VERSION=v3.2.2.0
 
 # Prepare dependencies
 FROM alpine:$ALPINE_RELEASE AS deps
@@ -20,10 +21,23 @@ LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage"
 
 RUN apk add --no-cache \
-      nginx nginx-mod-stream \
+      haproxy \
       dnsmasq \
       iptables \
       curl
+
+# s6-overlay
+ARG S6_OVERLAY_VERSION
+RUN apk add --no-cache xz && \
+    S6_ARCH=$(uname -m) && \
+    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" \
+      | xz -d | tar -C / -xpf - && \
+    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" \
+      | xz -d | tar -C / -xpf - && \
+    apk del xz
+
+ENV S6_KEEP_ENV=1
+ENV S6_LOGGING=0
 
 # envsubst
 COPY --from=deps /usr/bin/envsubst /usr/bin/envsubst
@@ -40,11 +54,16 @@ COPY files/cni.conflist   /etc/buildkit/cni.conflist
 # DNS
 COPY files/dnsmasq.conf /etc/dnsmasq.conf
 
-# Nginx
-COPY files/nginx.conf.template /etc/nginx/nginx.conf.template
+# HAProxy
+RUN mkdir -p /etc/haproxy/rules
+COPY files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
-# Entrypoint
-COPY files/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# s6 service definitions and init scripts
+COPY files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+COPY files/s6-scripts/ /etc/s6-overlay/scripts/
+RUN chmod +x /etc/s6-overlay/scripts/* && \
+    chmod +x /etc/s6-overlay/s6-rc.d/dnsmasq/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/haproxy/run
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/init"]
+CMD ["buildkitd", "--oci-worker-net=cni", "--addr", "tcp://0.0.0.0:1234"]

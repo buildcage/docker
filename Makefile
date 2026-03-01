@@ -5,18 +5,18 @@ COMPOSE_FILE ?= compose.yml
 help:
 	@grep -E '^[a-zA-Z_0-9-]+(-%)?:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
+.PHONY: clean
 clean: ## Clean up all resources
 	@echo "Stopping and removing all containers..."
 	@docker buildx rm buildcage 2>/dev/null || true
 	@docker compose -f compose.yml -f compose.test.yml down -v --rmi all
 	@docker rmi buildcage-test 2>/dev/null || true
 
+.PHONY: run_audit_mode
 run_audit_mode: ## Start in audit mode
 	@echo "Starting buildcage in AUDIT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=audit \
-	  ALLOWED_HTTP_DOMAINS="" \
-	  ALLOWED_HTTPS_DOMAINS="" \
 	  docker compose up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
@@ -24,12 +24,13 @@ run_audit_mode: ## Start in audit mode
 		--name buildcage \
 		--driver remote tcp://localhost:1234
 
+.PHONY: run_restrict_mode
 run_restrict_mode: ## Start in restrict mode
 	@echo "Starting buildcage in RESTRICT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=restrict \
-	  ALLOWED_HTTP_DOMAINS="$${ALLOWED_HTTP_DOMAINS:-}" \
-	  ALLOWED_HTTPS_DOMAINS="$${ALLOWED_HTTPS_DOMAINS:-github.com,registry.npmjs.org,api.github.com,objects.githubusercontent.com,httpbin.org,deb.debian.org,*.githubusercontent.com}" \
+	  ALLOWED_HTTP_RULES="$$(node setup/convert-rules.mjs "$${ALLOWED_HTTP_RULES:-}")" \
+	  ALLOWED_HTTPS_RULES="$$(node setup/convert-rules.mjs "$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}")" \
 	  docker compose up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
@@ -64,3 +65,7 @@ test_audit_mode: ## Run audit mode tests
 	@node report/main.mjs ./compose.yml
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean
+
+.PHONY: test_unit
+test_unit: ## Run unit tests
+	@node --test setup/lib/rules.test.mjs

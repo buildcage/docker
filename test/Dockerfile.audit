@@ -24,10 +24,32 @@ RUN echo "=== [Port 8080 - any domain] ===" && \
     echo "Testing blocked.example.com:8080 (HTTP, should be allowed in audit mode)..." && \
     (wget -q -O /dev/null --timeout=10 http://blocked.example.com:8080/ && echo "✓ blocked.example.com:8080: OK") || (echo "✗ blocked.example.com:8080: FAILED" && exit 1)
 
-# [Direct IP - blocked (iptables FORWARD DROP, mode-independent)]
-RUN echo "=== [Direct IP - blocked] ===" && \
-    echo "Testing direct IP access to 10.200.0.100 (should be blocked by iptables even in audit mode)..." && \
-    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by iptables (expected)"
+# [Direct IP - direct ip]
+RUN echo "=== [Direct IP - audit mode] ===" && \
+    echo "Testing direct IP access to 10.200.0.100 (routed through haproxy via TPROXY)..." && \
+    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✓ 10.200.0.100: OK") || (echo "✗ 10.200.0.100: FAILED" && exit 1)
+
+# [HTTPS - dns-failed (NXDOMAIN)]
+RUN echo "=== [HTTPS - dns-failed] ===" && \
+    echo "Testing nxdomain.wildcard.example.com (HTTPS, should be blocked by dns failure)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://nxdomain.wildcard.example.com/ && echo "✗ nxdomain.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ nxdomain.wildcard.example.com: BLOCKED (expected)"
+
+# [HTTP - dns-failed (NXDOMAIN)]
+RUN echo "=== [HTTP - dns-failed] ===" && \
+    echo "Testing nxdomain.wildcard.example.com (HTTP, should be blocked by dns failure)..." && \
+    (wget -q -O /dev/null --timeout=5 http://nxdomain.wildcard.example.com/ && echo "✗ nxdomain.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ nxdomain.wildcard.example.com HTTP: BLOCKED (expected)"
+
+# [HTTPS - missing-sni (TLS ClientHello without SNI extension)]
+RUN echo "=== [HTTPS - missing-sni] ===" && \
+    echo "Testing TLS connection without SNI (should be blocked)..." && \
+    (printf '\x16\x03\x01\x00\x2d\x01\x00\x00\x29\x03\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xff\x01\x00' | nc -w 5 allowed.example.com 443 > /dev/null 2>&1 || true) && \
+    echo "✓ missing-sni: request sent (blocked expected in logs)"
+
+# [HTTP - missing-host-header (HTTP request without Host header)]
+RUN echo "=== [HTTP - missing-host-header] ===" && \
+    echo "Testing HTTP request without Host header (should be blocked)..." && \
+    ((printf 'GET / HTTP/1.0\r\n\r\n'; sleep 1) | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
+    echo "✓ missing-host-header: request sent (blocked expected in logs)"
 
 # Network configuration check
 RUN echo "=== Network Configuration ===" && \

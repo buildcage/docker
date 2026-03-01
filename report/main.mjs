@@ -23,13 +23,14 @@ console.log();
 
 // 3. Parse log lines
 const logPattern =
-  /^\[.*?\]\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+(TCP|HTTP)\s+.*?"([^"]+)"/;
+  /^\[.*?\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+"([^"]+)"\s*(\S*)/;
 
 const entries = [];
 for (const line of logs.split("\n")) {
   const m = line.match(logPattern);
   if (m) {
-    const hostPort = m[3];
+    const hostPort = m[2];
+    const reason = m[3] || "-";
     const colonIdx = hostPort.lastIndexOf(":");
     let host, port;
     if (colonIdx > 0) {
@@ -41,9 +42,9 @@ for (const line of logs.split("\n")) {
     }
     entries.push({
       decision: m[1],
-      protocol: m[2] === "TCP" ? "HTTPS" : "HTTP",
       host,
       port,
+      reason,
     });
   }
 }
@@ -60,17 +61,17 @@ if (entries.length === 0) {
 
 const isAudit = entries.some((e) => e.decision === "AUDIT");
 
-// Aggregate by (host, protocol, decision) → count, sorted descending
+// Aggregate by (host, port, reason) → count, sorted descending
 function aggregate(filtered) {
   const map = new Map();
   for (const e of filtered) {
-    const key = `${e.host}\t${e.port}\t${e.protocol}`;
+    const key = `${e.host}\t${e.port}\t${e.reason}`;
     map.set(key, (map.get(key) || 0) + 1);
   }
   return [...map.entries()]
     .map(([key, count]) => {
-      const [host, portStr, protocol] = key.split("\t");
-      return { host, port: Number(portStr), protocol, count };
+      const [host, portStr, reason] = key.split("\t");
+      return { host, port: Number(portStr), reason, count };
     })
     .sort(
       (a, b) =>
@@ -80,10 +81,17 @@ function aggregate(filtered) {
     );
 }
 
-function markdownTable(rows) {
-  const lines = ["| Host | Port | Protocol | Count |", "| --- | --- | --- | ---: |"];
+function markdownTable(rows, { showReason = false } = {}) {
+  if (showReason) {
+    const lines = ["| Host | Port | Reason | Count |", "| --- | --- | --- | ---: |"];
+    for (const r of rows) {
+      lines.push(`| ${r.host} | ${r.port || ""} | ${r.reason} | ${r.count} |`);
+    }
+    return lines.join("\n");
+  }
+  const lines = ["| Host | Port | Count |", "| --- | --- | ---: |"];
   for (const r of rows) {
-    lines.push(`| ${r.host} | ${r.port || ""} | ${r.protocol} | ${r.count} |`);
+    lines.push(`| ${r.host} | ${r.port || ""} | ${r.count} |`);
   }
   return lines.join("\n");
 }
@@ -96,6 +104,11 @@ if (isAudit) {
   if (audited.length > 0) {
     markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n";
   }
+  const blocked = aggregate(entries.filter((e) => e.decision === "BLOCKED"));
+  if (blocked.length > 0) {
+    if (audited.length > 0) markdown += "\n";
+    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n";
+  }
 } else {
   const allowed = aggregate(entries.filter((e) => e.decision === "ALLOWED"));
   const blocked = aggregate(entries.filter((e) => e.decision === "BLOCKED"));
@@ -106,7 +119,7 @@ if (isAudit) {
     markdown += "\n";
   }
   if (blocked.length > 0) {
-    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked) + "\n";
+    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n";
   }
 }
 
@@ -124,16 +137,22 @@ if (summaryFile) {
 // 5. Error control for blocked connections
 const blockedCount = entries.filter((e) => e.decision === "BLOCKED").length;
 if (blockedCount > 0) {
-  const failOnBlocked =
-    (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
-  if (failOnBlocked) {
-    console.log(
-      `::error::${blockedCount} blocked connection(s) detected by buildcage proxy`
-    );
-    process.exitCode = 1;
-  } else {
+  if (isAudit) {
     console.log(
       `::notice::${blockedCount} blocked connection(s) detected by buildcage proxy`
     );
+  } else {
+    const failOnBlocked =
+      (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
+    if (failOnBlocked) {
+      console.log(
+        `::error::${blockedCount} blocked connection(s) detected by buildcage proxy`
+      );
+      process.exitCode = 1;
+    } else {
+      console.log(
+        `::notice::${blockedCount} blocked connection(s) detected by buildcage proxy`
+      );
+    }
   }
 }

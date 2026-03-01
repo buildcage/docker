@@ -34,7 +34,7 @@ buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drive
 
 - HTTPS: SNI (Server Name Indication) for domain matching — TLS is not terminated
 - HTTP: Host header for domain matching
-- Direct IP access: blocked by iptables
+- Direct IP access: blocked unless explicitly allowed
 
 **Two modes available** (see [Reference](#reference) for details):
 
@@ -126,7 +126,7 @@ The report action outputs a Job Summary showing every domain your build contacte
 
 <img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="556">
 
-Copy these domain names into `allowed_https_domains` or `allowed_http_domains` for Step 3.
+Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for Step 3.
 
 #### Step 3: Create your allowlist and switch to restrict mode
 
@@ -146,9 +146,9 @@ jobs:
         uses: dash14/buildcage/setup@v1
         with:
           proxy_mode: restrict  # Block everything except allowed domains
-          allowed_https_domains: >-
-            registry.npmjs.org,
-            fonts.googleapis.com
+          allowed_https_rules: >-
+            registry.npmjs.org:443
+            fonts.googleapis.com:443
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -184,7 +184,7 @@ Starts the buildcage builder container.
   uses: dash14/buildcage/setup@v1
   with:
     proxy_mode: restrict
-    allowed_https_domains: registry.npmjs.org,github.com
+    allowed_https_rules: registry.npmjs.org:443 github.com:443
 ```
 
 #### Parameters
@@ -194,22 +194,25 @@ Starts the buildcage builder container.
 | `buildcage_image` | No | `ghcr.io/<owner>/<repo>` | Docker image name |
 | `buildcage_version` | No | `1` | Image tag |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
-| `allowed_http_domains` | No | empty | Allowed HTTP domains (comma-separated, without port) |
-| `allowed_https_domains` | No | empty | Allowed HTTPS domains (comma-separated, without port) |
-| `http_ports` | No | `80` | Comma-separated HTTP listen ports for the proxy |
-| `https_ports` | No | `443` | Comma-separated HTTPS listen ports for the proxy |
+| `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
+| `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
+| `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 | `port` | No | `1234` | BuildKit endpoint port on localhost |
 
-**Domain matching patterns**
-
-The following patterns are supported for domain values:
+**Rule syntax**
 
 | Pattern | Example | Matches |
 |---------|---------|---------|
-| Exact domain | `www.example.com` | Only `www.example.com` |
-| Prefix wildcard | `*.example.com` | `sub.example.com`, `deep.sub.example.com` (not `example.com` itself) |
-| Dot-prefix shorthand | `.example.com` | Both `example.com` and `*.example.com` |
-| Suffix wildcard | `example.*` | `example.com`, `example.io`, `example.org`, etc. |
+| Exact domain | `example.com:443` | `example.com` on port 443 only |
+| Single-level wildcard | `*.example.com:443` | `sub.example.com` on port 443 (not `deep.sub.example.com`) |
+| Multi-level wildcard | `**.example.com:443` | `sub.example.com` and `deep.sub.example.com` on port 443 |
+| Single-char wildcard | `exampl?.com:443` | `example.com`, `examplx.com` on port 443 |
+| Wildcard port | `example.com:*` | `example.com` on any port |
+| Regex | `~^custom\.pattern:\d+$` | Matched against `domain:port` |
+
+IP address rules (e.g., `192.168.1.1:443`) use the same syntax but go in `allowed_ip_rules`.
+
+For detailed syntax, see [Rule Syntax](./docs/rules.md).
 
 #### Outputs
 
@@ -243,7 +246,7 @@ Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup
 **When to use:** Production builds, CI/CD pipelines, security-critical environments.
 
 **What it does:**
-- Allows connections only to domains in `allowed_http_domains` / `allowed_https_domains`
+- Allows connections only to domains in `allowed_http_rules` / `allowed_https_rules`
 - Blocks all other connections
 - Logs allowed and blocked attempts
 
@@ -252,18 +255,18 @@ Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup
 - Start with audit mode to discover required domains, then switch to restrict mode.
 - Separate HTTP and HTTPS domains — some services use different hosts for each protocol.
 - Common package registries often use multiple domains (e.g., PyPI uses both `pypi.org` and `files.pythonhosted.org`).
-- Some package managers download over plain HTTP (e.g., certain Debian mirrors). Add those domains to `allowed_http_domains` separately:
+- Some package managers download over plain HTTP (e.g., certain Debian mirrors). Add those domains to `allowed_http_rules` separately:
 
   ```yaml
-  allowed_http_domains: deb.debian.org
-  allowed_https_domains: registry.npmjs.org
+  allowed_http_rules: deb.debian.org:80
+  allowed_https_rules: registry.npmjs.org:443
   ```
 
-- If your build needs to listen on non-standard ports (e.g., an application server on port 8080), add them with `http_ports` / `https_ports`:
+- If your build needs to access non-standard ports, specify the port in the rule:
 
   ```yaml
-  http_ports: "80,8080"
-  https_ports: "443,8443"
+  allowed_http_rules: "example.com:8080"
+  allowed_https_rules: "example.com:8443"
   ```
 
 ### Report Action (`dash14/buildcage/report`)
@@ -288,13 +291,13 @@ Use the domain names shown in the report to create your allowlist for restrict m
 
 <img src="assets/report-restrict-mode.png" alt="Outbound Traffic Report - restrict mode" width="556">
 
-The report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false`.
+In restrict mode, the report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false`. In audit mode, blocked connections (e.g., protocol errors) are reported but never cause the step to fail.
 
 #### Parameters
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected |
+| `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
 
 ---
 
@@ -368,7 +371,7 @@ The only known bypass is **domain fronting** — a technique where an attacker s
 
 - **Does this work with private package registries?**
 
-  Yes. Just add your private registry's domain to `allowed_https_domains`.
+  Yes. Just add your private registry's domain to `allowed_https_rules` (e.g., `registry.example.com:443`).
 
 - **What happens if I forget to add a required domain?**
 
@@ -380,7 +383,7 @@ The only known bypass is **domain fronting** — a technique where an attacker s
 
 - **Can I allow access to an IP address (e.g., `http://192.168.1.1`)?**
 
-  No. Currently, only domain-based URLs are supported in the allowlist. Direct IP address access is blocked. If there is demand for this feature, it may be considered in a future release.
+  Yes. Add the IP address with a port to `allowed_ip_rules` (e.g., `192.168.1.1:443`). Only IPv4 addresses are supported; CIDR notation is not supported.
 
 - **Does this protect against malicious code execution?**
 
@@ -424,6 +427,7 @@ See [LICENSE](./LICENSE) file for more details.
 
 buildcage is built on top of:
 - [BuildKit](https://github.com/moby/buildkit) - Modern build toolkit
-- [nginx](https://nginx.org/) - HTTP proxy
-- [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) - DNS server
 - [CNI](https://github.com/containernetworking/cni) - Container network interface
+- [HAProxy](https://www.haproxy.org/) - TCP/HTTP proxy
+- [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) - DNS server
+- [s6-overlay](https://github.com/just-containers/s6-overlay) - Process supervisor

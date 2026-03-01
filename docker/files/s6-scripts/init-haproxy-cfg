@@ -1,0 +1,75 @@
+#!/command/with-contenv sh
+set -e
+
+echo "init-haproxy-cfg: generating HAProxy configuration..."
+
+# Set default values
+PROXY_MODE=${PROXY_MODE:-"restrict"}
+ALLOWED_HTTPS_RULES=${ALLOWED_HTTPS_RULES:-""}
+ALLOWED_HTTP_RULES=${ALLOWED_HTTP_RULES:-""}
+ALLOWED_IP_RULES=${ALLOWED_IP_RULES:-""}
+EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-"1.1.1.1,8.8.8.8"}
+
+echo "Proxy mode: $PROXY_MODE"
+echo "Allowed HTTPS rules: $ALLOWED_HTTPS_RULES"
+echo "Allowed HTTP rules: $ALLOWED_HTTP_RULES"
+echo "Allowed IP rules: $ALLOWED_IP_RULES"
+echo "Resolver: $EXTERNAL_RESOLVER"
+
+# Generate lst files
+mkdir -p /etc/haproxy/rules
+if [ "$PROXY_MODE" = "audit" ]; then
+    echo "Configuring audit mode (all connections allowed, logged only)..."
+    echo ".*" > /etc/haproxy/rules/allowed_https.lst
+    echo ".*" > /etc/haproxy/rules/allowed_http.lst
+    echo ".*" > /etc/haproxy/rules/allowed_ips.lst
+else
+    echo "Configuring restrict mode (only allowed rules)..."
+    # Convert whitespace-separated rules to newline-separated lst files.
+    # Uses tr -s to squeeze any whitespace into single newlines, then grep to remove empty lines.
+    if [ -n "$ALLOWED_HTTPS_RULES" ]; then
+        printf '%s' "$ALLOWED_HTTPS_RULES" | tr -s '[:space:]' '\n' | grep . > /etc/haproxy/rules/allowed_https.lst
+    else
+        : > /etc/haproxy/rules/allowed_https.lst
+    fi
+    if [ -n "$ALLOWED_HTTP_RULES" ]; then
+        printf '%s' "$ALLOWED_HTTP_RULES" | tr -s '[:space:]' '\n' | grep . > /etc/haproxy/rules/allowed_http.lst
+    else
+        : > /etc/haproxy/rules/allowed_http.lst
+    fi
+    if [ -n "$ALLOWED_IP_RULES" ]; then
+        printf '%s' "$ALLOWED_IP_RULES" | tr -s '[:space:]' '\n' | grep . > /etc/haproxy/rules/allowed_ips.lst
+    else
+        : > /etc/haproxy/rules/allowed_ips.lst
+    fi
+fi
+
+# Generate nameserver lines from EXTERNAL_RESOLVER (comma-separated IPs)
+HAPROXY_NAMESERVERS=""
+RESOLVER_IDX=1
+IFS=','
+for ip in $EXTERNAL_RESOLVER; do
+    HAPROXY_NAMESERVERS="${HAPROXY_NAMESERVERS}
+    nameserver ns${RESOLVER_IDX} ${ip}:53"
+    RESOLVER_IDX=$((RESOLVER_IDX + 1))
+done
+unset IFS
+
+# Set decision label and audit accept
+if [ "$PROXY_MODE" = "audit" ]; then
+    HAPROXY_DECISION_LABEL="AUDIT"
+    HAPROXY_AUDIT_ACCEPT="tcp-request content accept if !is_dns_routed !is_ip_match"
+else
+    HAPROXY_DECISION_LABEL="ALLOWED"
+    HAPROXY_AUDIT_ACCEPT="# restrict mode: reject unmatched IPs below"
+fi
+
+export HAPROXY_NAMESERVERS HAPROXY_DECISION_LABEL HAPROXY_AUDIT_ACCEPT
+
+# Generate config file from template
+echo "Generating haproxy.cfg from template..."
+envsubst '${HAPROXY_NAMESERVERS} ${HAPROXY_DECISION_LABEL} ${HAPROXY_AUDIT_ACCEPT}' \
+  < /etc/haproxy/haproxy.cfg.template \
+  > /etc/haproxy/haproxy.cfg
+
+echo "init-haproxy-cfg: configuration generated"
