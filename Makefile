@@ -29,8 +29,8 @@ run_restrict_mode: ## Start in restrict mode
 	@echo "Starting buildcage in RESTRICT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=restrict \
-	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
-	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-^github\.com:443$$,^registry\.npmjs\.org:443$$,^api\.github\.com:443$$,^objects\.githubusercontent\.com:443$$,^httpbin\.org:443$$,^deb\.debian\.org:80$$,^.*\.githubusercontent\.com:443$$}" \
+	  ALLOWED_HTTP_RULES="$$(node setup/convert-rules.mjs "$${ALLOWED_HTTP_RULES:-}")" \
+	  ALLOWED_HTTPS_RULES="$$(node setup/convert-rules.mjs "$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}")" \
 	  docker compose up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
@@ -68,4 +68,4 @@ test_audit_mode: ## Run audit mode tests
 
 .PHONY: test_unit
 test_unit: ## Run unit tests
-	@node --test setup/rules.test.mjs
+	@node --test setup/lib/rules.test.mjs

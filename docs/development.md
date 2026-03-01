@@ -94,8 +94,10 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │   ├── compose.yml            # Compose config for GitHub Actions (with image tag)
 │   ├── main.mjs               # Setup entrypoint (rule generation, compose up)
 │   ├── post.mjs               # Post-action cleanup
-│   ├── rules.mjs              # Rule parser (wildcards, regex, ports)
-│   └── rules.test.mjs         # Unit tests for rules.mjs
+│   ├── convert-rules.mjs      # CLI: wildcard rules → regex (used by Makefile)
+│   └── lib/
+│       ├── rules.mjs          # Rule parser (wildcards, regex, ports)
+│       └── rules.test.mjs     # Unit tests for rules.mjs
 ├── report/
 │   ├── action.yml             # GitHub Action: dash14/buildcage/report@v1
 │   └── main.mjs               # Log analysis and Job Summary output
