@@ -419,6 +419,10 @@ See the [Development Guide](./docs/development.md) for local usage, testing, vie
 
 Contributions are welcome! Please feel free to submit issues or pull requests at [github.com/dash14/buildcage](https://github.com/dash14/buildcage).
 
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind, express or implied. The authors and contributors are not liable for any damages, losses, or security incidents arising from the use of this software. Use at your own risk.
+
 ## License
 Licensed under the MIT License.
 See [LICENSE](./LICENSE) file for more details.
