@@ -25,9 +25,8 @@ if [ "$PROXY_MODE" = "audit" ]; then
     echo ".*" > /etc/haproxy/rules/allowed_ips.lst
 else
     echo "Configuring restrict mode (only allowed rules)..."
-    # Convert whitespace-separated rules to newline-separated lst files
+    # Convert whitespace-separated rules to newline-separated lst files.
     # Uses tr -s to squeeze any whitespace into single newlines, then grep to remove empty lines.
-    # Commas inside patterns (e.g. {80,8080}) are preserved.
     if [ -n "$ALLOWED_HTTPS_RULES" ]; then
         printf '%s' "$ALLOWED_HTTPS_RULES" | tr -s '[:space:]' '\n' | grep . > /etc/haproxy/rules/allowed_https.lst
     else
@@ -62,7 +61,7 @@ if [ "$PROXY_MODE" = "audit" ]; then
     HAPROXY_AUDIT_ACCEPT="tcp-request content accept if !is_dns_routed !is_ip_match"
 else
     HAPROXY_DECISION_LABEL="ALLOWED"
-    HAPROXY_AUDIT_ACCEPT=""
+    HAPROXY_AUDIT_ACCEPT="# restrict mode: reject unmatched IPs below"
 fi
 
 export HAPROXY_NAMESERVERS HAPROXY_DECISION_LABEL HAPROXY_AUDIT_ACCEPT
