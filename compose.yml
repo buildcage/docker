@@ -3,7 +3,16 @@ services:
     build:
       context: docker
       dockerfile: Dockerfile
-    privileged: true
+    # BuildKit OCI worker requires SYS_ADMIN for mount, namespaces, and cgroups.
+    # iptables and CNI networking require NET_ADMIN.
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    # BuildKit/runc needs syscalls (mount, unshare, pivot_root) blocked by
+    # default seccomp and AppArmor profiles.
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
     ports:
       - "${PORT:-1234}:1234"
     environment:
