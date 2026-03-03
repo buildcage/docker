@@ -15,8 +15,10 @@ services:
     security_opt:
       - seccomp=unconfined
       - apparmor=unconfined
-    # /sys/fs/cgroup is read-only in non-privileged containers, but BuildKit
-    # needs write access to create cgroups for build containers.
+    # Share the host's cgroup namespace so BuildKit can manage cgroups for
+    # build containers. The volume mount makes /sys/fs/cgroup writable
+    # (read-only by default in non-privileged containers).
+    cgroup: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     ports:
