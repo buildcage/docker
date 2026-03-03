@@ -43,6 +43,7 @@ jobs:
         with:
           image-ref: ${{ github.event_name == 'schedule' && format('ghcr.io/{0}:latest', github.repository) || 'buildcage:scan' }}
           ignore-unfixed: true
+          trivyignores: .trivyignore
           scanners: vuln
           format: sarif
           output: trivy-results.sarif
