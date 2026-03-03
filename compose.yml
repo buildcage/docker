@@ -5,14 +5,20 @@ services:
       dockerfile: Dockerfile
     # BuildKit OCI worker requires SYS_ADMIN for mount, namespaces, and cgroups.
     # iptables and CNI networking require NET_ADMIN.
+    # runc needs SYS_PTRACE to access /proc/PID/ns/mnt for mount namespace setup.
     cap_add:
       - SYS_ADMIN
       - NET_ADMIN
+      - SYS_PTRACE
     # BuildKit/runc needs syscalls (mount, unshare, pivot_root) blocked by
     # default seccomp and AppArmor profiles.
     security_opt:
       - seccomp=unconfined
       - apparmor=unconfined
+    # /sys/fs/cgroup is read-only in non-privileged containers, but BuildKit
+    # needs write access to create cgroups for build containers.
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     ports:
       - "${PORT:-1234}:1234"
     environment:
