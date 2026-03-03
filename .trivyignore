@@ -1,0 +1,42 @@
+# crypto/tls: Unexpected session resumption (Go stdlib)
+# Affected binaries (buildkitd, buildkit-runc, CNI plugins) do not use
+# TLS session resumption with dynamic Config mutation, so no practical impact.
+CVE-2025-68121
+
+# OpenTelemetry Go SDK PATH Hijacking (macOS/Darwin only)
+# This product runs in Linux containers; macOS code path is never executed.
+CVE-2026-24051
+
+# Go stdlib vulnerabilities affecting CNI plugins only.
+# CNI plugins (bridge, host-local, loopback, firewall) do not perform
+# TLS connections, certificate validation, ZIP processing, or URL parsing.
+CVE-2025-61730
+CVE-2025-61729
+CVE-2025-61728
+CVE-2025-61726
+
+# buildkit-runc does not use proxy-based HTTP communication or HTML parsing.
+CVE-2025-22870
+CVE-2025-22872
+
+# CNI plugins do not perform x509 certificate validation.
+CVE-2025-61727
+
+# sigstore/rekor server-side vulnerabilities.
+# buildkitd does not run as a Rekor server.
+CVE-2026-23831
+CVE-2026-24117
+
+# go-tuf client vulnerabilities.
+# buildkitd does not directly use TUF client with untrusted repositories.
+CVE-2026-23991
+CVE-2026-23992
+CVE-2026-24686
+
+# sigstore TUF client path traversal via disk cache.
+# buildkitd does not use sigstore TUF client with disk caching directly.
+CVE-2026-24137
+
+# libexpat integer overflow in tag buffer reallocation.
+# No external XML processing path exists in this product.
+CVE-2026-25210
