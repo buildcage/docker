@@ -1,6 +1,10 @@
 services:
   builder:
     image: ${BUILDCAGE_IMAGE}:${BUILDCAGE_VERSION:-1}
+    # Instead of privileged: true, grant only the minimum privileges required
+    # to run BuildKit and iptables. This avoids granting full device access
+    # and unrestricted /sys write permissions that privileged mode includes.
+    #
     # BuildKit OCI worker requires SYS_ADMIN for mount, namespaces, and cgroups.
     # iptables and CNI networking require NET_ADMIN.
     # runc needs SYS_PTRACE to access /proc/PID/ns/mnt for mount namespace setup.
