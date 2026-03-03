@@ -40,3 +40,11 @@ CVE-2026-24137
 # libexpat integer overflow in tag buffer reallocation.
 # No external XML processing path exists in this product.
 CVE-2026-25210
+
+# CIRCL ecc/p384 CombinedMult incorrect value for specific inputs.
+# buildkitd does not use CombinedMult directly; ECDH/ECDSA are unaffected.
+CVE-2026-1229
+
+# libexpat: XML_ExternalEntityParserCreate does not copy encoding handler user data.
+# No external XML entity processing path exists in this product.
+CVE-2026-24515
