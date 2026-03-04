@@ -23,14 +23,15 @@ console.log();
 
 // 3. Parse log lines
 const logPattern =
-  /^\[.*?\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+"([^"]+)"\s*(\S*)/;
+  /^\[.*?\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+\((\w+)\)\s+"([^"]+)"\s*(\S*)/;
 
 const entries = [];
 for (const line of logs.split("\n")) {
   const m = line.match(logPattern);
   if (m) {
-    const hostPort = m[2];
-    const reason = m[3] || "-";
+    const ruleType = m[2];
+    const hostPort = m[3];
+    const reason = m[4] || "-";
     const colonIdx = hostPort.lastIndexOf(":");
     let host, port;
     if (colonIdx > 0) {
@@ -42,6 +43,7 @@ for (const line of logs.split("\n")) {
     }
     entries.push({
       decision: m[1],
+      ruleType,
       host,
       port,
       reason,
@@ -65,13 +67,13 @@ const isAudit = entries.some((e) => e.decision === "AUDIT");
 function aggregate(filtered) {
   const map = new Map();
   for (const e of filtered) {
-    const key = `${e.host}\t${e.port}\t${e.reason}`;
+    const key = `${e.host}\t${e.port}\t${e.ruleType}\t${e.reason}`;
     map.set(key, (map.get(key) || 0) + 1);
   }
   return [...map.entries()]
     .map(([key, count]) => {
-      const [host, portStr, reason] = key.split("\t");
-      return { host, port: Number(portStr), reason, count };
+      const [host, portStr, ruleType, reason] = key.split("\t");
+      return { host, port: Number(portStr), ruleType, reason, count };
     })
     .sort(
       (a, b) =>
@@ -83,15 +85,15 @@ function aggregate(filtered) {
 
 function markdownTable(rows, { showReason = false } = {}) {
   if (showReason) {
-    const lines = ["| Host | Port | Reason | Count |", "| --- | --- | --- | ---: |"];
+    const lines = ["| Host | Port | Type | Reason | Count |", "| --- | --- | --- | --- | ---: |"];
     for (const r of rows) {
-      lines.push(`| ${r.host} | ${r.port || ""} | ${r.reason} | ${r.count} |`);
+      lines.push(`| ${r.host} | ${r.port || ""} | ${r.ruleType} | ${r.reason} | ${r.count} |`);
     }
     return lines.join("\n");
   }
-  const lines = ["| Host | Port | Count |", "| --- | --- | ---: |"];
+  const lines = ["| Host | Port | Type | Count |", "| --- | --- | --- | ---: |"];
   for (const r of rows) {
-    lines.push(`| ${r.host} | ${r.port || ""} | ${r.count} |`);
+    lines.push(`| ${r.host} | ${r.port || ""} | ${r.ruleType} | ${r.count} |`);
   }
   return lines.join("\n");
 }
