@@ -238,9 +238,8 @@ Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup
 **When to use:** First-time setup, adding new dependencies, or investigating issues.
 
 **What it does:**
-- Allows all HTTP/HTTPS connections
+- Allows all HTTP/HTTPS connections (except requests missing a Host header or SNI)
 - Logs every domain accessed during the build
-- Does NOT block anything
 
 ##### Restrict Mode (`proxy_mode: restrict`)
 
@@ -263,12 +262,6 @@ Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup
   allowed_https_rules: registry.npmjs.org:443
   ```
 
-- If your build needs to access non-standard ports, specify the port in the rule:
-
-  ```yaml
-  allowed_http_rules: "example.com:8080"
-  allowed_https_rules: "example.com:8443"
-  ```
 
 ### Report Action (`dash14/buildcage/report`)
 
