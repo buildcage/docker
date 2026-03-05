@@ -85,15 +85,15 @@ function aggregate(filtered) {
 
 function markdownTable(rows, { showReason = false } = {}) {
   if (showReason) {
-    const lines = ["| Host | Port | Type | Reason | Count |", "| --- | --- | --- | --- | ---: |"];
+    const lines = ["| Host | Rule | Reason | Count |", "| --- | --- | --- | ---: |"];
     for (const r of rows) {
-      lines.push(`| ${r.host} | ${r.port || ""} | ${r.ruleType} | ${r.reason} | ${r.count} |`);
+      lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.reason} | ${r.count} |`);
     }
     return lines.join("\n");
   }
-  const lines = ["| Host | Port | Type | Count |", "| --- | --- | --- | ---: |"];
+  const lines = ["| Host | Rule | Count |", "| --- | --- | ---: |"];
   for (const r of rows) {
-    lines.push(`| ${r.host} | ${r.port || ""} | ${r.ruleType} | ${r.count} |`);
+    lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.count} |`);
   }
   return lines.join("\n");
 }
@@ -124,6 +124,8 @@ if (isAudit) {
     markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n";
   }
 }
+
+markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
 
 const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 markdown += `\n*Reported by [buildcage](https://github.com/${actionRepo})*\n`;
