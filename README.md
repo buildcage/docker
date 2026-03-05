@@ -35,6 +35,7 @@ buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drive
 - HTTPS: SNI (Server Name Indication) for domain matching — TLS is not terminated
 - HTTP: Host header for domain matching
 - Direct IP access: blocked unless explicitly allowed
+- Non-TCP protocols (UDP, ICMP, etc.): all blocked — only TCP connections are supported
 
 **Two modes available** (see [Reference](#reference) for details):
 
