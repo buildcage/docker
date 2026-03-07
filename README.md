@@ -11,19 +11,13 @@
 ![license](https://img.shields.io/github/license/dash14/buildcage
 )
 
-**A secure Docker build environment that prevents supply chain attacks by restricting outbound network access during image builds.**
+**Secure your Docker builds against supply chain attacks — restrict outbound network access to only the domains you allow.**
 
-buildcage is a GitHub Actions-ready Docker container that runs a custom BuildKit builder. When you configure Docker Buildx to use buildcage as a remote builder, all network traffic from `RUN` steps in your Dockerfile is routed through an internal proxy that can log and block connections based on domain name.
+When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, those commands can reach any server on the internet — and you have no visibility or control over where they connect. A compromised dependency could silently exfiltrate your build secrets or phone home to an attacker's server.
 
-You define a list of allowed domains, and only connections to those domains are permitted during builds — everything else is blocked.
+buildcage prevents this. You define a list of allowed domains, and only those connections are permitted during builds. Everything else is blocked.
 
-*Think of it as a firewall for your Docker builds.*
-
-## Why Use buildcage?
-
-When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, these commands can connect to any server on the internet. **You have no visibility or control over where they connect.**
-
-buildcage solves this by restricting outbound network access during builds to only the domains you explicitly allow.
+No Dockerfile changes required. No certificates to install. Works with any language or package manager.
 
 
 ## How It Works
