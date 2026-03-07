@@ -64,6 +64,7 @@ buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drive
 - 🔍 **Audit mode**: Discover dependencies before enforcing restrictions
 - 🛡️ **Restrict mode**: Production-ready access control
 - 📊 **Detailed logging**: Complete visibility into all network connections during builds
+- 🔐 **Self-hostable**: Fork or import the repo to build and manage the image in your own GitHub environment — full control over what you trust
 
 ## Quick Start
 
@@ -325,6 +326,28 @@ All containers spawned by BuildKit `RUN` steps are placed on an isolated network
 
 ---
 
+## Trust & Self-Hosting
+
+buildcage is a security tool — so it's fair to ask: *how do you trust buildcage itself?*
+
+A pre-built image from a third party could be modified or rebuilt at any time without your knowledge. For a tool that sits in your build pipeline, that's a risk worth addressing.
+
+**Self-hosting (recommended for production)**
+
+You can fork or import this repository into your own GitHub organization, review the source code, and build the Docker image entirely within your own infrastructure. This gives you:
+
+- Full visibility into what the tool contains
+- Control over when and how updates are applied
+- A reproducible, tamper-proof build artifact that you own
+
+See the [Self-Hosting Guide](./docs/self-hosting.md) for setup instructions.
+
+**Using the upstream image**
+
+If you don't need that level of control, you can use the image published from this repository directly. This is the simplest option and keeps you up to date with the latest fixes and improvements automatically.
+
+---
+
 ## Security Considerations
 
 > **Important:** buildcage controls *where* your builds can connect, not *what code* they run. If a malicious package is delivered through a legitimate repository (e.g., a compromised npm package hosted on `registry.npmjs.org`), buildcage cannot detect or prevent it — the connection goes to an allowed domain.
@@ -353,7 +376,7 @@ The only known bypass is **domain fronting** — a technique where an attacker s
 
 - **Can I host buildcage in my own private repository?**
 
-  Yes. You can import the repository into your organization and build the Docker image yourself. See the [Self-Hosting Guide](./docs/self-hosting.md) for details.
+  Yes. See [Trust & Self-Hosting](#trust--self-hosting) for details.
 
 - **Does this slow down my builds?**
 
