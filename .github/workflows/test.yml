@@ -7,15 +7,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - 'docker/**'
-      - 'setup/**'
-      - 'report/**'
-      - 'test/**'
-      - 'compose.yml'
-      - 'compose.test.yml'
-      - 'Makefile'
-      - '.github/workflows/test.yml'
 
 jobs:
   unit_test:
