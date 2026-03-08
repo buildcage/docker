@@ -7,7 +7,13 @@ import * as std from "std";
 import { buildRules } from "./lib/rules.mjs";
 
 const input = std.in.readAsString();
-const regexRules = buildRules(input);
-if (regexRules.length > 0) {
-  std.out.puts(regexRules.join("\n") + "\n");
+
+try {
+  const regexRules = buildRules(input);
+  if (regexRules.length > 0) {
+    std.out.puts(regexRules.join("\n") + "\n");
+  }
+} catch (e) {
+  std.err.puts(`${e.message}\n`);
+  std.exit(1);
 }

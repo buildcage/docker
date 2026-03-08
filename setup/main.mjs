@@ -3,6 +3,7 @@ import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildLegacyRules } from "./lib/legacy-rules.mjs";
+import { buildRules } from "../docker/files/tools/lib/rules.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "compose.yml");
@@ -123,10 +124,13 @@ function resolveImageTag(repository, { versionInput, actionRef }) {
  * @returns {{ httpsRules: string[], httpRules: string[], ipRules: string[] }}
  */
 function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput, httpsDomainsInput, httpDomainsInput, httpsPortsInput, httpPortsInput }) {
-  // New-style rules: pass through as-is (wildcard format)
+  // New-style rules: pass through as-is (wildcard format), validate by converting to regex
   const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
   const httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
   const ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+  buildRules(httpsRulesInput);
+  buildRules(httpRulesInput);
+  buildRules(ipRulesInput);
 
   // Legacy rules (converted to wildcard format)
   const httpsLegacy = buildLegacyRules({
