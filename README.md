@@ -440,8 +440,9 @@ If you find buildcage helpful, please consider giving it a star ⭐ on GitHub!
 This software is provided "as is", without warranty of any kind, express or implied. The authors and contributors are not liable for any damages, losses, or security incidents arising from the use of this software. Use at your own risk.
 
 ## License
-Licensed under the MIT License.
-See [LICENSE](./LICENSE) file for more details.
+The buildcage source code is licensed under the MIT License. See [LICENSE](./LICENSE) file for details.
+
+The Docker image includes third-party components under their own licenses (GPL, Apache 2.0, ISC, etc.). See [THIRD_PARTY_LICENSES](./THIRD_PARTY_LICENSES) for the full list.
 
 ## Acknowledgments
 
