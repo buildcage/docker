@@ -29,8 +29,8 @@ run_restrict_mode: ## Start in restrict mode
 	@echo "Starting buildcage in RESTRICT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=restrict \
-	  ALLOWED_HTTP_RULES="$$(node setup/convert-rules.mjs "$${ALLOWED_HTTP_RULES:-}")" \
-	  ALLOWED_HTTPS_RULES="$$(node setup/convert-rules.mjs "$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}")" \
+	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
+	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
 	  docker compose up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
@@ -67,8 +67,17 @@ test_audit_mode: ## Run audit mode tests
 	@$(MAKE) clean
 
 .PHONY: test_unit
-test_unit: ## Run unit tests
-	@node --test setup/lib/rules.test.mjs
+test_unit: test_legacy test_qjs ## Run unit tests
+
+.PHONY: test_legacy
+test_legacy: ## Run legacy rules unit tests
+	@node --test setup/lib/legacy-rules.test.mjs
+
+.PHONY: test_qjs
+test_qjs: ## Run unit tests in Docker
+	@docker build -t buildcage-qjs-test docker
+	@docker run --rm --entrypoint qjs buildcage-qjs-test /opt/buildcage/tools/lib/rules.test.mjs
+	@docker run --rm --entrypoint qjs buildcage-qjs-test /opt/buildcage/tools/lib/log-parser.test.mjs
 
 .PHONY: test_audit_example
 run_audit_example: ## Run audit mode example tests

@@ -90,41 +90,49 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 
 ```
 .
-├── setup/
-│   ├── action.yml             # GitHub Action: dash14/buildcage/setup@v1
-│   ├── compose.yml            # Compose config for GitHub Actions (with image tag)
-│   ├── main.mjs               # Setup entrypoint (rule generation, compose up)
-│   ├── post.mjs               # Post-action cleanup
-│   ├── convert-rules.mjs      # CLI: wildcard rules → regex (used by Makefile)
+├── setup/                       # GitHub Actions setup
+│   ├── action.yml               # GitHub Action: dash14/buildcage/setup@v1
+│   ├── compose.yml              # Compose config for GitHub Actions (with image tag)
+│   ├── main.mjs                 # Setup entrypoint (rule generation, compose up)
+│   ├── post.mjs                 # Post-action cleanup
 │   └── lib/
-│       ├── rules.mjs          # Rule parser (wildcards, regex, ports)
-│       └── rules.test.mjs     # Unit tests for rules.mjs
-├── report/
-│   ├── action.yml             # GitHub Action: dash14/buildcage/report@v1
-│   └── main.mjs               # Log analysis and Job Summary output
-├── docs/
-│   ├── development.md         # Development guide
-│   ├── rules.md               # Rule format reference
-│   ├── security.md            # Security design
-│   └── self-hosting.md        # Self-hosting guide
-├── compose.yml                # Docker Compose config
-├── compose.test.yml           # Test override config
-├── Makefile                   # Operational commands
+│       ├── legacy-rules.mjs     # Legacy domain/port → wildcard conversion
+│       └── legacy-rules.test.mjs
+├── report/                      # GitHub Actions report
+│   ├── action.yml               # GitHub Action: dash14/buildcage/report@v1
+│   └── main.mjs                 # Log analysis and Job Summary output
 ├── docker/
-│   ├── Dockerfile             # Multi-stage BuildKit + haproxy + dnsmasq + s6-overlay
-│   └── files/                 # Builder container config files
-│       ├── buildkitd.toml     # BuildKit config
-│       ├── cni.conflist       # CNI config (isolated-net)
-│       ├── dnsmasq.conf       # DNS config (all domains → gateway)
+│   ├── Dockerfile               # Multi-stage BuildKit + haproxy + dnsmasq + s6-overlay
+│   └── files/
+│       ├── buildkitd.toml       # BuildKit config
+│       ├── cni.conflist         # CNI config (isolated-net)
+│       ├── dnsmasq.conf         # DNS config (all domains → gateway)
 │       ├── haproxy.cfg.template # Dynamic HAProxy config (HTTP/HTTPS)
-│       ├── s6-rc.d/           # s6-overlay service definitions
-│       └── s6-scripts/        # s6-overlay init scripts
-└── test/
-    ├── Dockerfile.audit       # Audit mode test
-    ├── Dockerfile.restrict    # Restrict mode test
-    ├── assert-audit-mode.sh   # Audit mode verification script
-    ├── assert-restrict-mode.sh # Restrict mode verification script
-    ├── helpers.sh             # Test helpers
-    ├── test-server/           # Test HTTP server
-    └── test-dns/              # Test DNS server
+│       ├── s6-rc.d/             # s6-overlay service definitions
+│       ├── s6-scripts/          # s6-overlay init scripts
+│       └── tools/               # QuickJS scripts (run inside container)
+│           ├── convert-rule.mjs # stdin wildcard → stdout regex filter
+│           ├── report.mjs       # Parse HAProxy logs → structured JSON
+│           └── lib/
+│               ├── rules.mjs        # Wildcard → regex conversion
+│               ├── rules.test.mjs
+│               ├── log-parser.mjs   # Log parsing and aggregation
+│               ├── log-parser.test.mjs
+│               └── test-shim.mjs    # Minimal test runner for QuickJS
+├── docs/
+│   ├── development.md           # Development guide
+│   ├── rules.md                 # Rule format reference
+│   ├── security.md              # Security design
+│   └── self-hosting.md          # Self-hosting guide
+├── test/
+│   ├── Dockerfile.audit         # Audit mode test
+│   ├── Dockerfile.restrict      # Restrict mode test
+│   ├── assert-audit-mode.sh     # Audit mode verification script
+│   ├── assert-restrict-mode.sh  # Restrict mode verification script
+│   ├── helpers.sh               # Test helpers
+│   ├── test-server/             # Test HTTP server
+│   └── test-dns/                # Test DNS server
+├── compose.yml                  # Docker Compose config
+├── compose.test.yml             # Test override config
+└── Makefile                     # Operational commands
 ```
