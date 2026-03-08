@@ -110,3 +110,5 @@ git push origin HEAD --tags --force
 ```
 
 After pushing a new version tag, the **Build and Push Docker Image** workflow will automatically trigger and publish the updated image.
+
+> **Note:** If the workflow does not trigger automatically, run it manually from **Actions** > **Build and Push Docker Image** > **Run workflow**. The branch selection can be left as `main` — the workflow will build from the latest version tag.
