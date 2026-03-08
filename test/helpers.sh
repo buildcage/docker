@@ -2,7 +2,7 @@
 set -euo pipefail
 
 FAILURES=0
-LOGS=$(docker compose logs --no-log-prefix builder 2>/dev/null)
+LOGS=$(docker compose exec builder cat /var/log/haproxy/current 2>/dev/null)
 
 assert_log_contains() {
   local marker="$1"

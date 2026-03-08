@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRules, buildLegacyRules } from "./lib/rules.mjs";
+import { buildLegacyRules } from "./lib/legacy-rules.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "compose.yml");
@@ -117,17 +117,18 @@ function resolveImageTag(repository, { versionInput, actionRef }) {
 
 /**
  * Build ACL rules by merging new-style rules and legacy rules.
- * Each property is an array of regex strings (not yet joined).
+ * New-style rules are passed through as-is (wildcard format).
+ * Legacy rules are converted to wildcard format.
  *
  * @returns {{ httpsRules: string[], httpRules: string[], ipRules: string[] }}
  */
 function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput, httpsDomainsInput, httpDomainsInput, httpsPortsInput, httpPortsInput }) {
-  // New-style rules
-  const httpsRules = buildRules(httpsRulesInput);
-  const httpRules = buildRules(httpRulesInput);
-  const ipRules = buildRules(ipRulesInput);
+  // New-style rules: pass through as-is (wildcard format)
+  const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
 
-  // Legacy rules
+  // Legacy rules (converted to wildcard format)
   const httpsLegacy = buildLegacyRules({
     domainsInput: httpsDomainsInput,
     portsInput: httpsPortsInput,

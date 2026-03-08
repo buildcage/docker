@@ -24,7 +24,8 @@ RUN apk add --no-cache \
       haproxy \
       dnsmasq \
       iptables \
-      curl
+      curl \
+      quickjs
 
 # s6-overlay
 ARG S6_OVERLAY_VERSION
@@ -55,15 +56,19 @@ COPY files/cni.conflist   /etc/buildkit/cni.conflist
 COPY files/dnsmasq.conf /etc/dnsmasq.conf
 
 # HAProxy
-RUN mkdir -p /etc/haproxy/rules
+RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
 COPY files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
+
+# Tools (QuickJS scripts)
+COPY files/tools/ /opt/buildcage/tools/
 
 # s6 service definitions and init scripts
 COPY files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 COPY files/s6-scripts/ /etc/s6-overlay/scripts/
 RUN chmod +x /etc/s6-overlay/scripts/* && \
     chmod +x /etc/s6-overlay/s6-rc.d/dnsmasq/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/haproxy/run
+    chmod +x /etc/s6-overlay/s6-rc.d/haproxy/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/haproxy-log/run
 
 ENTRYPOINT ["/init"]
 CMD ["buildkitd", "--oci-worker-net=cni", "--addr", "tcp://0.0.0.0:1234"]
