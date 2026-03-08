@@ -107,7 +107,7 @@ jobs:
           context: .
           push: false  # Set to true to push the built image
 
-      - name: Show what domains were accessed
+      - name: Show buildcage report
         if: always()
         uses: dash14/buildcage/report@v1
         with:
@@ -158,7 +158,7 @@ jobs:
           context: .
           push: false  # Set to true to push the built image
 
-      - name: Security report
+      - name: Show buildcage report
         if: always()
         uses: dash14/buildcage/report@v1
         # Build fails if any unexpected connections were blocked
