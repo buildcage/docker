@@ -17,7 +17,7 @@ FROM moby/buildkit:${BUILDKIT_VERSION}
 
 LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
-      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage"
 
 RUN apk add --no-cache \
@@ -61,6 +61,9 @@ COPY files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
 # Tools (QuickJS scripts)
 COPY files/tools/ /opt/buildcage/tools/
+
+# License
+COPY files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 
 # s6 service definitions and init scripts
 COPY files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
