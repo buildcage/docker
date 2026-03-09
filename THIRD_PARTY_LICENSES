@@ -1,8 +1,8 @@
 Third-Party Licenses
 ====================
 
-The buildcage Docker image includes the following third-party software.
-Each component retains its original license. The buildcage source code
+The Buildcage Docker image includes the following third-party software.
+Each component retains its original license. The Buildcage source code
 itself is licensed under the MIT License (see LICENSE file).
 
 ------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ repository. Their source code is available through:
   2. Alpine Linux source packages:
      https://pkgs.alpinelinux.org/packages
 
-The buildcage source code (MIT License) is not derived from, linked to,
+The Buildcage source code (MIT License) is not derived from, linked to,
 or combined with the GPL-licensed components. They are independent programs
 distributed together in a Docker image as an aggregate work, consistent
 with GPL v2 Section 2.
