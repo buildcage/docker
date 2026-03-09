@@ -13,11 +13,11 @@
 
 **Secure your Docker builds against supply chain attacks — restrict outbound network access to only the domains you allow.**
 
-When you run `RUN npm install` or `RUN apt-get install` in a Dockerfile, those commands can reach any server on the internet — and you have no visibility or control over where they connect. A compromised dependency could silently exfiltrate your build secrets or phone home to an attacker's server.
+When you run `RUN npm install` or `RUN pip install` in a Dockerfile, those commands can execute arbitrary code and make outbound connections to any server on the internet — without visibility or control. A compromised dependency could silently exfiltrate your build secrets or phone home to an attacker's server.
 
 buildcage prevents this. You define a list of allowed domains, and only those connections are permitted during builds. Everything else is blocked.
 
-No Dockerfile changes required. No certificates to install. Works with any language or package manager.
+No Dockerfile changes required. No proxy configuration needed. No certificates to install. Works with any language or package manager.
 
 
 ## How It Works
@@ -346,7 +346,7 @@ If you don't need that level of control, you can use the image published from th
 
 > **Important:** buildcage controls *where* your builds can connect, not *what code* they run. If a malicious package is delivered through a legitimate repository (e.g., a compromised npm package hosted on `registry.npmjs.org`), buildcage cannot detect or prevent it — the connection goes to an allowed domain.
 >
-> Do not rely on buildcage as your sole supply chain security measure. Use it as one layer in a defense-in-depth strategy — a last line of defense that limits the blast radius of compromised dependencies by restricting their ability to communicate with external servers.
+> Do not rely on buildcage as your sole supply chain security measure. Use it as one layer in a defense-in-depth strategy — a last line of defense. If something slips through your other measures, at least it can't call home.
 
 ### What buildcage protects against
 
