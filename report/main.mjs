@@ -92,7 +92,7 @@ if (isAudit) {
 markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
 
 const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
-markdown += `\n*Reported by [buildcage](https://github.com/${actionRepo})*\n`;
+markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
 
 // Write Job Summary
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;
