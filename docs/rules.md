@@ -1,6 +1,6 @@
 # Rule Syntax
 
-buildcage uses `allowed_https_rules`, `allowed_http_rules`, and `allowed_ip_rules` to control which destinations are accessible during Docker builds.
+Buildcage uses `allowed_https_rules`, `allowed_http_rules`, and `allowed_ip_rules` to control which destinations are accessible during Docker builds.
 
 ## Delimiters
 
@@ -66,7 +66,7 @@ Since the regex is tested against the `domain:port` string, include a port patte
 ## Examples
 
 ```yaml
-- name: Start buildcage
+- name: Start Buildcage
   uses: dash14/buildcage/setup@v1
   with:
     proxy_mode: restrict

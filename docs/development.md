@@ -1,10 +1,10 @@
 # Development Guide
 
-This document covers local development, testing, and the project structure of buildcage.
+This document covers local development, testing, and the project structure of Buildcage.
 
 ## Local Usage
 
-You can run buildcage locally without GitHub Actions using Docker Compose and Make.
+You can run Buildcage locally without GitHub Actions using Docker Compose and Make.
 
 > GitHub Actions inputs use lowercase names (e.g., `proxy_mode`), while environment variables for local usage use uppercase (e.g., `PROXY_MODE`).
 
@@ -31,7 +31,7 @@ ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make run_rest
 ### End-to-End Workflow
 
 ```bash
-# 1. Start buildcage
+# 1. Start Buildcage
 make run_audit_mode
 
 # 2. Build

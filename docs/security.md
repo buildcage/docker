@@ -1,6 +1,6 @@
 # Security Details
 
-This document provides in-depth technical details on how buildcage enforces network isolation during Docker builds.
+This document provides in-depth technical details on how Buildcage enforces network isolation during Docker builds.
 
 For a high-level overview, see the [Security Considerations](../README.md#security-considerations) section in the README.
 
@@ -31,7 +31,7 @@ For a high-level overview, see the [Security Considerations](../README.md#securi
 
 ## Attack Resistance
 
-buildcage's architecture defends against the following attack vectors.
+Buildcage's architecture defends against the following attack vectors.
 
 ### SNI Spoofing
 
@@ -73,13 +73,13 @@ An attacker may attempt to use DNS over HTTPS (DoH) or DNS over TLS (DoT) to byp
 
 ### Domain Fronting
 
-buildcage inspects the **SNI (Server Name Indication)** field in HTTPS connections but cannot decrypt the actual request content inside the TLS tunnel. This creates a potential bypass technique called "domain fronting."
+Buildcage inspects the **SNI (Server Name Indication)** field in HTTPS connections but cannot decrypt the actual request content inside the TLS tunnel. This creates a potential bypass technique called "domain fronting."
 
 **How it works:**
 
 ```
 Attack flow:
-1. ClientHello SNI: allowed.example.com  ← buildcage only sees this → ✅ allowed
+1. ClientHello SNI: allowed.example.com  ← Buildcage only sees this → ✅ allowed
 2. HTTP Host header: malicious.example.com  ← encrypted, cannot be inspected
 3. CDN routes based on Host header → reaches attacker's server
 ```

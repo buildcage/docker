@@ -1,5 +1,5 @@
 name: Setup Builder
-description: Start buildcage builder container
+description: Start Buildcage builder container
 
 inputs:
   buildcage_image:

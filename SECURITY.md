@@ -4,7 +4,7 @@
 
 I welcome reports about:
 
-- **Proxy bypass** — ways to make network connections from `RUN` steps that evade the buildcage proxy (other than the [known domain fronting limitation](./README.md#known-limitations))
+- **Proxy bypass** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./README.md#known-limitations))
 - **Network isolation escape** — bypassing CNI isolation or iptables rules to reach the internet directly
 - **GitHub Actions setup** — vulnerabilities in the `setup` or `report` actions (e.g., injection, credential leak)
 - **DNS filtering bypass** — bypassing the DNS redirect mechanism

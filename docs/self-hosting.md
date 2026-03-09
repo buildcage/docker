@@ -1,9 +1,9 @@
 # Self-Hosting Guide
 
-This guide explains how to host your own buildcage Docker image in a private GitHub repository. This is useful when you want to:
+This guide explains how to host your own Buildcage Docker image in a private GitHub repository. This is useful when you want to:
 
 - Keep the build infrastructure private within your organization
-- Control exactly which version of buildcage is deployed
+- Control exactly which version of Buildcage is deployed
 - Audit the source code before using it in your CI/CD pipelines
 
 ## Prerequisites
@@ -49,16 +49,16 @@ The published package needs to be accessible from the repositories that will use
 
 Allow other repositories in your organization to use the actions from your private repository:
 
-1. Go to your buildcage repository's **Settings** > **Actions** > **General**
+1. Go to your Buildcage repository's **Settings** > **Actions** > **General**
 2. Under **Access**, select **Accessible from repositories in the '\<your_org\>' organization**
 
 ## 5. Update Your Workflows
 
-In the repositories where you want to use buildcage, make two changes:
+In the repositories where you want to use Buildcage, make two changes:
 
 ### Add GHCR login step
 
-Add a login step before the buildcage setup, and ensure the job has `packages: read` permission:
+Add a login step before the Buildcage setup, and ensure the job has `packages: read` permission:
 
 ```yaml
 jobs:
@@ -77,7 +77,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Start buildcage
+      - name: Start Buildcage
         id: buildcage
         uses: <your_org>/buildcage/setup@v1
         with:
