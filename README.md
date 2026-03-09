@@ -443,12 +443,3 @@ This software is provided "as is", without warranty of any kind, express or impl
 The Buildcage source code is licensed under the MIT License. See [LICENSE](./LICENSE) file for details.
 
 The Docker image includes third-party components under their own licenses (GPL, Apache 2.0, ISC, etc.). See [THIRD_PARTY_LICENSES](./THIRD_PARTY_LICENSES) for the full list.
-
-## Acknowledgments
-
-Buildcage is built on top of:
-- [BuildKit](https://github.com/moby/buildkit) - Modern build toolkit
-- [CNI](https://github.com/containernetworking/cni) - Container network interface
-- [HAProxy](https://www.haproxy.org/) - TCP/HTTP proxy
-- [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) - DNS server
-- [s6-overlay](https://github.com/just-containers/s6-overlay) - Process supervisor
