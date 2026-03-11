@@ -67,11 +67,15 @@ test_audit_mode: ## Run audit mode tests
 	@$(MAKE) clean
 
 .PHONY: test_unit
-test_unit: test_legacy test_qjs ## Run unit tests
+test_unit: test_legacy test_report test_qjs ## Run unit tests
 
 .PHONY: test_legacy
 test_legacy: ## Run legacy rules unit tests
 	@node --test setup/lib/legacy-rules.test.mjs
+
+.PHONY: test_report
+test_report: ## Run report unit tests
+	@node --test report/lib/build-example.test.mjs
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker

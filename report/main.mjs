@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildRestrictExample } from "./lib/build-example.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -62,6 +63,7 @@ function markdownTable(rows, { showReason = false } = {}) {
   return lines.join("\n");
 }
 
+const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 const isAudit = report.mode === "audit";
 let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
 
@@ -70,6 +72,7 @@ if (isAudit) {
   if (audited.length > 0) {
     markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n";
   }
+  markdown += buildRestrictExample(audited, actionRepo);
   const blocked = report.sections.blocked || [];
   if (blocked.length > 0) {
     if (audited.length > 0) markdown += "\n";
@@ -91,7 +94,6 @@ if (isAudit) {
 
 markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
 
-const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
 
 // Write Job Summary
