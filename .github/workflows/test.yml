@@ -35,17 +35,19 @@ jobs:
             proxy_mode: audit
             test_dockerfile: test/Dockerfile.audit
             assert_script: ./test/assert-audit-mode.sh
-            endpoint_port: 1234
           - mode: restrict
             proxy_mode: restrict
             test_dockerfile: test/Dockerfile.restrict
             assert_script: ./test/assert-restrict-mode.sh
-            endpoint_port: 1235
 
     name: test (${{ matrix.mode }})
 
     env:
-      COMPOSE_FILE: compose.yml:compose.test.yml
+      COMPOSE_FILE: compose.test.yml
+      TEST_NETWORK: buildcage_test-net
+      TEST_EXTERNAL_RESOLVER: 10.200.0.53
+      TEST_ALLOWED_HTTPS_RULES: "allowed.example.com:443 allowed.example.com:8443 *.wildcard.example.com:443 *.wildcard.example.com:8443"
+      TEST_ALLOWED_HTTP_RULES: "allowed.example.com:80 allowed.example.com:8080 *.wildcard.example.com:80 *.wildcard.example.com:8080"
 
     steps:
       - name: Checkout
@@ -54,19 +56,24 @@ jobs:
           persist-credentials: false
 
       - name: Build containers
-        run: docker compose build
+        run: |
+          docker compose build
+          docker build -t buildcage:local docker
 
-      - name: Start containers
-        env:
-          PROXY_MODE: ${{ matrix.proxy_mode }}
-          PORT: ${{ matrix.endpoint_port }}
+      - name: Start test infrastructure
         run: docker compose up -d --wait
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-        with:
-          driver: remote
-          endpoint: tcp://localhost:${{ matrix.endpoint_port }}
+      - name: Create buildx builder
+        run: |
+          docker buildx create --bootstrap \
+            --name buildcage \
+            --driver docker-container \
+            --driver-opt image=buildcage:local \
+            --driver-opt "network=$TEST_NETWORK" \
+            --driver-opt "env.PROXY_MODE=${{ matrix.proxy_mode }}" \
+            --driver-opt "env.EXTERNAL_RESOLVER=$TEST_EXTERNAL_RESOLVER" \
+            --driver-opt "env.ALLOWED_HTTPS_RULES=$TEST_ALLOWED_HTTPS_RULES" \
+            --driver-opt "env.ALLOWED_HTTP_RULES=$TEST_ALLOWED_HTTP_RULES"
 
       - name: Build test image
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
@@ -81,14 +88,17 @@ jobs:
           no-cache: true
           load: true
           tags: buildcage-test
+          builder: buildcage
 
       - name: Show logs
         if: always()
-        run: node report/main.mjs ./compose.yml || true
+        run: node report/main.mjs || true
 
       - name: Run assertions
         run: ${{ matrix.assert_script }}
 
       - name: Cleanup
         if: always()
-        run: docker compose down -v --rmi all 2>/dev/null || true
+        run: |
+          docker buildx rm buildcage 2>/dev/null || true
+          docker compose down -v --rmi all 2>/dev/null || true

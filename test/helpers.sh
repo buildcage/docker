@@ -3,11 +3,11 @@ set -euo pipefail
 
 FAILURES=0
 BUILDCAGE_CONTAINER=$(docker ps -q -f name=buildx_buildkit_buildcage 2>/dev/null)
-if [ -n "$BUILDCAGE_CONTAINER" ]; then
-  LOGS=$(docker exec "$BUILDCAGE_CONTAINER" cat /var/log/haproxy/current 2>/dev/null)
-else
-  LOGS=$(docker compose exec builder cat /var/log/haproxy/current 2>/dev/null)
+if [ -z "$BUILDCAGE_CONTAINER" ]; then
+  echo "ERROR: buildcage container not found" >&2
+  exit 1
 fi
+LOGS=$(docker exec "$BUILDCAGE_CONTAINER" cat /var/log/haproxy/current 2>/dev/null)
 
 assert_log_contains() {
   local marker="$1"

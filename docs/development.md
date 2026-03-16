@@ -4,7 +4,7 @@ This document covers local development, testing, and the project structure of Bu
 
 ## Local Usage
 
-You can run Buildcage locally without GitHub Actions using Docker Compose and Make.
+You can run Buildcage locally without GitHub Actions using Make.
 
 > GitHub Actions inputs use lowercase names (e.g., `proxy_mode`), while environment variables for local usage use uppercase (e.g., `PROXY_MODE`).
 
@@ -38,7 +38,7 @@ make run_audit_mode
 docker buildx build --builder buildcage --progress=plain -f Dockerfile .
 
 # 3. View report
-docker compose logs builder
+docker logs buildx_buildkit_buildcage0
 
 # 4. Clean up
 make clean
@@ -58,10 +58,10 @@ make test_restrict_mode
 
 ```bash
 # All communication logs
-docker compose logs builder
+docker logs buildx_buildkit_buildcage0
 
 # Real-time log monitoring
-docker compose logs -f builder
+docker logs -f buildx_buildkit_buildcage0
 ```
 
 **Log format:**
@@ -100,7 +100,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │       └── legacy-rules.test.mjs
 ├── report/                      # GitHub Actions report
 │   ├── action.yml               # GitHub Action: dash14/buildcage/report@v1
-│   └── main.mjs                 # Log analysis and Job Summary output
+│   └── main.mjs                 # Log analysis and Job Summary output (via docker exec)
 ├── docker/
 │   ├── Dockerfile               # Multi-stage BuildKit + haproxy + dnsmasq + s6
 │   └── files/
@@ -132,7 +132,6 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │   ├── helpers.sh               # Test helpers
 │   ├── test-server/             # Test HTTP server
 │   └── test-dns/                # Test DNS server
-├── compose.yml                  # Docker Compose config
-├── compose.test.yml             # Test override config
+├── compose.test.yml             # Test infrastructure config
 └── Makefile                     # Operational commands
 ```

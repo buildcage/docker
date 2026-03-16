@@ -1,5 +1,3 @@
-COMPOSE_FILE ?= compose.yml
-
 TEST_NETWORK             := buildcage_test-net
 TEST_EXTERNAL_RESOLVER   := 10.200.0.53
 TEST_ALLOWED_HTTPS_RULES := allowed.example.com:443\ allowed.example.com:8443\ *.wildcard.example.com:443\ *.wildcard.example.com:8443
@@ -122,7 +120,7 @@ run_audit_example: ## Run audit mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/main.mjs ./compose.yml
+	@node report/main.mjs
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
 
@@ -143,7 +141,7 @@ run_restrict_example: ## Run restrict mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/main.mjs ./compose.yml || true
+	@node report/main.mjs || true
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
 
