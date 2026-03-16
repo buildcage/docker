@@ -64,16 +64,16 @@ jobs:
         run: docker compose up -d --wait
 
       - name: Create buildx builder
-        run: |
-          docker buildx create --bootstrap \
-            --name buildcage \
-            --driver docker-container \
-            --driver-opt image=buildcage:local \
-            --driver-opt "network=$TEST_NETWORK" \
-            --driver-opt "env.PROXY_MODE=${{ matrix.proxy_mode }}" \
-            --driver-opt "env.EXTERNAL_RESOLVER=$TEST_EXTERNAL_RESOLVER" \
-            --driver-opt "env.ALLOWED_HTTPS_RULES=$TEST_ALLOWED_HTTPS_RULES" \
-            --driver-opt "env.ALLOWED_HTTP_RULES=$TEST_ALLOWED_HTTP_RULES"
+        uses: ./setup
+        with:
+          buildcage_image: buildcage
+          buildcage_version: local
+          proxy_mode: ${{ matrix.proxy_mode }}
+          allowed_https_rules: ${{ env.TEST_ALLOWED_HTTPS_RULES }}
+          allowed_http_rules: ${{ env.TEST_ALLOWED_HTTP_RULES }}
+          extra_options: >-
+            --driver-opt network=${{ env.TEST_NETWORK }}
+            --driver-opt env.EXTERNAL_RESOLVER=${{ env.TEST_EXTERNAL_RESOLVER }}
 
       - name: Build test image
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
@@ -92,13 +92,14 @@ jobs:
 
       - name: Show logs
         if: always()
-        run: node report/main.mjs || true
+        uses: ./report
+        with:
+          fail_on_blocked: 'false'
+        continue-on-error: true
 
       - name: Run assertions
         run: ${{ matrix.assert_script }}
 
       - name: Cleanup
         if: always()
-        run: |
-          docker buildx rm buildcage 2>/dev/null || true
-          docker compose down -v --rmi all 2>/dev/null || true
+        run: docker compose down -v --rmi all 2>/dev/null || true

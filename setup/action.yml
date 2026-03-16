@@ -28,6 +28,10 @@ inputs:
     description: "IP address allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
     required: false
     default: ''
+  extra_options:
+    description: "Extra options to pass to 'docker buildx create' (e.g., '--driver-opt network=mynet --driver-opt env.FOO=bar')"
+    required: false
+    default: ''
   # Deprecated
   allowed_http_domains:
     description: "Deprecated: use allowed_http_rules instead"

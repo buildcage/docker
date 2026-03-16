@@ -64,6 +64,13 @@ function main() {
     args.push("--driver-opt", opt);
   }
 
+  // Append extra options (simple whitespace split — intended for test workflows
+  // passing additional --driver-opt flags with no spaces in values)
+  const extraOptions = env.INPUT_EXTRA_OPTIONS?.trim();
+  if (extraOptions) {
+    args.push(...extraOptions.split(/\s+/));
+  }
+
   execFileSync("docker", args, { stdio: "inherit" });
 
   // Verify the container is running
