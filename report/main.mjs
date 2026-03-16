@@ -1,19 +1,16 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildRestrictExample } from "./lib/build-example.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const name = process.env.INPUT_NAME || "buildcage";
+const containerId = findBuildkitContainer(name);
 
 // 1. Get structured report from container via QuickJS
-const composeFile = process.argv[2] || join(__dirname, "..", "setup", "compose.yml");
-
 let jsonOutput;
 try {
   jsonOutput = execFileSync(
     "docker",
-    ["compose", "-f", composeFile, "exec", "builder", "qjs", "/opt/buildcage/tools/report.mjs"],
+    ["exec", containerId, "qjs", "/opt/buildcage/tools/report.mjs"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
   );
 } catch (e) {
@@ -28,7 +25,7 @@ console.log("::group::HTTP Proxy communication logs");
 try {
   const rawLog = execFileSync(
     "docker",
-    ["compose", "-f", composeFile, "exec", "builder", "cat", "/var/log/haproxy/current"],
+    ["exec", containerId, "cat", "/var/log/haproxy/current"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
   );
   process.stdout.write(rawLog);
@@ -123,5 +120,22 @@ if (report.blockedCount > 0) {
         `::notice::${report.blockedCount} blocked connection(s) detected by buildcage proxy`
       );
     }
+  }
+}
+
+/**
+ * Find the Buildkit container ID for the given builder name.
+ */
+function findBuildkitContainer(name) {
+  try {
+    const id = execFileSync(
+      "docker", ["ps", "-q", "-f", `name=buildx_buildkit_${name}`],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+    ).trim();
+    if (!id) throw new Error(`Buildcage container not found for builder "${name}"`);
+    return id;
+  } catch (e) {
+    console.log(`::error::${e.message}`);
+    process.exit(1);
   }
 }

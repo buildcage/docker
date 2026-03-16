@@ -22,7 +22,7 @@ No Dockerfile changes required. No proxy configuration needed. No certificates t
 
 ## How It Works
 
-Buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drivers/remote/) for Docker Buildx. All `RUN` step containers are placed on an isolated network, and outbound traffic is routed through a proxy that enforces your allowlist.
+Buildcage runs as a [docker-container driver](https://docs.docker.com/build/builders/drivers/docker-container/) for Docker Buildx. All `RUN` step containers are placed on an isolated network, and outbound traffic is routed through a proxy that enforces your allowlist.
 
 <img src="assets/diagram-overview.png" alt="How Buildcage works" width="544" height="328">
 
@@ -66,15 +66,13 @@ Buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drive
 
 - Docker with BuildKit (buildx plugin)
 - GitHub Actions runner with Docker support (for CI/CD usage)
-- Docker Compose (for local usage)
 
 ### First-Time Setup (Recommended Workflow)
 
-Using Buildcage in GitHub Actions involves three workflow steps:
+Using Buildcage in GitHub Actions involves two workflow steps:
 
-1. Start the Buildcage container (runs BuildKit inside a network-controlled environment)
-2. Configure Docker Buildx to use the Buildcage container as a remote builder
-3. Run your build as usual — your Dockerfile and build commands stay the same
+1. Start the Buildcage Buildx builder (creates a network-controlled BuildKit environment)
+2. Run your build as usual with `--builder buildcage` — your Dockerfile and build commands stay the same
 
 #### Step 1: Discover what domains your build needs (Audit Mode)
 
@@ -90,21 +88,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Start Buildcage in audit mode
-        id: buildcage
         uses: dash14/buildcage/setup@v1
         with:
           proxy_mode: audit  # Log everything, block nothing
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: remote
-          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
 
       - name: Build and discover dependencies
         uses: docker/build-push-action@v6
         with:
           context: .
+          builder: buildcage  # Use the Buildcage builder
           push: false  # Set to true to push the built image
 
       - name: Show Buildcage report
@@ -138,7 +130,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Start Buildcage in restrict mode
-        id: buildcage
         uses: dash14/buildcage/setup@v1
         with:
           proxy_mode: restrict  # Block everything except allowed domains
@@ -146,16 +137,11 @@ jobs:
             registry.npmjs.org:443
             fonts.googleapis.com:443
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: remote
-          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
-
       - name: Build with protection
         uses: docker/build-push-action@v6
         with:
           context: .
+          builder: buildcage  # Use the Buildcage builder
           push: false  # Set to true to push the built image
 
       - name: Show Buildcage report
@@ -176,7 +162,6 @@ Starts the Buildcage builder container.
 
 ```yaml
 - name: Start Buildcage builder
-  id: buildcage
   uses: dash14/buildcage/setup@v1
   with:
     proxy_mode: restrict
@@ -187,13 +172,13 @@ Starts the Buildcage builder container.
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
+| `name` | No | `buildcage` | Buildx builder name |
 | `buildcage_image` | No | `ghcr.io/<owner>/<repo>` | Docker image name |
 | `buildcage_version` | No | `1` | Image tag |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
 | `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
-| `port` | No | `1234` | BuildKit endpoint port on localhost |
 
 **Rule syntax**
 
@@ -210,20 +195,16 @@ IP address rules (e.g., `192.168.1.1:443`) use the same syntax but go in `allowe
 
 For detailed syntax, see [Rule Syntax](./docs/rules.md).
 
-#### Outputs
+#### Using the builder
 
-| Name | Description |
-|------|-------------|
-| `port` | BuildKit endpoint port |
-
-Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup-buildx-action) to use Buildcage as a remote builder:
+After setup, use the builder name with `docker/build-push-action` or the `docker buildx build` command:
 
 ```yaml
-- name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v3
+- name: Build
+  uses: docker/build-push-action@v6
   with:
-    driver: remote
-    endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+    context: .
+    builder: buildcage  # Use the Buildcage builder
 ```
 
 #### Operation Modes
@@ -286,6 +267,7 @@ In restrict mode, the report step fails if blocked connections are detected, cau
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
+| `name` | No | `buildcage` | Buildx builder name (must match the name used in setup) |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
 
 ---
@@ -406,7 +388,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 
 1. **Check logs:**
    ```bash
-   docker compose logs builder
+   docker logs buildx_buildkit_buildcage0
    ```
 
 2. **Run in audit mode** to understand your build's network behavior:
@@ -414,13 +396,13 @@ If you encounter issues, try reproducing the problem locally to get detailed log
    make clean
    make run_audit_mode
    docker buildx build --builder buildcage --no-cache -f Dockerfile .
-   docker compose logs builder
+   docker logs buildx_buildkit_buildcage0
    ```
 
 3. **Open an issue** at [github.com/dash14/buildcage/issues](https://github.com/dash14/buildcage/issues) with:
    - Your Dockerfile
    - The audit mode report output
-   - Full error messages from `docker compose logs builder`
+   - Full error messages from `docker logs buildx_buildkit_buildcage0`
 
 ## Development
 

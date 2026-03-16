@@ -2,6 +2,10 @@ name: Setup Builder
 description: Start Buildcage builder container
 
 inputs:
+  name:
+    description: "Buildx builder name"
+    required: false
+    default: 'buildcage'
   buildcage_image:
     description: "Docker image name (default: ghcr.io/<action-owner>/<action-repo>)"
     required: false
@@ -41,14 +45,6 @@ inputs:
     description: "Deprecated: specify port per rule in allowed_https_rules (e.g., 'example.com:8443')"
     required: false
     default: '443'
-  port:
-    description: "BuildKit endpoint port on localhost"
-    required: false
-    default: '1234'
-
-outputs:
-  port:
-    description: "BuildKit endpoint port"
 
 runs:
   using: node24

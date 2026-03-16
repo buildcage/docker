@@ -2,6 +2,10 @@ name: Report
 description: Show proxy communication logs and fail if blocked connections detected
 
 inputs:
+  name:
+    description: "Buildx builder name"
+    required: false
+    default: 'buildcage'
   fail_on_blocked:
     description: "Fail the step if blocked connections are detected"
     required: false

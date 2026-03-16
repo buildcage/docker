@@ -1,15 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildLegacyRules } from "./lib/legacy-rules.mjs";
 import { buildRules } from "../docker/files/tools/lib/rules.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const composeFile = join(__dirname, "compose.yml");
-
 function main() {
   const env = process.env;
+  const name = env.INPUT_NAME || "buildcage";
 
   const image = resolveBuildcageImage({
     imageInput: env.INPUT_BUILDCAGE_IMAGE,
@@ -41,36 +36,56 @@ function main() {
   logRules("IP", rules.ipRules);
   console.log("::endgroup::");
 
-  const composeEnv = {
-    ...env,
-    PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
-    ALLOWED_HTTPS_RULES: rules.httpsRules.join('\n'),
-    ALLOWED_HTTP_RULES: rules.httpRules.join('\n'),
-    ALLOWED_IP_RULES: rules.ipRules.join('\n'),
-    BUILDCAGE_IMAGE: image.repository,
-    BUILDCAGE_VERSION: image.tag,
-    PORT: env.INPUT_PORT || "1234",
-  };
+  const proxyMode = env.INPUT_PROXY_MODE || "restrict";
 
-  execFileSync(
-    "docker",
-    ["compose", "-f", composeFile, "down"],
-    { stdio: "inherit", env: composeEnv }
-  );
+  // Remove existing builder if present
+  try {
+    execFileSync("docker", ["buildx", "rm", name], { stdio: "inherit" });
+  } catch {
+    // Builder doesn't exist yet — that's fine
+  }
 
-  execFileSync(
-    "docker",
-    [
-      "compose",
-      "-f", composeFile,
-      "up", "-d", "--pull", "always", "--no-build", "--wait",
-    ],
-    { stdio: "inherit", env: composeEnv }
-  );
+  // Create and bootstrap the builder
+  const driverOpts = [
+    `image=${image.repository}:${image.tag}`,
+    `env.PROXY_MODE=${proxyMode}`,
+    `env.ALLOWED_HTTPS_RULES=${rules.httpsRules.join('\n')}`,
+    `env.ALLOWED_HTTP_RULES=${rules.httpRules.join('\n')}`,
+    `env.ALLOWED_IP_RULES=${rules.ipRules.join('\n')}`,
+  ];
 
-  // Set action output
-  const port = env.INPUT_PORT || "1234";
-  appendFileSync(env.GITHUB_OUTPUT, `port=${port}\n`);
+  const args = [
+    "buildx", "create",
+    "--bootstrap",
+    "--name", name,
+    "--driver", "docker-container",
+  ];
+  for (const opt of driverOpts) {
+    args.push("--driver-opt", opt);
+  }
+
+  execFileSync("docker", args, { stdio: "inherit" });
+
+  // Verify the container is running
+  const containerId = findBuildkitContainer(name);
+  console.log(`Buildcage container running: ${containerId}`);
+}
+
+/**
+ * Find the Buildkit container ID for the given builder name.
+ */
+function findBuildkitContainer(name) {
+  try {
+    const id = execFileSync(
+      "docker", ["ps", "-q", "-f", `name=buildx_buildkit_${name}`],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+    ).trim();
+    if (!id) throw new Error(`Buildcage container not found for builder "${name}"`);
+    return id;
+  } catch (e) {
+    console.log(`::error::${e.message}`);
+    process.exit(1);
+  }
 }
 
 /**
