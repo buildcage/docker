@@ -92,8 +92,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 .
 ├── setup/                       # GitHub Actions setup
 │   ├── action.yml               # GitHub Action: dash14/buildcage/setup@v1
-│   ├── compose.yml              # Compose config for GitHub Actions (with image tag)
-│   ├── main.mjs                 # Setup entrypoint (rule generation, compose up)
+│   ├── main.mjs                 # Setup entrypoint (rule generation, buildx create)
 │   ├── post.mjs                 # Post-action cleanup
 │   └── lib/
 │       ├── legacy-rules.mjs     # Legacy domain/port → wildcard conversion
