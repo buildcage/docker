@@ -1,0 +1,3 @@
+#!/bin/sh
+exec 2>&1
+exec s6-notifyoncheck -d -w 200 -n 25 haproxy -f /etc/haproxy/haproxy.cfg -db

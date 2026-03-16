@@ -2,7 +2,12 @@
 set -euo pipefail
 
 FAILURES=0
-LOGS=$(docker compose exec builder cat /var/log/haproxy/current 2>/dev/null)
+BUILDCAGE_CONTAINER=$(docker ps -q -f name=buildx_buildkit_buildcage 2>/dev/null)
+if [ -n "$BUILDCAGE_CONTAINER" ]; then
+  LOGS=$(docker exec "$BUILDCAGE_CONTAINER" cat /var/log/haproxy/current 2>/dev/null)
+else
+  LOGS=$(docker compose exec builder cat /var/log/haproxy/current 2>/dev/null)
+fi
 
 assert_log_contains() {
   local marker="$1"

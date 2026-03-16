@@ -1,14 +1,4 @@
 services:
-  # Point builder's resolver to test-dns + configure test rules
-  builder:
-    environment:
-      - EXTERNAL_RESOLVER=10.200.0.53
-      - ALLOWED_HTTPS_RULES=allowed.example.com:443 allowed.example.com:8443 *.wildcard.example.com:443 *.wildcard.example.com:8443
-      - ALLOWED_HTTP_RULES=allowed.example.com:80 allowed.example.com:8080 *.wildcard.example.com:80 *.wildcard.example.com:8080
-    networks:
-      default:
-      test-net:
-
   # Test HTTP server (with self-signed certificate)
   test-server:
     build: test/test-server

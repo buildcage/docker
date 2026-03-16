@@ -102,14 +102,14 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │   ├── action.yml               # GitHub Action: dash14/buildcage/report@v1
 │   └── main.mjs                 # Log analysis and Job Summary output
 ├── docker/
-│   ├── Dockerfile               # Multi-stage BuildKit + haproxy + dnsmasq + s6-overlay
+│   ├── Dockerfile               # Multi-stage BuildKit + haproxy + dnsmasq + s6
 │   └── files/
 │       ├── buildkitd.toml       # BuildKit config
 │       ├── cni.conflist         # CNI config (isolated-net)
 │       ├── dnsmasq.conf         # DNS config (all domains → gateway)
 │       ├── haproxy.cfg.template # Dynamic HAProxy config (HTTP/HTTPS)
-│       ├── s6-rc.d/             # s6-overlay service definitions
-│       ├── s6-scripts/          # s6-overlay init scripts
+│       ├── services/            # s6-svscan service definitions
+│       ├── scripts/             # Init scripts (oneshot)
 │       └── tools/               # QuickJS scripts (run inside container)
 │           ├── convert-rule.mjs # stdin wildcard → stdout regex filter
 │           ├── report.mjs       # Parse HAProxy logs → structured JSON

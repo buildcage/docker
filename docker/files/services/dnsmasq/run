@@ -1,0 +1,2 @@
+#!/bin/sh
+exec s6-notifyoncheck -d -w 200 -n 25 dnsmasq --conf-file=/etc/dnsmasq.conf -k

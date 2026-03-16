@@ -36,10 +36,10 @@ CNI Plugins
 
 ------------------------------------------------------------------------------
 
-s6-overlay
-  Website : https://github.com/just-containers/s6-overlay
+s6
+  Website : https://skarnet.org/software/s6/
   License : ISC License
-  Source  : https://github.com/just-containers/s6-overlay
+  Source  : https://skarnet.org/software/s6/ or via Alpine Linux source packages
 
 ------------------------------------------------------------------------------
 

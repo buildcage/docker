@@ -1,7 +1,6 @@
 ARG BUILDKIT_VERSION=v0.28.0
 ARG CNI_VERSION=v1.9.0
 ARG ALPINE_RELEASE=3.23
-ARG S6_OVERLAY_VERSION=v3.2.2.0
 
 # Prepare dependencies
 FROM alpine:$ALPINE_RELEASE AS deps
@@ -25,20 +24,8 @@ RUN apk add --no-cache \
       dnsmasq \
       iptables \
       curl \
-      quickjs
-
-# s6-overlay
-ARG S6_OVERLAY_VERSION
-RUN apk add --no-cache xz && \
-    S6_ARCH=$(uname -m) && \
-    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" \
-      | xz -d | tar -C / -xpf - && \
-    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" \
-      | xz -d | tar -C / -xpf - && \
-    apk del xz
-
-ENV S6_KEEP_ENV=1
-ENV S6_LOGGING=0
+      quickjs \
+      s6
 
 # envsubst
 COPY --from=deps /usr/bin/envsubst /usr/bin/envsubst
@@ -66,12 +53,18 @@ COPY files/tools/ /opt/buildcage/tools/
 COPY files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 
 # s6 service definitions and init scripts
-COPY files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
-COPY files/s6-scripts/ /etc/s6-overlay/scripts/
-RUN chmod +x /etc/s6-overlay/scripts/* && \
-    chmod +x /etc/s6-overlay/s6-rc.d/dnsmasq/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/haproxy/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/haproxy-log/run
+COPY files/services/ /etc/buildcage/services/
+COPY files/scripts/ /opt/buildcage/scripts/
+RUN chmod +x /opt/buildcage/scripts/* && \
+    chmod +x /etc/buildcage/services/dnsmasq/run && \
+    chmod +x /etc/buildcage/services/dnsmasq/data/check && \
+    chmod +x /etc/buildcage/services/haproxy/run && \
+    chmod +x /etc/buildcage/services/haproxy/data/check && \
+    chmod +x /etc/buildcage/services/haproxy/log/run
 
-ENTRYPOINT ["/init"]
+# Entrypoint (s6-svscan for service supervision)
+COPY files/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["buildkitd", "--oci-worker-net=cni", "--addr", "tcp://0.0.0.0:1234"]
