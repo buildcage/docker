@@ -67,4 +67,4 @@ COPY files/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["buildkitd", "--oci-worker-net=cni", "--addr", "tcp://0.0.0.0:1234"]
+CMD ["buildkitd", "--oci-worker-net=cni"]
