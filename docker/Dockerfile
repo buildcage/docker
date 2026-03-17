@@ -74,4 +74,4 @@ RUN chmod +x /etc/s6-overlay/scripts/* && \
     chmod +x /etc/s6-overlay/s6-rc.d/haproxy-log/run
 
 ENTRYPOINT ["/init"]
-CMD ["buildkitd", "--oci-worker-net=cni", "--addr", "tcp://0.0.0.0:1234"]
+CMD ["buildkitd", "--oci-worker-net=cni"]

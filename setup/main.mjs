@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildLegacyRules } from "./lib/legacy-rules.mjs";
@@ -43,13 +42,13 @@ function main() {
 
   const composeEnv = {
     ...env,
+    BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
     PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
     ALLOWED_HTTPS_RULES: rules.httpsRules.join('\n'),
     ALLOWED_HTTP_RULES: rules.httpRules.join('\n'),
     ALLOWED_IP_RULES: rules.ipRules.join('\n'),
     BUILDCAGE_IMAGE: image.repository,
     BUILDCAGE_VERSION: image.tag,
-    PORT: env.INPUT_PORT || "1234",
   };
 
   execFileSync(
@@ -68,9 +67,6 @@ function main() {
     { stdio: "inherit", env: composeEnv }
   );
 
-  // Set action output
-  const port = env.INPUT_PORT || "1234";
-  appendFileSync(env.GITHUB_OUTPUT, `port=${port}\n`);
 }
 
 /**

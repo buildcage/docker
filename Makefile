@@ -22,7 +22,7 @@ run_audit_mode: ## Start in audit mode
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
 		--name buildcage \
-		--driver remote tcp://localhost:1234
+		--driver remote docker-container://buildcage
 
 .PHONY: run_restrict_mode
 run_restrict_mode: ## Start in restrict mode
@@ -36,7 +36,7 @@ run_restrict_mode: ## Start in restrict mode
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
 		--name buildcage \
-		--driver remote tcp://localhost:1234
+		--driver remote docker-container://buildcage
 
 .PHONY: test_restrict_mode
 test_restrict_mode: ## Run restrict mode tests

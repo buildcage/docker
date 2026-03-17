@@ -99,7 +99,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: remote
-          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+          endpoint: docker-container://buildcage
 
       - name: Build and discover dependencies
         uses: docker/build-push-action@v6
@@ -150,7 +150,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: remote
-          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+          endpoint: docker-container://buildcage
 
       - name: Build with protection
         uses: docker/build-push-action@v6
@@ -189,11 +189,11 @@ Starts the Buildcage builder container.
 |-----------|----------|---------|-------------|
 | `buildcage_image` | No | `ghcr.io/<owner>/<repo>` | Docker image name |
 | `buildcage_version` | No | `1` | Image tag |
+| `builder_name` | No | `buildcage` | Name of the builder container |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
 | `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
-| `port` | No | `1234` | BuildKit endpoint port on localhost |
 
 **Rule syntax**
 
@@ -210,20 +210,16 @@ IP address rules (e.g., `192.168.1.1:443`) use the same syntax but go in `allowe
 
 For detailed syntax, see [Rule Syntax](./docs/rules.md).
 
-#### Outputs
+#### Connecting Buildx
 
-| Name | Description |
-|------|-------------|
-| `port` | BuildKit endpoint port |
-
-Pass this port to [`docker/setup-buildx-action`](https://github.com/docker/setup-buildx-action) to use Buildcage as a remote builder:
+Pass the container name to [`docker/setup-buildx-action`](https://github.com/docker/setup-buildx-action) to use Buildcage as a remote builder. The `endpoint` must match the `builder_name` parameter (default: `buildcage`):
 
 ```yaml
 - name: Set up Docker Buildx
   uses: docker/setup-buildx-action@v3
   with:
     driver: remote
-    endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+    endpoint: docker-container://buildcage
 ```
 
 #### Operation Modes
@@ -286,6 +282,7 @@ In restrict mode, the report step fails if blocked connections are detected, cau
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
+| `builder_name` | No | `buildcage` | Name of the builder container |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
 
 ---
