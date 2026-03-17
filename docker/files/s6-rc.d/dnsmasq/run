@@ -1,2 +1,2 @@
 #!/command/with-contenv sh
-exec dnsmasq --conf-file=/etc/dnsmasq.conf -k
+exec s6-notifyoncheck -d -w 250 -n 12 dnsmasq --conf-file=/etc/dnsmasq.conf -k

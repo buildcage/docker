@@ -33,9 +33,3 @@ services:
       - ALLOWED_IP_RULES=${ALLOWED_IP_RULES:-}
       - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-1.1.1.1,8.8.8.8}
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "sh", "-c", "curl -sf --unix-socket /var/run/haproxy-health.sock http://localhost/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-      start_period: 5s

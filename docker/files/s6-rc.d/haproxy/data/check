@@ -1,0 +1,2 @@
+#!/bin/sh
+curl -sf --unix-socket /var/run/haproxy-health.sock http://localhost/health > /dev/null 2>&1
