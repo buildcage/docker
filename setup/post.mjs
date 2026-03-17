@@ -11,7 +11,7 @@ execFileSync(
     stdio: "inherit",
     env: {
       ...process.env,
-      BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
+      BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",
     },
   }
 );
