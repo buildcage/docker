@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Start Buildcage builder
-        uses: dash14/buildcage/setup@v1
+        uses: dash14/buildcage/setup@v2
         with:
           proxy_mode: audit
 
@@ -42,4 +42,4 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        uses: dash14/buildcage/report@v1
+        uses: dash14/buildcage/report@v2

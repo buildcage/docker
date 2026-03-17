@@ -79,13 +79,13 @@ jobs:
 
       - name: Start Buildcage
         id: buildcage
-        uses: <your_org>/buildcage/setup@v1
+        uses: <your_org>/buildcage/setup@v2
         with:
           proxy_mode: audit
       # ... rest of your workflow
 ```
 
-Note that `uses:` now points to `<your_org>/buildcage/setup@v1` instead of `dash14/buildcage/setup@v1`. The same applies to the report action (`<your_org>/buildcage/report@v1`).
+Note that `uses:` now points to `<your_org>/buildcage/setup@v2` instead of `dash14/buildcage/setup@v2`. The same applies to the report action (`<your_org>/buildcage/report@v2`).
 
 ## Syncing with Upstream
 

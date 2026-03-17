@@ -35,7 +35,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v1`,
+          `  uses: ${REPO}/setup@v2`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -56,7 +56,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v1`,
+          `  uses: ${REPO}/setup@v2`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -77,7 +77,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v1`,
+          `  uses: ${REPO}/setup@v2`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_ip_rules: >-",
@@ -98,7 +98,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v1`,
+          `  uses: ${REPO}/setup@v2`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -121,7 +121,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          "  uses: myorg/myrepo/setup@v1",
+          "  uses: myorg/myrepo/setup@v2",
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",

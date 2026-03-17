@@ -28,7 +28,7 @@ export function buildRestrictExample(auditedRows, actionRepo) {
   // Build YAML lines
   let yaml = "";
   yaml += "- name: Start Buildcage in restrict mode\n";
-  yaml += `  uses: ${actionRepo}/setup@v1\n`;
+  yaml += `  uses: ${actionRepo}/setup@v2\n`;
   yaml += "  with:\n";
   yaml += "    proxy_mode: restrict\n";
   for (const [param, rules] of groups) {

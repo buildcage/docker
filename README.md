@@ -91,7 +91,7 @@ jobs:
 
       - name: Start Buildcage in audit mode
         id: buildcage
-        uses: dash14/buildcage/setup@v1
+        uses: dash14/buildcage/setup@v2
         with:
           proxy_mode: audit  # Log everything, block nothing
 
@@ -109,7 +109,7 @@ jobs:
 
       - name: Show Buildcage report
         if: always()
-        uses: dash14/buildcage/report@v1
+        uses: dash14/buildcage/report@v2
         with:
           fail_on_blocked: false  # Don't fail, just show the report
 ```
@@ -139,7 +139,7 @@ jobs:
 
       - name: Start Buildcage in restrict mode
         id: buildcage
-        uses: dash14/buildcage/setup@v1
+        uses: dash14/buildcage/setup@v2
         with:
           proxy_mode: restrict  # Block everything except allowed domains
           allowed_https_rules: >-
@@ -160,7 +160,7 @@ jobs:
 
       - name: Show Buildcage report
         if: always()
-        uses: dash14/buildcage/report@v1
+        uses: dash14/buildcage/report@v2
         # Build fails if any unexpected connections were blocked
 ```
 
@@ -177,7 +177,7 @@ Starts the Buildcage builder container.
 ```yaml
 - name: Start Buildcage builder
   id: buildcage
-  uses: dash14/buildcage/setup@v1
+  uses: dash14/buildcage/setup@v2
   with:
     proxy_mode: restrict
     allowed_https_rules: registry.npmjs.org:443 github.com:443
@@ -261,7 +261,7 @@ Displays communication logs after builds and optionally fails if any BLOCKED con
 ```yaml
 - name: Show proxy report
   if: always()
-  uses: dash14/buildcage/report@v1
+  uses: dash14/buildcage/report@v2
 ```
 
 #### Job Summary
