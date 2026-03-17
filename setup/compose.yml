@@ -1,5 +1,6 @@
 services:
   builder:
+    container_name: ${BUILDER_NAME:-buildcage}
     image: ${BUILDCAGE_IMAGE}:${BUILDCAGE_VERSION:-1}
     # Instead of privileged: true, grant only the minimum privileges required
     # to run BuildKit and iptables. This avoids granting full device access
@@ -23,8 +24,6 @@ services:
     cgroup: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
-    ports:
-      - "${PORT:-1234}:1234"
     environment:
       - PROXY_MODE=${PROXY_MODE:-restrict}
       - ALLOWED_HTTPS_RULES=${ALLOWED_HTTPS_RULES:-}
@@ -33,7 +32,7 @@ services:
       - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-1.1.1.1,8.8.8.8}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "curl -sf --unix-socket /var/run/haproxy-health.sock http://localhost/health && nc -z 127.0.0.1 1234"]
+      test: ["CMD", "sh", "-c", "curl -sf --unix-socket /var/run/haproxy-health.sock http://localhost/health"]
       interval: 30s
       timeout: 5s
       retries: 10

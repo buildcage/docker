@@ -8,6 +8,10 @@ inputs:
   buildcage_version:
     description: "Image tag"
     required: false
+  builder_name:
+    description: "Name of the builder container"
+    required: false
+    default: 'buildcage'
   proxy_mode:
     description: "audit or restrict"
     required: false
@@ -41,14 +45,6 @@ inputs:
     description: "Deprecated: specify port per rule in allowed_https_rules (e.g., 'example.com:8443')"
     required: false
     default: '443'
-  port:
-    description: "BuildKit endpoint port on localhost"
-    required: false
-    default: '1234'
-
-outputs:
-  port:
-    description: "BuildKit endpoint port"
 
 runs:
   using: node24

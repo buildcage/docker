@@ -8,13 +8,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // 1. Get structured report from container via QuickJS
 const composeFile = process.argv[2] || join(__dirname, "..", "setup", "compose.yml");
+const composeEnv = {
+  ...process.env,
+  BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",
+};
 
 let jsonOutput;
 try {
   jsonOutput = execFileSync(
     "docker",
     ["compose", "-f", composeFile, "exec", "builder", "qjs", "/opt/buildcage/tools/report.mjs"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
   );
 } catch (e) {
   console.log("Failed to get report from container:", e.message);
@@ -29,7 +33,7 @@ try {
   const rawLog = execFileSync(
     "docker",
     ["compose", "-f", composeFile, "exec", "builder", "cat", "/var/log/haproxy/current"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
   );
   process.stdout.write(rawLog);
 } catch {
