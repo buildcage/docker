@@ -68,10 +68,5 @@ COPY files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 # s6 service definitions and init scripts
 COPY files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 COPY files/s6-scripts/ /etc/s6-overlay/scripts/
-RUN chmod +x /etc/s6-overlay/scripts/* && \
-    chmod +x /etc/s6-overlay/s6-rc.d/dnsmasq/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/haproxy/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/haproxy-log/run
 
 ENTRYPOINT ["/init"]
-CMD ["buildkitd", "--oci-worker-net=cni"]
