@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildLegacyRules } from "./lib/legacy-rules.mjs";
+
 import { buildRules } from "../docker/files/tools/lib/rules.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -24,10 +24,6 @@ function main() {
       httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
       httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
       ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
-      httpsDomainsInput: env.INPUT_ALLOWED_HTTPS_DOMAINS,
-      httpDomainsInput: env.INPUT_ALLOWED_HTTP_DOMAINS,
-      httpsPortsInput: env.INPUT_HTTPS_PORTS,
-      httpPortsInput: env.INPUT_HTTP_PORTS,
     });
   } catch (e) {
     console.log(`::error::${e.message}`);
@@ -113,14 +109,12 @@ function resolveImageTag(repository, { versionInput, actionRef }) {
 }
 
 /**
- * Build ACL rules by merging new-style rules and legacy rules.
- * New-style rules are passed through as-is (wildcard format).
- * Legacy rules are converted to wildcard format.
+ * Build ACL rules from input strings.
+ * Rules are passed through as-is (wildcard format), validated by converting to regex.
  *
  * @returns {{ httpsRules: string[], httpRules: string[], ipRules: string[] }}
  */
-function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput, httpsDomainsInput, httpDomainsInput, httpsPortsInput, httpPortsInput }) {
-  // New-style rules: pass through as-is (wildcard format), validate by converting to regex
+function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
   const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
   const httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
   const ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -128,24 +122,7 @@ function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput, httpsDom
   buildRules(httpRulesInput);
   buildRules(ipRulesInput);
 
-  // Legacy rules (converted to wildcard format)
-  const httpsLegacy = buildLegacyRules({
-    domainsInput: httpsDomainsInput,
-    portsInput: httpsPortsInput,
-    defaultPort: 443,
-    protocol: "HTTPS",
-  });
-  const httpLegacy = buildLegacyRules({
-    domainsInput: httpDomainsInput,
-    portsInput: httpPortsInput,
-    defaultPort: 80,
-    protocol: "HTTP",
-  });
-  return {
-    httpsRules: [...httpsRules, ...httpsLegacy],
-    httpRules: [...httpRules, ...httpLegacy],
-    ipRules,
-  };
+  return { httpsRules, httpRules, ipRules };
 }
 
 function logRules(label, rules) {
