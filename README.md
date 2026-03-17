@@ -96,7 +96,7 @@ jobs:
           proxy_mode: audit  # Log everything, block nothing
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           driver: remote
           endpoint: docker-container://buildcage
@@ -147,7 +147,7 @@ jobs:
             fonts.googleapis.com:443
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           driver: remote
           endpoint: docker-container://buildcage
@@ -216,7 +216,7 @@ Pass the container name to [`docker/setup-buildx-action`](https://github.com/doc
 
 ```yaml
 - name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v3
+  uses: docker/setup-buildx-action@v4
   with:
     driver: remote
     endpoint: docker-container://buildcage
