@@ -11,16 +11,15 @@ jobs:
 
     steps:
       - name: Start Buildcage builder
-        id: buildcage
-        uses: dash14/buildcage/setup@v1
+        uses: dash14/buildcage/setup@v2
         with:
           proxy_mode: audit
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           driver: remote
-          endpoint: tcp://localhost:${{ steps.buildcage.outputs.port }}
+          endpoint: docker-container://buildcage
 
       - name: Create test Dockerfile
         run: |
@@ -43,4 +42,4 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        uses: dash14/buildcage/report@v1
+        uses: dash14/buildcage/report@v2
