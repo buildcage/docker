@@ -1,8 +1,6 @@
 ARG BUILDKIT_VERSION=v0.28.0
 ARG CNI_VERSION=v1.9.0
 ARG ALPINE_RELEASE=3.23
-ARG S6_OVERLAY_VERSION=v3.2.2.0
-
 # Prepare dependencies
 FROM alpine:$ALPINE_RELEASE AS deps
 ARG CNI_VERSION
@@ -21,21 +19,12 @@ LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage"
 
 RUN apk add --no-cache \
+      s6-overlay \
       haproxy \
       dnsmasq \
       iptables \
       curl \
       quickjs
-
-# s6-overlay
-ARG S6_OVERLAY_VERSION
-RUN apk add --no-cache xz && \
-    S6_ARCH=$(uname -m) && \
-    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" \
-      | xz -d | tar -C / -xpf - && \
-    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" \
-      | xz -d | tar -C / -xpf - && \
-    apk del xz
 
 ENV S6_KEEP_ENV=1
 ENV S6_LOGGING=0
