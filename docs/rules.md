@@ -94,39 +94,3 @@ allowed_https_rules: >-
   ~^registry\.npmjs\.org:\d+$
   ~^.*\.githubusercontent\.com:443$
 ```
-
-## Deprecated Parameters
-
-The following parameters are deprecated and will be removed in a future version:
-
-| Deprecated | Replacement |
-|------------|-------------|
-| `allowed_https_domains` | `allowed_https_rules` |
-| `allowed_http_domains` | `allowed_http_rules` |
-| `https_ports` | Port specification in rules (e.g., `example.com:8443`) |
-| `http_ports` | Port specification in rules (e.g., `example.com:8080`) |
-
-### Migration
-
-```yaml
-# Before (deprecated)
-allowed_https_domains: "registry.npmjs.org, fonts.googleapis.com"
-https_ports: "443,8443"
-
-# After
-allowed_https_rules: >-
-  registry.npmjs.org:443
-  registry.npmjs.org:8443
-  fonts.googleapis.com:443
-  fonts.googleapis.com:8443
-```
-
-If you only use the default ports (80 for HTTP, 443 for HTTPS), migration is simpler — just rename the parameter and add the port:
-
-```yaml
-# Before (deprecated)
-allowed_https_domains: "registry.npmjs.org, fonts.googleapis.com"
-
-# After
-allowed_https_rules: "registry.npmjs.org:443 fonts.googleapis.com:443"
-```

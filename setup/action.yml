@@ -28,23 +28,7 @@ inputs:
     description: "IP address allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
     required: false
     default: ''
-  # Deprecated
-  allowed_http_domains:
-    description: "Deprecated: use allowed_http_rules instead"
-    required: false
-    default: ''
-  allowed_https_domains:
-    description: "Deprecated: use allowed_https_rules instead"
-    required: false
-    default: ''
-  http_ports:
-    description: "Deprecated: specify port per rule in allowed_http_rules (e.g., 'example.com:8080')"
-    required: false
-    default: '80'
-  https_ports:
-    description: "Deprecated: specify port per rule in allowed_https_rules (e.g., 'example.com:8443')"
-    required: false
-    default: '443'
+
 
 runs:
   using: node24
