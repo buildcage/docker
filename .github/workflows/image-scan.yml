@@ -37,7 +37,7 @@ jobs:
           tags: buildcage:scan
 
       - name: Scan image with Trivy
-        id: trivy-scan
+        if: github.ref == 'refs/heads/main'
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: ${{ github.event_name == 'schedule' && format('ghcr.io/{0}:latest', github.repository) || 'buildcage:scan' }}
@@ -49,6 +49,18 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy scan results to GitHub Security
+        if: github.ref == 'refs/heads/main'
         uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
         with:
           sarif_file: trivy-results.sarif
+
+      - name: Scan image with Trivy
+        if: github.ref != 'refs/heads/main'
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          image-ref: buildcage:scan
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          scanners: vuln
+          format: table
+          severity: CRITICAL,HIGH
