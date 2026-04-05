@@ -63,4 +63,3 @@ jobs:
           trivyignores: .trivyignore
           scanners: vuln
           format: table
-          severity: CRITICAL,HIGH
