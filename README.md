@@ -87,7 +87,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Start Buildcage in audit mode
         id: buildcage
@@ -96,13 +96,13 @@ jobs:
           proxy_mode: audit  # Log everything, block nothing
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
           driver: remote
           endpoint: docker-container://buildcage
 
       - name: Build and discover dependencies
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
           push: false  # Set to true to push the built image
@@ -135,7 +135,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Start Buildcage in restrict mode
         id: buildcage
@@ -147,13 +147,13 @@ jobs:
             fonts.googleapis.com:443
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
           driver: remote
           endpoint: docker-container://buildcage
 
       - name: Build with protection
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
           push: false  # Set to true to push the built image
@@ -216,7 +216,7 @@ Pass the container name to [`docker/setup-buildx-action`](https://github.com/doc
 
 ```yaml
 - name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v4
+  uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
   with:
     driver: remote
     endpoint: docker-container://buildcage
