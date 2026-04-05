@@ -61,3 +61,15 @@ CVE-2026-22184
 # Go stdlib net/url: incorrect parsing of IPv6 host literals.
 # CNI plugins do not parse user-supplied URLs.
 CVE-2026-25679
+
+# zlib: DoS via infinite loop in crc32_combine functions.
+# No code path in this product calls crc32_combine directly.
+CVE-2026-27171
+
+# Go stdlib html/template: URL escaping issue in meta content attribute.
+# CNI plugins do not generate or serve HTML.
+CVE-2026-27142
+
+# Go stdlib os: FileInfo can escape from a Root in ReadDir.
+# CNI plugins do not use the os.Root sandboxed filesystem API.
+CVE-2026-27139
