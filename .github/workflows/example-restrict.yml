@@ -30,7 +30,7 @@ jobs:
           cat <<'EOF' > /tmp/build-context/Dockerfile
           FROM node:24-alpine
           WORKDIR /app
-          RUN npm init -y && npm install express
+          RUN npm init -y && npm install --ignore-scripts express
           RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
           EOF
 
