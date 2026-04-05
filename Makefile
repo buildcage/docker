@@ -87,7 +87,7 @@ run_audit_example: ## Run audit mode example tests
 	@printf '%s\n' \
 	  "FROM node:24-alpine" \
 	  "WORKDIR /app" \
-	  "RUN npm init -y && npm install express" \
+	  "RUN npm init -y && npm install --ignore-scripts express" \
 	  > /tmp/build-context/Dockerfile
 	docker buildx build --no-cache \
 	  --builder buildcage \
@@ -107,7 +107,7 @@ run_restrict_example: ## Run restrict mode example tests
 	@printf '%s\n' \
 	  "FROM node:24-alpine" \
 	  "WORKDIR /app" \
-	  "RUN npm init -y && npm install express" \
+	  "RUN npm init -y && npm install --ignore-scripts express" \
 	  "RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true" \
 	  > /tmp/build-context/Dockerfile
 	docker buildx build --no-cache \
