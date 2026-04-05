@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/docker"
+      - "/test"
+      - "/test/test-dns"
+      - "/test/test-server"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
