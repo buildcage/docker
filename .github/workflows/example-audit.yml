@@ -10,13 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Prevent accidental execution of dash14's actions after forking.
+      # External actions referenced by tag pose a supply chain risk.
+      - name: Guard against unmodified fork usage
+        if: github.repository != 'dash14/buildcage'
+        run: |
+          echo "::error::This example references dash14/buildcage actions by tag. Replace with your fork (e.g., <your-org>/buildcage/setup@v2), or pin by commit hash if using dash14/buildcage directly."
+          exit 1
+
       - name: Start Buildcage builder
+        # For self-hosting, replace with: <your-org>/buildcage/setup@v2
+        # If using dash14/buildcage directly, pinning by commit hash is
+        # recommended for supply chain security.
         uses: dash14/buildcage/setup@v2
         with:
           proxy_mode: audit
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
           driver: remote
           endpoint: docker-container://buildcage
@@ -31,7 +42,7 @@ jobs:
           EOF
 
       - name: Build test image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: /tmp/build-context
           push: false
@@ -42,4 +53,7 @@ jobs:
 
       - name: Show proxy report
         if: always()
+        # For self-hosting, replace with: <your-org>/buildcage/report@v2
+        # If using dash14/buildcage directly, pinning by commit hash is
+        # recommended for supply chain security.
         uses: dash14/buildcage/report@v2
