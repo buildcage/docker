@@ -39,7 +39,7 @@ jobs:
 
       - name: Scan image with Trivy
         id: trivy-scan
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.34.2
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: ${{ github.event_name == 'schedule' && format('ghcr.io/{0}:latest', github.repository) || 'buildcage:scan' }}
           ignore-unfixed: true
