@@ -1,8 +1,11 @@
 ARG BUILDKIT_VERSION=v0.28.0
+ARG BUILDKIT_DIGEST=sha256:37539dd4d60fc70968d164d3850d903a2c56f6402214a1953fbf9fcb81ada731
 ARG CNI_VERSION=v1.9.0
 ARG ALPINE_RELEASE=3.23
+ARG ALPINE_DIGEST=sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+
 # Prepare dependencies
-FROM alpine:$ALPINE_RELEASE AS deps
+FROM alpine:${ALPINE_RELEASE}@${ALPINE_DIGEST} AS deps
 ARG CNI_VERSION
 RUN apk add --no-cache curl gettext && \
     mkdir -p /opt/cni/bin && \
@@ -11,7 +14,7 @@ RUN apk add --no-cache curl gettext && \
       | tar -C /opt/cni/bin -xz ./bridge ./host-local ./loopback
 
 # Final image
-FROM moby/buildkit:${BUILDKIT_VERSION}
+FROM moby/buildkit:${BUILDKIT_VERSION}@${BUILDKIT_DIGEST}
 
 LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
