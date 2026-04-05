@@ -48,3 +48,16 @@ CVE-2026-1229
 # libexpat: XML_ExternalEntityParserCreate does not copy encoding handler user data.
 # No external XML entity processing path exists in this product.
 CVE-2026-24515
+
+# QuickJS stack overflow via deeply nested JS input.
+# Only internal tool scripts (convert-rule.mjs, report.mjs) are executed;
+# no untrusted JavaScript is evaluated.
+CVE-2023-31922
+
+# zlib: buffer overflow in standalone untgz demo utility.
+# The core zlib library (libz) is unaffected; untgz is not used in this image.
+CVE-2026-22184
+
+# Go stdlib net/url: incorrect parsing of IPv6 host literals.
+# CNI plugins do not parse user-supplied URLs.
+CVE-2026-25679
