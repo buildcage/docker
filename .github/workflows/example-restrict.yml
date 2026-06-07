@@ -22,7 +22,7 @@ jobs:
         # For self-hosting, replace with: <your-org>/buildcage/setup@v2
         # If using dash14/buildcage directly, pinning by commit hash is
         # recommended for supply chain security.
-        uses: dash14/buildcage/setup@v2
+        uses: dash14/buildcage/setup@v2.0.1
         with:
           proxy_mode: restrict
           allowed_https_rules: >-
@@ -60,6 +60,6 @@ jobs:
         # For self-hosting, replace with: <your-org>/buildcage/report@v2
         # If using dash14/buildcage directly, pinning by commit hash is
         # recommended for supply chain security.
-        uses: dash14/buildcage/report@v2
+        uses: dash14/buildcage/report@v2.0.1
         with:
           fail_on_blocked: false
