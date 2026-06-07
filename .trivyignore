@@ -66,10 +66,39 @@ CVE-2026-25679
 # No code path in this product calls crc32_combine directly.
 CVE-2026-27171
 
-# Go stdlib html/template: URL escaping issue in meta content attribute.
-# CNI plugins do not generate or serve HTML.
+# Go stdlib html/template: XSS via escaping bugs in meta content URL and script type attribute.
+# No component in this product generates or serves HTML.
 CVE-2026-27142
+CVE-2026-39823
+CVE-2026-39826
 
 # Go stdlib os: FileInfo can escape from a Root in ReadDir.
 # CNI plugins do not use the os.Root sandboxed filesystem API.
 CVE-2026-27139
+
+# Go stdlib mime: excessive CPU on malformed MIME header decode.
+# buildkitd, buildkit-runc, and CNI plugins do not decode external MIME headers.
+CVE-2026-42504
+
+# containerd runAsNonRoot bypass via large numeric User directive.
+# buildcage does not use containerd directly; BuildKit is used as a remote builder
+# without Kubernetes runAsNonRoot enforcement.
+CVE-2026-46680
+
+# Go stdlib net/mail: DoS via pathological inputs (consumePhrase, ParseAddress,
+# ParseAddressList, ParseDate). No component in this product parses email addresses.
+CVE-2026-39820
+CVE-2026-42499
+
+# Go stdlib net: Dial/LookupPort panic on NUL input — Windows only.
+# This product runs exclusively in Linux containers; the Windows code path is never executed.
+CVE-2026-39836
+
+# Go stdlib net/http/httputil: ReverseProxy forwards params hidden from Rewrite function.
+# buildcage proxy performs SNI/Host-based allowlist checking and does not use ReverseProxy.
+CVE-2026-39825
+
+# golang.org/x/net/http2: infinite loop in HTTP/2 transport on SETTINGS_MAX_FRAME_SIZE=0.
+# buildkitd connects only to trusted local Docker endpoints and its own controlled build containers;
+# no external server can deliver crafted SETTINGS frames to the client transport.
+CVE-2026-33814
