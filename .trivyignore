@@ -102,3 +102,41 @@ CVE-2026-39825
 # buildkitd connects only to trusted local Docker endpoints and its own controlled build containers;
 # no external server can deliver crafted SETTINGS frames to the client transport.
 CVE-2026-33814
+
+# Go stdlib net: LookupCNAME double-free on very long CNAME response (cgo resolver).
+# CNI plugins use pure-Go DNS resolver and do not receive externally controlled CNAME responses.
+CVE-2026-33811
+
+# Go stdlib crypto/tls: TLS 1.3 deadlock via multiple key update messages in one record.
+# buildkitd connects only to trusted servers; a malicious peer cannot deliver crafted handshake records.
+CVE-2026-32283
+
+# Go stdlib crypto/x509: DoS during certificate chain validation with excessive intermediates or policy mappings.
+# buildkitd validates certificates issued by trusted root CAs only; crafted chains cannot be delivered.
+CVE-2026-32280
+CVE-2026-32281
+
+# Go stdlib crypto/x509: quadratic cost in VerifyHostname with large DNS SAN lists.
+# Same trust constraint as CVE-2026-32280/32281; attacker cannot deliver a cert with a large SAN list through a trusted CA.
+CVE-2026-27145
+
+# Go stdlib html/template: XSS via incorrect escaping in JS template literals.
+# No component in this product generates or serves HTML.
+CVE-2026-32289
+
+# AWS SDK for Go v2 EventStream decoder: panic on malformed header type byte.
+# buildcage does not use AWS SDK EventStream.
+GHSA-xmrv-pmrh-hhx2
+
+# Go stdlib net/textproto: input included in error messages allows log injection.
+# No component in this product uses net/textproto with externally controlled input in a log-injection-relevant path.
+CVE-2026-42507
+
+# Go stdlib internal/syscall/unix: Root.Chmod can follow symlinks outside the root on Linux.
+# No component in this product uses the os.Root sandboxed filesystem API.
+CVE-2026-32282
+
+# Go stdlib archive/tar: unbounded memory allocation on old GNU sparse map format.
+# Container image layers use POSIX/PAX tar format; old GNU sparse map headers
+# are not part of the OCI or Docker image layer specification and are not processed by buildkitd.
+CVE-2026-32288
