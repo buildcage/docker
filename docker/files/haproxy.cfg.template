@@ -24,7 +24,7 @@ frontend health
 # --- Frontend ---
 frontend outbound_proxy
     bind *:10024
-    tcp-request inspect-delay 1s
+    tcp-request inspect-delay 5s
 
     # Default variables
     # sess.decision defaults to BLOCKED — any reject/deny leaves it unchanged,
