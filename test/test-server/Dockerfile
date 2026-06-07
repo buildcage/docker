@@ -1,4 +1,4 @@
-FROM nginx:stable-alpine3.23-slim@sha256:b33eedfdf089be1f83759ced27b4deec5b6f1b6fc2a6819ebce0ae351a4406e5
+FROM nginx:stable-alpine3.23-slim@sha256:2c605dbeab79a6b2a63340474fe58119d0ef95bdc4b1f41df0aa689659b3d13b
 
 RUN apk add --no-cache openssl
 
