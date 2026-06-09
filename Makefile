@@ -67,7 +67,11 @@ test_audit_mode: ## Run audit mode tests
 	@$(MAKE) clean
 
 .PHONY: test_unit
-test_unit: test_report test_qjs ## Run unit tests
+test_unit: test_setup test_report test_qjs ## Run unit tests
+
+.PHONY: test_setup
+test_setup: ## Run setup action unit tests
+	@node --test setup/main.test.mjs
 
 .PHONY: test_report
 test_report: ## Run report unit tests
