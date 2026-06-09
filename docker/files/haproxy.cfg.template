@@ -1,6 +1,8 @@
 global
     log stdout format raw local0
     maxconn 2048
+    user haproxy
+    group haproxy
 
 resolvers my_dns
 ${HAPROXY_NAMESERVERS}
