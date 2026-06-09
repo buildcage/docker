@@ -1,7 +1,7 @@
 services:
   builder:
     container_name: ${BUILDER_NAME:-buildcage}
-    image: ${BUILDCAGE_IMAGE}:${BUILDCAGE_VERSION:-1}
+    image: ${BUILDCAGE_IMAGE_REF:-placeholder}
     # Instead of privileged: true, grant only the minimum privileges required
     # to run BuildKit and iptables. This avoids granting full device access
     # and unrestricted /sys write permissions that privileged mode includes.

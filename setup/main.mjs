@@ -10,13 +10,13 @@ const composeFile = join(__dirname, "compose.yml");
 function main() {
   const env = process.env;
 
-  const image = resolveBuildcageImage({
-    imageInput: env.INPUT_BUILDCAGE_IMAGE,
-    versionInput: env.INPUT_BUILDCAGE_VERSION,
+  // Digest is written to GITHUB_STATE by pre.mjs; empty when ref has no matching tag.
+  const imageRef = resolveBuildcageImageRef({
+    imageDigest: env.STATE_BUILDCAGE_DIGEST,
     actionRepository: env.GITHUB_ACTION_REPOSITORY,
     actionRef: env.GITHUB_ACTION_REF,
   });
-  console.log(`buildcage image: ${image.repository}:${image.tag}`);
+  console.log(`buildcage image: ${imageRef}`);
 
   let rules;
   try {
@@ -43,8 +43,7 @@ function main() {
     ALLOWED_HTTPS_RULES: rules.httpsRules.join('\n'),
     ALLOWED_HTTP_RULES: rules.httpRules.join('\n'),
     ALLOWED_IP_RULES: rules.ipRules.join('\n'),
-    BUILDCAGE_IMAGE: image.repository,
-    BUILDCAGE_VERSION: image.tag,
+    BUILDCAGE_IMAGE_REF: imageRef,
   };
 
   execFileSync(
@@ -62,41 +61,46 @@ function main() {
     ],
     { stdio: "inherit", env: composeEnv }
   );
-
 }
 
 /**
- * Resolve the buildcage Docker image name and tag.
+ * Resolve the buildcage Docker image reference (image@digest or image:tag).
+ * The repository is always derived from the action repository — external image
+ * overrides are intentionally not supported to preserve cosign verification integrity.
  *
- * @returns {{ repository: string, tag: string }}
+ * @param {{ imageDigest: string|undefined, actionRepository: string, actionRef: string }} opts
+ * @param {function} [_exec] - Override for execFileSync (used in tests)
+ * @returns {string} Full image reference (e.g. "ghcr.io/owner/repo@sha256:..." or "ghcr.io/owner/repo:2.0.1")
  */
-function resolveBuildcageImage({ imageInput, versionInput, actionRepository, actionRef }) {
-  const repository = (imageInput || `ghcr.io/${actionRepository}`).toLowerCase();
-  const tag = resolveImageTag(repository, { versionInput, actionRef });
-  return { repository, tag };
-}
-
-/**
- * Determine the Docker image tag to use.
- * Priority: explicit input > action ref tag > fallback "1"
- *
- * When called as `dash14/buildcage/setup@v1.0`, GITHUB_ACTION_REF is "v1.0".
- * Strip the "v" prefix if present, verify the image exists, then use it.
- * For non-v refs (commit hash, branch), check image existence with raw ref.
- * If the image doesn't exist, fall back to "1".
- */
-function resolveImageTag(repository, { versionInput, actionRef }) {
-  if (versionInput) {
-    return versionInput;
+export function resolveBuildcageImageRef({ imageDigest, actionRepository, actionRef }, _exec = execFileSync) {
+  const repository = `ghcr.io/${actionRepository}`.toLowerCase();
+  if (imageDigest) {
+    // Use the verified manifest list digest to guarantee the same bytes as verified.
+    // This eliminates any TOCTOU window between cosign verify and docker pull.
+    return `${repository}@${imageDigest}`;
   }
+  const tag = resolveImageTag(repository, { actionRef }, _exec);
+  return `${repository}:${tag}`;
+}
 
+/**
+ * Determine the Docker image tag from the action ref.
+ * Throws if the ref cannot be resolved to an existing image tag.
+ *
+ * Used only when no verified digest is available (e.g. branch/local references).
+ *
+ * @param {string} repository
+ * @param {{ actionRef: string|undefined }} opts
+ * @param {function} [_exec] - Override for execFileSync (used in tests)
+ */
+export function resolveImageTag(repository, { actionRef }, _exec = execFileSync) {
   if (actionRef) {
     // Full SHA (40 hex chars) → prefix with "sha-" to match image tag convention
     const tag = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}`
       : actionRef.startsWith("v") ? actionRef.slice(1)
       : actionRef;
     try {
-      execFileSync("docker", ["manifest", "inspect", `${repository}:${tag}`], {
+      _exec("docker", ["manifest", "inspect", `${repository}:${tag}`], {
         stdio: "pipe",
       });
       return tag;
@@ -105,7 +109,13 @@ function resolveImageTag(repository, { versionInput, actionRef }) {
     }
   }
 
-  return "1";
+  // No fallback: branch refs and local ./setup references land here.
+  // These are intentionally unsupported outside of development use.
+  // Pin the action to a version tag or commit SHA for production use.
+  throw new Error(
+    `Cannot resolve Docker image tag for action ref: ${JSON.stringify(actionRef)}. ` +
+    `Pin the action to a version tag (e.g. @v2.1.0) or commit SHA.`
+  );
 }
 
 /**
@@ -114,7 +124,7 @@ function resolveImageTag(repository, { versionInput, actionRef }) {
  *
  * @returns {{ httpsRules: string[], httpRules: string[], ipRules: string[] }}
  */
-function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
   const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
   const httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
   const ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -130,4 +140,7 @@ function logRules(label, rules) {
   for (const r of rules) console.log(`  ${r}`);
 }
 
-main();
+// Run main() only when executed directly as an entrypoint (not imported in tests)
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}
