@@ -93,7 +93,9 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 ├── setup/                       # GitHub Actions setup
 │   ├── action.yml               # GitHub Action: dash14/buildcage/setup@v2
 │   ├── compose.yml              # Compose config for GitHub Actions (with image tag)
-│   ├── main.mjs                 # Setup entrypoint (rule generation, compose up)
+│   ├── pre.mjs                  # Pre-action: cosign install, image verify, digest save
+│   ├── main.mjs                 # Main: resolve image ref, compose up
+│   ├── main.test.mjs            # Unit tests for main.mjs
 │   └── post.mjs                 # Post-action cleanup
 ├── report/                      # GitHub Actions report
 │   ├── action.yml               # GitHub Action: dash14/buildcage/report@v2

@@ -103,3 +103,45 @@ Given these implementation costs versus the strict preconditions for the attack 
 - **Use service-specific domains** — Prefer `registry.npmjs.org` over generic CDN wildcard domains.
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
 - **Regular audits** — Periodically run in [audit mode](../README.md#operation-modes) to detect anomalies in connection patterns.
+
+## Image Provenance Verification
+
+Buildcage uses [cosign](https://github.com/sigstore/cosign) keyless signing to cryptographically bind each release's Docker image to the CI workflow that built it.
+
+### How it works
+
+When a release tag is pushed, the `docker-publish.yml` workflow builds and signs the Docker image using a short-lived OIDC identity issued by GitHub Actions. The signature is stored transparently in the [Rekor](https://docs.sigstore.dev/logging/overview/) public ledger.
+
+When the setup action runs, it:
+
+1. Inspects the manifest list digest (no pull required).
+2. Verifies the cosign signature against the expected workflow identity.
+3. Pulls the image by digest — the same bytes that were verified — eliminating any window between verification and pull.
+
+### What this prevents
+
+An attacker who can push a malicious image to `ghcr.io/dash14/buildcage` without compromising the repository cannot produce a valid cosign signature. The signature requires a GitHub Actions OIDC token that is only issued during an actual workflow run on the real repository.
+
+This is **one layer of a defense-in-depth strategy**, not a complete guarantee. It reduces the attack surface to the registry layer and forces attackers to compromise the GitHub account or the repository itself — raising the cost significantly and leaving an audit trail in the Rekor transparency log.
+
+### Verification scope by reference type
+
+| How the action is pinned | Verification |
+|---|---|
+| `@<40-char SHA>` (commit SHA) | Confirms the `docker-publish.yml` workflow at exactly that commit SHA signed the image |
+| `@v2.1.1` (version tag) | Confirms the `docker-publish.yml` workflow on tag `refs/tags/v2.1.1` signed the image |
+| `@v2` (floating major tag) | Confirms a `docker-publish.yml` workflow run on any v2 release signed the image |
+| Branch name or local `./setup` | Skipped (no corresponding release signature exists) |
+
+For strongest guarantees, pin the action to a **commit SHA**:
+
+```yaml
+uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z
+```
+
+### Known limitations
+
+- **Account compromise**: If the repository owner's GitHub account or the repository itself is compromised, an attacker could trigger the release workflow and produce a legitimately-signed malicious image.
+- **Build non-reproducibility**: Buildcage does not currently publish reproducible builds, so the signed image cannot be independently rebuilt from source.
+- **Trust in Sigstore infrastructure**: Verification relies on the availability and integrity of the Rekor transparency log and the Fulcio certificate authority.
+- **Post-signature registry tampering**: The digest verified by cosign and used for the pull is fetched at action runtime. A highly targeted attack that replaces the registry content in the window between `cosign verify` and the digest resolution would still succeed — though such an attack requires compromising the registry itself.

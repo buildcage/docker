@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Login to GHCR
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -86,6 +86,29 @@ jobs:
 ```
 
 Note that `uses:` now points to `<your_org>/buildcage/setup@v2` instead of `dash14/buildcage/setup@v2`. The same applies to the report action (`<your_org>/buildcage/report@v2`).
+
+### Image provenance and cosign verification
+
+The setup action automatically verifies the Docker image using cosign keyless signing before pulling it. When you fork the repository:
+
+- The `docker-publish.yml` workflow in your fork will sign images with **your fork's** GitHub Actions OIDC identity.
+- The setup action will verify against your fork's workflow identity, so verification passes correctly.
+- If you use `uses: <your_org>/buildcage/setup@v2`, `github.action_repository` resolves to `<your_org>/buildcage` and the image is pulled from `ghcr.io/<your_org>/buildcage` automatically.
+
+> **Note:** The `buildcage_image` and `buildcage_version` parameters have been **removed** as of v2.1.
+> External image overrides are no longer supported because they would bypass the cosign verification
+> that guarantees image provenance. Self-hosting via fork is the supported alternative.
+
+If cosign verification fails, the action will exit with an error. Make sure you have published at least one signed release in your fork before using a version tag.
+
+To confirm that a specific image digest has a valid signature in your fork, run:
+
+```bash
+cosign verify \
+  --certificate-identity-regexp "^https://github.com/<your_org>/buildcage/.github/workflows/docker-publish.yml@refs/tags/.*$" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/<your_org>/buildcage@sha256:<digest>
+```
 
 ## Syncing with Upstream
 
