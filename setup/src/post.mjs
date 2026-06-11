@@ -6,7 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 execFileSync(
   "docker",
-  ["compose", "-f", join(__dirname, "compose.yml"), "down"],
+  ["compose", "-f", join(__dirname, "../compose.yml"), "down"],
   {
     stdio: "inherit",
     env: {
