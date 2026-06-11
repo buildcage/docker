@@ -1,0 +1,27 @@
+{
+  "name": "buildcage",
+  "private": true,
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=11"
+  },
+  "packageManager": "pnpm@11.5.3",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.16.0",
+      "onFail": "download"
+    },
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.5.3",
+      "onFail": "download"
+    }
+  },
+  "scripts": {
+    "build": "rollup -c"
+  },
+  "devDependencies": {
+    "rollup": "^4.60.4"
+  }
+}
