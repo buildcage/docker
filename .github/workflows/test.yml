@@ -87,7 +87,7 @@ jobs:
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
           INPUT_BUILDER_NAME: ${{ matrix.builder_name }}
-        run: node report/main.mjs ./compose.yml || true
+        run: node report/src/index.mjs ./compose.yml || true
 
       - name: Run assertions
         env:
