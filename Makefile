@@ -1,4 +1,4 @@
-COMPOSE_FILE ?= compose.yml
+COMPOSE_FILE ?= compose.yaml
 
 # Self-Documented Makefile
 .PHONY: help
@@ -9,7 +9,7 @@ help:
 clean: ## Clean up all resources
 	@echo "Stopping and removing all containers..."
 	@docker buildx rm buildcage 2>/dev/null || true
-	@docker compose -f compose.yml -f compose.test.yml down -v --rmi all
+	@docker compose -f compose.yaml -f compose.test.yaml down -v --rmi all
 	@docker rmi buildcage-test 2>/dev/null || true
 
 .PHONY: run_audit_mode
@@ -41,28 +41,28 @@ run_restrict_mode: ## Start in restrict mode
 .PHONY: test_restrict_mode
 test_restrict_mode: ## Run restrict mode tests
 	@echo "Running restrict mode tests..."
-	@COMPOSE_FILE=compose.yml:compose.test.yml \
+	@COMPOSE_FILE=compose.yaml:compose.test.yaml \
 	  $(MAKE) run_restrict_mode
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.restrict test/ \
 	  --load -t buildcage-test
-	@node report/src/main.mjs ./compose.yml || true
+	@node report/src/main.mjs ./compose.yaml || true
 	@./test/assert-restrict-mode.sh
 	@$(MAKE) clean
 
 .PHONY: test_audit_mode
 test_audit_mode: ## Run audit mode tests
 	@echo "Running audit mode tests..."
-	@COMPOSE_FILE=compose.yml:compose.test.yml \
+	@COMPOSE_FILE=compose.yaml:compose.test.yaml \
 	  $(MAKE) run_audit_mode
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.audit test/ \
 	  --load -t buildcage-test
-	@node report/src/main.mjs ./compose.yml
+	@node report/src/main.mjs ./compose.yaml
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean
 
@@ -94,7 +94,7 @@ run_audit_example: ## Run audit mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.mjs ./compose.yml
+	@node report/src/main.mjs ./compose.yaml
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
 
@@ -115,6 +115,6 @@ run_restrict_example: ## Run restrict mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.mjs ./compose.yml || true
+	@node report/src/main.mjs ./compose.yaml || true
 	@$(MAKE) clean
 	rm -fr /tmp/build-context

@@ -7,7 +7,7 @@ import { buildRestrictExample } from "./lib/build-example.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // 1. Get structured report from container via QuickJS
-const composeFile = process.argv[2] || join(__dirname, "../..", "setup", "compose.yml");
+const composeFile = process.argv[2] || join(__dirname, "../..", "setup", "compose.yaml");
 const composeEnv = {
   ...process.env,
   BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",

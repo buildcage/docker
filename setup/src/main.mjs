@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { buildRules } from "../../docker/files/tools/lib/rules.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const composeFile = join(__dirname, "../compose.yml");
+const composeFile = join(__dirname, "../compose.yaml");
 
 function main() {
   const env = process.env;

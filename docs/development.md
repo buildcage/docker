@@ -92,7 +92,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 .
 ├── setup/                       # GitHub Actions setup
 │   ├── action.yml               # GitHub Action: dash14/buildcage/setup@v2
-│   ├── compose.yml              # Compose config for GitHub Actions (with image tag)
+│   ├── compose.yaml             # Compose config for GitHub Actions (with image tag)
 │   ├── main.mjs                 # Setup entrypoint (rule generation, compose up)
 │   └── post.mjs                 # Post-action cleanup
 ├── report/                      # GitHub Actions report
@@ -129,7 +129,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │   ├── helpers.sh               # Test helpers
 │   ├── test-server/             # Test HTTP server
 │   └── test-dns/                # Test DNS server
-├── compose.yml                  # Docker Compose config
-├── compose.test.yml             # Test override config
+├── compose.yaml                 # Docker Compose config
+├── compose.test.yaml            # Test override config
 └── Makefile                     # Operational commands
 ```
