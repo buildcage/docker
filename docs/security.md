@@ -103,3 +103,79 @@ Given these implementation costs versus the strict preconditions for the attack 
 - **Use service-specific domains** — Prefer `registry.npmjs.org` over generic CDN wildcard domains.
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
 - **Regular audits** — Periodically run in [audit mode](../README.md#operation-modes) to detect anomalies in connection patterns.
+
+## Image Provenance Verification
+
+Buildcage uses [Sigstore](https://sigstore.dev) keyless signing to cryptographically bind each release's Docker image to the CI workflow that built it.
+
+### How it works
+
+**Signing (at release time):** When a release tag is pushed, the `docker-publish.yml` workflow builds and signs the Docker image using a short-lived OIDC identity issued by GitHub Actions. The signature is stored as a **Sigstore Bundle v0.3** attached to the image via the OCI 1.1 Referrers API in GHCR. The bundle contains the signature, a Fulcio leaf certificate embedding the workflow identity, and a Rekor transparency log entry.
+
+**Verification (at action startup, `main` phase):** The setup action verifies the image entirely in-process using `@sigstore/verify`, `@sigstore/tuf`, and `@sigstore/bundle` — no external binary (e.g. cosign) is downloaded or required. Running in the `main` phase ensures `docker/login-action` (if present) has already stored registry credentials before verification begins. The verification flow is:
+
+```
+1. Fetch manifest-list digest
+       docker buildx imagetools inspect <image>:<tag>
+       (uses docker login credentials — supports private packages)
+            ↓
+2. Fetch registry pull token
+       GET https://ghcr.io/token?scope=repository:<repo>:pull
+         → logged in (docker/login-action): Basic auth with Docker config credentials
+         → not logged in: anonymous request (public packages only)
+            ↓
+3. Pull Sigstore Bundle from OCI Referrers API
+       GET /v2/<repo>/referrers/<digest>  → locate bundle manifest
+       GET /v2/<repo>/blobs/<bundleDigest> → fetch bundle JSON
+            ↓
+4. Cryptographic + identity verification (@sigstore/verify, TUF-backed trust root)
+       verifyBundle(bundleJson, {
+         certificateIssuer,       ← OIDC issuer enforced cryptographically
+         certificateIdentityURI,  ← SAN regexp: workflow URL + ref/version
+         certificateOIDs,         ← OID 1.13: Source Repository Digest (SHA pin)
+       }, expectedDigest)
+            ↓
+5. Signed digest assertion (fail-closed)
+       Parse DSSE payload → critical.image.docker-manifest-digest
+       Must equal the digest fetched in step 1 (strict string equality)
+       Mismatch → VERIFY_FAILED (closes the Referrers API attribution gap)
+```
+
+For **private self-hosted packages**, place `docker/login-action` before the buildcage setup step in your workflow and ensure the job has `packages: read` permission. Credentials stored by Docker login are picked up automatically.
+
+All identity checks — OIDC issuer, signing workflow, ref/SHA claim, and manifest digest — are enforced inside the single `verifyBundle()` call, equivalent to cosign's `--certificate-oidc-issuer`, `--certificate-identity-regexp`, `--certificate-github-workflow-sha`, and the implicit digest-match that cosign performs against its target image argument.
+
+### Identity matching by reference type
+
+| How the action is pinned | Identity check | Mechanism |
+|---|---|---|
+| `@<40-char SHA>` | Source Repository Digest **strictly equals** the pinned SHA | `certificateOIDs` — Fulcio OID `1.3.6.1.4.1.57264.1.13`, raw byte match |
+| `@v2.1.0` (exact version) | SAN matches `...@refs/tags/v2\.1\.0(\.|$)` | `certificateIdentityURI` regexp |
+| `@v2` (major-floating) | SAN matches `...@refs/tags/v2(\.|$)` | `certificateIdentityURI` regexp |
+| Branch name or local `./setup` | **Hard fail** — pin to a version tag or commit SHA | — |
+
+For strongest guarantees, pin to a **commit SHA**:
+
+```yaml
+uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z
+```
+
+The SHA check is the core of tamper detection: it confirms the Docker image was built from exactly the same source tree as the pinned action commit. An image built from a different commit — even if signed — will fail verification.
+
+### What this prevents
+
+An attacker who can push a malicious image to `ghcr.io/dash14/buildcage` without compromising the repository cannot produce a valid Sigstore bundle. The bundle's Fulcio certificate requires a GitHub Actions OIDC token that is only issued during an actual workflow run on the real repository.
+
+This is **one layer of a defense-in-depth strategy**, not a complete guarantee. It reduces the attack surface to the registry layer and forces attackers to compromise the GitHub account or the repository itself — raising the cost significantly and leaving an audit trail in the Rekor transparency log.
+
+### Self-hosting with a private package
+
+When self-hosting Buildcage from a **private** GHCR package, run `docker/login-action` with `packages: read` before this action. Credentials written to Docker's config by the login step are read automatically — no `token` input is required. Public packages are verified without any credentials.
+
+### Known limitations
+
+- **Account compromise**: If the repository owner's GitHub account or the repository itself is compromised, an attacker could trigger the release workflow and produce a legitimately-signed malicious image.
+- **Build non-reproducibility**: Buildcage does not currently publish reproducible builds, so the signed image cannot be independently rebuilt from source.
+- **Trust in Sigstore infrastructure**: Verification relies on the availability and integrity of the Rekor transparency log and the Fulcio certificate authority. The TUF-backed trust root is fetched at verification time; a network outage will cause the main phase to hard-fail.
+- **TOCTOU window**: The manifest digest is fetched before the bundle is pulled. A highly targeted attack that replaces the registry content in the window between these two steps would still succeed — though such an attack requires compromising the registry itself. Note that the subsequent `docker pull` is digest-pinned (`image@sha256:…`), so there is no TOCTOU between verification and the actual image pull; the residual window is limited to between the manifest-digest fetch and the bundle fetch.
+- **Development bypass**: `BUILDCAGE_ALLOW_UNVERIFIED=1` skips verification for unverifiable refs (branch names, local `./setup`). This flag is **for local development only** and must never be used in CI or production workflows. See [development.md](./development.md#local-development) for details.

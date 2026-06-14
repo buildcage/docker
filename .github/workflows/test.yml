@@ -64,7 +64,7 @@ jobs:
     name: test (${{ matrix.mode }})
 
     env:
-      COMPOSE_FILE: compose.yml:compose.test.yml
+      COMPOSE_FILE: compose.yaml:compose.test.yaml
 
     steps:
       - name: Checkout
@@ -106,7 +106,7 @@ jobs:
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
           INPUT_BUILDER_NAME: ${{ matrix.builder_name }}
-        run: node report/src/main.mjs ./compose.yml || true
+        run: node report/src/main.mjs ./compose.yaml || true
 
       - name: Run assertions
         env:

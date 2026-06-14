@@ -54,6 +54,28 @@ make test_audit_mode
 make test_restrict_mode
 ```
 
+## Local Development
+
+### Image provenance verification bypass
+
+When running the setup action locally against a branch ref or a local `./setup` path, the
+action cannot resolve the ref to a published release and image provenance verification is
+skipped by default (the ref is "unverifiable").
+
+For development use, you can allow the action to pull the image without verification by
+setting:
+
+```bash
+BUILDCAGE_ALLOW_UNVERIFIED=1
+```
+
+> **⚠ This flag is for local development only.**
+> Never use it in CI or production workflows.
+> It is active only for unverifiable refs (branch names, local paths); version tags and
+> commit SHAs always go through full Sigstore verification regardless of this flag.
+
+See [security.md](./security.md#known-limitations) for more details.
+
 ## Viewing Logs
 
 ```bash
@@ -92,8 +114,8 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 .
 ├── setup/                       # GitHub Actions setup
 │   ├── action.yml               # GitHub Action: dash14/buildcage/setup@v2
-│   ├── compose.yml              # Compose config for GitHub Actions (with image tag)
-│   ├── main.mjs                 # Setup entrypoint (rule generation, compose up)
+│   ├── compose.yaml             # Compose config for GitHub Actions (with image tag)
+│   ├── main.mjs                 # Main: verify image provenance, resolve image ref, compose up
 │   └── post.mjs                 # Post-action cleanup
 ├── report/                      # GitHub Actions report
 │   ├── action.yml               # GitHub Action: dash14/buildcage/report@v2
@@ -129,7 +151,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │   ├── helpers.sh               # Test helpers
 │   ├── test-server/             # Test HTTP server
 │   └── test-dns/                # Test DNS server
-├── compose.yml                  # Docker Compose config
-├── compose.test.yml             # Test override config
+├── compose.yaml                 # Docker Compose config
+├── compose.test.yaml            # Test override config
 └── Makefile                     # Operational commands
 ```

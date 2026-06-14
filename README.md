@@ -187,13 +187,21 @@ Starts the Buildcage builder container.
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `buildcage_image` | No | `ghcr.io/<owner>/<repo>` | Docker image name |
-| `buildcage_version` | No | `1` | Image tag |
 | `builder_name` | No | `buildcage` | Name of the builder container |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
 | `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
+
+> **Security:** The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its
+> provenance is verified via cosign keyless signing. External image overrides are not supported to
+> preserve this guarantee. For best security, pin the action to a commit SHA:
+> `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
+>
+> Self-hosting with a custom image requires forking the repository. See the [Self-Hosting Guide](./docs/self-hosting.md).
+> If the action package is private (self-hosted in a private repository), run
+> [`docker/login-action`](https://github.com/docker/login-action) with `packages: read` before this
+> action — credentials stored by Docker are picked up automatically.
 
 **Rule syntax**
 

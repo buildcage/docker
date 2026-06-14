@@ -3,32 +3,58 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildRules } from "../../docker/files/tools/lib/rules.mjs";
+import { SetupError } from "./lib/errors.mjs";
+import { imageTagFromRef, verifyImageDigest } from "./lib/verify-image.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const composeFile = join(__dirname, "../compose.yml");
+const composeFile = join(__dirname, "../compose.yaml");
 
-function main() {
+async function main() {
   const env = process.env;
+  const actionRef = env.GITHUB_ACTION_REF ?? "";
+  const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 
-  const image = resolveBuildcageImage({
-    imageInput: env.INPUT_BUILDCAGE_IMAGE,
-    versionInput: env.INPUT_BUILDCAGE_VERSION,
-    actionRepository: env.GITHUB_ACTION_REPOSITORY,
-    actionRef: env.GITHUB_ACTION_REF,
-  });
-  console.log(`buildcage image: ${image.repository}:${image.tag}`);
-
-  let rules;
-  try {
-    rules = buildACLRules({
-      httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
-      httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
-      ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
+  // Verify image provenance before pulling.
+  // verifyImageDigest returns null for unverifiable refs (branch / local ./setup).
+  // On failure it throws SetupError — printed by the top-level catch.
+  const digest = await verifyImageDigest({ actionRef, actionRepo });
+  let imageRef;
+  if (digest === null) {
+    if (
+      env.BUILDCAGE_ALLOW_UNVERIFIED === "1" ||
+      env.BUILDCAGE_ALLOW_UNVERIFIED?.toLowerCase() === "true"
+    ) {
+      console.log(
+        `::warning::Skipping image provenance verification for unverifiable ref: ` +
+          `${JSON.stringify(actionRef)}. The image will be pulled without verification.`,
+      );
+      imageRef = resolveBuildcageImageRef({
+        imageDigest: undefined,
+        actionRepository: actionRepo,
+        actionRef,
+      });
+    } else {
+      throw new SetupError(
+        `Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. ` +
+          `Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`,
+        "UNVERIFIABLE_REF",
+      );
+    }
+  } else {
+    console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
+    imageRef = resolveBuildcageImageRef({
+      imageDigest: digest,
+      actionRepository: actionRepo,
+      actionRef,
     });
-  } catch (e) {
-    console.log(`::error::${e.message}`);
-    process.exit(1);
   }
+  console.log(`buildcage image: ${imageRef}`);
+
+  const rules = buildACLRules({
+    httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
+    httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
+    ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
+  });
 
   console.log("::group::Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
@@ -43,8 +69,7 @@ function main() {
     ALLOWED_HTTPS_RULES: rules.httpsRules.join('\n'),
     ALLOWED_HTTP_RULES: rules.httpRules.join('\n'),
     ALLOWED_IP_RULES: rules.ipRules.join('\n'),
-    BUILDCAGE_IMAGE: image.repository,
-    BUILDCAGE_VERSION: image.tag,
+    BUILDCAGE_IMAGE_REF: imageRef,
   };
 
   execFileSync(
@@ -58,45 +83,37 @@ function main() {
     [
       "compose",
       "-f", composeFile,
-      "up", "-d", "--pull", "always", "--no-build", "--wait",
+      "up", "-d", "--pull", "always", "--no-build", "--wait", "--quiet-pull",
     ],
     { stdio: "inherit", env: composeEnv }
   );
-
 }
 
 /**
- * Resolve the buildcage Docker image name and tag.
- *
- * @returns {{ repository: string, tag: string }}
+ * Resolve the buildcage Docker image reference (image@digest or image:tag).
+ * The repository is always derived from the action repository — external image
+ * overrides are intentionally not supported to preserve Sigstore verification integrity.
  */
-function resolveBuildcageImage({ imageInput, versionInput, actionRepository, actionRef }) {
-  const repository = (imageInput || `ghcr.io/${actionRepository}`).toLowerCase();
-  const tag = resolveImageTag(repository, { versionInput, actionRef });
-  return { repository, tag };
-}
-
-/**
- * Determine the Docker image tag to use.
- * Priority: explicit input > action ref tag > fallback "1"
- *
- * When called as `dash14/buildcage/setup@v1.0`, GITHUB_ACTION_REF is "v1.0".
- * Strip the "v" prefix if present, verify the image exists, then use it.
- * For non-v refs (commit hash, branch), check image existence with raw ref.
- * If the image doesn't exist, fall back to "1".
- */
-function resolveImageTag(repository, { versionInput, actionRef }) {
-  if (versionInput) {
-    return versionInput;
+export function resolveBuildcageImageRef({ imageDigest, actionRepository, actionRef }, _exec = execFileSync) {
+  const repository = `ghcr.io/${actionRepository}`.toLowerCase();
+  if (imageDigest) {
+    // Pull by verified digest to close the TOCTOU window between verification and docker pull.
+    return `${repository}@${imageDigest}`;
   }
+  const tag = resolveImageTag(repository, { actionRef }, _exec);
+  return `${repository}:${tag}`;
+}
 
+/**
+ * Determine the Docker image tag from the action ref.
+ * Throws if the ref cannot be resolved to an existing image tag.
+ * Used only when no verified digest is available (branch/local references).
+ */
+export function resolveImageTag(repository, { actionRef }, _exec = execFileSync) {
   if (actionRef) {
-    // Full SHA (40 hex chars) → prefix with "sha-" to match image tag convention
-    const tag = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}`
-      : actionRef.startsWith("v") ? actionRef.slice(1)
-      : actionRef;
+    const tag = imageTagFromRef(actionRef);
     try {
-      execFileSync("docker", ["manifest", "inspect", `${repository}:${tag}`], {
+      _exec("docker", ["manifest", "inspect", `${repository}:${tag}`], {
         stdio: "pipe",
       });
       return tag;
@@ -105,22 +122,31 @@ function resolveImageTag(repository, { versionInput, actionRef }) {
     }
   }
 
-  return "1";
+  // No fallback: branch refs and local ./setup references land here.
+  // These are intentionally unsupported outside of development use.
+  // Pin the action to a version tag or commit SHA for production use.
+  throw new SetupError(
+    `Cannot resolve Docker image tag for action ref: ${JSON.stringify(actionRef)}. ` +
+    `Pin the action to a version tag (e.g. @v2.1.0) or commit SHA.`,
+    "TAG_UNRESOLVED",
+  );
 }
 
 /**
  * Build ACL rules from input strings.
  * Rules are passed through as-is (wildcard format), validated by converting to regex.
- *
- * @returns {{ httpsRules: string[], httpRules: string[], ipRules: string[] }}
  */
-function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
   const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
   const httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
   const ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  buildRules(httpsRulesInput);
-  buildRules(httpRulesInput);
-  buildRules(ipRulesInput);
+  try {
+    buildRules(httpsRulesInput);
+    buildRules(httpRulesInput);
+    buildRules(ipRulesInput);
+  } catch (e) {
+    throw new SetupError(e.message, "INVALID_RULES");
+  }
 
   return { httpsRules, httpRules, ipRules };
 }
@@ -130,4 +156,13 @@ function logRules(label, rules) {
   for (const r of rules) console.log(`  ${r}`);
 }
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    if (err instanceof SetupError) {
+      console.log(`::error::${err.message}`);
+    } else {
+      console.log(`::error::Unexpected error in setup: ${err.message}`);
+    }
+    process.exit(1);
+  });
+}
