@@ -48,7 +48,7 @@ test_restrict_mode: ## Run restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.restrict test/ \
 	  --load -t buildcage-test
-	@node report/main.mjs ./compose.yml || true
+	@node report/src/main.mjs ./compose.yml || true
 	@./test/assert-restrict-mode.sh
 	@$(MAKE) clean
 
@@ -62,7 +62,7 @@ test_audit_mode: ## Run audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.audit test/ \
 	  --load -t buildcage-test
-	@node report/main.mjs ./compose.yml
+	@node report/src/main.mjs ./compose.yml
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean
 
@@ -71,7 +71,7 @@ test_unit: test_report test_qjs ## Run unit tests
 
 .PHONY: test_report
 test_report: ## Run report unit tests
-	@node --test report/lib/build-example.test.mjs
+	@node --test report/src/lib/build-example.test.mjs
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker
@@ -94,7 +94,7 @@ run_audit_example: ## Run audit mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/main.mjs ./compose.yml
+	@node report/src/main.mjs ./compose.yml
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
 
@@ -115,6 +115,6 @@ run_restrict_example: ## Run restrict mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/main.mjs ./compose.yml || true
+	@node report/src/main.mjs ./compose.yml || true
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
