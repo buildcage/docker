@@ -3,26 +3,25 @@ name: Example (restrict mode)
 on:
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
+  packages: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Prevent accidental execution of dash14's actions after forking.
-      # External actions referenced by tag pose a supply chain risk.
-      - name: Guard against unmodified fork usage
-        if: github.repository != 'dash14/buildcage'
-        run: |
-          echo "::error::This example references dash14/buildcage actions by tag. Replace with your fork (e.g., <your-org>/buildcage/setup@v2), or pin by commit hash if using dash14/buildcage directly."
-          exit 1
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start Buildcage builder
-        # For self-hosting, replace with: <your-org>/buildcage/setup@v2
-        # If using dash14/buildcage directly, pinning by commit hash is
-        # recommended for supply chain security.
-        uses: dash14/buildcage/setup@v2
+        # For self-hosting, replace with: <your-org>/buildcage/setup@<SHA>
+        uses: dash14/buildcage/setup@fb2972bea2e3295f09402f77cdc2a99a25d4ec2b # v2.0.2
         with:
           proxy_mode: restrict
           allowed_https_rules: >-
@@ -57,9 +56,7 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        # For self-hosting, replace with: <your-org>/buildcage/report@v2
-        # If using dash14/buildcage directly, pinning by commit hash is
-        # recommended for supply chain security.
-        uses: dash14/buildcage/report@v2
+        # For self-hosting, replace with: <your-org>/buildcage/report@<SHA>
+        uses: dash14/buildcage/report@fb2972bea2e3295f09402f77cdc2a99a25d4ec2b # v2.0.2
         with:
           fail_on_blocked: false

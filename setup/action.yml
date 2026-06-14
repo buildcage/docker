@@ -2,12 +2,6 @@ name: Setup Builder
 description: Start Buildcage builder container
 
 inputs:
-  buildcage_image:
-    description: "Docker image name (default: ghcr.io/<action-owner>/<action-repo>)"
-    required: false
-  buildcage_version:
-    description: "Image tag"
-    required: false
   builder_name:
     description: "Name of the builder container"
     required: false
