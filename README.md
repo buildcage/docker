@@ -194,9 +194,9 @@ Starts the Buildcage builder container.
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 
 > **Security:** The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its
-> provenance is verified via cosign keyless signing. External image overrides are not supported to
-> preserve this guarantee. For best security, pin the action to a commit SHA:
-> `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
+> build provenance is cryptographically verified (keyless signature) before the image is pulled.
+> External image overrides are not supported to preserve this guarantee. For best security, pin the
+> action to a commit SHA: `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
 >
 > Self-hosting with a custom image requires forking the repository. See the [Self-Hosting Guide](./docs/self-hosting.md).
 > If the action package is private (self-hosted in a private repository), run
