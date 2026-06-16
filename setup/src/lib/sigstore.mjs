@@ -139,5 +139,9 @@ export async function verifyBundle(bundleJson, options, expectedDigest) {
   // The Referrers API that links a bundle to a digest is registry metadata,
   // not a cryptographic binding — an attacker with package-write access could
   // re-attach a valid bundle to a different image.  This check closes that gap.
+  // The DSSE payload parsed by assertSignedDigest is the exact byte sequence covered by the
+  // signature that verifier.verify() above just cryptographically verified (same in-memory
+  // bundle). @sigstore/verify exposes no accessor for the verified payload, so parsing it
+  // directly is both necessary and sound — it is read only after verification succeeds.
   assertSignedDigest(bundleJson, expectedDigest);
 }
