@@ -136,7 +136,8 @@ Buildcage uses [Sigstore](https://sigstore.dev) keyless signing to cryptographic
        }, expectedDigest)
             ↓
 5. Signed digest assertion (fail-closed)
-       Parse DSSE payload → critical.image.docker-manifest-digest
+       Parse DSSE payload → subject[].digest.sha256 (in-toto v1, --new-bundle-format)
+                          or critical.image.docker-manifest-digest (legacy simple-signing)
        Must equal the digest fetched in step 1 (strict string equality)
        Mismatch → VERIFY_FAILED (closes the Referrers API attribution gap)
 ```
@@ -147,12 +148,37 @@ All identity checks — OIDC issuer, signing workflow, ref/SHA claim, and manife
 
 ### Identity matching by reference type
 
-| How the action is pinned | Identity check | Mechanism |
-|---|---|---|
-| `@<40-char SHA>` | Source Repository Digest **strictly equals** the pinned SHA | `certificateOIDs` — Fulcio OID `1.3.6.1.4.1.57264.1.13`, raw byte match |
-| `@v2.1.0` (exact version) | SAN matches `...@refs/tags/v2\.1\.0(\.|$)` | `certificateIdentityURI` regexp |
-| `@v2` (major-floating) | SAN matches `...@refs/tags/v2(\.|$)` | `certificateIdentityURI` regexp |
-| Branch name or local `./setup` | **Hard fail** — pin to a version tag or commit SHA | — |
+<table>
+<thead>
+<tr>
+<th>How the action is pinned</th>
+<th>Identity check</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>@&lt;40-char SHA&gt;</code></td>
+<td>Source Repository Digest <strong>strictly equals</strong> the pinned SHA</td>
+<td><code>certificateOIDs</code> — Fulcio OID <code>1.3.6.1.4.1.57264.1.13</code>, raw byte match</td>
+</tr>
+<tr>
+<td><code>@v2.1.0</code> (exact version)</td>
+<td>SAN matches <code>...@refs/tags/v2\.1\.0(\.|$)</code></td>
+<td><code>certificateIdentityURI</code> regexp</td>
+</tr>
+<tr>
+<td><code>@v2</code> (major-floating)</td>
+<td>SAN matches <code>...@refs/tags/v2(\.|$)</code></td>
+<td><code>certificateIdentityURI</code> regexp</td>
+</tr>
+<tr>
+<td>Branch name or local <code>./setup</code></td>
+<td><strong>Hard fail</strong> — pin to a version tag or commit SHA</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
 
 For strongest guarantees, pin to a **commit SHA**:
 
