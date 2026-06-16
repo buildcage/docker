@@ -191,9 +191,10 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
   }
 
   // Fallback: sha256-<hex> tag scheme.
-  // GHCR maintains this as an OCI Image Index (Referrers Tag Schema) whose
-  // manifests[] entries point to individual referrer artifacts.  Accept both
-  // the image-index and the legacy direct-manifest-with-layers formats.
+  // The OCI Referrers Tag Schema represents this as an OCI Image Index whose
+  // manifests[] entries point to individual referrer artifacts (as served by
+  // registries such as GHCR).  Accept both the image-index and the legacy
+  // direct-manifest-with-layers formats.
   const fallbackTag = digest.replace(":", "-");
   try {
     const tagResp = await _fetch(`${api}/manifests/${fallbackTag}`, {
@@ -247,9 +248,11 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
         if (m.artifactType === BUNDLE_MEDIA_TYPE) {
           return fetchBundleFromManifestDigest(api, m.digest, headers, _fetch);
         }
-        // GHCR stores config.mediaType ("application/vnd.oci.empty.v1+json")
-        // as artifactType in the index instead of the manifest's own artifactType.
-        // Inspect each sub-manifest to find the actual Sigstore bundle.
+        // Per the OCI Distribution Spec, a referrer descriptor's artifactType falls back to the
+        // manifest's config.mediaType when the manifest has no top-level artifactType. As a result
+        // the descriptor may carry the empty-config type ("application/vnd.oci.empty.v1+json")
+        // rather than the bundle type (observed with GHCR). This is a spec-valid fallback, so resolve
+        // the real type by inspecting the sub-manifest's own artifactType / layer mediaType.
         const subResp = await _fetch(`${api}/manifests/${m.digest}`, {
           headers: {
             ...headers,
