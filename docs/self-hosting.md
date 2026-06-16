@@ -79,13 +79,15 @@ jobs:
 
       - name: Start Buildcage
         id: buildcage
-        uses: <your_org>/buildcage/setup@v2
+        uses: <your_org>/buildcage/setup@<40-char-sha> # vX.Y.Z
         with:
           proxy_mode: audit
       # ... rest of your workflow
 ```
 
-Note that `uses:` now points to `<your_org>/buildcage/setup@v2` instead of `dash14/buildcage/setup@v2`. The same applies to the report action (`<your_org>/buildcage/report@v2`).
+Note that `uses:` now points to `<your_org>/buildcage/setup@<40-char-sha> # vX.Y.Z` instead of
+`dash14/buildcage/setup@...`. Replace `<40-char-sha>` with the commit SHA of the release tag in
+your fork. The same applies to the report action (`<your_org>/buildcage/report@<40-char-sha> # vX.Y.Z`).
 
 ### Image provenance verification
 
@@ -93,7 +95,7 @@ The setup action automatically verifies the Docker image's build provenance befo
 
 - The `docker-publish.yml` workflow in your fork will sign images with **your fork's** GitHub Actions OIDC identity.
 - The setup action will verify against your fork's workflow identity, so verification passes correctly.
-- If you use `uses: <your_org>/buildcage/setup@v2`, `github.action_repository` resolves to `<your_org>/buildcage` and the image is pulled from `ghcr.io/<your_org>/buildcage` automatically.
+- If you use `uses: <your_org>/buildcage/setup@<40-char-sha>`, `github.action_repository` resolves to `<your_org>/buildcage` and the image is pulled from `ghcr.io/<your_org>/buildcage` automatically.
 
 > **Note:** The `buildcage_image` and `buildcage_version` parameters have been **removed** as of v2.1.
 > External image overrides are no longer supported because they would bypass the provenance
