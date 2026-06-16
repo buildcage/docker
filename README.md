@@ -91,7 +91,7 @@ jobs:
 
       - name: Start Buildcage in audit mode
         id: buildcage
-        uses: dash14/buildcage/setup@v2
+        uses: dash14/buildcage/setup@b9d14782cead3b80b89244ce718174e699bcd759 # v2.1.0
         with:
           proxy_mode: audit  # Log everything, block nothing
 
@@ -109,7 +109,7 @@ jobs:
 
       - name: Show Buildcage report
         if: always()
-        uses: dash14/buildcage/report@v2
+        uses: dash14/buildcage/report@b9d14782cead3b80b89244ce718174e699bcd759 # v2.1.0
         with:
           fail_on_blocked: false  # Don't fail, just show the report
 ```
@@ -139,7 +139,7 @@ jobs:
 
       - name: Start Buildcage in restrict mode
         id: buildcage
-        uses: dash14/buildcage/setup@v2
+        uses: dash14/buildcage/setup@b9d14782cead3b80b89244ce718174e699bcd759 # v2.1.0
         with:
           proxy_mode: restrict  # Block everything except allowed domains
           allowed_https_rules: >-
@@ -160,7 +160,7 @@ jobs:
 
       - name: Show Buildcage report
         if: always()
-        uses: dash14/buildcage/report@v2
+        uses: dash14/buildcage/report@b9d14782cead3b80b89244ce718174e699bcd759 # v2.1.0
         # Build fails if any unexpected connections were blocked
 ```
 
@@ -177,7 +177,7 @@ Starts the Buildcage builder container.
 ```yaml
 - name: Start Buildcage builder
   id: buildcage
-  uses: dash14/buildcage/setup@v2
+  uses: dash14/buildcage/setup@b9d14782cead3b80b89244ce718174e699bcd759 # v2.1.0
   with:
     proxy_mode: restrict
     allowed_https_rules: registry.npmjs.org:443 github.com:443
@@ -194,9 +194,9 @@ Starts the Buildcage builder container.
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 
 > **Security:** The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its
-> provenance is verified via cosign keyless signing. External image overrides are not supported to
-> preserve this guarantee. For best security, pin the action to a commit SHA:
-> `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
+> build provenance is cryptographically verified (keyless signature) before the image is pulled.
+> External image overrides are not supported to preserve this guarantee. For best security, pin the
+> action to a commit SHA: `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
 >
 > Self-hosting with a custom image requires forking the repository. See the [Self-Hosting Guide](./docs/self-hosting.md).
 > If the action package is private (self-hosted in a private repository), run
@@ -269,7 +269,7 @@ Displays communication logs after builds and optionally fails if any BLOCKED con
 ```yaml
 - name: Show proxy report
   if: always()
-  uses: dash14/buildcage/report@v2
+  uses: dash14/buildcage/report@b9d14782cead3b80b89244ce718174e699bcd759 # v2.1.0
 ```
 
 #### Job Summary

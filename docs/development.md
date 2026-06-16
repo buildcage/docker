@@ -59,8 +59,8 @@ make test_restrict_mode
 ### Image provenance verification bypass
 
 When running the setup action locally against a branch ref or a local `./setup` path, the
-action cannot resolve the ref to a published release and image provenance verification is
-skipped by default (the ref is "unverifiable").
+action cannot resolve the ref to a published release. Because the setup action is fail-closed
+by default, it will exit with an error for such "unverifiable" refs.
 
 For development use, you can allow the action to pull the image without verification by
 setting:
@@ -113,13 +113,22 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 ```
 .
 ├── setup/                       # GitHub Actions setup
-│   ├── action.yml               # GitHub Action: dash14/buildcage/setup@v2
+│   ├── action.yml               # Action entry (node24 → dist/main.js, dist/post.js)
 │   ├── compose.yaml             # Compose config for GitHub Actions (with image tag)
-│   ├── main.mjs                 # Main: verify image provenance, resolve image ref, compose up
-│   └── post.mjs                 # Post-action cleanup
+│   ├── src/                     # Source (ESM .mjs)
+│   │   ├── main.mjs             # Verify image provenance, resolve image ref, compose up
+│   │   ├── post.mjs             # Post-action cleanup
+│   │   └── lib/                 # Helpers: OCI registry, Sigstore verification, error types
+│   └── dist/                    # Bundled output (rollup → CommonJS)
+│       ├── main.js
+│       └── post.js
 ├── report/                      # GitHub Actions report
-│   ├── action.yml               # GitHub Action: dash14/buildcage/report@v2
-│   └── main.mjs                 # Log analysis and Job Summary output
+│   ├── action.yml               # Action entry (node24 → dist/main.js)
+│   ├── src/                     # Source (ESM .mjs)
+│   │   ├── main.mjs             # Log analysis and Job Summary output
+│   │   └── lib/                 # Helpers: Job Summary rendering
+│   └── dist/                    # Bundled output (rollup → CommonJS)
+│       └── main.js
 ├── docker/
 │   ├── Dockerfile               # Multi-stage BuildKit + haproxy + dnsmasq + s6-overlay
 │   └── files/

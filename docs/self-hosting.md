@@ -79,29 +79,31 @@ jobs:
 
       - name: Start Buildcage
         id: buildcage
-        uses: <your_org>/buildcage/setup@v2
+        uses: <your_org>/buildcage/setup@<40-char-sha> # vX.Y.Z
         with:
           proxy_mode: audit
       # ... rest of your workflow
 ```
 
-Note that `uses:` now points to `<your_org>/buildcage/setup@v2` instead of `dash14/buildcage/setup@v2`. The same applies to the report action (`<your_org>/buildcage/report@v2`).
+Note that `uses:` now points to `<your_org>/buildcage/setup@<40-char-sha> # vX.Y.Z` instead of
+`dash14/buildcage/setup@...`. Replace `<40-char-sha>` with the commit SHA of the release tag in
+your fork. The same applies to the report action (`<your_org>/buildcage/report@<40-char-sha> # vX.Y.Z`).
 
-### Image provenance and cosign verification
+### Image provenance verification
 
-The setup action automatically verifies the Docker image using cosign keyless signing before pulling it. When you fork the repository:
+The setup action automatically verifies the Docker image's build provenance before pulling it. When you fork the repository:
 
 - The `docker-publish.yml` workflow in your fork will sign images with **your fork's** GitHub Actions OIDC identity.
 - The setup action will verify against your fork's workflow identity, so verification passes correctly.
-- If you use `uses: <your_org>/buildcage/setup@v2`, `github.action_repository` resolves to `<your_org>/buildcage` and the image is pulled from `ghcr.io/<your_org>/buildcage` automatically.
+- If you use `uses: <your_org>/buildcage/setup@<40-char-sha>`, `github.action_repository` resolves to `<your_org>/buildcage` and the image is pulled from `ghcr.io/<your_org>/buildcage` automatically.
 
 > **Note:** The `buildcage_image` and `buildcage_version` parameters have been **removed** as of v2.1.
-> External image overrides are no longer supported because they would bypass the cosign verification
-> that guarantees image provenance. Self-hosting via fork is the supported alternative.
+> External image overrides are no longer supported because they would bypass the provenance
+> verification that guarantees image integrity. Self-hosting via fork is the supported alternative.
 
-If cosign verification fails, the action will exit with an error. Make sure you have published at least one signed release in your fork before using a version tag.
+If provenance verification fails, the action will exit with an error. Make sure you have published at least one signed release in your fork before using a version tag.
 
-To confirm that a specific image digest has a valid signature in your fork, run:
+You can independently confirm that a specific image digest has a valid signature using standard signing tooling, e.g. the cosign CLI:
 
 ```bash
 cosign verify \
