@@ -6,6 +6,8 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 14
+      exclude:
+        - "dash14/buildcage*"
   
   - package-ecosystem: "npm"
     directory: "/"
