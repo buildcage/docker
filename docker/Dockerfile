@@ -10,7 +10,7 @@ RUN apk add --no-cache curl gettext && \
       | tar -C /opt/cni/bin -xz ./bridge ./host-local ./loopback
 
 # Final image
-FROM moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
+FROM moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1
 
 LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
