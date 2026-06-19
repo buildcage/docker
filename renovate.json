@@ -7,6 +7,13 @@
   "schedule": ["* * * * 1"],
   "minimumReleaseAge": "14 days",
   "internalChecksFilter": "strict",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["^docker/Dockerfile$"],
+      "matchStrings": ["# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG CNI_VERSION=(?<currentValue>v[\\d.]+)"]
+    }
+  ],
   "packageRules": [
     {
       "description": "Self-referencing actions (dash14/buildcage*) are exempt from minimumReleaseAge, matching the previous Dependabot cooldown exclusion.",
