@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "schedule": ["* * * * 1"],
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
+  "packageRules": [
+    {
+      "description": "Self-referencing actions (dash14/buildcage*) are exempt from minimumReleaseAge, matching the previous Dependabot cooldown exclusion.",
+      "matchPackageNames": ["/^dash14\\/buildcage/"],
+      "minimumReleaseAge": "0 days"
+    }
+  ]
+}
