@@ -10,7 +10,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^docker/Dockerfile$"],
+      "managerFilePatterns": [
+        "/^docker/Dockerfile$/"
+      ],
       "matchStrings": ["# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG CNI_VERSION=(?<currentValue>v[\\d.]+)"]
     }
   ],
