@@ -232,22 +232,23 @@ Pass the container name to [`docker/setup-buildx-action`](https://github.com/doc
 
 #### Operation Modes
 
-##### Audit Mode (`proxy_mode: audit`)
-
-**When to use:** First-time setup, adding new dependencies, or investigating issues.
-
-**What it does:**
-- Allows all HTTP/HTTPS connections (except requests missing a Host header or SNI)
-- Logs every domain accessed during the build
-
-##### Restrict Mode (`proxy_mode: restrict`)
-
-**When to use:** Production builds, CI/CD pipelines, security-critical environments.
-
-**What it does:**
-- Allows connections only to domains in `allowed_http_rules` / `allowed_https_rules`
-- Blocks all other connections
-- Logs allowed and blocked attempts
+<table>
+<thead>
+<tr><th>Mode</th><th>When to use</th><th>Behavior</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><b>Audit</b> (<code>proxy_mode: audit</code>)</td>
+<td>First-time setup, adding new dependencies, or investigating issues</td>
+<td><ul><li>Allows all HTTP/HTTPS connections (except requests missing a Host header or SNI)</li><li>Logs every domain accessed during the build</li></ul></td>
+</tr>
+<tr>
+<td><b>Restrict</b> (<code>proxy_mode: restrict</code>)</td>
+<td>Production builds, CI/CD pipelines, security-critical environments</td>
+<td><ul><li>Allows connections only to domains in <code>allowed_http_rules</code> / <code>allowed_https_rules</code></li><li>Blocks all other connections</li><li>Logs allowed and blocked attempts</li></ul></td>
+</tr>
+</tbody>
+</table>
 
 #### Tips
 
