@@ -3,8 +3,11 @@
 This guide explains how to host your own Buildcage Docker image in a private GitHub repository. This is useful when you want to:
 
 - Keep the build infrastructure private within your organization
-- Control exactly which version of Buildcage is deployed
-- Audit the source code before using it in your CI/CD pipelines
+- Control exactly which version of Buildcage is deployed and when updates are applied
+- Meet compliance requirements that mandate use of an internal container registry
+
+> [!NOTE]
+> The upstream image (`ghcr.io/dash14/buildcage`) is verified at action startup via Sigstore, confirming it was built from the exact source commit of the release — sufficient provenance assurance for most use cases. Self-hosting adds operational overhead: keeping your fork in sync with upstream and managing your own signing pipeline.
 
 ## Prerequisites
 
@@ -97,7 +100,8 @@ The setup action automatically verifies the Docker image's build provenance befo
 - The setup action will verify against your fork's workflow identity, so verification passes correctly.
 - If you use `uses: <your_org>/buildcage/setup@<40-char-sha>`, `github.action_repository` resolves to `<your_org>/buildcage` and the image is pulled from `ghcr.io/<your_org>/buildcage` automatically.
 
-> **Note:** The `buildcage_image` and `buildcage_version` parameters have been **removed** as of v2.1.
+> [!NOTE]
+> The `buildcage_image` and `buildcage_version` parameters have been **removed** as of v2.1.
 > External image overrides are no longer supported because they would bypass the provenance
 > verification that guarantees image integrity. Self-hosting via fork is the supported alternative.
 
@@ -136,4 +140,5 @@ git push origin HEAD --tags --force
 
 After pushing a new version tag, the **Build and Push Docker Image** workflow will automatically trigger and publish the updated image.
 
-> **Note:** If the workflow does not trigger automatically, run it manually from **Actions** > **Build and Push Docker Image** > **Run workflow**. The branch selection can be left as `main` — the workflow will build from the latest version tag.
+> [!NOTE]
+> If the workflow does not trigger automatically, run it manually from **Actions** > **Build and Push Docker Image** > **Run workflow**. The branch selection can be left as `main` — the workflow will build from the latest version tag.

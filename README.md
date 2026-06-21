@@ -58,7 +58,6 @@ Buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drive
 - 🔍 **Audit mode**: Discover dependencies before enforcing restrictions
 - 🛡️ **Restrict mode**: Production-ready access control
 - 📊 **Detailed logging**: Complete visibility into all network connections during builds
-- 🔐 **Self-hostable**: Fork or import the repo to build and manage the image in your own GitHub environment — full control over what you trust
 
 ## Quick Start
 
@@ -193,7 +192,8 @@ Starts the Buildcage builder container.
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 
-> **Security:** The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its
+> [!NOTE]
+> The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its
 > build provenance is cryptographically verified (keyless signature) before the image is pulled.
 > External image overrides are not supported to preserve this guarantee. For best security, pin the
 > action to a commit SHA: `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
@@ -232,24 +232,25 @@ Pass the container name to [`docker/setup-buildx-action`](https://github.com/doc
 
 #### Operation Modes
 
-##### Audit Mode (`proxy_mode: audit`)
+<table>
+<thead>
+<tr><th>Mode</th><th>When to use</th><th>Behavior</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><b>Audit</b> (<code>proxy_mode: audit</code>)</td>
+<td>First-time setup, adding new dependencies, or investigating issues</td>
+<td><ul><li>Allows all HTTP/HTTPS connections (except requests missing a Host header or SNI)</li><li>Logs every domain accessed during the build</li></ul></td>
+</tr>
+<tr>
+<td><b>Restrict</b> (<code>proxy_mode: restrict</code>)</td>
+<td>Production builds, CI/CD pipelines, security-critical environments</td>
+<td><ul><li>Allows connections only to domains in <code>allowed_http_rules</code> / <code>allowed_https_rules</code></li><li>Blocks all other connections</li><li>Logs allowed and blocked attempts</li></ul></td>
+</tr>
+</tbody>
+</table>
 
-**When to use:** First-time setup, adding new dependencies, or investigating issues.
-
-**What it does:**
-- Allows all HTTP/HTTPS connections (except requests missing a Host header or SNI)
-- Logs every domain accessed during the build
-
-##### Restrict Mode (`proxy_mode: restrict`)
-
-**When to use:** Production builds, CI/CD pipelines, security-critical environments.
-
-**What it does:**
-- Allows connections only to domains in `allowed_http_rules` / `allowed_https_rules`
-- Blocks all other connections
-- Logs allowed and blocked attempts
-
-#### Tips
+#### Usage notes
 
 - Start with audit mode to discover required domains, then switch to restrict mode.
 - Separate HTTP and HTTPS domains — some services use different hosts for each protocol.
@@ -319,37 +320,16 @@ Buildcage creates a controlled network environment for your Docker builds:
 
 ### Architecture Diagram
 
-<img src="assets/diagram-architecture.png" alt="Buildcage architecture" width="611" height="544">
+<img src="assets/diagram-architecture.png" alt="Buildcage architecture" width="611" height="490">
 
 All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). DNS queries are redirected to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking.
 
 ---
 
-## Trust & Self-Hosting
-
-Buildcage is a security tool — so it's fair to ask: *how do you trust Buildcage itself?*
-
-A pre-built image from a third party could be modified or rebuilt at any time without your knowledge. For a tool that sits in your build pipeline, that's a risk worth addressing.
-
-**Self-hosting (recommended for production)**
-
-You can fork or import this repository into your own GitHub organization, review the source code, and build the Docker image entirely within your own infrastructure. This gives you:
-
-- Full visibility into what the tool contains
-- Control over when and how updates are applied
-- A reproducible, tamper-proof build artifact that you own
-
-See the [Self-Hosting Guide](./docs/self-hosting.md) for setup instructions.
-
-**Using the upstream image**
-
-If you don't need that level of control, you can use the image published from this repository directly. This is the simplest option and keeps you up to date with the latest fixes and improvements automatically.
-
----
-
 ## Security Considerations
 
-> **Important:** Buildcage controls *where* your builds can connect, not *what code* they run. If a malicious package is delivered through a legitimate repository (e.g., a compromised npm package hosted on `registry.npmjs.org`), Buildcage cannot detect or prevent it — the connection goes to an allowed domain.
+> [!IMPORTANT]
+> Buildcage controls *where* your builds can connect, not *what code* they run. If a malicious package is delivered through a legitimate repository (e.g., a compromised npm package hosted on `registry.npmjs.org`), Buildcage cannot detect or prevent it — the connection goes to an allowed domain.
 >
 > Do not rely on Buildcage as your sole supply chain security measure. Use it as one layer in a defense-in-depth strategy — a last line of defense. If something slips through your other measures, at least it can't call home.
 
@@ -371,11 +351,27 @@ For full technical details, see the [Security Details](./docs/security.md) docum
 
 The only known bypass is **domain fronting** — a technique where an attacker sets the SNI to an allowed domain but routes the actual request to a different server on the same CDN. This requires the attacker's server to share infrastructure with an allowed domain, making it a narrow attack surface. See [Known Limitations](./docs/security.md#known-limitations) for details and mitigation strategies.
 
+### Trusting the Buildcage image
+
+Buildcage is a security tool — so it's fair to ask: *how do you trust Buildcage itself?*
+
+The upstream image is verified at action startup via Sigstore: the signature cryptographically binds the published image to the exact source commit SHA, so a tampered or substituted image fails verification before use. Both options below rely on this guarantee.
+
+**Using the upstream image**
+
+The simplest option. Pin to a commit SHA (or version tag) and update on your own schedule — the Sigstore verification ensures you are always running exactly what was built from that commit.
+
+**Self-hosting**
+
+Import this repository into your own GitHub organization and build the Docker image within your own infrastructure. Useful when you need to:
+
+- Keep build infrastructure private within your organization
+- Control exactly which version is deployed and when updates are applied
+- Meet compliance requirements that mandate use of an internal container registry
+
+See the [Self-Hosting Guide](./docs/self-hosting.md) for setup instructions.
+
 ## FAQ
-
-- **Can I host Buildcage in my own private repository?**
-
-  Yes. See [Trust & Self-Hosting](#trust--self-hosting) for details.
 
 - **Does this slow down my builds?**
 
@@ -404,6 +400,10 @@ The only known bypass is **domain fronting** — a technique where an attacker s
 - **Does this protect against malicious code execution?**
 
   No. Buildcage only controls network access. It doesn't prevent malicious code from running—it prevents that code from communicating with external servers.
+
+- **Can I host Buildcage in my own private repository?**
+
+  Yes. See [Trusting the Buildcage image](#trusting-the-buildcage-image) for details.
 
 ## Troubleshooting
 
