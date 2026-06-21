@@ -194,6 +194,8 @@ An attacker who can push a malicious image to `ghcr.io/dash14/buildcage` without
 
 This is **one layer of a defense-in-depth strategy**, not a complete guarantee. It reduces the attack surface to the registry layer and forces attackers to compromise the GitHub account or the repository itself — raising the cost significantly and leaving an audit trail in the Rekor transparency log.
 
+The cryptographic binding of the image digest to the exact source commit SHA also serves as an alternative to reproducible builds. The primary purpose of reproducible builds is to establish that a published artifact was produced from a specific source commit; here, that assurance is provided cryptographically by the Sigstore bundle rather than by requiring an independent rebuild to produce a bit-for-bit identical artifact.
+
 ### Self-hosting with a private package
 
 When self-hosting Buildcage from a **private** GHCR package, run `docker/login-action` with `packages: read` before this action. Credentials written to Docker's config by the login step are read automatically — no `token` input is required. Public packages are verified without any credentials.
@@ -201,7 +203,6 @@ When self-hosting Buildcage from a **private** GHCR package, run `docker/login-a
 ### Known limitations
 
 - **Account compromise**: If the repository owner's GitHub account or the repository itself is compromised, an attacker could trigger the release workflow and produce a legitimately-signed malicious image.
-- **Build non-reproducibility**: Buildcage does not currently publish reproducible builds, so the signed image cannot be independently rebuilt from source.
 - **Trust in Sigstore infrastructure**: Verification relies on the availability and integrity of the Rekor transparency log and the Fulcio certificate authority. The TUF-backed trust root is fetched at verification time; a network outage will cause the main phase to hard-fail.
 - **TOCTOU window**: The manifest digest is fetched before the bundle is pulled. A highly targeted attack that replaces the registry content in the window between these two steps would still succeed — though such an attack requires compromising the registry itself. Note that the subsequent `docker pull` is digest-pinned (`image@sha256:…`), so there is no TOCTOU between verification and the actual image pull; the residual window is limited to between the manifest-digest fetch and the bundle fetch.
 - **Development bypass**: `BUILDCAGE_ALLOW_UNVERIFIED=1` skips verification for unverifiable refs (branch names, local `./setup`). This flag is **for local development only** and must never be used in CI or production workflows. See [development.md](./development.md#local-development) for details.
