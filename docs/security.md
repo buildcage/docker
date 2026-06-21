@@ -194,11 +194,7 @@ An attacker who can push a malicious image to `ghcr.io/dash14/buildcage` without
 
 This is **one layer of a defense-in-depth strategy**, not a complete guarantee. It reduces the attack surface to the registry layer and forces attackers to compromise the GitHub account or the repository itself — raising the cost significantly and leaving an audit trail in the Rekor transparency log.
 
-The cryptographic binding of the image digest to the exact source commit SHA also serves as an alternative to reproducible builds. The primary purpose of reproducible builds is to establish that a published artifact was produced from a specific source commit; here, that assurance is provided cryptographically by the Sigstore bundle rather than by requiring an independent rebuild to produce a bit-for-bit identical artifact.
-
-### Self-hosting with a private package
-
-When self-hosting Buildcage from a **private** GHCR package, run `docker/login-action` with `packages: read` before this action. Credentials written to Docker's config by the login step are read automatically — no `token` input is required. Public packages are verified without any credentials.
+The binding of the image digest to the exact source commit SHA also serves as an alternative to reproducible builds: it establishes that the published artifact was produced from a specific source commit without requiring an independent rebuild.
 
 ### Known limitations
 

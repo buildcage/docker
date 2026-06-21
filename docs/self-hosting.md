@@ -3,8 +3,10 @@
 This guide explains how to host your own Buildcage Docker image in a private GitHub repository. This is useful when you want to:
 
 - Keep the build infrastructure private within your organization
-- Control exactly which version of Buildcage is deployed
-- Audit the source code before using it in your CI/CD pipelines
+- Control exactly which version of Buildcage is deployed and when updates are applied
+- Meet compliance requirements that mandate use of an internal container registry
+
+> **Note:** The upstream image (`ghcr.io/dash14/buildcage`) is verified at action startup via Sigstore, confirming it was built from the exact source commit of the release — sufficient provenance assurance for most use cases. Self-hosting adds operational overhead: keeping your fork in sync with upstream and managing your own signing pipeline.
 
 ## Prerequisites
 

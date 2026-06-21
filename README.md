@@ -329,21 +329,21 @@ All containers spawned by BuildKit `RUN` steps are placed on an isolated network
 
 Buildcage is a security tool — so it's fair to ask: *how do you trust Buildcage itself?*
 
-A pre-built image from a third party could be modified or rebuilt at any time without your knowledge. For a tool that sits in your build pipeline, that's a risk worth addressing.
-
-**Self-hosting (recommended for production)**
-
-You can fork or import this repository into your own GitHub organization, review the source code, and build the Docker image entirely within your own infrastructure. This gives you:
-
-- Full visibility into what the tool contains
-- Control over when and how updates are applied
-- A reproducible, tamper-proof build artifact that you own
-
-See the [Self-Hosting Guide](./docs/self-hosting.md) for setup instructions.
+The upstream image is verified at action startup via Sigstore: the signature cryptographically binds the published image to the exact source commit SHA, so a tampered or substituted image fails verification before use. Both options below rely on this guarantee.
 
 **Using the upstream image**
 
-If you don't need that level of control, you can use the image published from this repository directly. This is the simplest option and keeps you up to date with the latest fixes and improvements automatically.
+The simplest option. Pin to a commit SHA (or version tag) and update on your own schedule — the Sigstore verification ensures you are always running exactly what was built from that commit.
+
+**Self-hosting**
+
+Import this repository into your own GitHub organization and build the Docker image within your own infrastructure. Useful when you need to:
+
+- Keep build infrastructure private within your organization
+- Control exactly which version is deployed and when updates are applied
+- Meet compliance requirements that mandate use of an internal container registry
+
+See the [Self-Hosting Guide](./docs/self-hosting.md) for setup instructions.
 
 ---
 
