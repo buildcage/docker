@@ -250,7 +250,7 @@ Pass the container name to [`docker/setup-buildx-action`](https://github.com/doc
 </tbody>
 </table>
 
-#### Tips
+#### Usage notes
 
 - Start with audit mode to discover required domains, then switch to restrict mode.
 - Separate HTTP and HTTPS domains — some services use different hosts for each protocol.
@@ -320,7 +320,7 @@ Buildcage creates a controlled network environment for your Docker builds:
 
 ### Architecture Diagram
 
-<img src="assets/diagram-architecture.png" alt="Buildcage architecture" width="611" height="544">
+<img src="assets/diagram-architecture.png" alt="Buildcage architecture" width="611" height="490">
 
 All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). DNS queries are redirected to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking.
 
