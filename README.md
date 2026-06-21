@@ -373,10 +373,6 @@ See the [Self-Hosting Guide](./docs/self-hosting.md) for setup instructions.
 
 ## FAQ
 
-- **Can I host Buildcage in my own private repository?**
-
-  Yes. See [Trusting the Buildcage image](#trusting-the-buildcage-image) for details.
-
 - **Does this slow down my builds?**
 
   Minimal impact. The proxy adds negligible latency (<1ms per request). DNS caching and connection pooling keep overhead low.
@@ -404,6 +400,10 @@ See the [Self-Hosting Guide](./docs/self-hosting.md) for setup instructions.
 - **Does this protect against malicious code execution?**
 
   No. Buildcage only controls network access. It doesn't prevent malicious code from running—it prevents that code from communicating with external servers.
+
+- **Can I host Buildcage in my own private repository?**
+
+  Yes. See [Trusting the Buildcage image](#trusting-the-buildcage-image) for details.
 
 ## Troubleshooting
 
