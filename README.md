@@ -192,7 +192,8 @@ Starts the Buildcage builder container.
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 
-> **Security:** The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its
+> [!NOTE]
+> The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its
 > build provenance is cryptographically verified (keyless signature) before the image is pulled.
 > External image overrides are not supported to preserve this guarantee. For best security, pin the
 > action to a commit SHA: `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
@@ -326,7 +327,8 @@ All containers spawned by BuildKit `RUN` steps are placed on an isolated network
 
 ## Security Considerations
 
-> **Important:** Buildcage controls *where* your builds can connect, not *what code* they run. If a malicious package is delivered through a legitimate repository (e.g., a compromised npm package hosted on `registry.npmjs.org`), Buildcage cannot detect or prevent it — the connection goes to an allowed domain.
+> [!IMPORTANT]
+> Buildcage controls *where* your builds can connect, not *what code* they run. If a malicious package is delivered through a legitimate repository (e.g., a compromised npm package hosted on `registry.npmjs.org`), Buildcage cannot detect or prevent it — the connection goes to an allowed domain.
 >
 > Do not rely on Buildcage as your sole supply chain security measure. Use it as one layer in a defense-in-depth strategy — a last line of defense. If something slips through your other measures, at least it can't call home.
 
