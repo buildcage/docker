@@ -9,48 +9,89 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  getManifestDigest,
+  fetchManifestDigest,
   fetchRegistryToken,
   fetchBundle,
   readGhcrBasicAuth,
 } from "./oci-registry.mjs";
 
-// ── getManifestDigest ─────────────────────────────────────────────────────
+// ── fetchManifestDigest ───────────────────────────────────────────────────
 
-describe("getManifestDigest", () => {
-  it("returns digest on success", () => {
-    const digest = "sha256:" + "a".repeat(64);
-    const execOk = () => `${digest}\n`;
-    assert.equal(getManifestDigest("ghcr.io/owner/repo:2.1.0", execOk), digest);
-  });
+describe("fetchManifestDigest", () => {
+  const digest = "sha256:" + "a".repeat(64);
 
-  it("trims whitespace from the output", () => {
-    const execWhitespace = () => "  sha256:abc123  \n";
-    assert.equal(getManifestDigest("ghcr.io/owner/repo:2.1.0", execWhitespace), "sha256:abc123");
-  });
-
-  it("throws NOT_FOUND when docker reports 'not found'", () => {
-    const execFail = () => {
-      const err = new Error("ghcr.io/owner/repo:v99: not found");
-      err.stderr = "ERROR: ghcr.io/owner/repo:v99: not found";
-      throw err;
+  function makeResp(status, digestValue) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (name) => name === "Docker-Content-Digest" ? digestValue : null },
     };
+  }
+
+  it("returns digest from Docker-Content-Digest header on success", async () => {
+    let capturedOpts;
+    const mockFetch = async (url, opts) => { capturedOpts = opts; return makeResp(200, digest); };
+    const result = await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
+    assert.equal(result, digest);
+    assert.equal(capturedOpts.method, "HEAD");
+  });
+
+  it("throws NOT_FOUND on 404", async () => {
+    const mockFetch = async () => makeResp(404, null);
     try {
-      getManifestDigest("ghcr.io/owner/repo:v99", execFail);
+      await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       assert.equal(err.code, "NOT_FOUND");
     }
   });
 
-  it("throws TRANSIENT for non-404 errors", () => {
-    const execFail = () => {
-      const err = new Error("connection refused");
-      err.stderr = "connection refused";
-      throw err;
-    };
+  it("throws TRANSIENT on 5xx", async () => {
+    const mockFetch = async () => makeResp(500, null);
     try {
-      getManifestDigest("ghcr.io/owner/repo:2.1.0", execFail);
+      await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
+      assert.fail("should have thrown");
+    } catch (err) {
+      assert.equal(err.code, "TRANSIENT");
+    }
+  });
+
+  it("throws TRANSIENT with auth hint on 401", async () => {
+    const mockFetch = async () => makeResp(401, null);
+    try {
+      await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
+      assert.fail("should have thrown");
+    } catch (err) {
+      assert.equal(err.code, "TRANSIENT");
+      assert.ok(err.message.includes("authenticated"), "error message should hint at authentication");
+    }
+  });
+
+  it("throws TRANSIENT with auth hint on 403", async () => {
+    const mockFetch = async () => makeResp(403, null);
+    try {
+      await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
+      assert.fail("should have thrown");
+    } catch (err) {
+      assert.equal(err.code, "TRANSIENT");
+      assert.ok(err.message.includes("authenticated"), "error message should hint at authentication");
+    }
+  });
+
+  it("throws TRANSIENT when Docker-Content-Digest header is absent", async () => {
+    const mockFetch = async () => makeResp(200, null);
+    try {
+      await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
+      assert.fail("should have thrown");
+    } catch (err) {
+      assert.equal(err.code, "TRANSIENT");
+    }
+  });
+
+  it("throws TRANSIENT on network error", async () => {
+    const mockFetch = async () => { throw new Error("ECONNREFUSED"); };
+    try {
+      await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       assert.equal(err.code, "TRANSIENT");

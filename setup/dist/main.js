@@ -7093,7 +7093,7 @@ function imageTagFromRef(actionRef) {
 }
 
 async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo}) {
-  const image = `ghcr.io/${actionRepo}`.toLowerCase(), repoPath = actionRepo.toLowerCase(), verifyOptions = function({actionRef: actionRef, actionRepo: actionRepo}) {
+  const repoPath = actionRepo.toLowerCase(), verifyOptions = function({actionRef: actionRef, actionRepo: actionRepo}) {
     const sanPrefix = `^${escapeRegex(`https://github.com/${actionRepo}/.github/workflows/docker-publish.yml@refs/tags/`)}`, base = {
       certificateIssuer: "https://token.actions.githubusercontent.com",
       tlogThreshold: 1,
@@ -7115,21 +7115,7 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo})
     actionRepo: actionRepo
   });
   if (!verifyOptions) return null;
-  const digest = function(imageRef, _exec = node_child_process.execFileSync) {
-    try {
-      const digest = _exec("docker", [ "buildx", "imagetools", "inspect", imageRef, "--format", "{{.Manifest.Digest}}" ], {
-        stdio: "pipe",
-        encoding: "utf8"
-      }).trim();
-      if (!digest) throw new SetupError(`Docker image not found: ${imageRef}. Make sure the action ref corresponds to a published release.`, "NOT_FOUND");
-      return digest;
-    } catch (err) {
-      if (err instanceof SetupError) throw err;
-      const msg = (err.stderr || err.message || "").toString();
-      if (msg.includes("not found")) throw new SetupError(`Docker image not found: ${imageRef}. Make sure the action ref corresponds to a published release.`, "NOT_FOUND");
-      throw new SetupError(`Transient error fetching image digest for ${imageRef}: ${msg}`, "TRANSIENT");
-    }
-  }(`${image}:${imageTagFromRef(actionRef)}`), regToken = await async function(registry, repo, basicAuth, _fetch = fetch) {
+  const tag = imageTagFromRef(actionRef), regToken = await async function(registry, repo, basicAuth, _fetch = fetch) {
     const url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
     if (basicAuth) try {
       const resp = await _fetch(url, {
@@ -7161,7 +7147,28 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo})
     } catch {
       return null;
     }
-  }()), bundle = await async function(registry, repo, digest, token, _fetch = fetch) {
+  }()), digest = await async function(registry, repo, tag, token, _fetch = fetch) {
+    const url = `https://${registry}/v2/${repo}/manifests/${tag}`, headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: [ "application/vnd.oci.image.index.v1+json", "application/vnd.docker.distribution.manifest.list.v2+json" ].join(", ")
+    };
+    try {
+      const resp = await _fetch(url, {
+        method: "HEAD",
+        headers: headers
+      });
+      if (404 === resp.status) throw new SetupError(`Docker image not found: ${registry}/${repo}:${tag}. Make sure the action ref corresponds to a published release.`, "NOT_FOUND");
+      if (resp.status >= 500) throw new SetupError(`Transient error fetching manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}`, "TRANSIENT");
+      if (401 === resp.status || 403 === resp.status) throw new SetupError(`Registry denied access to manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}. For private repositories, ensure the runner is authenticated to the registry.`, "TRANSIENT");
+      if (!resp.ok) throw new SetupError(`Failed to fetch manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}`, "TRANSIENT");
+      const digest = resp.headers.get("Docker-Content-Digest");
+      if (!digest) throw new SetupError(`No digest in manifest response for ${registry}/${repo}:${tag}`, "TRANSIENT");
+      return digest;
+    } catch (err) {
+      if (err instanceof SetupError) throw err;
+      throw new SetupError(`Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${err.message}`, "TRANSIENT");
+    }
+  }("ghcr.io", repoPath, tag, regToken), bundle = await async function(registry, repo, digest, token, _fetch = fetch) {
     const api = `https://${registry}/v2/${repo}`, headers = {
       Authorization: `Bearer ${token}`
     };
