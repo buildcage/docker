@@ -9,7 +9,7 @@
  *   - Unverifiable ref (branch / local ./setup) → returns null.
  */
 
-import { getManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.mjs";
+import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.mjs";
 import { derUtf8, verifyBundle } from "./sigstore.mjs";
 
 const REGISTRY = "ghcr.io";
@@ -83,15 +83,14 @@ export function buildVerifyOptions({ actionRef, actionRepo }) {
  * @param {{ actionRef: string, actionRepo: string }} opts
  */
 export async function verifyImageDigest({ actionRef, actionRepo }) {
-  const image = `${REGISTRY}/${actionRepo}`.toLowerCase();
   const repoPath = actionRepo.toLowerCase();
 
   const verifyOptions = buildVerifyOptions({ actionRef, actionRepo });
   if (!verifyOptions) return null;
 
-  const imageTagRef = `${image}:${imageTagFromRef(actionRef)}`;
-  const digest = getManifestDigest(imageTagRef);
+  const tag = imageTagFromRef(actionRef);
   const regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth());
+  const digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
   const bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken);
   await verifyBundle(bundle, verifyOptions, digest);
   return digest;

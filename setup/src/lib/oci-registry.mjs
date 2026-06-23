@@ -5,7 +5,6 @@
  * Callers do not need to catch and re-wrap; just let them propagate.
  */
 
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -36,45 +35,66 @@ export function readGhcrBasicAuth(_env = process.env, _readFileSync = readFileSy
 }
 
 /**
- * Get the manifest list digest using docker buildx imagetools.
+ * Fetch the manifest digest for a container image tag via the OCI registry API.
+ * Uses HEAD /v2/{repo}/manifests/{tag} and reads the Docker-Content-Digest header.
+ *
  * Throws SetupError(NOT_FOUND) when the tag does not exist.
- * Throws SetupError(TRANSIENT) on network/registry errors.
+ * Throws SetupError(TRANSIENT) on network or 5xx errors.
  */
-export function getManifestDigest(imageRef, _exec = execFileSync) {
+export async function fetchManifestDigest(registry, repo, tag, token, _fetch = fetch) {
+  const url = `https://${registry}/v2/${repo}/manifests/${tag}`;
+  // Accept only index/manifest-list types so the registry returns the image index
+  // digest — not a per-platform manifest digest. The Sigstore bundle is signed
+  // against the index digest, so content-negotiating down to a platform manifest
+  // would cause the bundle lookup to fail.
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: [
+      "application/vnd.oci.image.index.v1+json",
+      "application/vnd.docker.distribution.manifest.list.v2+json",
+    ].join(", "),
+  };
+
   try {
-    const result = _exec(
-      "docker",
-      [
-        "buildx",
-        "imagetools",
-        "inspect",
-        imageRef,
-        "--format",
-        "{{.Manifest.Digest}}",
-      ],
-      { stdio: "pipe", encoding: "utf8" },
-    );
-    const digest = result.trim();
-    if (!digest) {
+    const resp = await _fetch(url, { method: "HEAD", headers });
+    if (resp.status === 404) {
       throw new SetupError(
-        `Docker image not found: ${imageRef}. ` +
+        `Docker image not found: ${registry}/${repo}:${tag}. ` +
           `Make sure the action ref corresponds to a published release.`,
         "NOT_FOUND",
+      );
+    }
+    if (resp.status >= 500) {
+      throw new SetupError(
+        `Transient error fetching manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}`,
+        "TRANSIENT",
+      );
+    }
+    if (resp.status === 401 || resp.status === 403) {
+      throw new SetupError(
+        `Registry denied access to manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}. ` +
+          `For private repositories, ensure the runner is authenticated to the registry.`,
+        "TRANSIENT",
+      );
+    }
+    if (!resp.ok) {
+      throw new SetupError(
+        `Failed to fetch manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}`,
+        "TRANSIENT",
+      );
+    }
+    const digest = resp.headers.get("Docker-Content-Digest");
+    if (!digest) {
+      throw new SetupError(
+        `No digest in manifest response for ${registry}/${repo}:${tag}`,
+        "TRANSIENT",
       );
     }
     return digest;
   } catch (err) {
     if (err instanceof SetupError) throw err;
-    const msg = (err.stderr || err.message || "").toString();
-    if (msg.includes("not found")) {
-      throw new SetupError(
-        `Docker image not found: ${imageRef}. ` +
-          `Make sure the action ref corresponds to a published release.`,
-        "NOT_FOUND",
-      );
-    }
     throw new SetupError(
-      `Transient error fetching image digest for ${imageRef}: ${msg}`,
+      `Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${err.message}`,
       "TRANSIENT",
     );
   }
