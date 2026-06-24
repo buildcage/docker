@@ -5,7 +5,6 @@ nameservers = ["172.20.0.1"]
 
 [worker.oci]
 enabled = true
-platforms = ["linux/amd64", "linux/arm64"]
 snapshotter = "auto"
 networkMode = "cni"
 cniConfigPath = "/etc/buildkit/cni.conflist"
