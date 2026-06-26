@@ -8,6 +8,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   unit_test:
     runs-on: ubuntu-latest

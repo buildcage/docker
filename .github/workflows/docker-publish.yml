@@ -12,6 +12,8 @@ concurrency:
   group: docker-publish
   cancel-in-progress: false
 
+permissions: {}
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
