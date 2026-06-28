@@ -142,3 +142,10 @@ After pushing a new version tag, the **Build and Push Docker Image** workflow wi
 
 > [!NOTE]
 > If the workflow does not trigger automatically, run it manually from **Actions** > **Build and Push Docker Image** > **Run workflow**. The branch selection can be left as `main` — the workflow will build from the latest version tag.
+
+Once the image is published, run the **Update major version tag** workflow to update the major/minor Docker tags (`:2`, `:2.1`) and the major git tag (`v2`):
+
+1. Navigate to **Actions** > **Update major version tag**
+2. Click **Run workflow**
+3. Enter the release tag (e.g., `v2.1.4`)
+4. Click **Run workflow**
