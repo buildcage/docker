@@ -48,7 +48,7 @@ test_restrict_mode: ## Run restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.restrict test/ \
 	  --load -t buildcage-test
-	@node report/src/main.mjs ./compose.yaml || true
+	@node report/src/main.js ./compose.yaml || true
 	@./test/assert-restrict-mode.sh
 	@$(MAKE) clean
 
@@ -62,7 +62,7 @@ test_audit_mode: ## Run audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f test/Dockerfile.audit test/ \
 	  --load -t buildcage-test
-	@node report/src/main.mjs ./compose.yaml
+	@node report/src/main.js ./compose.yaml
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean
 
@@ -71,17 +71,17 @@ test_unit: test_setup test_report test_qjs ## Run unit tests
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests
-	@node --test 'setup/src/**/*.test.mjs'
+	@node --test 'setup/src/**/*.test.js'
 
 .PHONY: test_report
 test_report: ## Run report unit tests
-	@node --test report/src/lib/build-example.test.mjs
+	@node --test report/src/lib/build-example.test.js
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker
 	@docker build -t buildcage-qjs-test docker
-	@docker run --rm --entrypoint qjs buildcage-qjs-test /opt/buildcage/tools/lib/rules.test.mjs
-	@docker run --rm --entrypoint qjs buildcage-qjs-test /opt/buildcage/tools/lib/log-parser.test.mjs
+	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/lib/rules.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/lib/log-parser.test.js
 
 .PHONY: test_audit_example
 run_audit_example: ## Run audit mode example tests
@@ -98,7 +98,7 @@ run_audit_example: ## Run audit mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.mjs ./compose.yaml
+	@node report/src/main.js ./compose.yaml
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
 
@@ -119,6 +119,6 @@ run_restrict_example: ## Run restrict mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.mjs ./compose.yaml || true
+	@node report/src/main.js ./compose.yaml || true
 	@$(MAKE) clean
 	rm -fr /tmp/build-context

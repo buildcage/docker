@@ -1,10 +1,10 @@
 /**
  * Convert whitespace-separated wildcard rules (stdin) to newline-separated regex (stdout).
  *
- * Usage: echo "*.example.com:443 other.com:80" | qjs convert-rule.mjs
+ * Usage: echo "*.example.com:443 other.com:80" | qjs -m convert-rule.js
  */
 import * as std from "std";
-import { buildRules } from "./lib/rules.mjs";
+import { buildRules } from "./lib/rules.js";
 
 const input = std.in.readAsString();
 

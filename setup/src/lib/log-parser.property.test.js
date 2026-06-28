@@ -1,13 +1,13 @@
 /**
- * Property-based tests for docker/files/tools/lib/log-parser.mjs.
+ * Property-based tests for docker/files/tools/lib/log-parser.js.
  *
- * Run with: node --test setup/src/lib/log-parser.property.test.mjs
+ * Run with: node --test setup/src/lib/log-parser.property.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { parseEntries, aggregate } from "../../../docker/files/tools/lib/log-parser.mjs";
+import { parseEntries, aggregate } from "../../../docker/files/tools/lib/log-parser.js";
 
 // ---------------------------------------------------------------------------
 // parseEntries

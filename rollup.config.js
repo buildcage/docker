@@ -1,29 +1,29 @@
-const resolve = require("@rollup/plugin-node-resolve");
-const commonjs = require("@rollup/plugin-commonjs");
-const json = require("@rollup/plugin-json");
-const terser = require("@rollup/plugin-terser");
+import resolve from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs";
+import json from "@rollup/plugin-json";
+import terser from "@rollup/plugin-terser";
 
 // Plugins required to bundle sigstore and its CJS/JSON dependencies.
-// Applied to setup/src/main.mjs; other entries have no external deps.
+// Applied to setup/src/main.js; other entries have no external deps.
 const mainPlugins = [
-  resolve.default({ preferBuiltins: true }),
+  resolve({ preferBuiltins: true }),
   commonjs(),
   json(),
 ];
 
 const configs = [
   {
-    input: "setup/src/main.mjs",
-    file: "setup/dist/main.js",
+    input: "setup/src/main.js",
+    file: "setup/dist/main.cjs",
     plugins: mainPlugins,
     // sigstore uses dynamic imports; inline them so dist is a single file.
     inlineDynamicImports: true,
   },
-  { input: "setup/src/post.mjs", file: "setup/dist/post.js", plugins: [] },
-  { input: "report/src/main.mjs", file: "report/dist/main.js", plugins: [] },
+  { input: "setup/src/post.js", file: "setup/dist/post.cjs", plugins: [] },
+  { input: "report/src/main.js", file: "report/dist/main.cjs", plugins: [] },
 ];
 
-module.exports = configs.map(
+export default configs.map(
   ({ input, file, plugins, inlineDynamicImports = false }) => ({
     input,
     external: /^node:/,

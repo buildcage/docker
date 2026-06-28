@@ -1,17 +1,17 @@
 /**
- * Unit tests for setup/src/lib/sigstore.mjs
+ * Unit tests for setup/src/lib/sigstore.js
  *
  * verifyBundle() requires a live TUF network call; that path is covered by
  * end-to-end / integration tests.
  *
  * assertSignedDigest() is pure synchronous logic and is fully unit-tested here.
  *
- * Run with: node --test setup/src/lib/sigstore.test.mjs
+ * Run with: node --test setup/src/lib/sigstore.test.js
  */
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { assertSignedDigest } from "./sigstore.mjs";
+import { assertSignedDigest } from "./sigstore.js";
 
 const DIGEST = "sha256:abc123";
 

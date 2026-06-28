@@ -1,5 +1,5 @@
-import { describe, it, assert, reportResults } from "./test-shim.mjs";
-import { parseEntries, aggregate } from "./log-parser.mjs";
+import { describe, it, assert, reportResults } from "./test-shim.js";
+import { parseEntries, aggregate } from "./log-parser.js";
 
 // ---------------------------------------------------------------------------
 // parseEntries

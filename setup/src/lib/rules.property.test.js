@@ -1,13 +1,13 @@
 /**
- * Property-based tests for docker/files/tools/lib/rules.mjs.
+ * Property-based tests for docker/files/tools/lib/rules.js.
  *
- * Run with: node --test setup/src/lib/rules.property.test.mjs
+ * Run with: node --test setup/src/lib/rules.property.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { convertRule, buildRules } from "../../../docker/files/tools/lib/rules.mjs";
+import { convertRule, buildRules } from "../../../docker/files/tools/lib/rules.js";
 
 // ---------------------------------------------------------------------------
 // convertRule / wildcardToRegex

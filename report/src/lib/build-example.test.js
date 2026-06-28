@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildRestrictExample } from "./build-example.mjs";
+import { buildRestrictExample } from "./build-example.js";
 
 const REPO = "dash14/buildcage";
 

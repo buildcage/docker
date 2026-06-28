@@ -1,9 +1,9 @@
-import { describe, it, assert, reportResults } from "./test-shim.mjs";
+import { describe, it, assert, reportResults } from "./test-shim.js";
 import {
   wildcardToRegex,
   convertRule,
   buildRules,
-} from "./rules.mjs";
+} from "./rules.js";
 
 // ---------------------------------------------------------------------------
 // wildcardToRegex

@@ -1,9 +1,9 @@
 /**
- * Unit tests for setup/src/lib/oci-registry.mjs
+ * Unit tests for setup/src/lib/oci-registry.js
  *
  * Tests use injectable _exec / _fetch arguments to avoid real network/docker calls.
  *
- * Run with: node --test setup/src/lib/oci-registry.test.mjs
+ * Run with: node --test setup/src/lib/oci-registry.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -13,7 +13,7 @@ import {
   fetchRegistryToken,
   fetchBundle,
   readGhcrBasicAuth,
-} from "./oci-registry.mjs";
+} from "./oci-registry.js";
 
 // ── fetchManifestDigest ───────────────────────────────────────────────────
 

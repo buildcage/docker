@@ -1,14 +1,14 @@
 /**
- * oci-registry.mjs — OCI registry I/O helpers
+ * oci-registry.js — OCI registry I/O helpers
  *
- * All errors are thrown as SetupError (see errors.mjs).
+ * All errors are thrown as SetupError (see errors.js).
  * Callers do not need to catch and re-wrap; just let them propagate.
  */
 
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SetupError } from "./errors.mjs";
+import { SetupError } from "./errors.js";
 
 const BUNDLE_MEDIA_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 

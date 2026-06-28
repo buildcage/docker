@@ -1,7 +1,7 @@
 import { bundleFromJSON } from "@sigstore/bundle";
 import { getTrustedRoot } from "@sigstore/tuf";
 import { toSignedEntity, toTrustMaterial, Verifier } from "@sigstore/verify";
-import { SetupError } from "./errors.mjs";
+import { SetupError } from "./errors.js";
 
 // Encode a string as DER UTF8String for Fulcio OID extension values.
 // sigstore-js compares the raw OCTET STRING bytes, so we must include

@@ -1,13 +1,13 @@
 /**
- * Property-based tests for verify-image.mjs helpers.
+ * Property-based tests for verify-image.js helpers.
  *
- * Run with: node --test setup/src/lib/verify-image.property.test.mjs
+ * Run with: node --test setup/src/lib/verify-image.property.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { buildVerifyOptions } from "./verify-image.mjs";
+import { buildVerifyOptions } from "./verify-image.js";
 
 // ---------------------------------------------------------------------------
 // buildVerifyOptions
