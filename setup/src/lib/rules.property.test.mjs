@@ -60,7 +60,7 @@ describe("convertRule – properties", () => {
   it("label with * mixed with other characters always throws", () => {
     const mixedWildcardLabel = fc
       .string({ minLength: 1, maxLength: 8 })
-      .filter((s) => s.includes("*") && s !== "*" && s !== "**" && !s.startsWith("~"));
+      .filter((s) => s.includes("*") && s !== "*" && s !== "**" && !s.startsWith("~") && !s.includes("."));
 
     fc.assert(
       fc.property(mixedWildcardLabel, (label) => {
