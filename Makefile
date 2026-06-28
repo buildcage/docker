@@ -71,7 +71,7 @@ test_unit: test_setup test_report test_qjs ## Run unit tests
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests
-	@node --test setup/src/main.test.mjs setup/src/lib/verify-image.test.mjs setup/src/lib/oci-registry.test.mjs setup/src/lib/sigstore.test.mjs
+	@node --test 'setup/src/**/*.test.mjs'
 
 .PHONY: test_report
 test_report: ## Run report unit tests
