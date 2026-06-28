@@ -1,14 +1,14 @@
 /**
- * Unit tests for setup/src/lib/verify-image.mjs
+ * Unit tests for setup/src/lib/verify-image.js
  *
  * Tests focus on buildcage-specific pure functions: imageTagFromRef and
  * buildVerifyOptions.  I/O functions (getManifestDigest, fetchRegistryToken,
- * fetchBundle) are tested in lib/oci-registry.test.mjs.
+ * fetchBundle) are tested in lib/oci-registry.test.js.
  *
  * verifyBundle and verifyImageDigest require a live TUF network call; those
  * paths are covered by end-to-end / integration tests.
  *
- * Run with: node --test setup/src/verify-image.test.mjs
+ * Run with: node --test setup/src/lib/verify-image.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -16,9 +16,9 @@ import assert from "node:assert/strict";
 import {
   imageTagFromRef,
   buildVerifyOptions,
-} from "./verify-image.mjs";
+} from "./verify-image.js";
 
-// ── Constants mirrored from verify-image.mjs (for assertion readability) ─────
+// ── Constants mirrored from verify-image.js (for assertion readability) ──────
 
 const EXPECTED_ISSUER        = "https://token.actions.githubusercontent.com";
 const RELEASE_WORKFLOW       = ".github/workflows/docker-publish.yml";

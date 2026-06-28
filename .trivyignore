@@ -50,7 +50,7 @@ CVE-2026-1229
 CVE-2026-24515
 
 # QuickJS stack overflow via deeply nested JS input.
-# Only internal tool scripts (convert-rule.mjs, report.mjs) are executed;
+# Only internal tool scripts (convert-rule.js, report.js) are executed;
 # no untrusted JavaScript is evaluated.
 CVE-2023-31922
 

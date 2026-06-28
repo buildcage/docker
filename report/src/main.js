@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRestrictExample } from "./lib/build-example.mjs";
+import { buildRestrictExample } from "./lib/build-example.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -17,7 +17,7 @@ let jsonOutput;
 try {
   jsonOutput = execFileSync(
     "docker",
-    ["compose", "-f", composeFile, "exec", "builder", "qjs", "/opt/buildcage/tools/report.mjs"],
+    ["compose", "-f", composeFile, "exec", "builder", "qjs", "-m", "/opt/buildcage/tools/report.js"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
   );
 } catch (e) {

@@ -1,14 +1,14 @@
 /**
- * Property-based tests for setup/main.mjs and its helpers.
+ * Property-based tests for setup/main.js and its helpers.
  *
- * Run with: node --test setup/src/main.property.test.mjs
+ * Run with: node --test setup/src/main.property.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { imageTagFromRef } from "./lib/verify-image.mjs";
-import { buildACLRules, resolveBuildcageImageRef } from "./main.mjs";
+import { imageTagFromRef } from "./lib/verify-image.js";
+import { buildACLRules, resolveBuildcageImageRef } from "./main.js";
 
 // ---------------------------------------------------------------------------
 // imageTagFromRef

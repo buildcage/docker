@@ -2,9 +2,9 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildRules } from "../../docker/files/tools/lib/rules.mjs";
-import { SetupError } from "./lib/errors.mjs";
-import { imageTagFromRef, verifyImageDigest } from "./lib/verify-image.mjs";
+import { buildRules } from "../../docker/files/tools/lib/rules.js";
+import { SetupError } from "./lib/errors.js";
+import { imageTagFromRef, verifyImageDigest } from "./lib/verify-image.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");

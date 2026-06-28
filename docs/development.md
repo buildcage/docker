@@ -113,22 +113,22 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 ```
 .
 ├── setup/                       # GitHub Actions setup
-│   ├── action.yml               # Action entry (node24 → dist/main.js, dist/post.js)
+│   ├── action.yml               # Action entry (node24 → dist/main.cjs, dist/post.cjs)
 │   ├── compose.yaml             # Compose config for GitHub Actions (with image tag)
-│   ├── src/                     # Source (ESM .mjs)
-│   │   ├── main.mjs             # Verify image provenance, resolve image ref, compose up
-│   │   ├── post.mjs             # Post-action cleanup
+│   ├── src/                     # Source (ESM)
+│   │   ├── main.js              # Verify image provenance, resolve image ref, compose up
+│   │   ├── post.js              # Post-action cleanup
 │   │   └── lib/                 # Helpers: OCI registry, Sigstore verification, error types
 │   └── dist/                    # Bundled output (rollup → CommonJS)
-│       ├── main.js
-│       └── post.js
+│       ├── main.cjs
+│       └── post.cjs
 ├── report/                      # GitHub Actions report
-│   ├── action.yml               # Action entry (node24 → dist/main.js)
-│   ├── src/                     # Source (ESM .mjs)
-│   │   ├── main.mjs             # Log analysis and Job Summary output
+│   ├── action.yml               # Action entry (node24 → dist/main.cjs)
+│   ├── src/                     # Source (ESM)
+│   │   ├── main.js              # Log analysis and Job Summary output
 │   │   └── lib/                 # Helpers: Job Summary rendering
 │   └── dist/                    # Bundled output (rollup → CommonJS)
-│       └── main.js
+│       └── main.cjs
 ├── docker/
 │   ├── Dockerfile               # Multi-stage BuildKit + haproxy + dnsmasq + s6-overlay
 │   └── files/
@@ -139,14 +139,14 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │       ├── s6-rc.d/             # s6-overlay service definitions
 │       ├── s6-scripts/          # s6-overlay init scripts
 │       └── tools/               # QuickJS scripts (run inside container)
-│           ├── convert-rule.mjs # stdin wildcard → stdout regex filter
-│           ├── report.mjs       # Parse HAProxy logs → structured JSON
+│           ├── convert-rule.js  # stdin wildcard → stdout regex filter
+│           ├── report.js        # Parse HAProxy logs → structured JSON
 │           └── lib/
-│               ├── rules.mjs        # Wildcard → regex conversion
-│               ├── rules.test.mjs
-│               ├── log-parser.mjs   # Log parsing and aggregation
-│               ├── log-parser.test.mjs
-│               └── test-shim.mjs    # Minimal test runner for QuickJS
+│               ├── rules.js         # Wildcard → regex conversion
+│               ├── rules.test.js
+│               ├── log-parser.js    # Log parsing and aggregation
+│               ├── log-parser.test.js
+│               └── test-shim.js     # Minimal test runner for QuickJS
 ├── docs/
 │   ├── development.md           # Development guide
 │   ├── rules.md                 # Rule format reference

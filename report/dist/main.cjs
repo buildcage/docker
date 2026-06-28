@@ -8,7 +8,7 @@ const ruleTypeToParam = {
   IP: "allowed_ip_rules"
 };
 
-const __dirname$1 = node_path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.js", document.baseURI).href)), composeFile = process.argv[2] || node_path.join(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
+const __dirname$1 = node_path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = process.argv[2] || node_path.join(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
   ...process.env,
   BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage"
 };
@@ -16,7 +16,7 @@ const __dirname$1 = node_path.dirname(node_url.fileURLToPath("undefined" == type
 let jsonOutput;
 
 try {
-  jsonOutput = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "qjs", "/opt/buildcage/tools/report.mjs" ], {
+  jsonOutput = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "qjs", "-m", "/opt/buildcage/tools/report.js" ], {
     encoding: "utf8",
     stdio: [ "ignore", "pipe", "pipe" ],
     env: composeEnv

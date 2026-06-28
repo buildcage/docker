@@ -7227,7 +7227,7 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo})
   return await verifyBundle(bundle, verifyOptions, digest), digest;
 }
 
-const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.js", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
+const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
 function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository, actionRef: actionRef}, _exec = node_child_process.execFileSync) {
   const repository = `ghcr.io/${actionRepository}`.toLowerCase();
@@ -7268,7 +7268,7 @@ function logRules(label, rules) {
   for (const r of rules) console.log(`  ${r}`);
 }
 
-process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.js", document.baseURI).href) && async function() {
+process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href) && async function() {
   const env = process.env, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", digest = await verifyImageDigest({
     actionRef: actionRef,
     actionRepo: actionRepo

@@ -1,12 +1,12 @@
 /**
- * Unit tests for setup/main.mjs
+ * Unit tests for setup/main.js
  *
- * Run with: node --test setup/src/main.test.mjs
+ * Run with: node --test setup/src/main.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveBuildcageImageRef, resolveImageTag, buildACLRules } from "./main.mjs";
+import { resolveBuildcageImageRef, resolveImageTag, buildACLRules } from "./main.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

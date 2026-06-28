@@ -18,6 +18,7 @@
       "onFail": "download"
     }
   },
+  "type": "module",
   "scripts": {
     "build": "rollup -c"
   },

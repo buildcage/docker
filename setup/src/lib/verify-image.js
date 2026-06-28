@@ -1,5 +1,5 @@
 /**
- * verify-image.mjs — Image provenance verification helpers
+ * verify-image.js — Image provenance verification helpers
  *
  * Verifies the Docker image's Sigstore provenance bundle.
  *
@@ -9,8 +9,8 @@
  *   - Unverifiable ref (branch / local ./setup) → returns null.
  */
 
-import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.mjs";
-import { derUtf8, verifyBundle } from "./sigstore.mjs";
+import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.js";
+import { derUtf8, verifyBundle } from "./sigstore.js";
 
 const REGISTRY = "ghcr.io";
 const EXPECTED_ISSUER = "https://token.actions.githubusercontent.com";
