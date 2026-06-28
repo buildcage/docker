@@ -14,6 +14,7 @@ permissions: {}
 jobs:
   release:
     runs-on: ubuntu-slim
+    environment: release
     permissions:
       contents: write
       actions: write
@@ -43,15 +44,6 @@ jobs:
             exit 1
           fi
 
-      - name: Push tag
-        env:
-          TAG: ${{ inputs.tag }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          git tag "$TAG"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "refs/tags/${TAG}"
-
       - name: Create draft release
         env:
           TAG: ${{ inputs.tag }}
@@ -62,7 +54,15 @@ jobs:
             --title "$TAG" \
             --generate-notes
 
-      - name: Trigger docker-publish
+      - name: Push tag
+        env:
+          TAG: ${{ inputs.tag }}
+          PAT: ${{ secrets.TAG_CREATION_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          git tag "$TAG"
+          git push "https://x-access-token:${PAT}@github.com/${REPO}.git" "refs/tags/${TAG}"
+
         env:
           TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
