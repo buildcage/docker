@@ -147,4 +147,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "$BUNDLE_CONTENT" > buildcage-container.intoto.jsonl
-          gh release upload "$TAG" buildcage-container.intoto.jsonl
+          gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" buildcage-container.intoto.jsonl
