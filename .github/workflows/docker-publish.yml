@@ -144,26 +144,35 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
   upload-release-assets:
-    if: github.event_name != 'push'
     needs: [build-and-push]
     runs-on: ubuntu-slim
     permissions:
       contents: write
 
     steps:
+      - name: Check release
+        id: check
+        env:
+          TAG: ${{ needs.build-and-push.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft 2>&1) || {
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          if [ "$(echo "$RELEASE" | jq -r '.isDraft')" != "true" ]; then
+            echo "::warning::Release $TAG is already published, skipping upload"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "upload=true" >> "$GITHUB_OUTPUT"
+
       - name: Upload to Release
+        if: steps.check.outputs.upload == 'true'
         env:
           TAG: ${{ needs.build-and-push.outputs.tag }}
           BUNDLE_CONTENT: ${{ needs.build-and-push.outputs.bundle-content }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,url 2>&1) || {
-            echo "::error::No release found for $TAG"
-            exit 1
-          }
-          if [ "$(echo "$RELEASE" | jq -r '.isDraft')" != "true" ]; then
-            echo "::error::Release $TAG is already published. Refusing to upload to an immutable release."
-            exit 1
-          fi
           echo "$BUNDLE_CONTENT" > buildcage-container.intoto.jsonl
           gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" buildcage-container.intoto.jsonl

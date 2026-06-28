@@ -17,7 +17,7 @@ jobs:
     environment: release
     permissions:
       contents: write
-      actions: write
+      actions: read
 
     steps:
       - name: Checkout
@@ -63,17 +63,27 @@ jobs:
           git tag "$TAG"
           git push "https://x-access-token:${PAT}@github.com/${REPO}.git" "refs/tags/${TAG}"
 
+      - name: Wait for docker-publish
         env:
           TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          STARTED_AT: ${{ github.run_started_at }}
         run: |
-          RUN_ID=$(printf '{"ref":"refs/tags/%s","inputs":{"tag":"%s"},"return_run_details":true}' "$TAG" "$TAG" \
-            | gh api "repos/${REPO}/actions/workflows/docker-publish.yml/dispatches" \
-                --method POST --input - \
-                --jq '.workflow_run_id')
-
-          echo "Watching run https://github.com/${REPO}/actions/runs/${RUN_ID}"
+          RUN_ID=""
+          for i in $(seq 1 24); do
+            RUN_ID=$(gh run list --repo "$REPO" --workflow docker-publish.yml \
+              --branch "$TAG" --limit 5 --json databaseId,createdAt \
+              --jq --arg since "$STARTED_AT" \
+              '[.[] | select(.createdAt >= $since)] | .[0].databaseId // empty' \
+              2>/dev/null)
+            [ -n "$RUN_ID" ] && break
+            sleep 5
+          done
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::docker-publish run for $TAG not found within 2 minutes"
+            exit 1
+          fi
           gh run watch "$RUN_ID" --exit-status
 
       - name: Summary
