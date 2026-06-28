@@ -21,6 +21,11 @@ jobs:
       id-token: write
       contents: read
       packages: write
+      attestations: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      digest: ${{ steps.build.outputs.digest }}
+      bundle-content: ${{ steps.bundle.outputs.content }}
 
     steps:
       - name: Checkout
@@ -107,5 +112,39 @@ jobs:
       - name: Sign Docker image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          REPO: ${{ github.repository }}
         run: |
-          cosign sign --yes --new-bundle-format ghcr.io/${{ github.repository }}@${DIGEST}
+          cosign sign --yes --new-bundle-format ghcr.io/${REPO}@${DIGEST}
+
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Read bundle content
+        id: bundle
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          echo "content<<EOF" >> "$GITHUB_OUTPUT"
+          cat "$BUNDLE" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+  upload-release-assets:
+    needs: [build-and-push]
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+
+    steps:
+      - name: Upload to Release
+        env:
+          TAG: ${{ needs.build-and-push.outputs.tag }}
+          BUNDLE_CONTENT: ${{ needs.build-and-push.outputs.bundle-content }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$BUNDLE_CONTENT" > buildcage-container.intoto.jsonl
+          gh release upload "$TAG" buildcage-container.intoto.jsonl
