@@ -7,6 +7,11 @@ on:
       - "v*.*.*"
 
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (leave empty to use latest)'
+        required: false
+        type: string
 
 concurrency:
   group: docker-publish
@@ -39,12 +44,17 @@ jobs:
         env:
           REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            TAG=$(git tag --sort=-version:refname --list 'v*.*' | head -1)
-            if [ -z "$TAG" ]; then
-              echo "::error::No version tag found"
-              exit 1
+            if [ -n "$INPUT_TAG" ]; then
+              TAG="$INPUT_TAG"
+            else
+              TAG=$(git tag --sort=-version:refname --list 'v*.*' | head -1)
+              if [ -z "$TAG" ]; then
+                echo "::error::No version tag found"
+                exit 1
+              fi
             fi
             git checkout "$TAG"
           else
@@ -134,6 +144,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
   upload-release-assets:
+    if: github.event_name != 'push'
     needs: [build-and-push]
     runs-on: ubuntu-slim
     permissions:
@@ -146,5 +157,13 @@ jobs:
           BUNDLE_CONTENT: ${{ needs.build-and-push.outputs.bundle-content }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          RELEASE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,url 2>&1) || {
+            echo "::error::No release found for $TAG"
+            exit 1
+          }
+          if [ "$(echo "$RELEASE" | jq -r '.isDraft')" != "true" ]; then
+            echo "::error::Release $TAG is already published. Refusing to upload to an immutable release."
+            exit 1
+          fi
           echo "$BUNDLE_CONTENT" > buildcage-container.intoto.jsonl
           gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" buildcage-container.intoto.jsonl
