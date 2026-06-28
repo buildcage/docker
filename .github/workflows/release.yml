@@ -60,6 +60,7 @@ jobs:
           PAT: ${{ secrets.TAG_CREATION_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
+          echo "PUSH_SINCE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_ENV"
           git tag "$TAG"
           git push "https://x-access-token:${PAT}@github.com/${REPO}.git" "refs/tags/${TAG}"
 
@@ -68,15 +69,13 @@ jobs:
           TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          STARTED_AT: ${{ github.run_started_at }}
         run: |
           RUN_ID=""
           for i in $(seq 1 24); do
             RUN_ID=$(gh run list --repo "$REPO" --workflow docker-publish.yml \
-              --branch "$TAG" --limit 5 --json databaseId,createdAt \
-              --jq --arg since "$STARTED_AT" \
-              '[.[] | select(.createdAt >= $since)] | .[0].databaseId // empty' \
-              2>/dev/null)
+              --branch "$TAG" --limit 5 --json databaseId,createdAt 2>/dev/null \
+              | jq -r --arg since "$PUSH_SINCE" \
+              '[.[] | select(.createdAt >= $since)] | .[0].databaseId // empty') || true
             [ -n "$RUN_ID" ] && break
             sleep 5
           done
@@ -84,7 +83,7 @@ jobs:
             echo "::error::docker-publish run for $TAG not found within 2 minutes"
             exit 1
           fi
-          gh run watch "$RUN_ID" --exit-status
+          gh run watch "$RUN_ID" --exit-status --interval 5 --compact
 
       - name: Summary
         env:
