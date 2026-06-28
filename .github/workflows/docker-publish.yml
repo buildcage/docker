@@ -7,6 +7,11 @@ on:
       - "v*.*.*"
 
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (leave empty to use latest)'
+        required: false
+        type: string
 
 concurrency:
   group: docker-publish
@@ -39,12 +44,17 @@ jobs:
         env:
           REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            TAG=$(git tag --sort=-version:refname --list 'v*.*' | head -1)
-            if [ -z "$TAG" ]; then
-              echo "::error::No version tag found"
-              exit 1
+            if [ -n "$INPUT_TAG" ]; then
+              TAG="$INPUT_TAG"
+            else
+              TAG=$(git tag --sort=-version:refname --list 'v*.*' | head -1)
+              if [ -z "$TAG" ]; then
+                echo "::error::No version tag found"
+                exit 1
+              fi
             fi
             git checkout "$TAG"
           else
@@ -52,21 +62,6 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-          # Check if this version is the latest within the same major/major.minor
-          VERSION="${TAG#v}"
-          MAJOR=$(echo "$VERSION" | cut -d. -f1)
-          MINOR=$(echo "$VERSION" | cut -d. -f1-2)
-
-          LATEST_IN_MAJOR=$(git tag --list "v${MAJOR}.*.*" --sort=-version:refname | head -1)
-          if [ "$TAG" != "$LATEST_IN_MAJOR" ]; then
-            echo "skip_major=true" >> "$GITHUB_OUTPUT"
-          fi
-
-          LATEST_IN_MINOR=$(git tag --list "v${MINOR}.*" --sort=-version:refname | head -1)
-          if [ "$TAG" != "$LATEST_IN_MINOR" ]; then
-            echo "skip_minor=true" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
@@ -81,8 +76,6 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
-            ${{ steps.version.outputs.skip_minor != 'true' && format('type=semver,pattern={{{{major}}}}.{{{{minor}}}},value={0}', steps.version.outputs.tag) || '' }}
-            ${{ steps.version.outputs.skip_major != 'true' && format('type=semver,pattern={{{{major}}}},value={0}', steps.version.outputs.tag) || '' }}
             type=raw,value=sha-${{ steps.version.outputs.sha }},priority=100
 
       - name: Login to GHCR
@@ -140,7 +133,25 @@ jobs:
       contents: write
 
     steps:
+      - name: Check release
+        id: check
+        env:
+          TAG: ${{ needs.build-and-push.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft 2>&1) || {
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          if [ "$(echo "$RELEASE" | jq -r '.isDraft')" != "true" ]; then
+            echo "::warning::Release $TAG is already published, skipping upload"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "upload=true" >> "$GITHUB_OUTPUT"
+
       - name: Upload to Release
+        if: steps.check.outputs.upload == 'true'
         env:
           TAG: ${{ needs.build-and-push.outputs.tag }}
           BUNDLE_CONTENT: ${{ needs.build-and-push.outputs.bundle-content }}

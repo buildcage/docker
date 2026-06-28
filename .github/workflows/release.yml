@@ -1,0 +1,96 @@
+name: Release
+run-name: Release ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Semver tag (e.g. v1.2.3)'
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-slim
+    environment: release
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate tag format
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid semver format: $TAG (expected vX.Y.Z)"
+            exit 1
+          fi
+
+      - name: Check tag does not exist
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "::error::Tag $TAG already exists"
+            exit 1
+          fi
+
+      - name: Create draft release
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$TAG" \
+            --draft \
+            --title "$TAG" \
+            --generate-notes
+
+      - name: Push tag
+        env:
+          TAG: ${{ inputs.tag }}
+          PAT: ${{ secrets.TAG_CREATION_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "PUSH_SINCE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_ENV"
+          git tag "$TAG"
+          git push "https://x-access-token:${PAT}@github.com/${REPO}.git" "refs/tags/${TAG}"
+
+      - name: Wait for docker-publish
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          RUN_ID=""
+          for i in $(seq 1 24); do
+            RUN_ID=$(gh run list --repo "$REPO" --workflow docker-publish.yml \
+              --branch "$TAG" --limit 5 --json databaseId,createdAt 2>/dev/null \
+              | jq -r --arg since "$PUSH_SINCE" \
+              '[.[] | select(.createdAt >= $since)] | .[0].databaseId // empty') || true
+            [ -n "$RUN_ID" ] && break
+            sleep 5
+          done
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::docker-publish run for $TAG not found within 2 minutes"
+            exit 1
+          fi
+          gh run watch "$RUN_ID" --exit-status --interval 5 --compact
+
+      - name: Summary
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_URL=$(gh release view "$TAG" --json url --jq '.url')
+          echo "### $TAG draft release is ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Review and publish: $RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
