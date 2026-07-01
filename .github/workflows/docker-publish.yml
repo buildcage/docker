@@ -157,5 +157,5 @@ jobs:
           BUNDLE_CONTENT: ${{ needs.build-and-push.outputs.bundle-content }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "$BUNDLE_CONTENT" > buildcage-container.intoto.jsonl
-          gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" buildcage-container.intoto.jsonl
+          echo "$BUNDLE_CONTENT" > buildcage-container.sigstore.json
+          gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" buildcage-container.sigstore.json
