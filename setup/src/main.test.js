@@ -6,7 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveBuildcageImageRef, resolveImageTag, buildACLRules } from "./main.js";
+import { resolveBuildcageImageRef, resolveImageTag, buildACLRules, resolveProxyEngine } from "./main.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,25 +23,30 @@ const execFail = () => { throw new Error("manifest not found"); };
 // ---------------------------------------------------------------------------
 
 describe("resolveImageTag", () => {
-  it("converts a 40-char hex SHA to sha-<sha>", () => {
+  it("converts a 40-char hex SHA to sha-<sha>-transparent by default", () => {
     const sha = "a".repeat(40);
     const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: sha }, execOk);
-    assert.equal(result, `sha-${"a".repeat(40)}`);
+    assert.equal(result, `sha-${"a".repeat(40)}-transparent`);
   });
 
   it("strips leading 'v' from a version tag", () => {
     const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: "v2.1.0" }, execOk);
-    assert.equal(result, "2.1.0");
+    assert.equal(result, "2.1.0-transparent");
   });
 
   it("strips leading 'v' from a major-only tag", () => {
     const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: "v3" }, execOk);
-    assert.equal(result, "3");
+    assert.equal(result, "3-transparent");
   });
 
   it("uses branch name as-is when image exists", () => {
     const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: "main" }, execOk);
-    assert.equal(result, "main");
+    assert.equal(result, "main-transparent");
+  });
+
+  it("uses the explicit engine suffix when requested", () => {
+    const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: "v2.1.0", proxyEngine: "explicit" }, execOk);
+    assert.equal(result, "2.1.0-explicit");
   });
 
   it("throws when docker manifest inspect fails (tag not found)", () => {
@@ -68,7 +73,7 @@ describe("resolveImageTag", () => {
   it("lowercases a SHA-derived tag", () => {
     const sha = "ABCDEF1234".padEnd(40, "0");
     const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: sha }, execOk);
-    assert.equal(result, `sha-${sha.toLowerCase()}`);
+    assert.equal(result, `sha-${sha.toLowerCase()}-transparent`);
   });
 });
 
@@ -100,7 +105,7 @@ describe("resolveBuildcageImageRef", () => {
       { imageDigest: "", actionRepository: "owner/repo", actionRef: "v2.1.0" },
       execOk
     );
-    assert.equal(result, "ghcr.io/owner/repo:2.1.0");
+    assert.equal(result, "ghcr.io/owner/repo:2.1.0-transparent");
   });
 
   it("falls back to tag reference when imageDigest is undefined", () => {
@@ -108,7 +113,15 @@ describe("resolveBuildcageImageRef", () => {
       { imageDigest: undefined, actionRepository: "owner/repo", actionRef: "v2.1.0" },
       execOk
     );
-    assert.equal(result, "ghcr.io/owner/repo:2.1.0");
+    assert.equal(result, "ghcr.io/owner/repo:2.1.0-transparent");
+  });
+
+  it("uses the explicit engine's tag suffix when requested", () => {
+    const result = resolveBuildcageImageRef(
+      { imageDigest: undefined, actionRepository: "owner/repo", actionRef: "v2.1.0", proxyEngine: "explicit" },
+      execOk
+    );
+    assert.equal(result, "ghcr.io/owner/repo:2.1.0-explicit");
   });
 
   it("always derives repository from actionRepository (no external override)", () => {
@@ -125,6 +138,42 @@ describe("resolveBuildcageImageRef", () => {
         { imageDigest: "", actionRepository: "owner/repo", actionRef: "v2.1.0" },
         execFail
       ),
+      (err) => { assert.ok(err instanceof Error); return true; }
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveProxyEngine
+// ---------------------------------------------------------------------------
+
+describe("resolveProxyEngine", () => {
+  it("defaults to transparent for undefined", () => {
+    assert.equal(resolveProxyEngine(undefined), "transparent");
+  });
+
+  it("defaults to transparent for empty string", () => {
+    assert.equal(resolveProxyEngine(""), "transparent");
+  });
+
+  it("accepts transparent explicitly", () => {
+    assert.equal(resolveProxyEngine("transparent"), "transparent");
+  });
+
+  it("accepts explicit", () => {
+    assert.equal(resolveProxyEngine("explicit"), "explicit");
+  });
+
+  it("throws SetupError for an invalid value", () => {
+    assert.throws(
+      () => resolveProxyEngine("restrict"),
+      (err) => { assert.ok(err instanceof Error); return true; }
+    );
+  });
+
+  it("throws SetupError for a value with different casing (case-sensitive)", () => {
+    assert.throws(
+      () => resolveProxyEngine("Explicit"),
       (err) => { assert.ok(err instanceof Error); return true; }
     );
   });
