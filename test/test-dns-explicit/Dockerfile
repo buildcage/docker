@@ -1,0 +1,9 @@
+FROM alpine:3.24.0@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
+
+RUN apk add --no-cache dnsmasq
+
+COPY dnsmasq.conf /etc/dnsmasq.conf
+
+EXPOSE 53/udp 53/tcp
+
+ENTRYPOINT ["dnsmasq", "--no-daemon", "--log-queries"]
