@@ -33,26 +33,26 @@ function makeSAN(ref) {
 // ── imageTagFromRef ───────────────────────────────────────────────────────────
 
 describe("imageTagFromRef", () => {
-  it("converts a 40-char hex SHA to sha-<sha> (lowercase)", () => {
+  it("converts a 40-char hex SHA to sha-<sha>-transparent by default", () => {
     const sha = "a".repeat(40);
-    assert.equal(imageTagFromRef(sha), `sha-${"a".repeat(40)}`);
+    assert.equal(imageTagFromRef(sha), `sha-${"a".repeat(40)}-transparent`);
   });
 
   it("lowercases the SHA", () => {
     const sha = "ABCDEF1234".padEnd(40, "0");
-    assert.equal(imageTagFromRef(sha), `sha-${sha.toLowerCase()}`);
+    assert.equal(imageTagFromRef(sha), `sha-${sha.toLowerCase()}-transparent`);
   });
 
   it("strips leading 'v' from a version tag", () => {
-    assert.equal(imageTagFromRef("v2.1.0"), "2.1.0");
+    assert.equal(imageTagFromRef("v2.1.0"), "2.1.0-transparent");
   });
 
   it("strips 'v' from a major-only tag", () => {
-    assert.equal(imageTagFromRef("v2"), "2");
+    assert.equal(imageTagFromRef("v2"), "2-transparent");
   });
 
-  it("returns a branch name as-is", () => {
-    assert.equal(imageTagFromRef("main"), "main");
+  it("returns a branch name as-is, with the engine suffix", () => {
+    assert.equal(imageTagFromRef("main"), "main-transparent");
   });
 
   it("returns empty string for empty input", () => {
@@ -61,6 +61,11 @@ describe("imageTagFromRef", () => {
 
   it("returns empty string for undefined", () => {
     assert.equal(imageTagFromRef(undefined), "");
+  });
+
+  it("appends the explicit engine suffix instead when requested", () => {
+    assert.equal(imageTagFromRef("v2.1.0", "explicit"), "2.1.0-explicit");
+    assert.equal(imageTagFromRef("a".repeat(40), "explicit"), `sha-${"a".repeat(40)}-explicit`);
   });
 });
 
