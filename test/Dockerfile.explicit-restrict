@@ -1,0 +1,91 @@
+FROM alpine:3.24.0@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
+
+# The FROM pull above already exercises the "base image pulls are unaffected
+# by the explicit-mode source policy" guarantee: registry-1.docker.io is never
+# in allowed_https_rules, yet the pull succeeds because docker-image:// source
+# identifiers never match buildcage's ^https?://-scoped policy rules.
+
+# DNS check — buildkit-proxy writes /etc/resolv.conf from EXTERNAL_RESOLVER at
+# container startup (no dnsmasq in this image).
+RUN echo "=== DNS Configuration ===" && \
+    cat /etc/resolv.conf
+
+# No --no-check-certificate here (unlike test/Dockerfile.transparent-restrict): BuildKit's
+# native --proxy-network injects its own generated CA into this container's
+# trust store, so a cooperative HTTPS client validates normally against the
+# MITM leaf certificate.
+
+# [HTTPS - allowed - exact match]
+RUN echo "=== [HTTPS - allowed - exact match] ===" && \
+    echo "Testing allowed.example.com (HTTPS)..." && \
+    (wget -q -O /dev/null --timeout=10 https://allowed.example.com/ && echo "✓ allowed.example.com: OK") || (echo "✗ allowed.example.com: FAILED" && exit 1)
+
+# [HTTPS - allowed - wildcard]
+RUN echo "=== [HTTPS - allowed - wildcard] ===" && \
+    echo "Testing sub.wildcard.example.com (HTTPS)..." && \
+    (wget -q -O /dev/null --timeout=10 https://sub.wildcard.example.com/ && echo "✓ sub.wildcard.example.com: OK") || (echo "✗ sub.wildcard.example.com: FAILED" && exit 1)
+
+# [HTTPS - blocked - nested subdomain]
+RUN echo "=== [HTTPS - blocked - nested subdomain] ===" && \
+    echo "Testing deep.sub.wildcard.example.com (HTTPS, should be blocked)..." && \
+    (wget -q -O /dev/null --timeout=5 https://deep.sub.wildcard.example.com/ && echo "✗ deep.sub.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ deep.sub.wildcard.example.com: BLOCKED (expected)"
+
+# [HTTPS - blocked]
+RUN echo "=== [HTTPS - blocked] ===" && \
+    echo "Testing blocked.example.com (HTTPS, should be blocked)..." && \
+    (wget -q -O /dev/null --timeout=5 https://blocked.example.com/ && echo "✗ blocked.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com: BLOCKED (expected)"
+
+# [HTTP - allowed]
+RUN echo "=== [HTTP - allowed] ===" && \
+    echo "Testing allowed.example.com (HTTP)..." && \
+    (wget -q -O /dev/null --timeout=10 http://allowed.example.com/ && echo "✓ allowed.example.com HTTP: OK") || (echo "✗ allowed.example.com HTTP: FAILED" && exit 1)
+
+# [HTTP - blocked]
+RUN echo "=== [HTTP - blocked] ===" && \
+    echo "Testing blocked.example.com (HTTP, should be blocked)..." && \
+    (wget -q -O /dev/null --timeout=5 http://blocked.example.com/ && echo "✗ blocked.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com HTTP: BLOCKED (expected)"
+
+# [HTTP - allowed - wildcard]
+RUN echo "=== [HTTP - allowed - wildcard] ===" && \
+    echo "Testing sub.wildcard.example.com (HTTP)..." && \
+    (wget -q -O /dev/null --timeout=10 http://sub.wildcard.example.com/ && echo "✓ sub.wildcard.example.com HTTP: OK") || (echo "✗ sub.wildcard.example.com HTTP: FAILED" && exit 1)
+
+# [Port 8443 - allowed]
+RUN echo "=== [Port 8443 - allowed] ===" && \
+    echo "Testing allowed.example.com:8443 (HTTPS)..." && \
+    (wget -q -O /dev/null --timeout=10 https://allowed.example.com:8443/ && echo "✓ allowed.example.com:8443: OK") || (echo "✗ allowed.example.com:8443: FAILED" && exit 1)
+
+# [Port 8080 - allowed]
+RUN echo "=== [Port 8080 - allowed] ===" && \
+    echo "Testing allowed.example.com:8080 (HTTP)..." && \
+    (wget -q -O /dev/null --timeout=10 http://allowed.example.com:8080/ && echo "✓ allowed.example.com:8080: OK") || (echo "✗ allowed.example.com:8080: FAILED" && exit 1)
+
+# [Port 8443 - blocked]
+RUN echo "=== [Port 8443 - blocked] ===" && \
+    echo "Testing blocked.example.com:8443 (HTTPS, should be blocked)..." && \
+    (wget -q -O /dev/null --timeout=5 https://blocked.example.com:8443/ && echo "✗ blocked.example.com:8443: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com:8443: BLOCKED (expected)"
+
+# [Port 8080 - blocked]
+RUN echo "=== [Port 8080 - blocked] ===" && \
+    echo "Testing blocked.example.com:8080 (HTTP, should be blocked)..." && \
+    (wget -q -O /dev/null --timeout=5 http://blocked.example.com:8080/ && echo "✗ blocked.example.com:8080: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com:8080: BLOCKED (expected)"
+
+# [Direct IP - blocked (no allowed_ip_rules configured for this test)]
+RUN echo "=== [Direct IP - blocked] ===" && \
+    echo "Testing direct IP access to 10.200.0.100 (should be blocked by source policy)..." && \
+    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by source policy (expected)"
+
+# Note: unlike test/Dockerfile.transparent-restrict, this Dockerfile has no missing-sni /
+# missing-host-header / dns-failed probes. Those exercise buildcage's
+# transparent-mode network-layer interception, which does not exist in
+# explicit mode: a raw TCP/TLS connection that bypasses HTTP_PROXY never
+# reaches BuildKit's internal proxy at all (it gets "network unreachable"
+# inside the exec's own captive netns) — a known, documented limitation
+# (see docs/security.md), not something to assert a specific log line for.
+
+# Network configuration check — the exec's own netns is a captive /30 with no
+# default route (BuildKit's --proxy-network model), unlike transparent mode's
+# CNI-bridged network. This is expected and not itself an assertion target.
+RUN echo "=== Network Configuration ===" && \
+    ip route show && \
+    echo "=== End of test ==="

@@ -52,27 +52,34 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - mode: audit
+          - mode: transparent-audit
             proxy_mode: audit
             proxy_engine: transparent
             compose_file: compose.yaml:compose.test-transparent.yaml
-            test_dockerfile: test/Dockerfile.audit
-            assert_script: ./test/assert-audit-mode.sh
-            builder_name: buildcage-audit
-          - mode: restrict
+            test_dockerfile: test/Dockerfile.transparent-audit
+            assert_script: ./test/assert-transparent-audit.sh
+            builder_name: buildcage-transparent-audit
+          - mode: transparent-restrict
             proxy_mode: restrict
             proxy_engine: transparent
             compose_file: compose.yaml:compose.test-transparent.yaml
-            test_dockerfile: test/Dockerfile.restrict
-            assert_script: ./test/assert-restrict-mode.sh
-            builder_name: buildcage-restrict
+            test_dockerfile: test/Dockerfile.transparent-restrict
+            assert_script: ./test/assert-transparent-restrict.sh
+            builder_name: buildcage-transparent-restrict
+          - mode: explicit-audit
+            proxy_mode: audit
+            proxy_engine: explicit
+            compose_file: compose.yaml:compose.test-explicit.yaml
+            test_dockerfile: test/Dockerfile.explicit-audit
+            assert_script: ./test/assert-explicit-audit.sh
+            builder_name: buildcage-explicit-audit
           - mode: explicit-restrict
             proxy_mode: restrict
             proxy_engine: explicit
             compose_file: compose.yaml:compose.test-explicit.yaml
-            test_dockerfile: test/Dockerfile.explicit
-            assert_script: ./test/assert-explicit-mode.sh
-            builder_name: buildcage-explicit
+            test_dockerfile: test/Dockerfile.explicit-restrict
+            assert_script: ./test/assert-explicit-restrict.sh
+            builder_name: buildcage-explicit-restrict
 
     name: test (${{ matrix.mode }})
 
@@ -137,7 +144,7 @@ jobs:
         run: ${{ matrix.assert_script }}
 
       - name: Run source-policy conflict assertions
-        if: matrix.proxy_engine == 'explicit'
+        if: matrix.mode == 'explicit-restrict'
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
         run: ./test/assert-explicit-source-policy-conflict.sh
