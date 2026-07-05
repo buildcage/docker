@@ -1,5 +1,5 @@
 name: Image Security Scan
-run-name: Image Security Scan (${{ github.event_name == 'schedule' && 'latest' || github.ref_name }})
+run-name: Image Security Scan (${{ github.ref_name }})
 
 on:
   schedule:
@@ -16,6 +16,11 @@ jobs:
       contents: read
       security-events: write
 
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [transparent, explicit]
+
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -23,11 +28,9 @@ jobs:
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        if: github.event_name == 'workflow_dispatch'
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
       - name: Build image
-        if: github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         env:
           DOCKER_BUILD_CHECKS_ANNOTATIONS: false
@@ -35,32 +38,34 @@ jobs:
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: docker
+          file: docker/${{ matrix.engine }}/Dockerfile
           load: true
-          tags: buildcage:scan
+          tags: buildcage-${{ matrix.engine }}:scan
 
       - name: Scan image with Trivy
         if: github.ref == 'refs/heads/main'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ github.event_name == 'schedule' && format('ghcr.io/{0}:latest', github.repository) || 'buildcage:scan' }}
+          image-ref: buildcage-${{ matrix.engine }}:scan
           ignore-unfixed: true
           trivyignores: .trivyignore
           scanners: vuln
           format: sarif
-          output: trivy-results.sarif
+          output: trivy-results-${{ matrix.engine }}.sarif
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy scan results to GitHub Security
         if: github.ref == 'refs/heads/main'
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
-          sarif_file: trivy-results.sarif
+          sarif_file: trivy-results-${{ matrix.engine }}.sarif
+          category: ${{ matrix.engine }}
 
       - name: Scan image with Trivy
         if: github.ref != 'refs/heads/main'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: buildcage:scan
+          image-ref: buildcage-${{ matrix.engine }}:scan
           ignore-unfixed: true
           trivyignores: .trivyignore
           scanners: vuln

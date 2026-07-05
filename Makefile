@@ -1,4 +1,7 @@
 COMPOSE_FILE ?= compose.yaml
+# Overridable so test_explicit_mode can clean up compose.test-explicit.yaml's
+# containers/images instead of the default transparent-engine test overlay.
+TEST_COMPOSE_FILE ?= compose.test-transparent.yaml
 
 # Self-Documented Makefile
 .PHONY: help
@@ -9,7 +12,7 @@ help:
 clean: ## Clean up all resources
 	@echo "Stopping and removing all containers..."
 	@docker buildx rm buildcage 2>/dev/null || true
-	@docker compose -f compose.yaml -f compose.test.yaml down -v --rmi all
+	@docker compose -f compose.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi all
 	@docker rmi buildcage-test 2>/dev/null || true
 
 .PHONY: run_audit_mode
@@ -41,7 +44,7 @@ run_restrict_mode: ## Start in restrict mode
 .PHONY: test_restrict_mode
 test_restrict_mode: ## Run restrict mode tests
 	@echo "Running restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test.yaml \
+	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
 	  $(MAKE) run_restrict_mode
 	@docker buildx build --no-cache \
 	  --builder buildcage \
@@ -55,7 +58,7 @@ test_restrict_mode: ## Run restrict mode tests
 .PHONY: test_audit_mode
 test_audit_mode: ## Run audit mode tests
 	@echo "Running audit mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test.yaml \
+	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
 	  $(MAKE) run_audit_mode
 	@docker buildx build --no-cache \
 	  --builder buildcage \
@@ -65,6 +68,35 @@ test_audit_mode: ## Run audit mode tests
 	@node report/src/main.js ./compose.yaml
 	@./test/assert-audit-mode.sh
 	@$(MAKE) clean
+
+.PHONY: run_explicit_mode
+run_explicit_mode: ## Start in explicit proxy engine (restrict mode)
+	@echo "Starting buildcage in EXPLICIT proxy engine mode..."
+	@COMPOSE_FILE=$(COMPOSE_FILE) \
+	  PROXY_ENGINE=explicit \
+	  PROXY_MODE=restrict \
+	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
+	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
+	  docker compose up -d --wait --build
+	@docker buildx rm buildcage 2>/dev/null || true
+	@echo "Creating buildx builder..."
+	@docker buildx create --bootstrap \
+		--name buildcage \
+		--driver remote docker-container://buildcage
+
+.PHONY: test_explicit_mode
+test_explicit_mode: ## Run explicit proxy engine tests
+	@echo "Running explicit proxy engine tests..."
+	@COMPOSE_FILE=compose.yaml:compose.test-explicit.yaml \
+	  $(MAKE) run_explicit_mode
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.explicit test/ \
+	  --load -t buildcage-test
+	@PROXY_ENGINE=explicit node report/src/main.js ./compose.yaml || true
+	@./test/assert-explicit-mode.sh
+	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean
 
 .PHONY: test_unit
 test_unit: test_setup test_report test_qjs ## Run unit tests
@@ -79,9 +111,15 @@ test_report: ## Run report unit tests
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker
-	@docker build -t buildcage-qjs-test docker
-	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/lib/rules.test.js
-	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/lib/log-parser.test.js
+	@docker build -f docker/transparent/Dockerfile -t buildcage-qjs-test docker
+	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/shared/lib/rules.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/shared/lib/aggregate.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/transparent/lib/log-parser.test.js
+	@docker build -f docker/explicit/Dockerfile -t buildcage-qjs-test-explicit docker
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/shared/lib/rules.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/shared/lib/aggregate.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/explicit/lib/source-policy.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/explicit/lib/buildkitd-log-parser.test.js
 
 .PHONY: test_audit_example
 run_audit_example: ## Run audit mode example tests
