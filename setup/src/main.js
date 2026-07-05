@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildRules } from "../../docker/files/tools/lib/rules.js";
+import { buildRules } from "../../docker/shared/tools/lib/rules.js";
 import { SetupError } from "./lib/errors.js";
 import { imageTagFromRef, verifyImageDigest } from "./lib/verify-image.js";
 
@@ -14,10 +14,13 @@ async function main() {
   const actionRef = env.GITHUB_ACTION_REF ?? "";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 
+  const proxyEngine = resolveProxyEngine(env.INPUT_PROXY_ENGINE);
+  console.log(`Proxy engine: ${proxyEngine}`);
+
   // Verify image provenance before pulling.
   // verifyImageDigest returns null for unverifiable refs (branch / local ./setup).
   // On failure it throws SetupError — printed by the top-level catch.
-  const digest = await verifyImageDigest({ actionRef, actionRepo });
+  const digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine });
   let imageRef;
   if (digest === null) {
     if (
@@ -32,6 +35,7 @@ async function main() {
         imageDigest: undefined,
         actionRepository: actionRepo,
         actionRef,
+        proxyEngine,
       });
     } else {
       throw new SetupError(
@@ -46,6 +50,7 @@ async function main() {
       imageDigest: digest,
       actionRepository: actionRepo,
       actionRef,
+      proxyEngine,
     });
   }
   console.log(`buildcage image: ${imageRef}`);
@@ -66,6 +71,7 @@ async function main() {
     ...env,
     BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
     PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
+    PROXY_ENGINE: proxyEngine,
     ALLOWED_HTTPS_RULES: rules.httpsRules.join('\n'),
     ALLOWED_HTTP_RULES: rules.httpRules.join('\n'),
     ALLOWED_IP_RULES: rules.ipRules.join('\n'),
@@ -94,13 +100,13 @@ async function main() {
  * The repository is always derived from the action repository — external image
  * overrides are intentionally not supported to preserve Sigstore verification integrity.
  */
-export function resolveBuildcageImageRef({ imageDigest, actionRepository, actionRef }, _exec = execFileSync) {
+export function resolveBuildcageImageRef({ imageDigest, actionRepository, actionRef, proxyEngine = "transparent" }, _exec = execFileSync) {
   const repository = `ghcr.io/${actionRepository}`.toLowerCase();
   if (imageDigest) {
     // Pull by verified digest to close the TOCTOU window between verification and docker pull.
     return `${repository}@${imageDigest}`;
   }
-  const tag = resolveImageTag(repository, { actionRef }, _exec);
+  const tag = resolveImageTag(repository, { actionRef, proxyEngine }, _exec);
   return `${repository}:${tag}`;
 }
 
@@ -109,14 +115,14 @@ export function resolveBuildcageImageRef({ imageDigest, actionRepository, action
  * Throws if the ref cannot be resolved to an existing image tag.
  * Used only when no verified digest is available (branch/local references).
  */
-export function resolveImageTag(repository, { actionRef }, _exec = execFileSync) {
+export function resolveImageTag(repository, { actionRef, proxyEngine = "transparent" }, _exec = execFileSync) {
+  const attemptedTag = actionRef ? imageTagFromRef(actionRef, proxyEngine) : undefined;
   if (actionRef) {
-    const tag = imageTagFromRef(actionRef);
     try {
-      _exec("docker", ["manifest", "inspect", `${repository}:${tag}`], {
+      _exec("docker", ["manifest", "inspect", `${repository}:${attemptedTag}`], {
         stdio: "pipe",
       });
-      return tag;
+      return attemptedTag;
     } catch {
       // Image with this tag doesn't exist; fall through
     }
@@ -126,10 +132,27 @@ export function resolveImageTag(repository, { actionRef }, _exec = execFileSync)
   // These are intentionally unsupported outside of development use.
   // Pin the action to a version tag or commit SHA for production use.
   throw new SetupError(
-    `Cannot resolve Docker image tag for action ref: ${JSON.stringify(actionRef)}. ` +
+    `Cannot resolve Docker image tag for action ref: ${JSON.stringify(actionRef)}` +
+    (attemptedTag ? ` (tried "${attemptedTag}")` : "") + `. ` +
     `Pin the action to a version tag (e.g. @v2.1.0) or commit SHA.`,
     "TAG_UNRESOLVED",
   );
+}
+
+/**
+ * Resolve and validate the proxy_engine input.
+ * Only "transparent" (default) and "explicit" are accepted — each maps to a
+ * separately published, separately tagged Docker image (see resolveImageTag).
+ */
+export function resolveProxyEngine(input) {
+  const engine = input?.trim() || "transparent";
+  if (engine !== "transparent" && engine !== "explicit") {
+    throw new SetupError(
+      `Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`,
+      "INVALID_PROXY_ENGINE",
+    );
+  }
+  return engine;
 }
 
 /**

@@ -22,12 +22,24 @@ const OID_SOURCE_REPO_DIGEST = "1.3.6.1.4.1.57264.1.13";
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export function imageTagFromRef(actionRef) {
+/**
+ * Convert an action ref into the base Docker image tag, then append the
+ * proxy engine suffix. Each release publishes one image per engine
+ * (e.g. `2.1.0-transparent` / `2.1.0-explicit`) sharing the same Sigstore
+ * verification identity (same workflow, same git ref) — only the published
+ * Docker tag differs, so this does not affect buildVerifyOptions below.
+ */
+export function imageTagFromRef(actionRef, proxyEngine = "transparent") {
   if (!actionRef) return "";
-  if (/^[0-9a-f]{40}$/i.test(actionRef))
-    return `sha-${actionRef.toLowerCase()}`;
-  if (actionRef.startsWith("v")) return actionRef.slice(1);
-  return actionRef;
+  let base;
+  if (/^[0-9a-f]{40}$/i.test(actionRef)) {
+    base = `sha-${actionRef.toLowerCase()}`;
+  } else if (actionRef.startsWith("v")) {
+    base = actionRef.slice(1);
+  } else {
+    base = actionRef;
+  }
+  return `${base}-${proxyEngine}`;
 }
 
 /**
@@ -80,15 +92,15 @@ export function buildVerifyOptions({ actionRef, actionRepo }) {
  * On failure, throws SetupError — the caller is responsible for printing
  * the error message.
  *
- * @param {{ actionRef: string, actionRepo: string }} opts
+ * @param {{ actionRef: string, actionRepo: string, proxyEngine?: string }} opts
  */
-export async function verifyImageDigest({ actionRef, actionRepo }) {
+export async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transparent" }) {
   const repoPath = actionRepo.toLowerCase();
 
   const verifyOptions = buildVerifyOptions({ actionRef, actionRepo });
   if (!verifyOptions) return null;
 
-  const tag = imageTagFromRef(actionRef);
+  const tag = imageTagFromRef(actionRef, proxyEngine);
   const regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth());
   const digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
   const bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken);
