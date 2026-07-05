@@ -15,9 +15,15 @@ const composeEnv = {
 
 let jsonOutput;
 try {
+  // Works unmodified against either engine without needing to know which one
+  // is running, same as the raw-log step below: try transparent's report.js,
+  // then explicit's.
   jsonOutput = execFileSync(
     "docker",
-    ["compose", "-f", composeFile, "exec", "builder", "qjs", "-m", "/opt/buildcage/tools/report.js"],
+    [
+      "compose", "-f", composeFile, "exec", "builder", "sh", "-c",
+      "qjs -m /opt/buildcage/tools/transparent/report.js 2>/dev/null || qjs -m /opt/buildcage/tools/explicit/report.js",
+    ],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
   );
 } catch (e) {

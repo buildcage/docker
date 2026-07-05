@@ -16,7 +16,7 @@ const __dirname$1 = node_path.dirname(node_url.fileURLToPath("undefined" == type
 let jsonOutput;
 
 try {
-  jsonOutput = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "qjs", "-m", "/opt/buildcage/tools/report.js" ], {
+  jsonOutput = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "sh", "-c", "qjs -m /opt/buildcage/tools/transparent/report.js 2>/dev/null || qjs -m /opt/buildcage/tools/explicit/report.js" ], {
     encoding: "utf8",
     stdio: [ "ignore", "pipe", "pipe" ],
     env: composeEnv
