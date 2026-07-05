@@ -188,6 +188,7 @@ Starts the Buildcage builder container.
 |-----------|----------|---------|-------------|
 | `builder_name` | No | `buildcage` | Name of the builder container |
 | `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
+| `proxy_engine` | No | `transparent` | Network enforcement engine (`transparent` / `explicit`, see [Proxy Engines](#proxy-engines)) |
 | `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
@@ -197,6 +198,10 @@ Starts the Buildcage builder container.
 > build provenance is cryptographically verified (keyless signature) before the image is pulled.
 > External image overrides are not supported to preserve this guarantee. For best security, pin the
 > action to a commit SHA: `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
+>
+> Each release publishes one image per `proxy_engine` value, tagged with an engine suffix
+> (e.g. `v2.2.0-transparent`, `v2.2.0-explicit`). The `setup` action resolves the correct tag
+> automatically based on the `proxy_engine` parameter — you never need to reference these tags directly.
 >
 > Self-hosting with a custom image requires forking the repository. See the [Self-Hosting Guide](./docs/self-hosting.md).
 > If the action package is private (self-hosted in a private repository), run
@@ -252,6 +257,34 @@ Set the `proxy_mode` parameter to control how Buildcage handles outbound connect
 </tbody>
 </table>
 
+#### Proxy Engines
+
+`proxy_engine` is a separate, orthogonal axis from `proxy_mode`: `proxy_mode` controls *how strict*
+enforcement is (audit vs. restrict), while `proxy_engine` controls *how* traffic is intercepted.
+Both engines accept the exact same `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules`
+syntax — switching engines never requires rewriting your allowlist.
+
+<table>
+<thead>
+<tr><th><code>proxy_engine</code></th><th>Mechanism</th><th>Visibility</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><code>transparent</code> (default)</td>
+<td>CNI network isolation + DNS redirection + a transparent proxy that inspects SNI/Host header without terminating TLS</td>
+<td>Domain-level, for every connection regardless of whether the tool in the <code>RUN</code> step is proxy-aware</td>
+</tr>
+<tr>
+<td><code>explicit</code></td>
+<td>BuildKit's native <code>--proxy-network</code>: injects <code>HTTP_PROXY</code>/<code>HTTPS_PROXY</code> and a generated CA into the <code>RUN</code> step, then MITMs the traffic</td>
+<td>Full URL/path-level, integrated into BuildKit's own build output and SLSA provenance — but only for tools that respect <code>HTTP_PROXY</code>. Non-proxy-aware tools are blocked with no visibility (see [Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine))</td>
+</tr>
+</tbody>
+</table>
+
+Use `transparent` (the default) unless you specifically need path-level provenance for cooperative
+tools and can accept reduced visibility into non-cooperative ones.
+
 #### Usage notes
 
 - Start with audit mode to discover required domains, then switch to restrict mode.
@@ -301,6 +334,9 @@ In restrict mode, the report step fails if blocked connections are detected, cau
 ## Architecture
 
 ### For Technical Users
+
+The description below covers the default `transparent` proxy engine. For the `explicit` engine
+(BuildKit's native `--proxy-network`), see [Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine).
 
 Buildcage creates a controlled network environment for your Docker builds:
 
@@ -419,7 +455,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 2. **Run in audit mode** to understand your build's network behavior:
    ```bash
    make clean
-   make run_audit_mode
+   make run_transparent_audit_mode
    docker buildx build --builder buildcage --no-cache -f Dockerfile .
    docker compose logs builder
    ```
