@@ -36,9 +36,16 @@ const report = JSON.parse(jsonOutput);
 // 2. Console output — raw log lines (read directly from container log file)
 console.log("::group::HTTP Proxy communication logs");
 try {
+  // Explicit proxy engine writes its log to /var/log/buildkitd/current instead
+  // of HAProxy's /var/log/haproxy/current; try that first and fall back so
+  // this works unmodified against either engine without needing to know
+  // which one is running.
   const rawLog = execFileSync(
     "docker",
-    ["compose", "-f", composeFile, "exec", "builder", "cat", "/var/log/haproxy/current"],
+    [
+      "compose", "-f", composeFile, "exec", "builder", "sh", "-c",
+      "cat /var/log/buildkitd/current 2>/dev/null || cat /var/log/haproxy/current 2>/dev/null",
+    ],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
   );
   process.stdout.write(rawLog);
