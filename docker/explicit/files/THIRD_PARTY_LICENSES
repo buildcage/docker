@@ -1,0 +1,69 @@
+Third-Party Licenses
+====================
+
+The Buildcage Docker image (explicit proxy engine) includes the following
+third-party software. Each component retains its original license. The
+Buildcage source code itself is licensed under the MIT License (see LICENSE
+file).
+
+------------------------------------------------------------------------------
+
+BuildKit (base image: moby/buildkit)
+  Website : https://github.com/moby/buildkit
+  License : Apache License 2.0 (Apache-2.0)
+  Source  : https://github.com/moby/buildkit
+
+------------------------------------------------------------------------------
+
+CNI Plugins
+  Website : https://github.com/containernetworking/plugins
+  License : Apache License 2.0 (Apache-2.0)
+  Source  : https://github.com/containernetworking/plugins
+
+------------------------------------------------------------------------------
+
+QuickJS
+  Website : https://bellard.org/quickjs/
+  License : MIT License
+  Source  : https://github.com/nicedoc/nicedoc.io or https://bellard.org/quickjs/
+
+------------------------------------------------------------------------------
+
+buildkit-proxy Go module dependencies
+
+  github.com/moby/buildkit (api/services/control, sourcepolicy/pb packages)
+    License : Apache License 2.0 (Apache-2.0)
+    Source  : https://github.com/moby/buildkit
+
+  google.golang.org/grpc
+    License : Apache License 2.0 (Apache-2.0)
+    Source  : https://github.com/grpc/grpc-go
+
+  google.golang.org/protobuf
+    License : BSD 3-Clause License
+    Source  : https://github.com/protocolbuffers/protobuf-go
+
+  github.com/planetscale/vtprotobuf
+    License : BSD 3-Clause License
+    Source  : https://github.com/planetscale/vtprotobuf
+
+  github.com/pkg/errors
+    License : BSD 2-Clause License
+    Source  : https://github.com/pkg/errors
+
+  github.com/opencontainers/image-spec, github.com/opencontainers/go-digest
+    License : Apache License 2.0 (Apache-2.0)
+    Source  : https://github.com/opencontainers
+
+  golang.org/x/net, golang.org/x/sys, golang.org/x/text
+    License : BSD 3-Clause License
+    Source  : https://cs.opensource.google/go
+
+  google.golang.org/genproto
+    License : Apache License 2.0 (Apache-2.0)
+    Source  : https://github.com/googleapis/go-genproto
+
+Full license texts for these modules are available from their respective
+source repositories. The buildkit-proxy binary is statically compiled from
+source at image build time (see docker/explicit/buildkit-proxy/); no Go
+toolchain remains in the published image.

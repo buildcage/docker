@@ -1,0 +1,17 @@
+debug = true
+proxyNetwork = true
+
+[grpc]
+address = ["unix:///run/buildkit/buildkitd-internal.sock"]
+
+[worker.oci]
+enabled = true
+snapshotter = "auto"
+networkMode = "cni"
+cniConfigPath = "/etc/buildkit/cni.conflist"
+cniPoolSize = 16
+# Enable IP forwarding for CNI networks
+cniPortForward = true
+
+[[worker.oci.gcpolicy]]
+all = true

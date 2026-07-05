@@ -30,7 +30,7 @@ const report = JSON.parse(jsonOutput);
 console.log("::group::HTTP Proxy communication logs");
 
 try {
-  const rawLog = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "cat", "/var/log/haproxy/current" ], {
+  const rawLog = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "sh", "-c", "cat /var/log/buildkitd/current 2>/dev/null || cat /var/log/haproxy/current 2>/dev/null" ], {
     encoding: "utf8",
     stdio: [ "ignore", "pipe", "pipe" ],
     env: composeEnv
