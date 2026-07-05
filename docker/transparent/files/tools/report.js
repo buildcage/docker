@@ -8,7 +8,8 @@
  *   { mode, sections: { allowed, blocked, audited }, blockedCount }
  */
 import * as std from "std";
-import { parseEntries, aggregate } from "./lib/log-parser.js";
+import { parseEntries } from "./lib/log-parser.js";
+import { aggregate } from "./lib/aggregate.js";
 
 const logFile = scriptArgs[1] || "/var/log/haproxy/current";
 
