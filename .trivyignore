@@ -140,3 +140,52 @@ CVE-2026-32282
 # Container image layers use POSIX/PAX tar format; old GNU sparse map headers
 # are not part of the OCI or Docker image layer specification and are not processed by buildkitd.
 CVE-2026-32288
+
+# golang.org/x/net/html: XSS and DoS via parsing/rendering arbitrary HTML.
+# No component in this product (buildkitd, buildkit-runc) parses or renders untrusted HTML.
+CVE-2026-42506
+CVE-2026-42502
+CVE-2026-27136
+CVE-2026-25681
+CVE-2026-25680
+CVE-2025-58190
+CVE-2025-47911
+
+# containerd CRI plugin vulnerabilities (image cache poisoning via checkpoint/restore,
+# CDI annotation injection, unbounded memory on crafted image, LABEL passthrough).
+# buildkitd embeds containerd only as a client/worker library for its own build execution;
+# it never runs the CRI plugin, and checkpoint/restore (CRIU) and CDI are not enabled.
+CVE-2026-50195
+CVE-2026-47262
+CVE-2026-53492
+CVE-2026-53489
+CVE-2026-53488
+
+# golang.org/x/net/idna: privilege escalation via incorrect Punycode label processing.
+# Only present in buildkit-runc, which handles namespaces/cgroups/rootfs setup and
+# never parses or authorizes hostnames; the idna package is an unused transitive
+# dependency in this binary.
+CVE-2026-39821
+
+# golang.org/x/sys/windows: integer overflow in NewNTUnicodeString — Windows only.
+# This product runs exclusively in Linux containers; the Windows code path is never executed.
+CVE-2026-39824
+
+# libexpat: additional XML parsing vulnerabilities (same rationale as
+# CVE-2026-25210/CVE-2026-24515 above). No external XML processing path exists
+# in this product.
+CVE-2026-56409
+CVE-2026-56408
+CVE-2026-56407
+CVE-2026-56131
+CVE-2026-41080
+CVE-2026-56412
+CVE-2026-56411
+CVE-2026-56410
+CVE-2026-56406
+CVE-2026-56405
+CVE-2026-56404
+CVE-2026-56403
+CVE-2026-56132
+CVE-2026-50219
+CVE-2026-45186
