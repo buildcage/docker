@@ -1,14 +1,15 @@
 /**
  * Parse HAProxy logs and output structured JSON.
  *
- * Usage: qjs -m /opt/buildcage/tools/report.js [logfile]
+ * Usage: qjs -m /opt/buildcage/tools/transparent/report.js [logfile]
  *   Default logfile: /var/log/haproxy/current
  *
  * Output JSON:
  *   { mode, sections: { allowed, blocked, audited }, blockedCount }
  */
 import * as std from "std";
-import { parseEntries, aggregate } from "./lib/log-parser.js";
+import { parseEntries } from "./lib/log-parser.js";
+import { aggregate } from "../shared/lib/aggregate.js";
 
 const logFile = scriptArgs[1] || "/var/log/haproxy/current";
 
