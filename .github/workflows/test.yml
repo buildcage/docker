@@ -233,3 +233,24 @@ jobs:
         env:
           BUILDER_NAME: buildcage-multiarch
         run: docker compose down -v --rmi all 2>/dev/null || true
+
+  # Single, stably-named required status check for branch protection: the
+  # `test` job's own name varies per matrix entry (test (transparent-audit),
+  # test (explicit-restrict), etc.), so branch protection can't target it
+  # directly without listing every combination and having to update that list
+  # whenever the matrix changes.
+  all-tests-passed:
+    name: All tests passed
+    runs-on: ubuntu-latest
+    needs: [unit_test, test, test_multiarch]
+    if: always()
+    permissions: {}
+    steps:
+      - name: Check whether all required jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more required jobs did not succeed:"
+            echo '${{ toJSON(needs) }}'
+            exit 1
+          fi
+          echo "All required jobs succeeded."
