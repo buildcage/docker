@@ -188,7 +188,7 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
 });
 
 describe("buildSourcePolicy — regex (~) rules", () => {
-  it("passes the user's regex through, wrapped in scheme + optional path only", () => {
+  it("passes a fully-anchored regex through with just scheme + optional path added", () => {
     const policy = buildSourcePolicy({
       proxyMode: "restrict",
       httpsRulesInput: "~^custom\\.regex:443$",
@@ -196,6 +196,86 @@ describe("buildSourcePolicy — regex (~) rules", () => {
       ipRulesInput: "",
     });
     assert.equal(policy.rules[1].selector.identifier, "^https://custom\\.regex:443(/.*)?$");
+  });
+
+  it("works the same way for an http rule (scheme is a parameter, not hardcoded)", () => {
+    const policy = buildSourcePolicy({
+      proxyMode: "restrict",
+      httpsRulesInput: "",
+      httpRulesInput: "~^custom\\.regex:80$",
+      ipRulesInput: "",
+    });
+    assert.equal(policy.rules[1].selector.identifier, "^http://custom\\.regex:80(/.*)?$");
+  });
+
+  it("an anchor-less regex matches as a substring within the domain, but the missing anchors don't reach into the path", () => {
+    const policy = buildSourcePolicy({
+      proxyMode: "restrict",
+      httpsRulesInput: "~example",
+      httpRulesInput: "",
+      ipRulesInput: "",
+    });
+    const re = new RegExp(policy.rules[1].selector.identifier);
+    assert.ok(re.test("https://example.com/"));
+    assert.ok(re.test("https://notexample.com/")); // no leading anchor: matches anywhere
+    assert.ok(re.test("https://example.company/")); // no trailing anchor: matches anywhere
+    // ...but the domain-side [^/]* filling each missing anchor can't reach
+    // past a "/" to satisfy a match that only exists in the path, unlike a
+    // naive unbounded ".*" would.
+    assert.ok(!re.test("https://evil.com/example.com/"));
+  });
+
+  it("only the anchors actually present are stripped — an unanchored end still gets its own [^/]*", () => {
+    const policy = buildSourcePolicy({
+      proxyMode: "restrict",
+      httpsRulesInput: "~^example",
+      httpRulesInput: "",
+      ipRulesInput: "",
+    });
+    const re = new RegExp(policy.rules[1].selector.identifier);
+    assert.ok(re.test("https://example.com/")); // leading-anchored, trailing open
+    assert.ok(!re.test("https://notexample.com/")); // leading anchor still enforced
+  });
+
+  it("the user's own \".*\" is confined to the domain (converted to [^/]*), so it can't cross into the path", () => {
+    const policy = buildSourcePolicy({
+      proxyMode: "restrict",
+      httpsRulesInput: "~^.*\\.example\\.com:443$",
+      httpRulesInput: "",
+      ipRulesInput: "",
+    });
+    const re = new RegExp(policy.rules[1].selector.identifier);
+    assert.ok(re.test("https://sub.example.com:443/"));
+    assert.ok(!re.test("https://evil.com/sub.example.com:443/"));
+  });
+
+  it("an escaped literal trailing $ is not mistaken for the end anchor (regression)", () => {
+    const policy = buildSourcePolicy({
+      proxyMode: "restrict",
+      httpsRulesInput: "~foo\\$",
+      httpRulesInput: "",
+      ipRulesInput: "",
+    });
+    // Previously this produced an invalid regex (a dangling "\" that escaped
+    // the wrapper's own "(" — see git history for the exact failure): the
+    // trailing "$" here is escaped (a literal dollar sign), not an anchor.
+    const re = new RegExp(policy.rules[1].selector.identifier);
+    assert.ok(re.test("https://foo$/"));
+    assert.ok(!re.test("https://bar$/"));
+  });
+
+  it("an escaped literal '.' followed by a real '*' quantifier is left alone (not confined)", () => {
+    const policy = buildSourcePolicy({
+      proxyMode: "restrict",
+      httpsRulesInput: "~^example\\.com:443\\.*$",
+      httpRulesInput: "",
+      ipRulesInput: "",
+    });
+    // `\.*` here means "zero or more literal dots", not the wildcard `.*` —
+    // confineDotStarToDomain must not touch it.
+    const re = new RegExp(policy.rules[1].selector.identifier);
+    assert.ok(re.test("https://example.com:443/"));
+    assert.ok(re.test("https://example.com:443.../"));
   });
 });
 

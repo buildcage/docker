@@ -8,6 +8,105 @@ const ruleTypeToParam = {
   IP: "allowed_ip_rules"
 };
 
+function renderRequestLine({method: method, url: url, status: status}) {
+  const line = `- ${escapeMarkdown(method)} ${escapeMarkdown(url)}`;
+  return void 0 === status ? line : `${line} -> ${status}`;
+}
+
+function escapeMarkdown(text) {
+  return text.replace(/([\\`*_[\]<>])/g, "\\$1");
+}
+
+function formatMillis(iso) {
+  return new Date(iso).toISOString().slice(11, 23) + "Z";
+}
+
+function formatSeconds(iso) {
+  return new Date(iso).toISOString().slice(11, 19) + "Z";
+}
+
+function formatDuration(started, completed) {
+  return `${((Date.parse(completed) - Date.parse(started)) / 1e3).toFixed(3)}s`;
+}
+
+const requestLineDetailPattern = /^-\s+(\S+)\s+(\S+?)(?:\s+->\s+(\d+))?$/;
+
+function parseAllowedRequestsFromText(text) {
+  const entries = [], lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) if ("proxy network requests:" === lines[i].trim()) for (let j = i + 1; j < lines.length; j++) {
+    const m = lines[j].match(requestLineDetailPattern);
+    if (!m) break;
+    const [, method, url, status] = m;
+    entries.push(void 0 === status ? {
+      method: method,
+      url: url
+    } : {
+      method: method,
+      url: url,
+      status: Number(status)
+    });
+  }
+  return entries;
+}
+
+const DEFAULT_PORT = {
+  https: "443",
+  http: "80"
+};
+
+function parseIdentifier(identifier) {
+  const m = identifier.match(/^(https?):\/\/([^/]+)/);
+  if (!m) return null;
+  const [, scheme, hostPort] = m, colonIdx = hostPort.lastIndexOf(":");
+  return colonIdx > 0 ? {
+    scheme: scheme,
+    host: hostPort.substring(0, colonIdx),
+    port: hostPort.substring(colonIdx + 1)
+  } : {
+    scheme: scheme,
+    host: hostPort,
+    port: DEFAULT_PORT[scheme]
+  };
+}
+
+const runVertexPattern = /^\[([^\]]+)\]\s+RUN\s/;
+
+function stageKeyOf(bracketContent) {
+  const parts = bracketContent.trim().split(/\s+/);
+  return parts.length > 1 ? parts[0] : "";
+}
+
+function aggregateAllowedHosts(builds, decision) {
+  const entries = [];
+  for (const vertices of builds) for (const {entries: vertexEntries} of vertices) for (const {url: url} of vertexEntries) {
+    const parsed = parseIdentifier(url);
+    parsed && entries.push({
+      decision: decision,
+      ruleType: "https" === parsed.scheme ? "HTTPS" : "HTTP",
+      host: parsed.host,
+      port: parsed.port,
+      reason: "-"
+    });
+  }
+  return function(filtered) {
+    const map = {};
+    for (const e of filtered) {
+      const key = `${e.host}\t${e.port}\t${e.ruleType}\t${e.reason}`;
+      map[key] = (map[key] || 0) + 1;
+    }
+    return Object.keys(map).map(key => {
+      const [host, portStr, ruleType, reason] = key.split("\t");
+      return {
+        host: host,
+        port: portStr,
+        ruleType: ruleType,
+        reason: reason,
+        count: map[key]
+      };
+    }).sort((a, b) => b.count - a.count || (a.host < b.host ? -1 : a.host > b.host ? 1 : 0) || Number(a.port) - Number(b.port));
+  }(entries);
+}
+
 const __dirname$1 = node_path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = process.argv[2] || node_path.join(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
   ...process.env,
   BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage"
@@ -57,12 +156,68 @@ function markdownTable(rows, {showReason: showReason = !1} = {}) {
   return lines.join("\n");
 }
 
-const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", isAudit = "audit" === report.mode;
+const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", isAudit = "audit" === report.mode, isExplicit = void 0 !== report.deniedTimeline;
+
+let builds = [];
+
+if (isExplicit) try {
+  const historiesOutput = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "buildctl", "debug", "histories", "--format", "{{json .}}" ], {
+    encoding: "utf8",
+    stdio: [ "ignore", "pipe", "pipe" ],
+    env: composeEnv
+  });
+  builds = function(historiesText) {
+    const byRef = new Map;
+    for (const line of historiesText.split("\n")) {
+      if (!line.trim()) continue;
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      const record = event.record, createdAt = record?.CreatedAt;
+      record?.Ref && createdAt && byRef.set(record.Ref, createdAt);
+    }
+    return [ ...byRef.entries() ].sort((a, b) => function(a, b) {
+      return a.seconds !== b.seconds ? a.seconds - b.seconds : (a.nanos || 0) - (b.nanos || 0);
+    }(a[1], b[1])).map(([ref]) => ref);
+  }(historiesOutput).map(ref => function(rawJsonText) {
+    const data = JSON.parse(rawJsonText), vertexes = data.vertexes || [], logs = data.logs || [], groups = new Map;
+    for (const v of vertexes) {
+      if (!v.started || !v.completed) continue;
+      const m = v.name.match(runVertexPattern);
+      if (!m) continue;
+      const stageKey = stageKeyOf(m[1]);
+      groups.has(stageKey) || groups.set(stageKey, []), groups.get(stageKey).push(v);
+    }
+    for (const list of groups.values()) list.sort((a, b) => Date.parse(a.started) - Date.parse(b.started));
+    const orderedGroups = [ ...groups.values() ].sort((a, b) => Date.parse(a[0].started) - Date.parse(b[0].started)), logsByDigest = new Map;
+    for (const l of logs) 2 === l.stream && (logsByDigest.has(l.vertex) || logsByDigest.set(l.vertex, []), 
+    logsByDigest.get(l.vertex).push(l));
+    return orderedGroups.flat().map(v => {
+      const text = (logsByDigest.get(v.digest) || []).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)).map(l => Buffer.from(l.data, "base64").toString("utf8")).join("");
+      return {
+        command: v.name,
+        started: v.started,
+        completed: v.completed,
+        entries: parseAllowedRequestsFromText(text)
+      };
+    });
+  }(node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "buildctl", "debug", "logs", "--progress=rawjson", ref ], {
+    encoding: "utf8",
+    stdio: [ "ignore", "pipe", "pipe" ],
+    env: composeEnv,
+    maxBuffer: 67108864
+  })));
+} catch (e) {
+  console.log("(failed to fetch allowed/audited traffic detail via buildctl:", e.message, ")");
+}
 
 let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
 
 if (isAudit) {
-  const audited = report.sections.audited || [];
+  const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
   audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n"), 
   markdown += function(auditedRows, actionRepo) {
     if (!auditedRows || 0 === auditedRows.length) return "";
@@ -88,14 +243,35 @@ if (isAudit) {
     showReason: !0
   }) + "\n");
 } else {
-  const allowed = report.sections.allowed || [], blocked = report.sections.blocked || [];
+  const allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections.allowed || [], blocked = report.sections.blocked || [];
   allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n"), 
   allowed.length > 0 && blocked.length > 0 && (markdown += "\n"), blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, {
     showReason: !0
   }) + "\n");
 }
 
-markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n", 
+isExplicit && (markdown += function(builds, deniedTimeline) {
+  const nonEmptyBuilds = (builds || []).filter(b => b && b.length > 0), hasVertexLog = nonEmptyBuilds.length > 0, hasDenied = deniedTimeline && deniedTimeline.length > 0;
+  if (!hasVertexLog && !hasDenied) return "";
+  let md = "\n<details>\n<summary>Communication details</summary>\n\n";
+  if (hasVertexLog) {
+    const showBuildHeadings = nonEmptyBuilds.length > 1;
+    nonEmptyBuilds.forEach((vertices, i) => {
+      showBuildHeadings && (md += `### Build ${i + 1}\n\n`);
+      for (const {command: command, started: started, completed: completed, entries: entries} of vertices) {
+        if (md += `**${escapeMarkdown(command)}**\n`, md += `_started ${formatMillis(started)} · duration ${formatDuration(started, completed)}_\n`, 
+        0 === entries.length) md += "(no communication)\n"; else for (const entry of entries) md += `${renderRequestLine(entry)}\n`;
+        md += "\n";
+      }
+    });
+  }
+  if (hasDenied) {
+    md += "**DENIED**\n";
+    for (const {url: url, timestamp: timestamp} of deniedTimeline) md += `- ${formatSeconds(timestamp)} ${escapeMarkdown(url)}\n`;
+    md += "\n";
+  }
+  return md += "</details>\n", md;
+}(builds, report.deniedTimeline)), markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n", 
 markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
 
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;

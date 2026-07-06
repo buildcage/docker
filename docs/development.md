@@ -102,12 +102,37 @@ docker compose logs -f builder
 
 Fields: `[timestamp] buildcage [status] "domain:port" reason`
 
-**In `proxy_engine: explicit`**, there is no HAProxy log — allowed requests appear directly in the
-build step's own console output (`proxy network requests:` in the `docker buildx build` log), and
-denied requests are recorded in buildkitd's own debug log at `/var/log/buildkitd/current` inside the
-container. The `report` action reads whichever of the two files exists, so `docker compose logs
-builder` (which shows buildkitd's combined stdout either way) and the `report` action work
-unmodified against either engine.
+**In `proxy_engine: explicit`**, there is no HAProxy log — instead, denied requests end up in
+buildkitd's own debug log at `/var/log/buildkitd/current` inside the container, logged by BuildKit's
+source-policy engine. Allowed/audited requests are *not* read from this log file: BuildKit's own
+"proxy network requests:" build output only ends up there if buildkitd runs with
+`BUILDKIT_DEBUG_EXEC_OUTPUT=1`, which also mirrors every RUN step's own console output into the same
+log. That data is instead fetched via `buildctl debug logs --progress=rawjson`, described below,
+which needs no such flag. The `report` action reads whichever of transparent/explicit's two log files
+exists for the denied side and raw console output, so `docker compose logs builder` and the `report`
+action work unmodified against either engine.
+
+The `explicit` engine's job summary builds its "Allowed"/"Audited Hosts" table, and a collapsed
+**Communication details** section (a per-command breakdown `transparent` mode has no equivalent for),
+from the same source: `report/src/lib/vertex-log.js` calls `buildctl debug histories` (to enumerate
+*every* build recorded since the container started — a workflow may run several builds against the
+same buildcage container before calling the report action once, and each is independently tracked)
+and `buildctl debug logs --progress=rawjson <ref>` for each one, whose log entries are each tagged
+with the exact vertex (RUN step) that produced them — reliable even under concurrent execution, since
+BuildKit can run independent RUN steps concurrently. The host-aggregated table sums these
+vertex-tagged entries across every RUN step and build; the Communication details section lists them
+per-step instead, with each step's own start time and duration — steps with no communication at all
+are still listed, marked `(no communication)`. Independent build stages are grouped together (ordered
+by each stage's earliest start) rather than interleaved by raw timestamp, since that's easier to read
+when debugging; if more than one build is found, each gets its own `### Build N` heading so
+identically-numbered steps from different builds aren't mistaken for one another.
+
+Denied requests are listed separately, as a flat, timestamped `DENIED` list at the end — BuildKit's
+own source-policy denial log carries no vertex/span identifier at all, so there's no reliable way to
+attribute a denial to a specific RUN step; a human has to compare its timestamp against the per-step
+times above. That timestamp is also only whole-seconds precise (buildkitd's own logrus formatter
+doesn't record sub-second precision), unlike the millisecond-precision start/duration `buildctl`
+reports for the allowed side.
 
 ## Makefile Commands
 

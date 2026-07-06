@@ -161,12 +161,30 @@ works and what changes versus the `transparent` engine.
   traffic still reaches the CNI bridge and is observed (and blocked, and logged) by the transparent
   proxy. In `explicit` mode, that traffic leaves no trace anywhere — not in the build log, not in
   provenance, not in the [report action](../README.md#report-action-dash14buildcagereport).
-- **Denied requests are visible via buildkitd's own debug log, not a per-build summary.** BuildKit's
-  own "proxy network requests:" build output only records successful (allowed) requests. Denied
-  requests are logged separately by BuildKit's source-policy engine at debug level
-  (`"Evaluated source policy"`); buildcage captures this to `/var/log/buildkitd/current` and the
-  `report` action parses it the same way it parses HAProxy's log in `transparent` mode — the
-  `report/action.yml` interface is unchanged.
+- **Denied requests are visible via buildkitd's own debug log; allowed/audited ones are not read from
+  it at all.** BuildKit's source-policy engine logs every denial at debug level
+  (`"Evaluated source policy"`) into `/var/log/buildkitd/current`, and the `report` action parses it
+  into the same `blocked` host table it produces for `transparent` mode. BuildKit's own "proxy network
+  requests:" build output — the source for what passed the policy (allowed or audited) — only ends up
+  in that same log file if buildkitd runs with `BUILDKIT_DEBUG_EXEC_OUTPUT=1`, which also mirrors every
+  RUN step's own console output into it. Instead, the `report` action queries `buildctl debug
+  histories`/`debug logs --progress=rawjson` for every build's own vertex log recorded since the
+  container started (not just the most recent one, so several builds run against the same container
+  before the report action is called are all covered) and aggregates that into the allowed/audited
+  host table itself — the `report/action.yml` interface is unchanged.
+- **The per-command "Communication details" breakdown attributes allowed requests reliably, but not
+  denied ones**, using that same vertex-tagged buildctl data — reliable even when BuildKit runs
+  independent steps concurrently. Denied requests have no equivalent: BuildKit's own source-policy
+  denial log carries no vertex/span identifier at all, so they're listed separately with only a
+  (whole-seconds-precision) timestamp, not attributed to a step or a specific build.
+- **`ADD <url>` is invisible when allowed, visible (and build-fatal) when denied.** Unlike `RUN`,
+  `ADD` with a remote URL is fetched by BuildKit's own HTTP source op, not through the exec proxy: an
+  allowed `ADD` leaves no trace in `proxy network requests:`, the vertex log, or buildkitd's own debug
+  log at all. A denied one is still caught by the same
+  source policy and logged the same "Evaluated source policy" way as a denied `RUN` request, but
+  aborts the entire build immediately at LLB load time (rather than just failing that one step).
+  This is out of scope for buildcage's reporting: the URL is developer-specified in the Dockerfile
+  itself, so an allowed fetch is already an intentional, reviewable part of the build.
 
 
 
