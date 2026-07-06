@@ -63,14 +63,45 @@ function toUrlIdentifierFromWildcard(rawRule, scheme) {
   return `^${scheme}://${domainRegex}${portPattern}(/.*)?$`;
 }
 
-// User-supplied `~regex` rules match against "domain:port" as a whole; we
-// cannot safely infer which part is the port to make it optional, so this is
-// passed through as-is (wrapped in scheme + optional path only). Document
-// this in docs/rules.md if a user needs default-port matching here.
+// True if the character at index i in s is escaped, i.e. preceded by an odd
+// number of consecutive backslashes (each adjacent pair of backslashes is
+// one literal backslash; a leftover single backslash escapes what follows).
+function isEscapedAt(s, i) {
+  let backslashes = 0;
+  for (let j = i - 1; j >= 0 && s[j] === "\\"; j--) backslashes++;
+  return backslashes % 2 === 1;
+}
+
+// Replaces every unescaped ".*" with "[^/]*". A bare "." also matches "/", so
+// without this, a rule like `~.*\.example\.com` could match past the domain
+// and into the (always-allowed) path — e.g. "https://evil.com/x.example.com".
+// Confining it to "[^/]*" keeps the match inside the domain:port segment.
+// The captured backslash run applies the same escape-parity check as
+// isEscapedAt above, inline as part of the replace.
+function confineDotStarToDomain(s) {
+  return s.replace(/(\\*)\.\*/g, (match, backslashes) =>
+    backslashes.length % 2 === 1 ? match : `${backslashes}[^/]*`
+  );
+}
+
+// User-supplied `~regex` rules match against "domain:port" as a whole, with
+// the same substring-search semantics as transparent mode's HAProxy ACLs (no
+// implicit anchoring there either): an explicit leading `^`/trailing `$`
+// anchors that end same as in any regex, and omitting either lets that end
+// match anywhere within the domain — e.g. `~example` matches `example.com`.
+// A missing anchor is filled with `[^/]*` rather than left unconstrained,
+// for the same domain/path-boundary reason as confineDotStarToDomain above.
 function toUrlIdentifierFromRegex(core, scheme) {
-  let body = core;
-  if (body.startsWith("^")) body = body.slice(1);
-  if (body.endsWith("$")) body = body.slice(0, -1);
+  const hasLeadingAnchor = core.startsWith("^");
+  const hasTrailingAnchor = core.endsWith("$") && !isEscapedAt(core, core.length - 1);
+
+  let body = hasLeadingAnchor ? core.slice(1) : core;
+  body = hasTrailingAnchor ? body.slice(0, -1) : body;
+  body = confineDotStarToDomain(body);
+
+  if (!hasLeadingAnchor) body = `[^/]*${body}`;
+  if (!hasTrailingAnchor) body = `${body}[^/]*`;
+
   return `^${scheme}://${body}(/.*)?$`;
 }
 

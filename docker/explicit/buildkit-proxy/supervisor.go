@@ -56,6 +56,15 @@ func generateSourcePolicy(outPath string) error {
 // startBuildkitd launches the real buildkitd as a child process, teeing its
 // combined stdout/stderr to both the container's own stdout (so `docker logs`
 // works) and a log file that report.js parses for policy-denial entries.
+// BuildKit's source-policy engine logs denials into this stream via its own
+// structured logger.
+//
+// Allowed requests are not read from this log file: report/src/lib/vertex-log.js
+// fetches those separately via `buildctl debug logs --progress=rawjson`, which
+// tags every entry with the vertex (RUN step) that produced it. Getting that
+// same data from buildkitd's own log instead would require running it with
+// BUILDKIT_DEBUG_EXEC_OUTPUT=1, which also mirrors every RUN step's own
+// console output into this same stream.
 func startBuildkitd(logFile string) (*exec.Cmd, error) {
 	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {

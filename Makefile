@@ -144,7 +144,7 @@ test_setup: ## Run setup action unit tests
 
 .PHONY: test_report
 test_report: ## Run report unit tests
-	@node --test report/src/lib/build-example.test.js
+	@node --test 'report/src/**/*.test.js'
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker
