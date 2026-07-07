@@ -10,29 +10,33 @@ You can run Buildcage locally without GitHub Actions using Docker Compose and Ma
 
 ### Starting the Builder
 
-**Audit mode** (log all connections):
+There's one `run_{engine}_{mode}_mode` target per (`transparent`, `explicit`) x (`audit`, `restrict`)
+combination:
 
 ```bash
-make run_audit_mode
+make run_transparent_audit_mode
+make run_transparent_restrict_mode
+make run_explicit_audit_mode
+make run_explicit_restrict_mode
 ```
 
-**Restrict mode** (allowlist-based):
+**Start with custom domains** (restrict mode only):
 
 ```bash
-make run_restrict_mode
+ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make run_transparent_restrict_mode
 ```
 
-**Start with custom domains**:
-
-```bash
-ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make run_restrict_mode
-```
+The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/HAProxy stack
+(see [Proxy Engines](../README.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
+`docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
+`build.dockerfile: ${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
+`docker/transparent/Dockerfile` exactly as before.
 
 ### End-to-End Workflow
 
 ```bash
 # 1. Start Buildcage
-make run_audit_mode
+make run_transparent_audit_mode
 
 # 2. Build
 docker buildx build --builder buildcage --progress=plain -f Dockerfile .
@@ -46,12 +50,14 @@ make clean
 
 ## Testing
 
-```bash
-# Audit mode test (start → build → verify → clean up)
-make test_audit_mode
+Each `run_{engine}_{mode}_mode` target has a matching `test_{engine}_{mode}_mode` target
+(start → build the matching `test/Dockerfile.*` → verify → clean up):
 
-# Restrict mode test (start → build → verify → clean up)
-make test_restrict_mode
+```bash
+make test_transparent_audit_mode
+make test_transparent_restrict_mode
+make test_explicit_audit_mode
+make test_explicit_restrict_mode
 ```
 
 ## Local Development
@@ -96,15 +102,51 @@ docker compose logs -f builder
 
 Fields: `[timestamp] buildcage [status] "domain:port" reason`
 
+**In `proxy_engine: explicit`**, there is no HAProxy log — instead, denied requests end up in
+buildkitd's own debug log at `/var/log/buildkitd/current` inside the container, logged by BuildKit's
+source-policy engine. Allowed/audited requests are *not* read from this log file: BuildKit's own
+"proxy network requests:" build output only ends up there if buildkitd runs with
+`BUILDKIT_DEBUG_EXEC_OUTPUT=1`, which also mirrors every RUN step's own console output into the same
+log. That data is instead fetched via `buildctl debug logs --progress=rawjson`, described below,
+which needs no such flag. The `report` action reads whichever of transparent/explicit's two log files
+exists for the denied side and raw console output, so `docker compose logs builder` and the `report`
+action work unmodified against either engine.
+
+The `explicit` engine's job summary builds its "Allowed"/"Audited Hosts" table, and a collapsed
+**Communication details** section (a per-command breakdown `transparent` mode has no equivalent for),
+from the same source: `report/src/lib/vertex-log.js` calls `buildctl debug histories` (to enumerate
+*every* build recorded since the container started — a workflow may run several builds against the
+same buildcage container before calling the report action once, and each is independently tracked)
+and `buildctl debug logs --progress=rawjson <ref>` for each one, whose log entries are each tagged
+with the exact vertex (RUN step) that produced them — reliable even under concurrent execution, since
+BuildKit can run independent RUN steps concurrently. The host-aggregated table sums these
+vertex-tagged entries across every RUN step and build; the Communication details section lists them
+per-step instead, with each step's own start time and duration — steps with no communication at all
+are still listed, marked `(no communication)`. Independent build stages are grouped together (ordered
+by each stage's earliest start) rather than interleaved by raw timestamp, since that's easier to read
+when debugging; if more than one build is found, each gets its own `### Build N` heading so
+identically-numbered steps from different builds aren't mistaken for one another.
+
+Denied requests are listed separately, as a flat, timestamped `DENIED` list at the end — BuildKit's
+own source-policy denial log carries no vertex/span identifier at all, so there's no reliable way to
+attribute a denial to a specific RUN step; a human has to compare its timestamp against the per-step
+times above. That timestamp is also only whole-seconds precise (buildkitd's own logrus formatter
+doesn't record sub-second precision), unlike the millisecond-precision start/duration `buildctl`
+reports for the allowed side.
+
 ## Makefile Commands
 
 | Command | Description |
 |---------|-------------|
 | `make help` | Show available commands |
-| `make run_audit_mode` | Start in audit mode |
-| `make run_restrict_mode` | Start in restrict mode (default domains) |
-| `make test_audit_mode` | Run audit mode tests (start → build → verify → clean up) |
-| `make test_restrict_mode` | Run restrict mode tests (start → build → verify → clean up) |
+| `make run_transparent_audit_mode` | Start transparent engine in audit mode |
+| `make run_transparent_restrict_mode` | Start transparent engine in restrict mode (default domains) |
+| `make run_explicit_audit_mode` | Start explicit proxy engine in audit mode |
+| `make run_explicit_restrict_mode` | Start explicit proxy engine in restrict mode |
+| `make test_transparent_audit_mode` | Run transparent-engine audit mode tests (start → build → verify → clean up) |
+| `make test_transparent_restrict_mode` | Run transparent-engine restrict mode tests (start → build → verify → clean up) |
+| `make test_explicit_audit_mode` | Run explicit-engine audit mode tests (start → build → verify → clean up) |
+| `make test_explicit_restrict_mode` | Run explicit-engine restrict mode tests (start → build → verify → clean up) |
 | `make test_unit` | Run unit tests |
 | `make clean` | Remove all resources |
 
@@ -112,55 +154,26 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 
 ```
 .
-├── setup/                       # GitHub Actions setup
-│   ├── action.yml               # Action entry (node24 → dist/main.cjs, dist/post.cjs)
-│   ├── compose.yaml             # Compose config for GitHub Actions (with image tag)
-│   ├── src/                     # Source (ESM)
-│   │   ├── main.js              # Verify image provenance, resolve image ref, compose up
-│   │   ├── post.js              # Post-action cleanup
-│   │   └── lib/                 # Helpers: OCI registry, Sigstore verification, error types
-│   └── dist/                    # Bundled output (rollup → CommonJS)
-│       ├── main.cjs
-│       └── post.cjs
-├── report/                      # GitHub Actions report
-│   ├── action.yml               # Action entry (node24 → dist/main.cjs)
-│   ├── src/                     # Source (ESM)
-│   │   ├── main.js              # Log analysis and Job Summary output
-│   │   └── lib/                 # Helpers: Job Summary rendering
-│   └── dist/                    # Bundled output (rollup → CommonJS)
-│       └── main.cjs
+├── setup/                    # GitHub Actions setup action
+│   ├── action.yml            # Action entry (node24 → dist/main.cjs, dist/post.cjs)
+│   ├── src/                  # Source (ESM): verify image provenance, resolve image ref, compose up
+│   └── dist/                 # Bundled output (rollup → CommonJS)
+├── report/                   # GitHub Actions report action
+│   ├── action.yml            # Action entry (node24 → dist/main.cjs)
+│   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
+│   └── dist/                 # Bundled output (rollup → CommonJS)
 ├── docker/
-│   ├── Dockerfile               # Multi-stage BuildKit + haproxy + dnsmasq + s6-overlay
-│   └── files/
-│       ├── buildkitd.toml       # BuildKit config
-│       ├── cni.conflist         # CNI config (isolated-net)
-│       ├── dnsmasq.conf         # DNS config (all domains → gateway)
-│       ├── haproxy.cfg.template # Dynamic HAProxy config (HTTP/HTTPS)
-│       ├── s6-rc.d/             # s6-overlay service definitions
-│       ├── s6-scripts/          # s6-overlay init scripts
-│       └── tools/               # QuickJS scripts (run inside container)
-│           ├── convert-rule.js  # stdin wildcard → stdout regex filter
-│           ├── report.js        # Parse HAProxy logs → structured JSON
-│           └── lib/
-│               ├── rules.js         # Wildcard → regex conversion
-│               ├── rules.test.js
-│               ├── log-parser.js    # Log parsing and aggregation
-│               ├── log-parser.test.js
-│               └── test-shim.js     # Minimal test runner for QuickJS
-├── docs/
-│   ├── development.md           # Development guide
-│   ├── rules.md                 # Rule format reference
-│   ├── security.md              # Security design
-│   └── self-hosting.md          # Self-hosting guide
-├── test/
-│   ├── Dockerfile.audit         # Audit mode test
-│   ├── Dockerfile.restrict      # Restrict mode test
-│   ├── assert-audit-mode.sh     # Audit mode verification script
-│   ├── assert-restrict-mode.sh  # Restrict mode verification script
-│   ├── helpers.sh               # Test helpers
-│   ├── test-server/             # Test HTTP server
-│   └── test-dns/                # Test DNS server
-├── compose.yaml                 # Docker Compose config
-├── compose.test.yaml            # Test override config
-└── Makefile                     # Operational commands
+│   ├── tools/                # QuickJS scripts shared by the built images (shared/, transparent/,
+│   │                         # explicit/ — each engine's rule/log/policy parsing and its tests)
+│   ├── transparent/          # proxy_engine: transparent — Dockerfile + BuildKit/haproxy/dnsmasq/
+│   │                         # s6-overlay config
+│   └── explicit/             # proxy_engine: explicit — Dockerfile + buildkit-proxy/ (Go module:
+│                             # entrypoint/PID1, supervises buildkitd, injects the source policy
+│                             # into Solve via a gRPC proxy)
+├── docs/                     # development.md, rules.md, security.md, self-hosting.md
+├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode} combination, plus
+│                             # test-server(-explicit)/test-dns(-explicit) fixture containers
+├── compose.yaml              # Docker Compose config (dockerfile path selected by PROXY_ENGINE)
+├── compose.test-*.yaml       # Test override config, one per engine
+└── Makefile                  # Operational commands
 ```

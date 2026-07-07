@@ -104,7 +104,89 @@ Given these implementation costs versus the strict preconditions for the attack 
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
 - **Regular audits** — Periodically run in [audit mode](../README.md#operation-modes) to detect anomalies in connection patterns.
 
-## Image Provenance Verification
+## Explicit Proxy Engine
+
+`proxy_engine: explicit` uses BuildKit's native `--proxy-network` (available since moby/buildkit
+v0.31.0) instead of the CNI/DNS-redirect/HAProxy stack described above. This section covers how it
+works and what changes versus the `transparent` engine.
+
+### How it works
+
+- A small statically-linked Go binary (`docker/explicit/buildkit-proxy/`) is the image's entrypoint
+  (PID 1) and directly supervises the real `buildkitd` as a child process. `RUN` steps are isolated
+  into their own point-to-point network namespace by `proxyNetwork = true`, built directly on
+  netlink/veth rather than CNI.
+- At startup, the binary: writes `/etc/resolv.conf` from `EXTERNAL_RESOLVER`; runs a QuickJS script
+  that compiles `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` (the exact same
+  syntax as `transparent` mode — see [Rule Syntax](./rules.md)) into a BuildKit
+  [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md); starts `buildkitd`
+  with `proxyNetwork = true` bound to an internal Unix socket; and starts its own gRPC listener on
+  the socket path Buildx actually connects to.
+- That gRPC listener sits in front of the real `buildkitd` control socket. It intercepts only the
+  `Solve` RPC to inject the compiled source policy, and transparently relays every other RPC
+  (`Session`, `Status`, `DiskUsage`, etc.) to the real daemon without decoding it — so future
+  BuildKit versions that add new RPCs are automatically supported.
+- If the build client has already set a **static** source policy on the request — e.g. via the
+  `EXPERIMENTAL_BUILDKIT_SOURCE_POLICY` environment variable, which `docker buildx build` reads
+  unconditionally (see `docker/buildx`'s `commands/build.go`) — buildcage **merges** it with its own
+  policy rather than rejecting the build, placing the client's rules first and its own rules last in
+  the combined document. BuildKit's source-policy engine evaluates rules within one document in
+  order with the last matching `ALLOW`/`DENY` rule winning (see `sourcepolicy/engine.go`'s
+  `evaluatePolicy` doc comment), so buildcage's own `DENY`-all-then-`ALLOW`-listed-domains block
+  always has the final say for every `http(s)` source: whatever the client's rules decided for the
+  same identifier is overwritten by buildcage's verdict, so a client-supplied policy can never
+  widen access beyond `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules`. For any
+  other scheme (`docker-image://`, `git://`, etc.) buildcage's rules never match at all, so the
+  client's rules apply unmodified — buildcage only ever governs what it was configured to govern.
+  `CONVERT` rules need no special handling despite being able to short-circuit a single evaluation
+  pass: BuildKit's `Engine.Evaluate` re-evaluates the entire merged document from the top after every
+  mutation (up to 20 times, erroring closed beyond that — see the same file), so buildcage's
+  trailing rules always get a chance to vet whatever identifier a client-side conversion converges
+  on before it's used, both for LLB source resolution and for the exec-proxy's own runtime `HTTP(S)`
+  checks. A **dynamic**, session-based policy (`docker buildx build --policy=...`, `docker/buildx`'s
+  own Rego policy feature) is a separate mechanism and is left untouched; it applies as an
+  additional condition alongside buildcage's (merged) policy.
+
+### Coverage and known limitations
+
+- **`FROM` / git contexts are unaffected**, exactly as in `transparent` mode: buildcage's generated
+  policy only ever matches `https://`/`http://` identifiers (BuildKit's source-policy identifiers
+  are scheme-prefixed by source type — `docker-image://`, `git://`, `local://`, `oci-layout://` —
+  and a source that matches no rule defaults to allowed).
+- **Non-cooperative applications are invisible, not just blocked.** BuildKit's `--proxy-network`
+  places each `RUN` step in a private point-to-point network namespace whose only reachable peer is
+  BuildKit's own built-in MITM proxy — there is no broader network to route through. A process that
+  ignores `HTTP_PROXY`/`HTTPS_PROXY` (or opens a raw socket) gets an immediate "network unreachable"
+  inside its own namespace. This is a **structural** difference from `transparent` mode, where such
+  traffic still reaches the CNI bridge and is observed (and blocked, and logged) by the transparent
+  proxy. In `explicit` mode, that traffic leaves no trace anywhere — not in the build log, not in
+  provenance, not in the [report action](../README.md#report-action-dash14buildcagereport).
+- **Denied requests are visible via buildkitd's own debug log; allowed/audited ones are not read from
+  it at all.** BuildKit's source-policy engine logs every denial at debug level
+  (`"Evaluated source policy"`) into `/var/log/buildkitd/current`, and the `report` action parses it
+  into the same `blocked` host table it produces for `transparent` mode. BuildKit's own "proxy network
+  requests:" build output — the source for what passed the policy (allowed or audited) — only ends up
+  in that same log file if buildkitd runs with `BUILDKIT_DEBUG_EXEC_OUTPUT=1`, which also mirrors every
+  RUN step's own console output into it. Instead, the `report` action queries `buildctl debug
+  histories`/`debug logs --progress=rawjson` for every build's own vertex log recorded since the
+  container started (not just the most recent one, so several builds run against the same container
+  before the report action is called are all covered) and aggregates that into the allowed/audited
+  host table itself — the `report/action.yml` interface is unchanged.
+- **The per-command "Communication details" breakdown attributes allowed requests reliably, but not
+  denied ones**, using that same vertex-tagged buildctl data — reliable even when BuildKit runs
+  independent steps concurrently. Denied requests have no equivalent: BuildKit's own source-policy
+  denial log carries no vertex/span identifier at all, so they're listed separately with only a
+  (whole-seconds-precision) timestamp, not attributed to a step or a specific build.
+- **`ADD <url>` is invisible when allowed, visible (and build-fatal) when denied.** Unlike `RUN`,
+  `ADD` with a remote URL is fetched by BuildKit's own HTTP source op, not through the exec proxy: an
+  allowed `ADD` leaves no trace in `proxy network requests:`, the vertex log, or buildkitd's own debug
+  log at all. A denied one is still caught by the same
+  source policy and logged the same "Evaluated source policy" way as a denied `RUN` request, but
+  aborts the entire build immediately at LLB load time (rather than just failing that one step).
+  This is out of scope for buildcage's reporting: the URL is developer-specified in the Dockerfile
+  itself, so an allowed fetch is already an intentional, reviewable part of the build.
+
+
 
 Buildcage uses [Sigstore](https://sigstore.dev) keyless signing to cryptographically bind each release's Docker image to the CI workflow that built it.
 

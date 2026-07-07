@@ -1,5 +1,5 @@
 /**
- * Property-based tests for docker/files/tools/lib/log-parser.js.
+ * Property-based tests for docker/tools/transparent/lib/log-parser.js.
  *
  * Run with: node --test setup/src/lib/log-parser.property.test.js
  */
@@ -7,7 +7,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { parseEntries, aggregate } from "../../../docker/files/tools/lib/log-parser.js";
+import { parseEntries } from "../../../docker/tools/transparent/lib/log-parser.js";
+// aggregate() lives separately in docker/tools/shared/lib/ (shared with the
+// explicit engine's buildkitd-log-parser.js) — report.js imports it directly
+// from there rather than through log-parser.js.
+import { aggregate } from "../../../docker/tools/shared/lib/aggregate.js";
 
 // ---------------------------------------------------------------------------
 // parseEntries

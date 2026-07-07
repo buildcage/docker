@@ -1,5 +1,5 @@
-import { describe, it, assert, reportResults } from "./test-shim.js";
-import { parseEntries, aggregate } from "./log-parser.js";
+import { describe, it, assert, reportResults } from "../../shared/lib/test-shim.js";
+import { parseEntries } from "./log-parser.js";
 
 // ---------------------------------------------------------------------------
 // parseEntries
@@ -50,28 +50,7 @@ describe("parseEntries", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// aggregate
-// ---------------------------------------------------------------------------
-describe("aggregate", () => {
-  it("aggregates entries by host:port:ruleType:reason", () => {
-    const entries = [
-      { host: "a.com", port: "443", ruleType: "HTTPS", reason: "r1", decision: "ALLOWED" },
-      { host: "a.com", port: "443", ruleType: "HTTPS", reason: "r1", decision: "ALLOWED" },
-      { host: "b.com", port: "80", ruleType: "HTTP", reason: "-", decision: "ALLOWED" },
-    ];
-    const result = aggregate(entries);
-    assert.equal(result.length, 2);
-    assert.equal(result[0].host, "a.com");
-    assert.equal(result[0].count, 2);
-    assert.equal(result[1].host, "b.com");
-    assert.equal(result[1].count, 1);
-  });
-
-  it("empty input returns empty array", () => {
-    assert.deepEqual(aggregate([]), []);
-  });
-});
+// aggregate() is tested in docker/tools/shared/lib/aggregate.test.js.
 
 // ---------------------------------------------------------------------------
 // mode detection
