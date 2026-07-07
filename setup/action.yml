@@ -11,9 +11,9 @@ inputs:
     required: false
     default: 'restrict'
   proxy_engine:
-    description: "Network enforcement engine: explicit (BuildKit's native --proxy-network) or transparent (HAProxy/dnsmasq/iptables interception)"
+    description: "Network enforcement engine: transparent (HAProxy/dnsmasq/iptables interception) or explicit (BuildKit's native --proxy-network)"
     required: false
-    default: 'explicit'
+    default: 'transparent'
   allowed_https_rules:
     description: "HTTPS allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '*.example.com:443 ~^custom\\.pattern:443$'"
     required: false

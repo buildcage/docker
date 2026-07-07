@@ -25,11 +25,11 @@ const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /**
  * Convert an action ref into the base Docker image tag, then append the
  * proxy engine suffix. Each release publishes one image per engine
- * (e.g. `2.1.0-explicit` / `2.1.0-transparent`) sharing the same Sigstore
+ * (e.g. `2.1.0-transparent` / `2.1.0-explicit`) sharing the same Sigstore
  * verification identity (same workflow, same git ref) — only the published
  * Docker tag differs, so this does not affect buildVerifyOptions below.
  */
-export function imageTagFromRef(actionRef, proxyEngine = "explicit") {
+export function imageTagFromRef(actionRef, proxyEngine = "transparent") {
   if (!actionRef) return "";
   let base;
   if (/^[0-9a-f]{40}$/i.test(actionRef)) {
@@ -94,7 +94,7 @@ export function buildVerifyOptions({ actionRef, actionRepo }) {
  *
  * @param {{ actionRef: string, actionRepo: string, proxyEngine?: string }} opts
  */
-export async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "explicit" }) {
+export async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transparent" }) {
   const repoPath = actionRepo.toLowerCase();
 
   const verifyOptions = buildVerifyOptions({ actionRef, actionRepo });
