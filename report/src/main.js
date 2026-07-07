@@ -83,6 +83,7 @@ function markdownTable(rows, { showReason = false } = {}) {
 }
 
 const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
+const actionRef = process.env.GITHUB_ACTION_REF || "v2";
 const isAudit = report.mode === "audit";
 
 // report.deniedTimeline is only present in explicit engine's report.js output
@@ -132,7 +133,7 @@ if (isAudit) {
   if (audited.length > 0) {
     markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n";
   }
-  markdown += buildRestrictExample(audited, actionRepo);
+  markdown += buildRestrictExample(audited, actionRepo, actionRef);
   const blocked = report.sections.blocked || [];
   if (blocked.length > 0) {
     if (audited.length > 0) markdown += "\n";

@@ -156,7 +156,7 @@ function markdownTable(rows, {showReason: showReason = !1} = {}) {
   return lines.join("\n");
 }
 
-const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", isAudit = "audit" === report.mode, isExplicit = void 0 !== report.deniedTimeline;
+const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", actionRef = process.env.GITHUB_ACTION_REF || "v2", isAudit = "audit" === report.mode, isExplicit = void 0 !== report.deniedTimeline;
 
 let builds = [];
 
@@ -219,16 +219,16 @@ let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} m
 if (isAudit) {
   const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
   audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n"), 
-  markdown += function(auditedRows, actionRepo) {
+  markdown += function(auditedRows, actionRepo, actionRef) {
     if (!auditedRows || 0 === auditedRows.length) return "";
-    const groups = new Map;
+    const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = new Map;
     for (const r of auditedRows) {
       const param = ruleTypeToParam[r.ruleType];
       param && (groups.has(param) || groups.set(param, []), groups.get(param).push(`${r.host}:${r.port}`));
     }
     if (0 === groups.size) return "";
     let yaml = "";
-    yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/setup@v2\n`, 
+    yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/setup@${ref}\n`, 
     yaml += "  with:\n", yaml += "    proxy_mode: restrict\n";
     for (const [param, rules] of groups) {
       yaml += `    ${param}: >-\n`;
@@ -237,7 +237,7 @@ if (isAudit) {
     let md = "\n<details>\n";
     return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", 
     md += yaml, md += "```\n\n", md += "</details>\n", md;
-  }(audited, actionRepo);
+  }(audited, actionRepo, actionRef);
   const blocked = report.sections.blocked || [];
   blocked.length > 0 && (audited.length > 0 && (markdown += "\n"), markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, {
     showReason: !0

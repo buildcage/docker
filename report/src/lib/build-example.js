@@ -9,10 +9,16 @@ const ruleTypeToParam = {
  * Returns a markdown string wrapped in <details> tags, or "" if no rows.
  *
  * @param {Array<{host: string, port: string, ruleType: string}>} auditedRows
+ * @param {string} actionRepo
+ * @param {string} actionRef - the ref (tag or commit SHA) this action was invoked with
  * @returns {string}
  */
-export function buildRestrictExample(auditedRows, actionRepo) {
+export function buildRestrictExample(auditedRows, actionRepo, actionRef) {
   if (!auditedRows || auditedRows.length === 0) return "";
+
+  // A 40-char SHA is opaque to the reader and specific to this run, so show a
+  // placeholder instead; a tag (e.g. v2, v2.1.0) is stable and useful as-is.
+  const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef;
 
   // Group by ruleType, preserving order of first appearance
   const groups = new Map();
@@ -28,7 +34,7 @@ export function buildRestrictExample(auditedRows, actionRepo) {
   // Build YAML lines
   let yaml = "";
   yaml += "- name: Start Buildcage in restrict mode\n";
-  yaml += `  uses: ${actionRepo}/setup@v2\n`;
+  yaml += `  uses: ${actionRepo}/setup@${ref}\n`;
   yaml += "  with:\n";
   yaml += "    proxy_mode: restrict\n";
   for (const [param, rules] of groups) {
