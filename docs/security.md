@@ -116,9 +116,11 @@ works and what changes versus the `transparent` engine.
   (PID 1) and directly supervises the real `buildkitd` as a child process. `RUN` steps are isolated
   into their own point-to-point network namespace by `proxyNetwork = true`, built directly on
   netlink/veth rather than CNI.
-- At startup, the binary: writes `/etc/resolv.conf` from `EXTERNAL_RESOLVER`; runs a QuickJS script
-  that compiles `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` (the exact same
-  syntax as `transparent` mode — see [Rule Syntax](./rules.md)) into a BuildKit
+- At startup, the binary: writes `/etc/resolv.conf` from `EXTERNAL_RESOLVER` if that variable is
+  set (otherwise the container's own resolv.conf, e.g. Docker's embedded DNS, is left untouched);
+  runs a QuickJS script that compiles `allowed_https_rules` / `allowed_http_rules` /
+  `allowed_ip_rules` (the exact same syntax as `transparent` mode — see
+  [Rule Syntax](./rules.md)) into a BuildKit
   [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md); starts `buildkitd`
   with `proxyNetwork = true` bound to an internal Unix socket; and starts its own gRPC listener on
   the socket path Buildx actually connects to.
