@@ -52,12 +52,12 @@ describe("imageTagFromRef – properties", () => {
     );
   });
 
-  it("defaults to the transparent engine suffix when no engine is given", () => {
+  it("defaults to the explicit engine suffix when no engine is given", () => {
     fc.assert(
       fc.property(
         fc.string({ minLength: 0, maxLength: 50 }).map((s) => `g${s}`),
         (ref) => {
-          assert.equal(imageTagFromRef(ref), `${ref}-transparent`);
+          assert.equal(imageTagFromRef(ref), `${ref}-explicit`);
         },
       ),
     );

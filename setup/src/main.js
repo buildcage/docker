@@ -100,7 +100,7 @@ async function main() {
  * The repository is always derived from the action repository — external image
  * overrides are intentionally not supported to preserve Sigstore verification integrity.
  */
-export function resolveBuildcageImageRef({ imageDigest, actionRepository, actionRef, proxyEngine = "transparent" }, _exec = execFileSync) {
+export function resolveBuildcageImageRef({ imageDigest, actionRepository, actionRef, proxyEngine = "explicit" }, _exec = execFileSync) {
   const repository = `ghcr.io/${actionRepository}`.toLowerCase();
   if (imageDigest) {
     // Pull by verified digest to close the TOCTOU window between verification and docker pull.
@@ -115,7 +115,7 @@ export function resolveBuildcageImageRef({ imageDigest, actionRepository, action
  * Throws if the ref cannot be resolved to an existing image tag.
  * Used only when no verified digest is available (branch/local references).
  */
-export function resolveImageTag(repository, { actionRef, proxyEngine = "transparent" }, _exec = execFileSync) {
+export function resolveImageTag(repository, { actionRef, proxyEngine = "explicit" }, _exec = execFileSync) {
   const attemptedTag = actionRef ? imageTagFromRef(actionRef, proxyEngine) : undefined;
   if (actionRef) {
     try {
@@ -141,11 +141,11 @@ export function resolveImageTag(repository, { actionRef, proxyEngine = "transpar
 
 /**
  * Resolve and validate the proxy_engine input.
- * Only "transparent" (default) and "explicit" are accepted — each maps to a
+ * Only "explicit" (default) and "transparent" are accepted — each maps to a
  * separately published, separately tagged Docker image (see resolveImageTag).
  */
 export function resolveProxyEngine(input) {
-  const engine = input?.trim() || "transparent";
+  const engine = input?.trim() || "explicit";
   if (engine !== "transparent" && engine !== "explicit") {
     throw new SetupError(
       `Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`,

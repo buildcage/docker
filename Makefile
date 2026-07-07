@@ -17,34 +17,8 @@ clean: ## Clean up all resources
 
 # ---------------------------------------------------------------------------
 # run_{engine}_{mode}_mode — start the builder only (no build/verify/cleanup).
-# One target per (transparent, explicit) x (audit, restrict) combination.
+# One target per (explicit, transparent) x (audit, restrict) combination.
 # ---------------------------------------------------------------------------
-
-.PHONY: run_transparent_audit_mode
-run_transparent_audit_mode: ## Start transparent engine in audit mode
-	@echo "Starting buildcage (transparent engine) in AUDIT mode..."
-	@COMPOSE_FILE=$(COMPOSE_FILE) \
-	  PROXY_MODE=audit \
-	  docker compose up -d --wait --build
-	@docker buildx rm buildcage 2>/dev/null || true
-	@echo "Creating buildx builder..."
-	@docker buildx create --bootstrap \
-		--name buildcage \
-		--driver remote docker-container://buildcage
-
-.PHONY: run_transparent_restrict_mode
-run_transparent_restrict_mode: ## Start transparent engine in restrict mode
-	@echo "Starting buildcage (transparent engine) in RESTRICT mode..."
-	@COMPOSE_FILE=$(COMPOSE_FILE) \
-	  PROXY_MODE=restrict \
-	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
-	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
-	  docker compose up -d --wait --build
-	@docker buildx rm buildcage 2>/dev/null || true
-	@echo "Creating buildx builder..."
-	@docker buildx create --bootstrap \
-		--name buildcage \
-		--driver remote docker-container://buildcage
 
 .PHONY: run_explicit_audit_mode
 run_explicit_audit_mode: ## Start explicit proxy engine in audit mode
@@ -74,38 +48,36 @@ run_explicit_restrict_mode: ## Start explicit proxy engine in restrict mode
 		--name buildcage \
 		--driver remote docker-container://buildcage
 
+.PHONY: run_transparent_audit_mode
+run_transparent_audit_mode: ## Start transparent engine in audit mode
+	@echo "Starting buildcage (transparent engine) in AUDIT mode..."
+	@COMPOSE_FILE=$(COMPOSE_FILE) \
+	  PROXY_MODE=audit \
+	  docker compose up -d --wait --build
+	@docker buildx rm buildcage 2>/dev/null || true
+	@echo "Creating buildx builder..."
+	@docker buildx create --bootstrap \
+		--name buildcage \
+		--driver remote docker-container://buildcage
+
+.PHONY: run_transparent_restrict_mode
+run_transparent_restrict_mode: ## Start transparent engine in restrict mode
+	@echo "Starting buildcage (transparent engine) in RESTRICT mode..."
+	@COMPOSE_FILE=$(COMPOSE_FILE) \
+	  PROXY_MODE=restrict \
+	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
+	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
+	  docker compose up -d --wait --build
+	@docker buildx rm buildcage 2>/dev/null || true
+	@echo "Creating buildx builder..."
+	@docker buildx create --bootstrap \
+		--name buildcage \
+		--driver remote docker-container://buildcage
+
 # ---------------------------------------------------------------------------
 # test_{engine}_{mode}_mode — run_{engine}_{mode}_mode + build the matching
 # test/Dockerfile.* + verify + clean up. One target per combination.
 # ---------------------------------------------------------------------------
-
-.PHONY: test_transparent_audit_mode
-test_transparent_audit_mode: ## Run transparent-engine audit mode tests
-	@echo "Running transparent-engine audit mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
-	  $(MAKE) run_transparent_audit_mode
-	@docker buildx build --no-cache \
-	  --builder buildcage \
-	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.transparent-audit test/ \
-	  --load -t buildcage-test
-	@node report/src/main.js ./compose.yaml
-	@./test/assert-transparent-audit.sh
-	@$(MAKE) clean
-
-.PHONY: test_transparent_restrict_mode
-test_transparent_restrict_mode: ## Run transparent-engine restrict mode tests
-	@echo "Running transparent-engine restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
-	  $(MAKE) run_transparent_restrict_mode
-	@docker buildx build --no-cache \
-	  --builder buildcage \
-	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.transparent-restrict test/ \
-	  --load -t buildcage-test
-	@node report/src/main.js ./compose.yaml || true
-	@./test/assert-transparent-restrict.sh
-	@$(MAKE) clean
 
 .PHONY: test_explicit_audit_mode
 test_explicit_audit_mode: ## Run explicit-engine audit mode tests
@@ -134,6 +106,34 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	@PROXY_ENGINE=explicit node report/src/main.js ./compose.yaml || true
 	@./test/assert-explicit-restrict.sh
 	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean
+
+.PHONY: test_transparent_audit_mode
+test_transparent_audit_mode: ## Run transparent-engine audit mode tests
+	@echo "Running transparent-engine audit mode tests..."
+	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
+	  $(MAKE) run_transparent_audit_mode
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.transparent-audit test/ \
+	  --load -t buildcage-test
+	@node report/src/main.js ./compose.yaml
+	@./test/assert-transparent-audit.sh
+	@$(MAKE) clean
+
+.PHONY: test_transparent_restrict_mode
+test_transparent_restrict_mode: ## Run transparent-engine restrict mode tests
+	@echo "Running transparent-engine restrict mode tests..."
+	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
+	  $(MAKE) run_transparent_restrict_mode
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.transparent-restrict test/ \
+	  --load -t buildcage-test
+	@node report/src/main.js ./compose.yaml || true
+	@./test/assert-transparent-restrict.sh
+	@$(MAKE) clean
 
 .PHONY: test_unit
 test_unit: test_setup test_report test_qjs ## Run unit tests
