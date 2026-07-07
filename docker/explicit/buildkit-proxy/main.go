@@ -44,8 +44,10 @@ func run() error {
 	policyFile := getenv("BUILDKIT_PROXY_POLICY_FILE", "/etc/buildkit/source-policy.json")
 	logFile := getenv("BUILDKIT_PROXY_LOG_FILE", "/var/log/buildkitd/current")
 
-	if err := writeResolvConf(getenv("EXTERNAL_RESOLVER", "1.1.1.1,8.8.8.8")); err != nil {
-		return fmt.Errorf("writing resolv.conf: %w", err)
+	if resolver := os.Getenv("EXTERNAL_RESOLVER"); resolver != "" {
+		if err := writeResolvConf(resolver); err != nil {
+			return fmt.Errorf("writing resolv.conf: %w", err)
+		}
 	}
 
 	if err := generateSourcePolicy(policyFile); err != nil {
