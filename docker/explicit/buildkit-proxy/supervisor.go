@@ -19,7 +19,9 @@ import (
 
 // writeResolvConf points the container's own resolv.conf at the external
 // resolver list, which buildkitd's internal MITM proxy reads via Go's
-// stdlib resolver to resolve DNS for its own egress.
+// stdlib resolver to resolve DNS for its own egress. Called by main.go only
+// when EXTERNAL_RESOLVER is set; otherwise the container's own resolv.conf
+// (e.g. Docker's embedded DNS) is left untouched.
 func writeResolvConf(externalResolver string) error {
 	var sb strings.Builder
 	for _, ip := range strings.Split(externalResolver, ",") {
