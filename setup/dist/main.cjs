@@ -7088,14 +7088,14 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 
 const OID_SOURCE_REPO_DIGEST = "1.3.6.1.4.1.57264.1.13", escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function imageTagFromRef(actionRef, proxyEngine = "explicit") {
+function imageTagFromRef(actionRef, proxyEngine = "transparent") {
   if (!actionRef) return "";
   let base;
   return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
   `${base}-${proxyEngine}`;
 }
 
-async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine = "explicit"}) {
+async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine = "transparent"}) {
   const repoPath = actionRepo.toLowerCase(), verifyOptions = function({actionRef: actionRef, actionRepo: actionRepo}) {
     const sanPrefix = `^${escapeRegex(`https://github.com/${actionRepo}/.github/workflows/docker-publish.yml@refs/tags/`)}`, base = {
       certificateIssuer: "https://token.actions.githubusercontent.com",
@@ -7232,7 +7232,7 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
 
 const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
-function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository, actionRef: actionRef, proxyEngine: proxyEngine = "explicit"}, _exec = node_child_process.execFileSync) {
+function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository, actionRef: actionRef, proxyEngine: proxyEngine = "transparent"}, _exec = node_child_process.execFileSync) {
   const repository = `ghcr.io/${actionRepository}`.toLowerCase();
   if (imageDigest) return `${repository}@${imageDigest}`;
   return `${repository}:${resolveImageTag(repository, {
@@ -7241,7 +7241,7 @@ function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: a
   }, _exec)}`;
 }
 
-function resolveImageTag(repository, {actionRef: actionRef, proxyEngine: proxyEngine = "explicit"}, _exec = node_child_process.execFileSync) {
+function resolveImageTag(repository, {actionRef: actionRef, proxyEngine: proxyEngine = "transparent"}, _exec = node_child_process.execFileSync) {
   const attemptedTag = actionRef ? imageTagFromRef(actionRef, proxyEngine) : void 0;
   if (actionRef) try {
     return _exec("docker", [ "manifest", "inspect", `${repository}:${attemptedTag}` ], {
@@ -7252,7 +7252,7 @@ function resolveImageTag(repository, {actionRef: actionRef, proxyEngine: proxyEn
 }
 
 function resolveProxyEngine(input) {
-  const engine = input?.trim() || "explicit";
+  const engine = input?.trim() || "transparent";
   if ("transparent" !== engine && "explicit" !== engine) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`, "INVALID_PROXY_ENGINE");
   return engine;
 }
