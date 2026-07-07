@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildRestrictExample } from "./build-example.js";
 
 const REPO = "dash14/buildcage";
+const REF = "v2";
 
 function wrap(yaml) {
   return (
@@ -31,11 +32,11 @@ describe("buildRestrictExample", () => {
       { host: "github.com", port: "443", ruleType: "HTTPS", count: 2 },
     ];
     assert.equal(
-      buildRestrictExample(rows, REPO),
+      buildRestrictExample(rows, REPO, REF),
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v2`,
+          `  uses: ${REPO}/setup@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -52,11 +53,11 @@ describe("buildRestrictExample", () => {
       { host: "deb.debian.org", port: "80", ruleType: "HTTP", count: 1 },
     ];
     assert.equal(
-      buildRestrictExample(rows, REPO),
+      buildRestrictExample(rows, REPO, REF),
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v2`,
+          `  uses: ${REPO}/setup@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -73,11 +74,11 @@ describe("buildRestrictExample", () => {
       { host: "192.168.1.1", port: "443", ruleType: "IP", count: 1 },
     ];
     assert.equal(
-      buildRestrictExample(rows, REPO),
+      buildRestrictExample(rows, REPO, REF),
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v2`,
+          `  uses: ${REPO}/setup@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_ip_rules: >-",
@@ -94,11 +95,11 @@ describe("buildRestrictExample", () => {
       { host: "10.0.0.1", port: "8080", ruleType: "IP", count: 1 },
     ];
     assert.equal(
-      buildRestrictExample(rows, REPO),
+      buildRestrictExample(rows, REPO, REF),
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v2`,
+          `  uses: ${REPO}/setup@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -117,11 +118,50 @@ describe("buildRestrictExample", () => {
       { host: "example.com", port: "443", ruleType: "HTTPS", count: 1 },
     ];
     assert.equal(
-      buildRestrictExample(rows, "myorg/myrepo"),
+      buildRestrictExample(rows, "myorg/myrepo", REF),
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          "  uses: myorg/myrepo/setup@v2",
+          `  uses: myorg/myrepo/setup@${REF}`,
+          "  with:",
+          "    proxy_mode: restrict",
+          "    allowed_https_rules: >-",
+          "      example.com:443",
+        ].join("\n") + "\n",
+      )
+    );
+  });
+
+  it("renders a tag actionRef as-is", () => {
+    const rows = [
+      { host: "example.com", port: "443", ruleType: "HTTPS", count: 1 },
+    ];
+    assert.equal(
+      buildRestrictExample(rows, REPO, "v2.1.0"),
+      wrap(
+        [
+          "- name: Start Buildcage in restrict mode",
+          `  uses: ${REPO}/setup@v2.1.0`,
+          "  with:",
+          "    proxy_mode: restrict",
+          "    allowed_https_rules: >-",
+          "      example.com:443",
+        ].join("\n") + "\n",
+      )
+    );
+  });
+
+  it("renders a commit SHA actionRef as a <sha> placeholder", () => {
+    const rows = [
+      { host: "example.com", port: "443", ruleType: "HTTPS", count: 1 },
+    ];
+    const sha = "abc1234567890def1234567890abcdef12345678";
+    assert.equal(
+      buildRestrictExample(rows, REPO, sha),
+      wrap(
+        [
+          "- name: Start Buildcage in restrict mode",
+          `  uses: ${REPO}/setup@<sha>`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
