@@ -2,18 +2,19 @@
 
 ## Scope
 
-I welcome reports about:
+I welcome reports about both proxy engines (`transparent` and `explicit`):
 
-- **Proxy bypass** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./README.md#known-limitations))
-- **Network isolation escape** — bypassing CNI isolation or iptables rules to reach the internet directly
+- **Proxy bypass (`transparent`)** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#known-limitations))
+- **Network isolation escape (`transparent`)** — bypassing CNI isolation or iptables rules to reach the internet directly
+- **DNS filtering bypass (`transparent`)** — bypassing the DNS redirect mechanism
+- **Source policy bypass (`explicit`)** — ways to make network connections from `RUN` steps that evade the BuildKit source policy *compiled by buildcage* from your allowlist (e.g., a flaw in how buildcage translates rules into policy, or in how it injects/merges that policy via the gRPC `Solve` intercept)
 - **GitHub Actions setup** — vulnerabilities in the `setup` or `report` actions (e.g., injection, credential leak)
-- **DNS filtering bypass** — bypassing the DNS redirect mechanism
 
 The following are **out of scope** (please report to the respective projects instead):
 
-- Vulnerabilities in BuildKit, Docker, or other upstream dependencies
+- Vulnerabilities in BuildKit, Docker, or other upstream dependencies — including BuildKit's own `--proxy-network` isolation, its MITM/TLS handling, or its source-policy evaluation engine itself. Buildcage's `explicit`-engine scope is limited to the policy it compiles and injects, not BuildKit's enforcement of that policy.
 - Issues that require the attacker to already have privileged access to the host
-- Domain fronting via shared CDN infrastructure (documented in README's [Security Considerations](./README.md#security-considerations))
+- Domain fronting via shared CDN infrastructure (documented in [Security Details](./docs/security.md#known-limitations))
 
 ## Supported Versions
 
