@@ -26,8 +26,8 @@ make run_explicit_restrict_mode
 ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make run_transparent_restrict_mode
 ```
 
-The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/HAProxy stack
-(see [Proxy Engines](../README.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
+The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/DNS-redirect/HAProxy
+stack (see [Proxy Engines](./reference.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
 `docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
 `build.dockerfile: ${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
 `docker/transparent/Dockerfile` exactly as before.
@@ -60,6 +60,39 @@ make test_explicit_audit_mode
 make test_explicit_restrict_mode
 ```
 
+## Explicit Engine Internals
+
+This section covers how `proxy_engine: explicit` is implemented internally. For the user-facing
+behavior — what's enforced, what's visible in the report — see
+[Explicit Proxy Engine](./security.md#explicit-proxy-engine) in Security Details.
+
+- A small statically-linked Go binary (`docker/explicit/buildkit-proxy/`) is the image's entrypoint
+  (PID 1) and directly supervises the real `buildkitd` as a child process. `RUN` steps are isolated
+  into their own point-to-point network namespace by `proxyNetwork = true`, built directly on
+  netlink/veth rather than CNI.
+- At startup, the binary: writes `/etc/resolv.conf` from `EXTERNAL_RESOLVER` if that variable is
+  set (otherwise the container's own resolv.conf, e.g. Docker's embedded DNS, is left untouched);
+  runs a QuickJS script that compiles `allowed_https_rules` / `allowed_http_rules` /
+  `allowed_ip_rules` (the exact same syntax as `transparent` mode — see
+  [Rule Syntax](./rules.md)) into a BuildKit
+  [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md); starts `buildkitd`
+  with `proxyNetwork = true` bound to an internal Unix socket; and starts its own gRPC listener on
+  the socket path Buildx actually connects to.
+- That gRPC listener sits in front of the real `buildkitd` control socket. It intercepts only the
+  `Solve` RPC to inject the compiled source policy, and transparently relays every other RPC
+  (`Session`, `Status`, `DiskUsage`, etc.) to the real daemon without decoding it — so future
+  BuildKit versions that add new RPCs are automatically supported.
+- If the build client has already set a **static** source policy on the request — e.g. via the
+  `EXPERIMENTAL_BUILDKIT_SOURCE_POLICY` environment variable, which `docker buildx build` reads
+  unconditionally — buildcage **merges** it with its own policy rather than rejecting the build,
+  placing its own rules last so they always have the final say for every `http(s)` source: a
+  client-supplied policy can never widen access beyond `allowed_https_rules` / `allowed_http_rules` /
+  `allowed_ip_rules`. For any other scheme (`docker-image://`, `git://`, etc.) buildcage's rules
+  never match, so the client's rules apply unmodified — buildcage only ever governs what it was
+  configured to govern. A **dynamic**, session-based policy (`docker buildx build --policy=...`,
+  `docker/buildx`'s own Rego policy feature) is a separate mechanism and is left untouched; it
+  applies as an additional condition alongside buildcage's (merged) policy.
+
 ## Local Development
 
 ### Image provenance verification bypass
@@ -80,7 +113,7 @@ BUILDCAGE_ALLOW_UNVERIFIED=1
 > It is active only for unverifiable refs (branch names, local paths); version tags and
 > commit SHAs always go through full Sigstore verification regardless of this flag.
 
-See [security.md](./security.md#known-limitations) for more details.
+See [security.md](./security.md#verification-limitations) for more details.
 
 ## Viewing Logs
 
@@ -152,7 +185,7 @@ reports for the allowed side.
 
 ## Directory Structure
 
-```
+```text
 .
 ├── setup/                    # GitHub Actions setup action
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs, dist/post.cjs)
@@ -177,3 +210,25 @@ reports for the allowed side.
 ├── compose.test-*.yaml       # Test override config, one per engine
 └── Makefile                  # Operational commands
 ```
+
+## Troubleshooting
+
+If you encounter issues, try reproducing the problem locally to get detailed logs:
+
+1. **Check logs:**
+   ```bash
+   docker compose logs builder
+   ```
+
+2. **Run in audit mode** to understand your build's network behavior:
+   ```bash
+   make clean
+   make run_transparent_audit_mode
+   docker buildx build --builder buildcage --no-cache -f Dockerfile .
+   docker compose logs builder
+   ```
+
+3. **Open an issue** at [github.com/dash14/buildcage/issues](https://github.com/dash14/buildcage/issues) with:
+   - Your Dockerfile
+   - The audit mode report output
+   - Full error messages from `docker compose logs builder`

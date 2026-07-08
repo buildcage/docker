@@ -1,77 +1,104 @@
 # Security Details
 
-This document provides in-depth technical details on how Buildcage enforces network isolation during Docker builds.
+This document explains, from a user's perspective, how Buildcage enforces network isolation during
+Docker builds: what's inspected, what's blocked, what attacks are resisted, and what's visible in the
+report. For implementation internals (the supervisor binary, RPC plumbing, log parsing), see the
+[Development Guide](./development.md).
 
-For a high-level overview, see the [Security Considerations](../README.md#security-considerations) section in the README.
+For a high-level overview, see [How It Works](../README.md#how-it-works) in the README.
 
-## Security Mechanisms
+## Transparent Proxy Engine (default)
 
-### Network Isolation
+### Architecture
+
+<img src="../assets/diagram-architecture-transparent.png" alt="Transparent proxy engine architecture" width="611" height="490">
+
+All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). DNS queries resolve to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking.
+
+1. **BuildKit RUN steps run in isolated containers** connected to a private network (CNI)
+2. **All DNS queries return the proxy IP** (172.20.0.1), forcing traffic through the proxy
+3. **The proxy inspects each request:**
+   - HTTPS: Reads the SNI (Server Name Indication) without decrypting
+   - HTTP: Reads the Host header
+4. **Allowlist check:** If the domain is allowed → connection proceeds. Otherwise → blocked.
+
+**Note:** Base image pulls (`FROM` instructions) are performed by buildkitd itself, which runs outside the isolated network. Only commands in `RUN` steps are subject to network filtering.
+
+**Why this approach?**
+- No MITM certificate injection needed
+- TLS certificate validation works normally
+- Zero modification to your Dockerfile required
+- Works with any programming language or package manager
+- Cannot inspect encrypted HTTPS payload content (see [Known Limitations](#known-limitations))
+
+### Security Mechanisms
+
+#### Network Isolation
 
 - **CNI configuration**: Places temporary containers from BuildKit RUN steps into isolated-net (buildkit0 bridge, 172.20.0.0/24).
 - **iptables**: Drops all FORWARD from buildkit0, also blocks direct access to buildkitd API.
 - **Gateway enforcement**: All traffic must go through the proxy on 172.20.0.1.
 
-### DNS-Level Control
+#### DNS-Level Control
 
 - **Universal DNS redirect**: All domain name queries return the proxy IP (172.20.0.1), forcing all traffic through the proxy regardless of the requested domain.
 - **ECH prevention**: The internal DNS server operates without any upstream resolvers, so DNS HTTPS (type 65) records — required to initiate Encrypted Client Hello (ECH) — are never returned to build containers.
 
-### HTTP/HTTPS Proxy Control
+#### HTTP/HTTPS Proxy Control
 
 - **HTTPS**: Determines the target server name by reading the SNI field, without terminating TLS. Certificate validation is unaffected.
 - **HTTP**: Determines the target domain by inspecting the Host header, then checks it against the allowlist.
 - **Dynamic allowlist**: Controlled via `allowed_https_rules`, `allowed_http_rules`, and `allowed_ip_rules` environment variables.
 - **Missing Host header rejection**: HTTP requests without a valid Host header are rejected with HTTP 400, preventing requests that cannot be checked against the allowlist.
 
-### Direct IP Address Connections
+#### Direct IP Address Connections
 
 - **Traffic redirection**: All TCP traffic from the isolated network is redirected to HAProxy via an iptables `PREROUTING REDIRECT` rule.
 - **IP allowlist check**: Connections to raw IP addresses (e.g., `curl http://1.2.3.4/`) are checked against `allowed_ip_rules`. If no `allowed_ip_rules` are configured, all direct IP connections are blocked.
 
-## Attack Resistance
+### Attack Resistance
 
 Buildcage's architecture defends against the following attack vectors.
 
-### SNI Spoofing
+#### SNI Spoofing
 
 An attacker may attempt to set the SNI field in a TLS ClientHello to an allowed domain while actually trying to reach an unauthorized server.
 
 **Why this is prevented:** The proxy resolves the domain name presented in the SNI field using external DNS and forwards the connection to the resulting IP address. Regardless of what SNI value the client provides, the proxy always connects to the legitimate server for that domain — never to an attacker-controlled server.
 
-### Encrypted Client Hello (ECH)
+#### Encrypted Client Hello (ECH)
 
 TLS 1.3 Encrypted Client Hello (ECH) encrypts the true SNI, which could theoretically bypass SNI-based filtering.
 
 **Why this is prevented:** ECH requires the client to obtain ECHConfig public keys via DNS HTTPS (type 65) records. The internal DNS server has no upstream resolvers and cannot return these records, so build containers can never initiate an ECH handshake.
 
-### DNS Tunneling
+#### DNS Tunneling
 
 An attacker may attempt to encode data into DNS queries to exfiltrate information or establish communication with external servers.
 
 **Why this is prevented:** The internal DNS server has no upstream resolvers and answers all queries locally. Additionally, all forwarded traffic from the isolated network is dropped by iptables — including any attempt to reach external DNS servers directly. With no path for DNS queries to reach the outside, encoded data has no route to an attacker's infrastructure.
 
-### Non-TCP Protocol Tunneling (ICMP, UDP, QUIC)
+#### Non-TCP Protocol Tunneling (ICMP, UDP, QUIC)
 
 An attacker may attempt to tunnel data using non-TCP protocols such as ICMP echo packets, raw UDP, or QUIC (HTTP/3) to bypass the proxy.
 
 **Why this is prevented:** The iptables FORWARD rule drops all traffic from the isolated network regardless of protocol — not just TCP. Since the proxy only handles TCP-based HTTP and HTTPS connections, there is no exit path for UDP or ICMP traffic. QUIC, which relies on UDP, is also blocked as a result.
 
-### IPv6 Bypass
+#### IPv6 Bypass
 
 An attacker may attempt to use IPv6 to circumvent IPv4-based iptables rules.
 
 **Why this is prevented:** Equivalent ip6tables rules drop all forwarded IPv6 traffic from the isolated network. Additionally, the internal DNS server returns the IPv6 unspecified address (::) for all queries, effectively disabling IPv6 name resolution within build containers.
 
-### Alternative DNS Transports (DoH / DoT)
+#### Alternative DNS Transports (DoH / DoT)
 
 An attacker may attempt to use DNS over HTTPS (DoH) or DNS over TLS (DoT) to bypass the internal DNS server and resolve domains through encrypted channels.
 
 **Why this is prevented:** DoT uses port 853, which the proxy does not listen on — making it unreachable from the isolated network. DoH operates over HTTPS and is therefore subject to the same SNI-based allowlist check as any other HTTPS connection. Only DoH servers hosted on explicitly allowed domains could be reached, and exploiting them would require the same preconditions as domain fronting (the attacker must control infrastructure behind an allowed domain).
 
-## Known Limitations
+### Known Limitations
 
-### Domain Fronting
+#### Domain Fronting
 
 Buildcage inspects the **SNI (Server Name Indication)** field in HTTPS connections but cannot decrypt the actual request content inside the TLS tunnel. This creates a potential bypass technique called "domain fronting."
 
@@ -102,7 +129,7 @@ Given these implementation costs versus the strict preconditions for the attack 
 - **Be specific with allowed domains** — Avoid broad wildcard CDN domains (e.g., `*.cdn.example.com`) when possible.
 - **Use service-specific domains** — Prefer `registry.npmjs.org` over generic CDN wildcard domains.
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
-- **Regular audits** — Periodically run in [audit mode](../README.md#operation-modes) to detect anomalies in connection patterns.
+- **Regular audits** — Periodically run in [audit mode](./reference.md#operation-modes) to detect anomalies in connection patterns.
 
 ## Explicit Proxy Engine
 
@@ -112,89 +139,71 @@ Given these implementation costs versus the strict preconditions for the attack 
 > [Coverage and known limitations](#coverage-and-known-limitations) below before relying on it.
 > `transparent` remains the default and recommended engine.
 
+### Architecture
+
+<img src="../assets/diagram-architecture-explicit.png" alt="Explicit proxy engine architecture" width="611" height="454">
+
 `proxy_engine: explicit` uses BuildKit's native `--proxy-network` (available since moby/buildkit
-v0.31.0) instead of the CNI/DNS-redirect/HAProxy stack described above. This section covers how it
-works and what changes versus the `transparent` engine.
+v0.31.0) instead of the CNI/DNS-redirect/HAProxy stack described in
+[Transparent Proxy Engine](#transparent-proxy-engine-default). Each `RUN` step is isolated into its
+own private point-to-point network namespace whose only reachable peer is buildkitd's built-in MITM
+proxy. `HTTP_PROXY`/`HTTPS_PROXY` and a generated CA certificate are injected into the step
+automatically — no Dockerfile changes needed for tools that already respect these standard variables.
+The proxy decrypts the traffic and checks the host against a BuildKit
+[source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md) compiled from your
+allowlist — the exact same `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` syntax as
+`transparent` mode (see [Rule Syntax](./rules.md)). Enforcement is domain (and port) granularity, same
+as `transparent` — the generated policy always allows any path once the host matches, since the rule
+syntax has no path component. The decrypted path is still visible, so it shows up in the report and
+BuildKit's own build output even though it isn't used to allow or deny the request.
 
-### How it works
+If the build client already sets its own **static** source policy (e.g. via
+`EXPERIMENTAL_BUILDKIT_SOURCE_POLICY`, which `docker buildx build` reads unconditionally), buildcage
+merges its own rules in last, so a client-supplied policy can never widen access beyond your
+allowlist. A separate **dynamic**, session-based policy mechanism (`docker buildx build
+--policy=...`) is left untouched and applies as an additional condition alongside buildcage's policy.
 
-- A small statically-linked Go binary (`docker/explicit/buildkit-proxy/`) is the image's entrypoint
-  (PID 1) and directly supervises the real `buildkitd` as a child process. `RUN` steps are isolated
-  into their own point-to-point network namespace by `proxyNetwork = true`, built directly on
-  netlink/veth rather than CNI.
-- At startup, the binary: writes `/etc/resolv.conf` from `EXTERNAL_RESOLVER` if that variable is
-  set (otherwise the container's own resolv.conf, e.g. Docker's embedded DNS, is left untouched);
-  runs a QuickJS script that compiles `allowed_https_rules` / `allowed_http_rules` /
-  `allowed_ip_rules` (the exact same syntax as `transparent` mode — see
-  [Rule Syntax](./rules.md)) into a BuildKit
-  [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md); starts `buildkitd`
-  with `proxyNetwork = true` bound to an internal Unix socket; and starts its own gRPC listener on
-  the socket path Buildx actually connects to.
-- That gRPC listener sits in front of the real `buildkitd` control socket. It intercepts only the
-  `Solve` RPC to inject the compiled source policy, and transparently relays every other RPC
-  (`Session`, `Status`, `DiskUsage`, etc.) to the real daemon without decoding it — so future
-  BuildKit versions that add new RPCs are automatically supported.
-- If the build client has already set a **static** source policy on the request — e.g. via the
-  `EXPERIMENTAL_BUILDKIT_SOURCE_POLICY` environment variable, which `docker buildx build` reads
-  unconditionally (see `docker/buildx`'s `commands/build.go`) — buildcage **merges** it with its own
-  policy rather than rejecting the build, placing the client's rules first and its own rules last in
-  the combined document. BuildKit's source-policy engine evaluates rules within one document in
-  order with the last matching `ALLOW`/`DENY` rule winning (see `sourcepolicy/engine.go`'s
-  `evaluatePolicy` doc comment), so buildcage's own `DENY`-all-then-`ALLOW`-listed-domains block
-  always has the final say for every `http(s)` source: whatever the client's rules decided for the
-  same identifier is overwritten by buildcage's verdict, so a client-supplied policy can never
-  widen access beyond `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules`. For any
-  other scheme (`docker-image://`, `git://`, etc.) buildcage's rules never match at all, so the
-  client's rules apply unmodified — buildcage only ever governs what it was configured to govern.
-  `CONVERT` rules need no special handling despite being able to short-circuit a single evaluation
-  pass: BuildKit's `Engine.Evaluate` re-evaluates the entire merged document from the top after every
-  mutation (up to 20 times, erroring closed beyond that — see the same file), so buildcage's
-  trailing rules always get a chance to vet whatever identifier a client-side conversion converges
-  on before it's used, both for LLB source resolution and for the exec-proxy's own runtime `HTTP(S)`
-  checks. A **dynamic**, session-based policy (`docker buildx build --policy=...`, `docker/buildx`'s
-  own Rego policy feature) is a separate mechanism and is left untouched; it applies as an
-  additional condition alongside buildcage's (merged) policy.
+For how the supervisor binary, gRPC interception, and policy compilation work internally, see
+[Explicit Engine Internals](./development.md#explicit-engine-internals) in the Development Guide.
 
-### Coverage and known limitations
+### Coverage and Visibility
 
-- **`FROM` / git contexts are unaffected**, exactly as in `transparent` mode: buildcage's generated
-  policy only ever matches `https://`/`http://` identifiers (BuildKit's source-policy identifiers
-  are scheme-prefixed by source type — `docker-image://`, `git://`, `local://`, `oci-layout://` —
-  and a source that matches no rule defaults to allowed).
-- **Non-cooperative applications are invisible, not just blocked.** BuildKit's `--proxy-network`
-  places each `RUN` step in a private point-to-point network namespace whose only reachable peer is
-  BuildKit's own built-in MITM proxy — there is no broader network to route through. A process that
-  ignores `HTTP_PROXY`/`HTTPS_PROXY` (or opens a raw socket) gets an immediate "network unreachable"
-  inside its own namespace. This is a **structural** difference from `transparent` mode, where such
-  traffic still reaches the CNI bridge and is observed (and blocked, and logged) by the transparent
-  proxy. In `explicit` mode, that traffic leaves no trace anywhere — not in the build log, not in
-  provenance, not in the [report action](../README.md#report-action-dash14buildcagereport).
-- **Denied requests are visible via buildkitd's own debug log; allowed/audited ones are not read from
-  it at all.** BuildKit's source-policy engine logs every denial at debug level
-  (`"Evaluated source policy"`) into `/var/log/buildkitd/current`, and the `report` action parses it
-  into the same `blocked` host table it produces for `transparent` mode. BuildKit's own "proxy network
-  requests:" build output — the source for what passed the policy (allowed or audited) — only ends up
-  in that same log file if buildkitd runs with `BUILDKIT_DEBUG_EXEC_OUTPUT=1`, which also mirrors every
-  RUN step's own console output into it. Instead, the `report` action queries `buildctl debug
-  histories`/`debug logs --progress=rawjson` for every build's own vertex log recorded since the
-  container started (not just the most recent one, so several builds run against the same container
-  before the report action is called are all covered) and aggregates that into the allowed/audited
-  host table itself — the `report/action.yml` interface is unchanged.
-- **The per-command "Communication details" breakdown attributes allowed requests reliably, but not
-  denied ones**, using that same vertex-tagged buildctl data — reliable even when BuildKit runs
-  independent steps concurrently. Denied requests have no equivalent: BuildKit's own source-policy
-  denial log carries no vertex/span identifier at all, so they're listed separately with only a
-  (whole-seconds-precision) timestamp, not attributed to a step or a specific build.
-- **`ADD <url>` is invisible when allowed, visible (and build-fatal) when denied.** Unlike `RUN`,
-  `ADD` with a remote URL is fetched by BuildKit's own HTTP source op, not through the exec proxy: an
-  allowed `ADD` leaves no trace in `proxy network requests:`, the vertex log, or buildkitd's own debug
-  log at all. A denied one is still caught by the same
-  source policy and logged the same "Evaluated source policy" way as a denied `RUN` request, but
-  aborts the entire build immediately at LLB load time (rather than just failing that one step).
-  This is out of scope for buildcage's reporting: the URL is developer-specified in the Dockerfile
-  itself, so an allowed fetch is already an intentional, reviewable part of the build.
+| Traffic | Allowed | Denied |
+|---|---|---|
+| `RUN` step, proxy-aware tool | Logged per-step in the report's "Communication details" | Logged in a flat `DENIED` list (no per-step attribution; whole-second timestamps) |
+| `RUN` step, non-cooperative tool or raw socket | — (immediate "network unreachable"; **no trace anywhere** — not in the build log, the report, or provenance) | same as above |
+| `ADD <url>` | Not tracked by the report — the URL is developer-specified in the Dockerfile, already an intentional, reviewable part of the build | Aborts the entire build immediately at LLB load time; logged the same way as a denied `RUN` |
+| `FROM` / git contexts | Unaffected — buildcage's policy only ever matches `http(s)://` sources | Unaffected |
 
+The key structural difference from `transparent` mode: there, a non-cooperative process still reaches
+the CNI bridge and is observed, blocked, and logged. Under `explicit`, each `RUN` step's network
+namespace has no broader network to route through, so that traffic leaves no trace at all — a
+structural trade-off for gaining full path-level visibility and BuildKit-native provenance
+integration.
 
+For exactly how the `report` action extracts allowed/denied data from buildkitd's own logs, see
+[Viewing Logs](./development.md#viewing-logs) in the Development Guide.
+
+## Trusting the Buildcage Image
+
+Buildcage is a security tool — so it's fair to ask: *how do you trust Buildcage itself?*
+
+The upstream image is verified at action startup via Sigstore: the signature cryptographically binds
+the published image to the exact source commit SHA, so a tampered or substituted image fails
+verification before use.
+
+**Using the upstream image**
+
+The simplest option. Pin to a commit SHA (or version tag) and update on your own schedule — the
+Sigstore verification ensures you are always running exactly what was built from that commit.
+
+**Self-hosting**
+
+If you need to keep build infrastructure private or control exactly which version is deployed, you can
+fork the repository and build the Docker image within your own infrastructure. See the
+[Self-Hosting Guide](./self-hosting.md).
+
+## Image Provenance Verification
 
 Buildcage uses [Sigstore](https://sigstore.dev) keyless signing to cryptographically bind each release's Docker image to the CI workflow that built it.
 
@@ -253,8 +262,8 @@ All identity checks — OIDC issuer, signing workflow, ref/SHA claim, and manife
 <td><code>certificateOIDs</code> — Fulcio OID <code>1.3.6.1.4.1.57264.1.13</code>, raw byte match</td>
 </tr>
 <tr>
-<td><code>@v2.1.0</code> (exact version)</td>
-<td>SAN matches <code>...@refs/tags/v2\.1\.0(\.|$)</code></td>
+<td><code>@v2.2.0</code> (exact version)</td>
+<td>SAN matches <code>...@refs/tags/v2\.2\.0(\.|$)</code></td>
 <td><code>certificateIdentityURI</code> regexp</td>
 </tr>
 <tr>
@@ -286,7 +295,7 @@ This is **one layer of a defense-in-depth strategy**, not a complete guarantee. 
 
 The binding of the image digest to the exact source commit SHA also serves as an alternative to reproducible builds: it establishes that the published artifact was produced from a specific source commit without requiring an independent rebuild.
 
-### Known limitations
+### Verification Limitations
 
 - **Account compromise**: If the repository owner's GitHub account or the repository itself is compromised, an attacker could trigger the release workflow and produce a legitimately-signed malicious image.
 - **Trust in Sigstore infrastructure**: Verification relies on the availability and integrity of the Rekor transparency log and the Fulcio certificate authority. The TUF-backed trust root is fetched at verification time; a network outage will cause the main phase to hard-fail.

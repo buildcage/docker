@@ -11,7 +11,7 @@ This guide explains how to host your own Buildcage Docker image in a private Git
 
 ## Prerequisites
 
-- A GitHub Organizations account with **GitHub Team** or **Enterprise** plan (required for private repository packages)
+- A GitHub organization (any plan, including Free) to hold the private repository and its container package. Private packages are available on all plans, though GitHub Packages storage/transfer beyond the plan's included quota (shared with Actions artifacts) is billed — see [GitHub Packages billing](https://docs.github.com/en/billing/concepts/product-billing/github-packages).
 
 ## 1. Import the Repository
 
