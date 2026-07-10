@@ -7092,7 +7092,7 @@ function imageTagFromRef(actionRef, proxyEngine = "transparent") {
   if (!actionRef) return "";
   let base;
   return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
-  `${base}-${proxyEngine}`;
+  "explicit" === proxyEngine ? `${base}-explicit` : base;
 }
 
 async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine = "transparent"}) {
