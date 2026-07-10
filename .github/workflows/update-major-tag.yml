@@ -67,14 +67,19 @@ jobs:
           LATEST_IN_MAJOR=$(echo "$TAGS" | grep -E "^v${MAJOR#v}\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
           LATEST_IN_MINOR=$(echo "$TAGS" | grep -E "^v${MINOR}\.[0-9]+$" | sort -V | tail -1)
 
-          # Each release publishes one image per proxy engine
-          # (e.g. ${VERSION}-transparent, ${VERSION}-explicit); update the
-          # floating major/minor tag for each engine independently.
+          # Each release publishes one image per proxy engine. transparent
+          # (default) uses the plain version tag (e.g. ${VERSION}); explicit
+          # (experimental) uses a -explicit suffix (e.g. ${VERSION}-explicit).
+          # Update the floating major/minor tag for each engine independently.
           for ENGINE in transparent explicit; do
+            SUFFIX=""
+            if [ "$ENGINE" = "explicit" ]; then
+              SUFFIX="-explicit"
+            fi
             if [ "$TAG" = "$LATEST_IN_MINOR" ]; then
-              docker buildx imagetools create --tag "${REPO}:${MINOR}-${ENGINE}" "${REPO}:${VERSION}-${ENGINE}"
+              docker buildx imagetools create --tag "${REPO}:${MINOR}${SUFFIX}" "${REPO}:${VERSION}${SUFFIX}"
             fi
             if [ "$TAG" = "$LATEST_IN_MAJOR" ]; then
-              docker buildx imagetools create --tag "${REPO}:${MAJOR#v}-${ENGINE}" "${REPO}:${VERSION}-${ENGINE}"
+              docker buildx imagetools create --tag "${REPO}:${MAJOR#v}${SUFFIX}" "${REPO}:${VERSION}${SUFFIX}"
             fi
           done

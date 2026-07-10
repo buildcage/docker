@@ -106,6 +106,12 @@ Given these implementation costs versus the strict preconditions for the attack 
 
 ## Explicit Proxy Engine
 
+> [!WARNING]
+> `explicit` is an **experimental** engine. Its underlying BuildKit feature (`--proxy-network`) is
+> still maturing, and it has structural limitations not present in the `transparent` engine — see
+> [Coverage and known limitations](#coverage-and-known-limitations) below before relying on it.
+> `transparent` remains the default and recommended engine.
+
 `proxy_engine: explicit` uses BuildKit's native `--proxy-network` (available since moby/buildkit
 v0.31.0) instead of the CNI/DNS-redirect/HAProxy stack described above. This section covers how it
 works and what changes versus the `transparent` engine.

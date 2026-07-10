@@ -14,50 +14,54 @@ import { buildACLRules, resolveBuildcageImageRef, resolveProxyEngine } from "./m
 // imageTagFromRef
 // ---------------------------------------------------------------------------
 
+// Only the `explicit` engine appends a suffix; `transparent` (the default)
+// publishes the plain tag, matching the pre-multi-engine tagging scheme.
+const suffixFor = (engine) => (engine === "explicit" ? "-explicit" : "");
+
 describe("imageTagFromRef – properties", () => {
-  it("40-char hex SHA always produces sha-<lowercase sha>-<engine>", () => {
+  it("40-char hex SHA always produces sha-<lowercase sha>, suffixed only for explicit", () => {
     fc.assert(
       fc.property(
         fc.stringMatching(/^[0-9a-fA-F]{40}$/),
         fc.constantFrom("transparent", "explicit"),
         (sha, engine) => {
-          assert.equal(imageTagFromRef(sha, engine), `sha-${sha.toLowerCase()}-${engine}`);
+          assert.equal(imageTagFromRef(sha, engine), `sha-${sha.toLowerCase()}${suffixFor(engine)}`);
         },
       ),
     );
   });
 
-  it("v-prefixed ref always strips the leading v and appends the engine suffix", () => {
+  it("v-prefixed ref always strips the leading v, suffixed only for explicit", () => {
     fc.assert(
       fc.property(
         fc.string({ minLength: 1 }).map((s) => `v${s}`),
         fc.constantFrom("transparent", "explicit"),
         (ref, engine) => {
-          assert.equal(imageTagFromRef(ref, engine), `${ref.slice(1)}-${engine}`);
+          assert.equal(imageTagFromRef(ref, engine), `${ref.slice(1)}${suffixFor(engine)}`);
         },
       ),
     );
   });
 
   // Leading 'g' is not a hex char and not 'v', so this always hits the passthrough branch.
-  it("non-SHA non-v-prefixed ref always passes through unchanged plus the engine suffix", () => {
+  it("non-SHA non-v-prefixed ref always passes through unchanged, suffixed only for explicit", () => {
     fc.assert(
       fc.property(
         fc.string({ minLength: 0, maxLength: 50 }).map((s) => `g${s}`),
         fc.constantFrom("transparent", "explicit"),
         (ref, engine) => {
-          assert.equal(imageTagFromRef(ref, engine), `${ref}-${engine}`);
+          assert.equal(imageTagFromRef(ref, engine), `${ref}${suffixFor(engine)}`);
         },
       ),
     );
   });
 
-  it("defaults to the transparent engine suffix when no engine is given", () => {
+  it("defaults to no suffix (transparent) when no engine is given", () => {
     fc.assert(
       fc.property(
         fc.string({ minLength: 0, maxLength: 50 }).map((s) => `g${s}`),
         (ref) => {
-          assert.equal(imageTagFromRef(ref), `${ref}-transparent`);
+          assert.equal(imageTagFromRef(ref), ref);
         },
       ),
     );
