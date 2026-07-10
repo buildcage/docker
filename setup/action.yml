@@ -11,7 +11,7 @@ inputs:
     required: false
     default: 'restrict'
   proxy_engine:
-    description: "Network enforcement engine: transparent (HAProxy/dnsmasq/iptables interception) or explicit (BuildKit's native --proxy-network)"
+    description: "Network enforcement engine: transparent (transparent proxy, default) or explicit (BuildKit's native --proxy-network; experimental, see docs/security.md)"
     required: false
     default: 'transparent'
   allowed_https_rules:

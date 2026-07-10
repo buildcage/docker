@@ -199,10 +199,6 @@ Starts the Buildcage builder container.
 > External image overrides are not supported to preserve this guarantee. For best security, pin the
 > action to a commit SHA: `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
 >
-> Each release publishes one image per `proxy_engine` value, tagged with an engine suffix
-> (e.g. `v2.2.0-transparent`, `v2.2.0-explicit`). The `setup` action resolves the correct tag
-> automatically based on the `proxy_engine` parameter — you never need to reference these tags directly.
->
 > Self-hosting with a custom image requires forking the repository. See the [Self-Hosting Guide](./docs/self-hosting.md).
 > If the action package is private (self-hosted in a private repository), run
 > [`docker/login-action`](https://github.com/docker/login-action) with `packages: read` before this
@@ -275,7 +271,7 @@ syntax — switching engines never requires rewriting your allowlist.
 <td>Domain-level, for every connection regardless of whether the tool in the <code>RUN</code> step is proxy-aware</td>
 </tr>
 <tr>
-<td><code>explicit</code></td>
+<td><code>explicit</code> (experimental)</td>
 <td>BuildKit's native <code>--proxy-network</code>: injects <code>HTTP_PROXY</code>/<code>HTTPS_PROXY</code> and a generated CA into the <code>RUN</code> step, then MITMs the traffic</td>
 <td>Full URL/path-level, integrated into BuildKit's own build output and SLSA provenance — but only for tools that respect <code>HTTP_PROXY</code>. Non-proxy-aware tools are blocked with no visibility (see [Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine))</td>
 </tr>
@@ -283,7 +279,11 @@ syntax — switching engines never requires rewriting your allowlist.
 </table>
 
 Use `transparent` (the default) unless you specifically need path-level provenance for cooperative
-tools and can accept reduced visibility into non-cooperative ones.
+tools and can accept reduced visibility into non-cooperative ones. `explicit` is experimental: its
+underlying BuildKit feature (`--proxy-network`) is still maturing, and some tools (e.g. npm) don't
+consult the injected CA even when they respect `HTTP_PROXY`, causing TLS errors. See
+[Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine) for known limitations before
+relying on it.
 
 #### Usage notes
 

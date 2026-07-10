@@ -37,7 +37,7 @@ To trigger the build:
 Once complete, the images will be available at:
 
 ```
-ghcr.io/<your_org>/buildcage:<version>-transparent
+ghcr.io/<your_org>/buildcage:<version>
 ghcr.io/<your_org>/buildcage:<version>-explicit
 ```
 
