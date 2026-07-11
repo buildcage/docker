@@ -13,14 +13,16 @@ For a high-level overview, see [How It Works](../README.md#how-it-works) in the 
 
 <img src="../assets/diagram-architecture-transparent.png" alt="Transparent proxy engine architecture" width="611" height="490">
 
-All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). DNS queries resolve to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking.
+All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). Only **TCP** is intercepted — non-TCP protocols never reach the proxy at all (see [Non-TCP Protocol Tunneling](#non-tcp-protocol-tunneling-icmp-udp-quic)). DNS queries resolve to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking; direct-IP connections take a third, uninspected path (see below).
 
 1. **BuildKit RUN steps run in isolated containers** connected to a private network (CNI)
-2. **All DNS queries return the proxy IP** (172.20.0.1), forcing traffic through the proxy
-3. **The proxy inspects each request:**
-   - HTTPS: Reads the SNI (Server Name Indication) without decrypting
-   - HTTP: Reads the Host header
-4. **Allowlist check:** If the domain is allowed → connection proceeds. Otherwise → blocked.
+2. **All TCP traffic is redirected to the proxy** via an iptables NAT rule — regardless of destination, so both DNS-resolved and direct-IP connections reach it; all other protocols (UDP, ICMP, etc.) are dropped before they ever reach the proxy
+3. **All DNS queries return the proxy IP** (172.20.0.1), which is what lets the proxy classify DNS-resolved connections by SNI/Host header below
+4. **The proxy classifies each TCP connection into one of three paths:**
+   - HTTPS (DNS-resolved, TLS ClientHello seen): reads the SNI (Server Name Indication) without decrypting
+   - HTTP (DNS-resolved, non-TLS): reads the Host header
+   - Direct IP (connection target bypassed DNS): no content inspection at all — see [Direct IP Address Connections](#direct-ip-address-connections)
+5. **Allowlist check:** If the domain (HTTPS/HTTP) or IP:port (direct IP) is allowed → connection proceeds. Otherwise → blocked.
 
 **Note:** Base image pulls (`FROM` instructions) are performed by buildkitd itself, which runs outside the isolated network. Only commands in `RUN` steps are subject to network filtering.
 
@@ -36,12 +38,12 @@ All containers spawned by BuildKit `RUN` steps are placed on an isolated network
 #### Network Isolation
 
 - **CNI configuration**: Places temporary containers from BuildKit RUN steps into isolated-net (buildkit0 bridge, 172.20.0.0/24).
-- **iptables**: Drops all FORWARD from buildkit0, also blocks direct access to buildkitd API.
-- **Gateway enforcement**: All traffic must go through the proxy on 172.20.0.1.
+- **iptables**: A `PREROUTING REDIRECT` rule sends all **TCP** traffic from buildkit0 to the proxy, regardless of destination. A separate `FORWARD` rule then drops everything else from buildkit0 — every non-TCP protocol, and any TCP that somehow bypasses the redirect — so only TCP ever reaches the proxy; also blocks direct access to buildkitd API.
+- **Gateway enforcement**: All TCP traffic is redirected to the proxy process; non-TCP traffic never reaches it at all (dropped by the `FORWARD` rule above).
 
 #### DNS-Level Control
 
-- **Universal DNS redirect**: All domain name queries return the proxy IP (172.20.0.1), forcing all traffic through the proxy regardless of the requested domain.
+- **Universal DNS redirect**: All domain name queries return the proxy IP (172.20.0.1), which lets the proxy classify TCP connections that go through DNS by SNI/Host header (see [Architecture](#architecture)). This is separate from the TCP redirect above — direct-IP connections skip DNS but still reach the proxy via the iptables redirect.
 - **ECH prevention**: The internal DNS server operates without any upstream resolvers, so DNS HTTPS (type 65) records — required to initiate Encrypted Client Hello (ECH) — are never returned to build containers.
 
 #### HTTP/HTTPS Proxy Control
@@ -54,7 +56,8 @@ All containers spawned by BuildKit `RUN` steps are placed on an isolated network
 #### Direct IP Address Connections
 
 - **Traffic redirection**: All TCP traffic from the isolated network is redirected to HAProxy via an iptables `PREROUTING REDIRECT` rule.
-- **IP allowlist check**: Connections to raw IP addresses (e.g., `curl http://1.2.3.4/`) are checked against `allowed_ip_rules`. If no `allowed_ip_rules` are configured, all direct IP connections are blocked.
+- **IP allowlist check**: Connections to raw IP addresses (e.g., `curl http://1.2.3.4/`) are checked against `allowed_ip_rules`, matched as `ip:port`. If no `allowed_ip_rules` are configured, all direct IP connections are blocked.
+- **No content inspection**: Unlike the HTTPS/HTTP paths, a matched direct-IP connection is passed through as a raw TCP stream — its protocol is never checked. Once an `ip:port` pair is allowlisted, any TCP-based protocol can use that path, not just HTTP/HTTPS. Prefer domain-based rules (`allowed_https_rules` / `allowed_http_rules`) when possible; reserve `allowed_ip_rules` for destinations that genuinely have no stable hostname.
 
 ### Attack Resistance
 
@@ -82,7 +85,7 @@ An attacker may attempt to encode data into DNS queries to exfiltrate informatio
 
 An attacker may attempt to tunnel data using non-TCP protocols such as ICMP echo packets, raw UDP, or QUIC (HTTP/3) to bypass the proxy.
 
-**Why this is prevented:** The iptables FORWARD rule drops all traffic from the isolated network regardless of protocol — not just TCP. Since the proxy only handles TCP-based HTTP and HTTPS connections, there is no exit path for UDP or ICMP traffic. QUIC, which relies on UDP, is also blocked as a result.
+**Why this is prevented:** The iptables FORWARD rule drops all traffic from the isolated network regardless of protocol — not just TCP. Since the proxy only handles TCP (HTTP, HTTPS, and allowlisted direct-IP connections — see [Architecture](#architecture)), there is no exit path for UDP or ICMP traffic. QUIC, which relies on UDP, is also blocked as a result.
 
 #### IPv6 Bypass
 
@@ -155,7 +158,10 @@ allowlist — the exact same `allowed_https_rules` / `allowed_http_rules` / `all
 `transparent` mode (see [Rule Syntax](./rules.md)). Enforcement is domain (and port) granularity, same
 as `transparent` — the generated policy always allows any path once the host matches, since the rule
 syntax has no path component. The decrypted path is still visible, so it shows up in the report and
-BuildKit's own build output even though it isn't used to allow or deny the request.
+BuildKit's own build output even though it isn't used to allow or deny the request. `allowed_ip_rules`
+entries are compiled into the same kind of policy rule as domain rules (matched as an `https`/`http`
+identifier) — unlike `transparent` mode, there's no raw, uninspected TCP passthrough for IP-based
+rules here.
 
 If the build client already sets its own **static** source policy (e.g. via
 `EXPERIMENTAL_BUILDKIT_SOURCE_POLICY`, which `docker buildx build` reads unconditionally), buildcage

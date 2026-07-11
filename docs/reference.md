@@ -91,6 +91,7 @@ use identical `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` 
 | TLS handling | Not terminated — SNI (HTTPS) / Host header (HTTP) inspected only | Terminated (MITM) via an injected CA — full host **and path** visible |
 | Dockerfile / tool changes | None required | None for tools that already respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store; the CA is injected locally, so tools with their own CA store (e.g. npm, bun) may need an env var or flag change to point at it |
 | Enforcement granularity | Domain (and port) | Domain (and port) — same as `transparent`; the decrypted path is visible for logging but isn't matched by `allowed_*_rules` |
+| `allowed_ip_rules` enforcement | Raw TCP passthrough — no protocol inspection once `ip:port` matches | Same as domain rules — matched and MITM'd via the BuildKit source policy, not a special-cased passthrough |
 | Non-cooperative tools (ignore proxy env vars, or open raw sockets) | Still observed, blocked, and logged — network-level enforcement, no opt-out | Blocked with "network unreachable" — invisible, no trace anywhere in the report |
 | Report detail | Allowed / blocked hosts | Allowed / blocked hosts (with full path), plus a per-step "Communication details" breakdown |
 | BuildKit provenance / SLSA integration | Not integrated | Integrated into BuildKit's own build output and SLSA provenance |
