@@ -127,8 +127,9 @@ For the full parameter reference, rule syntax, and operation modes, see the [Ref
 
 Buildcage runs as a [remote driver](https://docs.docker.com/build/builders/drivers/remote/) for
 Docker Buildx, and doesn't fork or patch BuildKit itself — it only extends how build traffic is
-wired up around a stock `buildkitd`. All `RUN` step traffic is routed through a proxy that
-enforces your allowlist. Two **proxy engines** implement this — **transparent** (the default) and
+wired up around a stock `buildkitd`. All `RUN` step TCP traffic is routed through a proxy that
+enforces your allowlist — other protocols (UDP, ICMP, etc.) are never allowed through. Two
+**proxy engines** implement this — **transparent** (the default) and
 **explicit** (experimental) — differing in *how* traffic is intercepted and how much visibility you get.
 
 ### Transparent Engine (default)
@@ -140,11 +141,12 @@ enforces your allowlist. Two **proxy engines** implement this — **transparent*
   whether the tool making the request is proxy-aware
 - HTTPS connections are matched by SNI (Server Name Indication) — TLS is not terminated
 - HTTP connections are matched by their Host header
-- Direct IP access is blocked unless explicitly allowed; non-TCP protocols (UDP, ICMP, etc.) are always blocked
+- Direct IP access is blocked unless explicitly allowed — and when allowed, that IP:port passes through as raw TCP with no HTTP/TLS inspection, unlike the domain-based rules above
+- Non-TCP protocols (UDP, ICMP, etc.) are always blocked
 - No proxy configuration or CA certificate is injected into the build — TLS validation works exactly as it would without Buildcage
 
-Every connection is forced through the proxy at the network level — no tool can opt out, whether or
-not it respects proxy environment variables — so non-cooperative tools are still caught and logged
+Every TCP connection is forced through the proxy at the network level — no tool can opt out, whether
+or not it respects proxy environment variables — so non-cooperative tools are still caught and logged
 rather than failing invisibly.
 
 ### Explicit Engine (experimental)
