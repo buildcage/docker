@@ -10,7 +10,7 @@
 
 **Secure your Docker builds against supply chain attacks — restrict outbound network access to only the domains you allow.**
 
-When a compromised dependency pulled in by `RUN npm install`, `RUN pip install`, or any other build command tries to exfiltrate secrets or phone home, Buildcage blocks it — only the domains you specify are reachable, with no Dockerfile changes required, regardless of the language or package manager.
+When a compromised dependency pulled in by `RUN npm install`, `RUN pip install`, or any other build command tries to exfiltrate secrets or phone home, Buildcage blocks it — only the domains you specify are reachable. No Dockerfile changes, no proxy configuration, no certificates to install — works with any language or package manager.
 
 This is not a hypothetical risk: the [Shai-Hulud npm worm](https://unit42.paloaltonetworks.com/npm-supply-chain-attack/) compromised hundreds of packages whose `postinstall` scripts exfiltrated CI/CD secrets straight out of the build environment — exactly the moment Buildcage is designed to guard.
 
@@ -153,12 +153,13 @@ rather than failing invisibly.
 
 <img src="assets/diagram-overview-explicit.png" alt="How the explicit engine works" width="620" height="364">
 
-BuildKit's own `--proxy-network` isolates each `RUN` step and routes it through buildkitd's built-in
-proxy, injecting `HTTP_PROXY`/`HTTPS_PROXY` and a CA certificate automatically — no Dockerfile changes
-needed for tools that already respect these standard variables and trust the system CA store. In
-exchange for full URL/path-level visibility and integration with BuildKit's own build output and SLSA
-provenance, tools that ignore `HTTP_PROXY`/`HTTPS_PROXY` (or open a raw socket) are blocked invisibly,
-with no trace in the report.
+Unlike `transparent`, which needs no proxy configuration or certificates at all, `explicit` relies on
+injecting both: BuildKit's own `--proxy-network` isolates each `RUN` step and routes it through
+buildkitd's built-in proxy, injecting `HTTP_PROXY`/`HTTPS_PROXY` and a CA certificate automatically —
+no Dockerfile changes needed for tools that already respect these standard variables and trust the
+system CA store. In exchange for full URL/path-level visibility and integration with BuildKit's own
+build output and SLSA provenance, tools that ignore `HTTP_PROXY`/`HTTPS_PROXY` (or open a raw socket)
+are blocked invisibly, with no trace in the report.
 
 This engine is experimental — its underlying BuildKit feature is still maturing. One notable gap:
 some package managers (e.g. npm, bun) ship their own CA store instead of consulting the system one, so
