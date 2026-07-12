@@ -43,7 +43,7 @@ The walkthrough below covers the full audit → restrict flow.
     proxy_mode: audit  # Log everything, enforce no allowlist
 
 - name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+  uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
   with:
     driver: remote
     endpoint: docker-container://buildcage
@@ -86,7 +86,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
       fonts.googleapis.com:443
 
 - name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+  uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
   with:
     driver: remote
     endpoint: docker-container://buildcage
