@@ -1,89 +1,15 @@
-# crypto/tls: Unexpected session resumption (Go stdlib)
-# Affected binaries (buildkitd, buildkit-runc, CNI plugins) do not use
-# TLS session resumption with dynamic Config mutation, so no practical impact.
-CVE-2025-68121
-
-# OpenTelemetry Go SDK PATH Hijacking (macOS/Darwin only)
-# This product runs in Linux containers; macOS code path is never executed.
-CVE-2026-24051
-
-# Go stdlib vulnerabilities affecting CNI plugins only.
-# CNI plugins (bridge, host-local, loopback, firewall) do not perform
-# TLS connections, certificate validation, ZIP processing, or URL parsing.
-CVE-2025-61730
-CVE-2025-61729
-CVE-2025-61728
-CVE-2025-61726
-
 # buildkit-runc does not use proxy-based HTTP communication or HTML parsing.
 CVE-2025-22870
 CVE-2025-22872
 
-# CNI plugins do not perform x509 certificate validation.
-CVE-2025-61727
-
-# sigstore/rekor server-side vulnerabilities.
-# buildkitd does not run as a Rekor server.
-CVE-2026-23831
-CVE-2026-24117
-
-# go-tuf client vulnerabilities.
-# buildkitd does not directly use TUF client with untrusted repositories.
-CVE-2026-23991
-CVE-2026-23992
-CVE-2026-24686
-
-# sigstore TUF client path traversal via disk cache.
-# buildkitd does not use sigstore TUF client with disk caching directly.
-CVE-2026-24137
-
-# libexpat integer overflow in tag buffer reallocation.
-# No external XML processing path exists in this product.
-CVE-2026-25210
-
-# CIRCL ecc/p384 CombinedMult incorrect value for specific inputs.
-# buildkitd does not use CombinedMult directly; ECDH/ECDSA are unaffected.
-CVE-2026-1229
-
-# libexpat: XML_ExternalEntityParserCreate does not copy encoding handler user data.
-# No external XML entity processing path exists in this product.
-CVE-2026-24515
-
-# QuickJS stack overflow via deeply nested JS input.
-# Only internal tool scripts (convert-rule.js, report.js) are executed;
-# no untrusted JavaScript is evaluated.
-CVE-2023-31922
-
-# zlib: buffer overflow in standalone untgz demo utility.
-# The core zlib library (libz) is unaffected; untgz is not used in this image.
-CVE-2026-22184
-
-# Go stdlib net/url: incorrect parsing of IPv6 host literals.
-# CNI plugins do not parse user-supplied URLs.
-CVE-2026-25679
-
-# zlib: DoS via infinite loop in crc32_combine functions.
-# No code path in this product calls crc32_combine directly.
-CVE-2026-27171
-
 # Go stdlib html/template: XSS via escaping bugs in meta content URL and script type attribute.
 # No component in this product generates or serves HTML.
-CVE-2026-27142
 CVE-2026-39823
 CVE-2026-39826
-
-# Go stdlib os: FileInfo can escape from a Root in ReadDir.
-# CNI plugins do not use the os.Root sandboxed filesystem API.
-CVE-2026-27139
 
 # Go stdlib mime: excessive CPU on malformed MIME header decode.
 # buildkitd, buildkit-runc, and CNI plugins do not decode external MIME headers.
 CVE-2026-42504
-
-# containerd runAsNonRoot bypass via large numeric User directive.
-# buildcage does not use containerd directly; BuildKit is used as a remote builder
-# without Kubernetes runAsNonRoot enforcement.
-CVE-2026-46680
 
 # Go stdlib net/mail: DoS via pathological inputs (consumePhrase, ParseAddress,
 # ParseAddressList, ParseDate). No component in this product parses email addresses.
@@ -123,10 +49,6 @@ CVE-2026-27145
 # Go stdlib html/template: XSS via incorrect escaping in JS template literals.
 # No component in this product generates or serves HTML.
 CVE-2026-32289
-
-# AWS SDK for Go v2 EventStream decoder: panic on malformed header type byte.
-# buildcage does not use AWS SDK EventStream.
-GHSA-xmrv-pmrh-hhx2
 
 # Go stdlib net/textproto: input included in error messages allows log injection.
 # No component in this product uses net/textproto with externally controlled input in a log-injection-relevant path.
@@ -171,14 +93,12 @@ CVE-2026-39821
 # This product runs exclusively in Linux containers; the Windows code path is never executed.
 CVE-2026-39824
 
-# libexpat: additional XML parsing vulnerabilities (same rationale as
-# CVE-2026-25210/CVE-2026-24515 above). No external XML processing path exists
-# in this product.
+# libexpat: additional XML parsing vulnerabilities. No external XML processing
+# path exists in this product.
 CVE-2026-56409
 CVE-2026-56408
 CVE-2026-56407
 CVE-2026-56131
-CVE-2026-41080
 CVE-2026-56412
 CVE-2026-56411
 CVE-2026-56410
@@ -188,4 +108,20 @@ CVE-2026-56404
 CVE-2026-56403
 CVE-2026-56132
 CVE-2026-50219
-CVE-2026-45186
+
+# c-ares: use-after-free / double-free in query-completion handling.
+# Only present as libcurl's transitive dependency, inherited from the moby/buildkit base image.
+# curl itself is invoked only at build time (fetching CNI plugins from a fixed github.com URL)
+# and at runtime for a Unix-socket healthcheck with no DNS resolution involved — no component
+# resolves attacker-influenced hostnames through c-ares.
+CVE-2026-33630
+
+# Go stdlib os.Root: symlink following allows directory traversal.
+# Same rationale as CVE-2026-32282 above — no component in this product uses
+# the os.Root sandboxed filesystem API.
+CVE-2026-39822
+
+# Go stdlib crypto/tls: information disclosure via Encrypted Client Hello (ECH).
+# ECH is an opt-in TLS extension that is never configured by any component in this product;
+# buildkitd/buildkit-runc/buildkit-proxy only ever connect to trusted local endpoints.
+CVE-2026-42505
