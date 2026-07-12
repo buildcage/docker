@@ -22,23 +22,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: '24'
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-pnpm
 
       - name: Build
         run: pnpm build
 
       - name: Check dist is up to date
         run: git diff --exit-code
+
+      - name: Check dist is free of the local-image test hook
+        run: |
+          if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' setup/dist/main.cjs; then
+            echo "::error::setup/dist/main.cjs still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — @rollup/plugin-replace failed to substitute it (see rollup.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published dash14/buildcage/setup@<ref> step. Do not merge until this passes."
+            exit 1
+          fi
+          echo "confirmed: setup/dist/main.cjs has no live BUILDCAGE_BUILD_TEST_HOOKS read — the local-image bypass is unreachable in this build."
 
       - name: Run unit tests
         run: make test_unit
@@ -136,7 +134,10 @@ jobs:
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
           INPUT_BUILDER_NAME: ${{ matrix.builder_name }}
-        run: node report/src/main.js ./compose.yaml || true
+        # This job tests proxy enforcement directly, not the report action
+        # itself — only test_action's real `uses: ./report` should produce a
+        # Job Summary, so print to stdout here instead.
+        run: GITHUB_STEP_SUMMARY= node report/src/main.js ./compose.yaml || true
 
       - name: Run assertions
         env:
@@ -234,6 +235,92 @@ jobs:
           BUILDER_NAME: buildcage-multiarch
         run: docker compose down -v --rmi all 2>/dev/null || true
 
+  # Exercises the real setup/report actions end-to-end (uses: ./setup,
+  # uses: ./report) against an image built from this branch, no registry
+  # involved — see docs/development.md#local-development.
+  test_action:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        proxy_engine: [transparent, explicit]
+
+    name: test (action, ${{ matrix.proxy_engine }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm
+
+      - name: Build local buildcage image
+        env:
+          PROXY_ENGINE: ${{ matrix.proxy_engine }}
+        run: docker compose build
+
+      - name: Resolve local image ref
+        id: local_image
+        run: echo "ref=$(docker compose config --images)" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild setup action with the local-image test hook enabled
+        env:
+          BUILDCAGE_BUILD_TEST_HOOKS: "1"
+        run: pnpm build
+
+      # Default builder_name is fine: each matrix entry runs on its own VM.
+      - name: Start Buildcage builder via the real setup action
+        uses: ./setup
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          proxy_mode: restrict
+          proxy_engine: ${{ matrix.proxy_engine }}
+          allowed_https_rules: registry.npmjs.org:443
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        with:
+          driver: remote
+          # Matches setup/action.yml's default builder_name — update together.
+          endpoint: docker-container://buildcage
+
+      - name: Create test Dockerfile
+        run: |
+          mkdir -p /tmp/build-context
+          cat <<'EOF' > /tmp/build-context/Dockerfile
+          FROM node:24-alpine
+          WORKDIR /app
+          # NODE_USE_SYSTEM_CA=1: required for the explicit engine (always
+          # MITMs TLS); harmless for transparent.
+          RUN npm init -y && NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts express
+          RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
+          EOF
+
+      - name: Build test image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: /tmp/build-context
+          push: false
+          no-cache: true
+
+      - name: Show proxy report
+        if: always()
+        uses: ./report
+        with:
+          fail_on_blocked: false
+
+      # No cleanup step: ephemeral runner, and setup's post-hook already
+      # stops the container.
+
   # Single, stably-named required status check for branch protection: the
   # `test` job's own name varies per matrix entry (test (transparent-audit),
   # test (explicit-restrict), etc.), so branch protection can't target it
@@ -242,7 +329,7 @@ jobs:
   all-tests-passed:
     name: All tests passed
     runs-on: ubuntu-latest
-    needs: [unit_test, test, test_multiarch]
+    needs: [unit_test, test, test_multiarch, test_action]
     if: always()
     permissions: {}
     steps:
