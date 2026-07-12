@@ -1,4 +1,4 @@
-FROM alpine:3.24.0@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
 
 # DNS check — buildkit-proxy writes /etc/resolv.conf from EXTERNAL_RESOLVER at
 # container startup (no dnsmasq in this image).
@@ -39,6 +39,13 @@ RUN echo "=== [Direct IP - audit mode] ===" && \
 # no dns-failed / missing-sni / missing-host-header probes. Those exercise
 # buildcage's transparent-mode network-layer interception; explicit mode has
 # no equivalent (see docs/security.md's "Coverage and known limitations").
+
+# [npm install - NODE_USE_SYSTEM_CA=1 trusts BuildKit's injected MITM CA]
+RUN echo "=== [npm install - system CA trust] ===" && \
+    mkdir -p /app && cd /app && \
+    (npm init -y >/dev/null 2>&1 && \
+     NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --fetch-retries=0 express >/dev/null 2>&1 && \
+     echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
 
 # Network configuration check
 RUN echo "=== Network Configuration ===" && \

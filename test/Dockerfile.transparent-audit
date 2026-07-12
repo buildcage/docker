@@ -1,4 +1,4 @@
-FROM alpine:3.24.0@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
 
 # DNS check
 RUN echo "=== DNS Configuration ===" && \
@@ -50,6 +50,13 @@ RUN echo "=== [HTTP - missing-host-header] ===" && \
     echo "Testing HTTP request without Host header (should be blocked)..." && \
     ((printf 'GET / HTTP/1.0\r\n\r\n'; sleep 1) | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
     echo "✓ missing-host-header: request sent (blocked expected in logs)"
+
+# [npm install - no CA workaround needed, unlike the explicit engine]
+RUN echo "=== [npm install - non-cooperative CA store] ===" && \
+    mkdir -p /app && cd /app && \
+    (npm init -y >/dev/null 2>&1 && \
+     npm install --ignore-scripts express >/dev/null 2>&1 && \
+     echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
 
 # Network configuration check
 RUN echo "=== Network Configuration ===" && \
