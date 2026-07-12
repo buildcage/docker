@@ -6,13 +6,22 @@
 # compose.test-explicit.yaml explicitly passes it, so integration-test-only code
 # (a self-signed-cert CA-trust escape hatch) is physically absent from the
 # published image's binary.
-FROM golang:1.25-alpine@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2 AS buildkit-proxy-build
+#
+# --platform=$BUILDPLATFORM pins this stage to the build host's own
+# architecture even when the overall image is being built for a different
+# target platform (e.g. linux/arm64 on an amd64 GitHub Actions runner), so
+# the Go toolchain always runs natively instead of under QEMU emulation.
+# GOOS/GOARCH below then cross-compile the actual output binary for the
+# target platform — CGO_ENABLED=0 makes this a plain, fast cross-compile.
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2 AS buildkit-proxy-build
 ARG BUILDKIT_PROXY_BUILD_TAGS=""
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY explicit/buildkit-proxy/go.mod explicit/buildkit-proxy/go.sum ./
 RUN go mod download
 COPY explicit/buildkit-proxy/ ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -tags="${BUILDKIT_PROXY_BUILD_TAGS}" -o /out/buildkit-proxy .
+RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -tags="${BUILDKIT_PROXY_BUILD_TAGS}" -o /out/buildkit-proxy .
 
 # Final image
 FROM moby/buildkit:v0.31.1@sha256:6b59b7df63a8cb9902736f9ddf7fcff8261613d3e7449b8ea8b7537fc399c03a
