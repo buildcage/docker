@@ -10,7 +10,7 @@ LOGS=$(docker compose exec builder cat /var/log/buildkitd/current 2>/dev/null)
 # when it's non-default.
 assert_denied() {
   local target="$1"
-  if echo "$LOGS" | grep -qF "ref=\"${target}\""; then
+  if grep -qF "ref=\"${target}\"" <<< "$LOGS"; then
     echo "  PASS  [BLOCKED] $target"
   else
     echo "  FAIL  [BLOCKED] $target -- not found in logs"
@@ -101,9 +101,9 @@ REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= PROXY_ENGINE=explicit node report/src/mai
 # report.js) from buildctl's build-history vertex log, aggregated by
 # aggregateAllowedHosts — see report/src/lib/vertex-log.js.
 echo "[report action] Allowed Hosts table (rendered markdown, from buildctl aggregation):"
-if echo "$REPORT_MARKDOWN" | grep -qF "### ✅ Allowed Hosts" \
-  && echo "$REPORT_MARKDOWN" | grep -qF "| allowed.example.com:443 | HTTPS | 1 |" \
-  && echo "$REPORT_MARKDOWN" | grep -qF "| sub.wildcard.example.com:443 | HTTPS | 1 |"; then
+if grep -qF "### ✅ Allowed Hosts" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| allowed.example.com:443 | HTTPS | 1 |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| sub.wildcard.example.com:443 | HTTPS | 1 |" <<< "$REPORT_MARKDOWN"; then
   echo "  PASS  rendered markdown has an Allowed Hosts table incl. allowed.example.com and sub.wildcard.example.com"
 else
   echo "  FAIL  rendered markdown missing expected Allowed Hosts table content"
@@ -116,12 +116,12 @@ echo ""
 # report/src/lib/vertex-log.js. Step-counter brackets are escaped in the
 # rendered markdown (see command-log.js's escapeMarkdown) — "**\[ 3/15\] RUN ...".
 echo "[report action] per-command communication detail (rendered markdown):"
-if echo "$REPORT_MARKDOWN" | grep -qF "Communication details" \
-  && echo "$REPORT_MARKDOWN" | grep -qE '^\*\*\\\[ *[0-9]+/[0-9]+\\\] RUN ' \
-  && echo "$REPORT_MARKDOWN" | grep -qF "(no communication)" \
-  && echo "$REPORT_MARKDOWN" | grep -qE -- '- GET https://allowed\.example\.com/ -> 200' \
-  && echo "$REPORT_MARKDOWN" | grep -qF "**DENIED**" \
-  && echo "$REPORT_MARKDOWN" | grep -qF "https://blocked.example.com/"; then
+if grep -qF "Communication details" <<< "$REPORT_MARKDOWN" \
+  && grep -qE '^\*\*\\\[ *[0-9]+/[0-9]+\\\] RUN ' <<< "$REPORT_MARKDOWN" \
+  && grep -qF "(no communication)" <<< "$REPORT_MARKDOWN" \
+  && grep -qE -- '- GET https://allowed\.example\.com/ -> 200' <<< "$REPORT_MARKDOWN" \
+  && grep -qF "**DENIED**" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "https://blocked.example.com/" <<< "$REPORT_MARKDOWN"; then
   echo "  PASS  rendered markdown has per-command breakdown, (no communication), and a DENIED list"
 else
   echo "  FAIL  rendered markdown missing expected Communication details content"
