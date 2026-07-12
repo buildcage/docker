@@ -185,7 +185,6 @@ describe("resolveBuildcageImageRef – properties", () => {
         const result = resolveBuildcageImageRef({
           imageDigest,
           actionRepository,
-          actionRef: "v1.0.0",
         });
         const [repoPart] = result.split("@");
         assert.equal(repoPart, `ghcr.io/${actionRepository.toLowerCase()}`);

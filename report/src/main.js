@@ -10,6 +10,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // 1. Get structured report from container via QuickJS
 const composeFile = process.argv[2] || join(__dirname, "../..", "setup", "compose.yaml");
+// "buildcage" here is a fallback for running outside the Actions runtime
+// (action.yml's own `default: 'buildcage'` covers the normal case) — keep
+// both, and setup/src/main.js's copy, in sync.
 const composeEnv = {
   ...process.env,
   BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",

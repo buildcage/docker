@@ -4,10 +4,38 @@ import { fileURLToPath } from "node:url";
 
 import { buildRules } from "../../docker/tools/shared/lib/rules.js";
 import { SetupError } from "./lib/errors.js";
-import { imageTagFromRef, verifyImageDigest } from "./lib/verify-image.js";
+import { verifyImageDigest } from "./lib/verify-image.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
+
+// Gates a local-image override used only by this repo's own CI/dev testing
+// (see test_action in .github/workflows/test.yml), never by a consumer of a
+// published action. A normal build physically excludes
+// lib/local-image-override.js (rollup tree-shakes the dead import); the
+// unit_test CI job also greps the built output as a backstop.
+const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1";
+
+/**
+ * Verifies image provenance and resolves the digest-pinned image ref.
+ * Throws SetupError("UNVERIFIABLE_REF") if verification can't be performed
+ * (branch ref / local ./setup) — printed by the top-level catch.
+ */
+async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }) {
+  const digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine });
+  if (digest === null) {
+    throw new SetupError(
+      `Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. ` +
+        `Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`,
+      "UNVERIFIABLE_REF",
+    );
+  }
+  console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
+  return {
+    imageRef: resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo }),
+    pullPolicy: "always",
+  };
+}
 
 async function main() {
   const env = process.env;
@@ -17,42 +45,19 @@ async function main() {
   const proxyEngine = resolveProxyEngine(env.INPUT_PROXY_ENGINE);
   console.log(`Proxy engine: ${proxyEngine}`);
 
-  // Verify image provenance before pulling.
-  // verifyImageDigest returns null for unverifiable refs (branch / local ./setup).
-  // On failure it throws SetupError — printed by the top-level catch.
-  const digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine });
-  let imageRef;
-  if (digest === null) {
-    if (
-      env.BUILDCAGE_ALLOW_UNVERIFIED === "1" ||
-      env.BUILDCAGE_ALLOW_UNVERIFIED?.toLowerCase() === "true"
-    ) {
-      console.log(
-        `::warning::Skipping image provenance verification for unverifiable ref: ` +
-          `${JSON.stringify(actionRef)}. The image will be pulled without verification.`,
-      );
-      imageRef = resolveBuildcageImageRef({
-        imageDigest: undefined,
-        actionRepository: actionRepo,
-        actionRef,
-        proxyEngine,
-      });
-    } else {
-      throw new SetupError(
-        `Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. ` +
-          `Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`,
-        "UNVERIFIABLE_REF",
-      );
-    }
-  } else {
-    console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
-    imageRef = resolveBuildcageImageRef({
-      imageDigest: digest,
-      actionRepository: actionRepo,
-      actionRef,
-      proxyEngine,
-    });
+  const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
+    ? (await import("./lib/local-image-override.js")).readLocalImageOverride(env)
+    : null;
+  if (localOverride) {
+    console.log(
+      `::warning::BUILDCAGE_LOCAL_IMAGE_REF is set (${JSON.stringify(localOverride.imageRef)}) — ` +
+        `skipping image provenance verification and registry tag resolution entirely. ` +
+        `This bypass exists only for buildcage's own CI self-tests and local development and is ` +
+        `dead-code-eliminated from every published release build.`,
+    );
   }
+  const { imageRef, pullPolicy } =
+    localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }));
   console.log(`buildcage image: ${imageRef}`);
 
   const rules = buildACLRules({
@@ -69,6 +74,9 @@ async function main() {
 
   const composeEnv = {
     ...env,
+    // "buildcage" here is a fallback for running outside the Actions runtime
+    // (action.yml's own `default: 'buildcage'` covers the normal case) — keep
+    // both, and report/src/main.js's copy, in sync.
     BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
     PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
     PROXY_ENGINE: proxyEngine,
@@ -89,60 +97,29 @@ async function main() {
     [
       "compose",
       "-f", composeFile,
-      "up", "-d", "--pull", "always", "--no-build", "--wait", "--quiet-pull",
+      "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull",
     ],
     { stdio: "inherit", env: composeEnv }
   );
 }
 
 /**
- * Resolve the buildcage Docker image reference (image@digest or image:tag).
- * The repository is always derived from the action repository — external image
- * overrides are intentionally not supported to preserve Sigstore verification integrity.
+ * Resolve the buildcage Docker image reference (image@digest). The
+ * repository is always derived from the action repository — external image
+ * overrides are intentionally not supported to preserve Sigstore verification
+ * integrity.
  */
-export function resolveBuildcageImageRef({ imageDigest, actionRepository, actionRef, proxyEngine = "transparent" }, _exec = execFileSync) {
+export function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
   const repository = `ghcr.io/${actionRepository}`.toLowerCase();
-  if (imageDigest) {
-    // Pull by verified digest to close the TOCTOU window between verification and docker pull.
-    return `${repository}@${imageDigest}`;
-  }
-  const tag = resolveImageTag(repository, { actionRef, proxyEngine }, _exec);
-  return `${repository}:${tag}`;
-}
-
-/**
- * Determine the Docker image tag from the action ref.
- * Throws if the ref cannot be resolved to an existing image tag.
- * Used only when no verified digest is available (branch/local references).
- */
-export function resolveImageTag(repository, { actionRef, proxyEngine = "transparent" }, _exec = execFileSync) {
-  const attemptedTag = actionRef ? imageTagFromRef(actionRef, proxyEngine) : undefined;
-  if (actionRef) {
-    try {
-      _exec("docker", ["manifest", "inspect", `${repository}:${attemptedTag}`], {
-        stdio: "pipe",
-      });
-      return attemptedTag;
-    } catch {
-      // Image with this tag doesn't exist; fall through
-    }
-  }
-
-  // No fallback: branch refs and local ./setup references land here.
-  // These are intentionally unsupported outside of development use.
-  // Pin the action to a version tag or commit SHA for production use.
-  throw new SetupError(
-    `Cannot resolve Docker image tag for action ref: ${JSON.stringify(actionRef)}` +
-    (attemptedTag ? ` (tried "${attemptedTag}")` : "") + `. ` +
-    `Pin the action to a version tag (e.g. @v2.1.0) or commit SHA.`,
-    "TAG_UNRESOLVED",
-  );
+  // Pull by verified digest to close the TOCTOU window between verification and docker pull.
+  return `${repository}@${imageDigest}`;
 }
 
 /**
  * Resolve and validate the proxy_engine input.
  * Only "transparent" (default) and "explicit" are accepted — each maps to a
- * separately published, separately tagged Docker image (see resolveImageTag).
+ * separately published, separately tagged Docker image (see
+ * lib/verify-image.js's imageTagFromRef).
  */
 export function resolveProxyEngine(input) {
   const engine = input?.trim() || "transparent";
