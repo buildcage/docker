@@ -1,4 +1,4 @@
-FROM alpine:3.24.0@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
 
 # The FROM pull above already exercises the "base image pulls are unaffected
 # by the explicit-mode source policy" guarantee: registry-1.docker.io is never
@@ -74,6 +74,13 @@ RUN echo "=== [Port 8080 - blocked] ===" && \
 RUN echo "=== [Direct IP - blocked] ===" && \
     echo "Testing direct IP access to 10.200.0.100 (should be blocked by source policy)..." && \
     (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by source policy (expected)"
+
+# [npm install - allowed - NODE_USE_SYSTEM_CA=1 trusts BuildKit's injected MITM CA]
+RUN echo "=== [npm install - system CA trust, allowed registry] ===" && \
+    mkdir -p /app && cd /app && \
+    (npm init -y >/dev/null 2>&1 && \
+     NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --fetch-retries=0 express >/dev/null 2>&1 && \
+     echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
 
 # Note: unlike test/Dockerfile.transparent-restrict, this Dockerfile has no missing-sni /
 # missing-host-header / dns-failed probes. Those exercise buildcage's
