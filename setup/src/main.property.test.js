@@ -8,37 +8,55 @@ import assert from "node:assert/strict";
 import fc from "fast-check";
 
 import { imageTagFromRef } from "./lib/verify-image.js";
-import { buildACLRules, resolveBuildcageImageRef } from "./main.js";
+import { buildACLRules, resolveBuildcageImageRef, resolveProxyEngine } from "./main.js";
 
 // ---------------------------------------------------------------------------
 // imageTagFromRef
 // ---------------------------------------------------------------------------
 
+// Only the `explicit` engine appends a suffix; `transparent` (the default)
+// publishes the plain tag, matching the pre-multi-engine tagging scheme.
+const suffixFor = (engine) => (engine === "explicit" ? "-explicit" : "");
+
 describe("imageTagFromRef – properties", () => {
-  it("40-char hex SHA always produces sha-<lowercase sha>", () => {
+  it("40-char hex SHA always produces sha-<lowercase sha>, suffixed only for explicit", () => {
     fc.assert(
       fc.property(
         fc.stringMatching(/^[0-9a-fA-F]{40}$/),
-        (sha) => {
-          assert.equal(imageTagFromRef(sha), `sha-${sha.toLowerCase()}`);
+        fc.constantFrom("transparent", "explicit"),
+        (sha, engine) => {
+          assert.equal(imageTagFromRef(sha, engine), `sha-${sha.toLowerCase()}${suffixFor(engine)}`);
         },
       ),
     );
   });
 
-  it("v-prefixed ref always strips the leading v", () => {
+  it("v-prefixed ref always strips the leading v, suffixed only for explicit", () => {
     fc.assert(
       fc.property(
         fc.string({ minLength: 1 }).map((s) => `v${s}`),
-        (ref) => {
-          assert.equal(imageTagFromRef(ref), ref.slice(1));
+        fc.constantFrom("transparent", "explicit"),
+        (ref, engine) => {
+          assert.equal(imageTagFromRef(ref, engine), `${ref.slice(1)}${suffixFor(engine)}`);
         },
       ),
     );
   });
 
   // Leading 'g' is not a hex char and not 'v', so this always hits the passthrough branch.
-  it("non-SHA non-v-prefixed ref always passes through unchanged", () => {
+  it("non-SHA non-v-prefixed ref always passes through unchanged, suffixed only for explicit", () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 0, maxLength: 50 }).map((s) => `g${s}`),
+        fc.constantFrom("transparent", "explicit"),
+        (ref, engine) => {
+          assert.equal(imageTagFromRef(ref, engine), `${ref}${suffixFor(engine)}`);
+        },
+      ),
+    );
+  });
+
+  it("defaults to no suffix (transparent) when no engine is given", () => {
     fc.assert(
       fc.property(
         fc.string({ minLength: 0, maxLength: 50 }).map((s) => `g${s}`),
@@ -46,6 +64,34 @@ describe("imageTagFromRef – properties", () => {
           assert.equal(imageTagFromRef(ref), ref);
         },
       ),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveProxyEngine
+// ---------------------------------------------------------------------------
+
+describe("resolveProxyEngine – properties", () => {
+  it("always returns one of the two literal engine names, or throws", () => {
+    fc.assert(
+      fc.property(fc.string({ minLength: 0, maxLength: 20 }), (input) => {
+        let result;
+        try {
+          result = resolveProxyEngine(input);
+        } catch {
+          return; // throwing is an acceptable outcome for invalid input
+        }
+        assert.ok(result === "transparent" || result === "explicit");
+      }),
+    );
+  });
+
+  it("is idempotent for its own valid outputs", () => {
+    fc.assert(
+      fc.property(fc.constantFrom("transparent", "explicit"), (engine) => {
+        assert.equal(resolveProxyEngine(resolveProxyEngine(engine)), engine);
+      }),
     );
   });
 });

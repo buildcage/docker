@@ -18,7 +18,7 @@ RUN apk add --no-cache curl gettext && \
     tar -C /opt/cni/bin -xz -f /tmp/cni.tgz ./bridge ./host-local ./loopback
 
 # Final image
-FROM moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1
+FROM moby/buildkit:v0.31.1@sha256:6b59b7df63a8cb9902736f9ddf7fcff8261613d3e7449b8ea8b7537fc399c03a
 
 LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
@@ -45,24 +45,25 @@ COPY --from=deps /opt/cni/bin /opt/cni/bin
 
 # BuildKit
 RUN mkdir -p /etc/buildkit
-COPY files/buildkitd.toml /etc/buildkit/buildkitd.toml
-COPY files/cni.conflist   /etc/buildkit/cni.conflist
+COPY transparent/files/buildkitd.toml /etc/buildkit/buildkitd.toml
+COPY transparent/files/cni.conflist   /etc/buildkit/cni.conflist
 
 # DNS
-COPY files/dnsmasq.conf /etc/dnsmasq.conf
+COPY transparent/files/dnsmasq.conf /etc/dnsmasq.conf
 
 # HAProxy
 RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
-COPY files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
+COPY transparent/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
 # Tools (QuickJS scripts)
-COPY files/tools/ /opt/buildcage/tools/
+COPY tools/transparent/ /opt/buildcage/tools/transparent/
+COPY tools/shared/      /opt/buildcage/tools/shared/
 
 # License
-COPY files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
+COPY transparent/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 
 # s6 service definitions and init scripts
-COPY files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
-COPY files/s6-scripts/ /etc/s6-overlay/scripts/
+COPY transparent/files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+COPY transparent/files/s6-scripts/ /etc/s6-overlay/scripts/
 
 ENTRYPOINT ["/init"]

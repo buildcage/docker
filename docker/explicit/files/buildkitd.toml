@@ -1,0 +1,18 @@
+proxyNetwork = true
+
+[log]
+level = "debug"
+
+[grpc]
+address = ["unix:///run/buildkit/buildkitd-internal.sock"]
+
+[worker.oci]
+enabled = true
+snapshotter = "auto"
+# Governs only the internal proxy's own egress (see moby/buildkit's
+# util/network/netproviders.Providers) — RUN steps are isolated via
+# proxyNetwork's own point-to-point veth regardless of this setting.
+networkMode = "host"
+
+[[worker.oci.gcpolicy]]
+all = true

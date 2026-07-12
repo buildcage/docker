@@ -27,10 +27,18 @@ jobs:
       contents: read
       packages: write
       attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [transparent, explicit]
     outputs:
       tag: ${{ steps.version.outputs.tag }}
-      digest: ${{ steps.build.outputs.digest }}
-      bundle-content: ${{ steps.bundle.outputs.content }}
+      # Matrix legs sharing one output name would clobber each other (last
+      # completed leg wins) — each leg instead writes to a step-output key
+      # suffixed with its own matrix.engine value, so the two never collide
+      # and both survive into this job's own (statically-declared) outputs.
+      bundle-content-transparent: ${{ steps.bundle.outputs['content-transparent'] }}
+      bundle-content-explicit: ${{ steps.bundle.outputs['content-explicit'] }}
 
     steps:
       - name: Checkout
@@ -74,9 +82,14 @@ jobs:
         uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
         with:
           images: ghcr.io/${{ github.repository }}
+          # transparent (default) publishes the plain version tag, matching the
+          # pre-multi-engine tagging scheme; explicit (experimental) publishes
+          # under a -explicit suffix. Only transparent claims "latest", since it's
+          # the only engine with an unsuffixed tag namespace.
+          flavor: latest=${{ matrix.engine == 'transparent' }}
           tags: |
-            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
-            type=raw,value=sha-${{ steps.version.outputs.sha }},priority=100
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}${{ matrix.engine == 'explicit' && ',suffix=-explicit' || '' }}
+            type=raw,value=sha-${{ steps.version.outputs.sha }}${{ matrix.engine == 'explicit' && '-explicit' || '' }},priority=100
 
       - name: Login to GHCR
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
@@ -94,6 +107,7 @@ jobs:
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: docker
+          file: docker/${{ matrix.engine }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -121,13 +135,14 @@ jobs:
         id: bundle
         env:
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          ENGINE: ${{ matrix.engine }}
         run: |
-          echo "content<<EOF" >> "$GITHUB_OUTPUT"
+          echo "content-${ENGINE}<<EOF" >> "$GITHUB_OUTPUT"
           cat "$BUNDLE" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
   upload-release-assets:
-    needs: [build-and-push]
+    needs: build-and-push
     runs-on: ubuntu-slim
     permissions:
       contents: write
@@ -154,8 +169,12 @@ jobs:
         if: steps.check.outputs.upload == 'true'
         env:
           TAG: ${{ needs.build-and-push.outputs.tag }}
-          BUNDLE_CONTENT: ${{ needs.build-and-push.outputs.bundle-content }}
+          BUNDLE_TRANSPARENT: ${{ needs.build-and-push.outputs['bundle-content-transparent'] }}
+          BUNDLE_EXPLICIT: ${{ needs.build-and-push.outputs['bundle-content-explicit'] }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "$BUNDLE_CONTENT" > buildcage-container.sigstore.json
-          gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" buildcage-container.sigstore.json
+          echo "$BUNDLE_TRANSPARENT" > buildcage-container.sigstore.json
+          echo "$BUNDLE_EXPLICIT" > buildcage-container-explicit.sigstore.json
+          gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" \
+            buildcage-container.sigstore.json \
+            buildcage-container-explicit.sigstore.json

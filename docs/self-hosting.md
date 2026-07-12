@@ -11,7 +11,7 @@ This guide explains how to host your own Buildcage Docker image in a private Git
 
 ## Prerequisites
 
-- A GitHub Organizations account with **GitHub Team** or **Enterprise** plan (required for private repository packages)
+- A GitHub organization (any plan, including Free) to hold the private repository and its container package. Private packages are available on all plans, though GitHub Packages storage/transfer beyond the plan's included quota (shared with Actions artifacts) is billed — see [GitHub Packages billing](https://docs.github.com/en/billing/concepts/product-billing/github-packages).
 
 ## 1. Import the Repository
 
@@ -26,7 +26,7 @@ Since forking creates a public repository, use **GitHub's import** feature to cr
 
 ## 2. Build and Publish the Docker Image
 
-Your imported repository already contains the **Build and Push Docker Image** workflow (`.github/workflows/docker-publish.yml`). This workflow builds the image from source and publishes it to your repository's GitHub Container Registry (GHCR).
+Your imported repository already contains the **Build and Push Docker Image** workflow (`.github/workflows/docker-publish.yml`). This workflow builds **two images per release** — one per `proxy_engine` (`transparent` and `explicit`), from `docker/transparent/Dockerfile` and `docker/explicit/Dockerfile` respectively — and publishes both to your repository's GitHub Container Registry (GHCR), each signed independently.
 
 To trigger the build:
 
@@ -34,11 +34,15 @@ To trigger the build:
 2. Navigate to **Actions** > **Build and Push Docker Image**
 3. Click **Run workflow**
 
-Once complete, the image will be available at:
+Once complete, the images will be available at:
 
 ```
-ghcr.io/<your_org>/buildcage
+ghcr.io/<your_org>/buildcage:<version>
+ghcr.io/<your_org>/buildcage:<version>-explicit
 ```
+
+The `setup` action resolves the correct tag automatically based on the `proxy_engine` input — you
+don't need to reference these tags directly in your own workflows.
 
 ## 3. Configure Package Visibility
 

@@ -1,5 +1,8 @@
 /**
- * Log parsing and aggregation library for HAProxy buildcage logs.
+ * Log parsing library for HAProxy buildcage logs. aggregate() lives
+ * separately in docker/tools/shared/lib/aggregate.js (shared with the
+ * explicit engine) and is imported directly by report.js, not re-exported
+ * here.
  */
 
 const logPattern =
@@ -36,28 +39,4 @@ export function parseEntries(logText) {
     }
   }
   return entries;
-}
-
-/**
- * Aggregate entries by (host, port, ruleType, reason) with counts, sorted descending.
- *
- * @param {{ host: string, port: string, ruleType: string, reason: string }[]} filtered
- * @returns {{ host: string, port: string, ruleType: string, reason: string, count: number }[]}
- */
-export function aggregate(filtered) {
-  const map = {};
-  for (const e of filtered) {
-    const key = `${e.host}\t${e.port}\t${e.ruleType}\t${e.reason}`;
-    map[key] = (map[key] || 0) + 1;
-  }
-  return Object.keys(map)
-    .map(key => {
-      const [host, portStr, ruleType, reason] = key.split("\t");
-      return { host, port: portStr, ruleType, reason, count: map[key] };
-    })
-    .sort((a, b) =>
-      b.count - a.count ||
-      (a.host < b.host ? -1 : a.host > b.host ? 1 : 0) ||
-      Number(a.port) - Number(b.port)
-    );
 }

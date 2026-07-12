@@ -52,21 +52,39 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - mode: audit
+          - mode: transparent-audit
             proxy_mode: audit
-            test_dockerfile: test/Dockerfile.audit
-            assert_script: ./test/assert-audit-mode.sh
-            builder_name: buildcage-audit
-          - mode: restrict
+            proxy_engine: transparent
+            compose_file: compose.yaml:compose.test-transparent.yaml
+            test_dockerfile: test/Dockerfile.transparent-audit
+            assert_script: ./test/assert-transparent-audit.sh
+            builder_name: buildcage-transparent-audit
+          - mode: transparent-restrict
             proxy_mode: restrict
-            test_dockerfile: test/Dockerfile.restrict
-            assert_script: ./test/assert-restrict-mode.sh
-            builder_name: buildcage-restrict
+            proxy_engine: transparent
+            compose_file: compose.yaml:compose.test-transparent.yaml
+            test_dockerfile: test/Dockerfile.transparent-restrict
+            assert_script: ./test/assert-transparent-restrict.sh
+            builder_name: buildcage-transparent-restrict
+          - mode: explicit-audit
+            proxy_mode: audit
+            proxy_engine: explicit
+            compose_file: compose.yaml:compose.test-explicit.yaml
+            test_dockerfile: test/Dockerfile.explicit-audit
+            assert_script: ./test/assert-explicit-audit.sh
+            builder_name: buildcage-explicit-audit
+          - mode: explicit-restrict
+            proxy_mode: restrict
+            proxy_engine: explicit
+            compose_file: compose.yaml:compose.test-explicit.yaml
+            test_dockerfile: test/Dockerfile.explicit-restrict
+            assert_script: ./test/assert-explicit-restrict.sh
+            builder_name: buildcage-explicit-restrict
 
     name: test (${{ matrix.mode }})
 
     env:
-      COMPOSE_FILE: compose.yaml:compose.test.yaml
+      COMPOSE_FILE: ${{ matrix.compose_file }}
 
     steps:
       - name: Checkout
@@ -75,17 +93,27 @@ jobs:
           persist-credentials: false
 
       - name: Build containers
+        env:
+          PROXY_ENGINE: ${{ matrix.proxy_engine }}
         run: docker compose build
 
       - name: Start containers
         env:
           PROXY_MODE: ${{ matrix.proxy_mode }}
+          PROXY_ENGINE: ${{ matrix.proxy_engine }}
           BUILDER_NAME: ${{ matrix.builder_name }}
         run: docker compose up -d --wait
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
         with:
+          # Without an explicit name, setup-buildx-action generates one, which
+          # doesn't match matrix.builder_name — harmless for steps that rely on
+          # the implicit default builder (e.g. Build test image below), but
+          # assert-explicit-source-policy-conflict.sh invokes `docker buildx
+          # build --builder "$BUILDER_NAME"` directly and needs the name to
+          # actually resolve.
+          name: ${{ matrix.builder_name }}
           driver: remote
           endpoint: docker-container://${{ matrix.builder_name }}
 
@@ -114,6 +142,12 @@ jobs:
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
         run: ${{ matrix.assert_script }}
+
+      - name: Run source-policy conflict assertions
+        if: matrix.mode == 'explicit-restrict'
+        env:
+          BUILDER_NAME: ${{ matrix.builder_name }}
+        run: ./test/assert-explicit-source-policy-conflict.sh
 
       - name: Cleanup
         if: always()
@@ -199,3 +233,24 @@ jobs:
         env:
           BUILDER_NAME: buildcage-multiarch
         run: docker compose down -v --rmi all 2>/dev/null || true
+
+  # Single, stably-named required status check for branch protection: the
+  # `test` job's own name varies per matrix entry (test (transparent-audit),
+  # test (explicit-restrict), etc.), so branch protection can't target it
+  # directly without listing every combination and having to update that list
+  # whenever the matrix changes.
+  all-tests-passed:
+    name: All tests passed
+    runs-on: ubuntu-latest
+    needs: [unit_test, test, test_multiarch]
+    if: always()
+    permissions: {}
+    steps:
+      - name: Check whether all required jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more required jobs did not succeed:"
+            echo '${{ toJSON(needs) }}'
+            exit 1
+          fi
+          echo "All required jobs succeeded."
