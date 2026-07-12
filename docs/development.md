@@ -95,23 +95,27 @@ behavior — what's enforced, what's visible in the report — see
 
 ## Local Development
 
-### Image provenance verification bypass
+### Local testing of the setup/report actions
 
-When running the setup action locally against a branch ref or a local `./setup` path, the
-action cannot resolve the ref to a published release. Because the setup action is fail-closed
-by default, it will exit with an error for such "unverifiable" refs.
+Sigstore verification requires a real, published GHCR image, so the setup action normally can't run
+against an unpublished branch or local changes. This repo's own CI (`test_action` job in
+`.github/workflows/test.yml`) tests the real `setup`/`report` actions end-to-end against a locally
+built image instead, via a build-time-gated mechanism: `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build`
+compiles a `setup/dist/main.cjs` where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The
+override logic lives in its own module (`setup/src/lib/local-image-override.js`), loaded only via a
+dynamic `import()` gated by that build-time flag. Without the flag (i.e. every normal/committed
+build), rollup's own module-graph tree-shaking excludes that entire file from the bundle — it's
+physically absent, not just unreachable. A CI check (`unit_test` job) additionally confirms a normal
+build never contains a live runtime read of `BUILDCAGE_BUILD_TEST_HOOKS`, guarding against a future
+refactor silently breaking that guarantee.
 
-For development use, you can allow the action to pull the image without verification by
-setting:
+To exercise it locally:
 
-```bash
-BUILDCAGE_ALLOW_UNVERIFIED=1
-```
-
-> **⚠ This flag is for local development only.**
-> Never use it in CI or production workflows.
-> It is active only for unverifiable refs (branch names, local paths); version tags and
-> commit SHAs always go through full Sigstore verification regardless of this flag.
+1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine).
+2. `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build`
+3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set (e.g. via `act`, or by
+   invoking `node setup/dist/main.cjs` directly with the relevant `INPUT_*` env vars). Never commit
+   a `dist/main.cjs` built this way — run `pnpm build` again (without the flag) before committing.
 
 See [security.md](./security.md#verification-limitations) for more details.
 

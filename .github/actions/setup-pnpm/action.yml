@@ -1,0 +1,21 @@
+name: Set up pnpm toolchain
+description: Enable Corepack, set up Node, and install pnpm dependencies
+# Callers must run actions/checkout before this — a local-path action can't
+# be located at all until the calling job has checked out the repo.
+
+runs:
+  using: composite
+  steps:
+    - name: Enable Corepack
+      shell: bash
+      run: corepack enable
+
+    - name: Set up Node
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: '24'
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

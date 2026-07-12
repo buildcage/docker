@@ -7116,13 +7116,6 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 
 const OID_SOURCE_REPO_DIGEST = "1.3.6.1.4.1.57264.1.13", escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function imageTagFromRef(actionRef, proxyEngine = "transparent") {
-  if (!actionRef) return "";
-  let base;
-  return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
-  "explicit" === proxyEngine ? `${base}-explicit` : base;
-}
-
 async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine = "transparent"}) {
   const repoPath = actionRepo.toLowerCase(), verifyOptions = function({actionRef: actionRef, actionRepo: actionRepo}) {
     const sanPrefix = `^${escapeRegex(`https://github.com/${actionRepo}/.github/workflows/docker-publish.yml@refs/tags/`)}`, base = {
@@ -7146,7 +7139,12 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
     actionRepo: actionRepo
   });
   if (!verifyOptions) return null;
-  const tag = imageTagFromRef(actionRef, proxyEngine), regToken = await async function(registry, repo, basicAuth, _fetch = fetch) {
+  const tag = function(actionRef, proxyEngine = "transparent") {
+    if (!actionRef) return "";
+    let base;
+    return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
+    "explicit" === proxyEngine ? `${base}-explicit` : base;
+  }(actionRef, proxyEngine), regToken = await async function(registry, repo, basicAuth, _fetch = fetch) {
     const url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
     if (basicAuth) try {
       const resp = await _fetch(url, {
@@ -7260,23 +7258,8 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
 
 const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
-function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository, actionRef: actionRef, proxyEngine: proxyEngine = "transparent"}, _exec = node_child_process.execFileSync) {
-  const repository = `ghcr.io/${actionRepository}`.toLowerCase();
-  if (imageDigest) return `${repository}@${imageDigest}`;
-  return `${repository}:${resolveImageTag(repository, {
-    actionRef: actionRef,
-    proxyEngine: proxyEngine
-  }, _exec)}`;
-}
-
-function resolveImageTag(repository, {actionRef: actionRef, proxyEngine: proxyEngine = "transparent"}, _exec = node_child_process.execFileSync) {
-  const attemptedTag = actionRef ? imageTagFromRef(actionRef, proxyEngine) : void 0;
-  if (actionRef) try {
-    return _exec("docker", [ "manifest", "inspect", `${repository}:${attemptedTag}` ], {
-      stdio: "pipe"
-    }), attemptedTag;
-  } catch {}
-  throw new SetupError(`Cannot resolve Docker image tag for action ref: ${JSON.stringify(actionRef)}` + (attemptedTag ? ` (tried "${attemptedTag}")` : "") + ". Pin the action to a version tag (e.g. @v2.1.0) or commit SHA.", "TAG_UNRESOLVED");
+function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository}) {
+  return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 
 function resolveProxyEngine(input) {
@@ -7307,26 +7290,24 @@ function logRules(label, rules) {
 process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href) && async function() {
   const env = process.env, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", proxyEngine = resolveProxyEngine(env.INPUT_PROXY_ENGINE);
   console.log(`Proxy engine: ${proxyEngine}`);
-  const digest = await verifyImageDigest({
-    actionRef: actionRef,
-    actionRepo: actionRepo,
-    proxyEngine: proxyEngine
-  });
-  let imageRef;
-  if (null === digest) {
-    if ("1" !== env.BUILDCAGE_ALLOW_UNVERIFIED && "true" !== env.BUILDCAGE_ALLOW_UNVERIFIED?.toLowerCase()) throw new SetupError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
-    console.log(`::warning::Skipping image provenance verification for unverifiable ref: ${JSON.stringify(actionRef)}. The image will be pulled without verification.`), 
-    imageRef = resolveBuildcageImageRef({
-      imageDigest: void 0,
-      actionRepository: actionRepo,
+  const {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine}) {
+    const digest = await verifyImageDigest({
       actionRef: actionRef,
+      actionRepo: actionRepo,
       proxyEngine: proxyEngine
     });
-  } else console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), 
-  imageRef = resolveBuildcageImageRef({
-    imageDigest: digest,
-    actionRepository: actionRepo,
+    if (null === digest) throw new SetupError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
+    return console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), 
+    {
+      imageRef: resolveBuildcageImageRef({
+        imageDigest: digest,
+        actionRepository: actionRepo
+      }),
+      pullPolicy: "always"
+    };
+  }({
     actionRef: actionRef,
+    actionRepo: actionRepo,
     proxyEngine: proxyEngine
   });
   console.log(`buildcage image: ${imageRef}`);
@@ -7350,7 +7331,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "down" ], {
     stdio: "inherit",
     env: composeEnv
-  }), node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "up", "-d", "--pull", "always", "--no-build", "--wait", "--quiet-pull" ], {
+  }), node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ], {
     stdio: "inherit",
     env: composeEnv
   });
@@ -7358,4 +7339,4 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   err instanceof SetupError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), 
   process.exit(1);
 }), exports.buildACLRules = buildACLRules, exports.resolveBuildcageImageRef = resolveBuildcageImageRef, 
-exports.resolveImageTag = resolveImageTag, exports.resolveProxyEngine = resolveProxyEngine;
+exports.resolveProxyEngine = resolveProxyEngine;

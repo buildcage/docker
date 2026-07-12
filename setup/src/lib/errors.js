@@ -12,7 +12,6 @@
  *   VERIFY_FAILED    – Sigstore bundle verification failed
  *   UNVERIFIABLE_REF – action ref cannot be verified (branch / local path)
  *   INVALID_RULES    – ACL rule syntax error
- *   TAG_UNRESOLVED   – Docker image tag cannot be resolved
  */
 export class SetupError extends Error {
   constructor(message, code) {

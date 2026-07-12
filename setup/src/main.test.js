@@ -6,140 +6,33 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveBuildcageImageRef, resolveImageTag, buildACLRules, resolveProxyEngine } from "./main.js";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** A stub for execFileSync that always succeeds (simulates image exists). */
-const execOk = () => Buffer.from("{}");
-
-/** A stub for execFileSync that always throws (simulates image not found). */
-const execFail = () => { throw new Error("manifest not found"); };
-
-// ---------------------------------------------------------------------------
-// resolveImageTag
-// ---------------------------------------------------------------------------
-
-describe("resolveImageTag", () => {
-  it("converts a 40-char hex SHA to sha-<sha> by default (no suffix for transparent)", () => {
-    const sha = "a".repeat(40);
-    const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: sha }, execOk);
-    assert.equal(result, `sha-${"a".repeat(40)}`);
-  });
-
-  it("strips leading 'v' from a version tag", () => {
-    const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: "v2.1.0" }, execOk);
-    assert.equal(result, "2.1.0");
-  });
-
-  it("strips leading 'v' from a major-only tag", () => {
-    const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: "v3" }, execOk);
-    assert.equal(result, "3");
-  });
-
-  it("uses branch name as-is when image exists", () => {
-    const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: "main" }, execOk);
-    assert.equal(result, "main");
-  });
-
-  it("uses the explicit engine suffix when requested", () => {
-    const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: "v2.1.0", proxyEngine: "explicit" }, execOk);
-    assert.equal(result, "2.1.0-explicit");
-  });
-
-  it("throws when docker manifest inspect fails (tag not found)", () => {
-    assert.throws(
-      () => resolveImageTag("ghcr.io/owner/repo", { actionRef: "v2.1.0" }, execFail),
-      (err) => { assert.ok(err instanceof Error); return true; }
-    );
-  });
-
-  it("throws when actionRef is empty string", () => {
-    assert.throws(
-      () => resolveImageTag("ghcr.io/owner/repo", { actionRef: "" }, execOk),
-      (err) => { assert.ok(err instanceof Error); return true; }
-    );
-  });
-
-  it("throws when actionRef is undefined", () => {
-    assert.throws(
-      () => resolveImageTag("ghcr.io/owner/repo", { actionRef: undefined }, execOk),
-      (err) => { assert.ok(err instanceof Error); return true; }
-    );
-  });
-
-  it("lowercases a SHA-derived tag", () => {
-    const sha = "ABCDEF1234".padEnd(40, "0");
-    const result = resolveImageTag("ghcr.io/owner/repo", { actionRef: sha }, execOk);
-    assert.equal(result, `sha-${sha.toLowerCase()}`);
-  });
-});
+import {
+  resolveBuildcageImageRef,
+  buildACLRules,
+  resolveProxyEngine,
+} from "./main.js";
 
 // ---------------------------------------------------------------------------
 // resolveBuildcageImageRef
 // ---------------------------------------------------------------------------
 
 describe("resolveBuildcageImageRef", () => {
-  it("uses IMAGE@DIGEST when imageDigest is provided", () => {
+  it("uses IMAGE@DIGEST", () => {
     const digest = "sha256:" + "a".repeat(64);
-    const result = resolveBuildcageImageRef(
-      { imageDigest: digest, actionRepository: "Owner/Repo", actionRef: "v2.1.0" },
-      execOk
-    );
+    const result = resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "Owner/Repo" });
     assert.equal(result, `ghcr.io/owner/repo@${digest}`);
   });
 
-  it("lowercases the repository when using digest", () => {
+  it("lowercases the repository", () => {
     const digest = "sha256:" + "b".repeat(64);
-    const result = resolveBuildcageImageRef(
-      { imageDigest: digest, actionRepository: "MyOrg/MyRepo", actionRef: "v2.1.0" },
-      execOk
-    );
+    const result = resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "MyOrg/MyRepo" });
     assert.ok(result.startsWith("ghcr.io/myorg/myrepo@"));
   });
 
-  it("falls back to tag reference when imageDigest is empty string", () => {
-    const result = resolveBuildcageImageRef(
-      { imageDigest: "", actionRepository: "owner/repo", actionRef: "v2.1.0" },
-      execOk
-    );
-    assert.equal(result, "ghcr.io/owner/repo:2.1.0");
-  });
-
-  it("falls back to tag reference when imageDigest is undefined", () => {
-    const result = resolveBuildcageImageRef(
-      { imageDigest: undefined, actionRepository: "owner/repo", actionRef: "v2.1.0" },
-      execOk
-    );
-    assert.equal(result, "ghcr.io/owner/repo:2.1.0");
-  });
-
-  it("uses the explicit engine's tag suffix when requested", () => {
-    const result = resolveBuildcageImageRef(
-      { imageDigest: undefined, actionRepository: "owner/repo", actionRef: "v2.1.0", proxyEngine: "explicit" },
-      execOk
-    );
-    assert.equal(result, "ghcr.io/owner/repo:2.1.0-explicit");
-  });
-
   it("always derives repository from actionRepository (no external override)", () => {
-    const result = resolveBuildcageImageRef(
-      { imageDigest: "", actionRepository: "dash14/buildcage", actionRef: "v2.1.0" },
-      execOk
-    );
-    assert.ok(result.startsWith("ghcr.io/dash14/buildcage:"));
-  });
-
-  it("throws when manifest inspect fails and no digest", () => {
-    assert.throws(
-      () => resolveBuildcageImageRef(
-        { imageDigest: "", actionRepository: "owner/repo", actionRef: "v2.1.0" },
-        execFail
-      ),
-      (err) => { assert.ok(err instanceof Error); return true; }
-    );
+    const digest = "sha256:" + "c".repeat(64);
+    const result = resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "dash14/buildcage" });
+    assert.ok(result.startsWith("ghcr.io/dash14/buildcage@"));
   });
 });
 
