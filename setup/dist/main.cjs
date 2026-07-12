@@ -4828,8 +4828,13 @@ function requireObj() {
       const byteCount = 127 & buf;
       if (byteCount > 6) throw new error_1.ASN1ParseError("length exceeds 6 byte limit");
       let len = 0;
-      for (let i = 0; i < byteCount; i++) len = 256 * len + stream.getUint8();
+      for (let i = 0; i < byteCount; i++) {
+        const byte = stream.getUint8();
+        if (0 === i && 0 === byte) throw new error_1.ASN1ParseError("non-minimal length encoding");
+        len = 256 * len + byte;
+      }
       if (0 === len) throw new error_1.ASN1ParseError("indefinite length encoding not supported");
+      if (len < 128) throw new error_1.ASN1ParseError("non-minimal length encoding");
       return len;
     }, length.encodeLength = function(len) {
       if (len < 128) return Buffer.from([ len ]);
@@ -4867,21 +4872,33 @@ function requireObj() {
       let pos = 0;
       const end = buf.length;
       let n = buf[pos++];
-      let oid = `${Math.floor(n / 40)}.${n % 40}`, val = 0;
-      for (;pos < end; ++pos) n = buf[pos], val = (val << 7) + (127 & n), 128 & n || (oid += `.${val}`, 
-      val = 0);
+      let oid = `${Math.floor(n / 40)}.${n % 40}`, val = 0n;
+      for (;pos < end; ++pos) n = buf[pos], val = (val << 7n) + BigInt(127 & n), 128 & n || (oid += `.${val}`, 
+      val = 0n);
       return oid;
     }, parse.parseBoolean = function(buf) {
-      return 0 !== buf[0];
+      if (1 !== buf.length) throw new error_1.ASN1ParseError("invalid boolean");
+      switch (buf[0]) {
+       case 0:
+        return !1;
+
+       case 255:
+        return !0;
+
+       default:
+        throw new error_1.ASN1ParseError("invalid boolean");
+      }
     }, parse.parseBitString = function(buf) {
-      const unused = buf[0], end = buf.length, bits = [];
+      const unused = buf[0];
+      if (unused > 7) throw new error_1.ASN1ParseError("invalid bit string");
+      const end = buf.length, bits = [];
       for (let i = 1; i < end; ++i) {
         const byte = buf[i], skip = i === end - 1 ? unused : 0;
         for (let j = 7; j >= skip; --j) bits.push(byte >> j & 1);
       }
       return bits;
     };
-    const RE_TIME_SHORT_YEAR = /^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\.\d{3})?Z$/, RE_TIME_LONG_YEAR = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\.\d{3})?Z$/;
+    const error_1 = requireError$2(), RE_TIME_SHORT_YEAR = /^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\.\d{3})?Z$/, RE_TIME_LONG_YEAR = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\.\d{3})?Z$/;
     function parseStringASCII(buf) {
       return buf.toString("ascii");
     }
@@ -4942,7 +4959,9 @@ function requireObj() {
       this.tag = tag, this.value = value, this.subs = subs;
     }
     static parseBuffer(buf) {
-      return parseStream(new stream_1.ByteStream(buf));
+      const stream = new stream_1.ByteStream(buf), obj = parseStream(stream);
+      if (stream.position !== stream.length) throw new error_1.ASN1ParseError("invalid trailing data");
+      return obj;
     }
     toDER() {
       const valueStream = new stream_1.ByteStream;
@@ -4980,23 +4999,26 @@ function requireObj() {
       return (0, parse_1.parseBitString)(this.value);
     }
   }
-  function parseStream(stream) {
+  obj.ASN1Obj = ASN1Obj;
+  const MAX_DEPTH = 100;
+  function parseStream(stream, depth = 0) {
+    if (depth > MAX_DEPTH) throw new error_1.ASN1ParseError("maximum nesting depth exceeded");
     const tag = new tag_1.ASN1Tag(stream.getUint8()), len = (0, length_1.decodeLength)(stream), value = stream.slice(stream.position, len), start = stream.position;
     let subs = [];
-    if (tag.constructed) subs = collectSubs(stream, len); else if (tag.isOctetString()) try {
-      subs = collectSubs(stream, len);
+    if (tag.constructed) subs = collectSubs(stream, len, depth); else if (tag.isOctetString()) try {
+      subs = collectSubs(stream, len, depth);
     } catch (e) {}
     return 0 === subs.length && stream.seek(start + len), new ASN1Obj(tag, value, subs);
   }
-  function collectSubs(stream, len) {
+  function collectSubs(stream, len, depth) {
     const end = stream.position + len;
     if (end > stream.length) throw new error_1.ASN1ParseError("invalid length");
     const subs = [];
-    for (;stream.position < end; ) subs.push(parseStream(stream));
+    for (;stream.position < end; ) subs.push(parseStream(stream, depth + 1));
     if (stream.position !== end) throw new error_1.ASN1ParseError("invalid length");
     return subs;
   }
-  return obj.ASN1Obj = ASN1Obj, obj;
+  return obj;
 }
 
 function requireAsn1() {
@@ -5894,6 +5916,9 @@ function requireBundle() {
       compareDigest(digest) {
         return core_1.crypto.bufferEqual(digest, core_1.crypto.digest("sha256", this.env.payload));
       }
+      compareSignedDigest(digest) {
+        return core_1.crypto.bufferEqual(digest, core_1.crypto.digest("sha256", this.preAuthEncoding));
+      }
       compareSignature(signature) {
         return core_1.crypto.bufferEqual(signature, this.signature);
       }
@@ -5934,6 +5959,9 @@ function requireBundle() {
       }
       compareDigest(digest) {
         return core_1.crypto.bufferEqual(digest, this.messageDigest);
+      }
+      compareSignedDigest(digest) {
+        return this.compareDigest(digest);
       }
       verifySignature(key) {
         return core_1.crypto.verify(this.artifact, key, this.signature, this.hashAlgorithm);
@@ -6586,7 +6614,7 @@ function requireHashedrekord() {
           message: "signature mismatch"
         });
         const tlogDigest = tlogEntry.spec.data.hash?.value || "";
-        if (!content.compareDigest(Buffer.from(tlogDigest, "hex"))) throw new error_1.VerificationError({
+        if (!content.compareSignedDigest(Buffer.from(tlogDigest, "hex"))) throw new error_1.VerificationError({
           code: "TLOG_BODY_ERROR",
           message: "digest mismatch"
         });
@@ -6608,7 +6636,7 @@ function requireHashedrekord() {
           message: "signature mismatch"
         });
         const tlogHash = spec.data?.digest || Buffer.from("");
-        if (!content.compareDigest(tlogHash)) throw new error_1.VerificationError({
+        if (!content.compareSignedDigest(tlogHash)) throw new error_1.VerificationError({
           code: "TLOG_BODY_ERROR",
           message: "digest mismatch"
         });
