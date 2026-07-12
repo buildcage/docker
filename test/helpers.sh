@@ -14,7 +14,9 @@ assert_log_contains() {
     pattern="$pattern $reason"
     label="$label $reason"
   fi
-  if echo "$LOGS" | grep buildcage | grep -q "$pattern"; then
+  local buildcage_logs
+  buildcage_logs=$(grep buildcage <<< "$LOGS" || true)
+  if grep -q "$pattern" <<< "$buildcage_logs"; then
     echo "  PASS  $label"
   else
     echo "  FAIL  $label  -- not found in logs"
