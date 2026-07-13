@@ -50,7 +50,7 @@ async function main() {
     : null;
   if (localOverride) {
     console.log(
-      `::warning::BUILDCAGE_LOCAL_IMAGE_REF is set (${JSON.stringify(localOverride.imageRef)}) — ` +
+      `BUILDCAGE_LOCAL_IMAGE_REF is set (${JSON.stringify(localOverride.imageRef)}) — ` +
         `skipping image provenance verification and registry tag resolution entirely. ` +
         `This bypass exists only for buildcage's own CI self-tests and local development and is ` +
         `dead-code-eliminated from every published release build.`,
