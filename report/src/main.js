@@ -161,7 +161,11 @@ if (isExplicit) {
   markdown += renderCommunicationDetails(builds, report.deniedTimeline);
 }
 
-markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
+// SNI-based sniffing only applies to the transparent engine — the explicit
+// engine terminates TLS itself, so this caveat doesn't apply to it.
+if (!isExplicit) {
+  markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
+}
 
 markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
 
