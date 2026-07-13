@@ -2,10 +2,25 @@
 CVE-2025-22870
 CVE-2025-22872
 
+# QuickJS stack overflow via deeply nested JS input.
+# Only internal tool scripts (convert-rule.js, report.js) are executed;
+# no untrusted JavaScript is evaluated.
+CVE-2023-31922
+
 # Go stdlib html/template: XSS via escaping bugs in meta content URL and script type attribute.
 # No component in this product generates or serves HTML.
+CVE-2026-27142
 CVE-2026-39823
 CVE-2026-39826
+
+# Go stdlib net/url: incorrect parsing of IPv6 host literals.
+# CNI plugins do not parse user-supplied URLs.
+CVE-2026-25679
+
+# Go stdlib os: FileInfo can escape from a Root in ReadDir.
+# Same rationale as CVE-2026-32282/CVE-2026-39822 above — no component in
+# this product uses the os.Root sandboxed filesystem API.
+CVE-2026-27139
 
 # Go stdlib mime: excessive CPU on malformed MIME header decode.
 # buildkitd, buildkit-runc, and CNI plugins do not decode external MIME headers.
@@ -108,6 +123,8 @@ CVE-2026-56404
 CVE-2026-56403
 CVE-2026-56132
 CVE-2026-50219
+CVE-2026-41080
+CVE-2026-45186
 
 # c-ares: use-after-free / double-free in query-completion handling.
 # Only present as libcurl's transitive dependency, inherited from the moby/buildkit base image.
