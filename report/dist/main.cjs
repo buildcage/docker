@@ -8,6 +8,16 @@ const ruleTypeToParam = {
   IP: "allowed_ip_rules"
 };
 
+function renderVertexItem({command: command, started: started, completed: completed, entries: entries}, indent) {
+  const inner = indent + "   ";
+  let s = `${indent}* ${escapeMarkdown(command)}\n\n`;
+  if (s += `${inner}(${formatSeconds(started)} · duration ${function(started, completed) {
+    const seconds = (Date.parse(completed) - Date.parse(started)) / 1e3;
+    return `${seconds.toFixed(3)}s`;
+  }(started, completed)})\n\n`, s += `${inner}\`\`\`\n`, 0 === entries.length) s += `${inner}(no communication)\n`; else for (const entry of entries) s += `${inner}${renderRequestLine(entry)}\n`;
+  return s += `${inner}\`\`\`\n\n`, s;
+}
+
 function renderRequestLine({method: method, url: url, status: status}) {
   const line = `- ${escapeMarkdown(method)} ${escapeMarkdown(url)}`;
   return void 0 === status ? line : `${line} -> ${status}`;
@@ -17,16 +27,8 @@ function escapeMarkdown(text) {
   return text.replace(/([\\`*_[\]<>])/g, "\\$1");
 }
 
-function formatMillis(iso) {
-  return new Date(iso).toISOString().slice(11, 23) + "Z";
-}
-
 function formatSeconds(iso) {
   return new Date(iso).toISOString().slice(11, 19) + "Z";
-}
-
-function formatDuration(started, completed) {
-  return `${((Date.parse(completed) - Date.parse(started)) / 1e3).toFixed(3)}s`;
 }
 
 const requestLineDetailPattern = /^-\s+(\S+)\s+(\S+?)(?:\s+->\s+(\d+))?$/;
@@ -253,25 +255,23 @@ if (isAudit) {
 isExplicit && (markdown += function(builds, deniedTimeline) {
   const nonEmptyBuilds = (builds || []).filter(b => b && b.length > 0), hasVertexLog = nonEmptyBuilds.length > 0, hasDenied = deniedTimeline && deniedTimeline.length > 0;
   if (!hasVertexLog && !hasDenied) return "";
-  let md = "\n<details>\n<summary>Communication details</summary>\n\n";
+  let md = "\n<details>\n<summary>💬 Communication details</summary>\n\n";
   if (hasVertexLog) {
+    md += "* **✅ Allowed Urls**\n\n";
     const showBuildHeadings = nonEmptyBuilds.length > 1;
     nonEmptyBuilds.forEach((vertices, i) => {
-      showBuildHeadings && (md += `### Build ${i + 1}\n\n`);
-      for (const {command: command, started: started, completed: completed, entries: entries} of vertices) {
-        if (md += `**${escapeMarkdown(command)}**\n`, md += `_started ${formatMillis(started)} · duration ${formatDuration(started, completed)}_\n`, 
-        0 === entries.length) md += "(no communication)\n"; else for (const entry of entries) md += `${renderRequestLine(entry)}\n`;
-        md += "\n";
-      }
+      const indent = showBuildHeadings ? "      " : "   ";
+      showBuildHeadings && (md += `   * Build ${i + 1}\n\n`);
+      for (const vertex of vertices) md += renderVertexItem(vertex, indent);
     });
   }
   if (hasDenied) {
-    md += "**DENIED**\n";
-    for (const {url: url, timestamp: timestamp} of deniedTimeline) md += `- ${formatSeconds(timestamp)} ${escapeMarkdown(url)}\n`;
+    md += "* **🚫 Blocked Urls**\n\n";
+    for (const {url: url, timestamp: timestamp} of deniedTimeline) md += `   - (${formatSeconds(timestamp)}) ${escapeMarkdown(url)}\n`;
     md += "\n";
   }
   return md += "</details>\n", md;
-}(builds, report.deniedTimeline)), markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n", 
+}(builds, report.deniedTimeline)), isExplicit || (markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n"), 
 markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
 
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;

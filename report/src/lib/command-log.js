@@ -1,32 +1,15 @@
 /**
  * Render the explicit engine's communication detail as a collapsed markdown
- * section. Returns "" if there is nothing to show (including when both
- * inputs are absent/empty, as in transparent mode, which has neither).
+ * section, or "" if there's nothing to show. Allowed Urls is listed before
+ * Blocked Urls, matching the Allowed Hosts / Blocked Hosts tables above.
  *
- * `builds` (one entry per build found via `buildctl debug histories` — see
- * report/src/lib/vertex-log.js's parseVertexAllowedLog(), called once per
- * ref — oldest build first) is rendered as one block per RUN step, including
- * steps with no communication at all, shown as "(no communication)"; each
- * build's own steps are already grouped by build stage and ordered for human
- * debugging by vertex-log.js, so this function just renders them in the
- * order given. A "### Build N" heading separates builds only when there is
- * more than one — a workflow that runs several builds against the same
- * container before calling the report action once would otherwise repeat
- * step labels like "[2/15] RUN ..." with no indication they're from
- * different builds.
+ * Blocked entries aren't attributed to a specific RUN step — buildkitd's
+ * denial log carries no vertex/span identifier to attribute it with. A
+ * "Build N" item separates builds only when there's more than one, since
+ * step labels like "[2/15] RUN ..." repeat across builds.
  *
- * `deniedTimeline` (from docker/tools/explicit/report.js's
- * parseDenialTimeline(), which already covers every build since it reads
- * buildkitd's own append-only debug log) is rendered separately, as a flat
- * "DENIED" list with each entry's own timestamp, rather than attributed to a
- * specific RUN step — BuildKit's own denial log carries no vertex/span
- * identifier to attribute it with, so a human has to eyeball the timestamps
- * against the per-step started/duration above to guess which step (and
- * which build) it belongs to.
- *
- * Command/URL text originates in the Dockerfile (or the request itself) and
- * is escaped before being embedded in markdown, so it can't break out of the
- * bold/list formatting it's rendered into.
+ * Command text is escaped since it's embedded directly in markdown; request
+ * lines go inside a fenced code block instead, where escaping isn't needed.
  *
  * @param {Array<Array<{ command: string, started: string, completed: string, entries: Array<{ method: string, url: string, status?: number }> }>>} builds
  * @param {Array<{ url: string, timestamp: string }>} deniedTimeline
@@ -38,35 +21,42 @@ export function renderCommunicationDetails(builds, deniedTimeline) {
   const hasDenied = deniedTimeline && deniedTimeline.length > 0;
   if (!hasVertexLog && !hasDenied) return "";
 
-  let md = "\n<details>\n<summary>Communication details</summary>\n\n";
+  let md = "\n<details>\n<summary>💬 Communication details</summary>\n\n";
 
   if (hasVertexLog) {
+    md += "* **✅ Allowed Urls**\n\n";
     const showBuildHeadings = nonEmptyBuilds.length > 1;
     nonEmptyBuilds.forEach((vertices, i) => {
-      if (showBuildHeadings) md += `### Build ${i + 1}\n\n`;
-      for (const { command, started, completed, entries } of vertices) {
-        md += `**${escapeMarkdown(command)}**\n`;
-        md += `_started ${formatMillis(started)} · duration ${formatDuration(started, completed)}_\n`;
-        if (entries.length === 0) {
-          md += "(no communication)\n";
-        } else {
-          for (const entry of entries) md += `${renderRequestLine(entry)}\n`;
-        }
-        md += "\n";
-      }
+      const indent = showBuildHeadings ? "      " : "   ";
+      if (showBuildHeadings) md += `   * Build ${i + 1}\n\n`;
+      for (const vertex of vertices) md += renderVertexItem(vertex, indent);
     });
   }
 
   if (hasDenied) {
-    md += "**DENIED**\n";
+    md += "* **🚫 Blocked Urls**\n\n";
     for (const { url, timestamp } of deniedTimeline) {
-      md += `- ${formatSeconds(timestamp)} ${escapeMarkdown(url)}\n`;
+      md += `   - (${formatSeconds(timestamp)}) ${escapeMarkdown(url)}\n`;
     }
     md += "\n";
   }
 
   md += "</details>\n";
   return md;
+}
+
+function renderVertexItem({ command, started, completed, entries }, indent) {
+  const inner = indent + "   ";
+  let s = `${indent}* ${escapeMarkdown(command)}\n\n`;
+  s += `${inner}(${formatSeconds(started)} · duration ${formatDuration(started, completed)})\n\n`;
+  s += `${inner}\`\`\`\n`;
+  if (entries.length === 0) {
+    s += `${inner}(no communication)\n`;
+  } else {
+    for (const entry of entries) s += `${inner}${renderRequestLine(entry)}\n`;
+  }
+  s += `${inner}\`\`\`\n\n`;
+  return s;
 }
 
 function renderRequestLine({ method, url, status }) {
@@ -87,15 +77,8 @@ function escapeMarkdown(text) {
   return text.replace(/([\\`*_[\]<>])/g, "\\$1");
 }
 
-// "HH:MM:SS.mmmZ" — millisecond precision, available for vertex started/
-// completed times (from buildctl's rawjson output).
-function formatMillis(iso) {
-  return new Date(iso).toISOString().slice(11, 23) + "Z";
-}
-
-// "HH:MM:SSZ" — whole-second precision only, matching what buildkitd's own
-// denial log actually records (no fractional seconds at all); formatting
-// this the same way as formatMillis would imply false precision.
+// Whole-second precision, matching what buildkitd's own denial log records
+// (no fractional seconds) — used for vertex started times too, for consistency.
 function formatSeconds(iso) {
   return new Date(iso).toISOString().slice(11, 19) + "Z";
 }

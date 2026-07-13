@@ -73,13 +73,14 @@ echo ""
 # The per-command "Communication details" section is built by report/src/main.js
 # itself (not report.js) via buildctl debug histories/logs — see
 # report/src/lib/vertex-log.js. Step-counter brackets are escaped in the
-# rendered markdown (see command-log.js's escapeMarkdown) — "**\[3/8\] RUN ...".
+# rendered markdown (see command-log.js's escapeMarkdown) — "* \[3/8\] RUN ...".
 echo "[report action] per-command communication detail (rendered markdown):"
 if grep -qF "Communication details" <<< "$REPORT_MARKDOWN" \
-  && grep -qE '^\*\*\\\[ *[0-9]+/[0-9]+\\\] RUN ' <<< "$REPORT_MARKDOWN" \
+  && grep -qF "Allowed Urls" <<< "$REPORT_MARKDOWN" \
+  && grep -qE '^ *\* \\\[ *[0-9]+/[0-9]+\\\] RUN ' <<< "$REPORT_MARKDOWN" \
   && grep -qE -- '- GET https://blocked\.example\.com/ -> 200' <<< "$REPORT_MARKDOWN" \
-  && ! grep -qF "**DENIED**" <<< "$REPORT_MARKDOWN"; then
-  echo "  PASS  rendered markdown has per-command breakdown with no DENIED section"
+  && ! grep -qF "Blocked Urls" <<< "$REPORT_MARKDOWN"; then
+  echo "  PASS  rendered markdown has per-command breakdown with no Blocked Urls section"
 else
   echo "  FAIL  rendered markdown missing expected Communication details content"
   FAILURES=$((FAILURES + 1))
