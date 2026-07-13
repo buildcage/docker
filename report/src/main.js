@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { buildRestrictExample } from "./lib/build-example.js";
 import { renderCommunicationDetails } from "./lib/command-log.js";
 import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.js";
+import { createAnnotation } from "./lib/annotation.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -173,22 +174,24 @@ if (summaryFile) {
 }
 
 // 4. Error control for blocked connections
+const outputForAction = Boolean(summaryFile);
+const annotation = createAnnotation(outputForAction);
 if (report.blockedCount > 0) {
   if (isAudit) {
-    console.log(
-      `::notice::${report.blockedCount} blocked connection(s) detected by buildcage proxy`
+    annotation.notice(
+      `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
     );
   } else {
     const failOnBlocked =
       (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
     if (failOnBlocked) {
-      console.log(
-        `::error::${report.blockedCount} blocked connection(s) detected by buildcage proxy`
+      annotation.error(
+        `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
       );
       process.exitCode = 1;
     } else {
-      console.log(
-        `::notice::${report.blockedCount} blocked connection(s) detected by buildcage proxy`
+      annotation.notice(
+        `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
       );
     }
   }
