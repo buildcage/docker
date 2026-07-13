@@ -11,7 +11,66 @@ on:
 permissions: {}
 
 jobs:
+  changes:
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      pull-requests: read
+    name: changes
+    if: github.event_name == 'pull_request'
+    outputs:
+      unit_test: ${{ steps.filter.outputs.unit_test }}
+      test: ${{ steps.filter.outputs.test }}
+      test_multiarch: ${{ steps.filter.outputs.test_multiarch }}
+      test_action: ${{ steps.filter.outputs.test_action }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          filters: |
+            docker: &docker
+              - 'docker/**'
+              - 'compose.yaml'
+            js-built: &js-built
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'rollup.config.js'
+              - '.github/actions/setup-pnpm/**'
+            workflow: &workflow
+              - '.github/workflows/test.yml'
+
+            unit_test:
+              - *js-built
+              - *workflow
+              - 'docker/transparent/**'
+              - 'docker/explicit/**'
+              - 'docker/tools/**'
+              - 'setup/**'
+              - 'report/**'
+              - 'Makefile'
+            test:
+              - *docker
+              - *workflow
+              - 'compose.test-transparent.yaml'
+              - 'compose.test-explicit.yaml'
+              - 'test/**'
+              - 'report/src/**'
+            test_multiarch:
+              - *docker
+              - *workflow
+              - 'test/Dockerfile.multiarch'
+            test_action:
+              - *docker
+              - *js-built
+              - *workflow
+              - 'setup/**'
+              - 'report/**'
+
   unit_test:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.unit_test == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -42,6 +101,8 @@ jobs:
         run: make test_unit
 
   test:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -157,6 +218,8 @@ jobs:
         run: docker compose down -v --rmi all 2>/dev/null || true
 
   test_multiarch:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_multiarch == 'true'
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
@@ -239,6 +302,8 @@ jobs:
   # uses: ./report) against an image built from this branch, no registry
   # involved — see docs/development.md#local-development.
   test_action:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_action == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -329,7 +394,7 @@ jobs:
   all-tests-passed:
     name: All tests passed
     runs-on: ubuntu-latest
-    needs: [unit_test, test, test_multiarch, test_action]
+    needs: [changes, unit_test, test, test_multiarch, test_action]
     if: always()
     permissions: {}
     steps:
