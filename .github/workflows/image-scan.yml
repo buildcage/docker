@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [transparent, explicit]
+        engine: [transparent, explicit, sandbox]
 
     steps:
       - name: Checkout
