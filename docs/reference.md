@@ -89,7 +89,7 @@ use identical `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` 
 |---|---|---|
 | Isolation mechanism | CNI network + DNS redirection | BuildKit native `--proxy-network` (point-to-point network namespace) |
 | TLS handling | Not terminated — SNI (HTTPS) / Host header (HTTP) inspected only | Terminated (MITM) via an injected CA — full host **and path** visible |
-| Dockerfile / tool changes | None required | None for tools that already respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store; the CA is injected locally, so tools with their own CA store (e.g. npm, bun) may need an env var or flag change to point at it |
+| Dockerfile / tool changes | None required | None for tools that already respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store (most OpenSSL-based tools); a tool that bundles its own CA store (e.g. npm) needs an env var or flag pointing it at the system CA store — see [CA Trust for Tools with Their Own CA Store](#ca-trust-for-tools-with-their-own-ca-store) below |
 | Enforcement granularity | Domain (and port) | Domain (and port) — same as `transparent`; the decrypted path is visible for logging but isn't matched by `allowed_*_rules` |
 | `allowed_ip_rules` enforcement | Raw TCP passthrough — no protocol inspection once `ip:port` matches | Same as domain rules — matched and MITM'd via the BuildKit source policy, not a special-cased passthrough |
 | Non-cooperative tools (ignore proxy env vars, or open raw sockets) | Still observed, blocked, and logged — network-level enforcement, no opt-out | Blocked with "network unreachable" — invisible, no trace anywhere in the report |
@@ -102,6 +102,35 @@ connection attempt is observed and recorded — this is why it's the default. Us
 need full URL/path-level visibility integrated into BuildKit's own build output and SLSA provenance,
 and your build's tools are known to respect `HTTP_PROXY`/`HTTPS_PROXY`. See
 [Explicit Proxy Engine](./security.md#explicit-proxy-engine) for the full technical detail.
+
+#### CA Trust for Tools with Their Own CA Store
+
+Under `proxy_engine: explicit`, BuildKit injects its generated CA directly into the container's own
+system CA bundle file, so tools that consult that file the normal way (most tools built on OpenSSL —
+`curl`, `git`, Go binaries, etc.) already trust it with no configuration. A tool that instead bundles
+its own separate CA store ignores that file entirely and still fails with a TLS/certificate error,
+even though `HTTP_PROXY`/`HTTPS_PROXY` are set correctly.
+
+**npm** is the common case — point it at the system CA store BuildKit already patched, either inline
+on the command that needs it:
+
+```dockerfile
+RUN NODE_USE_SYSTEM_CA=1 npm install
+```
+
+or once per stage if it runs npm more than once:
+
+```dockerfile
+FROM node:22-alpine
+ARG NODE_USE_SYSTEM_CA=1
+RUN npm install
+RUN npm run build
+```
+
+If a different tool fails the same way — a `RUN` step that works under `transparent` (or without
+Buildcage at all) but fails with a TLS/certificate error under `explicit` — check that tool's own
+documentation for an equivalent setting; this is specific to tools that maintain their own CA store
+rather than consulting the system one.
 
 ### Usage Notes
 
