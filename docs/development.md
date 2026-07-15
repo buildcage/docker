@@ -58,6 +58,7 @@ make test_transparent_audit_mode
 make test_transparent_restrict_mode
 make test_explicit_audit_mode
 make test_explicit_restrict_mode
+make test_explicit_arg_inject_mode
 ```
 
 ## Explicit Engine Internals
@@ -69,7 +70,11 @@ behavior — what's enforced, what's visible in the report — see
 - A small statically-linked Go binary (`docker/explicit/buildkit-proxy/`) is the image's entrypoint
   (PID 1) and directly supervises the real `buildkitd` as a child process. `RUN` steps are isolated
   into their own point-to-point network namespace by `proxyNetwork = true`, built directly on
-  netlink/veth rather than CNI.
+  netlink/veth rather than CNI. Its Go source is split into role-based packages:
+  `internal/bootstrap` (environment setup, launching/supervising `buildkitd`), `internal/rpcproxy`
+  (generic gRPC dual-codec + byte-for-byte passthrough plumbing), `internal/control` (the
+  Solve/Session interception below), `internal/dockerfilearg` (the Dockerfile ARG-injection logic),
+  and `internal/events` (the structured event log — see [Viewing Logs](#viewing-logs)).
 - At startup, the binary: writes `/etc/resolv.conf` from `EXTERNAL_RESOLVER` if that variable is
   set (otherwise the container's own resolv.conf, e.g. Docker's embedded DNS, is left untouched);
   runs a QuickJS script that compiles `allowed_https_rules` / `allowed_http_rules` /
@@ -92,6 +97,24 @@ behavior — what's enforced, what's visible in the report — see
   configured to govern. A **dynamic**, session-based policy (`docker buildx build --policy=...`,
   `docker/buildx`'s own Rego policy feature) is a separate mechanism and is left untouched; it
   applies as an additional condition alongside buildcage's (merged) policy.
+- `internal/control` also intercepts the `Session` RPC — the channel BuildKit's `docker buildx`
+  client uses to stream a local build context (including the Dockerfile itself) to `buildkitd` — with
+  a two-legged design: it plays the daemon's role toward the real `buildx` client (upstream leg) while
+  simultaneously dialing a brand-new `Session` toward the real `buildkitd`, reusing the same session
+  ID (downstream leg). Every FileSync call is relayed through unmodified, **except** the "dockerfile"
+  local dir: there, the real content is fully received, rewritten, and re-sent instead of relayed
+  byte-for-byte.
+- The rewrite itself (`internal/dockerfilearg`) is AST-based, not text/regex matching: it parses the
+  Dockerfile with BuildKit's own Dockerfile parser and inserts `ARG <name>=<value>` immediately after
+  every `FROM` instruction (each stage needs its own declaration), for each spec not already declared
+  anywhere in the file. See [Dockerfile ARG Injection](./security.md#dockerfile-arg-injection) in
+  Security Details for the current, user-facing list of what's injected and why.
+- Not every build synced its Dockerfile this way: a remote git/HTTP build context or pre-resolved
+  `FrontendInputs` (some gateway/bake invocations) bypass `Session`'s FileSync entirely, so there's no
+  Dockerfile content to intercept. `internal/control`'s `solve.go` detects this from the `Solve`
+  request itself (an empty or `dockerfile.v0` `Frontend` with a remote-URL `context` attribute, or a
+  non-empty `FrontendInputs`) and emits an `arg_injection_skipped` event rather than leaving the gap
+  silent — see [Structured Events](./security.md#structured-events).
 
 ## Local Development
 
@@ -171,6 +194,25 @@ times above. That timestamp is also only whole-seconds precise (buildkitd's own 
 doesn't record sub-second precision), unlike the millisecond-precision start/duration `buildctl`
 reports for the allowed side.
 
+**buildkit-proxy's own structured events** (`proxy_engine: explicit` only) are a separate, single-line
+JSON log format buildkit-proxy emits via the standard Go `log` package into the same
+`/var/log/buildkitd/current` file:
+
+```
+2026/07/14 22:11:52 buildcage: event={"type":"arg_injection_applied","level":"notice","message":"injected ARG(s): NODE_USE_SYSTEM_CA","sessionID":"9bm08p264tfcfs4q1ibxshxt5"}
+```
+
+Each event has a `type` (`source_policy_merged`, `arg_injection_applied`, `arg_injection_skipped`,
+`arg_injection_failed`, or `session_ended_with_error`), a `level` (`notice`/`warning`/`error`), a
+`message`, and either a `ref` (the Solve request it came from) or a `sessionID` (for events that can't
+be attributed to one particular Solve — a single Session can be shared by several Solve calls, e.g.
+bake). `docker/tools/explicit/lib/buildkitd-log-parser.js`'s `parseBuildcageEvents` extracts these
+lines; `report/src/main.js` maps each event's `level` directly onto the matching
+`report/src/lib/annotation.js` method (`::notice::`/`::warning::`/`::error::`), and sets the report
+step's exit code to 1 if any `error`-level event occurred — independent of `fail_on_blocked` or
+`proxy_mode`. See [Structured Events](./security.md#structured-events) in Security Details for the
+user-facing behavior this produces.
+
 ## Makefile Commands
 
 | Command | Description |
@@ -184,6 +226,7 @@ reports for the allowed side.
 | `make test_transparent_restrict_mode` | Run transparent-engine restrict mode tests (start → build → verify → clean up) |
 | `make test_explicit_audit_mode` | Run explicit-engine audit mode tests (start → build → verify → clean up) |
 | `make test_explicit_restrict_mode` | Run explicit-engine restrict mode tests (start → build → verify → clean up) |
+| `make test_explicit_arg_inject_mode` | Run explicit-engine Dockerfile ARG auto-injection tests (start → build → verify → clean up) |
 | `make test_unit` | Run unit tests |
 | `make clean` | Remove all resources |
 
@@ -205,8 +248,10 @@ reports for the allowed side.
 │   ├── transparent/          # proxy_engine: transparent — Dockerfile + BuildKit/haproxy/dnsmasq/
 │   │                         # s6-overlay config
 │   └── explicit/             # proxy_engine: explicit — Dockerfile + buildkit-proxy/ (Go module:
-│                             # entrypoint/PID1, supervises buildkitd, injects the source policy
-│                             # into Solve via a gRPC proxy)
+│                             # entrypoint/PID1, supervises buildkitd; internal/control intercepts
+│                             # Solve (source-policy injection) and Session (Dockerfile ARG
+│                             # injection via FileSync); internal/dockerfilearg, internal/events,
+│                             # internal/rpcproxy, internal/bootstrap are its supporting packages)
 ├── docs/                     # development.md, rules.md, security.md, self-hosting.md
 ├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode} combination, plus
 │                             # test-server(-explicit)/test-dns(-explicit) fixture containers

@@ -162,9 +162,15 @@ build output and SLSA provenance, tools that ignore `HTTP_PROXY`/`HTTPS_PROXY` (
 are blocked invisibly, with no trace in the report.
 
 This engine is experimental — its underlying BuildKit feature is still maturing. One notable gap:
-some package managers (e.g. npm, bun) ship their own CA store instead of consulting the system one, so
-they don't trust the injected CA by default and need a Dockerfile change (pointing them at the CA) to
-avoid TLS errors during `RUN` steps.
+some package managers (e.g. npm) ship their own CA store instead of consulting the system one, so they
+don't trust the injected CA by default. For known cases, `explicit` closes this gap automatically —
+it rewrites the Dockerfile in flight to add whichever ARG makes the tool trust the system CA store
+(and therefore the injected CA), so no manual Dockerfile edit is needed. This list is intentionally
+small today (see [Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine) for exactly which
+ARGs); a tool not on it still needs a manual Dockerfile change to avoid TLS errors. This rewrite also
+can't apply when the Dockerfile itself comes from a remote git/HTTP build context or pre-resolved
+frontend inputs — Buildcage detects that case and fails the build with a clear error instead of
+leaving you to debug a confusing TLS failure.
 
 Not sure which to use? See the [engine comparison](./docs/reference.md#proxy-engines) in the Reference
 doc, and [Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine) for the full technical

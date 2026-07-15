@@ -169,7 +169,31 @@ merges its own rules in last, so a client-supplied policy can never widen access
 allowlist. A separate **dynamic**, session-based policy mechanism (`docker buildx build
 --policy=...`) is left untouched and applies as an additional condition alongside buildcage's policy.
 
-For how the supervisor binary, gRPC interception, and policy compilation work internally, see
+#### Dockerfile ARG Injection
+
+Injecting `HTTP_PROXY`/`HTTPS_PROXY` and a CA certificate (above) is enough for tools that trust the
+system CA store, but some tools ship their own CA store instead and ignore it by default — they'd
+still fail TLS validation despite the proxy being configured correctly. For a small, known list of
+such tools, buildcage closes this gap: as the Dockerfile is synced from the client, buildkit-proxy
+intercepts it and inserts any missing ARG declaration right after each `FROM` — parsed with BuildKit's
+own Dockerfile AST parser, not text/regex matching — before buildkitd ever reads it.
+
+| ARG | Value | Tool | Why |
+|---|---|---|---|
+| `NODE_USE_SYSTEM_CA` | `1` | Node.js / npm | npm doesn't consult the system CA store by default; without this ARG it can't trust the injected MITM CA |
+
+This list is intentionally small today and may grow over time (the authoritative, current list is
+`DefaultInjectArgs` in buildkit-proxy's source). A tool not on this list, that also maintains its own
+CA store, still needs a manual Dockerfile change to trust the injected CA.
+
+This rewrite only applies to a Dockerfile synced from a local build context. It cannot apply to a
+**remote git/HTTP build context** (buildkitd fetches the Dockerfile itself, directly, bypassing the
+client-side sync this intercepts) or to **pre-resolved frontend inputs** (some gateway/bake
+invocations hand buildkitd an already-built LLB definition instead of a Dockerfile to parse). Rather
+than leave that case as a silent, hard-to-diagnose TLS failure, buildcage detects it and reports an
+error — see [Structured Events](#structured-events) below.
+
+For how the supervisor binary, gRPC/Session interception, and policy compilation work internally, see
 [Explicit Engine Internals](./development.md#explicit-engine-internals) in the Development Guide.
 
 ### Coverage and Visibility
@@ -188,6 +212,19 @@ structural trade-off for gaining full path-level visibility and BuildKit-native 
 integration.
 
 For exactly how the `report` action extracts allowed/denied data from buildkitd's own logs, see
+[Viewing Logs](./development.md#viewing-logs) in the Development Guide.
+
+### Structured Events
+
+Separately from the source-policy denial log above, buildkit-proxy emits its own structured events —
+source-policy merge notices, Dockerfile ARG-injection outcomes (applied / skipped / failed, see
+[Dockerfile ARG Injection](#dockerfile-arg-injection) above), and abnormal session termination. The
+`report` action turns each into a GitHub Actions annotation (`::notice::`, `::warning::`, or
+`::error::`) matching its severity. An `error`-level event — including the ARG-injection-skipped case
+above — always fails the report step, regardless of `fail_on_blocked` or `proxy_mode`, since it
+reflects a configuration gap rather than a blocked connection.
+
+For the event log's exact format and how the `report` action parses it, see
 [Viewing Logs](./development.md#viewing-logs) in the Development Guide.
 
 ## Trusting the Buildcage Image

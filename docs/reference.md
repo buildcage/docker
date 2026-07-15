@@ -89,7 +89,7 @@ use identical `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` 
 |---|---|---|
 | Isolation mechanism | CNI network + DNS redirection | BuildKit native `--proxy-network` (point-to-point network namespace) |
 | TLS handling | Not terminated — SNI (HTTPS) / Host header (HTTP) inspected only | Terminated (MITM) via an injected CA — full host **and path** visible |
-| Dockerfile / tool changes | None required | None for tools that already respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store; the CA is injected locally, so tools with their own CA store (e.g. npm, bun) may need an env var or flag change to point at it |
+| Dockerfile / tool changes | None required | None for tools that already respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store; for a small, known list of tools with their own CA store (currently just npm), buildcage rewrites the Dockerfile in flight to add the ARG that makes them trust it — see [Explicit Proxy Engine](./security.md#explicit-proxy-engine) for the current list. A tool not on that list still needs a manual Dockerfile change |
 | Enforcement granularity | Domain (and port) | Domain (and port) — same as `transparent`; the decrypted path is visible for logging but isn't matched by `allowed_*_rules` |
 | `allowed_ip_rules` enforcement | Raw TCP passthrough — no protocol inspection once `ip:port` matches | Same as domain rules — matched and MITM'd via the BuildKit source policy, not a special-cased passthrough |
 | Non-cooperative tools (ignore proxy env vars, or open raw sockets) | Still observed, blocked, and logged — network-level enforcement, no opt-out | Blocked with "network unreachable" — invisible, no trace anywhere in the report |
@@ -151,6 +151,8 @@ Use the domain names shown in the report to create your allowlist for restrict m
 <img src="../assets/report-restrict-mode.png" alt="Outbound Traffic Report - restrict mode" width="556">
 
 In restrict mode, the report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false`. In audit mode, blocked connections (e.g., protocol errors) are reported but never cause the step to fail.
+
+`proxy_engine: explicit` also emits its own structured events (e.g. a Dockerfile ARG-injection failure or a known-unsupported build context — see [Explicit Proxy Engine](./security.md#explicit-proxy-engine)), each shown as a `::notice::`/`::warning::`/`::error::` annotation. An `error`-level event always fails the report step — regardless of `fail_on_blocked` or `proxy_mode` — since it reflects a configuration gap rather than a blocked connection.
 
 ### Parameters
 
