@@ -135,6 +135,19 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	@./test/assert-explicit-restrict.sh
 	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean
 
+.PHONY: test_explicit_arg_inject_mode
+test_explicit_arg_inject_mode: ## Run explicit-engine Dockerfile ARG auto-injection tests
+	@echo "Running explicit-engine ARG auto-injection tests..."
+	@COMPOSE_FILE=compose.yaml:compose.test-explicit.yaml \
+	  $(MAKE) run_explicit_restrict_mode
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.explicit-arg-inject test/ \
+	  --load -t buildcage-test
+	@./test/assert-explicit-arg-inject.sh
+	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean
+
 .PHONY: test_unit
 test_unit: test_setup test_report test_qjs ## Run unit tests
 

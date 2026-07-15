@@ -1,0 +1,32 @@
+# This Dockerfile intentionally does NOT declare "ARG NODE_USE_SYSTEM_CA"
+# anywhere, and does not pass it on any RUN command line either (unlike
+# test/Dockerfile.explicit-restrict's manual "NODE_USE_SYSTEM_CA=1 npm
+# install ..."). buildkit-proxy is expected to inject it automatically for
+# every stage (docker/explicit/buildkit-proxy/injectargs.go /
+# dockerfile_rewrite.go) so that npm — which, unlike curl/git/openssl,
+# ignores the system CA store by default — still trusts BuildKit's
+# --proxy-network MITM CA with zero Dockerfile changes required.
+#
+# Two stages on purpose: injection must happen after *every* FROM, since an
+# ARG declared in one stage is not visible in another.
+
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build
+
+RUN echo "=== [build stage] npm install, no ARG declared here ===" && \
+    mkdir -p /app && cd /app && \
+    (npm init -y >/dev/null 2>&1 && \
+     npm install --ignore-scripts --fetch-retries=0 express >/dev/null 2>&1 && \
+     echo "✓ build stage: npm install express: OK") || (echo "✗ build stage: npm install express: FAILED" && exit 1)
+
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS final
+
+# COPY --from=build forces BuildKit to actually execute the "build" stage —
+# without a reference like this, an unused stage is pruned from the graph
+# entirely and never runs, silently defeating the point of this test.
+COPY --from=build /app/package.json /build-stage-ran/package.json
+
+RUN echo "=== [final stage] npm install, no ARG declared here either ===" && \
+    mkdir -p /app && cd /app && \
+    (npm init -y >/dev/null 2>&1 && \
+     npm install --ignore-scripts --fetch-retries=0 express >/dev/null 2>&1 && \
+     echo "✓ final stage: npm install express: OK") || (echo "✗ final stage: npm install express: FAILED" && exit 1)

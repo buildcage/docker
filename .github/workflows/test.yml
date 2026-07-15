@@ -139,6 +139,13 @@ jobs:
             test_dockerfile: test/Dockerfile.explicit-restrict
             assert_script: ./test/assert-explicit-restrict.sh
             builder_name: buildcage-explicit-restrict
+          - mode: explicit-arg-inject
+            proxy_mode: restrict
+            proxy_engine: explicit
+            compose_file: compose.yaml:compose.test-explicit.yaml
+            test_dockerfile: test/Dockerfile.explicit-arg-inject
+            assert_script: ./test/assert-explicit-arg-inject.sh
+            builder_name: buildcage-explicit-arg-inject
 
     name: test (${{ matrix.mode }})
 
