@@ -1,5 +1,11 @@
 import { describe, it, assert, reportResults } from "../../shared/lib/test-shim.js";
-import { parseEntries, parseAllowedRequestsFromText, parseDenialTimeline, parseIdentifier } from "./buildkitd-log-parser.js";
+import {
+  parseEntries,
+  parseAllowedRequestsFromText,
+  parseDenialTimeline,
+  parseIdentifier,
+  parseBuildcageEvents,
+} from "./buildkitd-log-parser.js";
 
 // Real line captured from a live moby/buildkit v0.31.1 explicit-mode container.
 const REAL_DENY_LINE =
@@ -143,6 +149,62 @@ describe("parseDenialTimeline", () => {
 
   it("ignores non-denial lines", () => {
     assert.deepEqual(parseDenialTimeline('time="2026-07-05T00:00:00Z" level=info msg="found worker"'), []);
+  });
+});
+
+describe("parseBuildcageEvents", () => {
+  it("parses a real event line, ignoring the Go log package's own date/time prefix", () => {
+    const line =
+      '2026/07/14 22:11:52 buildcage: event={"type":"source_policy_merged","level":"notice","message":"merged 1 client-supplied source policy rule(s) with buildcage\'s own policy","ref":"build-ref-1"}';
+    assert.deepEqual(parseBuildcageEvents(line), [
+      {
+        type: "source_policy_merged",
+        level: "notice",
+        message: "merged 1 client-supplied source policy rule(s) with buildcage's own policy",
+        ref: "build-ref-1",
+      },
+    ]);
+  });
+
+  it("parses an event keyed by sessionID instead of ref", () => {
+    const line = '2026/07/14 22:11:52 buildcage: event={"type":"arg_injection_applied","level":"notice","message":"injected ARG(s): NODE_USE_SYSTEM_CA","sessionID":"abc123"}';
+    assert.deepEqual(parseBuildcageEvents(line), [
+      {
+        type: "arg_injection_applied",
+        level: "notice",
+        message: "injected ARG(s): NODE_USE_SYSTEM_CA",
+        sessionID: "abc123",
+      },
+    ]);
+  });
+
+  it("parses multiple event lines interleaved with unrelated log lines", () => {
+    const logText = [
+      'time="2026-07-05T00:00:00Z" level=info msg="found worker"',
+      '2026/07/14 22:11:52 buildcage: event={"type":"arg_injection_skipped","level":"error","message":"remote context","ref":"build-ref-1"}',
+      'time="2026-07-05T00:00:01Z" level=debug msg="Evaluated source policy" error="denied"',
+      '2026/07/14 22:11:53 buildcage: event={"type":"session_ended_with_error","level":"warning","message":"boom","sessionID":"xyz"}',
+    ].join("\n");
+    const events = parseBuildcageEvents(logText);
+    assert.equal(events.length, 2);
+    assert.equal(events[0].type, "arg_injection_skipped");
+    assert.equal(events[0].level, "error");
+    assert.equal(events[1].type, "session_ended_with_error");
+    assert.equal(events[1].level, "warning");
+  });
+
+  it("skips a malformed event payload instead of throwing", () => {
+    const logText = [
+      "2026/07/14 22:11:52 buildcage: event={not valid json}",
+      '2026/07/14 22:11:53 buildcage: event={"type":"arg_injection_applied","level":"notice","message":"ok"}',
+    ].join("\n");
+    const events = parseBuildcageEvents(logText);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, "arg_injection_applied");
+  });
+
+  it("returns an empty array when no event lines are present", () => {
+    assert.deepEqual(parseBuildcageEvents('time="x" level=info msg="found worker"'), []);
   });
 });
 

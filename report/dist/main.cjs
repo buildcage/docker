@@ -282,15 +282,28 @@ const outputForAction = Boolean(summaryFile), annotation = outputForAction ? {
   notice(message) {
     console.log(`::notice::${message}`);
   },
+  warning(message) {
+    console.log(`::warning::${message}`);
+  },
   error(message) {
     console.log(`::error::${message}`);
   }
 } : {
   notice() {},
+  warning() {},
   error() {}
 };
 
 if (report.blockedCount > 0) if (isAudit) annotation.notice(`${report.blockedCount} blocked connection(s) detected by buildcage proxy`); else {
   "true" === (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() ? (annotation.error(`${report.blockedCount} blocked connection(s) detected by buildcage proxy`), 
   process.exitCode = 1) : annotation.notice(`${report.blockedCount} blocked connection(s) detected by buildcage proxy`);
+}
+
+if (report.events?.length > 0) {
+  let hasError = !1;
+  for (const e of report.events) {
+    const emit = annotation[e.level];
+    emit && (emit(`[${e.type}] ${e.message}`), "error" === e.level && (hasError = !0));
+  }
+  hasError && (process.exitCode = 1);
 }

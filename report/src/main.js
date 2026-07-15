@@ -200,3 +200,19 @@ if (report.blockedCount > 0) {
     }
   }
 }
+
+// 5. buildkit-proxy's own structured events (see docker/explicit/buildkit-proxy/events.go),
+// e.g. ARG auto-injection outcomes — undefined for transparent mode, which has no such
+// events at all. Each event's `level` maps directly onto the matching annotation method;
+// an unrecognized level is ignored rather than thrown, so a future new level doesn't need
+// a report/src/main.js change on the same day it's introduced in Go.
+if (report.events?.length > 0) {
+  let hasError = false;
+  for (const e of report.events) {
+    const emit = annotation[e.level];
+    if (!emit) continue;
+    emit(`[${e.type}] ${e.message}`);
+    if (e.level === "error") hasError = true;
+  }
+  if (hasError) process.exitCode = 1;
+}

@@ -1,6 +1,11 @@
 /**
  * Parse buildkitd's own debug log and output a structured JSON contract:
- *   { mode, sections: { blocked }, blockedCount, deniedTimeline }
+ *   { mode, sections: { blocked }, blockedCount, deniedTimeline, events }
+ *
+ * `events` is buildkit-proxy's own structured event log (see
+ * docker/explicit/buildkit-proxy/events.go and parseBuildcageEvents below) —
+ * unrelated to buildkitd's source-policy denials above. report/src/main.js
+ * turns each into a GitHub Actions annotation keyed by its `level`.
  *
  * Unlike transparent mode's report.js, there is no "allowed"/"audited"
  * section here — that table is instead built by report/src/main.js from
@@ -20,7 +25,7 @@
  *   Default logfile: /var/log/buildkitd/current
  */
 import * as std from "std";
-import { parseEntries, parseDenialTimeline } from "./lib/buildkitd-log-parser.js";
+import { parseEntries, parseDenialTimeline, parseBuildcageEvents } from "./lib/buildkitd-log-parser.js";
 import { aggregate } from "../shared/lib/aggregate.js";
 
 const logFile = scriptArgs[1] || "/var/log/buildkitd/current";
@@ -38,9 +43,10 @@ const mode = std.getenv("PROXY_MODE") || "restrict";
 
 const blocked = aggregate(parseEntries(logText));
 const deniedTimeline = parseDenialTimeline(logText);
+const events = parseBuildcageEvents(logText);
 
 const sections = {};
 if (blocked.length > 0) sections.blocked = blocked;
 
-const result = { mode, sections, blockedCount: blocked.length, deniedTimeline };
+const result = { mode, sections, blockedCount: blocked.length, deniedTimeline, events };
 std.out.puts(JSON.stringify(result, null, 2) + "\n");

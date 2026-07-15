@@ -142,3 +142,34 @@ export function parseIdentifier(identifier) {
   }
   return { scheme, host: hostPort, port: DEFAULT_PORT[scheme] };
 }
+
+const eventLinePattern = /buildcage: event=(\{.*\})\s*$/;
+
+/**
+ * Scan for buildkit-proxy's own structured event lines (see
+ * docker/explicit/buildkit-proxy/events.go's logEvent — the Go standard
+ * `log` package prefixes each line with its own date/time, which this
+ * pattern ignores by matching from "buildcage: event=" onward) and return
+ * each event, in log order. report/src/main.js maps each event's `level`
+ * ("notice"/"warning"/"error") directly onto the matching
+ * report/src/lib/annotation.js method.
+ *
+ * A malformed JSON payload is skipped rather than thrown, so one bad line
+ * can never abort report generation for an otherwise-successful build.
+ *
+ * @param {string} logText
+ * @returns {{ type: string, level: string, message: string, ref?: string, sessionID?: string }[]}
+ */
+export function parseBuildcageEvents(logText) {
+  const events = [];
+  for (const line of logText.split("\n")) {
+    const m = line.match(eventLinePattern);
+    if (!m) continue;
+    try {
+      events.push(JSON.parse(m[1]));
+    } catch {
+      // malformed line — skip rather than crash report generation
+    }
+  }
+  return events;
+}
