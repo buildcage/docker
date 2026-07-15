@@ -190,6 +190,74 @@ integration.
 For exactly how the `report` action extracts allowed/denied data from buildkitd's own logs, see
 [Viewing Logs](./development.md#viewing-logs) in the Development Guide.
 
+## Sandbox Action
+
+The `sandbox` action ([Reference](./reference.md#sandbox-action)) applies the same isolation
+technology as the `transparent` engine — bridge network, iptables redirect, DNS redirect,
+SNI/Host-based allowlist proxy — to an arbitrary `run:` command instead of a BuildKit `RUN` step.
+Its threat model differs from the two build engines above in one important way: the process being
+isolated is a full shell command chosen by the workflow author, running with the same privileges as
+the Actions runner itself (rather than inside a BuildKit-managed OCI container), so isolating its
+*network* access is not sufficient on its own — the isolated command must also be structurally
+unable to reach outside its sandbox by other means (escalating privileges, reaching the Docker
+socket, or reading another process's memory).
+
+### Isolation Mechanisms
+
+- **Network namespace**: the isolated command runs in its own network namespace, connected to the
+  sandbox proxy container's bridge via a veth pair — the same enforcement `transparent` mode
+  applies to Docker `RUN` steps (iptables `REDIRECT`/`DROP`, DNS redirect, SNI/Host allowlist).
+- **Capability bounding set**: fully cleared (`setpriv --bounding-set=-all`) before the command
+  executes. This is what actually makes privilege escalation impossible — even if the command
+  invokes `sudo` or a setuid binary, there is no `CAP_NET_ADMIN`/`CAP_SYS_ADMIN`/etc. left in the
+  bounding set for it to acquire, regardless of the resulting effective UID.
+- **`no_new_privileges`**: set as defense-in-depth alongside the capability drop, so setuid/setgid
+  binaries and file capabilities can't grant anything even in edge cases the bounding-set drop
+  doesn't cover on its own.
+- **Supplementary groups cleared**: `docker` and any other supplementary group membership is
+  dropped (`setpriv --clear-groups`). Runner users are typically members of the `docker` group,
+  which is equivalent to root — the Docker daemon will happily mount `/` into a new privileged
+  container for anyone who can reach its socket, regardless of that user's own capabilities. Group
+  membership is what gates that reach, not capabilities, so it has to be cleared independently.
+- **PID namespace**: the isolated command runs in its own PID namespace. This isn't just about
+  hiding other processes from `ps` — the Linux kernel structurally forbids a process from tracing
+  (`ptrace`) or reading `/proc/<pid>/mem` for any process outside its own PID namespace's lineage,
+  independent of capabilities. This closes off memory-dump-based attacks against the Actions runner
+  process itself.
+- **UID/GID preserved**: unlike the mechanisms above, the isolated command keeps the same UID/GID
+  as the runner user rather than switching to a dedicated unprivileged account. This is a deliberate
+  choice: `actions/setup-node`-installed toolchains, `$GITHUB_WORKSPACE` file ownership, and
+  `$HOME`-based caches (`~/.npm`, `~/.cache`, etc.) all assume the runner's own UID, and switching
+  UID would break them. Isolation here comes entirely from the capability/group/namespace
+  mechanisms above, not from UID separation.
+- **Sensitive `/proc` paths masked**: `/proc/kcore`, `/proc/kallsyms`, `/proc/kmsg`,
+  `/proc/sysrq-trigger`, `/proc/timer_list`, and `/proc/keys` are bind-mounted over with `/dev/null`
+  inside the isolated mount namespace, closing off kernel-memory-adjacent information disclosure
+  paths that aren't already covered by the capability drop.
+
+### Known Limitations
+
+- **No seccomp profile**: a seccomp-bpf filter would add defense-in-depth against kernel bugs
+  reachable via syscalls that don't require any capability at all (e.g. historical `io_uring` or
+  unprivileged user-namespace-creation CVEs) — this is tracked as future work, not yet implemented.
+- **No AppArmor/SELinux/Landlock policy**: these would add path-level MAC restrictions on top of
+  the capability-based model above. Not applied today; the isolation mechanisms above already
+  close off the specific escape routes considered (privilege escalation, Docker-socket access,
+  cross-namespace ptrace/memory access).
+- **Credential retrieval is intentionally not blocked**: `sandbox` restricts *where* the isolated
+  command can send network traffic, not what files it reads — a compromised dependency can still
+  read `~/.aws/credentials`, `~/.docker/config.json`, or similar local credential files, it just
+  cannot exfiltrate them anywhere outside the allowlist. This mirrors the same design principle as
+  the Docker build engines above (see the defense-in-depth note in the
+  [README](../README.md#how-it-works)).
+- **Linux only**: requires a Linux runner with passwordless `sudo` for the isolation setup itself
+  (network namespace, veth, iptables) — the default on GitHub-hosted `ubuntu-*` runners. Not
+  supported on Windows or macOS runners.
+- **Per-step overhead**: each `sandbox` step starts and stops its own proxy container, rather than
+  sharing one across steps in the same job — this keeps allowlists independently configurable per
+  step and keeps the traffic report's step-to-container mapping unambiguous, at the cost of
+  container startup overhead on jobs with many `sandbox` steps.
+
 ## Trusting the Buildcage Image
 
 Buildcage is a security tool — so it's fair to ask: *how do you trust Buildcage itself?*

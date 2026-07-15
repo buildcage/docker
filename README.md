@@ -26,6 +26,7 @@ This is not a hypothetical risk: the [Shai-Hulud npm worm](https://unit42.paloal
 - 🔍 **Audit mode**: Discover dependencies before enforcing restrictions
 - 🛡️ **Restrict mode**: Enforce an allowlist — block everything else
 - 📊 **Detailed logging**: Full visibility into every connection observed during builds
+- 📦 **Beyond Docker builds**: the [`sandbox` action](#beyond-docker-builds-the-sandbox-action) applies the same isolation to any `run:` step, not just Docker builds
 
 ## Quick Start
 
@@ -178,6 +179,28 @@ detail.
 > Don't make Buildcage your only supply chain security measure. Use it as one layer in a defense-in-depth strategy — a last line of defense. If something slips through your other measures, at least it can't call home.
 >
 > See [Security Considerations](./docs/security.md) for full details.
+
+## Beyond Docker Builds: the Sandbox Action
+
+Supply-chain attacks aren't limited to Docker builds — a compromised dependency can just as easily
+phone home from a plain `run:` step (`npm install`, `pip install`, a test suite, a build script).
+The `sandbox` action applies the same network-isolation technology to any command:
+
+```yaml
+- name: Run tests with outbound network isolation
+  uses: dash14/buildcage/sandbox@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  with:
+    proxy_mode: restrict
+    allowed_https_rules: registry.npmjs.org:443
+    run: |
+      npm install
+      npm test
+```
+
+Each step starts its own throwaway proxy, runs the isolated command with all capabilities dropped,
+`no_new_privileges` set, and Docker-socket access removed, appends a report to the Job Summary, and
+stops the proxy again. See the [Sandbox Action reference](./docs/reference.md#sandbox-action) for
+parameters and the [Security Details](./docs/security.md#sandbox-action) for the full threat model.
 
 ## FAQ
 

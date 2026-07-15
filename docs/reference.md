@@ -187,3 +187,67 @@ In restrict mode, the report step fails if blocked connections are detected, cau
 |-----------|----------|---------|-------------|
 | `builder_name` | No | `buildcage` | Name of the builder container |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
+
+---
+
+## Sandbox Action (`dash14/buildcage/sandbox`)
+
+Runs an arbitrary command — not just a Docker build — with the same outbound network isolation as
+the `setup`/`report` actions provide for `RUN` steps. Useful for `run:` steps that install
+dependencies, run tests, or execute build scripts directly on the runner, outside of any Docker
+build.
+
+```yaml
+- name: Run tests with outbound network isolation
+  uses: dash14/buildcage/sandbox@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  with:
+    proxy_mode: restrict
+    allowed_https_rules: registry.npmjs.org:443
+    run: |
+      npm install
+      npm test
+```
+
+Each `sandbox` step is self-contained: it starts its own throwaway proxy container, runs `run`
+inside the isolated sandbox, appends a report section to the Job Summary, and stops the proxy
+container again — all within that one step. Using `sandbox` multiple times in the same job starts
+a fresh proxy container each time, so different steps can use different allowlists.
+
+### Parameters
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `run` | Yes | — | Command(s) to run inside the isolated sandbox (multi-line supported, like a workflow `run:` step) |
+| `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
+| `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
+| `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
+| `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
+| `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
+
+Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above.
+
+### How It Works
+
+`sandbox` reuses the same isolation technology as the `transparent` engine (CNI-style bridge,
+iptables redirect, DNS redirect, SNI/Host-based allowlist proxy) but applies it to the runner host
+itself instead of a BuildKit `RUN` step:
+
+1. A throwaway proxy container starts (no `buildkitd` — just the bridge, iptables, DNS, and
+   HAProxy pieces from `transparent` mode).
+2. The `run` command executes directly on the runner host inside a fresh network/PID/mount/UTS/
+   IPC/cgroup namespace, connected to the proxy container's bridge via a veth pair — the same
+   network-level enforcement `transparent` mode gives Docker `RUN` steps.
+3. Before executing `run`, all capabilities are dropped, `no_new_privileges` is set, and
+   supplementary groups (e.g. `docker`) are cleared — the isolated command cannot re-escalate
+   privileges, touch the Docker socket, or reconfigure networking, even if it runs as the same
+   user/UID as the runner (kept unchanged so `actions/setup-node`-installed toolchains,
+   `$GITHUB_WORKSPACE` ownership, and `$HOME`-based caches keep working normally).
+   PID namespace isolation also means the isolated command structurally cannot `ptrace` or read
+   `/proc/<pid>/mem` for the Actions runner process itself — the kernel forbids reaching into a
+   parent PID namespace regardless of capabilities.
+
+> [!NOTE]
+> `sandbox` runs `run-isolated.sh` directly on the runner host (via `sudo -n`), so it requires a
+> Linux runner with passwordless `sudo` — this is the default on GitHub-hosted `ubuntu-*` runners.
+> It does not currently apply a seccomp profile, AppArmor/SELinux profile, or Landlock rules; see
+> [Security Details](./security.md#sandbox-action) for the full threat model and known limitations.
