@@ -136,7 +136,7 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean
 
 .PHONY: test_unit
-test_unit: test_setup test_report test_qjs ## Run unit tests
+test_unit: test_setup test_report test_sandbox_unit test_qjs ## Run unit tests
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests
@@ -145,6 +145,10 @@ test_setup: ## Run setup action unit tests
 .PHONY: test_report
 test_report: ## Run report unit tests
 	@node --test 'report/src/**/*.test.js'
+
+.PHONY: test_sandbox_unit
+test_sandbox_unit: ## Run sandbox action unit tests
+	@node --test 'sandbox/src/**/*.test.js'
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker

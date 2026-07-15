@@ -1,6 +1,6 @@
 "use strict";
 
-var node_child_process = require("node:child_process"), path = require("node:path"), node_url = require("node:url"), node_fs = require("node:fs"), os = require("node:os"), require$$0 = require("os"), require$$1 = require("path"), require$$0$5 = require("fs"), require$$0$2 = require("util"), require$$0$1 = require("crypto"), require$$0$3 = require("tty"), require$$0$4 = require("fs/promises"), require$$0$6 = require("url"), _documentCurrentScript = "undefined" != typeof document ? document.currentScript : null;
+var node_child_process = require("node:child_process"), node_fs = require("node:fs"), path = require("node:path"), node_url = require("node:url"), os = require("node:os"), require$$0 = require("os"), require$$1 = require("path"), require$$0$5 = require("fs"), require$$0$2 = require("util"), require$$0$1 = require("crypto"), require$$0$3 = require("tty"), require$$0$4 = require("fs/promises"), require$$0$6 = require("url"), node_crypto = require("node:crypto"), _documentCurrentScript = "undefined" != typeof document ? document.currentScript : null;
 
 function buildRules(rulesInput) {
   return (rulesInput?.trim().split(/\s+/).filter(Boolean) ?? []).map(convertRule);
@@ -7256,39 +7256,23 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
   return await verifyBundle(bundle, verifyOptions, digest), digest;
 }
 
-const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
+const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile$1 = path.join(__dirname$2, "../compose.yaml");
 
 function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository}) {
   return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 
-function resolveProxyEngine(input) {
-  const engine = input?.trim() || "transparent";
-  if ("transparent" !== engine && "explicit" !== engine) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`, "INVALID_PROXY_ENGINE");
-  return engine;
-}
-
-function buildACLRules({httpsRulesInput: httpsRulesInput, httpRulesInput: httpRulesInput, ipRulesInput: ipRulesInput}) {
-  const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  try {
-    buildRules(httpsRulesInput), buildRules(httpRulesInput), buildRules(ipRulesInput);
-  } catch (e) {
-    throw new SetupError(e.message, "INVALID_RULES");
-  }
-  return {
-    httpsRules: httpsRules,
-    httpRules: httpRules,
-    ipRules: ipRules
-  };
-}
-
-function logRules(label, rules) {
+function logRules$1(label, rules) {
   console.log(`${label} rules:${0 === rules.length ? " (none)" : ""}`);
   for (const r of rules) console.log(`  ${r}`);
 }
 
 process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href) && async function() {
-  const env = process.env, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", proxyEngine = resolveProxyEngine(env.INPUT_PROXY_ENGINE);
+  const env = process.env, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", proxyEngine = function(input) {
+    const engine = input?.trim() || "transparent";
+    if ("transparent" !== engine && "explicit" !== engine) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`, "INVALID_PROXY_ENGINE");
+    return engine;
+  }(env.INPUT_PROXY_ENGINE);
   console.log(`Proxy engine: ${proxyEngine}`);
   const {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine}) {
     const digest = await verifyImageDigest({
@@ -7311,13 +7295,25 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     proxyEngine: proxyEngine
   });
   console.log(`buildcage image: ${imageRef}`);
-  const rules = buildACLRules({
+  const rules = function({httpsRulesInput: httpsRulesInput, httpRulesInput: httpRulesInput, ipRulesInput: ipRulesInput}) {
+    const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+    try {
+      buildRules(httpsRulesInput), buildRules(httpRulesInput), buildRules(ipRulesInput);
+    } catch (e) {
+      throw new SetupError(e.message, "INVALID_RULES");
+    }
+    return {
+      httpsRules: httpsRules,
+      httpRules: httpRules,
+      ipRules: ipRules
+    };
+  }({
     httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
     httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
     ipRulesInput: env.INPUT_ALLOWED_IP_RULES
   });
-  console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), 
-  logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), console.log("::endgroup::");
+  console.log("::group::Configured ACL Rules"), logRules$1("HTTPS", rules.httpsRules), 
+  logRules$1("HTTP", rules.httpRules), logRules$1("IP", rules.ipRules), console.log("::endgroup::");
   const composeEnv = {
     ...env,
     BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
@@ -7328,15 +7324,225 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
     BUILDCAGE_IMAGE_REF: imageRef
   };
-  node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "down" ], {
+  node_child_process.execFileSync("docker", [ "compose", "-f", composeFile$1, "down" ], {
     stdio: "inherit",
     env: composeEnv
-  }), node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ], {
+  }), node_child_process.execFileSync("docker", [ "compose", "-f", composeFile$1, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ], {
     stdio: "inherit",
     env: composeEnv
   });
 }().catch(err => {
   err instanceof SetupError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), 
   process.exit(1);
-}), exports.buildACLRules = buildACLRules, exports.resolveBuildcageImageRef = resolveBuildcageImageRef, 
-exports.resolveProxyEngine = resolveProxyEngine;
+});
+
+class SandboxError extends Error {
+  constructor(message, code) {
+    super(message), this.name = "SandboxError", this.code = code;
+  }
+}
+
+function runIsolated({scriptPath: scriptPath, proxyPid: proxyPid, workdir: workdir, env: env, runScriptDir: runScriptDir}) {
+  const runIsolatedShPath = path.join(void 0, "..", "scripts", "run-isolated.sh"), envFilePath = function(env, dir) {
+    const envFilePath = path.join(dir, "env-dump.bin"), buf = Buffer.concat(Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => Buffer.from(`${k}=${v}\0`, "utf8")));
+    return node_fs.writeFileSync(envFilePath, buf), envFilePath;
+  }(env, runScriptDir), args = [ "-n", "--", runIsolatedShPath, "--proxy-pid", String(proxyPid), "--uid", String(process.getuid()), "--gid", String(process.getgid()), "--env-file", envFilePath ];
+  workdir && args.push("--workdir", workdir), args.push("--", scriptPath);
+  try {
+    return node_child_process.execFileSync("sudo", args, {
+      stdio: "inherit"
+    }), 0;
+  } catch (e) {
+    return "number" == typeof e.status ? e.status : 1;
+  }
+}
+
+function markdownTable(rows, {showReason: showReason = !1} = {}) {
+  if (showReason) {
+    const lines = [ "| Host | Rule | Reason | Count |", "| --- | --- | --- | ---: |" ];
+    for (const r of rows) lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.reason} | ${r.count} |`);
+    return lines.join("\n");
+  }
+  const lines = [ "| Host | Rule | Count |", "| --- | --- | ---: |" ];
+  for (const r of rows) lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.count} |`);
+  return lines.join("\n");
+}
+
+function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked} = {}) {
+  const markdown = function(report, {stepLabel: stepLabel} = {}) {
+    if (null === report.mode) return `### 🧰 Sandbox${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
+    const isAudit = "audit" === report.mode;
+    let markdown = `### 🧰 Sandbox${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
+    if (isAudit) {
+      const audited = report.sections.audited || [];
+      audited.length > 0 && (markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n");
+      const blocked = report.sections.blocked || [];
+      blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
+        showReason: !0
+      }) + "\n\n");
+    } else {
+      const allowed = report.sections.allowed || [];
+      allowed.length > 0 && (markdown += "**✅ Allowed Hosts**\n\n" + markdownTable(allowed) + "\n\n");
+      const blocked = report.sections.blocked || [];
+      blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
+        showReason: !0
+      }) + "\n\n");
+    }
+    return markdown;
+  }(report, {
+    stepLabel: stepLabel
+  }), summaryFile = process.env.GITHUB_STEP_SUMMARY;
+  summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown);
+  const annotation = Boolean(summaryFile) ? {
+    notice(message) {
+      console.log(`::notice::${message}`);
+    },
+    error(message) {
+      console.log(`::error::${message}`);
+    }
+  } : {
+    notice() {},
+    error() {}
+  };
+  if (report.blockedCount > 0) {
+    const isAudit = "audit" === report.mode, message = `${report.blockedCount} blocked connection(s) detected by buildcage sandbox`;
+    isAudit || !failOnBlocked ? annotation.notice(message) : (annotation.error(message), 
+    process.exitCode = 1);
+  }
+}
+
+const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
+
+function buildACLRules({httpsRulesInput: httpsRulesInput, httpRulesInput: httpRulesInput, ipRulesInput: ipRulesInput}) {
+  const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+  try {
+    buildRules(httpsRulesInput), buildRules(httpRulesInput), buildRules(ipRulesInput);
+  } catch (e) {
+    throw new SandboxError(e.message, "INVALID_RULES");
+  }
+  return {
+    httpsRules: httpsRules,
+    httpRules: httpRules,
+    ipRules: ipRules
+  };
+}
+
+function logRules(label, rules) {
+  console.log(`${label} rules:${0 === rules.length ? " (none)" : ""}`);
+  for (const r of rules) console.log(`  ${r}`);
+}
+
+process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href) && async function() {
+  const env = process.env, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", runInput = env.INPUT_RUN ?? "";
+  if (!runInput.trim()) throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
+  const {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo}) {
+    let digest;
+    try {
+      digest = await verifyImageDigest({
+        actionRef: actionRef,
+        actionRepo: actionRepo,
+        proxyEngine: "sandbox"
+      });
+    } catch (e) {
+      throw new SandboxError(e.message, e.code ?? "VERIFY_FAILED");
+    }
+    if (null === digest) throw new SandboxError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
+    return console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), 
+    {
+      imageRef: resolveBuildcageImageRef({
+        imageDigest: digest,
+        actionRepository: actionRepo
+      }),
+      pullPolicy: "always"
+    };
+  }({
+    actionRef: actionRef,
+    actionRepo: actionRepo
+  });
+  console.log(`buildcage-sandbox image: ${imageRef}`);
+  const rules = buildACLRules({
+    httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
+    httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
+    ipRulesInput: env.INPUT_ALLOWED_IP_RULES
+  });
+  console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), 
+  logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), console.log("::endgroup::");
+  const containerName = `buildcage-sandbox-${node_crypto.randomBytes(4).toString("hex")}`, stateFile = env.GITHUB_STATE;
+  stateFile && node_fs.appendFileSync(stateFile, `container_name=${containerName}\n`);
+  const composeEnv = {
+    ...env,
+    SANDBOX_CONTAINER_NAME: containerName,
+    PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
+    ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
+    ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
+    ALLOWED_IP_RULES: rules.ipRules.join("\n"),
+    BUILDCAGE_SANDBOX_IMAGE_REF: imageRef
+  };
+  node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ], {
+    stdio: "inherit",
+    env: composeEnv
+  });
+  let exitCode = 1;
+  try {
+    const proxyPid = function(containerName) {
+      try {
+        const out = node_child_process.execFileSync("docker", [ "inspect", "--format", "{{.State.Pid}}", containerName ], {
+          encoding: "utf8",
+          stdio: [ "ignore", "pipe", "ignore" ]
+        }).trim(), pid = Number(out);
+        return Number.isInteger(pid) && pid > 0 ? pid : null;
+      } catch {
+        return null;
+      }
+    }(containerName);
+    if (null === proxyPid) throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
+    exitCode = function(fn) {
+      const dir = node_fs.mkdtempSync(path.join(os.tmpdir(), "buildcage-sandbox-"));
+      try {
+        return fn(dir);
+      } finally {
+        node_fs.rmSync(dir, {
+          recursive: !0,
+          force: !0
+        });
+      }
+    }(dir => {
+      const scriptPath = function(runInput, dir) {
+        const scriptPath = path.join(dir, "run-script.sh"), content = runInput.startsWith("#!") ? runInput : `#!/bin/sh\nset -e\n${runInput}\n`;
+        return node_fs.writeFileSync(scriptPath, content, {
+          mode: 448
+        }), scriptPath;
+      }(runInput, dir);
+      return runIsolated({
+        scriptPath: scriptPath,
+        proxyPid: proxyPid,
+        workdir: env.GITHUB_WORKSPACE || "",
+        env: env,
+        runScriptDir: dir
+      });
+    });
+  } finally {
+    try {
+      const report = function(containerName) {
+        const jsonOutput = node_child_process.execFileSync("docker", [ "exec", containerName, "qjs", "-m", "/opt/buildcage/tools/transparent/report.js" ], {
+          encoding: "utf8",
+          stdio: [ "ignore", "pipe", "pipe" ]
+        });
+        return JSON.parse(jsonOutput);
+      }(containerName);
+      writeReport(report, {
+        failOnBlocked: "true" === (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase()
+      });
+    } catch (e) {
+      console.log(`::warning::Failed to fetch sandbox report: ${e.message}`);
+    }
+    node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "down" ], {
+      stdio: "inherit",
+      env: composeEnv
+    });
+  }
+  0 !== exitCode && (process.exitCode = exitCode);
+}().catch(err => {
+  err instanceof SandboxError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${err.message}`), 
+  process.exit(1);
+}), exports.buildACLRules = buildACLRules;

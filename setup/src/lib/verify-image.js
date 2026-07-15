@@ -26,11 +26,12 @@ const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * Convert an action ref into the base Docker image tag, then append the
  * proxy engine suffix for non-default engines. The `transparent` engine
  * (default) publishes the plain version tag (e.g. `2.1.0`), matching the
- * pre-multi-engine tagging scheme; the `explicit` engine, being experimental,
- * publishes under a `-explicit` suffix (e.g. `2.1.0-explicit`). Both share the
- * same Sigstore verification identity (same workflow, same git ref) — only
- * the published Docker tag differs, so this does not affect
- * buildVerifyOptions below.
+ * pre-multi-engine tagging scheme; `explicit` (experimental) and `sandbox`
+ * (the buildkitd-less network-isolation proxy used by the sandbox action)
+ * each publish under their own suffix (e.g. `2.1.0-explicit`,
+ * `2.1.0-sandbox`). All three share the same Sigstore verification identity
+ * (same workflow, same git ref) — only the published Docker tag differs, so
+ * this does not affect buildVerifyOptions below.
  */
 export function imageTagFromRef(actionRef, proxyEngine = "transparent") {
   if (!actionRef) return "";
@@ -42,7 +43,8 @@ export function imageTagFromRef(actionRef, proxyEngine = "transparent") {
   } else {
     base = actionRef;
   }
-  return proxyEngine === "explicit" ? `${base}-explicit` : base;
+  if (proxyEngine === "explicit" || proxyEngine === "sandbox") return `${base}-${proxyEngine}`;
+  return base;
 }
 
 /**
