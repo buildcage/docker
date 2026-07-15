@@ -1,6 +1,6 @@
 //go:build !testhooks
 
-package main
+package bootstrap
 
 import "os"
 

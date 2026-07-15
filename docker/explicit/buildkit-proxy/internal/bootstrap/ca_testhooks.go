@@ -11,7 +11,7 @@
 // sets no TLSClientConfig at all) — so a self-signed integration-test server
 // cert can only be trusted by giving buildkitd's own process a CA bundle
 // that includes it.
-package main
+package bootstrap
 
 import (
 	"fmt"

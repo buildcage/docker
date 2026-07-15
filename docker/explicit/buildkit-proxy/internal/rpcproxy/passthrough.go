@@ -1,4 +1,4 @@
-package main
+package rpcproxy
 
 import (
 	"errors"
@@ -10,13 +10,18 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// passthroughHandler generically relays any RPC not explicitly registered on
+// PassthroughHandler generically relays any RPC not explicitly registered on
 // this server to the real backend, without ever decoding the payload (frame
-// carries opaque bytes). This is what makes Session (bidi-stream), Status,
-// DiskUsage, Prune, ListWorkers, Info, ListenBuildHistory, UpdateBuildHistory,
-// and the grpc health-check service work unmodified, and keeps future
-// BuildKit RPC additions automatically covered with zero code changes.
-func passthroughHandler(backend *grpc.ClientConn) grpc.StreamHandler {
+// carries opaque bytes). At the outer (Control-service) server this is what
+// makes Status, DiskUsage, Prune, ListWorkers, Info, ListenBuildHistory,
+// UpdateBuildHistory, and the grpc health-check service work unmodified, and
+// keeps future BuildKit RPC additions automatically covered with zero code
+// changes. control's session.go also reuses this same function as the
+// UnknownServiceHandler of the *downstream* per-Session grpc.Server it
+// builds (see SessionServer.runDownstreamLeg), where it relays every
+// Attachable other than FileSync (Auth, SSH, Secrets, ...) through to the
+// real buildx client.
+func PassthroughHandler(backend *grpc.ClientConn) grpc.StreamHandler {
 	return func(_ any, serverStream grpc.ServerStream) error {
 		fullMethod, ok := grpc.MethodFromServerStream(serverStream)
 		if !ok {
@@ -32,7 +37,7 @@ func passthroughHandler(backend *grpc.ClientConn) grpc.StreamHandler {
 			StreamName:    fullMethod,
 			ServerStreams: true,
 			ClientStreams: true,
-		}, fullMethod, grpc.CallContentSubtype(rawCodecName))
+		}, fullMethod, grpc.CallContentSubtype(RawCodecName))
 		if err != nil {
 			return err
 		}

@@ -1,4 +1,4 @@
-package main
+package rpcproxy
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 
 func TestRawCodecFrameRoundTrip(t *testing.T) {
 	want := []byte{0x01, 0x02, 0x03, 0xff, 0x00}
-	var c rawCodec
+	var c RawCodec
 
 	data, err := c.Marshal(&frame{payload: want})
 	if err != nil {
@@ -29,7 +29,7 @@ func TestRawCodecFrameRoundTrip(t *testing.T) {
 }
 
 func TestRawCodecProtoRoundTrip(t *testing.T) {
-	var c rawCodec
+	var c RawCodec
 	want := &controlapi.SolveRequest{Ref: "build-ref-123"}
 
 	data, err := c.Marshal(want)
@@ -47,7 +47,7 @@ func TestRawCodecProtoRoundTrip(t *testing.T) {
 }
 
 func TestRawCodecUnsupportedType(t *testing.T) {
-	var c rawCodec
+	var c RawCodec
 	if _, err := c.Marshal("not a frame or proto.Message"); err == nil {
 		t.Fatal("Marshal: expected error for unsupported type, got nil")
 	}

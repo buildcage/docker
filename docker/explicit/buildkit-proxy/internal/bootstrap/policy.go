@@ -1,4 +1,4 @@
-package main
+package bootstrap
 
 import (
 	"fmt"
@@ -8,9 +8,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// loadPolicy reads a sourcepolicy.pb.Policy encoded as protobuf-JSON, exactly
+// LoadPolicy reads a sourcepolicy.pb.Policy encoded as protobuf-JSON, exactly
 // as produced by docker/tools/explicit/gen-source-policy.js.
-func loadPolicy(path string) (*sourcepolicypb.Policy, error) {
+func LoadPolicy(path string) (*sourcepolicypb.Policy, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)

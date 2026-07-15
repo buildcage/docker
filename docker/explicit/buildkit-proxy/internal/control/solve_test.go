@@ -1,10 +1,11 @@
-package main
+package control
 
 import (
 	"context"
 	"testing"
 
 	controlapi "github.com/moby/buildkit/api/services/control"
+	pb "github.com/moby/buildkit/solver/pb"
 	sourcepolicypb "github.com/moby/buildkit/sourcepolicy/pb"
 	"google.golang.org/grpc"
 )
@@ -32,9 +33,9 @@ func TestSolveMergesExistingSourcePolicy(t *testing.T) {
 	clientPolicy := &sourcepolicypb.Policy{Version: 1, Rules: []*sourcepolicypb.Rule{clientRule}}
 
 	var gotReq *controlapi.SolveRequest
-	s := &solveServer{
-		policy: buildcagePolicy,
-		backend: &fakeControlClient{
+	s := &SolveServer{
+		Policy: buildcagePolicy,
+		Backend: &fakeControlClient{
 			solveFn: func(_ context.Context, in *controlapi.SolveRequest, _ ...grpc.CallOption) (*controlapi.SolveResponse, error) {
 				gotReq = in
 				return &controlapi.SolveResponse{}, nil
@@ -68,9 +69,9 @@ func TestSolveInjectsPolicyWhenAbsent(t *testing.T) {
 	}}}
 
 	var gotReq *controlapi.SolveRequest
-	s := &solveServer{
-		policy: wantPolicy,
-		backend: &fakeControlClient{
+	s := &SolveServer{
+		Policy: wantPolicy,
+		Backend: &fakeControlClient{
 			solveFn: func(_ context.Context, in *controlapi.SolveRequest, _ ...grpc.CallOption) (*controlapi.SolveResponse, error) {
 				gotReq = in
 				return &controlapi.SolveResponse{}, nil
@@ -93,9 +94,9 @@ func TestSolveInjectsPolicyWhenAbsent(t *testing.T) {
 func TestSolveIgnoresSourcePolicySession(t *testing.T) {
 	wantPolicy := &sourcepolicypb.Policy{Version: 1}
 	var gotReq *controlapi.SolveRequest
-	s := &solveServer{
-		policy: wantPolicy,
-		backend: &fakeControlClient{
+	s := &SolveServer{
+		Policy: wantPolicy,
+		Backend: &fakeControlClient{
 			solveFn: func(_ context.Context, in *controlapi.SolveRequest, _ ...grpc.CallOption) (*controlapi.SolveResponse, error) {
 				gotReq = in
 				return &controlapi.SolveResponse{}, nil
@@ -114,5 +115,104 @@ func TestSolveIgnoresSourcePolicySession(t *testing.T) {
 	}
 	if gotReq.SourcePolicySession != "session-id-abc" {
 		t.Fatal("SourcePolicySession must be passed through untouched")
+	}
+}
+
+func TestLikelyBypassesDockerfileFileSync(t *testing.T) {
+	tests := []struct {
+		name string
+		req  *controlapi.SolveRequest
+		want bool
+	}{
+		{
+			name: "local context is synced normally",
+			req: &controlapi.SolveRequest{
+				Frontend:      "dockerfile.v0",
+				FrontendAttrs: map[string]string{"context": "local-dir-marker"},
+			},
+			want: false,
+		},
+		{
+			name: "no context attr at all",
+			req:  &controlapi.SolveRequest{Frontend: "dockerfile.v0"},
+			want: false,
+		},
+		{
+			name: "https context bypasses FileSync",
+			req: &controlapi.SolveRequest{
+				Frontend:      "dockerfile.v0",
+				FrontendAttrs: map[string]string{"context": "https://github.com/example/repo.git"},
+			},
+			want: true,
+		},
+		{
+			name: "http context bypasses FileSync",
+			req: &controlapi.SolveRequest{
+				Frontend:      "dockerfile.v0",
+				FrontendAttrs: map[string]string{"context": "http://example.com/context.tar.gz"},
+			},
+			want: true,
+		},
+		{
+			name: "git:// context bypasses FileSync",
+			req: &controlapi.SolveRequest{
+				Frontend:      "dockerfile.v0",
+				FrontendAttrs: map[string]string{"context": "git://example.com/repo.git"},
+			},
+			want: true,
+		},
+		{
+			name: "git@ scp-style context bypasses FileSync",
+			req: &controlapi.SolveRequest{
+				Frontend:      "dockerfile.v0",
+				FrontendAttrs: map[string]string{"context": "git@github.com:example/repo.git"},
+			},
+			want: true,
+		},
+		{
+			name: "FrontendInputs present bypasses FileSync",
+			req: &controlapi.SolveRequest{
+				Frontend:       "dockerfile.v0",
+				FrontendInputs: map[string]*pb.Definition{"context": {}},
+			},
+			want: true,
+		},
+		{
+			name: "non-dockerfile frontend is out of scope",
+			req: &controlapi.SolveRequest{
+				Frontend:      "gateway.v0",
+				FrontendAttrs: map[string]string{"context": "https://github.com/example/repo.git"},
+			},
+			want: false,
+		},
+		{
+			// Confirmed by live capture against a real docker-container builder:
+			// docker buildx leaves Frontend unset (BuildKit itself defaults it to
+			// the dockerfile frontend), it never sends the literal string
+			// "dockerfile.v0" — so this case, not the explicit-string one above,
+			// is what every real docker build/buildx build request looks like.
+			name: "empty frontend (BuildKit's own default) with https context bypasses FileSync",
+			req: &controlapi.SolveRequest{
+				Frontend:      "",
+				FrontendAttrs: map[string]string{"context": "https://github.com/example/repo.git"},
+			},
+			want: true,
+		},
+		{
+			name: "empty frontend with local context is synced normally",
+			req: &controlapi.SolveRequest{
+				Frontend:      "",
+				FrontendAttrs: map[string]string{"context": "local-dir-marker"},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := likelyBypassesDockerfileFileSync(tt.req); got != tt.want {
+				t.Fatalf("likelyBypassesDockerfileFileSync() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
