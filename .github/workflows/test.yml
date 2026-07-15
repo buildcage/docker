@@ -23,6 +23,7 @@ jobs:
       test: ${{ steps.filter.outputs.test }}
       test_multiarch: ${{ steps.filter.outputs.test_multiarch }}
       test_action: ${{ steps.filter.outputs.test_action }}
+      test_sandbox: ${{ steps.filter.outputs.test_sandbox }}
     steps:
       - name: Filter changed paths
         id: filter
@@ -46,9 +47,11 @@ jobs:
               - *workflow
               - 'docker/transparent/**'
               - 'docker/explicit/**'
+              - 'docker/sandbox/**'
               - 'docker/tools/**'
               - 'setup/**'
               - 'report/**'
+              - 'sandbox/**'
               - 'Makefile'
             test:
               - *docker
@@ -67,6 +70,12 @@ jobs:
               - *workflow
               - 'setup/**'
               - 'report/**'
+            test_sandbox:
+              - *docker
+              - *js-built
+              - *workflow
+              - 'sandbox/**'
+              - 'test/assert-sandbox.sh'
 
   unit_test:
     needs: changes
@@ -91,11 +100,13 @@ jobs:
 
       - name: Check dist is free of the local-image test hook
         run: |
-          if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' setup/dist/main.cjs; then
-            echo "::error::setup/dist/main.cjs still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — @rollup/plugin-replace failed to substitute it (see rollup.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published dash14/buildcage/setup@<ref> step. Do not merge until this passes."
-            exit 1
-          fi
-          echo "confirmed: setup/dist/main.cjs has no live BUILDCAGE_BUILD_TEST_HOOKS read — the local-image bypass is unreachable in this build."
+          for f in setup/dist/main.cjs sandbox/dist/main.cjs; do
+            if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
+              echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — @rollup/plugin-replace failed to substitute it (see rollup.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published action step. Do not merge until this passes."
+              exit 1
+            fi
+            echo "confirmed: $f has no live BUILDCAGE_BUILD_TEST_HOOKS read — the local-image bypass is unreachable in this build."
+          done
 
       - name: Run unit tests
         run: make test_unit
@@ -386,6 +397,70 @@ jobs:
       # No cleanup step: ephemeral runner, and setup's post-hook already
       # stops the container.
 
+  # Exercises the real sandbox action end-to-end (uses: ./sandbox) on the
+  # actual runner host — run-isolated.sh needs to unshare/veth/setpriv
+  # directly on the host, matching what happens in a real workflow, so
+  # (unlike test_action's Docker-build tests) this can't be validated inside
+  # a nested container the way the mac dev loop does (see sandbox/dev/ and
+  # docs/development.md).
+  test_sandbox:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: test (sandbox)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm
+
+      - name: Build local sandbox proxy image
+        run: docker compose build sandbox
+
+      - name: Resolve local image ref
+        id: local_image
+        run: echo "ref=$(docker compose config --images sandbox)" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild sandbox action with the local-image test hook enabled
+        env:
+          BUILDCAGE_BUILD_TEST_HOOKS: "1"
+        run: pnpm build
+
+      - name: Run an isolated command via the real sandbox action
+        uses: ./sandbox
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          allowed_https_rules: example.com:443
+          allowed_http_rules: example.com:80
+          run: |
+            echo "=== capability / privilege-escalation checks ==="
+            grep -E 'CapEff|NoNewPrivs' /proc/self/status
+            grep -q '^CapEff:[[:space:]]*0000000000000000$' /proc/self/status
+            grep -q '^NoNewPrivs:[[:space:]]*1$' /proc/self/status
+
+            echo "=== allowlisted host must be reachable ==="
+            wget -q -T 5 -O /dev/null http://example.com/
+
+            echo "=== non-allowlisted host must be blocked (isolation-escape check) ==="
+            if wget -q -T 5 -O /dev/null http://neverssl.com/ 2>&1; then
+              echo "UNEXPECTED: neverssl.com was reachable"
+              exit 1
+            fi
+            echo "OK: neverssl.com correctly blocked"
+
+      - name: Verify Job Summary contains the expected allowed/blocked entries
+        if: always()
+        run: ./test/assert-sandbox.sh
+
+      # No cleanup step: the sandbox action stops its own throwaway proxy
+      # container in its own finally block (post.js is a fallback only).
+
   # Single, stably-named required status check for branch protection: the
   # `test` job's own name varies per matrix entry (test (transparent-audit),
   # test (explicit-restrict), etc.), so branch protection can't target it
@@ -394,7 +469,7 @@ jobs:
   all-tests-passed:
     name: All tests passed
     runs-on: ubuntu-latest
-    needs: [changes, unit_test, test, test_multiarch, test_action]
+    needs: [changes, unit_test, test, test_multiarch, test_action, test_sandbox]
     if: always()
     permissions: {}
     steps:
