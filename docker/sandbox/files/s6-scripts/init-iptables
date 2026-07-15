@@ -1,0 +1,11 @@
+#!/command/with-contenv sh
+set -e
+
+echo "init-iptables: configuring isolation..."
+
+iptables -t nat -A PREROUTING -i sandbox0 -p tcp \
+  -j REDIRECT --to-ports 10024
+
+iptables -A FORWARD -i sandbox0 -j DROP
+ip6tables -A FORWARD -i sandbox0 -j DROP
+echo "init-iptables: REDIRECT configured, FORWARD from sandbox0 blocked (IPv4/IPv6)"

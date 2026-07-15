@@ -157,6 +157,10 @@ test_qjs: ## Run unit tests in Docker
 	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/shared/lib/aggregate.test.js
 	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/explicit/lib/source-policy.test.js
 	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/explicit/lib/buildkitd-log-parser.test.js
+	@docker build -f docker/sandbox/Dockerfile -t buildcage-qjs-test-sandbox docker
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/shared/lib/rules.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/shared/lib/aggregate.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/transparent/lib/log-parser.test.js
 
 .PHONY: test_audit_example
 run_audit_example: ## Run audit mode example tests
