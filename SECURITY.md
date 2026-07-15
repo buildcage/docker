@@ -23,6 +23,39 @@ The following are **out of scope** (please report to the respective projects ins
 | 1.x     | :x: |
 | 2.x     | :white_check_mark: |
 
+## Verifying Releases
+
+Buildcage ships one artifact: a Docker image at `ghcr.io/dash14/buildcage`, tagged `vX.Y.Z` for the
+default `transparent` engine and `vX.Y.Z-explicit` for the `explicit` engine. Each release is signed
+keylessly with [cosign](https://github.com/sigstore/cosign) and carries a GitHub build-provenance
+attestation, both issued via GitHub Actions OIDC at release time — there is no long-lived signing key
+to leak or rotate. The `setup` action verifies this automatically, in-process, on every run (see
+[Image Provenance Verification](./docs/security.md#image-provenance-verification) for exactly how);
+to verify a release manually instead:
+
+```sh
+cosign verify ghcr.io/dash14/buildcage:<tag> \
+  --certificate-identity-regexp '^https://github.com/dash14/buildcage/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/dash14/buildcage:<tag> --owner dash14
+```
+
+The Sigstore bundle for each release is also attached as a downloadable asset
+(`buildcage-container.sigstore.json` / `buildcage-container-explicit.sigstore.json`) on the
+corresponding [GitHub Release](https://github.com/dash14/buildcage/releases).
+
+## Dependency Management
+
+- Dependencies are pinned: JS packages via `pnpm-lock.yaml`, Go modules via `go.sum`, GitHub Actions
+  by commit SHA (with a version comment for readability), and container base images by digest.
+- [Renovate](https://docs.renovatebot.com/) opens dependency, GitHub Actions, and base-image update
+  PRs automatically; each still goes through CI and manual review before merging.
+- New dependencies are chosen for necessity, an OSI-approved license, and active maintenance; the
+  standard library is preferred where practical.
+- [Trivy](https://github.com/aquasecurity/trivy) scans every built image for known vulnerabilities
+  (on each push to `main` and monthly on schedule), and Dependabot alerts are enabled on the
+  repository — both report into this repository's Security tab.
+
 ## Reporting a Vulnerability
 
 **Please do not report security vulnerabilities through public GitHub issues.**
