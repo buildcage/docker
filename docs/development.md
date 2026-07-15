@@ -232,7 +232,13 @@ If you encounter issues, try reproducing the problem locally to get detailed log
    docker compose logs builder
    ```
 
-3. **Open an issue** at [github.com/dash14/buildcage/issues](https://github.com/dash14/buildcage/issues) with:
+3. **TLS/certificate errors under `proxy_engine: explicit`**: if a `RUN` step fails with a
+   certificate error there but works fine under `transparent` (or without Buildcage at all), the tool
+   likely bundles its own CA store instead of consulting the system one BuildKit already trusts — see
+   [CA Trust for Tools with Their Own CA Store](./reference.md#ca-trust-for-tools-with-their-own-ca-store)
+   in the Reference doc.
+
+4. **Open an issue** at [github.com/dash14/buildcage/issues](https://github.com/dash14/buildcage/issues) with:
    - Your Dockerfile
    - The audit mode report output
    - Full error messages from `docker compose logs builder`

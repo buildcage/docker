@@ -162,9 +162,11 @@ build output and SLSA provenance, tools that ignore `HTTP_PROXY`/`HTTPS_PROXY` (
 are blocked invisibly, with no trace in the report.
 
 This engine is experimental — its underlying BuildKit feature is still maturing. One notable gap:
-some package managers (e.g. npm, bun) ship their own CA store instead of consulting the system one, so
-they don't trust the injected CA by default and need a Dockerfile change (pointing them at the CA) to
-avoid TLS errors during `RUN` steps.
+some package managers (e.g. npm) ship their own CA store instead of consulting the system one, so
+they don't trust the injected CA by default and need a small Dockerfile change to avoid TLS errors
+during `RUN` steps — see
+[CA Trust for Tools with Their Own CA Store](./docs/reference.md#ca-trust-for-tools-with-their-own-ca-store)
+in the Reference doc for exactly what to add.
 
 Not sure which to use? See the [engine comparison](./docs/reference.md#proxy-engines) in the Reference
 doc, and [Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine) for the full technical
