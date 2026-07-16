@@ -485,6 +485,40 @@ jobs:
             fi
             echo "OK: example.org (HTTPS) correctly blocked"
 
+            echo "=== workspace/home/tmp must be writable by default ==="
+            echo x >> "$GITHUB_WORKSPACE/.buildcage-writable-test"
+            echo x >> "$HOME/.buildcage-writable-test"
+            echo x >> /tmp/.buildcage-writable-test
+
+            echo "=== everything else must be read-only by default ==="
+            if touch /opt/.buildcage-writable-test 2>/dev/null; then
+              echo "UNEXPECTED: /opt was writable without a writable: entry"
+              exit 1
+            fi
+            echo "OK: /opt correctly read-only"
+
+      - name: Run an isolated command with an extra writable directory
+        uses: ./sandbox
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          writable: /opt
+          run: |
+            echo "=== /opt must be writable when listed under writable: ==="
+            touch /opt/.buildcage-writable-test
+            rm -f /opt/.buildcage-writable-test
+
+      - name: Run an isolated command with writable set to / (restriction disabled)
+        uses: ./sandbox
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          writable: /
+          run: |
+            echo "=== / must be fully writable when writable: / is set ==="
+            touch /opt/.buildcage-writable-test
+            rm -f /opt/.buildcage-writable-test
+
       - name: Verify the sandbox report contains the expected allowed/blocked entries
         if: always()
         env:
