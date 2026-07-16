@@ -192,6 +192,10 @@ In restrict mode, the report step fails if blocked connections are detected, cau
 
 ## Sandbox Action (`dash14/buildcage/sandbox`)
 
+> [!WARNING]
+> `sandbox` is an **experimental** action — see
+> [Known Limitations](./security.md#known-limitations-1) in Security Details before relying on it.
+
 Runs an arbitrary command — not just a Docker build — with the same outbound network isolation as
 the `setup`/`report` actions provide for `RUN` steps. Useful for `run:` steps that install
 dependencies, run tests, or execute build scripts directly on the runner, outside of any Docker

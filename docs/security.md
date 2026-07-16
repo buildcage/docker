@@ -192,6 +192,11 @@ For exactly how the `report` action extracts allowed/denied data from buildkitd'
 
 ## Sandbox Action
 
+> [!WARNING]
+> `sandbox` is an **experimental** action. It hasn't seen the same real-world exposure as the
+> `setup`/`report` build-isolation actions yet — see [Known Limitations](#known-limitations-1) below
+> before relying on it.
+
 The `sandbox` action ([Reference](./reference.md#sandbox-action)) applies the same isolation
 technology as the `transparent` engine — bridge network, iptables redirect, DNS redirect,
 SNI/Host-based allowlist proxy — to an arbitrary `run:` command instead of a BuildKit `RUN` step.

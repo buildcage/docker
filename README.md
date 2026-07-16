@@ -26,7 +26,6 @@ This is not a hypothetical risk: the [Shai-Hulud npm worm](https://unit42.paloal
 - 🔍 **Audit mode**: Discover dependencies before enforcing restrictions
 - 🛡️ **Restrict mode**: Enforce an allowlist — block everything else
 - 📊 **Detailed logging**: Full visibility into every connection observed during builds
-- 📦 **Not just Docker builds**: the [`sandbox` action](#the-sandbox-action) applies the same isolation to any `run:` step
 
 ## Quick Start
 
@@ -180,11 +179,13 @@ detail.
 >
 > See [Security Considerations](./docs/security.md) for full details.
 
-## The Sandbox Action
+## The Sandbox Action (Experimental)
 
 Supply-chain attacks aren't limited to Docker builds — a compromised dependency can just as easily
 phone home from a plain `run:` step (`npm install`, `pip install`, a test suite, a build script).
-The `sandbox` action applies the same network-isolation technology to any command:
+The `sandbox` action applies the same network-isolation technology to any command. It's
+experimental — newer and less battle-tested than the `setup`/`report` actions above — see
+[Security Details](./docs/security.md#sandbox-action) for its current known limitations:
 
 ```yaml
 - name: Run tests with outbound network isolation
