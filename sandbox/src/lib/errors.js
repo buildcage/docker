@@ -12,7 +12,8 @@
  *   VERIFY_FAILED    – Sigstore bundle verification failed
  *   UNVERIFIABLE_REF – action ref cannot be verified (branch / local path)
  *   INVALID_RULES    – ACL rule syntax error
- *   ISOLATION_FAILED – run-isolated.sh itself failed (before the user command ran)
+ *   MISSING_RUN      – required `run` input was empty
+ *   PROXY_NOT_RUNNING – sandbox proxy container isn't running after `docker compose up`
  */
 export class SandboxError extends Error {
   constructor(message, code) {
