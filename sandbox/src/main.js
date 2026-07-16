@@ -7,9 +7,12 @@ import { buildRules } from "../../docker/tools/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../setup/src/lib/image-ref.js";
 import { verifyImageDigest } from "../../setup/src/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
-import { generateContainerName, getContainerPid } from "./lib/container.js";
+import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";
+import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.js";
 import { writeRunScript, runIsolated, withScratchDir } from "./lib/isolated-exec.js";
 import { fetchReport, writeReport } from "./lib/report.js";
+
+export { buildComposeUpArgs, buildComposeDownArgs };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
@@ -107,10 +110,14 @@ async function main() {
   // the isolated command, report, and stop, all within this one step —
   // rather than sharing one across steps in the same job.
   const containerName = generateContainerName();
+  const projectName = deriveProjectName(containerName);
   const stateFile = env.GITHUB_STATE;
   // Recorded so post.js can still clean up if this run is killed outright
   // before reaching its own finally block below.
-  if (stateFile) appendFileSync(stateFile, `container_name=${containerName}\n`);
+  if (stateFile) {
+    appendFileSync(stateFile, `container_name=${containerName}\n`);
+    appendFileSync(stateFile, `project_name=${projectName}\n`);
+  }
 
   const composeEnv = {
     ...env,
@@ -124,7 +131,7 @@ async function main() {
 
   execFileSync(
     "docker",
-    ["compose", "-f", composeFile, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull"],
+    buildComposeUpArgs({ composeFile, projectName, pullPolicy }),
     { stdio: "inherit", env: composeEnv },
   );
 
@@ -154,7 +161,7 @@ async function main() {
     } catch (e) {
       console.log(`::warning::Failed to fetch sandbox report: ${e.message}`);
     }
-    execFileSync("docker", ["compose", "-f", composeFile, "down"], { stdio: "inherit", env: composeEnv });
+    execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), { stdio: "inherit", env: composeEnv });
   }
 
   if (exitCode !== 0) {

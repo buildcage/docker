@@ -7266,6 +7266,14 @@ class SandboxError extends Error {
   }
 }
 
+function buildComposeUpArgs({composeFile: composeFile, projectName: projectName, pullPolicy: pullPolicy}) {
+  return [ "compose", "-f", composeFile, "-p", projectName, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ];
+}
+
+function buildComposeDownArgs({composeFile: composeFile, projectName: projectName}) {
+  return [ "compose", "-f", composeFile, "-p", projectName, "down" ];
+}
+
 const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href));
 
 function runIsolated({scriptPath: scriptPath, proxyPid: proxyPid, workdir: workdir, env: env, runScriptDir: runScriptDir}) {
@@ -7395,8 +7403,9 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   });
   console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), 
   logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), console.log("::endgroup::");
-  const containerName = `buildcage-sandbox-${node_crypto.randomBytes(4).toString("hex")}`, stateFile = env.GITHUB_STATE;
-  stateFile && node_fs.appendFileSync(stateFile, `container_name=${containerName}\n`);
+  const containerName = `buildcage-sandbox-${node_crypto.randomBytes(4).toString("hex")}`, projectName = containerName, stateFile = env.GITHUB_STATE;
+  stateFile && (node_fs.appendFileSync(stateFile, `container_name=${containerName}\n`), 
+  node_fs.appendFileSync(stateFile, `project_name=${projectName}\n`));
   const composeEnv = {
     ...env,
     SANDBOX_CONTAINER_NAME: containerName,
@@ -7406,7 +7415,11 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
     BUILDCAGE_SANDBOX_IMAGE_REF: imageRef
   };
-  node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ], {
+  node_child_process.execFileSync("docker", buildComposeUpArgs({
+    composeFile: composeFile,
+    projectName: projectName,
+    pullPolicy: pullPolicy
+  }), {
     stdio: "inherit",
     env: composeEnv
   });
@@ -7464,7 +7477,10 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     } catch (e) {
       console.log(`::warning::Failed to fetch sandbox report: ${e.message}`);
     }
-    node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "down" ], {
+    node_child_process.execFileSync("docker", buildComposeDownArgs({
+      composeFile: composeFile,
+      projectName: projectName
+    }), {
       stdio: "inherit",
       env: composeEnv
     });
@@ -7473,4 +7489,5 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
 }().catch(err => {
   err instanceof SandboxError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${err.message}`), 
   process.exit(1);
-}), exports.buildACLRules = buildACLRules;
+}), exports.buildACLRules = buildACLRules, exports.buildComposeDownArgs = buildComposeDownArgs, 
+exports.buildComposeUpArgs = buildComposeUpArgs;

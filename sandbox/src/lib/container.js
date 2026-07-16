@@ -13,6 +13,28 @@ export function generateContainerName() {
 }
 
 /**
+ * Derive the docker compose project name to use for this step's proxy
+ * container. Container names and Compose project names live in separate
+ * Docker namespaces, so reusing the exact same string for both is safe,
+ * and correlating them 1:1 makes `docker ps` / `docker network ls`
+ * debugging trivial when troubleshooting a specific concurrent step.
+ *
+ * Passing this explicitly via `-p` on every `docker compose` invocation is
+ * required when multiple `sandbox` steps in the same job run truly
+ * concurrently (see GitHub Actions' `background`/`wait`/`parallel` step
+ * keywords) — without it, Compose falls back to an implicit,
+ * directory-derived project name shared by every invocation, and it
+ * identifies "the" container for a service by project+service label
+ * rather than by container name. A concurrent `up`/`down` from a
+ * different step can then recreate or tear down another step's
+ * still-running proxy container even though their container names never
+ * collide.
+ */
+export function deriveProjectName(containerName) {
+  return containerName;
+}
+
+/**
  * Returns the container's PID (as seen from the Docker host's PID
  * namespace), or null if the container doesn't exist / isn't running.
  */
