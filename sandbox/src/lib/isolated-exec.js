@@ -1,7 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+
+// Not import.meta.dirname: rollup's cjs output doesn't understand that
+// (newer, Node 20.11+-only) property and silently substitutes `undefined`
+// for it — dirname(fileURLToPath(import.meta.url)) is what setup/src/main.js
+// uses for the same reason, and it survives the rollup->cjs conversion.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Write the user-supplied `run:` input to an executable script file.
@@ -42,7 +49,7 @@ export function writeEnvDump(env, dir) {
  * not this function.
  */
 export function runIsolated({ scriptPath, proxyPid, workdir, env, runScriptDir }) {
-  const runIsolatedShPath = join(import.meta.dirname, "..", "scripts", "run-isolated.sh");
+  const runIsolatedShPath = join(__dirname, "..", "scripts", "run-isolated.sh");
   const envFilePath = writeEnvDump(env, runScriptDir);
 
   const args = [

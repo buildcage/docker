@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 import { buildRules } from "../../docker/tools/shared/lib/rules.js";
 import { SetupError } from "./lib/errors.js";
 import { verifyImageDigest } from "./lib/verify-image.js";
+import { resolveBuildcageImageRef } from "./lib/image-ref.js";
+
+export { resolveBuildcageImageRef };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
@@ -101,18 +104,6 @@ async function main() {
     ],
     { stdio: "inherit", env: composeEnv }
   );
-}
-
-/**
- * Resolve the buildcage Docker image reference (image@digest). The
- * repository is always derived from the action repository — external image
- * overrides are intentionally not supported to preserve Sigstore verification
- * integrity.
- */
-export function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
-  const repository = `ghcr.io/${actionRepository}`.toLowerCase();
-  // Pull by verified digest to close the TOCTOU window between verification and docker pull.
-  return `${repository}@${imageDigest}`;
 }
 
 /**

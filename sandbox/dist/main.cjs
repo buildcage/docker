@@ -31,6 +31,10 @@ function convertRule(rule) {
   }(rule)}$`;
 }
 
+function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository}) {
+  return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
+}
+
 class SetupError extends Error {
   constructor(message, code) {
     super(message), this.name = "SetupError", this.code = code;
@@ -7256,94 +7260,16 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
   return await verifyBundle(bundle, verifyOptions, digest), digest;
 }
 
-const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile$1 = path.join(__dirname$2, "../compose.yaml");
-
-function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository}) {
-  return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
-}
-
-function logRules$1(label, rules) {
-  console.log(`${label} rules:${0 === rules.length ? " (none)" : ""}`);
-  for (const r of rules) console.log(`  ${r}`);
-}
-
-process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href) && async function() {
-  const env = process.env, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", proxyEngine = function(input) {
-    const engine = input?.trim() || "transparent";
-    if ("transparent" !== engine && "explicit" !== engine) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`, "INVALID_PROXY_ENGINE");
-    return engine;
-  }(env.INPUT_PROXY_ENGINE);
-  console.log(`Proxy engine: ${proxyEngine}`);
-  const {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine}) {
-    const digest = await verifyImageDigest({
-      actionRef: actionRef,
-      actionRepo: actionRepo,
-      proxyEngine: proxyEngine
-    });
-    if (null === digest) throw new SetupError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
-    return console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), 
-    {
-      imageRef: resolveBuildcageImageRef({
-        imageDigest: digest,
-        actionRepository: actionRepo
-      }),
-      pullPolicy: "always"
-    };
-  }({
-    actionRef: actionRef,
-    actionRepo: actionRepo,
-    proxyEngine: proxyEngine
-  });
-  console.log(`buildcage image: ${imageRef}`);
-  const rules = function({httpsRulesInput: httpsRulesInput, httpRulesInput: httpRulesInput, ipRulesInput: ipRulesInput}) {
-    const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-    try {
-      buildRules(httpsRulesInput), buildRules(httpRulesInput), buildRules(ipRulesInput);
-    } catch (e) {
-      throw new SetupError(e.message, "INVALID_RULES");
-    }
-    return {
-      httpsRules: httpsRules,
-      httpRules: httpRules,
-      ipRules: ipRules
-    };
-  }({
-    httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
-    httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
-    ipRulesInput: env.INPUT_ALLOWED_IP_RULES
-  });
-  console.log("::group::Configured ACL Rules"), logRules$1("HTTPS", rules.httpsRules), 
-  logRules$1("HTTP", rules.httpRules), logRules$1("IP", rules.ipRules), console.log("::endgroup::");
-  const composeEnv = {
-    ...env,
-    BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
-    PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
-    PROXY_ENGINE: proxyEngine,
-    ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
-    ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
-    ALLOWED_IP_RULES: rules.ipRules.join("\n"),
-    BUILDCAGE_IMAGE_REF: imageRef
-  };
-  node_child_process.execFileSync("docker", [ "compose", "-f", composeFile$1, "down" ], {
-    stdio: "inherit",
-    env: composeEnv
-  }), node_child_process.execFileSync("docker", [ "compose", "-f", composeFile$1, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ], {
-    stdio: "inherit",
-    env: composeEnv
-  });
-}().catch(err => {
-  err instanceof SetupError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), 
-  process.exit(1);
-});
-
 class SandboxError extends Error {
   constructor(message, code) {
     super(message), this.name = "SandboxError", this.code = code;
   }
 }
 
+const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href));
+
 function runIsolated({scriptPath: scriptPath, proxyPid: proxyPid, workdir: workdir, env: env, runScriptDir: runScriptDir}) {
-  const runIsolatedShPath = path.join(void 0, "..", "scripts", "run-isolated.sh"), envFilePath = function(env, dir) {
+  const runIsolatedShPath = path.join(__dirname$2, "..", "scripts", "run-isolated.sh"), envFilePath = function(env, dir) {
     const envFilePath = path.join(dir, "env-dump.bin"), buf = Buffer.concat(Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => Buffer.from(`${k}=${v}\0`, "utf8")));
     return node_fs.writeFileSync(envFilePath, buf), envFilePath;
   }(env, runScriptDir), args = [ "-n", "--", runIsolatedShPath, "--proxy-pid", String(proxyPid), "--uid", String(process.getuid()), "--gid", String(process.getgid()), "--env-file", envFilePath ];

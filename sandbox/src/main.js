@@ -4,7 +4,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildRules } from "../../docker/tools/shared/lib/rules.js";
-import { resolveBuildcageImageRef } from "../../setup/src/main.js";
+import { resolveBuildcageImageRef } from "../../setup/src/lib/image-ref.js";
 import { verifyImageDigest } from "../../setup/src/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
 import { generateContainerName, getContainerPid } from "./lib/container.js";

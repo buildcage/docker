@@ -7256,11 +7256,11 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
   return await verifyBundle(bundle, verifyOptions, digest), digest;
 }
 
-const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
-
 function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository}) {
   return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
+
+const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
 function resolveProxyEngine(input) {
   const engine = input?.trim() || "transparent";
