@@ -165,14 +165,17 @@ jobs:
       - name: Build containers
         env:
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
-        run: docker compose build
+        run: docker compose build builder
 
       - name: Start containers
         env:
           PROXY_MODE: ${{ matrix.proxy_mode }}
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: docker compose up -d --wait
+        # Scoped to builder — compose.yaml also defines a sandbox service
+        # (see the sandbox action's own test_sandbox job) that this job has
+        # no reason to build/start.
+        run: docker compose up -d --wait builder
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
@@ -246,13 +249,13 @@ jobs:
         uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
 
       - name: Build containers
-        run: docker compose build
+        run: docker compose build builder
 
       - name: Start containers
         env:
           PROXY_MODE: audit
           BUILDER_NAME: buildcage-multiarch
-        run: docker compose up -d --wait
+        run: docker compose up -d --wait builder
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
@@ -337,11 +340,15 @@ jobs:
       - name: Build local buildcage image
         env:
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
-        run: docker compose build
+        run: docker compose build builder
 
       - name: Resolve local image ref
         id: local_image
-        run: echo "ref=$(docker compose config --images)" >> "$GITHUB_OUTPUT"
+        # Scoped to the builder service — compose.yaml also defines a
+        # sandbox service (see the sandbox action's own test_sandbox job),
+        # and `--images` with no service argument would emit one line per
+        # service, breaking GITHUB_OUTPUT's single-line key=value format.
+        run: echo "ref=$(docker compose config --images builder)" >> "$GITHUB_OUTPUT"
 
       - name: Rebuild setup action with the local-image test hook enabled
         env:
