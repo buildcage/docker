@@ -203,6 +203,8 @@ Each step starts its own throwaway proxy, runs the isolated command with all cap
 stops the proxy again. See the [Sandbox Action reference](./docs/reference.md#sandbox-action) for
 parameters and the [Security Details](./docs/security.md#sandbox-action) for the full threat model.
 
+See the [complete example workflow](.github/workflows/example-sandbox.yml).
+
 ## FAQ
 
 - **Does this slow down my builds?**
