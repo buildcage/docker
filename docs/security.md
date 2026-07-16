@@ -234,6 +234,13 @@ socket, or reading another process's memory).
   `/proc/sysrq-trigger`, `/proc/timer_list`, and `/proc/keys` are bind-mounted over with `/dev/null`
   inside the isolated mount namespace, closing off kernel-memory-adjacent information disclosure
   paths that aren't already covered by the capability drop.
+- **Filesystem read-only outside the workspace/home/tmp**: `$GITHUB_WORKSPACE`, `$HOME`, and `/tmp`
+  are bind-mounted onto themselves and kept writable; every other existing mount is remounted
+  read-only inside the isolated mount namespace. This closes off tampering with anything outside
+  those three paths — e.g. rewriting a binary earlier on `$PATH` to plant a payload for a later,
+  non-sandboxed step in the same job. The `writable` input adds further paths to the writable set
+  for tools that need to write elsewhere (e.g. a cache directory); setting it to `/` disables this
+  restriction entirely — see [Filesystem Access](./reference.md#filesystem-access) in Reference.
 
 ### Known Limitations
 
@@ -245,11 +252,12 @@ socket, or reading another process's memory).
   close off the specific escape routes considered (privilege escalation, Docker-socket access,
   cross-namespace ptrace/memory access).
 - **Credential retrieval is intentionally not blocked**: `sandbox` restricts *where* the isolated
-  command can send network traffic, not what files it reads — a compromised dependency can still
-  read `~/.aws/credentials`, `~/.docker/config.json`, or similar local credential files, it just
-  cannot exfiltrate them anywhere outside the allowlist. This mirrors the same design principle as
-  the Docker build engines above (see the defense-in-depth note in the
-  [README](../README.md#how-it-works)).
+  command can send network traffic and, since the filesystem is read-only outside
+  `$GITHUB_WORKSPACE`/`$HOME`/`/tmp`, *where* it can persist a payload — but not what it reads. A
+  compromised dependency can still read `~/.aws/credentials`, `~/.docker/config.json`, or similar
+  local credential files anywhere on the filesystem; it just cannot exfiltrate them anywhere outside
+  the allowlist. This mirrors the same design principle as the Docker build engines above (see the
+  defense-in-depth note in the [README](../README.md#how-it-works)).
 - **Linux only**: requires a Linux runner with passwordless `sudo` for the isolation setup itself
   (network namespace, veth, iptables) — the default on GitHub-hosted `ubuntu-*` runners. Not
   supported on Windows or macOS runners.

@@ -155,15 +155,29 @@ Security Details and the [Reference](./reference.md#sandbox-action) doc.
      a placeholder process holding the new namespaces. `unshare --pid` doesn't move the caller
      itself into the new PID namespace — only the first forked child does — so the script discovers
      that child's host-visible PID via `/proc/<unshare-pid>/task/<unshare-pid>/children` before it
-     can `nsenter` into it.
+     can `nsenter` into it. Immediately after, `mount --make-rprivate /` (recursive) runs inside the
+     placeholder's mount namespace: a cloned mount namespace starts out in the same propagation peer
+     group as the one it was cloned from (typically "shared" under systemd), so without this, every
+     mount change made in the steps below would propagate straight back out to the host's real mount
+     namespace.
   2. A veth pair is created with one end moved into the placeholder's netns, the other moved
      directly into the (already-running) proxy container's netns and attached to its `sandbox0`
      bridge as a bridge port — the same role a BuildKit `RUN` step container's veth plays under
      `transparent` mode.
-  3. `/etc/resolv.conf` is bind-mounted over inside the placeholder's mount namespace only (the
-     rest of the filesystem stays shared with the host, so toolchains keep working); a handful of
-     sensitive `/proc` paths are bind-mounted over with `/dev/null` the same way.
-  4. The command finally executes via `nsenter --target <placeholder-pid> --net --mount --uts --ipc
+  3. `/etc/resolv.conf` is bind-mounted over inside the placeholder's mount namespace only; a
+     handful of sensitive `/proc` paths are bind-mounted over with `/dev/null` the same way.
+  4. The rest of the filesystem is then restricted to read-only, except `$GITHUB_WORKSPACE`, `$HOME`,
+     `/tmp`, and any paths from the action's `writable` input (`--writable`, repeatable). Each of
+     those is first bind-mounted onto itself, giving it its own mount-table entry, then every
+     *other* existing mount is remounted read-only via `mount -o remount,bind,ro` — the `bind`
+     there is required: a plain `remount,ro` changes the underlying filesystem's shared state
+     (still shared with the host even after step 1's `make-rprivate`, since that only stops
+     mount/unmount *event* propagation, not this kind of flag change), and would leak the read-only
+     flag back to the host, whereas `remount,bind,ro` scopes it to this one mount entry only. A
+     literal `/` among the `writable` paths is a sentinel that skips this whole step instead of
+     bind-mounting "/" itself, since most paths below "/" aren't separate mount points and so
+     wouldn't be covered by protecting "/" alone.
+  5. The command finally executes via `nsenter --target <placeholder-pid> --net --mount --uts --ipc
      --cgroup --pid -- env -i "${ENV_ASSIGNMENTS[@]}" setpriv --reuid=<uid> --regid=<gid>
      --clear-groups --bounding-set=-all --no-new-privs -- <script>`. Environment variables are
      passed through a NUL-separated dump file, read into a bash array with `mapfile -d ''` and
@@ -171,7 +185,7 @@ Security Details and the [Reference](./reference.md#sandbox-action) doc.
      sudoers `SETENV` tag). `mapfile` is used instead of `xargs -0` specifically so the isolated
      command's real exit code survives: GNU xargs remaps any exit status 1-125 from the command it
      runs to its own fixed exit status 123.
-  5. A `trap ... EXIT INT TERM` cleanup always removes the proxy-side veth and kills the placeholder
+  6. A `trap ... EXIT INT TERM` cleanup always removes the proxy-side veth and kills the placeholder
      — with `kill -9`, specifically: the placeholder is PID 1 of its own new PID namespace, and PID
      1 ignores the default-terminate action for signals it hasn't installed a handler for, so
      `SIGTERM` alone leaves it running forever. Only `SIGKILL` (which can't be caught or ignored)

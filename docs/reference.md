@@ -227,6 +227,7 @@ each other's containers.
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
+| `writable` | No | empty | Additional writable directories (newline-separated), on top of `$GITHUB_WORKSPACE`, `$HOME`, and `/tmp` — see [Filesystem Access](#filesystem-access) below |
 
 Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above.
 
@@ -249,6 +250,31 @@ itself instead of a BuildKit `RUN` step:
    PID namespace isolation also means the isolated command structurally cannot `ptrace` or read
    `/proc/<pid>/mem` for the Actions runner process itself — the kernel forbids reaching into a
    parent PID namespace regardless of capabilities.
+
+### Filesystem Access
+
+Only `$GITHUB_WORKSPACE`, `$HOME`, and `/tmp` are writable by default — every other path is
+remounted read-only for the duration of the `run` command. This closes off using the filesystem to
+plant a payload for a later, non-sandboxed step in the same job (e.g. rewriting a binary earlier on
+`$PATH`); it doesn't restrict what the command can *read* (see
+[Known Limitations](./security.md#sandbox-action) in Security Details).
+
+If `run` needs to write somewhere else — a tool-specific cache directory, for example — list it
+under `writable`:
+
+```yaml
+- uses: dash14/buildcage/sandbox@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  with:
+    writable: |
+      /opt/some-tool/cache
+    run: some-tool build
+```
+
+To disable the read-only restriction entirely, set `writable` to `/`:
+
+```yaml
+    writable: /
+```
 
 > [!NOTE]
 > `sandbox` runs `run-isolated.sh` directly on the runner host (via `sudo -n`), so it requires a
