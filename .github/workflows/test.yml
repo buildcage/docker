@@ -76,6 +76,7 @@ jobs:
               - *workflow
               - 'sandbox/**'
               - 'test/assert-sandbox.sh'
+              - 'test/assert-sandbox-concurrent.sh'
 
   unit_test:
     needs: changes
@@ -518,6 +519,62 @@ jobs:
             exit 1
           fi
           echo "OK: fail_on_blocked correctly failed the step"
+
+      # Drives sandbox/dist/main.cjs directly rather than through
+      # `uses: ./sandbox` steps, so this doesn't depend on Actions'
+      # `parallel:` step keyword to prove true concurrency (see the
+      # `parallel:`-based step below for that Actions-level check).
+      - name: Run two sandbox proxy lifecycles concurrently (direct)
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        run: ./test/assert-sandbox-concurrent.sh
+
+      # Actions-level counterpart to the direct test above: proves the fix
+      # also holds when concurrency comes from Actions' own `background`/
+      # `wait`/`parallel` step keywords rather than a bash `&`/`wait` pair.
+      - parallel:
+          - name: sandbox-parallel-a
+            id: parallel_a
+            uses: ./sandbox
+            env:
+              BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+              BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-parallel-a-summary.md
+            with:
+              allowed_https_rules: example.com:443
+              allowed_http_rules: example.com:80
+              fail_on_blocked: false
+              run: |
+                sleep 5
+                wget -q -T 5 -O /dev/null http://example.com/
+                if wget -q -T 5 -O /dev/null http://example.net/ 2>&1; then
+                  echo "::error::cross-talk: example.net (step B's allowlist) was reachable from step A"; exit 1
+                fi
+
+          - name: sandbox-parallel-b
+            id: parallel_b
+            uses: ./sandbox
+            env:
+              BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+              BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-parallel-b-summary.md
+            with:
+              allowed_https_rules: example.net:443
+              allowed_http_rules: example.net:80
+              fail_on_blocked: false
+              run: |
+                wget -q -T 5 -O /dev/null http://example.net/
+                if wget -q -T 5 -O /dev/null http://example.com/ 2>&1; then
+                  echo "::error::cross-talk: example.com (step A's allowlist) was reachable from step B"; exit 1
+                fi
+
+      - name: Verify no leftover buildcage-sandbox containers/networks after the parallel steps
+        if: always()
+        run: |
+          LEFTOVER_C=$(docker ps -a --filter "name=buildcage-sandbox-" -q)
+          LEFTOVER_N=$(docker network ls --filter "name=buildcage-sandbox-" -q)
+          if [ -n "$LEFTOVER_C" ] || [ -n "$LEFTOVER_N" ]; then
+            echo "::error::leftover buildcage-sandbox containers/networks found after parallel sandbox steps"
+            exit 1
+          fi
 
       # No cleanup step: the sandbox action stops its own throwaway proxy
       # container in its own finally block (post.js is a fallback only).
