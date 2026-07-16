@@ -70,6 +70,16 @@ export function writeReport(report, { stepLabel, failOnBlocked } = {}) {
     console.log(markdown);
   }
 
+  // Debug-only mirror: GITHUB_STEP_SUMMARY is unique per step and can't be
+  // overridden (GitHub ignores attempts to reassign GITHUB_*/RUNNER_* env
+  // vars), so a later step has no way to read this step's copy back. When
+  // set, also append to this second, stable path so a later step can
+  // inspect what was written.
+  const debugSummaryFile = process.env.BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE;
+  if (debugSummaryFile) {
+    appendFileSync(debugSummaryFile, markdown);
+  }
+
   const annotation = createAnnotation(Boolean(summaryFile));
   if (report.blockedCount > 0) {
     const isAudit = report.mode === "audit";

@@ -4,10 +4,8 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
-// Not import.meta.dirname: rollup's cjs output doesn't understand that
-// (newer, Node 20.11+-only) property and silently substitutes `undefined`
-// for it — dirname(fileURLToPath(import.meta.url)) is what setup/src/main.js
-// uses for the same reason, and it survives the rollup->cjs conversion.
+// rollup's cjs output doesn't convert import.meta.dirname (it silently
+// becomes undefined), so use this form instead.
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**

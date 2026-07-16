@@ -7319,6 +7319,8 @@ function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked
     stepLabel: stepLabel
   }), summaryFile = process.env.GITHUB_STEP_SUMMARY;
   summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown);
+  const debugSummaryFile = process.env.BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE;
+  debugSummaryFile && node_fs.appendFileSync(debugSummaryFile, markdown);
   const annotation = Boolean(summaryFile) ? {
     notice(message) {
       console.log(`::notice::${message}`);

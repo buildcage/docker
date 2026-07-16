@@ -153,10 +153,12 @@ if [ -n "$ENV_FILE" ]; then
   # xargs appends the args it read to the *end* of the command line, so
   # `xargs env -i -- cmd` would hand KEY=VALUE pairs to cmd instead of env.
   # Route through a tiny wrapper so "$@" lands where env expects them.
+  # No "--" before setpriv: env treats the first non-NAME=VALUE token as
+  # the command to run on its own.
   EXEC_WRAPPER=$(mktemp)
   cat > "$EXEC_WRAPPER" <<WRAPPER_EOF
 #!/bin/sh
-exec env -i "\$@" -- setpriv --reuid=${TARGET_UID} --regid=${TARGET_GID} --clear-groups --bounding-set=-all --no-new-privs -- ${SCRIPT_PATH}
+exec env -i "\$@" setpriv --reuid=${TARGET_UID} --regid=${TARGET_GID} --clear-groups --bounding-set=-all --no-new-privs -- ${SCRIPT_PATH}
 WRAPPER_EOF
   chmod +x "$EXEC_WRAPPER"
   nsenter "${NSENTER_ARGS[@]}" -- xargs -0 -a "$ENV_FILE" "$EXEC_WRAPPER"

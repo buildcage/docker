@@ -165,17 +165,19 @@ jobs:
       - name: Build containers
         env:
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
-        run: docker compose build builder
+        # Scoped to the services this job actually needs: builder, plus the
+        # test-server/test-dns fixtures added by matrix.compose_file's
+        # overlay (compose.test-{transparent,explicit}.yaml). compose.yaml
+        # also defines a sandbox service (see the sandbox action's own
+        # test_sandbox job) that this job has no reason to build/start.
+        run: docker compose build builder test-server test-dns
 
       - name: Start containers
         env:
           PROXY_MODE: ${{ matrix.proxy_mode }}
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
           BUILDER_NAME: ${{ matrix.builder_name }}
-        # Scoped to builder — compose.yaml also defines a sandbox service
-        # (see the sandbox action's own test_sandbox job) that this job has
-        # no reason to build/start.
-        run: docker compose up -d --wait builder
+        run: docker compose up -d --wait builder test-server test-dns
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
@@ -344,10 +346,10 @@ jobs:
 
       - name: Resolve local image ref
         id: local_image
-        # Scoped to the builder service — compose.yaml also defines a
-        # sandbox service (see the sandbox action's own test_sandbox job),
-        # and `--images` with no service argument would emit one line per
-        # service, breaking GITHUB_OUTPUT's single-line key=value format.
+        # Scoped to the builder service: compose.yaml defines more than one
+        # service (see the sandbox action's own test_sandbox job), and
+        # `--images` with no service argument emits one line per service,
+        # which doesn't fit GITHUB_OUTPUT's single-line key=value format.
         run: echo "ref=$(docker compose config --images builder)" >> "$GITHUB_OUTPUT"
 
       - name: Rebuild setup action with the local-image test hook enabled
@@ -442,28 +444,80 @@ jobs:
         uses: ./sandbox
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+          # GITHUB_STEP_SUMMARY is unique per step and can't be reassigned —
+          # GitHub silently ignores attempts to override GITHUB_*/RUNNER_*
+          # env vars — so a later step has no way to read this step's copy
+          # back. Leave GITHUB_STEP_SUMMARY itself untouched (the real Job
+          # Summary page still shows this step's report) and additionally
+          # mirror it to this debug-only path a later step can check.
+          BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-test-summary.md
         with:
           allowed_https_rules: example.com:443
           allowed_http_rules: example.com:80
+          # This test intentionally triggers blocked connections (below) to
+          # verify enforcement — that's expected, not a failure, so don't
+          # let the default fail_on_blocked treat it as one.
+          fail_on_blocked: false
           run: |
             echo "=== capability / privilege-escalation checks ==="
             grep -E 'CapEff|NoNewPrivs' /proc/self/status
             grep -q '^CapEff:[[:space:]]*0000000000000000$' /proc/self/status
             grep -q '^NoNewPrivs:[[:space:]]*1$' /proc/self/status
 
-            echo "=== allowlisted host must be reachable ==="
+            echo "=== allowlisted HTTP host must be reachable ==="
             wget -q -T 5 -O /dev/null http://example.com/
 
-            echo "=== non-allowlisted host must be blocked (isolation-escape check) ==="
+            echo "=== allowlisted HTTPS host must be reachable ==="
+            wget -q -T 5 -O /dev/null https://example.com/
+
+            echo "=== non-allowlisted HTTP host must be blocked (isolation-escape check) ==="
             if wget -q -T 5 -O /dev/null http://neverssl.com/ 2>&1; then
               echo "UNEXPECTED: neverssl.com was reachable"
               exit 1
             fi
             echo "OK: neverssl.com correctly blocked"
 
-      - name: Verify Job Summary contains the expected allowed/blocked entries
+            echo "=== non-allowlisted HTTPS host must be blocked ==="
+            if wget -q -T 5 -O /dev/null https://example.org/ 2>&1; then
+              echo "UNEXPECTED: example.org (HTTPS) was reachable"
+              exit 1
+            fi
+            echo "OK: example.org (HTTPS) correctly blocked"
+
+      - name: Verify the sandbox report contains the expected allowed/blocked entries
         if: always()
+        env:
+          # Not GITHUB_STEP_SUMMARY: reassigning that reserved var is
+          # silently ignored by GitHub, so assert-sandbox.sh reads this
+          # debug-only mirror path directly instead (see the note on the
+          # step above).
+          BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-test-summary.md
         run: ./test/assert-sandbox.sh
+
+      # fail_on_blocked defaults to true and is exercised nowhere above (the
+      # step above opts out of it to isolate the network-enforcement check
+      # from this one) — verify the default itself actually fails a step
+      # when a blocked connection occurs.
+      - name: Run an isolated command that triggers a blocked connection
+        id: blocked_connection
+        continue-on-error: true
+        uses: ./sandbox
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          allowed_https_rules: example.com:443
+          allowed_http_rules: example.com:80
+          # fail_on_blocked intentionally left at its default (true).
+          run: wget -q -T 5 -O /dev/null http://neverssl.com/ || true
+
+      - name: Verify fail_on_blocked actually failed the step
+        if: always()
+        run: |
+          if [ "${{ steps.blocked_connection.outcome }}" != "failure" ]; then
+            echo "::error::Expected the blocked-connection step to fail (fail_on_blocked defaults to true), but it reported '${{ steps.blocked_connection.outcome }}'"
+            exit 1
+          fi
+          echo "OK: fail_on_blocked correctly failed the step"
 
       # No cleanup step: the sandbox action stops its own throwaway proxy
       # container in its own finally block (post.js is a fallback only).
