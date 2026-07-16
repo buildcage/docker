@@ -179,6 +179,32 @@ detail.
 >
 > See [Security Considerations](./docs/security.md) for full details.
 
+## The Sandbox Action (Experimental)
+
+Supply-chain attacks aren't limited to Docker builds — a compromised dependency can just as easily
+phone home from a plain `run:` step (`npm install`, `pip install`, a test suite, a build script).
+The `sandbox` action applies the same network-isolation technology to any command. It's
+experimental — newer and less battle-tested than the `setup`/`report` actions above — see
+[Security Details](./docs/security.md#sandbox-action) for its current known limitations:
+
+```yaml
+- name: Run tests with outbound network isolation
+  uses: dash14/buildcage/sandbox@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  with:
+    proxy_mode: restrict
+    allowed_https_rules: registry.npmjs.org:443
+    run: |
+      npm install
+      npm test
+```
+
+Each step starts its own throwaway proxy, runs the isolated command with all capabilities dropped,
+`no_new_privileges` set, and Docker-socket access removed, appends a report to the Job Summary, and
+stops the proxy again. See the [Sandbox Action reference](./docs/reference.md#sandbox-action) for
+parameters and the [Security Details](./docs/security.md#sandbox-action) for the full threat model.
+
+See the [complete example workflow](.github/workflows/example-sandbox.yml).
+
 ## FAQ
 
 - **Does this slow down my builds?**

@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
 import fc from "fast-check";
 
 import { imageTagFromRef } from "./lib/verify-image.js";
-import { buildACLRules, resolveBuildcageImageRef, resolveProxyEngine } from "./main.js";
+import { resolveBuildcageImageRef } from "./lib/image-ref.js";
+import { buildACLRules, resolveProxyEngine } from "./main.js";
 
 // ---------------------------------------------------------------------------
 // imageTagFromRef

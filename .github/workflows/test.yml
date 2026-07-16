@@ -23,6 +23,7 @@ jobs:
       test: ${{ steps.filter.outputs.test }}
       test_multiarch: ${{ steps.filter.outputs.test_multiarch }}
       test_action: ${{ steps.filter.outputs.test_action }}
+      test_sandbox: ${{ steps.filter.outputs.test_sandbox }}
     steps:
       - name: Filter changed paths
         id: filter
@@ -46,9 +47,11 @@ jobs:
               - *workflow
               - 'docker/transparent/**'
               - 'docker/explicit/**'
+              - 'docker/sandbox/**'
               - 'docker/tools/**'
               - 'setup/**'
               - 'report/**'
+              - 'sandbox/**'
               - 'Makefile'
             test:
               - *docker
@@ -67,6 +70,13 @@ jobs:
               - *workflow
               - 'setup/**'
               - 'report/**'
+            test_sandbox:
+              - *docker
+              - *js-built
+              - *workflow
+              - 'sandbox/**'
+              - 'test/assert-sandbox.sh'
+              - 'test/assert-sandbox-concurrent.sh'
 
   unit_test:
     needs: changes
@@ -91,11 +101,13 @@ jobs:
 
       - name: Check dist is free of the local-image test hook
         run: |
-          if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' setup/dist/main.cjs; then
-            echo "::error::setup/dist/main.cjs still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — @rollup/plugin-replace failed to substitute it (see rollup.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published dash14/buildcage/setup@<ref> step. Do not merge until this passes."
-            exit 1
-          fi
-          echo "confirmed: setup/dist/main.cjs has no live BUILDCAGE_BUILD_TEST_HOOKS read — the local-image bypass is unreachable in this build."
+          for f in setup/dist/main.cjs sandbox/dist/main.cjs; do
+            if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
+              echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — @rollup/plugin-replace failed to substitute it (see rollup.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published action step. Do not merge until this passes."
+              exit 1
+            fi
+            echo "confirmed: $f has no live BUILDCAGE_BUILD_TEST_HOOKS read — the local-image bypass is unreachable in this build."
+          done
 
       - name: Run unit tests
         run: make test_unit
@@ -154,14 +166,19 @@ jobs:
       - name: Build containers
         env:
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
-        run: docker compose build
+        # Scoped to the services this job actually needs: builder, plus the
+        # test-server/test-dns fixtures added by matrix.compose_file's
+        # overlay (compose.test-{transparent,explicit}.yaml). compose.yaml
+        # also defines a sandbox service (see the sandbox action's own
+        # test_sandbox job) that this job has no reason to build/start.
+        run: docker compose build builder test-server test-dns
 
       - name: Start containers
         env:
           PROXY_MODE: ${{ matrix.proxy_mode }}
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: docker compose up -d --wait
+        run: docker compose up -d --wait builder test-server test-dns
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
@@ -235,13 +252,13 @@ jobs:
         uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
 
       - name: Build containers
-        run: docker compose build
+        run: docker compose build builder
 
       - name: Start containers
         env:
           PROXY_MODE: audit
           BUILDER_NAME: buildcage-multiarch
-        run: docker compose up -d --wait
+        run: docker compose up -d --wait builder
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
@@ -326,11 +343,15 @@ jobs:
       - name: Build local buildcage image
         env:
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
-        run: docker compose build
+        run: docker compose build builder
 
       - name: Resolve local image ref
         id: local_image
-        run: echo "ref=$(docker compose config --images)" >> "$GITHUB_OUTPUT"
+        # Scoped to the builder service: compose.yaml defines more than one
+        # service (see the sandbox action's own test_sandbox job), and
+        # `--images` with no service argument emits one line per service,
+        # which doesn't fit GITHUB_OUTPUT's single-line key=value format.
+        run: echo "ref=$(docker compose config --images builder)" >> "$GITHUB_OUTPUT"
 
       - name: Rebuild setup action with the local-image test hook enabled
         env:
@@ -386,6 +407,212 @@ jobs:
       # No cleanup step: ephemeral runner, and setup's post-hook already
       # stops the container.
 
+  # Exercises the real sandbox action end-to-end (uses: ./sandbox) on the
+  # actual runner host — run-isolated.sh needs to unshare/veth/setpriv
+  # directly on the host, matching what happens in a real workflow, so
+  # (unlike test_action's Docker-build tests) this can't be validated inside
+  # a nested container the way the mac dev loop does (see sandbox/dev/ and
+  # docs/development.md).
+  test_sandbox:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: test (sandbox)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm
+
+      - name: Build local sandbox proxy image
+        run: docker compose build sandbox
+
+      - name: Resolve local image ref
+        id: local_image
+        run: echo "ref=$(docker compose config --images sandbox)" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild sandbox action with the local-image test hook enabled
+        env:
+          BUILDCAGE_BUILD_TEST_HOOKS: "1"
+        run: pnpm build
+
+      - name: Run an isolated command via the real sandbox action
+        uses: ./sandbox
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+          # GITHUB_STEP_SUMMARY is unique per step and can't be reassigned —
+          # GitHub silently ignores attempts to override GITHUB_*/RUNNER_*
+          # env vars — so a later step has no way to read this step's copy
+          # back. Leave GITHUB_STEP_SUMMARY itself untouched (the real Job
+          # Summary page still shows this step's report) and additionally
+          # mirror it to this debug-only path a later step can check.
+          BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-test-summary.md
+        with:
+          allowed_https_rules: example.com:443
+          allowed_http_rules: example.com:80
+          # This test intentionally triggers blocked connections (below) to
+          # verify enforcement — that's expected, not a failure, so don't
+          # let the default fail_on_blocked treat it as one.
+          fail_on_blocked: false
+          run: |
+            echo "=== capability / privilege-escalation checks ==="
+            grep -E 'CapEff|NoNewPrivs' /proc/self/status
+            grep -q '^CapEff:[[:space:]]*0000000000000000$' /proc/self/status
+            grep -q '^NoNewPrivs:[[:space:]]*1$' /proc/self/status
+
+            echo "=== allowlisted HTTP host must be reachable ==="
+            wget -q -T 5 -O /dev/null http://example.com/
+
+            echo "=== allowlisted HTTPS host must be reachable ==="
+            wget -q -T 5 -O /dev/null https://example.com/
+
+            echo "=== non-allowlisted HTTP host must be blocked (isolation-escape check) ==="
+            if wget -q -T 5 -O /dev/null http://neverssl.com/ 2>&1; then
+              echo "UNEXPECTED: neverssl.com was reachable"
+              exit 1
+            fi
+            echo "OK: neverssl.com correctly blocked"
+
+            echo "=== non-allowlisted HTTPS host must be blocked ==="
+            if wget -q -T 5 -O /dev/null https://example.org/ 2>&1; then
+              echo "UNEXPECTED: example.org (HTTPS) was reachable"
+              exit 1
+            fi
+            echo "OK: example.org (HTTPS) correctly blocked"
+
+            echo "=== workspace/home/tmp must be writable by default ==="
+            echo x >> "$GITHUB_WORKSPACE/.buildcage-writable-test"
+            echo x >> "$HOME/.buildcage-writable-test"
+            echo x >> /tmp/.buildcage-writable-test
+
+            echo "=== everything else must be read-only by default ==="
+            if touch /opt/.buildcage-writable-test 2>/dev/null; then
+              echo "UNEXPECTED: /opt was writable without a writable: entry"
+              exit 1
+            fi
+            echo "OK: /opt correctly read-only"
+
+      - name: Run an isolated command with an extra writable directory
+        uses: ./sandbox
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          writable: /opt
+          run: |
+            echo "=== /opt must be writable when listed under writable: ==="
+            touch /opt/.buildcage-writable-test
+            rm -f /opt/.buildcage-writable-test
+
+      - name: Run an isolated command with writable set to / (restriction disabled)
+        uses: ./sandbox
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          writable: /
+          run: |
+            echo "=== / must be fully writable when writable: / is set ==="
+            touch /opt/.buildcage-writable-test
+            rm -f /opt/.buildcage-writable-test
+
+      - name: Verify the sandbox report contains the expected allowed/blocked entries
+        if: always()
+        env:
+          # Not GITHUB_STEP_SUMMARY: reassigning that reserved var is
+          # silently ignored by GitHub, so assert-sandbox.sh reads this
+          # debug-only mirror path directly instead (see the note on the
+          # step above).
+          BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-test-summary.md
+        run: ./test/assert-sandbox.sh
+
+      # fail_on_blocked defaults to true and is exercised nowhere above (the
+      # step above opts out of it to isolate the network-enforcement check
+      # from this one) — verify the default itself actually fails a step
+      # when a blocked connection occurs.
+      - name: Run an isolated command that triggers a blocked connection
+        id: blocked_connection
+        continue-on-error: true
+        uses: ./sandbox
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          allowed_https_rules: example.com:443
+          allowed_http_rules: example.com:80
+          # fail_on_blocked intentionally left at its default (true).
+          run: wget -q -T 5 -O /dev/null http://neverssl.com/ || true
+
+      - name: Verify fail_on_blocked actually failed the step
+        if: always()
+        run: |
+          if [ "${{ steps.blocked_connection.outcome }}" != "failure" ]; then
+            echo "::error::Expected the blocked-connection step to fail (fail_on_blocked defaults to true), but it reported '${{ steps.blocked_connection.outcome }}'"
+            exit 1
+          fi
+          echo "OK: fail_on_blocked correctly failed the step"
+
+      # Drives sandbox/dist/main.cjs directly rather than through
+      # `uses: ./sandbox` steps, so this doesn't depend on Actions'
+      # `parallel:` step keyword to prove true concurrency (see the
+      # `parallel:`-based step below for that Actions-level check).
+      - name: Run two sandbox proxy lifecycles concurrently (direct)
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        run: ./test/assert-sandbox-concurrent.sh
+
+      # Actions-level counterpart to the direct test above: proves the fix
+      # also holds when concurrency comes from Actions' own `background`/
+      # `wait`/`parallel` step keywords rather than a bash `&`/`wait` pair.
+      - parallel:
+          - name: sandbox-parallel-a
+            id: parallel_a
+            uses: ./sandbox
+            env:
+              BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+              BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-parallel-a-summary.md
+            with:
+              allowed_https_rules: example.com:443
+              allowed_http_rules: example.com:80
+              fail_on_blocked: false
+              run: |
+                sleep 5
+                wget -q -T 5 -O /dev/null http://example.com/
+                if wget -q -T 5 -O /dev/null http://example.net/ 2>&1; then
+                  echo "::error::cross-talk: example.net (step B's allowlist) was reachable from step A"; exit 1
+                fi
+
+          - name: sandbox-parallel-b
+            id: parallel_b
+            uses: ./sandbox
+            env:
+              BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+              BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-parallel-b-summary.md
+            with:
+              allowed_https_rules: example.net:443
+              allowed_http_rules: example.net:80
+              fail_on_blocked: false
+              run: |
+                wget -q -T 5 -O /dev/null http://example.net/
+                if wget -q -T 5 -O /dev/null http://example.com/ 2>&1; then
+                  echo "::error::cross-talk: example.com (step A's allowlist) was reachable from step B"; exit 1
+                fi
+
+      - name: Verify no leftover buildcage-sandbox containers/networks after the parallel steps
+        if: always()
+        run: |
+          LEFTOVER_C=$(docker ps -a --filter "name=buildcage-sandbox-" -q)
+          LEFTOVER_N=$(docker network ls --filter "name=buildcage-sandbox-" -q)
+          if [ -n "$LEFTOVER_C" ] || [ -n "$LEFTOVER_N" ]; then
+            echo "::error::leftover buildcage-sandbox containers/networks found after parallel sandbox steps"
+            exit 1
+          fi
+
+      # No cleanup step: the sandbox action stops its own throwaway proxy
+      # container in its own finally block (post.js is a fallback only).
+
   # Single, stably-named required status check for branch protection: the
   # `test` job's own name varies per matrix entry (test (transparent-audit),
   # test (explicit-restrict), etc.), so branch protection can't target it
@@ -394,7 +621,7 @@ jobs:
   all-tests-passed:
     name: All tests passed
     runs-on: ubuntu-latest
-    needs: [changes, unit_test, test, test_multiarch, test_action]
+    needs: [changes, unit_test, test, test_multiarch, test_action, test_sandbox]
     if: always()
     permissions: {}
     steps:

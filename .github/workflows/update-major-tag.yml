@@ -68,13 +68,14 @@ jobs:
           LATEST_IN_MINOR=$(echo "$TAGS" | grep -E "^v${MINOR}\.[0-9]+$" | sort -V | tail -1)
 
           # Each release publishes one image per proxy engine. transparent
-          # (default) uses the plain version tag (e.g. ${VERSION}); explicit
-          # (experimental) uses a -explicit suffix (e.g. ${VERSION}-explicit).
-          # Update the floating major/minor tag for each engine independently.
-          for ENGINE in transparent explicit; do
+          # (default) uses the plain version tag (e.g. ${VERSION}); every
+          # other engine uses a -<engine> suffix (e.g. ${VERSION}-explicit,
+          # ${VERSION}-sandbox). Update the floating major/minor tag for each
+          # engine independently.
+          for ENGINE in transparent explicit sandbox; do
             SUFFIX=""
-            if [ "$ENGINE" = "explicit" ]; then
-              SUFFIX="-explicit"
+            if [ "$ENGINE" != "transparent" ]; then
+              SUFFIX="-${ENGINE}"
             fi
             if [ "$TAG" = "$LATEST_IN_MINOR" ]; then
               docker buildx imagetools create --tag "${REPO}:${MINOR}${SUFFIX}" "${REPO}:${VERSION}${SUFFIX}"

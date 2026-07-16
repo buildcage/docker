@@ -30,15 +30,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [transparent, explicit]
+        engine: [transparent, explicit, sandbox]
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       # Matrix legs sharing one output name would clobber each other (last
       # completed leg wins) — each leg instead writes to a step-output key
-      # suffixed with its own matrix.engine value, so the two never collide
-      # and both survive into this job's own (statically-declared) outputs.
+      # suffixed with its own matrix.engine value, so all three never collide
+      # and all survive into this job's own (statically-declared) outputs.
       bundle-content-transparent: ${{ steps.bundle.outputs['content-transparent'] }}
       bundle-content-explicit: ${{ steps.bundle.outputs['content-explicit'] }}
+      bundle-content-sandbox: ${{ steps.bundle.outputs['content-sandbox'] }}
 
     steps:
       - name: Checkout
@@ -83,13 +84,14 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           # transparent (default) publishes the plain version tag, matching the
-          # pre-multi-engine tagging scheme; explicit (experimental) publishes
-          # under a -explicit suffix. Only transparent claims "latest", since it's
-          # the only engine with an unsuffixed tag namespace.
+          # pre-multi-engine tagging scheme; every other engine (explicit,
+          # sandbox) publishes under a -<engine> suffix. Only transparent
+          # claims "latest", since it's the only engine with an unsuffixed tag
+          # namespace.
           flavor: latest=${{ matrix.engine == 'transparent' }}
           tags: |
-            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}${{ matrix.engine == 'explicit' && ',suffix=-explicit' || '' }}
-            type=raw,value=sha-${{ steps.version.outputs.sha }}${{ matrix.engine == 'explicit' && '-explicit' || '' }},priority=100
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}${{ matrix.engine != 'transparent' && format(',suffix=-{0}', matrix.engine) || '' }}
+            type=raw,value=sha-${{ steps.version.outputs.sha }}${{ matrix.engine != 'transparent' && format('-{0}', matrix.engine) || '' }},priority=100
 
       - name: Login to GHCR
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
@@ -171,10 +173,13 @@ jobs:
           TAG: ${{ needs.build-and-push.outputs.tag }}
           BUNDLE_TRANSPARENT: ${{ needs.build-and-push.outputs['bundle-content-transparent'] }}
           BUNDLE_EXPLICIT: ${{ needs.build-and-push.outputs['bundle-content-explicit'] }}
+          BUNDLE_SANDBOX: ${{ needs.build-and-push.outputs['bundle-content-sandbox'] }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "$BUNDLE_TRANSPARENT" > buildcage-container.sigstore.json
           echo "$BUNDLE_EXPLICIT" > buildcage-container-explicit.sigstore.json
+          echo "$BUNDLE_SANDBOX" > buildcage-container-sandbox.sigstore.json
           gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" \
             buildcage-container.sigstore.json \
-            buildcage-container-explicit.sigstore.json
+            buildcage-container-explicit.sigstore.json \
+            buildcage-container-sandbox.sigstore.json

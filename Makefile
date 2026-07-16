@@ -75,6 +75,36 @@ run_explicit_restrict_mode: ## Start explicit proxy engine in restrict mode
 		--driver remote docker-container://buildcage
 
 # ---------------------------------------------------------------------------
+# run_sandbox_mode / test_sandbox_mode — mac-friendly dev loop for the
+# sandbox action (see sandbox/dev/Dockerfile). Production and CI's
+# test_sandbox job instead run run-isolated.sh directly on the host — see
+# docs/development.md.
+# ---------------------------------------------------------------------------
+
+.PHONY: run_sandbox_mode
+run_sandbox_mode: ## Start sandbox proxy + dev runner (mac-friendly dev loop)
+	@echo "Starting buildcage sandbox (dev loop)..."
+	@ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-example.com:443}" \
+	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-example.com:80}" \
+	  docker compose -f compose.yaml -f compose.sandbox-dev.yaml up -d --build --wait sandbox sandbox-dev-runner
+	@echo "Proxy container:  buildcage-sandbox"
+	@echo "Dev runner:       buildcage-sandbox-dev-runner"
+	@echo "Try: make test_sandbox_mode"
+
+.PHONY: test_sandbox_mode
+test_sandbox_mode: ## Run a sample isolated command in the dev loop and verify isolation
+	@$(MAKE) run_sandbox_mode
+	@PROXY_PID=$$(docker inspect --format '{{.State.Pid}}' buildcage-sandbox); \
+	  docker compose -f compose.yaml -f compose.sandbox-dev.yaml exec sandbox-dev-runner \
+	    run-isolated.sh --proxy-pid $$PROXY_PID --uid 1000 --gid 1000 \
+	    --gateway 172.20.0.1 --dns 172.20.0.1 -- /usr/local/bin/smoke-test.sh
+	@$(MAKE) clean_sandbox_mode
+
+.PHONY: clean_sandbox_mode
+clean_sandbox_mode: ## Stop and remove the sandbox dev-loop containers
+	@docker compose -f compose.yaml -f compose.sandbox-dev.yaml down -v --rmi local
+
+# ---------------------------------------------------------------------------
 # test_{engine}_{mode}_mode — run_{engine}_{mode}_mode + build the matching
 # test/Dockerfile.* + verify + clean up. One target per combination.
 # ---------------------------------------------------------------------------
@@ -136,7 +166,7 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean
 
 .PHONY: test_unit
-test_unit: test_setup test_report test_qjs ## Run unit tests
+test_unit: test_setup test_report test_sandbox_unit test_qjs ## Run unit tests
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests
@@ -145,6 +175,10 @@ test_setup: ## Run setup action unit tests
 .PHONY: test_report
 test_report: ## Run report unit tests
 	@node --test 'report/src/**/*.test.js'
+
+.PHONY: test_sandbox_unit
+test_sandbox_unit: ## Run sandbox action unit tests
+	@node --test 'sandbox/src/**/*.test.js'
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker
@@ -157,6 +191,10 @@ test_qjs: ## Run unit tests in Docker
 	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/shared/lib/aggregate.test.js
 	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/explicit/lib/source-policy.test.js
 	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/explicit/lib/buildkitd-log-parser.test.js
+	@docker build -f docker/sandbox/Dockerfile -t buildcage-qjs-test-sandbox docker
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/shared/lib/rules.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/shared/lib/aggregate.test.js
+	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/transparent/lib/log-parser.test.js
 
 .PHONY: test_audit_example
 run_audit_example: ## Run audit mode example tests

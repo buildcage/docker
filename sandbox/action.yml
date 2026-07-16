@@ -1,0 +1,36 @@
+name: Sandbox
+description: Run a command with outbound network isolation (allowlist), same enforcement as Buildcage's Docker build proxy
+
+inputs:
+  run:
+    description: "Command(s) to run inside the isolated sandbox (multi-line supported, like a workflow run: step)"
+    required: true
+  proxy_mode:
+    description: "audit or restrict"
+    required: false
+    default: 'restrict'
+  allowed_https_rules:
+    description: "HTTPS allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '*.example.com:443 ~^custom\\.pattern:443$'"
+    required: false
+    default: ''
+  allowed_http_rules:
+    description: "HTTP allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., 'example.com:80'"
+    required: false
+    default: ''
+  allowed_ip_rules:
+    description: "IP address allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
+    required: false
+    default: ''
+  fail_on_blocked:
+    description: "Fail the step if any connection was blocked (restrict mode only)"
+    required: false
+    default: 'true'
+  writable:
+    description: "Additional writable directories (newline-separated), on top of $GITHUB_WORKSPACE, $HOME, and /tmp which are always writable — everything else is read-only. Use '/' to disable the read-only restriction entirely."
+    required: false
+    default: ''
+
+runs:
+  using: node24
+  main: dist/main.cjs
+  post: dist/post.cjs

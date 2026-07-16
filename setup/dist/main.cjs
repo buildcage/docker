@@ -7143,7 +7143,7 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
     if (!actionRef) return "";
     let base;
     return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
-    "explicit" === proxyEngine ? `${base}-explicit` : base;
+    "explicit" === proxyEngine || "sandbox" === proxyEngine ? `${base}-${proxyEngine}` : base;
   }(actionRef, proxyEngine), regToken = await async function(registry, repo, basicAuth, _fetch = fetch) {
     const url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
     if (basicAuth) try {
@@ -7256,11 +7256,11 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
   return await verifyBundle(bundle, verifyOptions, digest), digest;
 }
 
-const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
-
 function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository}) {
   return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
+
+const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
 function resolveProxyEngine(input) {
   const engine = input?.trim() || "transparent";
@@ -7338,5 +7338,4 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
 }().catch(err => {
   err instanceof SetupError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), 
   process.exit(1);
-}), exports.buildACLRules = buildACLRules, exports.resolveBuildcageImageRef = resolveBuildcageImageRef, 
-exports.resolveProxyEngine = resolveProxyEngine;
+}), exports.buildACLRules = buildACLRules, exports.resolveProxyEngine = resolveProxyEngine;
