@@ -27,6 +27,12 @@ export function writeRunScript(runInput, dir) {
  * deliberately don't use `sudo -E` (its availability depends on a sudoers
  * SETENV tag, which isn't portable) — this file is the explicit channel
  * instead.
+ *
+ * Written 0600: this dump contains the whole process environment, including
+ * any secrets passed to the step via `env:`. The scratch dir is already
+ * 0700 (see withScratchDir), but restricting the file itself keeps the
+ * secrets unreadable to other local users even if the dir's mode is ever
+ * loosened, matching writeRunScript's own explicit mode.
  */
 export function writeEnvDump(env, dir) {
   const envFilePath = join(dir, "env-dump.bin");
@@ -35,7 +41,7 @@ export function writeEnvDump(env, dir) {
       .filter(([, v]) => v !== undefined)
       .map(([k, v]) => Buffer.from(`${k}=${v}\0`, "utf8")),
   );
-  writeFileSync(envFilePath, buf);
+  writeFileSync(envFilePath, buf, { mode: 0o600 });
   return envFilePath;
 }
 

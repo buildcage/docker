@@ -46,6 +46,14 @@ describe("writeEnvDump", () => {
       assert.equal(readFileSync(path, "utf8"), "FOO=bar\0");
     });
   });
+
+  it("writes the env dump 0600 (it can hold secrets from the step's env:)", () => {
+    withScratchDir((dir) => {
+      const path = writeEnvDump({ SECRET: "s3cr3t" }, dir);
+      const mode = statSync(path).mode & 0o777;
+      assert.equal(mode, 0o600);
+    });
+  });
 });
 
 describe("withScratchDir", () => {
