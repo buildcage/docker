@@ -7,8 +7,6 @@ import { SetupError } from "./lib/errors.js";
 import { verifyImageDigest } from "./lib/verify-image.js";
 import { resolveBuildcageImageRef } from "./lib/image-ref.js";
 
-export { resolveBuildcageImageRef };
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
 

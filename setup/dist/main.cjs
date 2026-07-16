@@ -7338,5 +7338,4 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
 }().catch(err => {
   err instanceof SetupError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), 
   process.exit(1);
-}), exports.buildACLRules = buildACLRules, exports.resolveBuildcageImageRef = resolveBuildcageImageRef, 
-exports.resolveProxyEngine = resolveProxyEngine;
+}), exports.buildACLRules = buildACLRules, exports.resolveProxyEngine = resolveProxyEngine;
