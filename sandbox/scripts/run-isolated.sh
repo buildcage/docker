@@ -52,7 +52,7 @@ if [ "$(id -u)" != "0" ]; then
   echo "ERROR: run-isolated.sh must be run as root (via sudo)" >&2
   exit 1
 fi
-for cmd in unshare nsenter setpriv ip xargs env; do
+for cmd in unshare nsenter setpriv ip env; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: required command not found: $cmd" >&2; exit 1; }
 done
 [ -e "/proc/${PROXY_PID}/ns/net" ] || { echo "ERROR: proxy netns not found for pid ${PROXY_PID}" >&2; exit 1; }
@@ -150,20 +150,20 @@ NSENTER_ARGS=(--target "$PLACEHOLDER_PID" --net --mount --uts --ipc --cgroup --p
 [ -n "$WORKDIR" ] && NSENTER_ARGS+=(--wd="$WORKDIR")
 
 if [ -n "$ENV_FILE" ]; then
-  # xargs appends the args it read to the *end* of the command line, so
-  # `xargs env -i -- cmd` would hand KEY=VALUE pairs to cmd instead of env.
-  # Route through a tiny wrapper so "$@" lands where env expects them.
+  # Read the NUL-separated KEY=VALUE dump directly into an array rather than
+  # piping it through `xargs -0`: GNU xargs maps *any* exit status 1-125 from
+  # the command it runs to its own fixed exit status 123 (255 becomes 124),
+  # which would make it impossible for this script to report the isolated
+  # command's actual exit code.
   # No "--" before setpriv: env treats the first non-NAME=VALUE token as
   # the command to run on its own.
-  EXEC_WRAPPER=$(mktemp)
-  cat > "$EXEC_WRAPPER" <<WRAPPER_EOF
-#!/bin/sh
-exec env -i "\$@" setpriv --reuid=${TARGET_UID} --regid=${TARGET_GID} --clear-groups --bounding-set=-all --no-new-privs -- ${SCRIPT_PATH}
-WRAPPER_EOF
-  chmod +x "$EXEC_WRAPPER"
-  nsenter "${NSENTER_ARGS[@]}" -- xargs -0 -a "$ENV_FILE" "$EXEC_WRAPPER"
+  mapfile -d '' -t ENV_ASSIGNMENTS < "$ENV_FILE"
+  nsenter "${NSENTER_ARGS[@]}" -- \
+    env -i "${ENV_ASSIGNMENTS[@]}" \
+    setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --clear-groups \
+      --bounding-set=-all --no-new-privs -- \
+    "$SCRIPT_PATH"
   CODE=$?
-  rm -f "$EXEC_WRAPPER"
 else
   nsenter "${NSENTER_ARGS[@]}" -- \
     setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --clear-groups \

@@ -164,10 +164,13 @@ Security Details and the [Reference](./reference.md#sandbox-action) doc.
      rest of the filesystem stays shared with the host, so toolchains keep working); a handful of
      sensitive `/proc` paths are bind-mounted over with `/dev/null` the same way.
   4. The command finally executes via `nsenter --target <placeholder-pid> --net --mount --uts --ipc
-     --cgroup --pid -- setpriv --reuid=<uid> --regid=<gid> --clear-groups --bounding-set=-all
-     --no-new-privs -- <script>`. Environment variables are passed through a NUL-separated dump file
-     and re-applied with `env -i "$@"` inside a tiny generated wrapper, rather than `sudo -E` (whose
-     availability depends on a non-portable sudoers `SETENV` tag).
+     --cgroup --pid -- env -i "${ENV_ASSIGNMENTS[@]}" setpriv --reuid=<uid> --regid=<gid>
+     --clear-groups --bounding-set=-all --no-new-privs -- <script>`. Environment variables are
+     passed through a NUL-separated dump file, read into a bash array with `mapfile -d ''` and
+     re-applied via `env -i`, rather than `sudo -E` (whose availability depends on a non-portable
+     sudoers `SETENV` tag). `mapfile` is used instead of `xargs -0` specifically so the isolated
+     command's real exit code survives: GNU xargs remaps any exit status 1-125 from the command it
+     runs to its own fixed exit status 123.
   5. A `trap ... EXIT INT TERM` cleanup always removes the proxy-side veth and kills the placeholder
      — with `kill -9`, specifically: the placeholder is PID 1 of its own new PID namespace, and PID
      1 ignores the default-terminate action for signals it hasn't installed a handler for, so
