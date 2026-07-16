@@ -231,6 +231,31 @@ each other's containers.
 
 Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above.
 
+### Passing Values to `run`
+
+Use the step's own `env:` (not a `with:` input) to pass values into `run` — exactly like a native
+`run:` step. `sandbox` forwards its whole process environment into the isolated command, so
+anything set via `env:` is available there too:
+
+```yaml
+- uses: dash14/buildcage/sandbox@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  env:
+    PR_TITLE: ${{ github.event.pull_request.title }}
+  with:
+    run: |
+      echo "Building for: $PR_TITLE"
+      npm test
+```
+
+Avoid interpolating `${{ }}` expressions directly into `run` itself (e.g. `run: echo "${{
+github.event.pull_request.title }}"`) — GitHub substitutes them into the script text before any
+shell runs, so an attacker-controlled value (a PR title, branch name, issue body, etc.) can inject
+arbitrary commands. Passing the same value through `env:` instead means it reaches the isolated
+command as a single environment variable, never interpreted as shell syntax. This is the same
+[script injection guidance](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#understanding-the-risk-of-script-injections)
+GitHub gives for any workflow, and applies to `sandbox`'s `run` exactly as it would to a native
+`run:` step.
+
 ### How It Works
 
 `sandbox` reuses the same isolation technology as the `transparent` engine (CNI-style bridge,
