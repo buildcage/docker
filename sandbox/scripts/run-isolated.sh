@@ -181,15 +181,34 @@ else
     # "remount,ro" changes the underlying superblock, which is shared with
     # the mount this was cloned from (i.e. the real host mount namespace)
     # even after make-rprivate -- only "remount,bind,ro" scopes the
-    # read-only flag to this one mount entry. Best-effort per mount (some
-    # pseudo-filesystems do not support remount) rather than fatal.
-    tac /proc/self/mountinfo | while read -r _ _ _ _ mnt_point _; do
+    # read-only flag to this one mount entry.
+    #
+    # A failed remount is NOT silently ignored: pseudo-filesystems that
+    # legitimately reject a read-only remount are tolerated (their
+    # writability is not a payload-planting surface for a later step), but
+    # any *real* filesystem left writable fails the run closed, so a silent
+    # remount failure can never quietly weaken the read-only guarantee
+    # documented in docs/security.md. In each mountinfo line the field
+    # immediately after the " - " separator is the filesystem type.
+    tac /proc/self/mountinfo | while read -r _ _ _ _ mnt_point rest; do
       skip=0
       for p in "$@"; do
         [ "$mnt_point" = "$p" ] && skip=1 && break
       done
       [ "$skip" = 1 ] && continue
-      mount -o remount,bind,ro "$mnt_point" 2>/dev/null || true
+      mount -o remount,bind,ro "$mnt_point" 2>/dev/null && continue
+      fstype=${rest#* - }
+      fstype=${fstype%% *}
+      case "$fstype" in
+        proc|procfs|sysfs|cgroup|cgroup2|devpts|mqueue|debugfs|tracefs|securityfs|\
+pstore|bpf|configfs|fusectl|hugetlbfs|binfmt_misc|autofs|efivarfs|nsfs|rpc_pipefs)
+          echo "run-isolated: note: pseudo-fs ${mnt_point} (${fstype}) rejected read-only remount; tolerated" >&2
+          ;;
+        *)
+          echo "ERROR: failed to remount ${mnt_point} (${fstype:-unknown}) read-only; refusing to run with it left writable" >&2
+          exit 1
+          ;;
+      esac
     done
   ' sh "${PROTECTED_PATHS[@]}"
 fi

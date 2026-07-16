@@ -18,7 +18,7 @@ BuildKit (base image: moby/buildkit)
 QuickJS
   Website : https://bellard.org/quickjs/
   License : MIT License
-  Source  : https://github.com/nicedoc/nicedoc.io or https://bellard.org/quickjs/
+  Source  : https://bellard.org/quickjs/ or via Alpine Linux source packages
 
 ------------------------------------------------------------------------------
 

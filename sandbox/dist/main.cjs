@@ -7279,7 +7279,9 @@ const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof do
 function runIsolated({scriptPath: scriptPath, proxyPid: proxyPid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, runScriptDir: runScriptDir}) {
   const runIsolatedShPath = path.join(__dirname$2, "..", "scripts", "run-isolated.sh"), envFilePath = function(env, dir) {
     const envFilePath = path.join(dir, "env-dump.bin"), buf = Buffer.concat(Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => Buffer.from(`${k}=${v}\0`, "utf8")));
-    return node_fs.writeFileSync(envFilePath, buf), envFilePath;
+    return node_fs.writeFileSync(envFilePath, buf, {
+      mode: 384
+    }), envFilePath;
   }(env, runScriptDir), args = [ "-n", "--", runIsolatedShPath, "--proxy-pid", String(proxyPid), "--uid", String(process.getuid()), "--gid", String(process.getgid()), "--env-file", envFilePath ];
   workdir && args.push("--workdir", workdir), home && args.push("--home", home);
   for (const p of writablePaths) args.push("--writable", p);

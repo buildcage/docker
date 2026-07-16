@@ -243,9 +243,13 @@ socket, or reading another process's memory).
   are bind-mounted onto themselves and kept writable; every other existing mount is remounted
   read-only inside the isolated mount namespace. This closes off tampering with anything outside
   those three paths — e.g. rewriting a binary earlier on `$PATH` to plant a payload for a later,
-  non-sandboxed step in the same job. The `writable` input adds further paths to the writable set
-  for tools that need to write elsewhere (e.g. a cache directory); setting it to `/` disables this
-  restriction entirely — see [Filesystem Access](./reference.md#filesystem-access) in Reference.
+  non-sandboxed step in the same job. The read-only remount is enforced, not best-effort: a
+  pseudo-filesystem that legitimately rejects a read-only remount (`proc`, `sysfs`, `cgroup2`,
+  etc.) is tolerated, but if any *real* filesystem cannot be made read-only the step fails closed
+  rather than running with it silently left writable. The `writable` input adds further paths to
+  the writable set for tools that need to write elsewhere (e.g. a cache directory); setting it to
+  `/` disables this restriction entirely — see
+  [Filesystem Access](./reference.md#filesystem-access) in Reference.
 
 ### Known Limitations
 
@@ -266,6 +270,11 @@ socket, or reading another process's memory).
 - **Linux only**: requires a Linux runner with passwordless `sudo` for the isolation setup itself
   (network namespace, veth, iptables) — the default on GitHub-hosted `ubuntu-*` runners. Not
   supported on Windows or macOS runners.
+- **Rootful Docker assumed**: the isolation joins the proxy container's network namespace via its
+  host-visible PID (`docker inspect .State.Pid`, entered as `/proc/<pid>/ns/net`). This assumes
+  containers share the host PID namespace, as they do on the default GitHub-hosted runner setup.
+  Under rootless Docker or `userns-remap`, that PID may not be directly reachable, so the sandbox
+  is not currently supported on those setups.
 - **Per-step overhead**: each `sandbox` step starts and stops its own proxy container, rather than
   sharing one across steps in the same job — this keeps allowlists independently configurable per
   step and keeps the traffic report's step-to-container mapping unambiguous, at the cost of
