@@ -211,7 +211,11 @@ build.
 Each `sandbox` step is self-contained: it starts its own throwaway proxy container, runs `run`
 inside the isolated sandbox, appends a report section to the Job Summary, and stops the proxy
 container again — all within that one step. Using `sandbox` multiple times in the same job starts
-a fresh proxy container each time, so different steps can use different allowlists.
+a fresh proxy container each time, so different steps can use different allowlists. This is also
+safe when those steps run truly concurrently via GitHub Actions' `background`/`wait`/`wait-all`/
+`parallel` step keywords — each step's proxy container, network, and Compose project are all
+namespaced by the same per-step random suffix, so concurrent steps never recreate or tear down
+each other's containers.
 
 ### Parameters
 

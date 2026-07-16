@@ -135,8 +135,20 @@ Security Details and the [Reference](./reference.md#sandbox-action) doc.
   `imageTagFromRef` in `setup/src/lib/verify-image.js`), starts a uniquely-named throwaway proxy
   container, runs the isolated command, appends this step's report section to the Job Summary, and
   stops the container again, all inside `main`'s own `try`/`finally`. `sandbox/src/post.js` is a
-  fallback only — it reads the container name back from `GITHUB_STATE` (`STATE_container_name`)
-  and stops it, in case the process was killed before reaching `main`'s own `finally`.
+  fallback only — it reads the container name and Compose project name back from `GITHUB_STATE`
+  (`STATE_container_name`/`STATE_project_name`) and stops it, in case the process was killed before
+  reaching `main`'s own `finally`. If `STATE_project_name` is missing, `post.js` skips cleanup
+  entirely rather than falling back to an unscoped `docker compose down` (see below).
+- Every `docker compose` invocation passes `-p <containerName>` (`lib/container.js`'s
+  `deriveProjectName`, currently the identity function — container names and Compose project names
+  live in separate Docker namespaces, so reusing the same string for both is safe and keeps
+  `docker ps`/`docker network ls` output easy to correlate). This matters once GitHub Actions'
+  `background`/`wait`/`parallel` step keywords let multiple `sandbox` steps in the same job run
+  truly concurrently: without an explicit `-p`, Compose falls back to an implicit,
+  directory-derived project name shared by every invocation, and it identifies "the" container for
+  a service by its project+service label rather than by container name — so one step's `up`/`down`
+  could recreate or tear down another step's still-running proxy container even though their
+  container names never collide.
 - The actual isolation is `sandbox/scripts/run-isolated.sh`, invoked via `sudo -n` since setting up
   namespaces/veth/iptables requires root:
   1. `unshare --net --pid --mount --uts --ipc --cgroup --mount-proc --fork -- sleep infinity` creates
