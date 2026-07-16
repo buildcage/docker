@@ -16,14 +16,17 @@ GATEWAY="172.20.0.1"
 DNS="172.20.0.1"
 TARGET_IP="172.20.0.101"
 WORKDIR=""
+HOME_DIR=""
 ENV_FILE=""
 SCRIPT_PATH=""
+WRITABLE_PATHS=()
 
 usage() {
   cat >&2 <<'EOF'
 Usage: run-isolated.sh --proxy-pid <PID> --uid <UID> --gid <GID>
          [--gateway <IP>] [--dns <IP>] [--target-ip <IP>]
-         [--workdir <PATH>] [--env-file <PATH>] -- <script-path>
+         [--workdir <PATH>] [--home <PATH>] [--writable <PATH>]...
+         [--env-file <PATH>] -- <script-path>
 EOF
 }
 
@@ -36,6 +39,8 @@ while [ $# -gt 0 ]; do
     --dns) DNS="$2"; shift 2 ;;
     --target-ip) TARGET_IP="$2"; shift 2 ;;
     --workdir) WORKDIR="$2"; shift 2 ;;
+    --home) HOME_DIR="$2"; shift 2 ;;
+    --writable) WRITABLE_PATHS+=("$2"); shift 2 ;;
     --env-file) ENV_FILE="$2"; shift 2 ;;
     --) shift; SCRIPT_PATH="${1:-}"; shift || true; break ;;
     -h|--help) usage; exit 0 ;;
@@ -107,6 +112,14 @@ done
 [ -z "$PLACEHOLDER_PID" ] && { echo "ERROR: timed out waiting for placeholder namespace" >&2; exit 1; }
 echo "run-isolated: placeholder pid=${PLACEHOLDER_PID}" >&2
 
+# The placeholder's mount namespace starts out as a clone of the host's, and
+# a cloned mount keeps the same propagation type (typically "shared" under
+# systemd) as its origin -- meaning every bind-mount/remount below would
+# otherwise propagate straight back out to the host's real mount namespace.
+# `--make-rprivate` (recursive) detaches the whole tree from that peer group
+# before anything else touches it.
+nsenter --mount="/proc/${PLACEHOLDER_PID}/ns/mnt" -- mount --make-rprivate /
+
 echo "run-isolated: creating veth pair ${VETH_T} <-> ${VETH_P}..." >&2
 ip link add "$VETH_T" type veth peer name "$VETH_P"
 ip link set "$VETH_T" netns "$PLACEHOLDER_PID"
@@ -136,6 +149,50 @@ nsenter --mount="/proc/${PLACEHOLDER_PID}/ns/mnt" -- sh -c '
   done
   true
 '
+
+# Paths that stay writable: workdir/home/tmp plus whatever --writable added.
+# "/" among the extras is a sentinel meaning "disable this restriction
+# entirely" (see usage()) rather than literally protecting just the "/"
+# mount entry, since most of the filesystem below "/" isn't a separate
+# mount point and so wouldn't be covered by protecting "/" alone.
+PROTECTED_PATHS=("$WORKDIR" "$HOME_DIR" /tmp)
+[ ${#WRITABLE_PATHS[@]} -gt 0 ] && PROTECTED_PATHS+=("${WRITABLE_PATHS[@]}")
+DISABLE_READONLY=false
+for p in "${WRITABLE_PATHS[@]}"; do
+  [ "$p" = "/" ] && DISABLE_READONLY=true
+done
+
+if [ "$DISABLE_READONLY" = "true" ]; then
+  echo "run-isolated: 'writable: /' given -- leaving the filesystem fully writable" >&2
+else
+  echo "run-isolated: restricting filesystem to read-only (except workdir/home/tmp/writable)..." >&2
+  # --target (not just --mount=) is required here: /proc/self/mountinfo only
+  # resolves "self" correctly when this process is actually a member of the
+  # pid namespace that the target's /proc instance was mounted for.
+  nsenter --target "$PLACEHOLDER_PID" --mount --pid -- sh -c '
+    set -e
+    # Bind-mounting a path onto itself gives it its own mount-table entry, so
+    # remounting everything else read-only below does not affect it.
+    for d in "$@"; do
+      [ -n "$d" ] && [ -d "$d" ] && mount --bind "$d" "$d"
+    done
+    # Walk existing mounts and remount each read-only in place, skipping the
+    # paths just made writable above. "bind" is required: a plain
+    # "remount,ro" changes the underlying superblock, which is shared with
+    # the mount this was cloned from (i.e. the real host mount namespace)
+    # even after make-rprivate -- only "remount,bind,ro" scopes the
+    # read-only flag to this one mount entry. Best-effort per mount (some
+    # pseudo-filesystems do not support remount) rather than fatal.
+    tac /proc/self/mountinfo | while read -r _ _ _ _ mnt_point _; do
+      skip=0
+      for p in "$@"; do
+        [ "$mnt_point" = "$p" ] && skip=1 && break
+      done
+      [ "$skip" = 1 ] && continue
+      mount -o remount,bind,ro "$mnt_point" 2>/dev/null || true
+    done
+  ' sh "${PROTECTED_PATHS[@]}"
+fi
 
 echo "run-isolated: attaching proxy-side veth to sandbox0 bridge..." >&2
 nsenter --net="/proc/${PROXY_PID}/ns/net" -- sh -c "

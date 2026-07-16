@@ -7276,12 +7276,14 @@ function buildComposeDownArgs({composeFile: composeFile, projectName: projectNam
 
 const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href));
 
-function runIsolated({scriptPath: scriptPath, proxyPid: proxyPid, workdir: workdir, env: env, runScriptDir: runScriptDir}) {
+function runIsolated({scriptPath: scriptPath, proxyPid: proxyPid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, runScriptDir: runScriptDir}) {
   const runIsolatedShPath = path.join(__dirname$2, "..", "scripts", "run-isolated.sh"), envFilePath = function(env, dir) {
     const envFilePath = path.join(dir, "env-dump.bin"), buf = Buffer.concat(Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => Buffer.from(`${k}=${v}\0`, "utf8")));
     return node_fs.writeFileSync(envFilePath, buf), envFilePath;
   }(env, runScriptDir), args = [ "-n", "--", runIsolatedShPath, "--proxy-pid", String(proxyPid), "--uid", String(process.getuid()), "--gid", String(process.getgid()), "--env-file", envFilePath ];
-  workdir && args.push("--workdir", workdir), args.push("--", scriptPath);
+  workdir && args.push("--workdir", workdir), home && args.push("--home", home);
+  for (const p of writablePaths) args.push("--writable", p);
+  args.push("--", scriptPath);
   try {
     return node_child_process.execFileSync("sudo", args, {
       stdio: "inherit"
@@ -7363,6 +7365,10 @@ function buildACLRules({httpsRulesInput: httpsRulesInput, httpRulesInput: httpRu
   };
 }
 
+function parseWritablePaths(input) {
+  return input?.split(/\r?\n/).map(s => s.trim()).filter(Boolean) ?? [];
+}
+
 function logRules(label, rules) {
   console.log(`${label} rules:${0 === rules.length ? " (none)" : ""}`);
   for (const r of rules) console.log(`  ${r}`);
@@ -7403,7 +7409,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   });
   console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), 
   logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), console.log("::endgroup::");
-  const containerName = `buildcage-sandbox-${node_crypto.randomBytes(4).toString("hex")}`, projectName = containerName, stateFile = env.GITHUB_STATE;
+  const writablePaths = parseWritablePaths(env.INPUT_WRITABLE), containerName = `buildcage-sandbox-${node_crypto.randomBytes(4).toString("hex")}`, projectName = containerName, stateFile = env.GITHUB_STATE;
   stateFile && (node_fs.appendFileSync(stateFile, `container_name=${containerName}\n`), 
   node_fs.appendFileSync(stateFile, `project_name=${projectName}\n`));
   const composeEnv = {
@@ -7458,6 +7464,8 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         scriptPath: scriptPath,
         proxyPid: proxyPid,
         workdir: env.GITHUB_WORKSPACE || "",
+        home: env.HOME || "",
+        writablePaths: writablePaths,
         env: env,
         runScriptDir: dir
       });
@@ -7490,4 +7498,4 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   err instanceof SandboxError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${err.message}`), 
   process.exit(1);
 }), exports.buildACLRules = buildACLRules, exports.buildComposeDownArgs = buildComposeDownArgs, 
-exports.buildComposeUpArgs = buildComposeUpArgs;
+exports.buildComposeUpArgs = buildComposeUpArgs, exports.parseWritablePaths = parseWritablePaths;

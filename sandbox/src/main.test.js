@@ -6,7 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs } from "./main.js";
+import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs, parseWritablePaths } from "./main.js";
 import { SandboxError } from "./lib/errors.js";
 
 describe("buildACLRules", () => {
@@ -92,5 +92,25 @@ describe("buildComposeDownArgs", () => {
       "-p", "buildcage-sandbox-abcd1234",
       "down",
     ]);
+  });
+});
+
+describe("parseWritablePaths", () => {
+  it("splits on newlines, trimming each entry", () => {
+    assert.deepEqual(parseWritablePaths("/opt/extra\n /var/cache \n"), ["/opt/extra", "/var/cache"]);
+  });
+
+  it("does not split on internal spaces (paths may contain them)", () => {
+    assert.deepEqual(parseWritablePaths("/path with spaces\n/other"), ["/path with spaces", "/other"]);
+  });
+
+  it("returns an empty array for empty/undefined input", () => {
+    assert.deepEqual(parseWritablePaths(""), []);
+    assert.deepEqual(parseWritablePaths(undefined), []);
+    assert.deepEqual(parseWritablePaths("   \n  \n"), []);
+  });
+
+  it("preserves a lone '/' entry (the disable-readonly sentinel)", () => {
+    assert.deepEqual(parseWritablePaths("/"), ["/"]);
   });
 });

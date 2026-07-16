@@ -46,7 +46,7 @@ export function writeEnvDump(env, dir) {
  * throws for a non-zero exit, since that's the user's command failing,
  * not this function.
  */
-export function runIsolated({ scriptPath, proxyPid, workdir, env, runScriptDir }) {
+export function runIsolated({ scriptPath, proxyPid, workdir, home, writablePaths = [], env, runScriptDir }) {
   const runIsolatedShPath = join(__dirname, "..", "scripts", "run-isolated.sh");
   const envFilePath = writeEnvDump(env, runScriptDir);
 
@@ -64,6 +64,8 @@ export function runIsolated({ scriptPath, proxyPid, workdir, env, runScriptDir }
     envFilePath,
   ];
   if (workdir) args.push("--workdir", workdir);
+  if (home) args.push("--home", home);
+  for (const p of writablePaths) args.push("--writable", p);
   args.push("--", scriptPath);
 
   try {

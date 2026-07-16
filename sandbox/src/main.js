@@ -66,6 +66,20 @@ export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput })
   return { httpsRules, httpRules, ipRules };
 }
 
+/**
+ * Parse the `writable` input into a list of directories. Newline-separated
+ * (not whitespace-split like the ACL rule inputs above) since paths can
+ * legitimately contain spaces.
+ */
+export function parseWritablePaths(input) {
+  return (
+    input
+      ?.split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean) ?? []
+  );
+}
+
 function logRules(label, rules) {
   console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
   for (const r of rules) console.log(`  ${r}`);
@@ -105,6 +119,8 @@ async function main() {
   logRules("HTTP", rules.httpRules);
   logRules("IP", rules.ipRules);
   console.log("::endgroup::");
+
+  const writablePaths = parseWritablePaths(env.INPUT_WRITABLE);
 
   // Each `sandbox` step gets its own throwaway proxy container — start, run
   // the isolated command, report, and stop, all within this one step —
@@ -148,6 +164,8 @@ async function main() {
         scriptPath,
         proxyPid,
         workdir: env.GITHUB_WORKSPACE || "",
+        home: env.HOME || "",
+        writablePaths,
         env,
         runScriptDir: dir,
       });
