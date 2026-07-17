@@ -1,0 +1,270 @@
+name: Test / Integration
+run-name: Test / Integration (${{ github.ref_name }})
+
+on:
+  workflow_dispatch:
+
+  pull_request:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  changes:
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      pull-requests: read
+    name: changes
+    if: github.event_name == 'pull_request'
+    outputs:
+      test: ${{ steps.filter.outputs.test }}
+      test_multiarch: ${{ steps.filter.outputs.test_multiarch }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          filters: |
+            docker: &docker
+              - 'docker/**'
+              - 'compose.yaml'
+            workflow: &workflow
+              - '.github/workflows/test-integration.yml'
+
+            test:
+              - *docker
+              - *workflow
+              - 'compose.test-transparent.yaml'
+              - 'compose.test-explicit.yaml'
+              - 'test/**'
+              - 'report/src/**'
+            test_multiarch:
+              - *docker
+              - *workflow
+              - 'test/Dockerfile.multiarch'
+
+  test:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: transparent-audit
+            proxy_mode: audit
+            proxy_engine: transparent
+            compose_file: compose.yaml:compose.test-transparent.yaml
+            test_dockerfile: test/Dockerfile.transparent-audit
+            assert_script: ./test/assert-transparent-audit.sh
+            builder_name: buildcage-transparent-audit
+          - mode: transparent-restrict
+            proxy_mode: restrict
+            proxy_engine: transparent
+            compose_file: compose.yaml:compose.test-transparent.yaml
+            test_dockerfile: test/Dockerfile.transparent-restrict
+            assert_script: ./test/assert-transparent-restrict.sh
+            builder_name: buildcage-transparent-restrict
+          - mode: explicit-audit
+            proxy_mode: audit
+            proxy_engine: explicit
+            compose_file: compose.yaml:compose.test-explicit.yaml
+            test_dockerfile: test/Dockerfile.explicit-audit
+            assert_script: ./test/assert-explicit-audit.sh
+            builder_name: buildcage-explicit-audit
+          - mode: explicit-restrict
+            proxy_mode: restrict
+            proxy_engine: explicit
+            compose_file: compose.yaml:compose.test-explicit.yaml
+            test_dockerfile: test/Dockerfile.explicit-restrict
+            assert_script: ./test/assert-explicit-restrict.sh
+            builder_name: buildcage-explicit-restrict
+
+    name: "integration: test (${{ matrix.mode }})"
+
+    env:
+      COMPOSE_FILE: ${{ matrix.compose_file }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Build containers
+        env:
+          PROXY_ENGINE: ${{ matrix.proxy_engine }}
+        # Scoped to the services this job actually needs: builder, plus the
+        # test-server/test-dns fixtures added by matrix.compose_file's
+        # overlay (compose.test-{transparent,explicit}.yaml). compose.yaml
+        # also defines a sandbox service (see the sandbox action's own
+        # test_sandbox job) that this job has no reason to build/start.
+        run: docker compose build builder test-server test-dns
+
+      - name: Start containers
+        env:
+          PROXY_MODE: ${{ matrix.proxy_mode }}
+          PROXY_ENGINE: ${{ matrix.proxy_engine }}
+          BUILDER_NAME: ${{ matrix.builder_name }}
+        run: docker compose up -d --wait builder test-server test-dns
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        with:
+          # Without an explicit name, setup-buildx-action generates one, which
+          # doesn't match matrix.builder_name — harmless for steps that rely on
+          # the implicit default builder (e.g. Build test image below), but
+          # assert-explicit-source-policy-conflict.sh invokes `docker buildx
+          # build --builder "$BUILDER_NAME"` directly and needs the name to
+          # actually resolve.
+          name: ${{ matrix.builder_name }}
+          driver: remote
+          endpoint: docker-container://${{ matrix.builder_name }}
+
+      - name: Build test image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: test
+          file: ${{ matrix.test_dockerfile }}
+          push: false
+          no-cache: true
+          load: true
+          tags: buildcage-test
+
+      - name: Show logs
+        if: always()
+        env:
+          BUILDER_NAME: ${{ matrix.builder_name }}
+          INPUT_BUILDER_NAME: ${{ matrix.builder_name }}
+        # This job tests proxy enforcement directly, not the report action
+        # itself — only test_action's real `uses: ./report` should produce a
+        # Job Summary, so print to stdout here instead.
+        run: GITHUB_STEP_SUMMARY= node report/src/main.js ./compose.yaml || true
+
+      - name: Run assertions
+        env:
+          BUILDER_NAME: ${{ matrix.builder_name }}
+        run: ${{ matrix.assert_script }}
+
+      - name: Run source-policy conflict assertions
+        if: matrix.mode == 'explicit-restrict'
+        env:
+          BUILDER_NAME: ${{ matrix.builder_name }}
+        run: ./test/assert-explicit-source-policy-conflict.sh
+
+      - name: Cleanup
+        if: always()
+        env:
+          BUILDER_NAME: ${{ matrix.builder_name }}
+        run: docker compose down -v --rmi all 2>/dev/null || true
+
+  test_multiarch:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_multiarch == 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    name: "integration: test (multiarch)"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
+
+      - name: Build containers
+        run: docker compose build builder
+
+      - name: Start containers
+        env:
+          PROXY_MODE: audit
+          BUILDER_NAME: buildcage-multiarch
+        run: docker compose up -d --wait builder
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        with:
+          driver: remote
+          endpoint: docker-container://buildcage-multiarch
+
+      - name: Build without specifying platforms
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: test
+          file: test/Dockerfile.multiarch
+          push: false
+          load: true
+          no-cache: true
+          tags: buildcage-multiarch-test:default
+
+      - name: Verify default platform is arm64
+        run: |
+          ARCH=$(docker run --rm buildcage-multiarch-test:default uname -m)
+          echo "Default platform architecture: $ARCH"
+          [ "$ARCH" = "aarch64" ] || (echo "Expected aarch64 (native), got $ARCH" && exit 1)
+          echo "✓ Default platform is linux/arm64 (native runner architecture)"
+
+      - name: Build for linux/amd64
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: test
+          file: test/Dockerfile.multiarch
+          platforms: linux/amd64
+          push: false
+          load: true
+          no-cache: true
+          tags: buildcage-multiarch-test:amd64
+
+      - name: Verify amd64 cross-platform build
+        run: |
+          ARCH=$(docker run --rm --platform linux/amd64 buildcage-multiarch-test:amd64 uname -m)
+          echo "linux/amd64 image architecture: $ARCH"
+          [ "$ARCH" = "x86_64" ] || (echo "Expected x86_64, got $ARCH" && exit 1)
+          echo "✓ linux/amd64 cross-platform build verified"
+
+      - name: Cleanup
+        if: always()
+        env:
+          BUILDER_NAME: buildcage-multiarch
+        run: docker compose down -v --rmi all 2>/dev/null || true
+
+  # Single, stably-named required status check for branch protection: the
+  # `test` job's own name varies per matrix entry (test (transparent-audit),
+  # test (explicit-restrict), etc.), so branch protection can't target it
+  # directly without listing every combination and having to update that list
+  # whenever the matrix changes.
+  integration-tests-passed:
+    name: Integration tests passed
+    runs-on: ubuntu-latest
+    needs: [changes, test, test_multiarch]
+    if: always()
+    permissions: {}
+    steps:
+      - name: Check whether all required jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more required jobs did not succeed:"
+            echo '${{ toJSON(needs) }}'
+            exit 1
+          fi
+          echo "All required jobs succeeded."
