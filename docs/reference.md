@@ -7,7 +7,7 @@ Starts the Buildcage builder container.
 ```yaml
 - name: Start Buildcage builder
   id: buildcage
-  uses: dash14/buildcage/setup@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  uses: dash14/buildcage/setup@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
   with:
     proxy_mode: restrict
     allowed_https_rules: >-
@@ -164,7 +164,7 @@ Displays communication logs after builds and optionally fails if any BLOCKED con
 ```yaml
 - name: Show proxy report
   if: always()
-  uses: dash14/buildcage/report@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  uses: dash14/buildcage/report@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
 ```
 
 ### Job Summary
@@ -203,7 +203,7 @@ build.
 
 ```yaml
 - name: Run tests with outbound network isolation
-  uses: dash14/buildcage/sandbox@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  uses: dash14/buildcage/sandbox@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
   with:
     proxy_mode: restrict
     allowed_https_rules: registry.npmjs.org:443
@@ -242,7 +242,7 @@ Use the step's own `env:` (not a `with:` input) to pass values into `run` — ex
 anything set via `env:` is available there too:
 
 ```yaml
-- uses: dash14/buildcage/sandbox@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+- uses: dash14/buildcage/sandbox@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
   env:
     PR_TITLE: ${{ github.event.pull_request.title }}
   with:
@@ -292,7 +292,7 @@ If `run` needs to write somewhere else — a tool-specific cache directory, for 
 under `writable`:
 
 ```yaml
-- uses: dash14/buildcage/sandbox@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+- uses: dash14/buildcage/sandbox@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
   with:
     writable: |
       /opt/some-tool/cache

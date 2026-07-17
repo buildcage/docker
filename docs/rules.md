@@ -67,7 +67,7 @@ Since the regex is tested against the `domain:port` string, include a port patte
 
 ```yaml
 - name: Start Buildcage
-  uses: dash14/buildcage/setup@0f4a487d1062628ed90ca3cea661db00890c5e8c # v2.2.0
+  uses: dash14/buildcage/setup@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
   with:
     proxy_mode: restrict
 
