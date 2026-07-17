@@ -5,7 +5,7 @@
 [![GitHub](https://img.shields.io/badge/GitHub-dash14%2Fbuildcage-blue?logo=github)](https://github.com/dash14/buildcage)
 ![version](https://img.shields.io/github/v/release/dash14/buildcage)
 ![build](https://img.shields.io/github/actions/workflow/status/dash14/buildcage/docker-publish.yml)
-![test](https://img.shields.io/github/actions/workflow/status/dash14/buildcage/test.yml?label=test)
+![test](https://img.shields.io/github/actions/workflow/status/dash14/buildcage/test-e2e.yml?label=test)
 ![license](https://img.shields.io/github/license/dash14/buildcage)
 
 **Secure your Docker builds against supply chain attacks — restrict outbound network access to only the domains you allow.**

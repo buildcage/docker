@@ -202,7 +202,7 @@ Security Details and the [Reference](./reference.md#sandbox-action) doc.
 
 Sigstore verification requires a real, published GHCR image, so the setup and sandbox actions
 normally can't run against an unpublished branch or local changes. This repo's own CI (`test_action`
-and `test_sandbox` jobs in `.github/workflows/test.yml`) tests the real `setup`/`report`/`sandbox`
+and `test_sandbox` jobs in `.github/workflows/test-e2e.yml`) tests the real `setup`/`report`/`sandbox`
 actions end-to-end against a locally built image instead, via a build-time-gated mechanism:
 `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build` compiles `setup/dist/main.cjs` and `sandbox/dist/main.cjs`
 where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
