@@ -221,6 +221,11 @@ safe when those steps run truly concurrently via GitHub Actions' `background`/`w
 namespaced by the same per-step random suffix, so concurrent steps never recreate or tear down
 each other's containers.
 
+In `audit` mode, the Job Summary also includes a ready-to-paste `restrict` mode example — a
+`run` step with `proxy_mode: restrict` and allowlist rules generated from the hosts observed
+during the audited run — mirroring the same example the `report` action generates for
+`setup`/`report` workflows.
+
 ### Parameters
 
 | Parameter | Required | Default | Description |

@@ -174,6 +174,9 @@ async function main() {
     try {
       const report = fetchReport(containerName);
       writeReport(report, {
+        actionRepo,
+        actionRef,
+        runCommand: runInput,
         failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
       });
     } catch (e) {
