@@ -11,9 +11,14 @@ const ruleTypeToParam = {
  * @param {Array<{host: string, port: string, ruleType: string}>} auditedRows
  * @param {string} actionRepo
  * @param {string} actionRef - the ref (tag or commit SHA) this action was invoked with
+ * @param {{actionName?: string, runCommand?: string}} [options] - actionName
+ *   selects which sub-action the example step uses ("setup" for the
+ *   two-step setup+report flow, "run" for the self-contained run action);
+ *   runCommand, only meaningful for actionName "run", is the original
+ *   `run:` input to preserve in the example step.
  * @returns {string}
  */
-export function buildRestrictExample(auditedRows, actionRepo, actionRef) {
+export function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName = "setup", runCommand } = {}) {
   if (!auditedRows || auditedRows.length === 0) return "";
 
   // A 40-char SHA is opaque to the reader and specific to this run, so show a
@@ -34,8 +39,17 @@ export function buildRestrictExample(auditedRows, actionRepo, actionRef) {
   // Build YAML lines
   let yaml = "";
   yaml += "- name: Start Buildcage in restrict mode\n";
-  yaml += `  uses: ${actionRepo}/setup@${ref}\n`;
+  yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`;
   yaml += "  with:\n";
+  // The `run` action is a single self-contained step, so its example must
+  // repeat the `run:` command alongside the mode switch to stay copy-pasteable
+  // (matches `run:`'s position as the first input in run/action.yml).
+  if (actionName === "run" && runCommand) {
+    yaml += "    run: |\n";
+    for (const line of runCommand.split(/\r?\n/)) {
+      yaml += `      ${line}\n`;
+    }
+  }
   yaml += "    proxy_mode: restrict\n";
   for (const [param, rules] of groups) {
     yaml += `    ${param}: >-\n`;

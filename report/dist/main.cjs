@@ -221,7 +221,7 @@ let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} m
 if (isAudit) {
   const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
   audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n"), 
-  markdown += function(auditedRows, actionRepo, actionRef) {
+  markdown += function(auditedRows, actionRepo, actionRef, {actionName: actionName = "setup", runCommand: runCommand} = {}) {
     if (!auditedRows || 0 === auditedRows.length) return "";
     const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = new Map;
     for (const r of auditedRows) {
@@ -230,8 +230,12 @@ if (isAudit) {
     }
     if (0 === groups.size) return "";
     let yaml = "";
-    yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/setup@${ref}\n`, 
-    yaml += "  with:\n", yaml += "    proxy_mode: restrict\n";
+    if (yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`, 
+    yaml += "  with:\n", "run" === actionName && runCommand) {
+      yaml += "    run: |\n";
+      for (const line of runCommand.split(/\r?\n/)) yaml += `      ${line}\n`;
+    }
+    yaml += "    proxy_mode: restrict\n";
     for (const [param, rules] of groups) {
       yaml += `    ${param}: >-\n`;
       for (const rule of rules) yaml += `      ${rule}\n`;
