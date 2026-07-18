@@ -3,9 +3,9 @@ import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildRules } from "../../docker/tools/shared/lib/rules.js";
-import { resolveBuildcageImageRef } from "../../setup/src/lib/image-ref.js";
-import { verifyImageDigest } from "../../setup/src/lib/verify-image.js";
+import { buildRules } from "../../core/shared/lib/rules.js";
+import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
+import { verifyImageDigest } from "../../core/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";
 import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.js";
@@ -25,7 +25,7 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
 /**
  * Verifies image provenance and resolves the digest-pinned image ref for
  * the sandbox (buildkitd-less) proxy image, published under the `-sandbox`
- * tag suffix (see imageTagFromRef in setup/src/lib/verify-image.js).
+ * tag suffix (see imageTagFromRef in core/lib/verify-image.js).
  */
 async function resolveVerifiedImage({ actionRef, actionRepo }) {
   let digest;
@@ -96,7 +96,7 @@ async function main() {
   }
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("../../setup/src/lib/local-image-override.js")).readLocalImageOverride(env)
+    ? (await import("../../core/lib/local-image-override.js")).readLocalImageOverride(env)
     : null;
   if (localOverride) {
     console.log(

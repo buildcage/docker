@@ -28,7 +28,9 @@ jobs:
         with:
           filters: |
             docker: &docker
-              - 'docker/**'
+              - 'core/**'
+              - 'setup/docker/**'
+              - 'sandbox/docker/**'
               - 'compose.yaml'
             js-built: &js-built
               - 'package.json'
@@ -50,8 +52,6 @@ jobs:
               - *js-built
               - *workflow
               - 'sandbox/**'
-              - 'test/assert-sandbox.sh'
-              - 'test/assert-sandbox-concurrent.sh'
 
   # Exercises the real setup/report actions end-to-end (uses: ./setup,
   # uses: ./report) against an image built from this branch, no registry
@@ -265,7 +265,7 @@ jobs:
           # debug-only mirror path directly instead (see the note on the
           # step above).
           BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-test-summary.md
-        run: ./test/assert-sandbox.sh
+        run: ./sandbox/test/assert-sandbox.sh
 
       # fail_on_blocked defaults to true and is exercised nowhere above (the
       # step above opts out of it to isolate the network-enforcement check
@@ -299,7 +299,7 @@ jobs:
       - name: Run two sandbox proxy lifecycles concurrently (direct)
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
-        run: ./test/assert-sandbox-concurrent.sh
+        run: ./sandbox/test/assert-sandbox-concurrent.sh
 
       # Actions-level counterpart to the direct test above: proves the fix
       # also holds when concurrency comes from Actions' own `background`/

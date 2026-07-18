@@ -1,0 +1,7 @@
+.git
+node_modules
+setup/dist
+report/dist
+sandbox/dist
+**/*.test.js
+core/shared/test

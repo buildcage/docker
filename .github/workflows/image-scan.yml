@@ -19,7 +19,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [transparent, explicit, sandbox]
+        include:
+          - engine: transparent
+            dockerfile: setup/docker/transparent/Dockerfile
+          - engine: explicit
+            dockerfile: setup/docker/explicit/Dockerfile
+          - engine: sandbox
+            dockerfile: sandbox/docker/Dockerfile
 
     steps:
       - name: Checkout
@@ -37,8 +43,8 @@ jobs:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
-          context: docker
-          file: docker/${{ matrix.engine }}/Dockerfile
+          context: .
+          file: ${{ matrix.dockerfile }}
           load: true
           tags: buildcage-${{ matrix.engine }}:scan
 

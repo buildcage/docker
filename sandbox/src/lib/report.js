@@ -1,17 +1,17 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import { createAnnotation } from "../../../report/src/lib/annotation.js";
+import { createAnnotation } from "../../../core/lib/annotation.js";
 
 /**
  * Fetch the structured HAProxy-log report from the (still-running) proxy
  * container. Unlike report/src/main.js (which supports both engines), the
  * sandbox action always runs the transparent-engine proxy stack, so this
- * only ever needs docker/tools/transparent/report.js.
+ * only ever needs core/scripts/report.js.
  */
 export function fetchReport(containerName) {
   const jsonOutput = execFileSync(
     "docker",
-    ["exec", containerName, "qjs", "-m", "/opt/buildcage/tools/transparent/report.js"],
+    ["exec", containerName, "qjs", "-m", "/opt/buildcage/scripts/report.js"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   );
   return JSON.parse(jsonOutput);

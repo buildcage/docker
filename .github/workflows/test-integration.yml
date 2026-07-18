@@ -28,7 +28,8 @@ jobs:
         with:
           filters: |
             docker: &docker
-              - 'docker/**'
+              - 'core/**'
+              - 'setup/docker/**'
               - 'compose.yaml'
             workflow: &workflow
               - '.github/workflows/test-integration.yml'
@@ -36,14 +37,14 @@ jobs:
             test:
               - *docker
               - *workflow
-              - 'compose.test-transparent.yaml'
-              - 'compose.test-explicit.yaml'
-              - 'test/**'
+              - 'setup/compose.test-transparent.yaml'
+              - 'setup/compose.test-explicit.yaml'
+              - 'setup/test/**'
               - 'report/src/**'
             test_multiarch:
               - *docker
               - *workflow
-              - 'test/Dockerfile.multiarch'
+              - 'setup/test/Dockerfile.multiarch'
 
   test:
     needs: changes
@@ -59,30 +60,30 @@ jobs:
           - mode: transparent-audit
             proxy_mode: audit
             proxy_engine: transparent
-            compose_file: compose.yaml:compose.test-transparent.yaml
-            test_dockerfile: test/Dockerfile.transparent-audit
-            assert_script: ./test/assert-transparent-audit.sh
+            compose_file: compose.yaml:setup/compose.test-transparent.yaml
+            test_dockerfile: setup/test/Dockerfile.transparent-audit
+            assert_script: ./setup/test/assert-transparent-audit.sh
             builder_name: buildcage-transparent-audit
           - mode: transparent-restrict
             proxy_mode: restrict
             proxy_engine: transparent
-            compose_file: compose.yaml:compose.test-transparent.yaml
-            test_dockerfile: test/Dockerfile.transparent-restrict
-            assert_script: ./test/assert-transparent-restrict.sh
+            compose_file: compose.yaml:setup/compose.test-transparent.yaml
+            test_dockerfile: setup/test/Dockerfile.transparent-restrict
+            assert_script: ./setup/test/assert-transparent-restrict.sh
             builder_name: buildcage-transparent-restrict
           - mode: explicit-audit
             proxy_mode: audit
             proxy_engine: explicit
-            compose_file: compose.yaml:compose.test-explicit.yaml
-            test_dockerfile: test/Dockerfile.explicit-audit
-            assert_script: ./test/assert-explicit-audit.sh
+            compose_file: compose.yaml:setup/compose.test-explicit.yaml
+            test_dockerfile: setup/test/Dockerfile.explicit-audit
+            assert_script: ./setup/test/assert-explicit-audit.sh
             builder_name: buildcage-explicit-audit
           - mode: explicit-restrict
             proxy_mode: restrict
             proxy_engine: explicit
-            compose_file: compose.yaml:compose.test-explicit.yaml
-            test_dockerfile: test/Dockerfile.explicit-restrict
-            assert_script: ./test/assert-explicit-restrict.sh
+            compose_file: compose.yaml:setup/compose.test-explicit.yaml
+            test_dockerfile: setup/test/Dockerfile.explicit-restrict
+            assert_script: ./setup/test/assert-explicit-restrict.sh
             builder_name: buildcage-explicit-restrict
 
     name: "integration: test (${{ matrix.mode }})"
@@ -133,7 +134,7 @@ jobs:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
-          context: test
+          context: setup/test
           file: ${{ matrix.test_dockerfile }}
           push: false
           no-cache: true
@@ -159,7 +160,7 @@ jobs:
         if: matrix.mode == 'explicit-restrict'
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: ./test/assert-explicit-source-policy-conflict.sh
+        run: ./setup/test/assert-explicit-source-policy-conflict.sh
 
       - name: Cleanup
         if: always()
@@ -206,8 +207,8 @@ jobs:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
-          context: test
-          file: test/Dockerfile.multiarch
+          context: setup/test
+          file: setup/test/Dockerfile.multiarch
           push: false
           load: true
           no-cache: true
@@ -227,8 +228,8 @@ jobs:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
-          context: test
-          file: test/Dockerfile.multiarch
+          context: setup/test
+          file: setup/test/Dockerfile.multiarch
           platforms: linux/amd64
           push: false
           load: true

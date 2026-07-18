@@ -5,7 +5,7 @@
  * directly would pull in its
  * `if (process.argv[1] === fileURLToPath(import.meta.url))` check too,
  * which fires a second time once rollup merges both files'
- * `import.meta.url` into a single bundle (see setup/src/lib/image-ref.js
+ * `import.meta.url` into a single bundle (see core/lib/image-ref.js
  * for the same issue hit previously).
  *
  * `-p projectName` is required on both so that fully concurrent `sandbox`

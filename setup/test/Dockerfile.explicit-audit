@@ -1,0 +1,53 @@
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
+
+# DNS check — buildkit-proxy writes /etc/resolv.conf from EXTERNAL_RESOLVER at
+# container startup (no dnsmasq in this image).
+RUN echo "=== DNS Configuration ===" && \
+    cat /etc/resolv.conf
+
+# In audit mode, gen-source-policy.js emits an empty rule set (see
+# setup/docker/explicit/scripts/lib/source-policy.js) — every domain is allowed, and
+# BuildKit's own "proxy network requests:" build output provides audit
+# visibility instead of a custom denial log.
+
+# [HTTPS - any domain, allowed in audit mode]
+RUN echo "=== [HTTPS - any domain] ===" && \
+    echo "Testing blocked.example.com (HTTPS, should be allowed in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=10 https://blocked.example.com/ && echo "✓ blocked.example.com: OK") || (echo "✗ blocked.example.com: FAILED" && exit 1)
+
+# [HTTP - any domain, allowed in audit mode]
+RUN echo "=== [HTTP - any domain] ===" && \
+    echo "Testing blocked.example.com (HTTP, should be allowed in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=10 http://blocked.example.com/ && echo "✓ blocked.example.com HTTP: OK") || (echo "✗ blocked.example.com HTTP: FAILED" && exit 1)
+
+# [Port 8443 - any domain]
+RUN echo "=== [Port 8443 - any domain] ===" && \
+    echo "Testing blocked.example.com:8443 (HTTPS, should be allowed in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=10 https://blocked.example.com:8443/ && echo "✓ blocked.example.com:8443: OK") || (echo "✗ blocked.example.com:8443: FAILED" && exit 1)
+
+# [Port 8080 - any domain]
+RUN echo "=== [Port 8080 - any domain] ===" && \
+    echo "Testing blocked.example.com:8080 (HTTP, should be allowed in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=10 http://blocked.example.com:8080/ && echo "✓ blocked.example.com:8080: OK") || (echo "✗ blocked.example.com:8080: FAILED" && exit 1)
+
+# [Direct IP - allowed in audit mode]
+RUN echo "=== [Direct IP - audit mode] ===" && \
+    echo "Testing direct IP access to 10.200.0.100 (should be allowed in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✓ 10.200.0.100: OK") || (echo "✗ 10.200.0.100: FAILED" && exit 1)
+
+# Note: unlike test/Dockerfile.transparent-audit, this Dockerfile has
+# no dns-failed / missing-sni / missing-host-header probes. Those exercise
+# buildcage's transparent-mode network-layer interception; explicit mode has
+# no equivalent (see docs/security.md's "Coverage and known limitations").
+
+# [npm install - NODE_USE_SYSTEM_CA=1 trusts BuildKit's injected MITM CA]
+RUN echo "=== [npm install - system CA trust] ===" && \
+    mkdir -p /app && cd /app && \
+    (npm init -y >/dev/null 2>&1 && \
+     NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --fetch-retries=0 express >/dev/null 2>&1 && \
+     echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
+
+# Network configuration check
+RUN echo "=== Network Configuration ===" && \
+    ip route show && \
+    echo "=== End of test ==="

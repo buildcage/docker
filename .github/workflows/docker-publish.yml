@@ -30,7 +30,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [transparent, explicit, sandbox]
+        include:
+          - engine: transparent
+            dockerfile: setup/docker/transparent/Dockerfile
+          - engine: explicit
+            dockerfile: setup/docker/explicit/Dockerfile
+          - engine: sandbox
+            dockerfile: sandbox/docker/Dockerfile
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       # Matrix legs sharing one output name would clobber each other (last
@@ -108,8 +114,8 @@ jobs:
           DOCKER_BUILD_SUMMARY: true
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
-          context: docker
-          file: docker/${{ matrix.engine }}/Dockerfile
+          context: .
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
