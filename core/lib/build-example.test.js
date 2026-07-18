@@ -214,6 +214,28 @@ describe("buildRestrictExample", () => {
     );
   });
 
+  it("strips the trailing newline GitHub Actions adds to `run: |` block scalars", () => {
+    const rows = [
+      { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 },
+    ];
+    assert.equal(
+      buildRestrictExample(rows, REPO, REF, { actionName: "run", runCommand: "npm ci\nnpm test\n" }),
+      wrap(
+        [
+          "- name: Start Buildcage in restrict mode",
+          `  uses: ${REPO}/run@${REF}`,
+          "  with:",
+          "    run: |",
+          "      npm ci",
+          "      npm test",
+          "    proxy_mode: restrict",
+          "    allowed_https_rules: >-",
+          "      registry.npmjs.org:443",
+        ].join("\n") + "\n",
+      )
+    );
+  });
+
   it("actionName 'run' without a runCommand omits the run: block", () => {
     const rows = [
       { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 },

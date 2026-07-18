@@ -233,7 +233,7 @@ if (isAudit) {
     if (yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`, 
     yaml += "  with:\n", "run" === actionName && runCommand) {
       yaml += "    run: |\n";
-      for (const line of runCommand.split(/\r?\n/)) yaml += `      ${line}\n`;
+      for (const line of runCommand.replace(/\r?\n$/, "").split(/\r?\n/)) yaml += `      ${line}\n`;
     }
     yaml += "    proxy_mode: restrict\n";
     for (const [param, rules] of groups) {
