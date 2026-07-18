@@ -102,4 +102,26 @@ describe("buildReportMarkdown", () => {
     const markdown = buildReportMarkdown(report, { actionRepo: "dash14/buildcage", actionRef: "v2" });
     assert.doesNotMatch(markdown, /Switch to restrict mode/);
   });
+
+  it("uses a level-2 heading matching the report action's wording", () => {
+    const report = { mode: "restrict", blockedCount: 0, sections: {} };
+    const markdown = buildReportMarkdown(report, { actionRepo: "dash14/buildcage", actionRef: "v2" });
+    assert.match(markdown, /^## Outbound Traffic Report \(restrict mode\)\n/);
+  });
+
+  it("appends stepLabel to the heading to tell steps apart", () => {
+    const report = { mode: "restrict", blockedCount: 0, sections: {} };
+    const markdown = buildReportMarkdown(report, {
+      actionRepo: "dash14/buildcage",
+      actionRef: "v2",
+      stepLabel: "npm install",
+    });
+    assert.match(markdown, /^## Outbound Traffic Report — npm install \(restrict mode\)\n/);
+  });
+
+  it("appends stepLabel to the heading even when there are no proxy logs", () => {
+    const report = { mode: null };
+    const markdown = buildReportMarkdown(report, { stepLabel: "npm install" });
+    assert.match(markdown, /^## Outbound Traffic Report — npm install\n\nNo proxy logs found\.\n$/);
+  });
 });

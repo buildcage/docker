@@ -179,6 +179,7 @@ async function main() {
         actionRepo,
         actionRef,
         runCommand: runInput,
+        stepLabel: env.INPUT_LABEL || undefined,
         failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
       });
     } catch (e) {

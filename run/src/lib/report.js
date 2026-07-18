@@ -35,12 +35,15 @@ function markdownTable(rows, { showReason = false } = {}) {
  * per job), matching the "one proxy container per step" execution model.
  */
 export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand } = {}) {
+  // Mirrors report/src/main.js's "## Outbound Traffic Report during Docker
+  // Build (mode)" heading, so both actions read as the same kind of report.
+  const heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
   if (report.mode === null) {
-    return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
+    return `## ${heading}\n\nNo proxy logs found.\n`;
   }
 
   const isAudit = report.mode === "audit";
-  let markdown = `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
+  let markdown = `## ${heading} (${report.mode} mode)\n\n`;
 
   if (isAudit) {
     const audited = report.sections.audited || [];

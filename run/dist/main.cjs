@@ -7312,9 +7312,10 @@ function markdownTable(rows, {showReason: showReason = !1} = {}) {
 }
 
 function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand} = {}) {
-  if (null === report.mode) return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
+  const heading = "Outbound Traffic Report" + (stepLabel ? ` — ${stepLabel}` : "");
+  if (null === report.mode) return `## ${heading}\n\nNo proxy logs found.\n`;
   const isAudit = "audit" === report.mode;
-  let markdown = `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
+  let markdown = `## ${heading} (${report.mode} mode)\n\n`;
   if (isAudit) {
     const audited = report.sections.audited || [];
     audited.length > 0 && (markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n"), 
@@ -7521,6 +7522,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         actionRepo: actionRepo,
         actionRef: actionRef,
         runCommand: runInput,
+        stepLabel: env.INPUT_LABEL || void 0,
         failOnBlocked: "true" === (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase()
       });
     } catch (e) {

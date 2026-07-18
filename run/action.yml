@@ -29,6 +29,10 @@ inputs:
     description: "Additional writable directories (newline-separated), on top of $GITHUB_WORKSPACE, $HOME, and /tmp which are always writable — everything else is read-only. Use '/' to disable the read-only restriction entirely."
     required: false
     default: ''
+  label:
+    description: "Label appended to this step's Job Summary heading, e.g. 'npm install' — useful to tell steps apart when `run` is used more than once in the same job"
+    required: false
+    default: ''
 
 runs:
   using: node24
