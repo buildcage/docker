@@ -49,7 +49,7 @@ The walkthrough below covers the full audit → restrict flow.
     endpoint: docker-container://buildcage
 
 - name: Build and discover dependencies
-  uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+  uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
   with:
     context: .
     push: false  # Set to true to push the built image
@@ -92,7 +92,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
     endpoint: docker-container://buildcage
 
 - name: Build with protection
-  uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+  uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
   with:
     context: .
     push: false  # Set to true to push the built image
