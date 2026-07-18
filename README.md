@@ -38,7 +38,7 @@ The walkthrough below covers the full audit → restrict flow.
 ```yaml
 - name: Start Buildcage in audit mode
   id: buildcage
-  uses: dash14/buildcage/setup@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+  uses: dash14/buildcage/setup@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
   with:
     proxy_mode: audit  # Log everything, enforce no allowlist
 
@@ -56,7 +56,7 @@ The walkthrough below covers the full audit → restrict flow.
 
 - name: Show Buildcage report
   if: always()
-  uses: dash14/buildcage/report@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+  uses: dash14/buildcage/report@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
   with:
     fail_on_blocked: false  # Don't fail, just show the report
 ```
@@ -78,7 +78,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 ```yaml
 - name: Start Buildcage in restrict mode
   id: buildcage
-  uses: dash14/buildcage/setup@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+  uses: dash14/buildcage/setup@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
   with:
     proxy_mode: restrict  # Block everything except allowed domains
     allowed_https_rules: >-
@@ -99,7 +99,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 
 - name: Show Buildcage report
   if: always()
-  uses: dash14/buildcage/report@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+  uses: dash14/buildcage/report@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
   # Build fails if any unexpected connections were blocked
 ```
 
@@ -191,7 +191,7 @@ experimental — newer and less battle-tested than the `setup`/`report` actions 
 
 ```yaml
 - name: Run tests with outbound network isolation
-  uses: dash14/buildcage/run@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+  uses: dash14/buildcage/run@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
   with:
     proxy_mode: restrict
     allowed_https_rules: registry.npmjs.org:443

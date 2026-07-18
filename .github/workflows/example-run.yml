@@ -23,7 +23,7 @@ jobs:
 
       - name: Run tests with outbound network isolation
         # For self-hosting, replace with: <your-org>/buildcage/run@<SHA>
-        uses: dash14/buildcage/run@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+        uses: dash14/buildcage/run@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
         with:
           proxy_mode: restrict
           allowed_https_rules: >-

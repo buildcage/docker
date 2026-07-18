@@ -21,7 +21,7 @@ jobs:
 
       - name: Start Buildcage builder
         # For self-hosting, replace with: <your-org>/buildcage/setup@<SHA>
-        uses: dash14/buildcage/setup@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+        uses: dash14/buildcage/setup@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
         with:
           proxy_mode: restrict
           allowed_https_rules: >-
@@ -57,6 +57,6 @@ jobs:
       - name: Show proxy report
         if: always()
         # For self-hosting, replace with: <your-org>/buildcage/report@<SHA>
-        uses: dash14/buildcage/report@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+        uses: dash14/buildcage/report@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
         with:
           fail_on_blocked: false
