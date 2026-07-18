@@ -41,10 +41,10 @@ RUN echo "=== [Direct IP - audit mode] ===" && \
 # no equivalent (see docs/security.md's "Coverage and known limitations").
 
 # [npm install - NODE_USE_SYSTEM_CA=1 trusts BuildKit's injected MITM CA]
+COPY files/package.json files/package-lock.json /app/
 RUN echo "=== [npm install - system CA trust] ===" && \
-    mkdir -p /app && cd /app && \
-    (npm init -y >/dev/null 2>&1 && \
-     NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --fetch-retries=0 express >/dev/null 2>&1 && \
+    cd /app && \
+    (NODE_USE_SYSTEM_CA=1 npm ci --ignore-scripts --fetch-retries=0 >/dev/null 2>&1 && \
      echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
 
 # Network configuration check
