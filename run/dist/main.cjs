@@ -7318,7 +7318,7 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
   let markdown = `## ${heading} (${report.mode} mode)\n\n`;
   if (isAudit) {
     const audited = report.sections.audited || [];
-    audited.length > 0 && (markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n"), 
+    audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n\n"), 
     markdown += function(auditedRows, actionRepo, actionRef, {actionName: actionName = "setup", runCommand: runCommand} = {}) {
       if (!auditedRows || 0 === auditedRows.length) return "";
       const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = new Map;
@@ -7346,14 +7346,14 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
       runCommand: runCommand
     });
     const blocked = report.sections.blocked || [];
-    blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
+    blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, {
       showReason: !0
     }) + "\n\n");
   } else {
     const allowed = report.sections.allowed || [];
-    allowed.length > 0 && (markdown += "**✅ Allowed Hosts**\n\n" + markdownTable(allowed) + "\n\n");
+    allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n");
     const blocked = report.sections.blocked || [];
-    blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
+    blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, {
       showReason: !0
     }) + "\n\n");
   }

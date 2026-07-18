@@ -47,15 +47,15 @@ export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, 
 
   if (isAudit) {
     const audited = report.sections.audited || [];
-    if (audited.length > 0) markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n";
+    if (audited.length > 0) markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n\n";
     markdown += buildRestrictExample(audited, actionRepo, actionRef, { actionName: "run", runCommand });
     const blocked = report.sections.blocked || [];
-    if (blocked.length > 0) markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
+    if (blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
   } else {
     const allowed = report.sections.allowed || [];
-    if (allowed.length > 0) markdown += "**✅ Allowed Hosts**\n\n" + markdownTable(allowed) + "\n\n";
+    if (allowed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n";
     const blocked = report.sections.blocked || [];
-    if (blocked.length > 0) markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
+    if (blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
   }
 
   return markdown;
