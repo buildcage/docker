@@ -13,6 +13,6 @@ containerName && projectName ? node_child_process.execFileSync("docker", functio
   stdio: "inherit",
   env: {
     ...process.env,
-    SANDBOX_CONTAINER_NAME: containerName
+    PROXY_CONTAINER_NAME: containerName
   }
-}) : containerName && console.log(`::warning::sandbox post-cleanup: container_name is set but project_name is missing from GITHUB_STATE; skipping cleanup to avoid targeting Compose's implicit, shared project name. Container ${containerName} may need manual removal.`);
+}) : containerName && console.log(`::warning::run post-cleanup: container_name is set but project_name is missing from GITHUB_STATE; skipping cleanup to avoid targeting Compose's implicit, shared project name. Container ${containerName} may need manual removal.`);

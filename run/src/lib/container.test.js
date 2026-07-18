@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./container.js";
 
 describe("generateContainerName", () => {
-  it("always starts with the buildcage-sandbox- prefix", () => {
-    assert.match(generateContainerName(), /^buildcage-sandbox-[0-9a-f]{8}$/);
+  it("always starts with the buildcage-proxy- prefix", () => {
+    assert.match(generateContainerName(), /^buildcage-proxy-[0-9a-f]{8}$/);
   });
 
   it("produces distinct names across calls", () => {
@@ -16,13 +16,13 @@ describe("generateContainerName", () => {
 
 describe("getContainerPid", () => {
   it("returns null for a container that doesn't exist", () => {
-    assert.equal(getContainerPid("buildcage-sandbox-this-should-not-exist-anywhere"), null);
+    assert.equal(getContainerPid("buildcage-proxy-this-should-not-exist-anywhere"), null);
   });
 });
 
 describe("deriveProjectName", () => {
   it("returns the container name unchanged", () => {
-    assert.equal(deriveProjectName("buildcage-sandbox-abcd1234"), "buildcage-sandbox-abcd1234");
+    assert.equal(deriveProjectName("buildcage-proxy-abcd1234"), "buildcage-proxy-abcd1234");
   });
 
   it("matches docker compose's project-name character constraints for any generated container name", () => {

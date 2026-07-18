@@ -1,4 +1,4 @@
-name: Sandbox
+name: Run
 description: Run a command with outbound network isolation (allowlist), same enforcement as Buildcage's Docker build proxy
 
 inputs:

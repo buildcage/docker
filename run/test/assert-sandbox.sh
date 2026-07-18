@@ -1,9 +1,9 @@
 #!/bin/bash
-# Verifies the sandbox action's report output. Reads
-# BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE rather than GITHUB_STEP_SUMMARY:
+# Verifies the run action's report output. Reads
+# BUILDCAGE_RUN_DEBUG_SUMMARY_FILE rather than GITHUB_STEP_SUMMARY:
 # GitHub silently ignores attempts to reassign that reserved env var, and it
 # is unique per step anyway, so a later step could never read an earlier
-# step's copy back through it. The sandbox action itself stops its own
+# step's copy back through it. The run action itself stops its own
 # throwaway proxy container before this script runs, so unlike
 # test/assert-{transparent,explicit}-*.sh, there's no long-lived builder
 # container left to `docker compose exec` into either.
@@ -14,7 +14,7 @@ echo "=== Sandbox Report Assertions ==="
 echo ""
 
 FAILURES=0
-SUMMARY=$(cat "$BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE")
+SUMMARY=$(cat "$BUILDCAGE_RUN_DEBUG_SUMMARY_FILE")
 
 assert_summary_contains() {
   local pattern="$1"

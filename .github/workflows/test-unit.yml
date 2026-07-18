@@ -36,7 +36,7 @@ jobs:
               - 'core/**'
               - 'setup/**'
               - 'report/**'
-              - 'sandbox/**'
+              - 'run/**'
               - 'Makefile'
 
   unit_test:
@@ -62,7 +62,7 @@ jobs:
 
       - name: Check dist is free of the local-image test hook
         run: |
-          for f in setup/dist/main.cjs sandbox/dist/main.cjs; do
+          for f in setup/dist/main.cjs run/dist/main.cjs; do
             if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
               echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — @rollup/plugin-replace failed to substitute it (see rollup.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published action step. Do not merge until this passes."
               exit 1

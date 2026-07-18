@@ -1,5 +1,5 @@
 /**
- * SandboxError — intentional error in the sandbox action.
+ * SandboxError — intentional error in the run action.
  *
  * All expected failure paths (missing image, network error, verification
  * failure, invalid config) throw SandboxError. Anything that is NOT a

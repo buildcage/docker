@@ -50,13 +50,13 @@ make clean
 
 ### Sandbox Dev Loop (mac-friendly)
 
-The `sandbox` action's own isolation mechanism (`run-isolated.sh`) uses Linux-only primitives
+The `run` action's own isolation mechanism (`run-isolated.sh`) uses Linux-only primitives
 (`unshare`, `nsenter`, `setpriv`) that can't run natively on macOS. `make run_sandbox_mode` /
 `make test_sandbox_mode` instead drive it from inside a container with `pid: host` (see
-`sandbox/dev/Dockerfile` and `sandbox/compose.sandbox-dev.yaml`), which can see the sandbox proxy
+`run/dev/Dockerfile` and `run/compose.sandbox-dev.yaml`), which can see the proxy
 container's PID/netns via `/proc` — close enough to the real "runner host + separate proxy
 container" arrangement for day-to-day iteration, though it can't validate the container-boundary
-parts of production (see [Sandbox Action Internals](#sandbox-action-internals) below). CI's
+parts of production (see [Run Action Internals](#run-action-internals) below). CI's
 `test_sandbox` job runs `run-isolated.sh` directly on the runner host instead, matching production
 exactly — treat that as the final word on whether a change actually works, not this dev loop.
 
@@ -77,10 +77,10 @@ make test_explicit_audit_mode
 make test_explicit_restrict_mode
 ```
 
-`make test_sandbox_unit` runs the sandbox action's Node.js unit tests
-(`node --test 'sandbox/src/**/*.test.js'`); `make test_sandbox_mode` is the dev-loop end-to-end
+`make test_sandbox_unit` runs the run action's Node.js unit tests
+(`node --test 'run/src/**/*.test.js'`); `make test_sandbox_mode` is the dev-loop end-to-end
 check described above. The CI-only `test_sandbox` end-to-end job (real runner host, no nested
-container) is described in [Sandbox Action Internals](#sandbox-action-internals) below.
+container) is described in [Run Action Internals](#run-action-internals) below.
 
 ## Explicit Engine Internals
 
@@ -115,26 +115,26 @@ behavior — what's enforced, what's visible in the report — see
   `docker/buildx`'s own Rego policy feature) is a separate mechanism and is left untouched; it
   applies as an additional condition alongside buildcage's (merged) policy.
 
-## Sandbox Action Internals
+## Run Action Internals
 
-This section covers how the `sandbox` action (`sandbox/`) is implemented internally. For the
-user-facing behavior and threat model, see [Sandbox Action](./security.md#sandbox-action) in
-Security Details and the [Reference](./reference.md#sandbox-action) doc.
+This section covers how the `run` action (`run/`) is implemented internally. For the
+user-facing behavior and threat model, see [Run Action](./security.md#run-action) in
+Security Details and the [Reference](./reference.md#run-action) doc.
 
-- `sandbox/docker/` is a stripped-down build of the `transparent` engine's image with `buildkitd`
+- `run/docker/` is a stripped-down build of the `transparent` engine's image with `buildkitd`
   removed entirely — only the bridge (`sandbox0`, not `buildkit0` — there's no BuildKit here to
   share the name with), iptables `REDIRECT`/`DROP` rules, dnsmasq, and HAProxy remain. Since
   BuildKit's CNI integration normally creates that bridge, a new `init-cni-bridge` s6 service
-  (`sandbox/docker/files/s6-scripts/init-cni-bridge`) creates it directly via `ip link add ... type
-  bridge` instead. `sandbox/docker/files/s6-scripts/init-iptables` is `setup/docker/transparent`'s
+  (`run/docker/files/s6-scripts/init-cni-bridge`) creates it directly via `ip link add ... type
+  bridge` instead. `run/docker/files/s6-scripts/init-iptables` is `setup/docker/transparent`'s
   script with the bridge name swapped; `init-haproxy-cfg`, `dnsmasq.conf`, and `haproxy.cfg.template`
   are unmodified copies.
-- `sandbox/action.yml` is a `node24` action (`main` + `post`, mirroring `setup`'s shape). Each
-  invocation is fully self-contained — `sandbox/src/main.js` verifies and pulls the proxy image
-  (same Sigstore flow as `setup`, published under the `-sandbox` tag suffix — see
+- `run/action.yml` is a `node24` action (`main` + `post`, mirroring `setup`'s shape). Each
+  invocation is fully self-contained — `run/src/main.js` verifies and pulls the proxy image
+  (same Sigstore flow as `setup`, published under the `-proxy` tag suffix — see
   `imageTagFromRef` in `core/lib/verify-image.js`), starts a uniquely-named throwaway proxy
   container, runs the isolated command, appends this step's report section to the Job Summary, and
-  stops the container again, all inside `main`'s own `try`/`finally`. `sandbox/src/post.js` is a
+  stops the container again, all inside `main`'s own `try`/`finally`. `run/src/post.js` is a
   fallback only — it reads the container name and Compose project name back from `GITHUB_STATE`
   (`STATE_container_name`/`STATE_project_name`) and stops it, in case the process was killed before
   reaching `main`'s own `finally`. If `STATE_project_name` is missing, `post.js` skips cleanup
@@ -143,13 +143,13 @@ Security Details and the [Reference](./reference.md#sandbox-action) doc.
   `deriveProjectName`, currently the identity function — container names and Compose project names
   live in separate Docker namespaces, so reusing the same string for both is safe and keeps
   `docker ps`/`docker network ls` output easy to correlate). This matters once GitHub Actions'
-  `background`/`wait`/`parallel` step keywords let multiple `sandbox` steps in the same job run
+  `background`/`wait`/`parallel` step keywords let multiple `run` steps in the same job run
   truly concurrently: without an explicit `-p`, Compose falls back to an implicit,
   directory-derived project name shared by every invocation, and it identifies "the" container for
   a service by its project+service label rather than by container name — so one step's `up`/`down`
   could recreate or tear down another step's still-running proxy container even though their
   container names never collide.
-- The actual isolation is `sandbox/scripts/run-isolated.sh`, invoked via `sudo -n` since setting up
+- The actual isolation is `run/scripts/run-isolated.sh`, invoked via `sudo -n` since setting up
   namespaces/veth/iptables requires root:
   1. `unshare --net --pid --mount --uts --ipc --cgroup --mount-proc --fork -- sleep infinity` creates
      a placeholder process holding the new namespaces. `unshare --pid` doesn't move the caller
@@ -190,21 +190,21 @@ Security Details and the [Reference](./reference.md#sandbox-action) doc.
      1 ignores the default-terminate action for signals it hasn't installed a handler for, so
      `SIGTERM` alone leaves it running forever. Only `SIGKILL` (which can't be caught or ignored)
      reliably tears it down.
-- The report step (`sandbox/src/lib/report.js`) reuses `core/scripts/report.js` and
+- The report step (`run/src/lib/report.js`) reuses `core/scripts/report.js` and
   `core/shared/lib/aggregate.js` unmodified via `docker exec <container> qjs -m
-  /opt/buildcage/scripts/report.js` — the sandbox proxy always runs the `transparent`
+  /opt/buildcage/scripts/report.js` — the proxy always runs the `transparent`
   engine's HAProxy log format, so there's no `explicit`-engine branch to handle here the way
   `report/src/main.js` has to.
 
 ## Local Development
 
-### Local testing of the setup/report/sandbox actions
+### Local testing of the setup/report/run actions
 
-Sigstore verification requires a real, published GHCR image, so the setup and sandbox actions
+Sigstore verification requires a real, published GHCR image, so the setup and run actions
 normally can't run against an unpublished branch or local changes. This repo's own CI (`test_action`
-and `test_sandbox` jobs in `.github/workflows/test-e2e.yml`) tests the real `setup`/`report`/`sandbox`
+and `test_sandbox` jobs in `.github/workflows/test-e2e.yml`) tests the real `setup`/`report`/`run`
 actions end-to-end against a locally built image instead, via a build-time-gated mechanism:
-`BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build` compiles `setup/dist/main.cjs` and `sandbox/dist/main.cjs`
+`BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build` compiles `setup/dist/main.cjs` and `run/dist/main.cjs`
 where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
 module (`core/lib/local-image-override.js`, shared by both actions), loaded only via a
 dynamic `import()` gated by that build-time flag. Without the flag (i.e. every normal/committed
@@ -216,11 +216,11 @@ guarding against a future refactor silently breaking that guarantee.
 To exercise it locally:
 
 1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine, or `docker
-   compose build sandbox` for the sandbox proxy image).
+   compose build proxy` for the proxy image).
 2. `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build`
 3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set (e.g. via `act`, or by
-   invoking `node setup/dist/main.cjs` / `node sandbox/dist/main.cjs` directly with the relevant
-   `INPUT_*` env vars — note `sandbox`'s own isolation step still needs a real Linux host, so this
+   invoking `node setup/dist/main.cjs` / `node run/dist/main.cjs` directly with the relevant
+   `INPUT_*` env vars — note `run`'s own isolation step still needs a real Linux host, so this
    only gets you past image verification, not a full local run on macOS). Never commit a
    `dist/main.cjs` built this way — run `pnpm build` again (without the flag) before committing.
 
@@ -291,10 +291,10 @@ reports for the allowed side.
 | `make test_transparent_restrict_mode` | Run transparent-engine restrict mode tests (start → build → verify → clean up) |
 | `make test_explicit_audit_mode` | Run explicit-engine audit mode tests (start → build → verify → clean up) |
 | `make test_explicit_restrict_mode` | Run explicit-engine restrict mode tests (start → build → verify → clean up) |
-| `make run_sandbox_mode` | Start the sandbox action's proxy + mac-friendly dev-loop runner |
+| `make run_sandbox_mode` | Start the run action's proxy + mac-friendly dev-loop runner |
 | `make test_sandbox_mode` | Run a sample isolated command in the dev loop and verify isolation |
 | `make test_unit` | Run unit tests (includes `test_sandbox_unit`) |
-| `make test_sandbox_unit` | Run the sandbox action's Node.js unit tests |
+| `make test_sandbox_unit` | Run the run action's Node.js unit tests |
 | `make clean` | Remove all resources |
 
 ## Directory Structure
@@ -320,18 +320,18 @@ reports for the allowed side.
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
 │   └── dist/                 # Bundled output (rollup → CommonJS)
-├── sandbox/                  # GitHub Actions sandbox action (isolates an arbitrary run: command)
+├── run/                      # GitHub Actions run action (isolates an arbitrary run: command)
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs, dist/post.cjs)
 │   ├── src/                  # Source (ESM): start proxy, run isolated command, report, stop
 │   ├── dist/                 # Bundled output (rollup → CommonJS)
 │   ├── scripts/run-isolated.sh  # unshare/veth/setpriv isolation, invoked via `sudo -n`
 │   ├── compose.yaml          # Runtime compose file the action itself uses (verified, digest-pinned
 │   │                         # image ref)
-│   ├── docker/               # sandbox action's proxy image — transparent's bridge/iptables/
+│   ├── docker/               # run action's proxy image — transparent's bridge/iptables/
 │   │                         # dnsmasq/HAProxy stack with buildkitd removed entirely
-│   ├── test/                 # assert-sandbox*.sh (checks the sandbox action's Job Summary and
+│   ├── test/                 # assert-sandbox*.sh (checks the run action's Job Summary and
 │   │                         # concurrent-execution behavior)
-│   ├── compose.sandbox-dev.yaml  # Mac dev-loop overlay for the sandbox action (see dev/)
+│   ├── compose.sandbox-dev.yaml  # Mac dev-loop overlay for the run action (see dev/)
 │   └── dev/                  # Mac dev-loop-only Dockerfile + smoke-test.sh (see
 │                             # compose.sandbox-dev.yaml) — not used in production or CI
 ├── core/                     # Code shared across actions
@@ -343,7 +343,7 @@ reports for the allowed side.
 │                             # shared/test/ is a qjs test runner + node:test shim
 ├── docs/                     # development.md, rules.md, security.md, self-hosting.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
-│                             # PROXY_ENGINE; also defines the local-dev `sandbox` service)
+│                             # PROXY_ENGINE; also defines the local-dev `proxy` service)
 └── Makefile                  # Operational commands
 ```
 

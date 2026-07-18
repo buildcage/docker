@@ -1,7 +1,7 @@
 /**
- * Unit tests for sandbox/main.js
+ * Unit tests for run/main.js
  *
- * Run with: node --test sandbox/src/main.test.js
+ * Run with: node --test run/src/main.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -62,7 +62,7 @@ describe("buildACLRules", () => {
 // Regression guard for the concurrent-step container/network collision:
 // both must always include "-p" + the project name, or Compose falls back
 // to an implicit, directory-derived project name shared by every
-// concurrent `sandbox` step in the job (see lib/container.js's
+// concurrent `run` step in the job (see lib/container.js's
 // deriveProjectName).
 // -----------------------------------------------------------------------
 
@@ -70,12 +70,12 @@ describe("buildComposeUpArgs", () => {
   it("always includes -p <projectName> alongside -f <composeFile>", () => {
     const args = buildComposeUpArgs({
       composeFile: "/path/to/compose.yaml",
-      projectName: "buildcage-sandbox-abcd1234",
+      projectName: "buildcage-proxy-abcd1234",
       pullPolicy: "always",
     });
     assert.deepEqual(args, [
       "compose", "-f", "/path/to/compose.yaml",
-      "-p", "buildcage-sandbox-abcd1234",
+      "-p", "buildcage-proxy-abcd1234",
       "up", "-d", "--pull", "always", "--no-build", "--wait", "--quiet-pull",
     ]);
   });
@@ -85,11 +85,11 @@ describe("buildComposeDownArgs", () => {
   it("always includes -p <projectName> alongside -f <composeFile>", () => {
     const args = buildComposeDownArgs({
       composeFile: "/path/to/compose.yaml",
-      projectName: "buildcage-sandbox-abcd1234",
+      projectName: "buildcage-proxy-abcd1234",
     });
     assert.deepEqual(args, [
       "compose", "-f", "/path/to/compose.yaml",
-      "-p", "buildcage-sandbox-abcd1234",
+      "-p", "buildcage-proxy-abcd1234",
       "down",
     ]);
   });

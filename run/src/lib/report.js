@@ -5,7 +5,7 @@ import { createAnnotation } from "../../../core/lib/annotation.js";
 /**
  * Fetch the structured HAProxy-log report from the (still-running) proxy
  * container. Unlike report/src/main.js (which supports both engines), the
- * sandbox action always runs the transparent-engine proxy stack, so this
+ * run action always runs the transparent-engine proxy stack, so this
  * only ever needs core/scripts/report.js.
  */
 export function fetchReport(containerName) {
@@ -29,17 +29,17 @@ function markdownTable(rows, { showReason = false } = {}) {
 }
 
 /**
- * Build the Job Summary markdown section for this sandbox step's traffic
- * report. Each `sandbox` step gets its own section (rather than one report
+ * Build the Job Summary markdown section for this run step's traffic
+ * report. Each `run` step gets its own section (rather than one report
  * per job), matching the "one proxy container per step" execution model.
  */
 export function buildReportMarkdown(report, { stepLabel } = {}) {
   if (report.mode === null) {
-    return `### 🧰 Sandbox${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
+    return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
   }
 
   const isAudit = report.mode === "audit";
-  let markdown = `### 🧰 Sandbox${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
+  let markdown = `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
 
   if (isAudit) {
     const audited = report.sections.audited || [];
@@ -59,7 +59,7 @@ export function buildReportMarkdown(report, { stepLabel } = {}) {
 /**
  * Append this step's report to the Job Summary and emit annotations /
  * set the exit code for blocked connections, mirroring report/src/main.js's
- * behavior but scoped to a single sandbox step's proxy container.
+ * behavior but scoped to a single run step's proxy container.
  */
 export function writeReport(report, { stepLabel, failOnBlocked } = {}) {
   const markdown = buildReportMarkdown(report, { stepLabel });
@@ -75,7 +75,7 @@ export function writeReport(report, { stepLabel, failOnBlocked } = {}) {
   // vars), so a later step has no way to read this step's copy back. When
   // set, also append to this second, stable path so a later step can
   // inspect what was written.
-  const debugSummaryFile = process.env.BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE;
+  const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
   if (debugSummaryFile) {
     appendFileSync(debugSummaryFile, markdown);
   }

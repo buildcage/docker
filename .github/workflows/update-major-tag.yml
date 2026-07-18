@@ -70,9 +70,9 @@ jobs:
           # Each release publishes one image per proxy engine. transparent
           # (default) uses the plain version tag (e.g. ${VERSION}); every
           # other engine uses a -<engine> suffix (e.g. ${VERSION}-explicit,
-          # ${VERSION}-sandbox). Update the floating major/minor tag for each
+          # ${VERSION}-proxy). Update the floating major/minor tag for each
           # engine independently.
-          for ENGINE in transparent explicit sandbox; do
+          for ENGINE in transparent explicit proxy; do
             SUFFIX=""
             if [ "$ENGINE" != "transparent" ]; then
               SUFFIX="-${ENGINE}"

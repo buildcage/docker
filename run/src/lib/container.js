@@ -2,14 +2,14 @@ import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
 /**
- * Generate a unique container name for this sandbox step. Each `sandbox`
+ * Generate a unique container name for this run step. Each `run`
  * step gets its own throwaway proxy container (start -> run -> report ->
  * stop, all within one step) rather than reusing one across steps, so
  * name collisions across concurrent/successive steps are avoided by
  * construction.
  */
 export function generateContainerName() {
-  return `buildcage-sandbox-${randomBytes(4).toString("hex")}`;
+  return `buildcage-proxy-${randomBytes(4).toString("hex")}`;
 }
 
 /**
@@ -20,7 +20,7 @@ export function generateContainerName() {
  * debugging trivial when troubleshooting a specific concurrent step.
  *
  * Passing this explicitly via `-p` on every `docker compose` invocation is
- * required when multiple `sandbox` steps in the same job run truly
+ * required when multiple `run` steps in the same job run truly
  * concurrently (see GitHub Actions' `background`/`wait`/`parallel` step
  * keywords) — without it, Compose falls back to an implicit,
  * directory-derived project name shared by every invocation, and it
