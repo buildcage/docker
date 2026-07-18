@@ -57,8 +57,9 @@ The `run` action's own isolation mechanism (`run-isolated.sh`) uses Linux-only p
 container's PID/netns via `/proc` — close enough to the real "runner host + separate proxy
 container" arrangement for day-to-day iteration, though it can't validate the container-boundary
 parts of production (see [Run Action Internals](#run-action-internals) below). CI's
-`test_sandbox` job runs `run-isolated.sh` directly on the runner host instead, matching production
-exactly — treat that as the final word on whether a change actually works, not this dev loop.
+`test_sandbox_*` e2e jobs run `run-isolated.sh` directly on the runner host instead, matching
+production exactly — treat those as the final word on whether a change actually works, not this
+dev loop.
 
 ```bash
 make run_sandbox_mode   # start the proxy + dev-loop runner container
@@ -79,8 +80,11 @@ make test_explicit_restrict_mode
 
 `make test_sandbox_unit` runs the run action's Node.js unit tests
 (`node --test 'run/src/**/*.test.js'`); `make test_sandbox_mode` is the dev-loop end-to-end
-check described above. The CI-only `test_sandbox` end-to-end job (real runner host, no nested
-container) is described in [Run Action Internals](#run-action-internals) below.
+check described above; `make test_sandbox_integration` drives `run/dist/main.cjs` directly for
+checks that don't depend on the real action wrapper (see `run/test/integration-test-*.sh`) and
+is what CI's `test_sandbox` job in `test-integration.yml` runs. The CI-only `test_sandbox_*`
+end-to-end jobs (real runner host, no nested container) are described in
+[Run Action Internals](#run-action-internals) below.
 
 ## Explicit Engine Internals
 
@@ -202,7 +206,7 @@ Security Details and the [Reference](./reference.md#run-action) doc.
 
 Sigstore verification requires a real, published GHCR image, so the setup and run actions
 normally can't run against an unpublished branch or local changes. This repo's own CI (`test_action`
-and `test_sandbox` jobs in `.github/workflows/test-e2e.yml`) tests the real `setup`/`report`/`run`
+and `test_sandbox_*` jobs in `.github/workflows/test-e2e.yml`) tests the real `setup`/`report`/`run`
 actions end-to-end against a locally built image instead, via a build-time-gated mechanism:
 `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build` compiles `setup/dist/main.cjs` and `run/dist/main.cjs`
 where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
@@ -295,6 +299,7 @@ reports for the allowed side.
 | `make test_sandbox_mode` | Run a sample isolated command in the dev loop and verify isolation |
 | `make test_unit` | Run unit tests (includes `test_sandbox_unit`) |
 | `make test_sandbox_unit` | Run the run action's Node.js unit tests |
+| `make test_sandbox_integration` | Run the run action's integration tests (needs `BUILDCAGE_LOCAL_IMAGE_REF` and a test-hook build of `run/dist/main.cjs`) |
 | `make clean` | Remove all resources |
 
 ## Directory Structure

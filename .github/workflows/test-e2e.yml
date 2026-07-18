@@ -145,19 +145,70 @@ jobs:
       # No cleanup step: ephemeral runner, and setup's post-hook already
       # stops the container.
 
-  # Exercises the real run action end-to-end (uses: ./run) on the
-  # actual runner host — run-isolated.sh needs to unshare/veth/setpriv
-  # directly on the host, matching what happens in a real workflow, so
-  # (unlike test_action's Docker-build tests) this can't be validated inside
-  # a nested container the way the mac dev loop does (see run/dev/ and
-  # docs/development.md).
-  test_sandbox:
+  # Exercises the real run action end-to-end (uses: ./run) on the actual
+  # runner host — can't be validated inside a nested container (see
+  # run/dev/ and docs/development.md).
+  #
+  # Split into one job per case (test_sandbox_*) so each gets its own Job
+  # Summary section and status check. run-isolated.sh's own mechanics
+  # (privilege drop, filesystem defaults, writable: variations, concurrent
+  # lifecycles) are covered more cheaply in test-integration.yml instead.
+  #
+  # Verifies audit mode's Job Summary includes the auto-generated
+  # restrict-mode example (core/lib/build-example.js), mirroring `report`.
+  test_sandbox_audit_mode:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    name: "e2e: test (sandbox)"
+    name: "e2e: test (sandbox, audit mode)"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm
+
+      - name: Build local sandbox proxy image
+        run: docker compose build proxy
+
+      - name: Resolve local image ref
+        id: local_image
+        run: echo "ref=$(docker compose config --images proxy)" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild run action with the local-image test hook enabled
+        env:
+          BUILDCAGE_BUILD_TEST_HOOKS: "1"
+        run: pnpm build
+
+      - name: Run an isolated command in audit mode
+        uses: ./run
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+          BUILDCAGE_RUN_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-audit-summary.md
+        with:
+          proxy_mode: audit
+          run: |
+            wget -q -T 5 -O /dev/null http://example.com/
+            wget -q -T 5 -O /dev/null https://example.com/
+
+      - name: Verify the audit-mode report includes a restrict-mode example
+        env:
+          BUILDCAGE_RUN_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-audit-summary.md
+        run: ./run/test/assert-sandbox-audit.sh
+
+      # No cleanup step: run stops its own proxy container in its finally block.
+
+  test_sandbox_enforcement:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: "e2e: test (sandbox, enforcement)"
 
     steps:
       - name: Checkout
@@ -183,26 +234,18 @@ jobs:
         uses: ./run
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
-          # GITHUB_STEP_SUMMARY is unique per step and can't be reassigned —
-          # GitHub silently ignores attempts to override GITHUB_*/RUNNER_*
-          # env vars — so a later step has no way to read this step's copy
-          # back. Leave GITHUB_STEP_SUMMARY itself untouched (the real Job
-          # Summary page still shows this step's report) and additionally
-          # mirror it to this debug-only path a later step can check.
+          # A later step can't read this step's GITHUB_STEP_SUMMARY back
+          # (GitHub ignores attempts to reassign it), so mirror it here too.
           BUILDCAGE_RUN_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-test-summary.md
         with:
           allowed_https_rules: example.com:443
           allowed_http_rules: example.com:80
-          # This test intentionally triggers blocked connections (below) to
-          # verify enforcement — that's expected, not a failure, so don't
-          # let the default fail_on_blocked treat it as one.
+          # Blocked connections below are expected, not a failure.
           fail_on_blocked: false
+          # One representative writable: pattern through the real action;
+          # other writable: values are cheaper to check in test-integration.yml.
+          writable: /opt
           run: |
-            echo "=== capability / privilege-escalation checks ==="
-            grep -E 'CapEff|NoNewPrivs' /proc/self/status
-            grep -q '^CapEff:[[:space:]]*0000000000000000$' /proc/self/status
-            grep -q '^NoNewPrivs:[[:space:]]*1$' /proc/self/status
-
             echo "=== allowlisted HTTP host must be reachable ==="
             wget -q -T 5 -O /dev/null http://example.com/
 
@@ -223,54 +266,49 @@ jobs:
             fi
             echo "OK: example.org (HTTPS) correctly blocked"
 
-            echo "=== workspace/home/tmp must be writable by default ==="
-            echo x >> "$GITHUB_WORKSPACE/.buildcage-writable-test"
-            echo x >> "$HOME/.buildcage-writable-test"
-            echo x >> /tmp/.buildcage-writable-test
-
-            echo "=== everything else must be read-only by default ==="
-            if touch /opt/.buildcage-writable-test 2>/dev/null; then
-              echo "UNEXPECTED: /opt was writable without a writable: entry"
-              exit 1
-            fi
-            echo "OK: /opt correctly read-only"
-
-      - name: Run an isolated command with an extra writable directory
-        uses: ./run
-        env:
-          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
-        with:
-          writable: /opt
-          run: |
             echo "=== /opt must be writable when listed under writable: ==="
-            touch /opt/.buildcage-writable-test
-            rm -f /opt/.buildcage-writable-test
-
-      - name: Run an isolated command with writable set to / (restriction disabled)
-        uses: ./run
-        env:
-          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
-        with:
-          writable: /
-          run: |
-            echo "=== / must be fully writable when writable: / is set ==="
             touch /opt/.buildcage-writable-test
             rm -f /opt/.buildcage-writable-test
 
       - name: Verify the sandbox report contains the expected allowed/blocked entries
         if: always()
         env:
-          # Not GITHUB_STEP_SUMMARY: reassigning that reserved var is
-          # silently ignored by GitHub, so assert-sandbox.sh reads this
-          # debug-only mirror path directly instead (see the note on the
-          # step above).
+          # Same debug-only mirror as the step above, not GITHUB_STEP_SUMMARY.
           BUILDCAGE_RUN_DEBUG_SUMMARY_FILE: ${{ runner.temp }}/sandbox-test-summary.md
         run: ./run/test/assert-sandbox.sh
 
-      # fail_on_blocked defaults to true and is exercised nowhere above (the
-      # step above opts out of it to isolate the network-enforcement check
-      # from this one) — verify the default itself actually fails a step
-      # when a blocked connection occurs.
+      # No cleanup step: run stops its own proxy container in its finally block.
+
+  # fail_on_blocked defaults to true; verify a blocked connection actually
+  # fails the step (exit-code logic itself is already unit-tested).
+  test_sandbox_fail_on_blocked:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: "e2e: test (sandbox, fail_on_blocked)"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm
+
+      - name: Build local sandbox proxy image
+        run: docker compose build proxy
+
+      - name: Resolve local image ref
+        id: local_image
+        run: echo "ref=$(docker compose config --images proxy)" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild run action with the local-image test hook enabled
+        env:
+          BUILDCAGE_BUILD_TEST_HOOKS: "1"
+        run: pnpm build
+
       - name: Run an isolated command that triggers a blocked connection
         id: blocked_connection
         continue-on-error: true
@@ -292,18 +330,39 @@ jobs:
           fi
           echo "OK: fail_on_blocked correctly failed the step"
 
-      # Drives run/dist/main.cjs directly rather than through
-      # `uses: ./run` steps, so this doesn't depend on Actions'
-      # `parallel:` step keyword to prove true concurrency (see the
-      # `parallel:`-based step below for that Actions-level check).
-      - name: Run two sandbox proxy lifecycles concurrently (direct)
-        env:
-          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
-        run: ./run/test/assert-sandbox-concurrent.sh
+      # No cleanup step: run stops its own proxy container in its finally block.
 
-      # Actions-level counterpart to the direct test above: proves the fix
-      # also holds when concurrency comes from Actions' own `background`/
-      # `wait`/`parallel` step keywords rather than a bash `&`/`wait` pair.
+  # Proves container/network/Compose-project namespacing holds under
+  # Actions' own `parallel:` keyword; the direct-script counterpart is
+  # in test-integration.yml.
+  test_sandbox_concurrency:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: "e2e: test (sandbox, concurrency)"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm
+
+      - name: Build local sandbox proxy image
+        run: docker compose build proxy
+
+      - name: Resolve local image ref
+        id: local_image
+        run: echo "ref=$(docker compose config --images proxy)" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild run action with the local-image test hook enabled
+        env:
+          BUILDCAGE_BUILD_TEST_HOOKS: "1"
+        run: pnpm build
+
       - parallel:
           - name: sandbox-parallel-a
             id: parallel_a
@@ -348,8 +407,7 @@ jobs:
             exit 1
           fi
 
-      # No cleanup step: the run action stops its own throwaway proxy
-      # container in its own finally block (post.js is a fallback only).
+      # No cleanup step: run stops its own proxy container in its finally block.
 
   # Single, stably-named required status check for branch protection: the
   # jobs above vary their own names by matrix entry (e2e: test (action,
@@ -358,7 +416,15 @@ jobs:
   e2e-tests-passed:
     name: E2E tests passed
     runs-on: ubuntu-latest
-    needs: [changes, test_action, test_sandbox]
+    needs:
+      [
+        changes,
+        test_action,
+        test_sandbox_audit_mode,
+        test_sandbox_enforcement,
+        test_sandbox_fail_on_blocked,
+        test_sandbox_concurrency,
+      ]
     if: always()
     permissions: {}
     steps:
