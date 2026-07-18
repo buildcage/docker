@@ -87,8 +87,10 @@ function logRules(label, rules) {
 
 async function main() {
   const env = process.env;
-  const actionRef = env.GITHUB_ACTION_REF ?? "";
-  const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
+  // Empty (not `??`-catchable) for local-path `uses: ./run` invocations —
+  // mirrors report/src/main.js's fallback for the same case.
+  const actionRef = env.GITHUB_ACTION_REF || "v2";
+  const actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 
   const runInput = env.INPUT_RUN ?? "";
   if (!runInput.trim()) {

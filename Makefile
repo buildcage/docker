@@ -165,6 +165,16 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	@./setup/test/assert-explicit-restrict.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
+# Unlike test_{engine}_{mode}_mode above, this drives run/dist/main.cjs
+# directly (see run/test/integration-test-*.sh) since the run action
+# isolates a host command, not a Docker build.
+.PHONY: test_sandbox_integration
+test_sandbox_integration: ## Run the run action's integration tests (needs BUILDCAGE_LOCAL_IMAGE_REF and a test-hook build of run/dist/main.cjs)
+	@./run/test/integration-test-writable-dir.sh
+	@./run/test/integration-test-writable-disabled.sh
+	@./run/test/integration-test-defaults.sh
+	@./run/test/integration-test-concurrent.sh
+
 .PHONY: test_unit
 test_unit: test_setup test_report test_sandbox_unit test_qjs ## Run unit tests
 

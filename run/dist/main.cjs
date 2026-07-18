@@ -7144,7 +7144,6 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
   });
   if (!verifyOptions) return null;
   const tag = function(actionRef, proxyEngine = "transparent") {
-    if (!actionRef) return "";
     let base;
     return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
     "explicit" === proxyEngine || "proxy" === proxyEngine ? `${base}-${proxyEngine}` : base;
@@ -7414,7 +7413,7 @@ function logRules(label, rules) {
 }
 
 process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href) && async function() {
-  const env = process.env, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", runInput = env.INPUT_RUN ?? "";
+  const env = process.env, actionRef = env.GITHUB_ACTION_REF || "v2", actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", runInput = env.INPUT_RUN ?? "";
   if (!runInput.trim()) throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
   const {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo}) {
     let digest;
