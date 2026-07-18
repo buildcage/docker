@@ -11,11 +11,7 @@ const ruleTypeToParam = {
  * @param {Array<{host: string, port: string, ruleType: string}>} auditedRows
  * @param {string} actionRepo
  * @param {string} actionRef - the ref (tag or commit SHA) this action was invoked with
- * @param {{actionName?: string, runCommand?: string}} [options] - actionName
- *   selects which sub-action the example step uses ("setup" for the
- *   two-step setup+report flow, "run" for the self-contained run action);
- *   runCommand, only meaningful for actionName "run", is the original
- *   `run:` input to preserve in the example step.
+ * @param {{actionName?: string, runCommand?: string}} [options] - actionName: "setup" (default) or "run"; runCommand: the `run:` input, included only when actionName is "run"
  * @returns {string}
  */
 export function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName = "setup", runCommand } = {}) {
@@ -41,9 +37,8 @@ export function buildRestrictExample(auditedRows, actionRepo, actionRef, { actio
   yaml += "- name: Start Buildcage in restrict mode\n";
   yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`;
   yaml += "  with:\n";
-  // The `run` action is a single self-contained step, so its example must
-  // repeat the `run:` command alongside the mode switch to stay copy-pasteable
-  // (matches `run:`'s position as the first input in run/action.yml).
+  // `run` is a single self-contained step, so the example must repeat the
+  // run: command to stay copy-pasteable on its own.
   if (actionName === "run" && runCommand) {
     yaml += "    run: |\n";
     for (const line of runCommand.split(/\r?\n/)) {
