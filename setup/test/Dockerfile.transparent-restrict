@@ -88,10 +88,10 @@ RUN echo "=== [HTTP - missing-host-header] ===" && \
 
 # [npm install - allowed - registry.npmjs.org is in ALLOWED_HTTPS_RULES; no CA
 # workaround needed, unlike the explicit engine]
+COPY files/package.json files/package-lock.json /app/
 RUN echo "=== [npm install - allowed registry] ===" && \
-    mkdir -p /app && cd /app && \
-    (npm init -y >/dev/null 2>&1 && \
-     npm install --ignore-scripts express >/dev/null 2>&1 && \
+    cd /app && \
+    (npm ci --ignore-scripts >/dev/null 2>&1 && \
      echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
 
 # Network configuration check
