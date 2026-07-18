@@ -24,13 +24,13 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
 
 /**
  * Verifies image provenance and resolves the digest-pinned image ref for
- * the sandbox (buildkitd-less) proxy image, published under the `-sandbox`
+ * the run action's (buildkitd-less) proxy image, published under the `-proxy`
  * tag suffix (see imageTagFromRef in core/lib/verify-image.js).
  */
 async function resolveVerifiedImage({ actionRef, actionRepo }) {
   let digest;
   try {
-    digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine: "sandbox" });
+    digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine: "proxy" });
   } catch (e) {
     throw new SandboxError(e.message, e.code ?? "VERIFY_FAILED");
   }
@@ -106,7 +106,7 @@ async function main() {
     );
   }
   const { imageRef, pullPolicy } = localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo }));
-  console.log(`buildcage-sandbox image: ${imageRef}`);
+  console.log(`buildcage-proxy image: ${imageRef}`);
 
   const rules = buildACLRules({
     httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
@@ -122,7 +122,7 @@ async function main() {
 
   const writablePaths = parseWritablePaths(env.INPUT_WRITABLE);
 
-  // Each `sandbox` step gets its own throwaway proxy container — start, run
+  // Each `run` step gets its own throwaway proxy container — start, run
   // the isolated command, report, and stop, all within this one step —
   // rather than sharing one across steps in the same job.
   const containerName = generateContainerName();
@@ -137,12 +137,12 @@ async function main() {
 
   const composeEnv = {
     ...env,
-    SANDBOX_CONTAINER_NAME: containerName,
+    PROXY_CONTAINER_NAME: containerName,
     PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
     ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
-    BUILDCAGE_SANDBOX_IMAGE_REF: imageRef,
+    BUILDCAGE_PROXY_IMAGE_REF: imageRef,
   };
 
   execFileSync(

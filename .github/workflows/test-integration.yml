@@ -103,7 +103,7 @@ jobs:
         # Scoped to the services this job actually needs: builder, plus the
         # test-server/test-dns fixtures added by matrix.compose_file's
         # overlay (compose.test-{transparent,explicit}.yaml). compose.yaml
-        # also defines a sandbox service (see the sandbox action's own
+        # also defines a proxy service (see the run action's own
         # test_sandbox job) that this job has no reason to build/start.
         run: docker compose build builder test-server test-dns
 

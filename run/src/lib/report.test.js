@@ -1,11 +1,11 @@
 /**
- * Unit tests for sandbox/lib/report.js — specifically writeReport's
+ * Unit tests for run/lib/report.js — specifically writeReport's
  * exit-code semantics (see main.js's own `if (exitCode !== 0)` for the
  * other half: the isolated command's own exit code always fails the step
  * regardless of blocked connections, and this file's `process.exitCode = 1`
  * is only ever additive on top of that, never resetting it back to success).
  *
- * Run with: node --test sandbox/src/lib/report.test.js
+ * Run with: node --test run/src/lib/report.test.js
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { writeReport } from "./report.js";
 import { withScratchDir } from "./isolated-exec.js";
 
-// writeReport reads GITHUB_STEP_SUMMARY/BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE
+// writeReport reads GITHUB_STEP_SUMMARY/BUILDCAGE_RUN_DEBUG_SUMMARY_FILE
 // from process.env and mutates process.exitCode directly (mirroring what
 // main.js itself does) -- both are saved/restored per test so a test here
 // can never leak into another test in this file, another test file, or
@@ -39,7 +39,7 @@ function writeReportWithSummary(report, opts) {
     const summaryPath = join(dir, "summary.md");
     writeFileSync(summaryPath, "");
     process.env.GITHUB_STEP_SUMMARY = summaryPath;
-    delete process.env.BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE;
+    delete process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
     writeReport(report, opts);
     return process.exitCode;
   });

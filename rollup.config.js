@@ -35,14 +35,14 @@ const configs = [
   { input: "setup/src/post.js", file: "setup/dist/post.cjs", plugins: [] },
   { input: "report/src/main.js", file: "report/dist/main.cjs", plugins: [] },
   {
-    input: "sandbox/src/main.js",
-    file: "sandbox/dist/main.cjs",
+    input: "run/src/main.js",
+    file: "run/dist/main.cjs",
     // Pulls in setup/src/lib/verify-image.js, which uses sigstore the same
     // way setup/src/main.js does — same plugin set for the same reason.
     plugins: mainPlugins,
     inlineDynamicImports: true,
   },
-  { input: "sandbox/src/post.js", file: "sandbox/dist/post.cjs", plugins: [] },
+  { input: "run/src/post.js", file: "run/dist/post.cjs", plugins: [] },
 ];
 
 export default configs.map(

@@ -7149,7 +7149,7 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
     if (!actionRef) return "";
     let base;
     return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
-    "explicit" === proxyEngine || "sandbox" === proxyEngine ? `${base}-${proxyEngine}` : base;
+    "explicit" === proxyEngine || "proxy" === proxyEngine ? `${base}-${proxyEngine}` : base;
   }(actionRef, proxyEngine), regToken = await async function(registry, repo, basicAuth, _fetch = fetch) {
     const url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
     if (basicAuth) try {

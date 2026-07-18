@@ -1,7 +1,7 @@
 /**
- * Property-based tests for sandbox/main.js and its helpers.
+ * Property-based tests for run/main.js and its helpers.
  *
- * Run with: node --test sandbox/src/main.property.test.js
+ * Run with: node --test run/src/main.property.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

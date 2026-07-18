@@ -190,14 +190,14 @@ integration.
 For exactly how the `report` action extracts allowed/denied data from buildkitd's own logs, see
 [Viewing Logs](./development.md#viewing-logs) in the Development Guide.
 
-## Sandbox Action
+## Run Action
 
 > [!WARNING]
-> `sandbox` is an **experimental** action. It hasn't seen the same real-world exposure as the
+> `run` is an **experimental** action. It hasn't seen the same real-world exposure as the
 > `setup`/`report` build-isolation actions yet — see [Known Limitations](#known-limitations-1) below
 > before relying on it.
 
-The `sandbox` action ([Reference](./reference.md#sandbox-action)) applies the same isolation
+The `run` action ([Reference](./reference.md#run-action)) applies the same isolation
 technology as the `transparent` engine — bridge network, iptables redirect, DNS redirect,
 SNI/Host-based allowlist proxy — to an arbitrary `run:` command instead of a BuildKit `RUN` step.
 Its threat model differs from the two build engines above in one important way: the process being
@@ -210,7 +210,7 @@ socket, or reading another process's memory).
 ### Isolation Mechanisms
 
 - **Network namespace**: the isolated command runs in its own network namespace, connected to the
-  sandbox proxy container's bridge via a veth pair — the same enforcement `transparent` mode
+  proxy container's bridge via a veth pair — the same enforcement `transparent` mode
   applies to Docker `RUN` steps (iptables `REDIRECT`/`DROP`, DNS redirect, SNI/Host allowlist).
 - **Capability bounding set**: fully cleared (`setpriv --bounding-set=-all`) before the command
   executes. This is what actually makes privilege escalation impossible — even if the command
@@ -260,7 +260,7 @@ socket, or reading another process's memory).
   the capability-based model above. Not applied today; the isolation mechanisms above already
   close off the specific escape routes considered (privilege escalation, Docker-socket access,
   cross-namespace ptrace/memory access).
-- **Credential retrieval is intentionally not blocked**: `sandbox` restricts *where* the isolated
+- **Credential retrieval is intentionally not blocked**: `run` restricts *where* the isolated
   command can send network traffic and, since the filesystem is read-only outside
   `$GITHUB_WORKSPACE`/`$HOME`/`/tmp`, *where* it can persist a payload — but not what it reads. A
   compromised dependency can still read `~/.aws/credentials`, `~/.docker/config.json`, or similar
@@ -273,12 +273,12 @@ socket, or reading another process's memory).
 - **Rootful Docker assumed**: the isolation joins the proxy container's network namespace via its
   host-visible PID (`docker inspect .State.Pid`, entered as `/proc/<pid>/ns/net`). This assumes
   containers share the host PID namespace, as they do on the default GitHub-hosted runner setup.
-  Under rootless Docker or `userns-remap`, that PID may not be directly reachable, so the sandbox
+  Under rootless Docker or `userns-remap`, that PID may not be directly reachable, so `run`
   is not currently supported on those setups.
-- **Per-step overhead**: each `sandbox` step starts and stops its own proxy container, rather than
+- **Per-step overhead**: each `run` step starts and stops its own proxy container, rather than
   sharing one across steps in the same job — this keeps allowlists independently configurable per
   step and keeps the traffic report's step-to-container mapping unambiguous, at the cost of
-  container startup overhead on jobs with many `sandbox` steps.
+  container startup overhead on jobs with many `run` steps.
 
 ## Trusting the Buildcage Image
 

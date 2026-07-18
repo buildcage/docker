@@ -37,14 +37,14 @@ services:
       - PROXY_ENGINE=${PROXY_ENGINE:-transparent}
     restart: unless-stopped
 
-  # The sandbox action's proxy container (no buildkitd — see sandbox/docker/).
-  # A local-development counterpart to sandbox/compose.yaml (which the
+  # The run action's proxy container (no buildkitd — see run/docker/).
+  # A local-development counterpart to run/compose.yaml (which the
   # action itself uses with a verified, digest-pinned image ref).
-  sandbox:
-    container_name: ${SANDBOX_CONTAINER_NAME:-buildcage-sandbox}
+  proxy:
+    container_name: ${PROXY_CONTAINER_NAME:-buildcage-proxy}
     build:
       context: .
-      dockerfile: sandbox/docker/Dockerfile
+      dockerfile: run/docker/Dockerfile
     cap_add:
       - NET_ADMIN
     environment:

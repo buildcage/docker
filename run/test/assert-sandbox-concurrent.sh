@@ -1,6 +1,6 @@
 #!/bin/bash
-# Drives two sandbox proxy lifecycles directly against sandbox/dist/main.cjs
-# (rather than through two real `uses: ./sandbox` steps) so this test doesn't
+# Drives two sandbox proxy lifecycles directly against run/dist/main.cjs
+# (rather than through two real `uses: ./run` steps) so this test doesn't
 # depend on GitHub Actions' `parallel:` step keyword to prove true
 # concurrency — see test-e2e.yml's own `parallel:`-based test for the
 # Actions-level version of the same check.
@@ -19,7 +19,7 @@ run_instance() {
   GITHUB_WORKSPACE="$tmpdir" \
   GITHUB_STATE="$tmpdir/state.env" \
   GITHUB_STEP_SUMMARY="$tmpdir/summary.md" \
-  BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE="$tmpdir/debug-summary.md" \
+  BUILDCAGE_RUN_DEBUG_SUMMARY_FILE="$tmpdir/debug-summary.md" \
   BUILDCAGE_BUILD_TEST_HOOKS=1 \
   BUILDCAGE_LOCAL_IMAGE_REF="$BUILDCAGE_LOCAL_IMAGE_REF" \
   INPUT_ALLOWED_HTTPS_RULES="$https_rule" \
@@ -31,11 +31,11 @@ if wget -q -T 5 -O /dev/null $other_url 2>&1; then
   echo cross-talk: $other_url was reachable
   exit 1
 fi" \
-    node "$REPO_ROOT/sandbox/dist/main.cjs" > "$tmpdir/out.log" 2>&1
+    node "$REPO_ROOT/run/dist/main.cjs" > "$tmpdir/out.log" 2>&1
   echo $? > "$tmpdir/exit_code"
 }
 
-: "${BUILDCAGE_LOCAL_IMAGE_REF:?BUILDCAGE_LOCAL_IMAGE_REF must be set to the locally built sandbox image}"
+: "${BUILDCAGE_LOCAL_IMAGE_REF:?BUILDCAGE_LOCAL_IMAGE_REF must be set to the locally built proxy image}"
 touch "$TMP_A/state.env" "$TMP_B/state.env"
 
 run_instance "$TMP_A" "example.com:443" "https://example.com/" "https://example.net/" &
@@ -63,19 +63,19 @@ for label_dir in "A:$TMP_A" "B:$TMP_B"; do
   fi
 done
 
-LEFTOVER_CONTAINERS=$(docker ps -a --filter "name=buildcage-sandbox-" -q)
+LEFTOVER_CONTAINERS=$(docker ps -a --filter "name=buildcage-proxy-" -q)
 if [ -z "$LEFTOVER_CONTAINERS" ]; then
-  echo "  PASS  no leftover buildcage-sandbox-* containers"
+  echo "  PASS  no leftover buildcage-proxy-* containers"
 else
-  echo "  FAIL  leftover buildcage-sandbox-* containers: $LEFTOVER_CONTAINERS"
+  echo "  FAIL  leftover buildcage-proxy-* containers: $LEFTOVER_CONTAINERS"
   FAILURES=$((FAILURES + 1))
 fi
 
-LEFTOVER_NETWORKS=$(docker network ls --filter "name=buildcage-sandbox-" -q)
+LEFTOVER_NETWORKS=$(docker network ls --filter "name=buildcage-proxy-" -q)
 if [ -z "$LEFTOVER_NETWORKS" ]; then
-  echo "  PASS  no leftover buildcage-sandbox-* networks"
+  echo "  PASS  no leftover buildcage-proxy-* networks"
 else
-  echo "  FAIL  leftover buildcage-sandbox-* networks: $LEFTOVER_NETWORKS"
+  echo "  FAIL  leftover buildcage-proxy-* networks: $LEFTOVER_NETWORKS"
   FAILURES=$((FAILURES + 1))
 fi
 

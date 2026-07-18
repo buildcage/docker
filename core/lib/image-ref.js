@@ -5,7 +5,7 @@
  * integrity.
  *
  * Kept in its own module (rather than inside setup/src/main.js) so other
- * entry points (e.g. sandbox/src/main.js) can reuse it without also
+ * entry points (e.g. run/src/main.js) can reuse it without also
  * bundling setup/src/main.js's own self-invocation guard.
  */
 export function resolveBuildcageImageRef({ imageDigest, actionRepository }) {

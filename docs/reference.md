@@ -190,10 +190,10 @@ In restrict mode, the report step fails if blocked connections are detected, cau
 
 ---
 
-## Sandbox Action (`dash14/buildcage/sandbox`)
+## Run Action (`dash14/buildcage/run`)
 
 > [!WARNING]
-> `sandbox` is an **experimental** action — see
+> `run` is an **experimental** action — see
 > [Known Limitations](./security.md#known-limitations-1) in Security Details before relying on it.
 
 Runs an arbitrary command — not just a Docker build — with the same outbound network isolation as
@@ -203,7 +203,7 @@ build.
 
 ```yaml
 - name: Run tests with outbound network isolation
-  uses: dash14/buildcage/sandbox@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+  uses: dash14/buildcage/run@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
   with:
     proxy_mode: restrict
     allowed_https_rules: registry.npmjs.org:443
@@ -212,9 +212,9 @@ build.
       npm test
 ```
 
-Each `sandbox` step is self-contained: it starts its own throwaway proxy container, runs `run`
+Each `run` step is self-contained: it starts its own throwaway proxy container, runs `run`
 inside the isolated sandbox, appends a report section to the Job Summary, and stops the proxy
-container again — all within that one step. Using `sandbox` multiple times in the same job starts
+container again — all within that one step. Using `run` multiple times in the same job starts
 a fresh proxy container each time, so different steps can use different allowlists. This is also
 safe when those steps run truly concurrently via GitHub Actions' `background`/`wait`/`wait-all`/
 `parallel` step keywords — each step's proxy container, network, and Compose project are all
@@ -238,11 +238,11 @@ Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above.
 ### Passing Values to `run`
 
 Use the step's own `env:` (not a `with:` input) to pass values into `run` — exactly like a native
-`run:` step. `sandbox` forwards its whole process environment into the isolated command, so
+`run:` step. `run` forwards its whole process environment into the isolated command, so
 anything set via `env:` is available there too:
 
 ```yaml
-- uses: dash14/buildcage/sandbox@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+- uses: dash14/buildcage/run@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
   env:
     PR_TITLE: ${{ github.event.pull_request.title }}
   with:
@@ -257,12 +257,12 @@ shell runs, so an attacker-controlled value (a PR title, branch name, issue body
 arbitrary commands. Passing the same value through `env:` instead means it reaches the isolated
 command as a single environment variable, never interpreted as shell syntax. This is the same
 [script injection guidance](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#understanding-the-risk-of-script-injections)
-GitHub gives for any workflow, and applies to `sandbox`'s `run` exactly as it would to a native
-`run:` step.
+GitHub gives for any workflow, and applies to this action's `run` input exactly as it would to a
+native `run:` step.
 
 ### How It Works
 
-`sandbox` reuses the same isolation technology as the `transparent` engine (CNI-style bridge,
+`run` reuses the same isolation technology as the `transparent` engine (CNI-style bridge,
 iptables redirect, DNS redirect, SNI/Host-based allowlist proxy) but applies it to the runner host
 itself instead of a BuildKit `RUN` step:
 
@@ -286,13 +286,13 @@ Only `$GITHUB_WORKSPACE`, `$HOME`, and `/tmp` are writable by default — every 
 remounted read-only for the duration of the `run` command. This closes off using the filesystem to
 plant a payload for a later, non-sandboxed step in the same job (e.g. rewriting a binary earlier on
 `$PATH`); it doesn't restrict what the command can *read* (see
-[Known Limitations](./security.md#sandbox-action) in Security Details).
+[Known Limitations](./security.md#run-action) in Security Details).
 
 If `run` needs to write somewhere else — a tool-specific cache directory, for example — list it
 under `writable`:
 
 ```yaml
-- uses: dash14/buildcage/sandbox@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
+- uses: dash14/buildcage/run@5852b5758679ec16bf63411118c42850ce86d165 # v2.2.2
   with:
     writable: |
       /opt/some-tool/cache
@@ -306,7 +306,7 @@ To disable the read-only restriction entirely, set `writable` to `/`:
 ```
 
 > [!NOTE]
-> `sandbox` runs `run-isolated.sh` directly on the runner host (via `sudo -n`), so it requires a
+> `run` runs `run-isolated.sh` directly on the runner host (via `sudo -n`), so it requires a
 > Linux runner with passwordless `sudo` — this is the default on GitHub-hosted `ubuntu-*` runners.
 > It does not currently apply a seccomp profile, AppArmor/SELinux profile, or Landlock rules; see
-> [Security Details](./security.md#sandbox-action) for the full threat model and known limitations.
+> [Security Details](./security.md#run-action) for the full threat model and known limitations.

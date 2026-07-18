@@ -7147,7 +7147,7 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
     if (!actionRef) return "";
     let base;
     return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
-    "explicit" === proxyEngine || "sandbox" === proxyEngine ? `${base}-${proxyEngine}` : base;
+    "explicit" === proxyEngine || "proxy" === proxyEngine ? `${base}-${proxyEngine}` : base;
   }(actionRef, proxyEngine), regToken = await async function(registry, repo, basicAuth, _fetch = fetch) {
     const url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
     if (basicAuth) try {
@@ -7308,9 +7308,9 @@ function markdownTable(rows, {showReason: showReason = !1} = {}) {
 
 function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked} = {}) {
   const markdown = function(report, {stepLabel: stepLabel} = {}) {
-    if (null === report.mode) return `### 🧰 Sandbox${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
+    if (null === report.mode) return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
     const isAudit = "audit" === report.mode;
-    let markdown = `### 🧰 Sandbox${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
+    let markdown = `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
     if (isAudit) {
       const audited = report.sections.audited || [];
       audited.length > 0 && (markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n");
@@ -7331,7 +7331,7 @@ function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked
     stepLabel: stepLabel
   }), summaryFile = process.env.GITHUB_STEP_SUMMARY;
   summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown);
-  const debugSummaryFile = process.env.BUILDCAGE_SANDBOX_DEBUG_SUMMARY_FILE;
+  const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
   debugSummaryFile && node_fs.appendFileSync(debugSummaryFile, markdown);
   const annotation = Boolean(summaryFile) ? {
     notice(message) {
@@ -7385,7 +7385,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
       digest = await verifyImageDigest({
         actionRef: actionRef,
         actionRepo: actionRepo,
-        proxyEngine: "sandbox"
+        proxyEngine: "proxy"
       });
     } catch (e) {
       throw new SandboxError(e.message, e.code ?? "VERIFY_FAILED");
@@ -7403,7 +7403,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     actionRef: actionRef,
     actionRepo: actionRepo
   });
-  console.log(`buildcage-sandbox image: ${imageRef}`);
+  console.log(`buildcage-proxy image: ${imageRef}`);
   const rules = buildACLRules({
     httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
     httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
@@ -7411,17 +7411,17 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   });
   console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), 
   logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), console.log("::endgroup::");
-  const writablePaths = parseWritablePaths(env.INPUT_WRITABLE), containerName = `buildcage-sandbox-${node_crypto.randomBytes(4).toString("hex")}`, projectName = containerName, stateFile = env.GITHUB_STATE;
+  const writablePaths = parseWritablePaths(env.INPUT_WRITABLE), containerName = `buildcage-proxy-${node_crypto.randomBytes(4).toString("hex")}`, projectName = containerName, stateFile = env.GITHUB_STATE;
   stateFile && (node_fs.appendFileSync(stateFile, `container_name=${containerName}\n`), 
   node_fs.appendFileSync(stateFile, `project_name=${projectName}\n`));
   const composeEnv = {
     ...env,
-    SANDBOX_CONTAINER_NAME: containerName,
+    PROXY_CONTAINER_NAME: containerName,
     PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
     ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
-    BUILDCAGE_SANDBOX_IMAGE_REF: imageRef
+    BUILDCAGE_PROXY_IMAGE_REF: imageRef
   };
   node_child_process.execFileSync("docker", buildComposeUpArgs({
     composeFile: composeFile,

@@ -22,17 +22,17 @@ if (containerName && projectName) {
     buildComposeDownArgs({ composeFile: join(__dirname, "../compose.yaml"), projectName }),
     {
       stdio: "inherit",
-      env: { ...process.env, SANDBOX_CONTAINER_NAME: containerName },
+      env: { ...process.env, PROXY_CONTAINER_NAME: containerName },
     },
   );
 } else if (containerName) {
   // Without project_name, the only fallback compose can use is its
   // implicit, directory-derived project name — which every concurrent
-  // `sandbox` step in the job shares. Running `down` against it would risk
+  // `run` step in the job shares. Running `down` against it would risk
   // tearing down another step's still-running proxy container, the exact
   // collision this project-name scheme exists to prevent, so skip cleanup
   // instead.
   console.log(
-    `::warning::sandbox post-cleanup: container_name is set but project_name is missing from GITHUB_STATE; skipping cleanup to avoid targeting Compose's implicit, shared project name. Container ${containerName} may need manual removal.`,
+    `::warning::run post-cleanup: container_name is set but project_name is missing from GITHUB_STATE; skipping cleanup to avoid targeting Compose's implicit, shared project name. Container ${containerName} may need manual removal.`,
   );
 }

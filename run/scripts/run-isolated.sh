@@ -2,11 +2,11 @@
 # run-isolated.sh — run a command in a network-isolated sandbox.
 #
 # Creates a throwaway network/pid/mount/uts/ipc/cgroup namespace, wires a
-# veth pair into the buildcage-sandbox proxy container's "sandbox0" bridge,
+# veth pair into the buildcage-proxy container's "sandbox0" bridge,
 # strips all capabilities and privilege-escalation paths from the target
 # process, and execs the given script inside it.
 #
-# Must be run as root (invoked via `sudo -n` from the sandbox action).
+# Must be run as root (invoked via `sudo -n` from the run action).
 set -euo pipefail
 
 PROXY_PID=""

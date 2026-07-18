@@ -1,4 +1,4 @@
-# Mac-friendly dev-loop overlay for the sandbox action (see sandbox/dev/Dockerfile
+# Mac-friendly dev-loop overlay for the run action (see run/dev/Dockerfile
 # for why this exists and how it differs from production / CI's test_sandbox).
 #
 # Usage: make run_sandbox_mode / make test_sandbox_mode
@@ -6,7 +6,7 @@ services:
   sandbox-dev-runner:
     container_name: buildcage-sandbox-dev-runner
     build:
-      context: sandbox
+      context: run
       dockerfile: dev/Dockerfile
     pid: host
     cap_add:
@@ -17,9 +17,9 @@ services:
       - seccomp=unconfined
       - apparmor=unconfined
     volumes:
-      - ./sandbox/scripts/run-isolated.sh:/usr/local/bin/run-isolated.sh:ro
-      - ./sandbox/dev/smoke-test.sh:/usr/local/bin/smoke-test.sh:ro
+      - ./run/scripts/run-isolated.sh:/usr/local/bin/run-isolated.sh:ro
+      - ./run/dev/smoke-test.sh:/usr/local/bin/smoke-test.sh:ro
     depends_on:
-      sandbox:
+      proxy:
         condition: service_started
     restart: unless-stopped
