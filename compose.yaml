@@ -2,8 +2,8 @@ services:
   builder:
     container_name: ${BUILDER_NAME:-buildcage}
     build:
-      context: docker
-      dockerfile: ${PROXY_ENGINE:-transparent}/Dockerfile
+      context: .
+      dockerfile: setup/docker/${PROXY_ENGINE:-transparent}/Dockerfile
     # Instead of privileged: true, grant only the minimum privileges required
     # to run BuildKit and iptables. This avoids granting full device access
     # and unrestricted /sys write permissions that privileged mode includes.
@@ -37,14 +37,14 @@ services:
       - PROXY_ENGINE=${PROXY_ENGINE:-transparent}
     restart: unless-stopped
 
-  # The sandbox action's proxy container (no buildkitd — see docker/sandbox/).
+  # The sandbox action's proxy container (no buildkitd — see sandbox/docker/).
   # A local-development counterpart to sandbox/compose.yaml (which the
   # action itself uses with a verified, digest-pinned image ref).
   sandbox:
     container_name: ${SANDBOX_CONTAINER_NAME:-buildcage-sandbox}
     build:
-      context: docker
-      dockerfile: sandbox/Dockerfile
+      context: .
+      dockerfile: sandbox/docker/Dockerfile
     cap_add:
       - NET_ADMIN
     environment:

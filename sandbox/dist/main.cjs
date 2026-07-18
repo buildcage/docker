@@ -35,9 +35,9 @@ function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: a
   return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 
-class SetupError extends Error {
+class VerifyImageError extends Error {
   constructor(message, code) {
-    super(message), this.name = "SetupError", this.code = code;
+    super(message), this.name = "VerifyImageError", this.code = code;
   }
 }
 
@@ -51,15 +51,15 @@ async function fetchBundleFromManifestDigest(api, manifestDigest, headers, _fetc
         Accept: "application/vnd.oci.image.manifest.v1+json"
       }
     });
-    if (resp.status >= 500) throw new SetupError(`Transient error fetching bundle manifest: HTTP ${resp.status}`, "TRANSIENT");
-    if (401 === resp.status || 403 === resp.status) throw new SetupError(`Registry denied access to bundle manifest: HTTP ${resp.status}`, "TRANSIENT");
-    if (!resp.ok) throw new SetupError(`Failed to fetch bundle manifest: HTTP ${resp.status}`, "TRANSIENT");
+    if (resp.status >= 500) throw new VerifyImageError(`Transient error fetching bundle manifest: HTTP ${resp.status}`, "TRANSIENT");
+    if (401 === resp.status || 403 === resp.status) throw new VerifyImageError(`Registry denied access to bundle manifest: HTTP ${resp.status}`, "TRANSIENT");
+    if (!resp.ok) throw new VerifyImageError(`Failed to fetch bundle manifest: HTTP ${resp.status}`, "TRANSIENT");
     const layer = ((await resp.json()).layers ?? []).find(l => l.mediaType === BUNDLE_MEDIA_TYPE);
-    if (!layer) throw new SetupError("No Sigstore bundle layer found in bundle manifest", "NOT_FOUND");
+    if (!layer) throw new VerifyImageError("No Sigstore bundle layer found in bundle manifest", "NOT_FOUND");
     return fetchBundleBlob(api, layer.digest, headers, _fetch);
   } catch (err) {
-    if (err instanceof SetupError) throw err;
-    throw new SetupError(`Transient error fetching bundle manifest: ${err.message}`, "TRANSIENT");
+    if (err instanceof VerifyImageError) throw err;
+    throw new VerifyImageError(`Transient error fetching bundle manifest: ${err.message}`, "TRANSIENT");
   }
 }
 
@@ -68,13 +68,13 @@ async function fetchBundleBlob(api, blobDigest, headers, _fetch = fetch) {
     const resp = await _fetch(`${api}/blobs/${blobDigest}`, {
       headers: headers
     });
-    if (resp.status >= 500) throw new SetupError(`Transient error fetching bundle blob: HTTP ${resp.status}`, "TRANSIENT");
-    if (401 === resp.status || 403 === resp.status) throw new SetupError(`Registry denied access fetching bundle blob: HTTP ${resp.status}. For private repositories, ensure the runner is authenticated to the registry.`, "TRANSIENT");
-    if (!resp.ok) throw new SetupError(`Failed to fetch bundle blob: HTTP ${resp.status}`, "NOT_FOUND");
+    if (resp.status >= 500) throw new VerifyImageError(`Transient error fetching bundle blob: HTTP ${resp.status}`, "TRANSIENT");
+    if (401 === resp.status || 403 === resp.status) throw new VerifyImageError(`Registry denied access fetching bundle blob: HTTP ${resp.status}. For private repositories, ensure the runner is authenticated to the registry.`, "TRANSIENT");
+    if (!resp.ok) throw new VerifyImageError(`Failed to fetch bundle blob: HTTP ${resp.status}`, "NOT_FOUND");
     return resp.json();
   } catch (err) {
-    if (err instanceof SetupError) throw err;
-    throw new SetupError(`Transient error fetching bundle blob: ${err.message}`, "TRANSIENT");
+    if (err instanceof VerifyImageError) throw err;
+    throw new VerifyImageError(`Transient error fetching bundle blob: ${err.message}`, "TRANSIENT");
   }
 }
 
@@ -7094,26 +7094,26 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
   try {
     verifier.verify(signedEntity, policy);
   } catch (err) {
-    throw new SetupError(`Image provenance verification failed: ${err.message}`, "VERIFY_FAILED");
+    throw new VerifyImageError(`Image provenance verification failed: ${err.message}`, "VERIFY_FAILED");
   }
   !function(bundleJson, expectedDigest) {
     const dsse = bundleJson?.dsseEnvelope, payload = dsse?.payload;
-    if (!payload) throw new SetupError("Bundle is not a DSSE envelope or is missing a signed payload", "VERIFY_FAILED");
+    if (!payload) throw new VerifyImageError("Bundle is not a DSSE envelope or is missing a signed payload", "VERIFY_FAILED");
     try {
       const sl = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
       if ("application/vnd.in-toto+json" === dsse.payloadType) {
         const subjects = sl?.subject ?? [];
         if (!subjects.some(s => s?.digest?.sha256 && `sha256:${s.digest.sha256}` === expectedDigest)) {
           const found = subjects.map(s => s?.digest?.sha256 ? `sha256:${s.digest.sha256}` : null).filter(Boolean).join(", ") || "missing";
-          throw new SetupError(`Signed digest (${found}) does not match fetched digest (${expectedDigest}). The bundle may have been re-attached to a different image.`, "VERIFY_FAILED");
+          throw new VerifyImageError(`Signed digest (${found}) does not match fetched digest (${expectedDigest}). The bundle may have been re-attached to a different image.`, "VERIFY_FAILED");
         }
       } else {
         const signedDigest = sl?.critical?.image?.["docker-manifest-digest"];
-        if (!signedDigest || signedDigest !== expectedDigest) throw new SetupError(`Signed digest (${signedDigest ?? "missing"}) does not match fetched digest (${expectedDigest}). The bundle may have been re-attached to a different image.`, "VERIFY_FAILED");
+        if (!signedDigest || signedDigest !== expectedDigest) throw new VerifyImageError(`Signed digest (${signedDigest ?? "missing"}) does not match fetched digest (${expectedDigest}). The bundle may have been re-attached to a different image.`, "VERIFY_FAILED");
       }
     } catch (err) {
-      if (err instanceof SetupError) throw err;
-      throw new SetupError("Failed to parse signed payload from bundle", "VERIFY_FAILED");
+      if (err instanceof VerifyImageError) throw err;
+      throw new VerifyImageError("Failed to parse signed payload from bundle", "VERIFY_FAILED");
     }
   }(bundleJson, expectedDigest);
 }
@@ -7156,21 +7156,21 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
           Authorization: `Basic ${basicAuth}`
         }
       });
-      if (resp.status >= 500) throw new SetupError(`Transient error from ${registry} token endpoint: HTTP ${resp.status}`, "TRANSIENT");
+      if (resp.status >= 500) throw new VerifyImageError(`Transient error from ${registry} token endpoint: HTTP ${resp.status}`, "TRANSIENT");
       if (resp.ok) return (await resp.json()).token;
-      throw new SetupError(`Registry authentication failed: HTTP ${resp.status}. The credentials in Docker config may be expired — run \`docker login ${registry}\` again.`, "TOKEN_ERROR");
+      throw new VerifyImageError(`Registry authentication failed: HTTP ${resp.status}. The credentials in Docker config may be expired — run \`docker login ${registry}\` again.`, "TOKEN_ERROR");
     } catch (err) {
-      if (err instanceof SetupError) throw err;
-      throw new SetupError(`Transient error fetching registry token: ${err.message}`, "TRANSIENT");
+      if (err instanceof VerifyImageError) throw err;
+      throw new VerifyImageError(`Transient error fetching registry token: ${err.message}`, "TRANSIENT");
     }
     try {
       const resp = await _fetch(url);
-      if (resp.status >= 500) throw new SetupError(`Transient error from ${registry} token endpoint: HTTP ${resp.status}`, "TRANSIENT");
+      if (resp.status >= 500) throw new VerifyImageError(`Transient error from ${registry} token endpoint: HTTP ${resp.status}`, "TRANSIENT");
       if (resp.ok) return (await resp.json()).token;
-      throw new SetupError(`Failed to get registry token: HTTP ${resp.status}. The package may be private. Run \`docker login ${registry}\` (or use docker/login-action with 'packages: read') before this action.`, "TOKEN_ERROR");
+      throw new VerifyImageError(`Failed to get registry token: HTTP ${resp.status}. The package may be private. Run \`docker login ${registry}\` (or use docker/login-action with 'packages: read') before this action.`, "TOKEN_ERROR");
     } catch (err) {
-      if (err instanceof SetupError) throw err;
-      throw new SetupError(`Transient error fetching registry token: ${err.message}`, "TRANSIENT");
+      if (err instanceof VerifyImageError) throw err;
+      throw new VerifyImageError(`Transient error fetching registry token: ${err.message}`, "TRANSIENT");
     }
   }("ghcr.io", repoPath, function(_env = process.env, _readFileSync = node_fs.readFileSync) {
     try {
@@ -7190,16 +7190,16 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
         method: "HEAD",
         headers: headers
       });
-      if (404 === resp.status) throw new SetupError(`Docker image not found: ${registry}/${repo}:${tag}. Make sure the action ref corresponds to a published release.`, "NOT_FOUND");
-      if (resp.status >= 500) throw new SetupError(`Transient error fetching manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}`, "TRANSIENT");
-      if (401 === resp.status || 403 === resp.status) throw new SetupError(`Registry denied access to manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}. For private repositories, ensure the runner is authenticated to the registry.`, "TRANSIENT");
-      if (!resp.ok) throw new SetupError(`Failed to fetch manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}`, "TRANSIENT");
+      if (404 === resp.status) throw new VerifyImageError(`Docker image not found: ${registry}/${repo}:${tag}. Make sure the action ref corresponds to a published release.`, "NOT_FOUND");
+      if (resp.status >= 500) throw new VerifyImageError(`Transient error fetching manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}`, "TRANSIENT");
+      if (401 === resp.status || 403 === resp.status) throw new VerifyImageError(`Registry denied access to manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}. For private repositories, ensure the runner is authenticated to the registry.`, "TRANSIENT");
+      if (!resp.ok) throw new VerifyImageError(`Failed to fetch manifest for ${registry}/${repo}:${tag}: HTTP ${resp.status}`, "TRANSIENT");
       const digest = resp.headers.get("Docker-Content-Digest");
-      if (!digest) throw new SetupError(`No digest in manifest response for ${registry}/${repo}:${tag}`, "TRANSIENT");
+      if (!digest) throw new VerifyImageError(`No digest in manifest response for ${registry}/${repo}:${tag}`, "TRANSIENT");
       return digest;
     } catch (err) {
-      if (err instanceof SetupError) throw err;
-      throw new SetupError(`Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${err.message}`, "TRANSIENT");
+      if (err instanceof VerifyImageError) throw err;
+      throw new VerifyImageError(`Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${err.message}`, "TRANSIENT");
     }
   }("ghcr.io", repoPath, tag, regToken), bundle = await async function(registry, repo, digest, token, _fetch = fetch) {
     const api = `https://${registry}/v2/${repo}`, headers = {
@@ -7209,14 +7209,14 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
       const refResp = await _fetch(`${api}/referrers/${digest}?artifactType=${encodeURIComponent(BUNDLE_MEDIA_TYPE)}`, {
         headers: headers
       });
-      if (refResp.status >= 500) throw new SetupError(`Transient error from referrers API: HTTP ${refResp.status}`, "TRANSIENT");
+      if (refResp.status >= 500) throw new VerifyImageError(`Transient error from referrers API: HTTP ${refResp.status}`, "TRANSIENT");
       if (refResp.ok) {
         const manifest = ((await refResp.json()).manifests ?? []).find(m => m.artifactType === BUNDLE_MEDIA_TYPE);
         if (manifest) return fetchBundleFromManifestDigest(api, manifest.digest, headers, _fetch);
       }
     } catch (err) {
-      if (err instanceof SetupError) throw err;
-      throw new SetupError(`Transient error fetching referrers: ${err.message}`, "TRANSIENT");
+      if (err instanceof VerifyImageError) throw err;
+      throw new VerifyImageError(`Transient error fetching referrers: ${err.message}`, "TRANSIENT");
     }
     const fallbackTag = digest.replace(":", "-");
     try {
@@ -7226,10 +7226,10 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
           Accept: [ "application/vnd.oci.image.index.v1+json", "application/vnd.oci.image.manifest.v1+json" ].join(", ")
         }
       });
-      if (404 === tagResp.status || 400 === tagResp.status) throw new SetupError(`No Sigstore bundle found for digest ${digest}. The image may not have been signed with --new-bundle-format.`, "NOT_FOUND");
-      if (tagResp.status >= 500) throw new SetupError(`Transient error from fallback tag API: HTTP ${tagResp.status}`, "TRANSIENT");
-      if (401 === tagResp.status || 403 === tagResp.status) throw new SetupError(`Registry denied access to fallback tag: HTTP ${tagResp.status}. For private repositories, ensure the runner is authenticated to the registry.`, "TRANSIENT");
-      if (!tagResp.ok) throw new SetupError(`Unexpected error fetching fallback tag: HTTP ${tagResp.status}`, "NOT_FOUND");
+      if (404 === tagResp.status || 400 === tagResp.status) throw new VerifyImageError(`No Sigstore bundle found for digest ${digest}. The image may not have been signed with --new-bundle-format.`, "NOT_FOUND");
+      if (tagResp.status >= 500) throw new VerifyImageError(`Transient error from fallback tag API: HTTP ${tagResp.status}`, "TRANSIENT");
+      if (401 === tagResp.status || 403 === tagResp.status) throw new VerifyImageError(`Registry denied access to fallback tag: HTTP ${tagResp.status}. For private repositories, ensure the runner is authenticated to the registry.`, "TRANSIENT");
+      if (!tagResp.ok) throw new VerifyImageError(`Unexpected error fetching fallback tag: HTTP ${tagResp.status}`, "NOT_FOUND");
       const tagManifest = await tagResp.json();
       if (Array.isArray(tagManifest.manifests)) {
         for (const m of tagManifest.manifests) {
@@ -7247,14 +7247,14 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
           const layer = (sub.layers ?? []).find(l => l.mediaType === BUNDLE_MEDIA_TYPE);
           if (layer) return fetchBundleBlob(api, layer.digest, headers, _fetch);
         }
-        throw new SetupError(`No Sigstore bundle found for digest ${digest}. The image may not have been signed with --new-bundle-format.`, "NOT_FOUND");
+        throw new VerifyImageError(`No Sigstore bundle found for digest ${digest}. The image may not have been signed with --new-bundle-format.`, "NOT_FOUND");
       }
       const layer = (tagManifest.layers ?? []).find(l => l.mediaType === BUNDLE_MEDIA_TYPE);
-      if (!layer) throw new SetupError(`No Sigstore bundle found for digest ${digest}. The image may not have been signed with --new-bundle-format.`, "NOT_FOUND");
+      if (!layer) throw new VerifyImageError(`No Sigstore bundle found for digest ${digest}. The image may not have been signed with --new-bundle-format.`, "NOT_FOUND");
       return fetchBundleBlob(api, layer.digest, headers, _fetch);
     } catch (err) {
-      if (err instanceof SetupError) throw err;
-      throw new SetupError(`Transient error fetching fallback tag: ${err.message}`, "TRANSIENT");
+      if (err instanceof VerifyImageError) throw err;
+      throw new VerifyImageError(`Transient error fetching fallback tag: ${err.message}`, "TRANSIENT");
     }
   }("ghcr.io", repoPath, digest, regToken);
   return await verifyBundle(bundle, verifyOptions, digest), digest;
@@ -7475,7 +7475,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   } finally {
     try {
       const report = function(containerName) {
-        const jsonOutput = node_child_process.execFileSync("docker", [ "exec", containerName, "qjs", "-m", "/opt/buildcage/tools/transparent/report.js" ], {
+        const jsonOutput = node_child_process.execFileSync("docker", [ "exec", containerName, "qjs", "-m", "/opt/buildcage/scripts/report.js" ], {
           encoding: "utf8",
           stdio: [ "ignore", "pipe", "pipe" ]
         });

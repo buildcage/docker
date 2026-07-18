@@ -11,7 +11,7 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/^docker/transparent/Dockerfile$/"
+        "/^setup/docker/transparent/Dockerfile$/"
       ],
       "matchStrings": ["# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG CNI_VERSION=(?<currentValue>v[\\d.]+)"]
     },

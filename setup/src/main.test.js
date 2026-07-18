@@ -6,7 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveBuildcageImageRef } from "./lib/image-ref.js";
+import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
 import { buildACLRules, resolveProxyEngine } from "./main.js";
 
 // ---------------------------------------------------------------------------

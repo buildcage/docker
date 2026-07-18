@@ -2,18 +2,18 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildRules } from "../../docker/tools/shared/lib/rules.js";
+import { buildRules } from "../../core/shared/lib/rules.js";
 import { SetupError } from "./lib/errors.js";
-import { verifyImageDigest } from "./lib/verify-image.js";
-import { resolveBuildcageImageRef } from "./lib/image-ref.js";
+import { verifyImageDigest } from "../../core/lib/verify-image.js";
+import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
 
 // Gates a local-image override used only by this repo's own CI/dev testing
-// (see test_action in .github/workflows/test.yml), never by a consumer of a
-// published action. A normal build physically excludes
-// lib/local-image-override.js (rollup tree-shakes the dead import); the
+// (see test_action in .github/workflows/test-e2e.yml), never by a consumer of
+// a published action. A normal build physically excludes
+// core/lib/local-image-override.js (rollup tree-shakes the dead import); the
 // unit_test CI job also greps the built output as a backstop.
 const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1";
 
@@ -23,7 +23,12 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
  * (branch ref / local ./setup) — printed by the top-level catch.
  */
 async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }) {
-  const digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine });
+  let digest;
+  try {
+    digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine });
+  } catch (e) {
+    throw new SetupError(e.message, e.code ?? "VERIFY_FAILED");
+  }
   if (digest === null) {
     throw new SetupError(
       `Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. ` +
@@ -47,7 +52,7 @@ async function main() {
   console.log(`Proxy engine: ${proxyEngine}`);
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("./lib/local-image-override.js")).readLocalImageOverride(env)
+    ? (await import("../../core/lib/local-image-override.js")).readLocalImageOverride(env)
     : null;
   if (localOverride) {
     console.log(

@@ -31,26 +31,6 @@ function formatSeconds(iso) {
   return new Date(iso).toISOString().slice(11, 19) + "Z";
 }
 
-const requestLineDetailPattern = /^-\s+(\S+)\s+(\S+?)(?:\s+->\s+(\d+))?$/;
-
-function parseAllowedRequestsFromText(text) {
-  const entries = [], lines = text.split("\n");
-  for (let i = 0; i < lines.length; i++) if ("proxy network requests:" === lines[i].trim()) for (let j = i + 1; j < lines.length; j++) {
-    const m = lines[j].match(requestLineDetailPattern);
-    if (!m) break;
-    const [, method, url, status] = m;
-    entries.push(void 0 === status ? {
-      method: method,
-      url: url
-    } : {
-      method: method,
-      url: url,
-      status: Number(status)
-    });
-  }
-  return entries;
-}
-
 const DEFAULT_PORT = {
   https: "443",
   http: "80"
@@ -76,6 +56,26 @@ const runVertexPattern = /^\[([^\]]+)\]\s+RUN\s/;
 function stageKeyOf(bracketContent) {
   const parts = bracketContent.trim().split(/\s+/);
   return parts.length > 1 ? parts[0] : "";
+}
+
+const requestLineDetailPattern = /^-\s+(\S+)\s+(\S+?)(?:\s+->\s+(\d+))?$/;
+
+function parseAllowedRequestsFromText(text) {
+  const entries = [], lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) if ("proxy network requests:" === lines[i].trim()) for (let j = i + 1; j < lines.length; j++) {
+    const m = lines[j].match(requestLineDetailPattern);
+    if (!m) break;
+    const [, method, url, status] = m;
+    entries.push(void 0 === status ? {
+      method: method,
+      url: url
+    } : {
+      method: method,
+      url: url,
+      status: Number(status)
+    });
+  }
+  return entries;
 }
 
 function aggregateAllowedHosts(builds, decision) {
@@ -117,7 +117,7 @@ const __dirname$1 = node_path.dirname(node_url.fileURLToPath("undefined" == type
 let jsonOutput;
 
 try {
-  jsonOutput = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "sh", "-c", "qjs -m /opt/buildcage/tools/transparent/report.js 2>/dev/null || qjs -m /opt/buildcage/tools/explicit/report.js" ], {
+  jsonOutput = node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "exec", "builder", "sh", "-c", "qjs -m /opt/buildcage/scripts/report.js" ], {
     encoding: "utf8",
     stdio: [ "ignore", "pipe", "pipe" ],
     env: composeEnv

@@ -1,7 +1,7 @@
 COMPOSE_FILE ?= compose.yaml
-# Overridable so test_explicit_*_mode can clean up compose.test-explicit.yaml's
+# Overridable so test_explicit_*_mode can clean up setup/compose.test-explicit.yaml's
 # containers/images instead of the default transparent-engine test overlay.
-TEST_COMPOSE_FILE ?= compose.test-transparent.yaml
+TEST_COMPOSE_FILE ?= setup/compose.test-transparent.yaml
 
 # Self-Documented Makefile
 .PHONY: help
@@ -86,7 +86,7 @@ run_sandbox_mode: ## Start sandbox proxy + dev runner (mac-friendly dev loop)
 	@echo "Starting buildcage sandbox (dev loop)..."
 	@ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-example.com:443}" \
 	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-example.com:80}" \
-	  docker compose -f compose.yaml -f compose.sandbox-dev.yaml up -d --build --wait sandbox sandbox-dev-runner
+	  docker compose -f compose.yaml -f sandbox/compose.sandbox-dev.yaml up -d --build --wait sandbox sandbox-dev-runner
 	@echo "Proxy container:  buildcage-sandbox"
 	@echo "Dev runner:       buildcage-sandbox-dev-runner"
 	@echo "Try: make test_sandbox_mode"
@@ -95,75 +95,75 @@ run_sandbox_mode: ## Start sandbox proxy + dev runner (mac-friendly dev loop)
 test_sandbox_mode: ## Run a sample isolated command in the dev loop and verify isolation
 	@$(MAKE) run_sandbox_mode
 	@PROXY_PID=$$(docker inspect --format '{{.State.Pid}}' buildcage-sandbox); \
-	  docker compose -f compose.yaml -f compose.sandbox-dev.yaml exec sandbox-dev-runner \
+	  docker compose -f compose.yaml -f sandbox/compose.sandbox-dev.yaml exec sandbox-dev-runner \
 	    run-isolated.sh --proxy-pid $$PROXY_PID --uid 1000 --gid 1000 \
 	    --gateway 172.20.0.1 --dns 172.20.0.1 -- /usr/local/bin/smoke-test.sh
 	@$(MAKE) clean_sandbox_mode
 
 .PHONY: clean_sandbox_mode
 clean_sandbox_mode: ## Stop and remove the sandbox dev-loop containers
-	@docker compose -f compose.yaml -f compose.sandbox-dev.yaml down -v --rmi local
+	@docker compose -f compose.yaml -f sandbox/compose.sandbox-dev.yaml down -v --rmi local
 
 # ---------------------------------------------------------------------------
 # test_{engine}_{mode}_mode — run_{engine}_{mode}_mode + build the matching
-# test/Dockerfile.* + verify + clean up. One target per combination.
+# setup/test/Dockerfile.* + verify + clean up. One target per combination.
 # ---------------------------------------------------------------------------
 
 .PHONY: test_transparent_audit_mode
 test_transparent_audit_mode: ## Run transparent-engine audit mode tests
 	@echo "Running transparent-engine audit mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
+	@COMPOSE_FILE=compose.yaml:setup/compose.test-transparent.yaml \
 	  $(MAKE) run_transparent_audit_mode
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.transparent-audit test/ \
+	  --progress=plain -f setup/test/Dockerfile.transparent-audit setup/test/ \
 	  --load -t buildcage-test
 	@node report/src/main.js ./compose.yaml
-	@./test/assert-transparent-audit.sh
+	@./setup/test/assert-transparent-audit.sh
 	@$(MAKE) clean
 
 .PHONY: test_transparent_restrict_mode
 test_transparent_restrict_mode: ## Run transparent-engine restrict mode tests
 	@echo "Running transparent-engine restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
+	@COMPOSE_FILE=compose.yaml:setup/compose.test-transparent.yaml \
 	  $(MAKE) run_transparent_restrict_mode
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.transparent-restrict test/ \
+	  --progress=plain -f setup/test/Dockerfile.transparent-restrict setup/test/ \
 	  --load -t buildcage-test
 	@node report/src/main.js ./compose.yaml || true
-	@./test/assert-transparent-restrict.sh
+	@./setup/test/assert-transparent-restrict.sh
 	@$(MAKE) clean
 
 .PHONY: test_explicit_audit_mode
 test_explicit_audit_mode: ## Run explicit-engine audit mode tests
 	@echo "Running explicit-engine audit mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-explicit.yaml \
+	@COMPOSE_FILE=compose.yaml:setup/compose.test-explicit.yaml \
 	  $(MAKE) run_explicit_audit_mode
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.explicit-audit test/ \
+	  --progress=plain -f setup/test/Dockerfile.explicit-audit setup/test/ \
 	  --load -t buildcage-test
 	@PROXY_ENGINE=explicit node report/src/main.js ./compose.yaml || true
-	@./test/assert-explicit-audit.sh
-	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean
+	@./setup/test/assert-explicit-audit.sh
+	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
 .PHONY: test_explicit_restrict_mode
 test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	@echo "Running explicit-engine restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-explicit.yaml \
+	@COMPOSE_FILE=compose.yaml:setup/compose.test-explicit.yaml \
 	  $(MAKE) run_explicit_restrict_mode
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.explicit-restrict test/ \
+	  --progress=plain -f setup/test/Dockerfile.explicit-restrict setup/test/ \
 	  --load -t buildcage-test
 	@PROXY_ENGINE=explicit node report/src/main.js ./compose.yaml || true
-	@./test/assert-explicit-restrict.sh
-	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean
+	@./setup/test/assert-explicit-restrict.sh
+	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
 .PHONY: test_unit
 test_unit: test_setup test_report test_sandbox_unit test_qjs ## Run unit tests
@@ -180,21 +180,25 @@ test_report: ## Run report unit tests
 test_sandbox_unit: ## Run sandbox action unit tests
 	@node --test 'sandbox/src/**/*.test.js'
 
+# *.test.js is excluded from the built images (see .dockerignore), so bind-mount it back in for qjs to exec.
+# qjs itself and the scripts/shared sources are identical across images, so one representative build
+# (setup's transparent engine) is enough. core/scripts and setup/docker/explicit/scripts both map to
+# /opt/buildcage/scripts in their respective (mutually exclusive) images, so the latter is mounted at
+# an alias here to avoid colliding with the former in this single test container.
+QJS_MOUNTS := \
+	-v "$(CURDIR)/core/scripts:/opt/buildcage/scripts:ro" \
+	-v "$(CURDIR)/core/shared:/opt/buildcage/shared:ro" \
+	-v "$(CURDIR)/setup/docker/explicit/scripts:/opt/buildcage/explicit-scripts:ro"
+QJS_TEST_DIRS := \
+	/opt/buildcage/scripts/lib \
+	/opt/buildcage/shared/lib \
+	/opt/buildcage/explicit-scripts/lib
+
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker
-	@docker build -f docker/transparent/Dockerfile -t buildcage-qjs-test docker
-	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/shared/lib/rules.test.js
-	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/shared/lib/aggregate.test.js
-	@docker run --rm --entrypoint qjs buildcage-qjs-test -m /opt/buildcage/tools/transparent/lib/log-parser.test.js
-	@docker build -f docker/explicit/Dockerfile -t buildcage-qjs-test-explicit docker
-	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/shared/lib/rules.test.js
-	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/shared/lib/aggregate.test.js
-	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/explicit/lib/source-policy.test.js
-	@docker run --rm --entrypoint qjs buildcage-qjs-test-explicit -m /opt/buildcage/tools/explicit/lib/buildkitd-log-parser.test.js
-	@docker build -f docker/sandbox/Dockerfile -t buildcage-qjs-test-sandbox docker
-	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/shared/lib/rules.test.js
-	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/shared/lib/aggregate.test.js
-	@docker run --rm --entrypoint qjs buildcage-qjs-test-sandbox -m /opt/buildcage/tools/transparent/lib/log-parser.test.js
+	@docker build -f setup/docker/transparent/Dockerfile -t buildcage-qjs-test .
+	@docker run --rm --entrypoint qjs $(QJS_MOUNTS) buildcage-qjs-test \
+		-m /opt/buildcage/shared/test/run-tests.js $(QJS_TEST_DIRS)
 
 .PHONY: test_audit_example
 run_audit_example: ## Run audit mode example tests

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { buildRestrictExample } from "./lib/build-example.js";
 import { renderCommunicationDetails } from "./lib/command-log.js";
 import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.js";
-import { createAnnotation } from "./lib/annotation.js";
+import { createAnnotation } from "../../core/lib/annotation.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,14 +21,11 @@ const composeEnv = {
 
 let jsonOutput;
 try {
-  // Works unmodified against either engine without needing to know which one
-  // is running, same as the raw-log step below: try transparent's report.js,
-  // then explicit's.
   jsonOutput = execFileSync(
     "docker",
     [
       "compose", "-f", composeFile, "exec", "builder", "sh", "-c",
-      "qjs -m /opt/buildcage/tools/transparent/report.js 2>/dev/null || qjs -m /opt/buildcage/tools/explicit/report.js",
+      "qjs -m /opt/buildcage/scripts/report.js",
     ],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
   );
@@ -91,7 +88,7 @@ const actionRef = process.env.GITHUB_ACTION_REF || "v2";
 const isAudit = report.mode === "audit";
 
 // report.deniedTimeline is only present in explicit engine's report.js output
-// (see docker/tools/explicit/report.js) — transparent mode has neither this
+// (see setup/docker/explicit/scripts/report.js) — transparent mode has neither this
 // nor a per-command breakdown to offer at all (its ACL log has no per-command
 // boundary), so `isExplicit` gates both the allowed/audited table's source
 // below and the Communication details section further down.

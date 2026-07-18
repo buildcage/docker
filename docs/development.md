@@ -28,9 +28,9 @@ ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make run_tran
 
 The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/DNS-redirect/HAProxy
 stack (see [Proxy Engines](./reference.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
-`docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
-`build.dockerfile: ${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
-`docker/transparent/Dockerfile` exactly as before.
+`setup/docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
+`build.dockerfile: setup/docker/${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
+`setup/docker/transparent/Dockerfile` exactly as before.
 
 ### End-to-End Workflow
 
@@ -53,7 +53,7 @@ make clean
 The `sandbox` action's own isolation mechanism (`run-isolated.sh`) uses Linux-only primitives
 (`unshare`, `nsenter`, `setpriv`) that can't run natively on macOS. `make run_sandbox_mode` /
 `make test_sandbox_mode` instead drive it from inside a container with `pid: host` (see
-`sandbox/dev/Dockerfile` and `compose.sandbox-dev.yaml`), which can see the sandbox proxy
+`sandbox/dev/Dockerfile` and `sandbox/compose.sandbox-dev.yaml`), which can see the sandbox proxy
 container's PID/netns via `/proc` — close enough to the real "runner host + separate proxy
 container" arrangement for day-to-day iteration, though it can't validate the container-boundary
 parts of production (see [Sandbox Action Internals](#sandbox-action-internals) below). CI's
@@ -68,7 +68,7 @@ make test_sandbox_mode  # run a sample isolated command and verify allow/block +
 ## Testing
 
 Each `run_{engine}_{mode}_mode` target has a matching `test_{engine}_{mode}_mode` target
-(start → build the matching `test/Dockerfile.*` → verify → clean up):
+(start → build the matching `setup/test/Dockerfile.*` → verify → clean up):
 
 ```bash
 make test_transparent_audit_mode
@@ -88,7 +88,7 @@ This section covers how `proxy_engine: explicit` is implemented internally. For 
 behavior — what's enforced, what's visible in the report — see
 [Explicit Proxy Engine](./security.md#explicit-proxy-engine) in Security Details.
 
-- A small statically-linked Go binary (`docker/explicit/buildkit-proxy/`) is the image's entrypoint
+- A small statically-linked Go binary (`setup/docker/explicit/buildkit-proxy/`) is the image's entrypoint
   (PID 1) and directly supervises the real `buildkitd` as a child process. `RUN` steps are isolated
   into their own point-to-point network namespace by `proxyNetwork = true`, built directly on
   netlink/veth rather than CNI.
@@ -121,18 +121,18 @@ This section covers how the `sandbox` action (`sandbox/`) is implemented interna
 user-facing behavior and threat model, see [Sandbox Action](./security.md#sandbox-action) in
 Security Details and the [Reference](./reference.md#sandbox-action) doc.
 
-- `docker/sandbox/` is a stripped-down build of the `transparent` engine's image with `buildkitd`
+- `sandbox/docker/` is a stripped-down build of the `transparent` engine's image with `buildkitd`
   removed entirely — only the bridge (`sandbox0`, not `buildkit0` — there's no BuildKit here to
   share the name with), iptables `REDIRECT`/`DROP` rules, dnsmasq, and HAProxy remain. Since
   BuildKit's CNI integration normally creates that bridge, a new `init-cni-bridge` s6 service
-  (`docker/sandbox/files/s6-scripts/init-cni-bridge`) creates it directly via `ip link add ... type
-  bridge` instead. `docker/sandbox/files/s6-scripts/init-iptables` is `docker/transparent`'s script
-  with the bridge name swapped; `init-haproxy-cfg`, `dnsmasq.conf`, and `haproxy.cfg.template` are
-  unmodified copies.
+  (`sandbox/docker/files/s6-scripts/init-cni-bridge`) creates it directly via `ip link add ... type
+  bridge` instead. `sandbox/docker/files/s6-scripts/init-iptables` is `setup/docker/transparent`'s
+  script with the bridge name swapped; `init-haproxy-cfg`, `dnsmasq.conf`, and `haproxy.cfg.template`
+  are unmodified copies.
 - `sandbox/action.yml` is a `node24` action (`main` + `post`, mirroring `setup`'s shape). Each
   invocation is fully self-contained — `sandbox/src/main.js` verifies and pulls the proxy image
   (same Sigstore flow as `setup`, published under the `-sandbox` tag suffix — see
-  `imageTagFromRef` in `setup/src/lib/verify-image.js`), starts a uniquely-named throwaway proxy
+  `imageTagFromRef` in `core/lib/verify-image.js`), starts a uniquely-named throwaway proxy
   container, runs the isolated command, appends this step's report section to the Job Summary, and
   stops the container again, all inside `main`'s own `try`/`finally`. `sandbox/src/post.js` is a
   fallback only — it reads the container name and Compose project name back from `GITHUB_STATE`
@@ -190,9 +190,9 @@ Security Details and the [Reference](./reference.md#sandbox-action) doc.
      1 ignores the default-terminate action for signals it hasn't installed a handler for, so
      `SIGTERM` alone leaves it running forever. Only `SIGKILL` (which can't be caught or ignored)
      reliably tears it down.
-- The report step (`sandbox/src/lib/report.js`) reuses `docker/tools/transparent/report.js` and
-  `docker/tools/shared/lib/aggregate.js` unmodified via `docker exec <container> qjs -m
-  /opt/buildcage/tools/transparent/report.js` — the sandbox proxy always runs the `transparent`
+- The report step (`sandbox/src/lib/report.js`) reuses `core/scripts/report.js` and
+  `core/shared/lib/aggregate.js` unmodified via `docker exec <container> qjs -m
+  /opt/buildcage/scripts/report.js` — the sandbox proxy always runs the `transparent`
   engine's HAProxy log format, so there's no `explicit`-engine branch to handle here the way
   `report/src/main.js` has to.
 
@@ -206,7 +206,7 @@ and `test_sandbox` jobs in `.github/workflows/test-e2e.yml`) tests the real `set
 actions end-to-end against a locally built image instead, via a build-time-gated mechanism:
 `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build` compiles `setup/dist/main.cjs` and `sandbox/dist/main.cjs`
 where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
-module (`setup/src/lib/local-image-override.js`, shared by both actions), loaded only via a
+module (`core/lib/local-image-override.js`, shared by both actions), loaded only via a
 dynamic `import()` gated by that build-time flag. Without the flag (i.e. every normal/committed
 build), rollup's own module-graph tree-shaking excludes that entire file from the bundle — it's
 physically absent, not just unreachable. A CI check (`unit_test` job) additionally confirms a normal
@@ -304,7 +304,18 @@ reports for the allowed side.
 ├── setup/                    # GitHub Actions setup action
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs, dist/post.cjs)
 │   ├── src/                  # Source (ESM): verify image provenance, resolve image ref, compose up
-│   └── dist/                 # Bundled output (rollup → CommonJS)
+│   ├── dist/                 # Bundled output (rollup → CommonJS)
+│   ├── compose.yaml          # Runtime compose file the action itself uses (verified, digest-pinned
+│   │                         # image ref) — distinct from the top-level compose.yaml below
+│   ├── docker/               # proxy_engine build contexts
+│   │   ├── transparent/      # proxy_engine: transparent — Dockerfile + BuildKit/haproxy/dnsmasq/
+│   │   │                     # s6-overlay config
+│   │   └── explicit/         # proxy_engine: explicit — Dockerfile + buildkit-proxy/ (Go module:
+│   │                         # entrypoint/PID1, supervises buildkitd, injects the source policy
+│   │                         # into Solve via a gRPC proxy) + scripts/ (QuickJS report/policy tools)
+│   ├── test/                 # Dockerfile.*/assert-*.sh per {engine}-{mode} combination, plus
+│   │                         # test-server(-explicit)/test-dns(-explicit) fixture containers
+│   └── compose.test-*.yaml   # Test override config, one per engine
 ├── report/                   # GitHub Actions report action
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
@@ -314,26 +325,25 @@ reports for the allowed side.
 │   ├── src/                  # Source (ESM): start proxy, run isolated command, report, stop
 │   ├── dist/                 # Bundled output (rollup → CommonJS)
 │   ├── scripts/run-isolated.sh  # unshare/veth/setpriv isolation, invoked via `sudo -n`
+│   ├── compose.yaml          # Runtime compose file the action itself uses (verified, digest-pinned
+│   │                         # image ref)
+│   ├── docker/               # sandbox action's proxy image — transparent's bridge/iptables/
+│   │                         # dnsmasq/HAProxy stack with buildkitd removed entirely
+│   ├── test/                 # assert-sandbox*.sh (checks the sandbox action's Job Summary and
+│   │                         # concurrent-execution behavior)
+│   ├── compose.sandbox-dev.yaml  # Mac dev-loop overlay for the sandbox action (see dev/)
 │   └── dev/                  # Mac dev-loop-only Dockerfile + smoke-test.sh (see
 │                             # compose.sandbox-dev.yaml) — not used in production or CI
-├── docker/
-│   ├── tools/                # QuickJS scripts shared by the built images (shared/, transparent/,
-│   │                         # explicit/ — each engine's rule/log/policy parsing and its tests)
-│   ├── transparent/          # proxy_engine: transparent — Dockerfile + BuildKit/haproxy/dnsmasq/
-│   │                         # s6-overlay config
-│   ├── explicit/             # proxy_engine: explicit — Dockerfile + buildkit-proxy/ (Go module:
-│   │                         # entrypoint/PID1, supervises buildkitd, injects the source policy
-│   │                         # into Solve via a gRPC proxy)
-│   └── sandbox/              # sandbox action's proxy image — transparent's bridge/iptables/
-│                             # dnsmasq/HAProxy stack with buildkitd removed entirely
+├── core/                     # Code shared across actions
+│   ├── lib/                  # Image verification: Sigstore, OCI registry lookups, image ref
+│   │                         # resolution, local-image test-hook override
+│   ├── scripts/              # QuickJS report/rule-conversion scripts, run inside the built images
+│   │                         # (COPYed into /opt/buildcage/scripts/)
+│   └── shared/               # Rule/log parsing + aggregation shared by scripts/ and report/;
+│                             # shared/test/ is a qjs test runner + node:test shim
 ├── docs/                     # development.md, rules.md, security.md, self-hosting.md
-├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode} combination, plus
-│                             # test-server(-explicit)/test-dns(-explicit) fixture containers,
-│                             # and assert-sandbox.sh (checks the sandbox action's Job Summary)
-├── compose.yaml              # Docker Compose config (dockerfile path selected by PROXY_ENGINE;
-│                             # also defines the local-dev `sandbox` service)
-├── compose.test-*.yaml       # Test override config, one per engine
-├── compose.sandbox-dev.yaml  # Mac dev-loop overlay for the sandbox action (see sandbox/dev/)
+├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
+│                             # PROXY_ENGINE; also defines the local-dev `sandbox` service)
 └── Makefile                  # Operational commands
 ```
 
