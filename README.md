@@ -172,6 +172,8 @@ Not sure which to use? See the [engine comparison](./docs/reference.md#proxy-eng
 doc, and [Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine) for the full technical
 detail.
 
+See the [complete example workflow](.github/workflows/example-explicit.yml).
+
 > [!IMPORTANT]
 > Buildcage controls *where* your builds can connect, not *what code* they run. If a malicious package is delivered through a legitimate repository (e.g., a compromised npm package hosted on `registry.npmjs.org`), Buildcage cannot detect or prevent it — the connection goes to an allowed domain.
 >
