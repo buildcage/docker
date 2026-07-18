@@ -215,6 +215,34 @@ describe("parseVertexAllowedLog", () => {
     });
     assert.deepEqual(parseVertexAllowedLog(rawJson), []);
   });
+
+  it("merges vertexes and logs when buildctl emits multiple newline-separated JSON documents instead of one blob", () => {
+    const doc1 = JSON.stringify({
+      vertexes: [{ digest: "d1", name: "[1/2] RUN echo one", started: "2026-01-01T00:00:00.000Z", completed: "2026-01-01T00:00:00.050Z" }],
+      logs: [{ vertex: "d1", stream: 2, timestamp: "2026-01-01T00:00:00.010Z", data: encode("proxy network requests:\n- GET https://one.example.com/ -> 200\n") }],
+    });
+    const doc2 = JSON.stringify({
+      vertexes: [{ digest: "d2", name: "[2/2] RUN echo two", started: "2026-01-01T00:00:00.100Z", completed: "2026-01-01T00:00:00.150Z" }],
+      logs: [{ vertex: "d2", stream: 2, timestamp: "2026-01-01T00:00:00.110Z", data: encode("proxy network requests:\n- GET https://two.example.com/ -> 200\n") }],
+    });
+    // A single JSON.parse(rawJsonText) on this combined text would throw
+    // ("Unexpected non-whitespace character after JSON ... line 2 column 1")
+    // — this is the exact failure this parses around.
+    const result = parseVertexAllowedLog(`${doc1}\n${doc2}\n`);
+    assert.equal(result.length, 2);
+    assert.equal(result[0].entries[0].url, "https://one.example.com/");
+    assert.equal(result[1].entries[0].url, "https://two.example.com/");
+  });
+
+  it("skips a document line that fails to parse as JSON, keeping the rest", () => {
+    const doc1 = JSON.stringify({
+      vertexes: [{ digest: "d1", name: "[1/2] RUN echo one", started: "2026-01-01T00:00:00.000Z", completed: "2026-01-01T00:00:00.050Z" }],
+      logs: [{ vertex: "d1", stream: 2, timestamp: "2026-01-01T00:00:00.010Z", data: encode("proxy network requests:\n- GET https://one.example.com/ -> 200\n") }],
+    });
+    const result = parseVertexAllowedLog(`${doc1}\nnot json at all\n`);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].entries[0].url, "https://one.example.com/");
+  });
 });
 
 describe("aggregateAllowedHosts", () => {

@@ -185,7 +185,18 @@ if (isExplicit) try {
       return a.seconds !== b.seconds ? a.seconds - b.seconds : (a.nanos || 0) - (b.nanos || 0);
     }(a[1], b[1])).map(([ref]) => ref);
   }(historiesOutput).map(ref => function(rawJsonText) {
-    const data = JSON.parse(rawJsonText), vertexes = data.vertexes || [], logs = data.logs || [], groups = new Map;
+    const vertexes = [], logs = [];
+    for (const line of rawJsonText.split("\n")) {
+      if (!line.trim()) continue;
+      let data;
+      try {
+        data = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      vertexes.push(...data.vertexes || []), logs.push(...data.logs || []);
+    }
+    const groups = new Map;
     for (const v of vertexes) {
       if (!v.started || !v.completed) continue;
       const m = v.name.match(runVertexPattern);

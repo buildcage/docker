@@ -106,9 +106,28 @@ export function parseAllowedRequestsFromText(text) {
  * @returns {{ command: string, started: string, completed: string, entries: { method: string, url: string, status?: number }[] }[]}
  */
 export function parseVertexAllowedLog(rawJsonText) {
-  const data = JSON.parse(rawJsonText);
-  const vertexes = data.vertexes || [];
-  const logs = data.logs || [];
+  // Usually a single JSON object, but buildctl can flush a large build's
+  // rawjson history as several newline-separated JSON documents instead —
+  // mirroring selectAllRefs's line-by-line parsing above, concatenate them
+  // into one vertexes/logs view rather than assume a single blob (a lone
+  // JSON.parse on the whole text would throw on the second document). Not
+  // deduplicated by digest: the existing `!v.started || !v.completed` skip
+  // below already drops each vertex's earlier partial occurrence(s) within
+  // a single document, preserving the array-order semantics the ordering
+  // below (and its tests) depend on.
+  const vertexes = [];
+  const logs = [];
+  for (const line of rawJsonText.split("\n")) {
+    if (!line.trim()) continue;
+    let data;
+    try {
+      data = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    vertexes.push(...(data.vertexes || []));
+    logs.push(...(data.logs || []));
+  }
 
   const groups = new Map(); // stageKey -> vertex[]
   for (const v of vertexes) {
