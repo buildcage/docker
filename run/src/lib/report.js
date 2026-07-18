@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { createAnnotation } from "../../../core/lib/annotation.js";
+import { buildRestrictExample } from "../../../core/lib/build-example.js";
 
 /**
  * Fetch the structured HAProxy-log report from the (still-running) proxy
@@ -33,7 +34,7 @@ function markdownTable(rows, { showReason = false } = {}) {
  * report. Each `run` step gets its own section (rather than one report
  * per job), matching the "one proxy container per step" execution model.
  */
-export function buildReportMarkdown(report, { stepLabel } = {}) {
+export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand } = {}) {
   if (report.mode === null) {
     return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
   }
@@ -44,6 +45,7 @@ export function buildReportMarkdown(report, { stepLabel } = {}) {
   if (isAudit) {
     const audited = report.sections.audited || [];
     if (audited.length > 0) markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n";
+    markdown += buildRestrictExample(audited, actionRepo, actionRef, { actionName: "run", runCommand });
     const blocked = report.sections.blocked || [];
     if (blocked.length > 0) markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
   } else {
@@ -61,8 +63,8 @@ export function buildReportMarkdown(report, { stepLabel } = {}) {
  * set the exit code for blocked connections, mirroring report/src/main.js's
  * behavior but scoped to a single run step's proxy container.
  */
-export function writeReport(report, { stepLabel, failOnBlocked } = {}) {
-  const markdown = buildReportMarkdown(report, { stepLabel });
+export function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand } = {}) {
+  const markdown = buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand });
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
   if (summaryFile) {
     appendFileSync(summaryFile, markdown);

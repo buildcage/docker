@@ -7295,6 +7295,12 @@ function runIsolated({scriptPath: scriptPath, proxyPid: proxyPid, workdir: workd
   }
 }
 
+const ruleTypeToParam = {
+  HTTPS: "allowed_https_rules",
+  HTTP: "allowed_http_rules",
+  IP: "allowed_ip_rules"
+};
+
 function markdownTable(rows, {showReason: showReason = !1} = {}) {
   if (showReason) {
     const lines = [ "| Host | Rule | Reason | Count |", "| --- | --- | --- | ---: |" ];
@@ -7306,29 +7312,60 @@ function markdownTable(rows, {showReason: showReason = !1} = {}) {
   return lines.join("\n");
 }
 
-function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked} = {}) {
-  const markdown = function(report, {stepLabel: stepLabel} = {}) {
-    if (null === report.mode) return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
-    const isAudit = "audit" === report.mode;
-    let markdown = `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
-    if (isAudit) {
-      const audited = report.sections.audited || [];
-      audited.length > 0 && (markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n");
-      const blocked = report.sections.blocked || [];
-      blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
-        showReason: !0
-      }) + "\n\n");
-    } else {
-      const allowed = report.sections.allowed || [];
-      allowed.length > 0 && (markdown += "**✅ Allowed Hosts**\n\n" + markdownTable(allowed) + "\n\n");
-      const blocked = report.sections.blocked || [];
-      blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
-        showReason: !0
-      }) + "\n\n");
-    }
-    return markdown;
-  }(report, {
-    stepLabel: stepLabel
+function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand} = {}) {
+  if (null === report.mode) return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
+  const isAudit = "audit" === report.mode;
+  let markdown = `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
+  if (isAudit) {
+    const audited = report.sections.audited || [];
+    audited.length > 0 && (markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n"), 
+    markdown += function(auditedRows, actionRepo, actionRef, {actionName: actionName = "setup", runCommand: runCommand} = {}) {
+      if (!auditedRows || 0 === auditedRows.length) return "";
+      const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = new Map;
+      for (const r of auditedRows) {
+        const param = ruleTypeToParam[r.ruleType];
+        param && (groups.has(param) || groups.set(param, []), groups.get(param).push(`${r.host}:${r.port}`));
+      }
+      if (0 === groups.size) return "";
+      let yaml = "";
+      if (yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`, 
+      yaml += "  with:\n", "run" === actionName && runCommand) {
+        yaml += "    run: |\n";
+        for (const line of runCommand.split(/\r?\n/)) yaml += `      ${line}\n`;
+      }
+      yaml += "    proxy_mode: restrict\n";
+      for (const [param, rules] of groups) {
+        yaml += `    ${param}: >-\n`;
+        for (const rule of rules) yaml += `      ${rule}\n`;
+      }
+      let md = "\n<details>\n";
+      return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", 
+      md += yaml, md += "```\n\n", md += "</details>\n", md;
+    }(audited, actionRepo, actionRef, {
+      actionName: "run",
+      runCommand: runCommand
+    });
+    const blocked = report.sections.blocked || [];
+    blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
+      showReason: !0
+    }) + "\n\n");
+  } else {
+    const allowed = report.sections.allowed || [];
+    allowed.length > 0 && (markdown += "**✅ Allowed Hosts**\n\n" + markdownTable(allowed) + "\n\n");
+    const blocked = report.sections.blocked || [];
+    blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
+      showReason: !0
+    }) + "\n\n");
+  }
+  return markdown;
+}
+
+function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand} = {}) {
+  const markdown = buildReportMarkdown(report, {
+    stepLabel: stepLabel,
+    actionRepo: actionRepo,
+    actionRef: actionRef,
+    runCommand: runCommand
   }), summaryFile = process.env.GITHUB_STEP_SUMMARY;
   summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown);
   const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
@@ -7482,6 +7519,9 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         return JSON.parse(jsonOutput);
       }(containerName);
       writeReport(report, {
+        actionRepo: actionRepo,
+        actionRef: actionRef,
+        runCommand: runInput,
         failOnBlocked: "true" === (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase()
       });
     } catch (e) {
