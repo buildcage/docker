@@ -7312,12 +7312,13 @@ function markdownTable(rows, {showReason: showReason = !1} = {}) {
 }
 
 function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand} = {}) {
-  if (null === report.mode) return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
+  const heading = "Outbound Traffic Report" + (stepLabel ? ` — ${stepLabel}` : "");
+  if (null === report.mode) return `## ${heading}\n\nNo proxy logs found.\n`;
   const isAudit = "audit" === report.mode;
-  let markdown = `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
+  let markdown = `## ${heading} (${report.mode} mode)\n\n`;
   if (isAudit) {
     const audited = report.sections.audited || [];
-    audited.length > 0 && (markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n"), 
+    audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n\n"), 
     markdown += function(auditedRows, actionRepo, actionRef, {actionName: actionName = "setup", runCommand: runCommand} = {}) {
       if (!auditedRows || 0 === auditedRows.length) return "";
       const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = new Map;
@@ -7330,7 +7331,7 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
       if (yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`, 
       yaml += "  with:\n", "run" === actionName && runCommand) {
         yaml += "    run: |\n";
-        for (const line of runCommand.split(/\r?\n/)) yaml += `      ${line}\n`;
+        for (const line of runCommand.replace(/\r?\n$/, "").split(/\r?\n/)) yaml += `      ${line}\n`;
       }
       yaml += "    proxy_mode: restrict\n";
       for (const [param, rules] of groups) {
@@ -7345,14 +7346,14 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
       runCommand: runCommand
     });
     const blocked = report.sections.blocked || [];
-    blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
+    blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, {
       showReason: !0
     }) + "\n\n");
   } else {
     const allowed = report.sections.allowed || [];
-    allowed.length > 0 && (markdown += "**✅ Allowed Hosts**\n\n" + markdownTable(allowed) + "\n\n");
+    allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n");
     const blocked = report.sections.blocked || [];
-    blocked.length > 0 && (markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, {
+    blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, {
       showReason: !0
     }) + "\n\n");
   }
@@ -7521,6 +7522,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         actionRepo: actionRepo,
         actionRef: actionRef,
         runCommand: runInput,
+        stepLabel: env.INPUT_LABEL || void 0,
         failOnBlocked: "true" === (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase()
       });
     } catch (e) {

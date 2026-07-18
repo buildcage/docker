@@ -41,7 +41,10 @@ export function buildRestrictExample(auditedRows, actionRepo, actionRef, { actio
   // run: command to stay copy-pasteable on its own.
   if (actionName === "run" && runCommand) {
     yaml += "    run: |\n";
-    for (const line of runCommand.split(/\r?\n/)) {
+    // GitHub Actions' `run: |` block scalar always keeps one trailing
+    // newline (YAML's default "clip" chomping), which would otherwise
+    // split into a spurious blank line at the end.
+    for (const line of runCommand.replace(/\r?\n$/, "").split(/\r?\n/)) {
       yaml += `      ${line}\n`;
     }
   }

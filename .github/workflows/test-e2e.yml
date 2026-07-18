@@ -373,6 +373,7 @@ jobs:
             with:
               allowed_https_rules: example.com:443
               allowed_http_rules: example.com:80
+              label: parallel-a
               fail_on_blocked: false
               run: |
                 sleep 5
@@ -390,6 +391,7 @@ jobs:
             with:
               allowed_https_rules: example.net:443
               allowed_http_rules: example.net:80
+              label: parallel-b
               fail_on_blocked: false
               run: |
                 wget -q -T 5 -O /dev/null http://example.net/

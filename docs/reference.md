@@ -237,6 +237,7 @@ during the audited run — mirroring the same example the `report` action genera
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
 | `writable` | No | empty | Additional writable directories (newline-separated), on top of `$GITHUB_WORKSPACE`, `$HOME`, and `/tmp` — see [Filesystem Access](#filesystem-access) below |
+| `label` | No | empty | Label appended to this step's Job Summary heading, e.g. `npm install` — useful to tell steps apart when `run` is used more than once in the same job |
 
 Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above.
 

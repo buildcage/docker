@@ -35,24 +35,27 @@ function markdownTable(rows, { showReason = false } = {}) {
  * per job), matching the "one proxy container per step" execution model.
  */
 export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand } = {}) {
+  // Mirrors report/src/main.js's "## Outbound Traffic Report during Docker
+  // Build (mode)" heading, so both actions read as the same kind of report.
+  const heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
   if (report.mode === null) {
-    return `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""}\n\nNo proxy logs found.\n`;
+    return `## ${heading}\n\nNo proxy logs found.\n`;
   }
 
   const isAudit = report.mode === "audit";
-  let markdown = `### 🧰 Run${stepLabel ? ` — ${stepLabel}` : ""} (${report.mode} mode)\n\n`;
+  let markdown = `## ${heading} (${report.mode} mode)\n\n`;
 
   if (isAudit) {
     const audited = report.sections.audited || [];
-    if (audited.length > 0) markdown += "**📋 Audited Hosts**\n\n" + markdownTable(audited) + "\n\n";
+    if (audited.length > 0) markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n\n";
     markdown += buildRestrictExample(audited, actionRepo, actionRef, { actionName: "run", runCommand });
     const blocked = report.sections.blocked || [];
-    if (blocked.length > 0) markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
+    if (blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
   } else {
     const allowed = report.sections.allowed || [];
-    if (allowed.length > 0) markdown += "**✅ Allowed Hosts**\n\n" + markdownTable(allowed) + "\n\n";
+    if (allowed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n";
     const blocked = report.sections.blocked || [];
-    if (blocked.length > 0) markdown += "**🚫 Blocked Hosts**\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
+    if (blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
   }
 
   return markdown;
