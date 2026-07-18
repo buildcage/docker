@@ -188,16 +188,27 @@ else
     # writability is not a payload-planting surface for a later step), but
     # any *real* filesystem left writable fails the run closed, so a silent
     # remount failure can never quietly weaken the read-only guarantee
-    # documented in docs/security.md. In each mountinfo line the field
-    # immediately after the " - " separator is the filesystem type.
-    tac /proc/self/mountinfo | while read -r _ _ _ _ mnt_point rest; do
+    # documented in docs/security.md. In each mountinfo line the 6th field
+    # holds the per-mount options, and the field immediately after the
+    # " - " separator is the filesystem type.
+    tac /proc/self/mountinfo | while read -r _ _ _ _ mnt_point mnt_opts rest; do
       skip=0
       for p in "$@"; do
         [ "$mnt_point" = "$p" ] && skip=1 && break
       done
       [ "$skip" = 1 ] && continue
+      # Already read-only per mountinfo -- no remount needed.
+      case ",${mnt_opts}," in
+        *,ro,*) continue ;;
+      esac
       mount -o remount,bind,ro "$mnt_point" 2>/dev/null && continue
-      fstype=${rest#* - }
+      # Retry once, re-bound onto itself: a mount that predates this
+      # namespace (e.g. a Docker maskedPath tmpfs re-parented under
+      # --mount-proc, seen on /proc/scsi and /proc/interrupts) can reject an
+      # otherwise-safe remount until re-bound gives it a fresh mount entry.
+      mount --bind "$mnt_point" "$mnt_point" 2>/dev/null &&
+        mount -o remount,bind,ro "$mnt_point" 2>/dev/null && continue
+      fstype=${rest#*- }
       fstype=${fstype%% *}
       case "$fstype" in
         proc|procfs|sysfs|cgroup|cgroup2|devpts|mqueue|debugfs|tracefs|securityfs|\
