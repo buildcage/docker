@@ -7277,6 +7277,8 @@ function buildComposeDownArgs({composeFile: composeFile, projectName: projectNam
   return [ "compose", "-f", composeFile, "-p", projectName, "down" ];
 }
 
+var EXTRA_MASKED_PROC_PATHS = [ "/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-trigger" ];
+
 const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href));
 
 function parseMountinfo(mountinfoContent) {
@@ -7294,8 +7296,6 @@ const TOLERATED_PSEUDO_FSTYPES = new Set([ "proc", "procfs", "sysfs", "cgroup", 
 function computeReadonlyHostMounts(hostMounts, protectedPaths) {
   return hostMounts.filter(({mountPoint: mountPoint, fsType: fsType}) => "/" !== mountPoint && !TOLERATED_PSEUDO_FSTYPES.has(fsType) && !protectedPaths.has(mountPoint)).map(({mountPoint: mountPoint}) => mountPoint);
 }
-
-const EXTRA_MASKED_PROC_PATHS = [ "/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-trigger" ];
 
 function unmountAllUnder(dir) {
   let mountPoints;

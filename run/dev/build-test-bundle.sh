@@ -39,6 +39,7 @@ jq \
   --arg resolvConf "${BUNDLE_DIR}/resolv.conf" \
   --arg scriptPath "$SCRIPT_PATH" \
   --slurpfile seccomp "$BUNDLE_DIR/seccomp.json" \
+  --slurpfile extraMasked /etc/buildcage/extra-masked-proc-paths.json \
   '
   .root.path = $rootfsBindDir | .root.readonly = true |
   .mounts += [
@@ -47,8 +48,8 @@ jq \
   ] |
   .linux.namespaces = (.linux.namespaces | map(if .type == "network" then . + {"path": $netnsPath} else . end)) |
   .linux.seccomp = $seccomp[0] |
-  .linux.maskedPaths += ["/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-trigger"] |
-  .linux.readonlyPaths -= ["/proc/sysrq-trigger"] |
+  .linux.maskedPaths += $extraMasked[0] |
+  .linux.readonlyPaths -= $extraMasked[0] |
   .process.terminal = false |
   .process.user = {"uid": 1000, "gid": 1000} |
   .process.args = ["setpriv", "--pdeathsig=KILL", "--", $scriptPath] |

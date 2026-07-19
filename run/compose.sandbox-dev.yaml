@@ -26,6 +26,7 @@ services:
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - ./run/scripts/run-isolated.sh:/usr/local/bin/run-isolated.sh:ro
+      - ./run/scripts/extra-masked-proc-paths.json:/etc/buildcage/extra-masked-proc-paths.json:ro
       - ./run/dev/smoke-test.sh:/usr/local/bin/smoke-test.sh:ro
       - ./run/dev/build-test-bundle.sh:/usr/local/bin/build-test-bundle.sh:ro
     depends_on:

@@ -3,6 +3,18 @@ import { writeFileSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+// Sensitive /proc paths masked with /dev/null, matching the previous
+// unshare-based implementation. runc's own `runc spec` default already
+// masks /proc/kcore, /proc/keys, and /proc/timer_list (among others) and
+// leaves /proc/sysrq-trigger merely read-only — buildOciConfig upgrades
+// sysrq-trigger to fully masked (moving it out of readonlyPaths) and adds
+// kallsyms/kmsg, which runc's default doesn't cover at all.
+//
+// Imported from a shared JSON file (rather than a JS literal) so run/dev's
+// build-test-bundle.sh — a bash/jq stand-in for this same function, used
+// by the Mac dev loop — has a single source of truth to read the same
+// list from instead of hand-duplicating it.
+import EXTRA_MASKED_PROC_PATHS from "../../scripts/extra-masked-proc-paths.json" with { type: "json" };
 
 // rollup's cjs output doesn't convert import.meta.dirname (it silently
 // becomes undefined), so use this form instead.
@@ -114,16 +126,6 @@ export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
     .filter(({ mountPoint, fsType }) => mountPoint !== "/" && !TOLERATED_PSEUDO_FSTYPES.has(fsType) && !protectedPaths.has(mountPoint))
     .map(({ mountPoint }) => mountPoint);
 }
-
-/**
- * Sensitive /proc paths masked with /dev/null, matching the previous
- * unshare-based implementation. runc's own `runc spec` default already
- * masks /proc/kcore, /proc/keys, and /proc/timer_list (among others) and
- * leaves /proc/sysrq-trigger merely read-only — buildOciConfig upgrades
- * sysrq-trigger to fully masked (moving it out of readonlyPaths) and adds
- * kallsyms/kmsg, which runc's default doesn't cover at all.
- */
-const EXTRA_MASKED_PROC_PATHS = ["/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-trigger"];
 
 /**
  * Build the final OCI Runtime Spec (config.json) for the isolated command,

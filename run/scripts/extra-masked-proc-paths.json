@@ -1,0 +1,5 @@
+[
+  "/proc/kallsyms",
+  "/proc/kmsg",
+  "/proc/sysrq-trigger"
+]
