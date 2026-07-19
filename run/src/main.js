@@ -190,43 +190,47 @@ async function main() {
         throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
       }
 
-      // Run natively on the runner host (not `docker exec`, which would
-      // resolve against the container's kernel/arch instead of the real
-      // one) — see gen-seccomp-profile/main.go for why this matters.
-      const seccompProfile = JSON.parse(execFileSync(genSeccompProfilePath, { encoding: "utf8" }));
-
       const workdir = env.GITHUB_WORKSPACE || "";
       const home = env.HOME || "";
-      const resolvConfPath = writeResolvConf(dns, dir);
-      const rootfsBindDir = join(dir, "rootfs");
       // Distinct from the Docker container name/Compose project name
       // (different ID namespace — `ip netns`/runc container IDs), but
       // derived from it to keep `ip netns`/`docker ps` output correlated
       // per step, same reasoning as deriveProjectName.
       const netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-");
+      const rootfsBindDir = join(dir, "rootfs");
 
-      const scriptPath = writeRunScript(runInput, dir);
-      const baseSpec = generateBaseOciSpec(runcPath, dir);
-      // Real host mount table, read now (before run-isolated.sh's `mount
-      // --rbind /` duplicates it into rootfsBindDir) so buildOciConfig can
-      // force every real submount read-only individually -- root.readonly
-      // alone only covers the top-level rootfs mount (see
-      // computeReadonlyHostMounts).
-      const hostMounts = listHostMounts();
-      const config = buildOciConfig(baseSpec, {
-        uid: process.getuid(),
-        gid: process.getgid(),
-        workdir,
-        home,
-        writablePaths,
-        env,
-        netnsPath: `/var/run/netns/${netnsName}`,
-        rootfsBindDir,
-        resolvConfPath,
-        seccompProfile,
-        scriptPath,
-        hostMounts,
-      });
+      let config;
+      try {
+        // Run natively on the runner host (not `docker exec`, which would
+        // resolve against the container's kernel/arch instead of the real
+        // one) — see gen-seccomp-profile/main.go for why this matters.
+        const seccompProfile = JSON.parse(execFileSync(genSeccompProfilePath, { encoding: "utf8" }));
+        const resolvConfPath = writeResolvConf(dns, dir);
+        const scriptPath = writeRunScript(runInput, dir);
+        const baseSpec = generateBaseOciSpec(runcPath, dir);
+        // Real host mount table, read now (before run-isolated.sh's `mount
+        // --rbind /` duplicates it into rootfsBindDir) so buildOciConfig can
+        // force every real submount read-only individually -- root.readonly
+        // alone only covers the top-level rootfs mount (see
+        // computeReadonlyHostMounts).
+        const hostMounts = listHostMounts();
+        config = buildOciConfig(baseSpec, {
+          uid: process.getuid(),
+          gid: process.getgid(),
+          workdir,
+          home,
+          writablePaths,
+          env,
+          netnsPath: `/var/run/netns/${netnsName}`,
+          rootfsBindDir,
+          resolvConfPath,
+          seccompProfile,
+          scriptPath,
+          hostMounts,
+        });
+      } catch (e) {
+        throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${e.message}`, "OCI_CONFIG_BUILD_FAILED");
+      }
       writeOciConfig(config, dir);
 
       return runIsolated({

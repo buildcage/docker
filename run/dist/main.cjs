@@ -7530,105 +7530,112 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
       } catch (e) {
         throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
       }
-      const seccompProfile = JSON.parse(node_child_process.execFileSync(genSeccompProfilePath, {
-        encoding: "utf8"
-      })), workdir = env.GITHUB_WORKSPACE || "", home = env.HOME || "", resolvConfPath = function(dns, dir) {
-        const resolvConfPath = path.join(dir, "resolv.conf");
-        return node_fs.writeFileSync(resolvConfPath, `nameserver ${dns}\n`, {
-          mode: 420
-        }), resolvConfPath;
-      }(dns, dir), rootfsBindDir = path.join(dir, "rootfs"), netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-"), scriptPath = function(runInput, dir) {
-        const scriptPath = path.join(dir, "run-script.sh"), content = runInput.startsWith("#!") ? runInput : `#!/bin/sh\nset -e\n${runInput}\n`;
-        return node_fs.writeFileSync(scriptPath, content, {
-          mode: 448
-        }), scriptPath;
-      }(runInput, dir), baseSpec = function(runcPath, bundleDir) {
-        return node_child_process.execFileSync(runcPath, [ "spec" ], {
-          cwd: bundleDir
-        }), JSON.parse(node_fs.readFileSync(path.join(bundleDir, "config.json"), "utf8"));
-      }(runcPath, dir), hostMounts = parseMountinfo(node_fs.readFileSync("/proc/self/mountinfo", "utf8")), config = function(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, netnsPath: netnsPath, rootfsBindDir: rootfsBindDir, resolvConfPath: resolvConfPath, seccompProfile: seccompProfile, scriptPath: scriptPath, hostMounts: hostMounts = []}) {
-        const disableReadonly = writablePaths.includes("/"), mounts = [ ...baseSpec.mounts, {
-          destination: "/etc/resolv.conf",
-          type: "none",
-          source: resolvConfPath,
-          options: [ "rbind", "ro" ]
-        } ], protectedPaths = new Set([ workdir, home, "/tmp", ...writablePaths ].filter(Boolean));
-        if (!disableReadonly) {
-          workdir && mounts.push({
-            destination: workdir,
+      const workdir = env.GITHUB_WORKSPACE || "", home = env.HOME || "", netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-"), rootfsBindDir = path.join(dir, "rootfs");
+      let config;
+      try {
+        const seccompProfile = JSON.parse(node_child_process.execFileSync(genSeccompProfilePath, {
+          encoding: "utf8"
+        })), resolvConfPath = function(dns, dir) {
+          const resolvConfPath = path.join(dir, "resolv.conf");
+          return node_fs.writeFileSync(resolvConfPath, `nameserver ${dns}\n`, {
+            mode: 420
+          }), resolvConfPath;
+        }(dns, dir), scriptPath = function(runInput, dir) {
+          const scriptPath = path.join(dir, "run-script.sh"), content = runInput.startsWith("#!") ? runInput : `#!/bin/sh\nset -e\n${runInput}\n`;
+          return node_fs.writeFileSync(scriptPath, content, {
+            mode: 448
+          }), scriptPath;
+        }(runInput, dir), baseSpec = function(runcPath, bundleDir) {
+          return node_child_process.execFileSync(runcPath, [ "spec" ], {
+            cwd: bundleDir
+          }), JSON.parse(node_fs.readFileSync(path.join(bundleDir, "config.json"), "utf8"));
+        }(runcPath, dir), hostMounts = parseMountinfo(node_fs.readFileSync("/proc/self/mountinfo", "utf8"));
+        config = function(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, netnsPath: netnsPath, rootfsBindDir: rootfsBindDir, resolvConfPath: resolvConfPath, seccompProfile: seccompProfile, scriptPath: scriptPath, hostMounts: hostMounts = []}) {
+          const disableReadonly = writablePaths.includes("/"), mounts = [ ...baseSpec.mounts, {
+            destination: "/etc/resolv.conf",
             type: "none",
-            source: workdir,
-            options: [ "rbind", "rw" ]
-          }), home && mounts.push({
-            destination: home,
-            type: "none",
-            source: home,
-            options: [ "rbind", "rw" ]
-          }), mounts.push({
-            destination: "/tmp",
-            type: "none",
-            source: "/tmp",
-            options: [ "rbind", "rw" ]
-          });
-          for (const p of writablePaths) mounts.push({
-            destination: p,
-            type: "none",
-            source: p,
-            options: [ "rbind", "rw" ]
-          });
-        }
-        const maskedPaths = [ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ], baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), readonlyPaths = disableReadonly ? baseReadonlyPaths : Array.from(new Set([ ...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths) ])), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
-          ...ns,
-          path: netnsPath
-        } : ns);
-        return {
-          ...baseSpec,
-          root: {
-            path: rootfsBindDir,
-            readonly: !disableReadonly
-          },
-          mounts: mounts,
-          process: {
-            ...baseSpec.process,
-            terminal: !1,
-            user: {
-              uid: uid,
-              gid: gid
-            },
-            args: [ "setpriv", "--pdeathsig=KILL", "--", scriptPath ],
-            env: Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => `${k}=${v}`),
-            cwd: workdir || "/",
-            capabilities: {
-              bounding: [],
-              effective: [],
-              permitted: [],
-              inheritable: [],
-              ambient: []
-            },
-            noNewPrivileges: !0
-          },
-          linux: {
-            ...baseSpec.linux,
-            namespaces: namespaces,
-            seccomp: seccompProfile,
-            maskedPaths: maskedPaths,
-            readonlyPaths: readonlyPaths
+            source: resolvConfPath,
+            options: [ "rbind", "ro" ]
+          } ], protectedPaths = new Set([ workdir, home, "/tmp", ...writablePaths ].filter(Boolean));
+          if (!disableReadonly) {
+            workdir && mounts.push({
+              destination: workdir,
+              type: "none",
+              source: workdir,
+              options: [ "rbind", "rw" ]
+            }), home && mounts.push({
+              destination: home,
+              type: "none",
+              source: home,
+              options: [ "rbind", "rw" ]
+            }), mounts.push({
+              destination: "/tmp",
+              type: "none",
+              source: "/tmp",
+              options: [ "rbind", "rw" ]
+            });
+            for (const p of writablePaths) mounts.push({
+              destination: p,
+              type: "none",
+              source: p,
+              options: [ "rbind", "rw" ]
+            });
           }
-        };
-      }(baseSpec, {
-        uid: process.getuid(),
-        gid: process.getgid(),
-        workdir: workdir,
-        home: home,
-        writablePaths: writablePaths,
-        env: env,
-        netnsPath: `/var/run/netns/${netnsName}`,
-        rootfsBindDir: rootfsBindDir,
-        resolvConfPath: resolvConfPath,
-        seccompProfile: seccompProfile,
-        scriptPath: scriptPath,
-        hostMounts: hostMounts
-      });
+          const maskedPaths = [ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ], baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), readonlyPaths = disableReadonly ? baseReadonlyPaths : Array.from(new Set([ ...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths) ])), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
+            ...ns,
+            path: netnsPath
+          } : ns);
+          return {
+            ...baseSpec,
+            root: {
+              path: rootfsBindDir,
+              readonly: !disableReadonly
+            },
+            mounts: mounts,
+            process: {
+              ...baseSpec.process,
+              terminal: !1,
+              user: {
+                uid: uid,
+                gid: gid
+              },
+              args: [ "setpriv", "--pdeathsig=KILL", "--", scriptPath ],
+              env: Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => `${k}=${v}`),
+              cwd: workdir || "/",
+              capabilities: {
+                bounding: [],
+                effective: [],
+                permitted: [],
+                inheritable: [],
+                ambient: []
+              },
+              noNewPrivileges: !0
+            },
+            linux: {
+              ...baseSpec.linux,
+              namespaces: namespaces,
+              seccomp: seccompProfile,
+              maskedPaths: maskedPaths,
+              readonlyPaths: readonlyPaths
+            }
+          };
+        }(baseSpec, {
+          uid: process.getuid(),
+          gid: process.getgid(),
+          workdir: workdir,
+          home: home,
+          writablePaths: writablePaths,
+          env: env,
+          netnsPath: `/var/run/netns/${netnsName}`,
+          rootfsBindDir: rootfsBindDir,
+          resolvConfPath: resolvConfPath,
+          seccompProfile: seccompProfile,
+          scriptPath: scriptPath,
+          hostMounts: hostMounts
+        });
+      } catch (e) {
+        throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${e.message}`, "OCI_CONFIG_BUILD_FAILED");
+      }
       return function(config, bundleDir) {
         const configPath = path.join(bundleDir, "config.json");
         node_fs.writeFileSync(configPath, JSON.stringify(config), {
