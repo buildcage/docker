@@ -50,6 +50,30 @@ QuickJS
 
 ------------------------------------------------------------------------------
 
+runc (used only by the `run` action's proxy image, docker/Dockerfile)
+  Website : https://github.com/opencontainers/runc
+  License : Apache License 2.0 (Apache-2.0)
+  Source  : https://github.com/opencontainers/runc
+  Note    : Official pre-built release binary, checksum-pinned. Extracted
+            onto the runner host at `run` action startup and used by
+            run-isolated.sh to execute the isolated command.
+
+------------------------------------------------------------------------------
+
+run/scripts/seccomp.json (used only by the `run` action)
+
+  This file is not part of the Docker image; it ships as part of the
+  action's own source and is loaded directly by run/src/lib/isolated-exec.js.
+  It is generated offline (not at image build time) from moby/profiles'
+  default seccomp profile, resolved against an empty capability set with
+  the exported `LoadProfile` function.
+
+  moby/profiles
+    License : Apache License 2.0 (Apache-2.0)
+    Source  : https://github.com/moby/profiles
+
+------------------------------------------------------------------------------
+
 Note on GPL components (HAProxy, dnsmasq):
 
 These components are installed from the Alpine Linux official package

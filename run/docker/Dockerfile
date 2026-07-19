@@ -1,9 +1,54 @@
+# renovate: datasource=github-releases depName=opencontainers/runc
+ARG RUNC_VERSION=v1.5.1
+ARG RUNC_SHA256_AMD64=177df879d50c913eb205e898d5c1c05a18f574053c0ce5524c471208eaf06f6f
+ARG RUNC_SHA256_ARM64=ca70e7dbd6616ca782a59b5d3ac86909123fdaa9fa3f89dcf29051c70eee7ce9
+
+# Prepare dependencies — runc's official release binaries are already
+# statically linked (including libseccomp), so no compilation is needed,
+# only a checksum-pinned download (see docs/development.md).
+FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS deps
+ARG RUNC_VERSION
+ARG RUNC_SHA256_AMD64
+ARG RUNC_SHA256_ARM64
+RUN apk add --no-cache curl && \
+    mkdir -p /opt/buildcage/bin && \
+    ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') && \
+    EXPECTED_SHA256=$([ "$ARCH" = "amd64" ] && echo "$RUNC_SHA256_AMD64" || echo "$RUNC_SHA256_ARM64") && \
+    curl -fsSL "https://github.com/opencontainers/runc/releases/download/${RUNC_VERSION}/runc.${ARCH}" \
+      -o /opt/buildcage/bin/runc && \
+    echo "${EXPECTED_SHA256}  /opt/buildcage/bin/runc" | sha256sum -c && \
+    chmod +x /opt/buildcage/bin/runc
+
+# gen-seccomp-profile is extracted onto the runner host (docker cp, same as
+# runc below) and run natively there at `run` action startup, before any
+# namespace isolation is set up for the sandboxed command — not run at image
+# build time. Its output depends on the actual host kernel (a real
+# uname(2) call gates a handful of syscalls) and architecture, both of
+# which only match the real runner when resolved on the host itself. On a
+# real GitHub Actions runner this is equivalent to running it inside the
+# still-running proxy container (Linux containers share the host kernel),
+# but extracting it onto the host lets `run` action startup reuse the same
+# docker-cp extraction path already needed for runc, rather than adding a
+# second (docker exec) mechanism. Building it here only compiles the
+# binary; see gen-seccomp-profile/main.go and docs/development.md for why.
+# Pure Go (CGO_ENABLED=0), so this cross-compiles natively via
+# BUILDPLATFORM without needing QEMU, same as buildkit-proxy-build in
+# setup/docker/explicit/Dockerfile.
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2 AS gen-seccomp-profile-build
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY run/docker/gen-seccomp-profile/go.mod run/docker/gen-seccomp-profile/go.sum ./
+RUN go mod download
+COPY run/docker/gen-seccomp-profile/main.go ./
+RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -o /out/gen-seccomp-profile .
+
 # Final image
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 LABEL org.opencontainers.image.title="buildcage-proxy" \
       org.opencontainers.image.description="Network-isolated proxy for arbitrary GitHub Actions commands" \
-      org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later" \
+      org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later AND Apache-2.0" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage"
 
 RUN apk add --no-cache \
@@ -30,6 +75,15 @@ COPY run/docker/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 # report.js/lib/log-parser.js by the run action's report step
 COPY core/scripts/ /opt/buildcage/scripts/
 COPY core/shared/  /opt/buildcage/shared/
+
+# runc — extracted onto the runner host at `run` action startup and used by
+# run-isolated.sh to execute the isolated command (see docs/development.md)
+COPY --from=deps /opt/buildcage/bin/runc /opt/buildcage/bin/runc
+
+# gen-seccomp-profile — extracted onto the runner host and run natively
+# there (not inside this container) to produce the seccomp filter embedded
+# in runc's config.json; see the build stage comment above for why.
+COPY --from=gen-seccomp-profile-build /out/gen-seccomp-profile /opt/buildcage/bin/gen-seccomp-profile
 
 # License
 COPY run/docker/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES

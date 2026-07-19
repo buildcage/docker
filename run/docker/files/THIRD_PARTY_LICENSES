@@ -36,6 +36,16 @@ QuickJS
 
 ------------------------------------------------------------------------------
 
+runc
+  Website : https://github.com/opencontainers/runc
+  License : Apache License 2.0 (Apache-2.0)
+  Source  : https://github.com/opencontainers/runc
+  Note    : Official pre-built release binary, checksum-pinned in
+            run/docker/Dockerfile. Extracted onto the runner host at `run`
+            action startup and used by run-isolated.sh.
+
+------------------------------------------------------------------------------
+
 Note on GPL components (HAProxy, dnsmasq):
 
 These components are installed from the Alpine Linux official package
