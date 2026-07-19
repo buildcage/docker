@@ -104,10 +104,6 @@ CVE-2026-53488
 # dependency in this binary.
 CVE-2026-39821
 
-# golang.org/x/sys/windows: integer overflow in NewNTUnicodeString — Windows only.
-# This product runs exclusively in Linux containers; the Windows code path is never executed.
-CVE-2026-39824
-
 # libexpat: additional XML parsing vulnerabilities. No external XML processing
 # path exists in this product.
 CVE-2026-56409
