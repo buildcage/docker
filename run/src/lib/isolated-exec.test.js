@@ -12,6 +12,7 @@ import {
   scratchDirFor,
   parseMountinfo,
   computeReadonlyHostMounts,
+  freshMountDestinationsFrom,
   parseMountsUnder,
 } from "./isolated-exec.js";
 
@@ -90,28 +91,46 @@ describe("parseMountinfo", () => {
 
 describe("computeReadonlyHostMounts", () => {
   const hostMounts = parseMountinfo(SAMPLE_MOUNTINFO);
+  const freshMountDestinations = new Set(["/proc"]);
 
   it("excludes '/' itself (already covered by root.readonly)", () => {
-    const result = computeReadonlyHostMounts(hostMounts, new Set());
+    const result = computeReadonlyHostMounts(hostMounts, new Set(), freshMountDestinations);
     assert.ok(!result.includes("/"));
   });
 
-  it("excludes tolerated pseudo-filesystems (proc gets its own fresh mount from runc)", () => {
-    const result = computeReadonlyHostMounts(hostMounts, new Set());
+  it("excludes paths runc's own base spec already mounts fresh", () => {
+    const result = computeReadonlyHostMounts(hostMounts, new Set(), freshMountDestinations);
     assert.ok(!result.includes("/proc"));
   });
 
   it("excludes explicitly protected (writable) paths", () => {
-    const result = computeReadonlyHostMounts(hostMounts, new Set(["/run"]));
+    const result = computeReadonlyHostMounts(hostMounts, new Set(["/run"]), freshMountDestinations);
     assert.ok(!result.includes("/run"));
     assert.ok(result.includes("/run/user/1000"), "a nested mount under a protected path is still its own separate mount point");
   });
 
   it("includes real, non-pseudo, non-protected host mounts (e.g. a separate disk at /mnt)", () => {
-    const result = computeReadonlyHostMounts(hostMounts, new Set());
+    const result = computeReadonlyHostMounts(hostMounts, new Set(), freshMountDestinations);
     assert.ok(result.includes("/mnt"));
     assert.ok(result.includes("/run"));
     assert.ok(result.includes("/run/user/1000"));
+  });
+
+  it("includes a pseudo-filesystem-like mount whose path isn't one of runc's own fresh destinations", () => {
+    // e.g. securityfs at /sys/kernel/security: it looks like the same
+    // "kernel pseudo-fs" class as /proc, but runc's default spec never
+    // declares a mount for it, so the host-swept copy must be forced
+    // read-only just like any other real mount point.
+    const withSecurityfs = [...hostMounts, { mountPoint: "/sys/kernel/security", fsType: "securityfs" }];
+    const result = computeReadonlyHostMounts(withSecurityfs, new Set(), freshMountDestinations);
+    assert.ok(result.includes("/sys/kernel/security"));
+  });
+});
+
+describe("freshMountDestinationsFrom", () => {
+  it("collects every mounts[].destination from the base spec", () => {
+    const baseSpec = { mounts: [{ destination: "/proc" }, { destination: "/sys" }, { destination: "/dev/pts" }] };
+    assert.deepEqual(freshMountDestinationsFrom(baseSpec), new Set(["/proc", "/sys", "/dev/pts"]));
   });
 });
 
@@ -321,6 +340,18 @@ describe("buildOciConfig", () => {
     const hostMounts = [{ mountPoint: "/mnt", fsType: "ext4" }];
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/"], hostMounts });
     assert.ok(!config.linux.readonlyPaths.includes("/mnt"));
+  });
+
+  it("forces a kernel pseudo-fs into readonlyPaths when runc's own base spec doesn't mount it fresh", () => {
+    // Regression guard: a fixed allowlist of "pseudo-fs" filesystem types
+    // previously tolerated anything that merely looked like proc/sysfs/etc,
+    // even when runc's own base spec (fakeBaseSpec here only declares
+    // /proc and /sys) never actually gives it a fresh, isolated mount --
+    // e.g. securityfs at /sys/kernel/security, which is commonly mounted
+    // read-write on AppArmor-enabled hosts.
+    const hostMounts = [{ mountPoint: "/sys/kernel/security", fsType: "securityfs" }];
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], hostMounts });
+    assert.ok(config.linux.readonlyPaths.includes("/sys/kernel/security"));
   });
 });
 

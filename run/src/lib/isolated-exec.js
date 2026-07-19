@@ -120,52 +120,43 @@ export function listHostMounts() {
 }
 
 /**
- * Pseudo-filesystems tolerated as-is (not forced read-only): each of these
- * gets its own fresh, namespace-scoped mount from runc's own default
- * `mounts` entries (or from `linux.maskedPaths`/`namespaces` handling)
- * rather than being read from the host-root bind-mount at all, so forcing
- * the host-side copy read-only would be meaningless (and some reject a
- * read-only remount outright).
+ * Pure: given the host's real mount table, the set of paths that must stay
+ * writable, and the destinations runc's own base spec already declares a
+ * fresh mount for (see freshMountDestinationsFrom), return the host mount
+ * points that need to be explicitly forced read-only. This exists because
+ * `root.readonly` in OCI/runc only remounts the top-level rootfs mount
+ * point — it does *not* recursively apply to separate mount points that
+ * `mount --rbind /` duplicates into the sandbox's rootfs. A host mount
+ * point is skipped only when it exactly matches one of
+ * `freshMountDestinations`: runc will mount fresh content there when it
+ * sets up the sandbox's own further-nested namespaces, shadowing whatever
+ * the rbind copy swept in from the host at that path, so forcing that
+ * (about-to-be-overridden) copy read-only would be pointless -- and some
+ * pseudo-filesystems reject a read-only remount outright. Any other real
+ * host mount point not covered would otherwise remain fully writable
+ * despite the sandbox's documented read-only-outside-workdir/home/tmp/
+ * writable guarantee. "/" itself is excluded since root.readonly already
+ * covers it directly.
  */
-const TOLERATED_PSEUDO_FSTYPES = new Set([
-  "proc",
-  "procfs",
-  "sysfs",
-  "cgroup",
-  "cgroup2",
-  "devpts",
-  "mqueue",
-  "debugfs",
-  "tracefs",
-  "securityfs",
-  "pstore",
-  "bpf",
-  "configfs",
-  "fusectl",
-  "hugetlbfs",
-  "binfmt_misc",
-  "autofs",
-  "efivarfs",
-  "nsfs",
-  "rpc_pipefs",
-]);
+export function computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinations) {
+  return hostMounts
+    .filter(({ mountPoint }) => mountPoint !== "/" && !freshMountDestinations.has(mountPoint) && !protectedPaths.has(mountPoint))
+    .map(({ mountPoint }) => mountPoint);
+}
 
 /**
- * Pure: given the host's real mount table and the set of paths that must
- * stay writable, return the host mount points that need to be explicitly
- * forced read-only. This exists because `root.readonly` in OCI/runc only
- * remounts the top-level rootfs mount point — it does *not* recursively
- * apply to separate mount points that `mount --rbind /` duplicates into
- * the sandbox's rootfs. Any real (non-pseudo) host mount point not
- * covered by this list would otherwise remain fully writable despite the
- * sandbox's documented read-only-outside-workdir/home/tmp/writable
- * guarantee. "/" itself is excluded since root.readonly already covers
- * it directly.
+ * Pure: the set of destination paths `baseSpec.mounts` already declares a
+ * mount for. Derived directly from the actual `runc spec` output already
+ * being used to build config.json (see generateBaseOciSpec), rather than a
+ * hardcoded list of filesystem types -- this stays correct automatically
+ * if a future runc version changes its own default mounts, and sidesteps
+ * fstype ambiguity (e.g. runc's default spec declares a `cgroup`-type
+ * mount at /sys/fs/cgroup that transparently resolves to the host's real
+ * cgroup v1 or v2 hierarchy, so matching by destination path covers both
+ * without needing to special-case a literal "cgroup2" fstype name).
  */
-export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
-  return hostMounts
-    .filter(({ mountPoint, fsType }) => mountPoint !== "/" && !TOLERATED_PSEUDO_FSTYPES.has(fsType) && !protectedPaths.has(mountPoint))
-    .map(({ mountPoint }) => mountPoint);
+export function freshMountDestinationsFrom(baseSpec) {
+  return new Set(baseSpec.mounts.map((m) => m.destination));
 }
 
 // runc resolves process.args[0] against the *sandbox's* PATH (the step's own
@@ -272,7 +263,9 @@ export function buildOciConfig(
   const baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter((p) => !EXTRA_MASKED_PROC_PATHS.includes(p));
   const readonlyPaths = disableReadonly
     ? baseReadonlyPaths
-    : Array.from(new Set([...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths)]));
+    : Array.from(
+        new Set([...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinationsFrom(baseSpec))]),
+      );
 
   const namespaces = baseSpec.linux.namespaces.map((ns) => (ns.type === "network" ? { ...ns, path: netnsPath } : ns));
 

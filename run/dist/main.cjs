@@ -7316,10 +7316,12 @@ function parseMountinfo(mountinfoContent) {
   });
 }
 
-const TOLERATED_PSEUDO_FSTYPES = new Set([ "proc", "procfs", "sysfs", "cgroup", "cgroup2", "devpts", "mqueue", "debugfs", "tracefs", "securityfs", "pstore", "bpf", "configfs", "fusectl", "hugetlbfs", "binfmt_misc", "autofs", "efivarfs", "nsfs", "rpc_pipefs" ]);
+function computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinations) {
+  return hostMounts.filter(({mountPoint: mountPoint}) => "/" !== mountPoint && !freshMountDestinations.has(mountPoint) && !protectedPaths.has(mountPoint)).map(({mountPoint: mountPoint}) => mountPoint);
+}
 
-function computeReadonlyHostMounts(hostMounts, protectedPaths) {
-  return hostMounts.filter(({mountPoint: mountPoint, fsType: fsType}) => "/" !== mountPoint && !TOLERATED_PSEUDO_FSTYPES.has(fsType) && !protectedPaths.has(mountPoint)).map(({mountPoint: mountPoint}) => mountPoint);
+function freshMountDestinationsFrom(baseSpec) {
+  return new Set(baseSpec.mounts.map(m => m.destination));
 }
 
 const SETPRIV_CANDIDATE_PATHS = [ "/usr/bin/setpriv", "/bin/setpriv", "/usr/sbin/setpriv", "/sbin/setpriv" ];
@@ -7347,7 +7349,7 @@ function buildOciConfig(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: h
       options: [ "rbind", "rw" ]
     });
   }
-  const maskedPaths = [ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ], baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), readonlyPaths = disableReadonly ? baseReadonlyPaths : Array.from(new Set([ ...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths) ])), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
+  const maskedPaths = [ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ], baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), readonlyPaths = disableReadonly ? baseReadonlyPaths : Array.from(new Set([ ...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinationsFrom(baseSpec)) ])), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
     ...ns,
     path: netnsPath
   } : ns);

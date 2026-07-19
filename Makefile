@@ -181,6 +181,7 @@ test_sandbox_integration: ## Run the run action's integration tests (needs BUILD
 	@./run/test/integration-test-fs-escape.sh
 	@./run/test/integration-test-runner-temp.sh
 	@./run/test/integration-test-nested-mount-readonly.sh
+	@./run/test/integration-test-non-runc-default-pseudofs-readonly.sh
 	@./run/test/integration-test-concurrent.sh
 
 .PHONY: test_unit
