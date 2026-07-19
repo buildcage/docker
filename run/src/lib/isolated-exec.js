@@ -101,7 +101,19 @@ export function buildOciConfig(
       ...baseSpec.process,
       terminal: false,
       user: { uid, gid },
-      args: [scriptPath],
+      // setpriv --pdeathsig ties this process's life to its direct
+      // parent's -- the `runc run` process, not run-isolated.sh itself
+      // (runc's own process sits in between). This is the second hop of a
+      // two-hop chain: run-isolated.sh also wraps its own `runc run`
+      // invocation in `setpriv --pdeathsig=KILL` (targeting itself), so if
+      // run-isolated.sh is SIGKILL'd, `runc run` dies too, which then
+      // kills this process in turn -- without the outer hop, `runc run`
+      // would merely become an orphan (still alive) and this process,
+      // whose parent never actually died, would never receive anything.
+      // No other setpriv flags are needed here -- uid/gid, capabilities,
+      // and no_new_privs are already applied by runc itself (above/below)
+      // before this execs.
+      args: ["setpriv", "--pdeathsig=KILL", "--", scriptPath],
       env: Object.entries(env)
         .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}=${v}`),

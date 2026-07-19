@@ -59,7 +59,7 @@ if [ "$(id -u)" != "0" ]; then
   echo "ERROR: run-isolated.sh must be run as root (via sudo)" >&2
   exit 1
 fi
-for cmd in nsenter ip mount; do
+for cmd in nsenter ip mount setpriv; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: required command not found: $cmd" >&2; exit 1; }
 done
 [ -e "/proc/${PROXY_PID}/ns/net" ] || { echo "ERROR: proxy netns not found for pid ${PROXY_PID}" >&2; exit 1; }
@@ -132,7 +132,30 @@ set +e
 # isolated-exec.js's buildOciConfig), so runc joins it itself as part of
 # its own container setup -- namespaces, capabilities, mounts, uid/gid,
 # and the seccomp filter are all declared in config.json.
-"$RUNC_PATH" run --bundle "$BUNDLE_DIR" "$CONTAINER_ID"
+#
+# setpriv --pdeathsig here (targeting this script's own life) is the first
+# half of a two-hop chain: `runc run`'s own process, not the container
+# process it starts, is this script's direct child, so a plain
+# --die-with-parent-style guard on the *sandboxed* process alone (set in
+# config.json's process.args, see buildOciConfig) would only protect
+# against `runc run` itself dying -- if this script gets SIGKILL'd,
+# `runc run` would just become an orphan (still alive, unaffected) without
+# this. Verified empirically: killing this script's own bash process tears
+# down the whole chain (runc and the sandboxed command both die); without
+# the outer setpriv, the sandboxed command survives as an orphan.
+#
+# Known residual gap: `sudo -n` itself (invoked by isolated-exec.js) forks
+# a separate monitor process ahead of this script on distros with the
+# common `Defaults use_pty` sudoers setting -- if *that* specific process
+# were killed in isolation (without this script also dying), this chain
+# wouldn't trigger, since this script would merely become sudo's monitor's
+# orphan, still alive. Not addressed here: this is a low-severity gap
+# (an orphaned, still-fully-sandboxed process, not a security boundary
+# issue -- see docs/security.md), and the realistic failure modes this
+# guards against (the runner process/job being torn down, an OOM kill
+# landing on this script itself) target this script directly, not
+# specifically sudo's monitor process in isolation.
+setpriv --pdeathsig=KILL -- "$RUNC_PATH" run --bundle "$BUNDLE_DIR" "$CONTAINER_ID"
 CODE=$?
 set -e
 

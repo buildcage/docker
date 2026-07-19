@@ -7560,7 +7560,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
               uid: uid,
               gid: gid
             },
-            args: [ scriptPath ],
+            args: [ "setpriv", "--pdeathsig=KILL", "--", scriptPath ],
             env: Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => `${k}=${v}`),
             cwd: workdir || "/",
             capabilities: {

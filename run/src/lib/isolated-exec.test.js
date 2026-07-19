@@ -93,11 +93,15 @@ describe("buildOciConfig", () => {
     assert.equal(config.process.noNewPrivileges, true);
   });
 
-  it("sets uid/gid, args, and cwd from the given options", () => {
+  it("sets uid/gid and cwd from the given options", () => {
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
     assert.deepEqual(config.process.user, { uid: 1000, gid: 1000 });
-    assert.deepEqual(config.process.args, [baseArgs.scriptPath]);
     assert.equal(config.process.cwd, baseArgs.workdir);
+  });
+
+  it("wraps the script in `setpriv --pdeathsig=KILL` (die-with-parent, see run-isolated.sh)", () => {
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    assert.deepEqual(config.process.args, ["setpriv", "--pdeathsig=KILL", "--", baseArgs.scriptPath]);
   });
 
   it("replaces process.env with the given env, dropping undefined values", () => {
