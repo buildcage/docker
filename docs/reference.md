@@ -236,7 +236,7 @@ during the audited run — mirroring the same example the `report` action genera
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
-| `writable` | No | empty | Additional writable directories (newline-separated), on top of `$GITHUB_WORKSPACE`, `$HOME`, and `/tmp` — see [Filesystem Access](#filesystem-access) below |
+| `writable` | No | empty | Additional writable directories (newline-separated), on top of `$GITHUB_WORKSPACE`, `$HOME`, `/tmp`, and `$RUNNER_TEMP` — see [Filesystem Access](#filesystem-access) below |
 | `label` | No | empty | Label appended to this step's Job Summary heading, e.g. `npm install` — useful to tell steps apart when `run` is used more than once in the same job |
 
 Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above.
@@ -288,10 +288,10 @@ itself instead of a BuildKit `RUN` step:
 
 ### Filesystem Access
 
-Only `$GITHUB_WORKSPACE`, `$HOME`, and `/tmp` are writable by default — every other path is
-remounted read-only for the duration of the `run` command. This closes off using the filesystem to
-plant a payload for a later, non-sandboxed step in the same job (e.g. rewriting a binary earlier on
-`$PATH`); it doesn't restrict what the command can *read* (see
+Only `$GITHUB_WORKSPACE`, `$HOME`, `/tmp`, and `$RUNNER_TEMP` are writable by default — every other
+path is remounted read-only for the duration of the `run` command. This closes off using the
+filesystem to plant a payload for a later, non-sandboxed step in the same job (e.g. rewriting a
+binary earlier on `$PATH`); it doesn't restrict what the command can *read* (see
 [Known Limitations](./security.md#run-action) in Security Details).
 
 If `run` needs to write somewhere else — a tool-specific cache directory, for example — list it
@@ -314,5 +314,6 @@ To disable the read-only restriction entirely, set `writable` to `/`:
 > [!NOTE]
 > `run` runs `run-isolated.sh` directly on the runner host (via `sudo -n`), so it requires a
 > Linux runner with passwordless `sudo` — this is the default on GitHub-hosted `ubuntu-*` runners.
-> It does not currently apply a seccomp profile, AppArmor/SELinux profile, or Landlock rules; see
-> [Security Details](./security.md#run-action) for the full threat model and known limitations.
+> It applies a seccomp filter derived from Docker's own default profile; it does not apply an
+> AppArmor/SELinux profile or Landlock rules. See [Security Details](./security.md#run-action) for
+> the full threat model and known limitations.

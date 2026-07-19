@@ -42,7 +42,7 @@ const configs = [
     plugins: mainPlugins,
     inlineDynamicImports: true,
   },
-  { input: "run/src/post.js", file: "run/dist/post.cjs", plugins: [] },
+  { input: "run/src/post.js", file: "run/dist/post.cjs", plugins: [json()] },
 ];
 
 export default configs.map(

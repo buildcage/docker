@@ -14,6 +14,8 @@
  *   INVALID_RULES    – ACL rule syntax error
  *   MISSING_RUN      – required `run` input was empty
  *   PROXY_NOT_RUNNING – sandbox proxy container isn't running after `docker compose up`
+ *   RUNC_EXTRACT_FAILED – failed to `docker cp` runc/gen-seccomp-profile out of the proxy image
+ *   OCI_CONFIG_BUILD_FAILED – failed to run gen-seccomp-profile/runc spec or assemble config.json
  */
 export class SandboxError extends Error {
   constructor(message, code) {

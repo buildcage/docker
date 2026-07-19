@@ -95,9 +95,12 @@ run_sandbox_mode: ## Start sandbox proxy + dev runner (mac-friendly dev loop)
 test_sandbox_mode: ## Run a sample isolated command in the dev loop and verify isolation
 	@$(MAKE) run_sandbox_mode
 	@PROXY_PID=$$(docker inspect --format '{{.State.Pid}}' buildcage-proxy); \
-	  docker compose -f compose.yaml -f run/compose.sandbox-dev.yaml exec sandbox-dev-runner \
-	    run-isolated.sh --proxy-pid $$PROXY_PID --uid 1000 --gid 1000 \
-	    --gateway 172.20.0.1 --dns 172.20.0.1 -- /usr/local/bin/smoke-test.sh
+	  docker compose -f compose.yaml -f run/compose.sandbox-dev.yaml exec sandbox-dev-runner sh -c " \
+	    set -e; \
+	    build-test-bundle.sh --netns-name buildcage-sandbox-dev --script /usr/local/bin/smoke-test.sh --bundle /var/tmp/buildcage/dev-bundle; \
+	    run-isolated.sh --proxy-pid $$PROXY_PID --runc /usr/local/bin/runc --bundle /var/tmp/buildcage/dev-bundle \
+	      --container-id buildcage-sandbox-dev --netns-name buildcage-sandbox-dev --rootfs-bind-dir /var/tmp/buildcage/dev-bundle/rootfs \
+	      --gateway 172.20.0.1 --dns 172.20.0.1 --target-ip 172.20.0.101"
 	@$(MAKE) clean_sandbox_mode
 
 .PHONY: clean_sandbox_mode
@@ -173,6 +176,12 @@ test_sandbox_integration: ## Run the run action's integration tests (needs BUILD
 	@./run/test/integration-test-writable-dir.sh
 	@./run/test/integration-test-writable-disabled.sh
 	@./run/test/integration-test-defaults.sh
+	@./run/test/integration-test-seccomp.sh
+	@./run/test/integration-test-die-with-parent.sh
+	@./run/test/integration-test-fs-escape.sh
+	@./run/test/integration-test-runner-temp.sh
+	@./run/test/integration-test-nested-mount-readonly.sh
+	@./run/test/integration-test-non-runc-default-pseudofs-readonly.sh
 	@./run/test/integration-test-concurrent.sh
 
 .PHONY: test_unit

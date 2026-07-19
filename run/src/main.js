@@ -9,7 +9,16 @@ import { verifyImageDigest } from "../../core/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";
 import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.js";
-import { writeRunScript, runIsolated, withScratchDir } from "./lib/isolated-exec.js";
+import {
+  writeRunScript,
+  writeResolvConf,
+  extractRuncBootstrap,
+  buildOciConfig,
+  writeOciConfig,
+  runIsolated,
+  withScratchDir,
+  listHostMounts,
+} from "./lib/isolated-exec.js";
 import { fetchReport, writeReport } from "./lib/report.js";
 
 export { buildComposeUpArgs, buildComposeDownArgs };
@@ -160,18 +169,76 @@ async function main() {
       throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
     }
 
+    // Fixed addressing on the proxy's sandbox0 bridge.
+    const gateway = "172.20.0.1";
+    const dns = "172.20.0.1";
+    const targetIp = "172.20.0.101";
+
     exitCode = withScratchDir((dir) => {
-      const scriptPath = writeRunScript(runInput, dir);
+      let runcPath, seccompProfile, baseSpec;
+      try {
+        // Extracted into this run's own scratch dir — see extractRuncBootstrap.
+        // Run natively on the runner host (not `docker exec`, which would
+        // resolve against the container's kernel/arch instead of the real
+        // one) — see gen-seccomp-profile/main.go.
+        ({ runcPath, seccompProfile, baseSpec } = extractRuncBootstrap({ containerName, destDir: dir }));
+      } catch (e) {
+        throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
+      }
+
+      const workdir = env.GITHUB_WORKSPACE || "";
+      const home = env.HOME || "";
+      // Distinct from the Docker container name/Compose project name
+      // (different ID namespace — `ip netns`/runc container IDs), but
+      // derived from it to keep `ip netns`/`docker ps` output correlated
+      // per step, same reasoning as deriveProjectName.
+      const netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-");
+      const rootfsBindDir = join(dir, "rootfs");
+
+      let config;
+      try {
+        const resolvConfPath = writeResolvConf(dns, dir);
+        const scriptPath = writeRunScript(runInput, dir);
+        // Real host mount table, read now (before run-isolated.sh's `mount
+        // --rbind /` duplicates it into rootfsBindDir) so buildOciConfig can
+        // force every real submount read-only individually -- root.readonly
+        // alone only covers the top-level rootfs mount (see
+        // computeReadonlyHostMounts).
+        const hostMounts = listHostMounts();
+        config = buildOciConfig(baseSpec, {
+          uid: process.getuid(),
+          gid: process.getgid(),
+          workdir,
+          home,
+          // Standard writable runner scratch; not always under $HOME on
+          // self-hosted runners, so covered explicitly (see buildOciConfig).
+          runnerTemp: env.RUNNER_TEMP || "",
+          writablePaths,
+          env,
+          netnsPath: `/var/run/netns/${netnsName}`,
+          rootfsBindDir,
+          resolvConfPath,
+          seccompProfile,
+          scriptPath,
+          hostMounts,
+        });
+      } catch (e) {
+        throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${e.message}`, "OCI_CONFIG_BUILD_FAILED");
+      }
+      writeOciConfig(config, dir);
+
       return runIsolated({
-        scriptPath,
+        runcPath,
         proxyPid,
-        workdir: env.GITHUB_WORKSPACE || "",
-        home: env.HOME || "",
-        writablePaths,
-        env,
-        runScriptDir: dir,
+        bundleDir: dir,
+        containerId: containerName,
+        netnsName,
+        rootfsBindDir,
+        gateway,
+        dns,
+        targetIp,
       });
-    });
+    }, containerName);
   } finally {
     try {
       const report = fetchReport(containerName);

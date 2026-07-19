@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildComposeDownArgs } from "./lib/compose-args.js";
+import { cleanupScratchDir, scratchDirFor } from "./lib/isolated-exec.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -15,6 +17,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // https://docs.github.com/en/actions/creating-actions/dockerfile-support-for-github-actions#saving-state.
 const containerName = process.env.STATE_container_name;
 const projectName = process.env.STATE_project_name;
+
+// Reclaim this step's sandbox scratch dir if a hard kill bypassed main.js's
+// own withScratchDir finally. Its path is derived deterministically from
+// containerName (scratchDirFor), so no separately recorded path is needed.
+// cleanupScratchDir force-detaches the rootfs bind-mount before deleting, so
+// this can't walk into the host filesystem even if a mount somehow survived.
+// Independent of the container teardown below, so it runs regardless.
+if (containerName?.startsWith("buildcage-proxy-")) {
+  try {
+    const scratchDir = scratchDirFor(containerName);
+    if (existsSync(scratchDir)) cleanupScratchDir(scratchDir);
+  } catch (e) {
+    console.log(`::warning::run post-cleanup: failed to remove sandbox scratch dir: ${e.message}`);
+  }
+}
 
 if (containerName && projectName) {
   execFileSync(

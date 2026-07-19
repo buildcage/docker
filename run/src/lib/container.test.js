@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { generateContainerName, getContainerPid, deriveProjectName } from "./container.js";
+import { generateContainerName, getContainerPid, deriveProjectName, buildDockerCpArgs } from "./container.js";
 
 describe("generateContainerName", () => {
   it("always starts with the buildcage-proxy- prefix", () => {
@@ -17,6 +17,15 @@ describe("generateContainerName", () => {
 describe("getContainerPid", () => {
   it("returns null for a container that doesn't exist", () => {
     assert.equal(getContainerPid("buildcage-proxy-this-should-not-exist-anywhere"), null);
+  });
+});
+
+describe("buildDockerCpArgs", () => {
+  it("builds a `docker cp <container>:<containerPath> <hostPath>` argv", () => {
+    assert.deepEqual(
+      buildDockerCpArgs({ containerName: "buildcage-proxy-abcd1234", containerPath: "/opt/buildcage/bin/runc", hostPath: "/tmp/x/runc" }),
+      ["cp", "buildcage-proxy-abcd1234:/opt/buildcage/bin/runc", "/tmp/x/runc"],
+    );
   });
 });
 

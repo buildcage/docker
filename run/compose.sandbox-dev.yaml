@@ -16,9 +16,19 @@ services:
     security_opt:
       - seccomp=unconfined
       - apparmor=unconfined
+    # runc needs to create/manage a cgroup for the sandboxed process, which
+    # needs a writable /sys/fs/cgroup -- read-only by default in a
+    # non-privileged container, same reasoning as the "builder" service in
+    # ../../compose.yaml. Not needed on the real GitHub Actions runner host
+    # this dev loop stands in for (root already has full cgroup access
+    # there without this).
+    cgroup: host
     volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - ./run/scripts/run-isolated.sh:/usr/local/bin/run-isolated.sh:ro
+      - ./run/scripts/extra-masked-proc-paths.json:/etc/buildcage/extra-masked-proc-paths.json:ro
       - ./run/dev/smoke-test.sh:/usr/local/bin/smoke-test.sh:ro
+      - ./run/dev/build-test-bundle.sh:/usr/local/bin/build-test-bundle.sh:ro
     depends_on:
       proxy:
         condition: service_started

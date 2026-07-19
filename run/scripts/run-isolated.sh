@@ -1,132 +1,151 @@
 #!/bin/bash
-# run-isolated.sh — run a command in a network-isolated sandbox.
+# run-isolated.sh — run a command in a network-isolated sandbox via runc.
 #
-# Creates a throwaway network/pid/mount/uts/ipc/cgroup namespace, wires a
-# veth pair into the buildcage-proxy container's "sandbox0" bridge,
-# strips all capabilities and privilege-escalation paths from the target
-# process, and execs the given script inside it.
+# Creates a network namespace, wires a veth pair into the buildcage-proxy
+# container's "sandbox0" bridge, bind-mounts the host's own "/" so it can
+# be handed to runc as a read-only rootfs, and execs `runc run` against an
+# OCI bundle (config.json) that isolated-exec.js has already fully built --
+# namespaces, capabilities, mounts, uid/gid, and the seccomp filter are all
+# declared there. This script only sets up what runc itself cannot: the
+# network namespace's veth wiring into the proxy's bridge, and the rootfs
+# bind-mount runc needs as its root.path (pivot_root can't target "/"
+# itself).
 #
 # Must be run as root (invoked via `sudo -n` from the run action).
 set -euo pipefail
 
+# Re-exec into a fresh, private mount namespace before doing anything else.
+# Every concurrently running `run:` step's own scratch dir lives under the
+# same /tmp, so without this, the `mount --rbind /` staging below (and `ip
+# netns add`'s own bind-mount of /run/netns) would run in the one mount
+# namespace shared by every step on the host -- unavoidably nesting a copy
+# of each concurrently running step's rootfs tree inside every other's
+# snapshot, which races their unmount/rmdir cleanup against each other.
+# With this, everything this script mounts is invisible to (and
+# unaffected by) every other concurrent invocation from the moment it's
+# created. `--propagation private` is `unshare`'s shortcut for "unshare +
+# recursively make every mount private" in one step. No `--fork`, so this
+# and the subsequent exec replace the current process in place -- this
+# script's PID (and /proc/self/cmdline, matched by
+# integration-test-die-with-parent.sh's pgrep) stays the same across the
+# re-exec.
+if [ -z "${BUILDCAGE_UNSHARED:-}" ]; then
+  command -v unshare >/dev/null 2>&1 || { echo "ERROR: required command not found: unshare" >&2; exit 1; }
+  export BUILDCAGE_UNSHARED=1
+  exec unshare --mount --propagation private -- "$0" "$@"
+fi
+
 PROXY_PID=""
-TARGET_UID=""
-TARGET_GID=""
-GATEWAY="172.20.0.1"
-DNS="172.20.0.1"
-TARGET_IP="172.20.0.101"
-WORKDIR=""
-HOME_DIR=""
-ENV_FILE=""
-SCRIPT_PATH=""
-WRITABLE_PATHS=()
+RUNC_PATH=""
+BUNDLE_DIR=""
+CONTAINER_ID=""
+NETNS_NAME=""
+ROOTFS_BIND_DIR=""
+GATEWAY=""
+DNS=""
+TARGET_IP=""
 
 usage() {
   cat >&2 <<'EOF'
-Usage: run-isolated.sh --proxy-pid <PID> --uid <UID> --gid <GID>
-         [--gateway <IP>] [--dns <IP>] [--target-ip <IP>]
-         [--workdir <PATH>] [--home <PATH>] [--writable <PATH>]...
-         [--env-file <PATH>] -- <script-path>
+Usage: run-isolated.sh --proxy-pid <PID> --runc <PATH> --bundle <DIR>
+         --container-id <ID> --netns-name <NAME> --rootfs-bind-dir <DIR>
+         --gateway <IP> --dns <IP> --target-ip <IP>
 EOF
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --proxy-pid) PROXY_PID="$2"; shift 2 ;;
-    --uid) TARGET_UID="$2"; shift 2 ;;
-    --gid) TARGET_GID="$2"; shift 2 ;;
+    --runc) RUNC_PATH="$2"; shift 2 ;;
+    --bundle) BUNDLE_DIR="$2"; shift 2 ;;
+    --container-id) CONTAINER_ID="$2"; shift 2 ;;
+    --netns-name) NETNS_NAME="$2"; shift 2 ;;
+    --rootfs-bind-dir) ROOTFS_BIND_DIR="$2"; shift 2 ;;
     --gateway) GATEWAY="$2"; shift 2 ;;
     --dns) DNS="$2"; shift 2 ;;
     --target-ip) TARGET_IP="$2"; shift 2 ;;
-    --workdir) WORKDIR="$2"; shift 2 ;;
-    --home) HOME_DIR="$2"; shift 2 ;;
-    --writable) WRITABLE_PATHS+=("$2"); shift 2 ;;
-    --env-file) ENV_FILE="$2"; shift 2 ;;
-    --) shift; SCRIPT_PATH="${1:-}"; shift || true; break ;;
     -h|--help) usage; exit 0 ;;
     *) echo "ERROR: unknown argument: $1" >&2; usage; exit 1 ;;
   esac
 done
 
 [ -z "$PROXY_PID" ] && { echo "ERROR: --proxy-pid is required" >&2; usage; exit 1; }
-[ -z "$TARGET_UID" ] && { echo "ERROR: --uid is required" >&2; usage; exit 1; }
-[ -z "$TARGET_GID" ] && { echo "ERROR: --gid is required" >&2; usage; exit 1; }
-[ -z "$SCRIPT_PATH" ] && { echo "ERROR: script path is required after --" >&2; usage; exit 1; }
+[ -z "$RUNC_PATH" ] && { echo "ERROR: --runc is required" >&2; usage; exit 1; }
+[ -z "$BUNDLE_DIR" ] && { echo "ERROR: --bundle is required" >&2; usage; exit 1; }
+[ -z "$CONTAINER_ID" ] && { echo "ERROR: --container-id is required" >&2; usage; exit 1; }
+[ -z "$NETNS_NAME" ] && { echo "ERROR: --netns-name is required" >&2; usage; exit 1; }
+[ -z "$ROOTFS_BIND_DIR" ] && { echo "ERROR: --rootfs-bind-dir is required" >&2; usage; exit 1; }
+[ -z "$GATEWAY" ] && { echo "ERROR: --gateway is required" >&2; usage; exit 1; }
+[ -z "$DNS" ] && { echo "ERROR: --dns is required" >&2; usage; exit 1; }
+[ -z "$TARGET_IP" ] && { echo "ERROR: --target-ip is required" >&2; usage; exit 1; }
 
 if [ "$(id -u)" != "0" ]; then
   echo "ERROR: run-isolated.sh must be run as root (via sudo)" >&2
   exit 1
 fi
-for cmd in unshare nsenter setpriv ip env; do
+for cmd in nsenter ip mount setpriv; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: required command not found: $cmd" >&2; exit 1; }
 done
 [ -e "/proc/${PROXY_PID}/ns/net" ] || { echo "ERROR: proxy netns not found for pid ${PROXY_PID}" >&2; exit 1; }
-[ -x "$SCRIPT_PATH" ] || { echo "ERROR: script not found or not executable: ${SCRIPT_PATH}" >&2; exit 1; }
+[ -x "$RUNC_PATH" ] || { echo "ERROR: runc not found or not executable: ${RUNC_PATH}" >&2; exit 1; }
+[ -f "${BUNDLE_DIR}/config.json" ] || { echo "ERROR: OCI bundle config not found: ${BUNDLE_DIR}/config.json" >&2; exit 1; }
 
 RAND_ID=$(od -An -tx1 -N4 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -z "$RAND_ID" ] && RAND_ID=$(printf '%08x' "$$")
 VETH_T="sbxt${RAND_ID}"
 VETH_P="sbxp${RAND_ID}"
 
-PLACEHOLDER_UNSHARE_PID=""
-PLACEHOLDER_PID=""
 CODE=1
 
 cleanup() {
   set +e
-  if [ -n "$PLACEHOLDER_PID" ]; then
-    # The proxy-side veth lives in the long-lived proxy container's netns,
-    # so it must be explicitly removed; the target-side end disappears
-    # automatically when the placeholder namespace is torn down below.
-    nsenter --net="/proc/${PROXY_PID}/ns/net" -- ip link del "$VETH_P" >/dev/null 2>&1
-  fi
-  # The placeholder ("sleep infinity") is pid 1 inside its own new pid
-  # namespace, and pid 1 ignores signals with a default action of
-  # terminate unless it installed a handler -- SIGTERM will not touch it.
-  # SIGKILL cannot be caught or ignored, so it always tears the namespace
-  # down.
-  [ -n "$PLACEHOLDER_PID" ] && kill -9 "$PLACEHOLDER_PID" >/dev/null 2>&1
-  [ -n "$PLACEHOLDER_UNSHARE_PID" ] && kill -9 "$PLACEHOLDER_UNSHARE_PID" >/dev/null 2>&1
-  wait >/dev/null 2>&1
+  # -f/--force also kills the container's process tree if it's still
+  # running (e.g. this trap fired from INT/TERM mid-run), so it must run
+  # before the network/mount resources below are torn out from under it.
+  "$RUNC_PATH" delete -f "$CONTAINER_ID" >/dev/null 2>&1
+  # Not silenced: a failed unmount here (e.g. EBUSY from a lingering
+  # process) leaves ROOTFS_BIND_DIR -- a bind-mount of the entire host
+  # filesystem -- still live, so it's worth surfacing even though
+  # isolated-exec.js's withScratchDir has its own safety net before it
+  # recursively deletes this directory.
+  UMOUNT_ERR_FILE="/tmp/.buildcage-umount-err.$$"
+  umount -R "$ROOTFS_BIND_DIR" >/dev/null 2>"$UMOUNT_ERR_FILE" || {
+    echo "WARNING: failed to unmount ${ROOTFS_BIND_DIR}: $(cat "$UMOUNT_ERR_FILE" 2>/dev/null)" >&2
+  }
+  rm -f "$UMOUNT_ERR_FILE"
+  # The proxy-side veth lives in the long-lived proxy container's netns, so
+  # it must be explicitly removed -- unlike the target-side end (torn down
+  # for free when the sandbox netns below is deleted), a still-alive
+  # namespace doesn't lose its interfaces just because its veth peer's
+  # namespace went away.
+  nsenter --net="/proc/${PROXY_PID}/ns/net" -- ip link del "$VETH_P" >/dev/null 2>&1
+  ip netns del "$NETNS_NAME" >/dev/null 2>&1
   exit "$CODE"
 }
 trap cleanup EXIT INT TERM
 
-echo "run-isolated: creating placeholder namespace..." >&2
-unshare --net --pid --mount --uts --ipc --cgroup --mount-proc --fork -- sh -c 'exec sleep infinity' &
-PLACEHOLDER_UNSHARE_PID=$!
+# Bind-mounted first, before any of the network setup below: it has no
+# dependency on the netns/veth work that follows, and doing it first
+# minimizes the gap between isolated-exec.js's listHostMounts() snapshot
+# (which config.json's readonlyPaths was computed from) and this rbind
+# actually capturing the host's mount table.
+echo "run-isolated: bind-mounting host root for runc's rootfs..." >&2
+mkdir -p "$ROOTFS_BIND_DIR"
+mount --rbind / "$ROOTFS_BIND_DIR"
+# No separate `mount --make-rprivate` needed here: the whole-namespace
+# `--propagation private` set up above already makes every mount created
+# under it private by default, including this one.
 
-# unshare --pid does not move the calling (unshare) process itself into the
-# new pid namespace -- only the first forked child does, and *that* child's
-# host-visible PID is what nsenter needs. Discover it via procfs.
-i=0
-while [ "$i" -lt 200 ]; do
-  CHILD=$(cat "/proc/${PLACEHOLDER_UNSHARE_PID}/task/${PLACEHOLDER_UNSHARE_PID}/children" 2>/dev/null | awk '{print $1}')
-  if [ -n "$CHILD" ] && [ -e "/proc/${CHILD}/ns/net" ]; then
-    PLACEHOLDER_PID="$CHILD"
-    break
-  fi
-  i=$((i + 1))
-  sleep 0.02
-done
-[ -z "$PLACEHOLDER_PID" ] && { echo "ERROR: timed out waiting for placeholder namespace" >&2; exit 1; }
-echo "run-isolated: placeholder pid=${PLACEHOLDER_PID}" >&2
-
-# The placeholder's mount namespace starts out as a clone of the host's, and
-# a cloned mount keeps the same propagation type (typically "shared" under
-# systemd) as its origin -- meaning every bind-mount/remount below would
-# otherwise propagate straight back out to the host's real mount namespace.
-# `--make-rprivate` (recursive) detaches the whole tree from that peer group
-# before anything else touches it.
-nsenter --mount="/proc/${PLACEHOLDER_PID}/ns/mnt" -- mount --make-rprivate /
+echo "run-isolated: creating sandbox network namespace..." >&2
+ip netns add "$NETNS_NAME"
 
 echo "run-isolated: creating veth pair ${VETH_T} <-> ${VETH_P}..." >&2
 ip link add "$VETH_T" type veth peer name "$VETH_P"
-ip link set "$VETH_T" netns "$PLACEHOLDER_PID"
+ip link set "$VETH_T" netns "$NETNS_NAME"
 ip link set "$VETH_P" netns "$PROXY_PID"
 
-echo "run-isolated: configuring target namespace network..." >&2
-nsenter --net="/proc/${PLACEHOLDER_PID}/ns/net" -- sh -c "
+echo "run-isolated: configuring sandbox namespace network..." >&2
+ip netns exec "$NETNS_NAME" sh -c "
   set -e
   ip link set '${VETH_T}' name eth0
   ip addr add '${TARGET_IP}/24' dev eth0
@@ -135,95 +154,6 @@ nsenter --net="/proc/${PLACEHOLDER_PID}/ns/net" -- sh -c "
   ip route add default via '${GATEWAY}'
 "
 
-echo "run-isolated: rewriting resolv.conf inside target mount namespace..." >&2
-nsenter --mount="/proc/${PLACEHOLDER_PID}/ns/mnt" --net="/proc/${PLACEHOLDER_PID}/ns/net" -- sh -c "
-  set -e
-  printf 'nameserver %s\n' '${DNS}' > /tmp/.buildcage-resolv.conf
-  mount --bind /tmp/.buildcage-resolv.conf /etc/resolv.conf
-"
-
-echo "run-isolated: masking sensitive /proc paths..." >&2
-nsenter --mount="/proc/${PLACEHOLDER_PID}/ns/mnt" -- sh -c '
-  for p in /proc/kcore /proc/kallsyms /proc/kmsg /proc/sysrq-trigger /proc/timer_list /proc/keys; do
-    [ -e "$p" ] && mount --bind /dev/null "$p" 2>/dev/null
-  done
-  true
-'
-
-# Paths that stay writable: workdir/home/tmp plus whatever --writable added.
-# "/" among the extras is a sentinel meaning "disable this restriction
-# entirely" (see usage()) rather than literally protecting just the "/"
-# mount entry, since most of the filesystem below "/" isn't a separate
-# mount point and so wouldn't be covered by protecting "/" alone.
-PROTECTED_PATHS=("$WORKDIR" "$HOME_DIR" /tmp)
-[ ${#WRITABLE_PATHS[@]} -gt 0 ] && PROTECTED_PATHS+=("${WRITABLE_PATHS[@]}")
-DISABLE_READONLY=false
-for p in "${WRITABLE_PATHS[@]}"; do
-  [ "$p" = "/" ] && DISABLE_READONLY=true
-done
-
-if [ "$DISABLE_READONLY" = "true" ]; then
-  echo "run-isolated: 'writable: /' given -- leaving the filesystem fully writable" >&2
-else
-  echo "run-isolated: restricting filesystem to read-only (except workdir/home/tmp/writable)..." >&2
-  # --target (not just --mount=) is required here: /proc/self/mountinfo only
-  # resolves "self" correctly when this process is actually a member of the
-  # pid namespace that the target's /proc instance was mounted for.
-  nsenter --target "$PLACEHOLDER_PID" --mount --pid -- sh -c '
-    set -e
-    # Bind-mounting a path onto itself gives it its own mount-table entry, so
-    # remounting everything else read-only below does not affect it.
-    for d in "$@"; do
-      [ -n "$d" ] && [ -d "$d" ] && mount --bind "$d" "$d"
-    done
-    # Walk existing mounts and remount each read-only in place, skipping the
-    # paths just made writable above. "bind" is required: a plain
-    # "remount,ro" changes the underlying superblock, which is shared with
-    # the mount this was cloned from (i.e. the real host mount namespace)
-    # even after make-rprivate -- only "remount,bind,ro" scopes the
-    # read-only flag to this one mount entry.
-    #
-    # A failed remount is NOT silently ignored: pseudo-filesystems that
-    # legitimately reject a read-only remount are tolerated (their
-    # writability is not a payload-planting surface for a later step), but
-    # any *real* filesystem left writable fails the run closed, so a silent
-    # remount failure can never quietly weaken the read-only guarantee
-    # documented in docs/security.md. In each mountinfo line the 6th field
-    # holds the per-mount options, and the field immediately after the
-    # " - " separator is the filesystem type.
-    tac /proc/self/mountinfo | while read -r _ _ _ _ mnt_point mnt_opts rest; do
-      skip=0
-      for p in "$@"; do
-        [ "$mnt_point" = "$p" ] && skip=1 && break
-      done
-      [ "$skip" = 1 ] && continue
-      # Already read-only per mountinfo -- no remount needed.
-      case ",${mnt_opts}," in
-        *,ro,*) continue ;;
-      esac
-      mount -o remount,bind,ro "$mnt_point" 2>/dev/null && continue
-      # Retry once, re-bound onto itself: a mount that predates this
-      # namespace (e.g. a Docker maskedPath tmpfs re-parented under
-      # --mount-proc, seen on /proc/scsi and /proc/interrupts) can reject an
-      # otherwise-safe remount until re-bound gives it a fresh mount entry.
-      mount --bind "$mnt_point" "$mnt_point" 2>/dev/null &&
-        mount -o remount,bind,ro "$mnt_point" 2>/dev/null && continue
-      fstype=${rest#*- }
-      fstype=${fstype%% *}
-      case "$fstype" in
-        proc|procfs|sysfs|cgroup|cgroup2|devpts|mqueue|debugfs|tracefs|securityfs|\
-pstore|bpf|configfs|fusectl|hugetlbfs|binfmt_misc|autofs|efivarfs|nsfs|rpc_pipefs)
-          echo "run-isolated: note: pseudo-fs ${mnt_point} (${fstype}) rejected read-only remount; tolerated" >&2
-          ;;
-        *)
-          echo "ERROR: failed to remount ${mnt_point} (${fstype:-unknown}) read-only; refusing to run with it left writable" >&2
-          exit 1
-          ;;
-      esac
-    done
-  ' sh "${PROTECTED_PATHS[@]}"
-fi
-
 echo "run-isolated: attaching proxy-side veth to sandbox0 bridge..." >&2
 nsenter --net="/proc/${PROXY_PID}/ns/net" -- sh -c "
   set -e
@@ -231,33 +161,29 @@ nsenter --net="/proc/${PROXY_PID}/ns/net" -- sh -c "
   ip link set '${VETH_P}' up
 "
 
-echo "run-isolated: executing isolated command..." >&2
+echo "run-isolated: executing isolated command via runc..." >&2
 set +e
-NSENTER_ARGS=(--target "$PLACEHOLDER_PID" --net --mount --uts --ipc --cgroup --pid)
-[ -n "$WORKDIR" ] && NSENTER_ARGS+=(--wd="$WORKDIR")
-
-if [ -n "$ENV_FILE" ]; then
-  # Read the NUL-separated KEY=VALUE dump directly into an array rather than
-  # piping it through `xargs -0`: GNU xargs maps *any* exit status 1-125 from
-  # the command it runs to its own fixed exit status 123 (255 becomes 124),
-  # which would make it impossible for this script to report the isolated
-  # command's actual exit code.
-  # No "--" before setpriv: env treats the first non-NAME=VALUE token as
-  # the command to run on its own.
-  mapfile -d '' -t ENV_ASSIGNMENTS < "$ENV_FILE"
-  nsenter "${NSENTER_ARGS[@]}" -- \
-    env -i "${ENV_ASSIGNMENTS[@]}" \
-    setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --clear-groups \
-      --bounding-set=-all --no-new-privs -- \
-    "$SCRIPT_PATH"
-  CODE=$?
-else
-  nsenter "${NSENTER_ARGS[@]}" -- \
-    setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --clear-groups \
-      --bounding-set=-all --no-new-privs -- \
-    "$SCRIPT_PATH"
-  CODE=$?
-fi
+# No nsenter wrapper needed here: config.json's linux.namespaces network
+# entry already points at /var/run/netns/${NETNS_NAME}, so runc joins it
+# itself as part of its own container setup.
+#
+# setpriv --pdeathsig here (targeting this script's own life) is the first
+# half of a two-hop die-with-parent chain: `runc run`'s own process, not
+# the container process it starts, is this script's direct child, so a
+# guard on just the *sandboxed* process (config.json's process.args, see
+# buildOciConfig) would only protect against `runc run` itself dying --
+# without this outer hop, SIGKILL-ing this script would leave `runc run`
+# (and the sandboxed process under it) as a still-alive orphan.
+#
+# Known residual gap: on distros with the common `Defaults use_pty`
+# sudoers setting, `sudo -n` forks a separate monitor process ahead of
+# this script -- killing *that* specific process in isolation wouldn't
+# trigger this chain, since this script would merely become its orphan,
+# still alive. Low-severity (an orphaned but still-fully-sandboxed
+# process, not a security boundary issue -- see docs/security.md), and
+# not addressed here.
+setpriv --pdeathsig=KILL -- "$RUNC_PATH" run --bundle "$BUNDLE_DIR" "$CONTAINER_ID"
+CODE=$?
 set -e
 
 echo "run-isolated: command exited with code ${CODE}" >&2
