@@ -51,12 +51,16 @@ make clean
 ### Sandbox Dev Loop (mac-friendly)
 
 The `run` action's own isolation mechanism (`run-isolated.sh`) uses Linux-only primitives
-(`unshare`, `nsenter`, `setpriv`) that can't run natively on macOS. `make run_sandbox_mode` /
+(`ip netns`, `nsenter`, `runc`) that can't run natively on macOS. `make run_sandbox_mode` /
 `make test_sandbox_mode` instead drive it from inside a container with `pid: host` (see
 `run/dev/Dockerfile` and `run/compose.sandbox-dev.yaml`), which can see the proxy
 container's PID/netns via `/proc` — close enough to the real "runner host + separate proxy
 container" arrangement for day-to-day iteration, though it can't validate the container-boundary
-parts of production (see [Run Action Internals](#run-action-internals) below). CI's
+parts of production (see [Run Action Internals](#run-action-internals) below). `runc` and
+`gen-seccomp-profile` are built directly into the dev-loop image (mirroring `run/docker/Dockerfile`)
+rather than `docker cp`-extracted from the proxy image at runtime, so the dev loop doesn't need the
+Docker socket mounted in just to reach a sibling container; `run/dev/build-test-bundle.sh` stands in
+for `isolated-exec.js`'s `buildOciConfig` to build a minimal OCI bundle for the smoke test. CI's
 `test_sandbox_*` e2e jobs run `run-isolated.sh` directly on the runner host instead, matching
 production exactly — treat those as the final word on whether a change actually works, not this
 dev loop.
@@ -153,47 +157,56 @@ Security Details and the [Reference](./reference.md#run-action) doc.
   a service by its project+service label rather than by container name — so one step's `up`/`down`
   could recreate or tear down another step's still-running proxy container even though their
   container names never collide.
-- The actual isolation is `run/scripts/run-isolated.sh`, invoked via `sudo -n` since setting up
-  namespaces/veth/iptables requires root:
-  1. `unshare --net --pid --mount --uts --ipc --cgroup --mount-proc --fork -- sleep infinity` creates
-     a placeholder process holding the new namespaces. `unshare --pid` doesn't move the caller
-     itself into the new PID namespace — only the first forked child does — so the script discovers
-     that child's host-visible PID via `/proc/<unshare-pid>/task/<unshare-pid>/children` before it
-     can `nsenter` into it. Immediately after, `mount --make-rprivate /` (recursive) runs inside the
-     placeholder's mount namespace: a cloned mount namespace starts out in the same propagation peer
-     group as the one it was cloned from (typically "shared" under systemd), so without this, every
-     mount change made in the steps below would propagate straight back out to the host's real mount
-     namespace.
-  2. A veth pair is created with one end moved into the placeholder's netns, the other moved
-     directly into the (already-running) proxy container's netns and attached to its `sandbox0`
-     bridge as a bridge port — the same role a BuildKit `RUN` step container's veth plays under
-     `transparent` mode.
-  3. `/etc/resolv.conf` is bind-mounted over inside the placeholder's mount namespace only; a
-     handful of sensitive `/proc` paths are bind-mounted over with `/dev/null` the same way.
-  4. The rest of the filesystem is then restricted to read-only, except `$GITHUB_WORKSPACE`, `$HOME`,
-     `/tmp`, and any paths from the action's `writable` input (`--writable`, repeatable). Each of
-     those is first bind-mounted onto itself, giving it its own mount-table entry, then every
-     *other* existing mount is remounted read-only via `mount -o remount,bind,ro` — the `bind`
-     there is required: a plain `remount,ro` changes the underlying filesystem's shared state
-     (still shared with the host even after step 1's `make-rprivate`, since that only stops
-     mount/unmount *event* propagation, not this kind of flag change), and would leak the read-only
-     flag back to the host, whereas `remount,bind,ro` scopes it to this one mount entry only. A
-     literal `/` among the `writable` paths is a sentinel that skips this whole step instead of
-     bind-mounting "/" itself, since most paths below "/" aren't separate mount points and so
-     wouldn't be covered by protecting "/" alone.
-  5. The command finally executes via `nsenter --target <placeholder-pid> --net --mount --uts --ipc
-     --cgroup --pid -- env -i "${ENV_ASSIGNMENTS[@]}" setpriv --reuid=<uid> --regid=<gid>
-     --clear-groups --bounding-set=-all --no-new-privs -- <script>`. Environment variables are
-     passed through a NUL-separated dump file, read into a bash array with `mapfile -d ''` and
-     re-applied via `env -i`, rather than `sudo -E` (whose availability depends on a non-portable
-     sudoers `SETENV` tag). `mapfile` is used instead of `xargs -0` specifically so the isolated
-     command's real exit code survives: GNU xargs remaps any exit status 1-125 from the command it
-     runs to its own fixed exit status 123.
-  6. A `trap ... EXIT INT TERM` cleanup always removes the proxy-side veth and kills the placeholder
-     — with `kill -9`, specifically: the placeholder is PID 1 of its own new PID namespace, and PID
-     1 ignores the default-terminate action for signals it hasn't installed a handler for, so
-     `SIGTERM` alone leaves it running forever. Only `SIGKILL` (which can't be caught or ignored)
-     reliably tears it down.
+- The actual isolation is `runc` (the OCI reference runtime), driven by an OCI bundle
+  (`config.json`) that `run/src/lib/isolated-exec.js` builds in JS and `run/scripts/run-isolated.sh`
+  (invoked via `sudo -n`, since setting up the netns/veth/rootfs bind-mount requires root) hands off
+  to. Namespaces, capabilities, mounts, uid/gid, and the seccomp filter are all declared in
+  `config.json` and enforced by runc itself — `run-isolated.sh`'s own job is only what runc can't do:
+  1. `runc` and `gen-seccomp-profile` (see below) are `docker cp`-extracted from the already-running
+     proxy container onto the runner host and run natively there — not `docker exec`'d inside the
+     container — since their output depends on the real host's architecture/kernel, which only
+     matches when they actually run on it.
+  2. `isolated-exec.js` generates a baseline OCI spec via `runc spec` (rather than hand-writing one
+     from scratch, so the mount/rlimit/etc. defaults stay whatever runc itself considers sane for its
+     own version) and patches it: `root.path` to a not-yet-created bind-mount directory, `root.readonly`
+     plus `rw` mount overrides for `$GITHUB_WORKSPACE`/`$HOME`/`/tmp`/`writable` paths (a literal `/`
+     among them disables the read-only root entirely, per the `writable` input), `process.capabilities`
+     fully emptied, `process.noNewPrivileges`, `process.user` (uid/gid preserved, no `additionalGids`),
+     `process.env` replaced with the step's real environment, `linux.namespaces`' network entry given a
+     `path` pointing at a netns `run-isolated.sh` will create, `linux.seccomp` set to the resolved
+     profile, and `linux.maskedPaths` extended with a few sensitive `/proc` paths runc's own defaults
+     don't cover. `process.args` wraps the script in `setpriv --pdeathsig=KILL --` (see step 5).
+  3. `run-isolated.sh` creates the network namespace with `ip netns add` (not a placeholder process —
+     unlike a namespace held open by a live process, `ip netns add`'s bind-mount at
+     `/var/run/netns/<name>` persists on its own), creates a veth pair with one end moved into that
+     netns and the other into the (already-running) proxy container's netns, attached to its
+     `sandbox0` bridge as a bridge port — the same role a BuildKit `RUN` step container's veth plays
+     under `transparent` mode.
+  4. It bind-mounts the host's own `/` onto a fresh directory (`mount --rbind`) for runc's
+     `root.path` — `pivot_root` can't target `/` itself — then `mount --make-rprivate`s just that
+     bind-mount (not the host's real `/`), stopping propagation of anything that happens inside
+     runc's rootfs back out to the host without touching the host's own mount-namespace propagation
+     settings. `resolv.conf` and the sensitive-`/proc`-path masking no longer need separate bind-mount
+     steps here — they're declared in `config.json`'s `mounts`/`linux.maskedPaths` and applied by
+     runc itself when it sets up the container's own mount namespace.
+  5. The command finally executes via `setpriv --pdeathsig=KILL -- runc run --bundle <dir>
+     <container-id>` — no `nsenter --net=...` wrapper needed, since `config.json`'s namespace `path`
+     already tells runc which netns to join itself. The outer `setpriv --pdeathsig` (targeting
+     `run-isolated.sh`'s own life) and the inner one baked into `process.args` (targeting `runc
+     run`'s life) form a two-hop die-with-parent chain: `runc run`'s own process sits between
+     `run-isolated.sh` and the container's init process, so a single-hop guard on just one end
+     wouldn't tie the whole tree's life together.
+  6. A `trap ... EXIT INT TERM` cleanup runs `runc delete -f` (also kills the container if the trap
+     fired mid-run), unmounts the rootfs bind-mount, removes the proxy-side veth, and deletes the
+     netns.
+- `run/docker/gen-seccomp-profile/` is a small pure-Go tool (`CGO_ENABLED=0`, cross-compiles the same
+  way `buildkit-proxy` does) that resolves `moby/profiles`' Docker default seccomp profile into the
+  OCI form `config.json` expects, via the exported `GetDefaultProfile` — against a synthetic spec
+  with an empty capability set, matching the sandboxed process. It's built into the proxy image but
+  deliberately *run* on the runner host rather than at image-build time or via `docker exec`: its
+  output depends on the actual architecture and kernel of whatever machine runs it (a handful of
+  Docker's profile rules are gated on kernel version via a real `uname(2)` call), so it has to
+  execute on the real target to be correct.
 - The report step (`run/src/lib/report.js`) reuses `core/scripts/report.js` and
   `core/shared/lib/aggregate.js` unmodified via `docker exec <container> qjs -m
   /opt/buildcage/scripts/report.js` — the proxy always runs the `transparent`
@@ -329,16 +342,18 @@ reports for the allowed side.
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs, dist/post.cjs)
 │   ├── src/                  # Source (ESM): start proxy, run isolated command, report, stop
 │   ├── dist/                 # Bundled output (rollup → CommonJS)
-│   ├── scripts/run-isolated.sh  # unshare/veth/setpriv isolation, invoked via `sudo -n`
+│   ├── scripts/run-isolated.sh  # netns/veth/rootfs-bind setup around `runc run`, invoked via
+│   │                         # `sudo -n` (see Run Action Internals)
 │   ├── compose.yaml          # Runtime compose file the action itself uses (verified, digest-pinned
 │   │                         # image ref)
 │   ├── docker/               # run action's proxy image — transparent's bridge/iptables/
-│   │                         # dnsmasq/HAProxy stack with buildkitd removed entirely
-│   ├── test/                 # assert-sandbox*.sh (checks the run action's Job Summary and
-│   │                         # concurrent-execution behavior)
+│   │                         # dnsmasq/HAProxy stack with buildkitd removed entirely, plus a
+│   │                         # checksum-pinned runc binary and the gen-seccomp-profile/ Go tool
+│   ├── test/                 # assert-sandbox*.sh + integration-test-*.sh (capability/filesystem/
+│   │                         # seccomp/die-with-parent checks driving run/dist/main.cjs directly)
 │   ├── compose.sandbox-dev.yaml  # Mac dev-loop overlay for the run action (see dev/)
-│   └── dev/                  # Mac dev-loop-only Dockerfile + smoke-test.sh (see
-│                             # compose.sandbox-dev.yaml) — not used in production or CI
+│   └── dev/                  # Mac dev-loop-only Dockerfile + smoke-test.sh + build-test-bundle.sh
+│                             # (see compose.sandbox-dev.yaml) — not used in production or CI
 ├── core/                     # Code shared across actions
 │   ├── lib/                  # Image verification: Sigstore, OCI registry lookups, image ref
 │   │                         # resolution, local-image test-hook override
