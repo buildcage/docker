@@ -165,7 +165,14 @@ Security Details and the [Reference](./reference.md#run-action) doc.
   1. `runc` and `gen-seccomp-profile` (see below) are `docker cp`-extracted from the already-running
      proxy container onto the runner host and run natively there — not `docker exec`'d inside the
      container — since their output depends on the real host's architecture/kernel, which only
-     matches when they actually run on it.
+     matches when they actually run on it. `getOrPopulateBootstrapCache` (in `isolated-exec.js`)
+     caches the extracted `runc` binary and the resolved seccomp profile/base OCI spec under a
+     digest-keyed directory in `tmpdir()`, reused across every `run:` step in the same job instead of
+     redoing this extraction from scratch each time — but the actual `runc` binary handed to
+     `run-isolated.sh` is always a fresh copy into that run's own scratch dir, never a path into the
+     shared cache directly (see the function's own doc comment for why: a shared, long-lived binary
+     path would stay "busy" inside every concurrently running sandbox's `mount --rbind /` rootfs
+     snapshot, not just the one using it).
   2. `isolated-exec.js` generates a baseline OCI spec via `runc spec` (rather than hand-writing one
      from scratch, so the mount/rlimit/etc. defaults stay whatever runc itself considers sane for its
      own version) and patches it: `root.path` to a not-yet-created bind-mount directory, `root.readonly`
