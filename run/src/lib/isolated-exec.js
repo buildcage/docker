@@ -1,8 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, rmSync, readFileSync, chmodSync } from "node:fs";
+import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tmpdir } from "node:os";
 import { buildDockerCpArgs } from "./container.js";
 // Sensitive /proc paths masked with /dev/null. runc's own `runc spec`
 // default already masks /proc/kcore, /proc/keys, and /proc/timer_list
@@ -20,6 +19,19 @@ import EXTRA_MASKED_PROC_PATHS from "../../scripts/extra-masked-proc-paths.json"
 // rollup's cjs output doesn't convert import.meta.dirname (it silently
 // becomes undefined), so use this form instead.
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Base directory for each run's scratch dir (OCI bundle + the host-`/`
+// rootfs bind-mount). Deliberately under /var/tmp rather than os.tmpdir():
+// the rootfs bind must live somewhere that is never one of the sandbox's
+// writable exceptions (workdir/home/tmp/RUNNER_TEMP/writablePaths),
+// otherwise the recursive writable rbind of that path would re-expose the
+// whole host `/` as a second, writable copy inside the sandbox. /var/tmp
+// itself is 1777 (writable by the non-root runner user) and execable, so
+// this own subdirectory inherits that without needing root to create it.
+// buildOciConfig fails closed if a step's `writable:` input tries to list
+// this directory (or an ancestor of it) as writable — see
+// assertScratchBaseNotWritable.
+const SANDBOX_SCRATCH_BASE = "/var/tmp/buildcage";
 
 /**
  * Write the user-supplied `run:` input to an executable script file.
@@ -52,7 +64,7 @@ export function generateBaseOciSpec(runcPath, bundleDir) {
  * own `destDir` (its per-step scratch dir), then resolve the base OCI spec
  * and the seccomp profile from them. Run once per `run:` step; each
  * invocation is independent, and everything written here is torn down with
- * the scratch dir (see withScratchDir).
+ * the scratch dir (see withScratchDir / cleanupScratchDir).
  *
  * Both binaries ship inside the proxy image and are pulled onto the host via
  * `docker cp`, then run natively there (not `docker exec`) since the seccomp
@@ -157,6 +169,40 @@ export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
 }
 
 /**
+ * True if `a` and `b` are the same path, or one is an ancestor directory of
+ * the other (path-component-wise, not a bare string prefix -- "/var/tmp/bu"
+ * must not count as overlapping "/var/tmp/buildcage").
+ */
+function pathsOverlap(a, b) {
+  if (a === b) return true;
+  const withSlash = (p) => (p.endsWith("/") ? p : `${p}/`);
+  return a.startsWith(withSlash(b)) || b.startsWith(withSlash(a));
+}
+
+/**
+ * Fail closed if any writable-exception directory is, or contains, or is
+ * contained in, SANDBOX_SCRATCH_BASE. That directory holds the run's own
+ * `mount --rbind /` rootfs (see rootfsBindDir in main.js); the writable
+ * exceptions are recursive bind-mounts, so any overlap would recursively
+ * re-expose that rootfs inside the sandbox as a second, *writable* copy of
+ * the whole host `/` -- the exact escape SANDBOX_SCRATCH_BASE's placement
+ * (outside the default writable set) exists to avoid. Only reachable via an
+ * explicit `writable:` input naming /var/tmp/buildcage or an ancestor of it
+ * (workdir/home/tmp/RUNNER_TEMP are operator/runner-controlled, not
+ * attacker-controlled), so this is a misconfiguration guard, not a
+ * hardening measure against a hostile isolated command.
+ */
+function assertScratchBaseNotWritable(writableDirs) {
+  const overlapping = writableDirs.find((p) => pathsOverlap(p, SANDBOX_SCRATCH_BASE));
+  if (overlapping) {
+    throw new Error(
+      `writable path ${JSON.stringify(overlapping)} overlaps the sandbox's own scratch directory (${SANDBOX_SCRATCH_BASE}); ` +
+        `this would re-expose the sandboxed host filesystem read-write inside the sandbox itself. Choose a writable path outside ${SANDBOX_SCRATCH_BASE}.`,
+    );
+  }
+}
+
+/**
  * Build the final OCI Runtime Spec (config.json) for the isolated command,
  * starting from runc's own `baseSpec` (see generateBaseOciSpec) and
  * overriding only what this sandbox needs to control:
@@ -166,7 +212,12 @@ export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
  *   itself), made read-only via `root.readonly` plus an explicit
  *   `linux.readonlyPaths` entry per real host mount point `--rbind`
  *   duplicated in (see computeReadonlyHostMounts — root.readonly alone
- *   only covers the top-level mount), except workdir/home/tmp/writablePaths.
+ *   only covers the top-level mount), except workdir/home/tmp/runnerTemp/
+ *   writablePaths. rootfsBindDir itself lives under SANDBOX_SCRATCH_BASE,
+ *   which is never one of those writable exceptions, so the recursive
+ *   writable rbinds don't re-expose the host-`/` rootfs as a second, writable
+ *   copy inside the sandbox (see assertScratchBaseNotWritable, which fails
+ *   closed if a `writable:` input would break that invariant).
  * - linux.namespaces: same six namespace types runc's own default spec
  *   already requests (no user namespace — see docs/security.md's
  *   rationale for preserving the real UID/GID), just adding `path` to the
@@ -186,17 +237,23 @@ export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
  */
 export function buildOciConfig(
   baseSpec,
-  { uid, gid, workdir, home, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] },
+  { uid, gid, workdir, home, runnerTemp, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] },
 ) {
   const disableReadonly = writablePaths.includes("/");
 
   const mounts = [...baseSpec.mounts, { destination: "/etc/resolv.conf", type: "none", source: resolvConfPath, options: ["rbind", "ro"] }];
-  const protectedPaths = new Set([workdir, home, "/tmp", ...writablePaths].filter(Boolean));
+  // Paths kept writable on top of the read-only root. RUNNER_TEMP is included
+  // because many actions/tools write there and it isn't always under $HOME
+  // (self-hosted runners can place it elsewhere), so the $HOME exception
+  // wouldn't otherwise cover it. Deduped so an overlapping entry (RUNNER_TEMP
+  // nested under $HOME, or a writablePaths duplicate) isn't bind-mounted twice.
+  const writableDirs = [...new Set([workdir, home, "/tmp", runnerTemp, ...writablePaths].filter(Boolean))];
+  const protectedPaths = new Set(writableDirs);
   if (!disableReadonly) {
-    if (workdir) mounts.push({ destination: workdir, type: "none", source: workdir, options: ["rbind", "rw"] });
-    if (home) mounts.push({ destination: home, type: "none", source: home, options: ["rbind", "rw"] });
-    mounts.push({ destination: "/tmp", type: "none", source: "/tmp", options: ["rbind", "rw"] });
-    for (const p of writablePaths) mounts.push({ destination: p, type: "none", source: p, options: ["rbind", "rw"] });
+    // `writable: /` (disableReadonly) is an intentional, documented full
+    // opt-out of the read-only restriction, so it's exempt from this guard.
+    assertScratchBaseNotWritable(writableDirs);
+    for (const p of writableDirs) mounts.push({ destination: p, type: "none", source: p, options: ["rbind", "rw"] });
   }
 
   const maskedPaths = [...(baseSpec.linux.maskedPaths ?? []), ...EXTRA_MASKED_PROC_PATHS];
@@ -379,13 +436,48 @@ function removeScratchDir(dir) {
   }
 }
 
-/** Create/remove a scratch directory for this step's OCI bundle + run-script. */
-export function withScratchDir(fn) {
-  const dir = mkdtempSync(join(tmpdir(), "buildcage-sandbox-"));
+/**
+ * Force-detach anything still mounted under `dir` (the rootfs bind-mount
+ * safety net — see unmountAllUnder) and then recursively remove it. Exported
+ * so post.js can reclaim a scratch dir orphaned by a hard kill that bypassed
+ * withScratchDir's own finally. No-ops safely when `dir` doesn't exist.
+ */
+export function cleanupScratchDir(dir) {
+  unmountAllUnder(dir);
+  removeScratchDir(dir);
+}
+
+/**
+ * Absolute path of the scratch dir for a given proxy container, derived
+ * deterministically from `containerName` (the `buildcage-proxy-` prefix
+ * swapped for `sandbox-`, under SANDBOX_SCRATCH_BASE). Lets the post step
+ * reconstruct and reclaim the exact same directory from `STATE_container_name`
+ * alone.
+ */
+export function scratchDirFor(containerName) {
+  return join(SANDBOX_SCRATCH_BASE, containerName.replace(/^buildcage-proxy-/, "sandbox-"));
+}
+
+/**
+ * Create/remove a scratch directory for this step's OCI bundle + run-script.
+ * With `containerName` the dir is named deterministically (scratchDirFor) so
+ * post.js can reclaim it after a hard kill; without it a random mkdtemp name
+ * is used (unit tests). Cleaned up on every exit path that unwinds — a
+ * SIGKILL bypasses this finally, which is exactly what post.js covers.
+ */
+export function withScratchDir(fn, containerName) {
+  let dir;
+  mkdirSync(SANDBOX_SCRATCH_BASE, { recursive: true, mode: 0o755 });
+  if (containerName) {
+    dir = scratchDirFor(containerName);
+    cleanupScratchDir(dir); // clear any stale remnant at this deterministic path (unmount-safe)
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+  } else {
+    dir = mkdtempSync(join(SANDBOX_SCRATCH_BASE, "sandbox-"));
+  }
   try {
     return fn(dir);
   } finally {
-    unmountAllUnder(dir);
-    removeScratchDir(dir);
+    cleanupScratchDir(dir);
   }
 }

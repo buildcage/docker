@@ -260,13 +260,20 @@ runc's rootfs (`pivot_root` can't target `/` itself). Everything else below is d
   (the OCI spec's `linux.maskedPaths`, extending runc's own sensible defaults), closing off
   kernel-memory-adjacent information disclosure paths that aren't already covered by the capability
   drop.
-- **Filesystem read-only outside the workspace/home/tmp**: `$GITHUB_WORKSPACE`, `$HOME`, and `/tmp`
-  are bind-mounted as writable exceptions on top of a read-only root (`root.readonly` in
-  `config.json`, applied by runc itself). This closes off tampering with anything outside those
-  three paths — e.g. rewriting a binary earlier on `$PATH` to plant a payload for a later,
-  non-sandboxed step in the same job. The `writable` input adds further paths to the writable set
-  for tools that need to write elsewhere (e.g. a cache directory); setting it to `/` disables this
-  restriction entirely — see [Filesystem Access](./reference.md#filesystem-access) in Reference.
+- **Filesystem read-only outside the workspace/home/tmp**: `$GITHUB_WORKSPACE`, `$HOME`, `/tmp`, and
+  `$RUNNER_TEMP` are bind-mounted as writable exceptions on top of a read-only root (`root.readonly`
+  in `config.json`, applied by runc itself). This closes off tampering with anything outside those
+  paths — e.g. rewriting a binary earlier on `$PATH` to plant a payload for a later, non-sandboxed
+  step in the same job. The rest of the host filesystem, including nested mounts, stays fully
+  *visible* (read-only) so existing tools keep working; only writes are restricted. The writable
+  exceptions are recursive bind-mounts (preserving any legitimately nested mounts under them); the
+  sandbox's own `mount --rbind /` rootfs is staged under `/var/tmp/buildcage`, which is never one of
+  those writable exceptions, so that recursion doesn't re-expose it as a second, writable copy of
+  the whole host `/`. A `writable:` input naming that directory (or an ancestor of it) is rejected
+  outright — see [Known Limitations](#known-limitations-1) below. The `writable` input adds further
+  paths to the writable set for tools that need to write elsewhere (e.g. a cache directory); setting
+  it to `/` disables this restriction entirely — see
+  [Filesystem Access](./reference.md#filesystem-access) in Reference.
 - **Die-with-parent**: the isolated command's life is tied to `run-isolated.sh`'s own via a two-hop
   `setpriv --pdeathsig=KILL` chain (`run-isolated.sh` → `runc run` → the isolated command — `runc
   run`'s own process sits between the two, so a single-hop guard wouldn't be enough). If
@@ -279,6 +286,19 @@ runc's rootfs (`pivot_root` can't target `/` itself). Everything else below is d
   the capability-based model above. Not applied today; the isolation mechanisms above already
   close off the specific escape routes considered (privilege escalation, Docker-socket access,
   cross-namespace ptrace/memory access).
+- **Read-only enforcement reads the mount table just before the rootfs is staged**: the set of host
+  mounts forced read-only is computed from `/proc/self/mountinfo` immediately before
+  `run-isolated.sh` bind-mounts the host root. A real filesystem mounted into that sub-second window
+  would be duplicated into the sandbox without a read-only entry — but creating a host mount already
+  requires root on the runner, at which point the sandbox boundary is moot, so this is a negligible,
+  accepted gap.
+- **`writable:` cannot name the sandbox's own scratch directory**: a `run:` step's `writable:` input
+  listing `/var/tmp/buildcage` (or an ancestor of it, e.g. `/var/tmp` or `/`) is rejected outright —
+  that directory holds the run's own `mount --rbind /` rootfs, and the writable exceptions are
+  recursive bind-mounts, so allowing it would recursively re-expose the whole host `/` inside the
+  sandbox as a second, writable copy. This is a misconfiguration guard against an operator-supplied
+  `writable:` value, not a defense against the isolated command itself (see
+  [Filesystem Access](./reference.md#filesystem-access) in Reference).
 - **Credential retrieval is intentionally not blocked**: `run` restricts *where* the isolated
   command can send network traffic and, since the filesystem is read-only outside
   `$GITHUB_WORKSPACE`/`$HOME`/`/tmp`, *where* it can persist a payload — but not what it reads. A

@@ -7322,6 +7322,69 @@ function computeReadonlyHostMounts(hostMounts, protectedPaths) {
   return hostMounts.filter(({mountPoint: mountPoint, fsType: fsType}) => "/" !== mountPoint && !TOLERATED_PSEUDO_FSTYPES.has(fsType) && !protectedPaths.has(mountPoint)).map(({mountPoint: mountPoint}) => mountPoint);
 }
 
+function buildOciConfig(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: home, runnerTemp: runnerTemp, writablePaths: writablePaths = [], env: env, netnsPath: netnsPath, rootfsBindDir: rootfsBindDir, resolvConfPath: resolvConfPath, seccompProfile: seccompProfile, scriptPath: scriptPath, hostMounts: hostMounts = []}) {
+  const disableReadonly = writablePaths.includes("/"), mounts = [ ...baseSpec.mounts, {
+    destination: "/etc/resolv.conf",
+    type: "none",
+    source: resolvConfPath,
+    options: [ "rbind", "ro" ]
+  } ], writableDirs = [ ...new Set([ workdir, home, "/tmp", runnerTemp, ...writablePaths ].filter(Boolean)) ], protectedPaths = new Set(writableDirs);
+  if (!disableReadonly) {
+    !function(writableDirs) {
+      const overlapping = writableDirs.find(p => function(a, b) {
+        if (a === b) return !0;
+        const withSlash = p => p.endsWith("/") ? p : `${p}/`;
+        return a.startsWith(withSlash(b)) || b.startsWith(withSlash(a));
+      }(p, "/var/tmp/buildcage"));
+      if (overlapping) throw new Error(`writable path ${JSON.stringify(overlapping)} overlaps the sandbox's own scratch directory (/var/tmp/buildcage); this would re-expose the sandboxed host filesystem read-write inside the sandbox itself. Choose a writable path outside /var/tmp/buildcage.`);
+    }(writableDirs);
+    for (const p of writableDirs) mounts.push({
+      destination: p,
+      type: "none",
+      source: p,
+      options: [ "rbind", "rw" ]
+    });
+  }
+  const maskedPaths = [ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ], baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), readonlyPaths = disableReadonly ? baseReadonlyPaths : Array.from(new Set([ ...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths) ])), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
+    ...ns,
+    path: netnsPath
+  } : ns);
+  return {
+    ...baseSpec,
+    root: {
+      path: rootfsBindDir,
+      readonly: !disableReadonly
+    },
+    mounts: mounts,
+    process: {
+      ...baseSpec.process,
+      terminal: !1,
+      user: {
+        uid: uid,
+        gid: gid
+      },
+      args: [ "setpriv", "--pdeathsig=KILL", "--", scriptPath ],
+      env: Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => `${k}=${v}`),
+      cwd: workdir || "/",
+      capabilities: {
+        bounding: [],
+        effective: [],
+        permitted: [],
+        inheritable: [],
+        ambient: []
+      },
+      noNewPrivileges: !0
+    },
+    linux: {
+      ...baseSpec.linux,
+      namespaces: namespaces,
+      seccomp: seccompProfile,
+      maskedPaths: maskedPaths,
+      readonlyPaths: readonlyPaths
+    }
+  };
+}
+
 function unmountAllUnder(dir) {
   let mountPoints;
   try {
@@ -7341,22 +7404,35 @@ function unmountAllUnder(dir) {
   }
 }
 
-function withScratchDir(fn) {
-  const dir = node_fs.mkdtempSync(path.join(os.tmpdir(), "buildcage-sandbox-"));
+function cleanupScratchDir(dir) {
+  unmountAllUnder(dir), function(dir) {
+    for (let attempt = 1; attempt <= 5; attempt++) try {
+      return void node_fs.rmSync(dir, {
+        recursive: !0,
+        force: !0
+      });
+    } catch (e) {
+      if ("EBUSY" !== e.code || 5 === attempt) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+    }
+  }(dir);
+}
+
+function withScratchDir(fn, containerName) {
+  let dir;
+  node_fs.mkdirSync("/var/tmp/buildcage", {
+    recursive: !0,
+    mode: 493
+  }), containerName ? (dir = function(containerName) {
+    return path.join("/var/tmp/buildcage", containerName.replace(/^buildcage-proxy-/, "sandbox-"));
+  }(containerName), cleanupScratchDir(dir), node_fs.mkdirSync(dir, {
+    recursive: !0,
+    mode: 448
+  })) : dir = node_fs.mkdtempSync(path.join("/var/tmp/buildcage", "sandbox-"));
   try {
     return fn(dir);
   } finally {
-    unmountAllUnder(dir), function(dir) {
-      for (let attempt = 1; attempt <= 5; attempt++) try {
-        return void node_fs.rmSync(dir, {
-          recursive: !0,
-          force: !0
-        });
-      } catch (e) {
-        if ("EBUSY" !== e.code || 5 === attempt) throw e;
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
-      }
-    }(dir);
+    cleanupScratchDir(dir);
   }
 }
 
@@ -7573,80 +7649,12 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
             mode: 448
           }), scriptPath;
         }(runInput, dir), hostMounts = parseMountinfo(node_fs.readFileSync("/proc/self/mountinfo", "utf8"));
-        config = function(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, netnsPath: netnsPath, rootfsBindDir: rootfsBindDir, resolvConfPath: resolvConfPath, seccompProfile: seccompProfile, scriptPath: scriptPath, hostMounts: hostMounts = []}) {
-          const disableReadonly = writablePaths.includes("/"), mounts = [ ...baseSpec.mounts, {
-            destination: "/etc/resolv.conf",
-            type: "none",
-            source: resolvConfPath,
-            options: [ "rbind", "ro" ]
-          } ], protectedPaths = new Set([ workdir, home, "/tmp", ...writablePaths ].filter(Boolean));
-          if (!disableReadonly) {
-            workdir && mounts.push({
-              destination: workdir,
-              type: "none",
-              source: workdir,
-              options: [ "rbind", "rw" ]
-            }), home && mounts.push({
-              destination: home,
-              type: "none",
-              source: home,
-              options: [ "rbind", "rw" ]
-            }), mounts.push({
-              destination: "/tmp",
-              type: "none",
-              source: "/tmp",
-              options: [ "rbind", "rw" ]
-            });
-            for (const p of writablePaths) mounts.push({
-              destination: p,
-              type: "none",
-              source: p,
-              options: [ "rbind", "rw" ]
-            });
-          }
-          const maskedPaths = [ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ], baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), readonlyPaths = disableReadonly ? baseReadonlyPaths : Array.from(new Set([ ...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths) ])), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
-            ...ns,
-            path: netnsPath
-          } : ns);
-          return {
-            ...baseSpec,
-            root: {
-              path: rootfsBindDir,
-              readonly: !disableReadonly
-            },
-            mounts: mounts,
-            process: {
-              ...baseSpec.process,
-              terminal: !1,
-              user: {
-                uid: uid,
-                gid: gid
-              },
-              args: [ "setpriv", "--pdeathsig=KILL", "--", scriptPath ],
-              env: Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => `${k}=${v}`),
-              cwd: workdir || "/",
-              capabilities: {
-                bounding: [],
-                effective: [],
-                permitted: [],
-                inheritable: [],
-                ambient: []
-              },
-              noNewPrivileges: !0
-            },
-            linux: {
-              ...baseSpec.linux,
-              namespaces: namespaces,
-              seccomp: seccompProfile,
-              maskedPaths: maskedPaths,
-              readonlyPaths: readonlyPaths
-            }
-          };
-        }(baseSpec, {
+        config = buildOciConfig(baseSpec, {
           uid: process.getuid(),
           gid: process.getgid(),
           workdir: workdir,
           home: home,
+          runnerTemp: env.RUNNER_TEMP || "",
           writablePaths: writablePaths,
           env: env,
           netnsPath: `/var/run/netns/${netnsName}`,
@@ -7684,7 +7692,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         dns: dns,
         targetIp: targetIp
       });
-    });
+    }, containerName);
   } finally {
     try {
       const report = function(containerName) {

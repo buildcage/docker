@@ -210,6 +210,9 @@ async function main() {
           gid: process.getgid(),
           workdir,
           home,
+          // Standard writable runner scratch; not always under $HOME on
+          // self-hosted runners, so covered explicitly (see buildOciConfig).
+          runnerTemp: env.RUNNER_TEMP || "",
           writablePaths,
           env,
           netnsPath: `/var/run/netns/${netnsName}`,
@@ -235,7 +238,7 @@ async function main() {
         dns,
         targetIp,
       });
-    });
+    }, containerName);
   } finally {
     try {
       const report = fetchReport(containerName);

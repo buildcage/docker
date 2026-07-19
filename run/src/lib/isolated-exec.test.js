@@ -9,6 +9,7 @@ import {
   buildOciConfig,
   writeOciConfig,
   withScratchDir,
+  scratchDirFor,
   parseMountinfo,
   computeReadonlyHostMounts,
   parseMountsUnder,
@@ -37,6 +38,17 @@ describe("writeRunScript", () => {
       const mode = statSync(path).mode & 0o777;
       assert.equal(mode, 0o700);
     });
+  });
+});
+
+describe("scratchDirFor", () => {
+  it("derives a path under /var/tmp/buildcage from the container name (not under a writable exception)", () => {
+    const dir = scratchDirFor("buildcage-proxy-abcd1234");
+    assert.equal(dir, "/var/tmp/buildcage/sandbox-abcd1234");
+  });
+
+  it("is deterministic for the same container name (so post.js can reconstruct it)", () => {
+    assert.equal(scratchDirFor("buildcage-proxy-xyz"), scratchDirFor("buildcage-proxy-xyz"));
   });
 });
 
@@ -223,6 +235,56 @@ describe("buildOciConfig", () => {
     assert.equal(config.root.path, baseArgs.rootfsBindDir);
     const rw = config.mounts.filter((m) => m.options?.includes("rw")).map((m) => m.destination);
     assert.deepEqual(rw.sort(), ["/opt/cache", "/tmp", baseArgs.home, baseArgs.workdir].sort());
+  });
+
+  it("does not mount anything over rootfsBindDir (it lives under /var/tmp/buildcage, so nothing re-exposes it)", () => {
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/opt/cache"] });
+    assert.ok(!config.mounts.some((m) => m.destination === baseArgs.rootfsBindDir));
+  });
+
+  it("fails closed when writable: lists the scratch base itself", () => {
+    assert.throws(
+      () => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp/buildcage"] }),
+      /overlaps the sandbox's own scratch directory/,
+    );
+  });
+
+  it("fails closed when writable: lists an ancestor of the scratch base", () => {
+    assert.throws(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp"] }), /overlaps/);
+  });
+
+  it("fails closed when writable: lists a descendant of the scratch base", () => {
+    assert.throws(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp/buildcage/some-other-run"] }), /overlaps/);
+  });
+
+  it("fails closed when $HOME or RUNNER_TEMP itself overlaps the scratch base", () => {
+    assert.throws(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, home: "/var/tmp/buildcage", writablePaths: [] }), /overlaps/);
+  });
+
+  it("does not fail closed for an unrelated sibling under /var/tmp", () => {
+    assert.doesNotThrow(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp/some-other-tool"] }));
+  });
+
+  it("`writable: /` is exempt from the scratch-base guard (documented full opt-out)", () => {
+    assert.doesNotThrow(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/"] }));
+  });
+
+  it("keeps RUNNER_TEMP writable (rw bind) and out of readonlyPaths", () => {
+    const runnerTemp = "/opt/actions-runner/_work/_temp"; // self-hosted: outside $HOME
+    const hostMounts = [
+      { mountPoint: "/", fsType: "ext4" },
+      { mountPoint: runnerTemp, fsType: "ext4" },
+    ];
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], runnerTemp, hostMounts });
+    const rw = config.mounts.filter((m) => m.options?.includes("rw")).map((m) => m.destination);
+    assert.ok(rw.includes(runnerTemp), "RUNNER_TEMP must be bind-mounted writable");
+    assert.ok(!config.linux.readonlyPaths.includes(runnerTemp), "RUNNER_TEMP must not be forced read-only");
+  });
+
+  it("does not double-mount RUNNER_TEMP when it duplicates another writable path", () => {
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], runnerTemp: "/tmp" });
+    const tmpMounts = config.mounts.filter((m) => m.destination === "/tmp" && m.options?.includes("rw"));
+    assert.equal(tmpMounts.length, 1);
   });
 
   it("adds a read-only resolv.conf bind mount", () => {
