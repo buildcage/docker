@@ -143,10 +143,9 @@ order it actually happens. For the user-facing behavior and threat model, see
    - Both ship inside the proxy image and are pulled onto the host via `docker cp`, then run
      natively there — not `docker exec`'d — since the seccomp profile's content depends on the
      real host's kernel and architecture.
-   - Cached per proxy image (keyed by image digest) under a shared temp directory, so repeated
-     `run:` steps in the same job reuse the extraction instead of repeating it. The `runc` binary
-     handed to each run is still always a fresh copy into that run's own scratch directory, so the
-     shared cache itself never becomes part of any one run's own mount snapshot.
+   - Extracted fresh into this step's own scratch directory on every invocation (no shared,
+     cross-step/cross-job cache), so each `run:` step is fully independent and everything extracted
+     is torn down with the scratch directory afterward.
 4. Build an OCI runtime bundle (`config.json`) describing the sandbox (`isolated-exec.js`).
    - Starts from `runc`'s own default spec, then patches in: a root filesystem pointing at a
      not-yet-created bind-mount directory, made read-only (every real host mount point is forced

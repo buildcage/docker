@@ -1,9 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, renameSync, chmodSync, copyFileSync } from "node:fs";
+import { writeFileSync, mkdtempSync, rmSync, readFileSync, chmodSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
-import { createHash } from "node:crypto";
 import { buildDockerCpArgs } from "./container.js";
 // Sensitive /proc paths masked with /dev/null. runc's own `runc spec`
 // default already masks /proc/kcore, /proc/keys, and /proc/timer_list
@@ -48,88 +47,34 @@ export function generateBaseOciSpec(runcPath, bundleDir) {
   return JSON.parse(readFileSync(join(bundleDir, "config.json"), "utf8"));
 }
 
-const BOOTSTRAP_CACHE_FILES = ["runc", "seccomp.json", "config.json"];
-
-function isBootstrapCachePopulated(cacheDir) {
-  return BOOTSTRAP_CACHE_FILES.every((f) => existsSync(join(cacheDir, f)));
-}
-
 /**
- * Extract runc/gen-seccomp-profile from the proxy image and resolve the
- * base OCI spec + seccomp profile once per distinct proxy image, reusing
- * the result across every `run:` step in the same job -- and across jobs
- * on a self-hosted runner, since the cache lives under a shared tmpdir
- * path rather than per-run scratch space.
+ * Extract runc and gen-seccomp-profile from the proxy image into this run's
+ * own `destDir` (its per-step scratch dir), then resolve the base OCI spec
+ * and the seccomp profile from them. Run once per `run:` step; each
+ * invocation is independent, and everything written here is torn down with
+ * the scratch dir (see withScratchDir).
  *
- * Keyed by a hash of imageRef, not the image content itself: a digest-pinned
- * production imageRef makes that equivalent (a new digest is a new image),
- * but the BUILDCAGE_LOCAL_IMAGE_REF test/dev override (see main.js) is
- * typically a floating tag, so rebuilding that same tag with different
- * content on a self-hosted runner could reuse a stale cache entry -- an
- * accepted limitation of a dev/CI-only escape hatch never used in
- * production.
- *
- * Concurrent steps racing to populate the same cache entry are made safe
- * by staging in a private, uniquely-named directory and atomically
- * renaming it into place; a losing racer just discards its own staging
- * dir and reuses the winner's (rename onto an existing directory fails
- * with ENOTEMPTY/EEXIST rather than silently clobbering it).
- *
- * Copies the cached runc binary into the caller's own per-run `destDir`
- * rather than handing back a path into the shared, long-lived cache dir
- * directly: run-isolated.sh's `mount --rbind /` recursively captures the
- * whole host filesystem, including the shared cache dir under tmpdir(),
- * so a runc binary living there would stay present (and busy) inside
- * *every* concurrently running sandbox's rootfs snapshot, not just the
- * run using it -- enough to make a concurrent step's own rootfs
- * unmount/rmdir fail with EBUSY at cleanup. The cheap local copy keeps
- * the actually-executed file private per run.
+ * Both binaries ship inside the proxy image and are pulled onto the host via
+ * `docker cp`, then run natively there (not `docker exec`) since the seccomp
+ * profile's content depends on the real host kernel/arch -- see
+ * gen-seccomp-profile/main.go. gen-seccomp-profile is only needed transiently
+ * to resolve the profile, so it's removed once read; runc stays for `runc run`.
  */
-export function getOrPopulateBootstrapCache({ imageRef, containerName, destDir }) {
-  const cacheKey = createHash("sha256").update(imageRef).digest("hex");
-  const cacheRoot = join(tmpdir(), "buildcage-runc-cache");
-  const cacheDir = join(cacheRoot, cacheKey);
-
-  if (!isBootstrapCachePopulated(cacheDir)) {
-    mkdirSync(cacheRoot, { recursive: true });
-    const stagingDir = mkdtempSync(join(cacheRoot, ".staging-"));
-    let populated = false;
-    try {
-      const runcPath = join(stagingDir, "runc");
-      const genSeccompProfilePath = join(stagingDir, "gen-seccomp-profile");
-      execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/runc", hostPath: runcPath }));
-      execFileSync(
-        "docker",
-        buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/gen-seccomp-profile", hostPath: genSeccompProfilePath }),
-      );
-      chmodSync(runcPath, 0o755);
-      chmodSync(genSeccompProfilePath, 0o755);
-      writeFileSync(join(stagingDir, "seccomp.json"), execFileSync(genSeccompProfilePath, { encoding: "utf8" }));
-      generateBaseOciSpec(runcPath, stagingDir); // writes config.json into stagingDir itself
-      rmSync(genSeccompProfilePath); // only needed transiently to resolve seccomp.json above
-
-      try {
-        renameSync(stagingDir, cacheDir);
-        populated = true;
-      } catch (e) {
-        if (e.code !== "ENOTEMPTY" && e.code !== "EEXIST") throw e;
-        // Another concurrent step already populated this cache entry first;
-        // its content is equivalent (same image, same host), so just reuse it.
-      }
-    } finally {
-      if (!populated) rmSync(stagingDir, { recursive: true, force: true });
-    }
-  }
-
+export function extractRuncBootstrap({ containerName, destDir }) {
   const runcPath = join(destDir, "runc");
-  copyFileSync(join(cacheDir, "runc"), runcPath);
+  const genSeccompProfilePath = join(destDir, "gen-seccomp-profile");
+  execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/runc", hostPath: runcPath }));
+  execFileSync(
+    "docker",
+    buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/gen-seccomp-profile", hostPath: genSeccompProfilePath }),
+  );
   chmodSync(runcPath, 0o755);
+  chmodSync(genSeccompProfilePath, 0o755);
+  const seccompProfile = JSON.parse(execFileSync(genSeccompProfilePath, { encoding: "utf8" }));
+  const baseSpec = generateBaseOciSpec(runcPath, destDir); // writes config.json into destDir (overwritten later by writeOciConfig)
+  rmSync(genSeccompProfilePath); // only needed to resolve seccompProfile above
 
-  return {
-    runcPath,
-    seccompProfile: JSON.parse(readFileSync(join(cacheDir, "seccomp.json"), "utf8")),
-    baseSpec: JSON.parse(readFileSync(join(cacheDir, "config.json"), "utf8")),
-  };
+  return { runcPath, seccompProfile, baseSpec };
 }
 
 /**

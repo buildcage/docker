@@ -12,7 +12,7 @@ import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.js"
 import {
   writeRunScript,
   writeResolvConf,
-  getOrPopulateBootstrapCache,
+  extractRuncBootstrap,
   buildOciConfig,
   writeOciConfig,
   runIsolated,
@@ -177,13 +177,11 @@ async function main() {
     exitCode = withScratchDir((dir) => {
       let runcPath, seccompProfile, baseSpec;
       try {
-        // Cached per proxy image (see getOrPopulateBootstrapCache) so
-        // repeated `run:` steps in the same job don't redo `docker cp` +
-        // `runc spec` + gen-seccomp-profile from scratch every time. Run
-        // natively on the runner host (not `docker exec`, which would
+        // Extracted into this run's own scratch dir — see extractRuncBootstrap.
+        // Run natively on the runner host (not `docker exec`, which would
         // resolve against the container's kernel/arch instead of the real
-        // one) — see gen-seccomp-profile/main.go for why this matters.
-        ({ runcPath, seccompProfile, baseSpec } = getOrPopulateBootstrapCache({ imageRef, containerName, destDir: dir }));
+        // one) — see gen-seccomp-profile/main.go.
+        ({ runcPath, seccompProfile, baseSpec } = extractRuncBootstrap({ containerName, destDir: dir }));
       } catch (e) {
         throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
       }

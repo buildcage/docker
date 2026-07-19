@@ -7281,54 +7281,28 @@ var EXTRA_MASKED_PROC_PATHS = [ "/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-tri
 
 const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href));
 
-const BOOTSTRAP_CACHE_FILES = [ "runc", "seccomp.json", "config.json" ];
-
-function getOrPopulateBootstrapCache({imageRef: imageRef, containerName: containerName, destDir: destDir}) {
-  const cacheKey = node_crypto.createHash("sha256").update(imageRef).digest("hex"), cacheRoot = path.join(os.tmpdir(), "buildcage-runc-cache"), cacheDir = path.join(cacheRoot, cacheKey);
-  if (!function(cacheDir) {
-    return BOOTSTRAP_CACHE_FILES.every(f => node_fs.existsSync(path.join(cacheDir, f)));
-  }(cacheDir)) {
-    node_fs.mkdirSync(cacheRoot, {
-      recursive: !0
-    });
-    const stagingDir = node_fs.mkdtempSync(path.join(cacheRoot, ".staging-"));
-    let populated = !1;
-    try {
-      const runcPath = path.join(stagingDir, "runc"), genSeccompProfilePath = path.join(stagingDir, "gen-seccomp-profile");
-      node_child_process.execFileSync("docker", buildDockerCpArgs({
-        containerName: containerName,
-        containerPath: "/opt/buildcage/bin/runc",
-        hostPath: runcPath
-      })), node_child_process.execFileSync("docker", buildDockerCpArgs({
-        containerName: containerName,
-        containerPath: "/opt/buildcage/bin/gen-seccomp-profile",
-        hostPath: genSeccompProfilePath
-      })), node_fs.chmodSync(runcPath, 493), node_fs.chmodSync(genSeccompProfilePath, 493), 
-      node_fs.writeFileSync(path.join(stagingDir, "seccomp.json"), node_child_process.execFileSync(genSeccompProfilePath, {
-        encoding: "utf8"
-      })), function(runcPath, bundleDir) {
-        node_child_process.execFileSync(runcPath, [ "spec" ], {
-          cwd: bundleDir
-        }), JSON.parse(node_fs.readFileSync(path.join(bundleDir, "config.json"), "utf8"));
-      }(runcPath, stagingDir), node_fs.rmSync(genSeccompProfilePath);
-      try {
-        node_fs.renameSync(stagingDir, cacheDir), populated = !0;
-      } catch (e) {
-        if ("ENOTEMPTY" !== e.code && "EEXIST" !== e.code) throw e;
-      }
-    } finally {
-      populated || node_fs.rmSync(stagingDir, {
-        recursive: !0,
-        force: !0
-      });
-    }
-  }
-  const runcPath = path.join(destDir, "runc");
-  return node_fs.copyFileSync(path.join(cacheDir, "runc"), runcPath), node_fs.chmodSync(runcPath, 493), 
-  {
+function extractRuncBootstrap({containerName: containerName, destDir: destDir}) {
+  const runcPath = path.join(destDir, "runc"), genSeccompProfilePath = path.join(destDir, "gen-seccomp-profile");
+  node_child_process.execFileSync("docker", buildDockerCpArgs({
+    containerName: containerName,
+    containerPath: "/opt/buildcage/bin/runc",
+    hostPath: runcPath
+  })), node_child_process.execFileSync("docker", buildDockerCpArgs({
+    containerName: containerName,
+    containerPath: "/opt/buildcage/bin/gen-seccomp-profile",
+    hostPath: genSeccompProfilePath
+  })), node_fs.chmodSync(runcPath, 493), node_fs.chmodSync(genSeccompProfilePath, 493);
+  const seccompProfile = JSON.parse(node_child_process.execFileSync(genSeccompProfilePath, {
+    encoding: "utf8"
+  })), baseSpec = function(runcPath, bundleDir) {
+    return node_child_process.execFileSync(runcPath, [ "spec" ], {
+      cwd: bundleDir
+    }), JSON.parse(node_fs.readFileSync(path.join(bundleDir, "config.json"), "utf8"));
+  }(runcPath, destDir);
+  return node_fs.rmSync(genSeccompProfilePath), {
     runcPath: runcPath,
-    seccompProfile: JSON.parse(node_fs.readFileSync(path.join(cacheDir, "seccomp.json"), "utf8")),
-    baseSpec: JSON.parse(node_fs.readFileSync(path.join(cacheDir, "config.json"), "utf8"))
+    seccompProfile: seccompProfile,
+    baseSpec: baseSpec
   };
 }
 
@@ -7578,8 +7552,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     exitCode = withScratchDir(dir => {
       let runcPath, seccompProfile, baseSpec;
       try {
-        ({runcPath: runcPath, seccompProfile: seccompProfile, baseSpec: baseSpec} = getOrPopulateBootstrapCache({
-          imageRef: imageRef,
+        ({runcPath: runcPath, seccompProfile: seccompProfile, baseSpec: baseSpec} = extractRuncBootstrap({
           containerName: containerName,
           destDir: dir
         }));
