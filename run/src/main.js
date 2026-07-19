@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, chmodSync } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,12 +7,12 @@ import { buildRules } from "../../core/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
 import { verifyImageDigest } from "../../core/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
-import { generateContainerName, getContainerPid, deriveProjectName, buildDockerCpArgs } from "./lib/container.js";
+import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";
 import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.js";
 import {
   writeRunScript,
   writeResolvConf,
-  generateBaseOciSpec,
+  getOrPopulateBootstrapCache,
   buildOciConfig,
   writeOciConfig,
   runIsolated,
@@ -176,16 +176,15 @@ async function main() {
     const targetIp = "172.20.0.101";
 
     exitCode = withScratchDir((dir) => {
-      const runcPath = join(dir, "runc");
-      const genSeccompProfilePath = join(dir, "gen-seccomp-profile");
+      let runcPath, seccompProfile, baseSpec;
       try {
-        execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/runc", hostPath: runcPath }));
-        execFileSync(
-          "docker",
-          buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/gen-seccomp-profile", hostPath: genSeccompProfilePath }),
-        );
-        chmodSync(runcPath, 0o755);
-        chmodSync(genSeccompProfilePath, 0o755);
+        // Cached per proxy image (see getOrPopulateBootstrapCache) so
+        // repeated `run:` steps in the same job don't redo `docker cp` +
+        // `runc spec` + gen-seccomp-profile from scratch every time. Run
+        // natively on the runner host (not `docker exec`, which would
+        // resolve against the container's kernel/arch instead of the real
+        // one) — see gen-seccomp-profile/main.go for why this matters.
+        ({ runcPath, seccompProfile, baseSpec } = getOrPopulateBootstrapCache({ imageRef, containerName, destDir: dir }));
       } catch (e) {
         throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
       }
@@ -201,13 +200,8 @@ async function main() {
 
       let config;
       try {
-        // Run natively on the runner host (not `docker exec`, which would
-        // resolve against the container's kernel/arch instead of the real
-        // one) — see gen-seccomp-profile/main.go for why this matters.
-        const seccompProfile = JSON.parse(execFileSync(genSeccompProfilePath, { encoding: "utf8" }));
         const resolvConfPath = writeResolvConf(dns, dir);
         const scriptPath = writeRunScript(runInput, dir);
-        const baseSpec = generateBaseOciSpec(runcPath, dir);
         // Real host mount table, read now (before run-isolated.sh's `mount
         // --rbind /` duplicates it into rootfsBindDir) so buildOciConfig can
         // force every real submount read-only individually -- root.readonly

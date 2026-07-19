@@ -47,9 +47,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(linuxSeccomp); err != nil {
+	// Machine-readable only (isolated-exec.js's getOrPopulateBootstrapCache
+	// JSON.parses this straight off stdout) -- no pretty-printing needed.
+	if err := json.NewEncoder(os.Stdout).Encode(linuxSeccomp); err != nil {
 		fmt.Fprintln(os.Stderr, "gen-seccomp-profile:", err)
 		os.Exit(1)
 	}
