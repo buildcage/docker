@@ -14,6 +14,36 @@
 # Must be run as root (invoked via `sudo -n` from the run action).
 set -euo pipefail
 
+# Re-exec into a fresh, private mount namespace before doing anything else.
+# Without this, the mount --rbind / staging below (and `ip netns add`'s own
+# bind-mount of /run/netns) operate directly in the one mount namespace
+# shared by every concurrently running `run:` step on this host. Since
+# each step's own rootfsBindDir lives under the same /tmp, each step's
+# `mount --rbind /` snapshot unavoidably captures a nested copy of every
+# *other* concurrently running step's own rootfs tree too -- whatever
+# happens to exist under "/" at that instant. That doesn't break sandbox
+# isolation itself (runc still creates its own further-nested namespace
+# for the sandboxed process regardless), but it does mean concurrent
+# steps' cleanup (unmount + rmdir) can race against each other's staging;
+# empirically, this was the root cause of an intermittent EBUSY failure in
+# isolated-exec.js's withScratchDir cleanup under concurrent `run:` steps.
+# Doing the rest of this script's work in its own private mount namespace
+# instead means its rootfs bind-mount and netns file are invisible to (and
+# unaffected by) every other concurrent invocation from the moment they're
+# created, the same staging pattern tools like bubblewrap use. `--propagation
+# private` is `unshare`'s shortcut for "unshare + recursively make every
+# mount private" in one step. No `--fork` is used, so this and the
+# subsequent exec replace the current process in place rather than
+# spawning a child -- this script's PID (and therefore its
+# /proc/self/cmdline, matched by
+# run/test/integration-test-die-with-parent.sh's pgrep) stays the same
+# across the re-exec.
+if [ -z "${BUILDCAGE_UNSHARED:-}" ]; then
+  command -v unshare >/dev/null 2>&1 || { echo "ERROR: required command not found: unshare" >&2; exit 1; }
+  export BUILDCAGE_UNSHARED=1
+  exec unshare --mount --propagation private -- "$0" "$@"
+fi
+
 PROXY_PID=""
 RUNC_PATH=""
 BUNDLE_DIR=""
@@ -124,11 +154,9 @@ ip netns exec "$NETNS_NAME" sh -c "
 echo "run-isolated: bind-mounting host root for runc's rootfs..." >&2
 mkdir -p "$ROOTFS_BIND_DIR"
 mount --rbind / "$ROOTFS_BIND_DIR"
-# Scope privacy to this one bind-mount rather than the host's real "/" --
-# runc's own (later, further-nested) mount namespace for the container
-# takes care of making *that* private; this only needs to stop propagation
-# of what happens inside runc's rootfs back out to the host.
-mount --make-rprivate "$ROOTFS_BIND_DIR"
+# No separate `mount --make-rprivate` needed here: the whole-namespace
+# `--propagation private` set up above already makes every mount created
+# under it private by default, including this one.
 
 echo "run-isolated: attaching proxy-side veth to sandbox0 bridge..." >&2
 nsenter --net="/proc/${PROXY_PID}/ns/net" -- sh -c "
