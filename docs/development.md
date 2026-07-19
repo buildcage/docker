@@ -182,21 +182,30 @@ Security Details and the [Reference](./reference.md#run-action) doc.
      `process.env` replaced with the step's real environment, `linux.namespaces`' network entry given a
      `path` pointing at a netns `run-isolated.sh` will create, `linux.seccomp` set to the resolved
      profile, and `linux.maskedPaths` extended with a few sensitive `/proc` paths runc's own defaults
-     don't cover. `process.args` wraps the script in `setpriv --pdeathsig=KILL --` (see step 5).
-  3. `run-isolated.sh` creates the network namespace with `ip netns add` (not a placeholder process —
+     don't cover. `process.args` wraps the script in `setpriv --pdeathsig=KILL --` (see step 6).
+  3. Before anything else, `run-isolated.sh` re-execs itself into a fresh, private mount namespace
+     (`unshare --mount --propagation private`, no `--fork` — same PID throughout, so
+     `integration-test-die-with-parent.sh`'s pgrep-based lookup still matches). Without this, its
+     later `mount --rbind /` staging (step 5) would run directly in the one mount namespace shared by
+     every concurrently running `run:` step on the host: since each step's own scratch dir lives under
+     the same `/tmp`, each step's `--rbind` snapshot would unavoidably capture a nested copy of every
+     *other* concurrently running step's own rootfs tree too, which was empirically the root cause of
+     an intermittent `EBUSY` race in `withScratchDir`'s cleanup under concurrent `run:` steps — the
+     same staging pattern tools like bubblewrap use to avoid it.
+  4. `run-isolated.sh` creates the network namespace with `ip netns add` (not a placeholder process —
      unlike a namespace held open by a live process, `ip netns add`'s bind-mount at
      `/var/run/netns/<name>` persists on its own), creates a veth pair with one end moved into that
      netns and the other into the (already-running) proxy container's netns, attached to its
      `sandbox0` bridge as a bridge port — the same role a BuildKit `RUN` step container's veth plays
      under `transparent` mode.
-  4. It bind-mounts the host's own `/` onto a fresh directory (`mount --rbind`) for runc's
-     `root.path` — `pivot_root` can't target `/` itself — then `mount --make-rprivate`s just that
-     bind-mount (not the host's real `/`), stopping propagation of anything that happens inside
-     runc's rootfs back out to the host without touching the host's own mount-namespace propagation
-     settings. `resolv.conf` and the sensitive-`/proc`-path masking no longer need separate bind-mount
-     steps here — they're declared in `config.json`'s `mounts`/`linux.maskedPaths` and applied by
-     runc itself when it sets up the container's own mount namespace.
-  5. The command finally executes via `setpriv --pdeathsig=KILL -- runc run --bundle <dir>
+  5. It bind-mounts the host's own `/` onto a fresh directory (`mount --rbind`) for runc's
+     `root.path` — `pivot_root` can't target `/` itself. No separate `mount --make-rprivate` is
+     needed for this bind-mount specifically: every mount created under an already-private namespace
+     (step 3) is private by default. `resolv.conf` and the sensitive-`/proc`-path masking no longer
+     need separate bind-mount steps here — they're declared in `config.json`'s
+     `mounts`/`linux.maskedPaths` and applied by runc itself when it sets up the container's own
+     mount namespace.
+  6. The command finally executes via `setpriv --pdeathsig=KILL -- runc run --bundle <dir>
      <container-id>` — no `nsenter --net=...` wrapper needed, since `config.json`'s namespace `path`
      already tells runc which netns to join itself. The outer `setpriv --pdeathsig` (targeting
      `run-isolated.sh`'s own life) and the inner one baked into `process.args` (targeting `runc
