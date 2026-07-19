@@ -124,6 +124,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Bind-mounted first, before any of the network setup below: it has no
+# dependency on the netns/veth work that follows, and doing it first
+# minimizes the gap between isolated-exec.js's listHostMounts() snapshot
+# (which config.json's readonlyPaths was computed from) and this rbind
+# actually capturing the host's mount table.
+echo "run-isolated: bind-mounting host root for runc's rootfs..." >&2
+mkdir -p "$ROOTFS_BIND_DIR"
+mount --rbind / "$ROOTFS_BIND_DIR"
+# No separate `mount --make-rprivate` needed here: the whole-namespace
+# `--propagation private` set up above already makes every mount created
+# under it private by default, including this one.
+
 echo "run-isolated: creating sandbox network namespace..." >&2
 ip netns add "$NETNS_NAME"
 
@@ -141,13 +153,6 @@ ip netns exec "$NETNS_NAME" sh -c "
   ip link set lo up
   ip route add default via '${GATEWAY}'
 "
-
-echo "run-isolated: bind-mounting host root for runc's rootfs..." >&2
-mkdir -p "$ROOTFS_BIND_DIR"
-mount --rbind / "$ROOTFS_BIND_DIR"
-# No separate `mount --make-rprivate` needed here: the whole-namespace
-# `--propagation private` set up above already makes every mount created
-# under it private by default, including this one.
 
 echo "run-isolated: attaching proxy-side veth to sandbox0 bridge..." >&2
 nsenter --net="/proc/${PROXY_PID}/ns/net" -- sh -c "

@@ -295,12 +295,6 @@ runc's rootfs (`pivot_root` can't target `/` itself). Everything else below is d
   the capability-based model above. Not applied today; the isolation mechanisms above already
   close off the specific escape routes considered (privilege escalation, Docker-socket access,
   cross-namespace ptrace/memory access).
-- **Read-only enforcement reads the mount table just before the rootfs is staged**: the set of host
-  mounts forced read-only is computed from `/proc/self/mountinfo` immediately before
-  `run-isolated.sh` bind-mounts the host root. A real filesystem mounted into that sub-second window
-  would be duplicated into the sandbox without a read-only entry — but creating a host mount already
-  requires root on the runner, at which point the sandbox boundary is moot, so this is a negligible,
-  accepted gap.
 - **`writable:` cannot name the sandbox's own scratch directory**: a `run:` step's `writable:` input
   listing `/var/tmp/buildcage` (or an ancestor of it, e.g. `/var/tmp` or `/`) is rejected outright —
   that directory holds the run's own `mount --rbind /` rootfs, and the writable exceptions are

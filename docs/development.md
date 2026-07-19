@@ -165,10 +165,13 @@ order it actually happens. For the user-facing behavior and threat model, see
    - Re-execs itself into a fresh, private mount namespace before touching anything else, so the
      mount work below is invisible to every other `run:` step running concurrently on the same
      host.
+   - Bind-mounts the host's own root filesystem onto a fresh directory to serve as the sandbox's
+     rootfs (a plain `pivot_root` can't target the real root directly). Done before the network
+     setup below, since it has no dependency on it and doing it first minimizes the gap between
+     `listHostMounts()`'s snapshot (which `readonlyPaths` above was computed from) and this
+     actually capturing the host's mount table.
    - Creates a network namespace and a veth pair, with one end moved into it and the other
      attached as a bridge port on the proxy container's own network.
-   - Bind-mounts the host's own root filesystem onto a fresh directory to serve as the sandbox's
-     rootfs (a plain `pivot_root` can't target the real root directly).
 6. Run the sandboxed command via `runc`.
    - runc creates its own further-nested namespaces per `config.json` and enforces every
      isolation guarantee declared there — capability drop, seccomp filter, read-only filesystem,
