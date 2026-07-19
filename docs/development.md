@@ -133,8 +133,8 @@ order it actually happens. For the user-facing behavior and threat model, see
 1. Verify the proxy image's provenance and resolve a digest-pinned image ref (`main.js`).
    - Sigstore bundle verification against the image published under the `-proxy` tag suffix.
 2. Start a dedicated, throwaway proxy container for this one step (`main.js`).
-   - The container provides network-layer isolation only (bridge, iptables `REDIRECT`/`DROP`
-     rules, dnsmasq, HAProxy) — no build daemon.
+   - The container provides network-layer isolation only (iptables `REDIRECT`/`DROP` rules,
+     dnsmasq, HAProxy) — no build daemon.
    - Every `docker compose` invocation passes an explicit `-p <containerName>`, so concurrent
      `run:` steps in the same job (GitHub Actions' `background`/`wait`/`parallel` keywords) never
      share an implicit, directory-derived Compose project — otherwise one step's `up`/`down` could
@@ -170,8 +170,11 @@ order it actually happens. For the user-facing behavior and threat model, see
      setup below, since it has no dependency on it and doing it first minimizes the gap between
      `listHostMounts()`'s snapshot (which `readonlyPaths` above was computed from) and this
      actually capturing the host's mount table.
-   - Creates a network namespace and a veth pair, with one end moved into it and the other
-     attached as a bridge port on the proxy container's own network.
+   - Creates a network namespace and a veth pair, with one end moved into it (as `eth0`) and the
+     other moved into the proxy container's own netns, renamed to `sandbox0`, and given the
+     proxy's fixed gateway address directly — no bridge, since this is always a 1:1 connection
+     (one sandbox, one proxy) and a plain named interface is enough for `init-iptables`'s
+     `-i sandbox0` rule (added at container startup) to match once this device appears later.
 6. Run the sandboxed command via `runc`.
    - runc creates its own further-nested namespaces per `config.json` and enforces every
      isolation guarantee declared there — capability drop, seccomp filter, read-only filesystem,
@@ -327,9 +330,9 @@ reports for the allowed side.
 │   │                         # `sudo -n` (see Run Action Internals)
 │   ├── compose.yaml          # Runtime compose file the action itself uses (verified, digest-pinned
 │   │                         # image ref)
-│   ├── docker/               # run action's proxy image — transparent's bridge/iptables/
-│   │                         # dnsmasq/HAProxy stack with buildkitd removed entirely, plus a
-│   │                         # checksum-pinned runc binary and the gen-seccomp-profile/ Go tool
+│   ├── docker/               # run action's proxy image — transparent's iptables/dnsmasq/HAProxy
+│   │                         # stack with buildkitd removed entirely, plus a checksum-pinned
+│   │                         # runc binary and the gen-seccomp-profile/ Go tool
 │   ├── test/                 # assert-sandbox*.sh + integration-test-*.sh (capability/filesystem/
 │   │                         # seccomp/die-with-parent checks driving run/dist/main.cjs directly)
 │   ├── compose.sandbox-dev.yaml  # Mac dev-loop overlay for the run action (see dev/)
