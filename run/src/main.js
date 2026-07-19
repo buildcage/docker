@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, chmodSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,9 +7,17 @@ import { buildRules } from "../../core/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
 import { verifyImageDigest } from "../../core/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
-import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";
+import { generateContainerName, getContainerPid, deriveProjectName, buildDockerCpArgs } from "./lib/container.js";
 import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.js";
-import { writeRunScript, runIsolated, withScratchDir } from "./lib/isolated-exec.js";
+import {
+  writeRunScript,
+  writeResolvConf,
+  generateBaseOciSpec,
+  buildOciConfig,
+  writeOciConfig,
+  runIsolated,
+  withScratchDir,
+} from "./lib/isolated-exec.js";
 import { fetchReport, writeReport } from "./lib/report.js";
 
 export { buildComposeUpArgs, buildComposeDownArgs };
@@ -160,16 +168,69 @@ async function main() {
       throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
     }
 
+    // Fixed addressing on the proxy's sandbox0 bridge — same values
+    // run-isolated.sh has always defaulted to.
+    const gateway = "172.20.0.1";
+    const dns = "172.20.0.1";
+    const targetIp = "172.20.0.101";
+
     exitCode = withScratchDir((dir) => {
+      const runcPath = join(dir, "runc");
+      const genSeccompProfilePath = join(dir, "gen-seccomp-profile");
+      try {
+        execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/runc", hostPath: runcPath }));
+        execFileSync(
+          "docker",
+          buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/gen-seccomp-profile", hostPath: genSeccompProfilePath }),
+        );
+        chmodSync(runcPath, 0o755);
+        chmodSync(genSeccompProfilePath, 0o755);
+      } catch (e) {
+        throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
+      }
+
+      // Run natively on the runner host (not `docker exec`, which would
+      // resolve against the container's kernel/arch instead of the real
+      // one) — see gen-seccomp-profile/main.go for why this matters.
+      const seccompProfile = JSON.parse(execFileSync(genSeccompProfilePath, { encoding: "utf8" }));
+
+      const workdir = env.GITHUB_WORKSPACE || "";
+      const home = env.HOME || "";
+      const resolvConfPath = writeResolvConf(dns, dir);
+      const rootfsBindDir = join(dir, "rootfs");
+      // Distinct from the Docker container name/Compose project name
+      // (different ID namespace — `ip netns`/runc container IDs), but
+      // derived from it to keep `ip netns`/`docker ps` output correlated
+      // per step, same reasoning as deriveProjectName.
+      const netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-");
+
       const scriptPath = writeRunScript(runInput, dir);
-      return runIsolated({
-        scriptPath,
-        proxyPid,
-        workdir: env.GITHUB_WORKSPACE || "",
-        home: env.HOME || "",
+      const baseSpec = generateBaseOciSpec(runcPath, dir);
+      const config = buildOciConfig(baseSpec, {
+        uid: process.getuid(),
+        gid: process.getgid(),
+        workdir,
+        home,
         writablePaths,
         env,
-        runScriptDir: dir,
+        netnsPath: `/var/run/netns/${netnsName}`,
+        rootfsBindDir,
+        resolvConfPath,
+        seccompProfile,
+        scriptPath,
+      });
+      writeOciConfig(config, dir);
+
+      return runIsolated({
+        runcPath,
+        proxyPid,
+        bundleDir: dir,
+        containerId: containerName,
+        netnsName,
+        rootfsBindDir,
+        gateway,
+        dns,
+        targetIp,
       });
     });
   } finally {

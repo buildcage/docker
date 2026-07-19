@@ -35,6 +35,16 @@ export function deriveProjectName(containerName) {
 }
 
 /**
+ * Build the `docker cp` argv for extracting a single file from a running
+ * container onto the host filesystem — used to pull runc and
+ * gen-seccomp-profile out of the proxy image before run-isolated.sh runs
+ * (see lib/isolated-exec.js).
+ */
+export function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
+  return ["cp", `${containerName}:${containerPath}`, hostPath];
+}
+
+/**
  * Returns the container's PID (as seen from the Docker host's PID
  * namespace), or null if the container doesn't exist / isn't running.
  */

@@ -7265,6 +7265,10 @@ class SandboxError extends Error {
   }
 }
 
+function buildDockerCpArgs({containerName: containerName, containerPath: containerPath, hostPath: hostPath}) {
+  return [ "cp", `${containerName}:${containerPath}`, hostPath ];
+}
+
 function buildComposeUpArgs({composeFile: composeFile, projectName: projectName, pullPolicy: pullPolicy}) {
   return [ "compose", "-f", composeFile, "-p", projectName, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ];
 }
@@ -7275,24 +7279,7 @@ function buildComposeDownArgs({composeFile: composeFile, projectName: projectNam
 
 const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href));
 
-function runIsolated({scriptPath: scriptPath, proxyPid: proxyPid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, runScriptDir: runScriptDir}) {
-  const runIsolatedShPath = path.join(__dirname$2, "..", "scripts", "run-isolated.sh"), envFilePath = function(env, dir) {
-    const envFilePath = path.join(dir, "env-dump.bin"), buf = Buffer.concat(Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => Buffer.from(`${k}=${v}\0`, "utf8")));
-    return node_fs.writeFileSync(envFilePath, buf, {
-      mode: 384
-    }), envFilePath;
-  }(env, runScriptDir), args = [ "-n", "--", runIsolatedShPath, "--proxy-pid", String(proxyPid), "--uid", String(process.getuid()), "--gid", String(process.getgid()), "--env-file", envFilePath ];
-  workdir && args.push("--workdir", workdir), home && args.push("--home", home);
-  for (const p of writablePaths) args.push("--writable", p);
-  args.push("--", scriptPath);
-  try {
-    return node_child_process.execFileSync("sudo", args, {
-      stdio: "inherit"
-    }), 0;
-  } catch (e) {
-    return "number" == typeof e.status ? e.status : 1;
-  }
-}
+const EXTRA_MASKED_PROC_PATHS = [ "/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-trigger" ];
 
 const ruleTypeToParam = {
   HTTPS: "allowed_https_rules",
@@ -7482,6 +7469,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
       }
     }(containerName);
     if (null === proxyPid) throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
+    const gateway = "172.20.0.1", dns = "172.20.0.1", targetIp = "172.20.0.101";
     exitCode = function(fn) {
       const dir = node_fs.mkdtempSync(path.join(os.tmpdir(), "buildcage-sandbox-"));
       try {
@@ -7493,20 +7481,143 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         });
       }
     }(dir => {
-      const scriptPath = function(runInput, dir) {
+      const runcPath = path.join(dir, "runc"), genSeccompProfilePath = path.join(dir, "gen-seccomp-profile");
+      try {
+        node_child_process.execFileSync("docker", buildDockerCpArgs({
+          containerName: containerName,
+          containerPath: "/opt/buildcage/bin/runc",
+          hostPath: runcPath
+        })), node_child_process.execFileSync("docker", buildDockerCpArgs({
+          containerName: containerName,
+          containerPath: "/opt/buildcage/bin/gen-seccomp-profile",
+          hostPath: genSeccompProfilePath
+        })), node_fs.chmodSync(runcPath, 493), node_fs.chmodSync(genSeccompProfilePath, 493);
+      } catch (e) {
+        throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
+      }
+      const seccompProfile = JSON.parse(node_child_process.execFileSync(genSeccompProfilePath, {
+        encoding: "utf8"
+      })), workdir = env.GITHUB_WORKSPACE || "", home = env.HOME || "", resolvConfPath = function(dns, dir) {
+        const resolvConfPath = path.join(dir, "resolv.conf");
+        return node_fs.writeFileSync(resolvConfPath, `nameserver ${dns}\n`, {
+          mode: 420
+        }), resolvConfPath;
+      }(dns, dir), rootfsBindDir = path.join(dir, "rootfs"), netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-"), scriptPath = function(runInput, dir) {
         const scriptPath = path.join(dir, "run-script.sh"), content = runInput.startsWith("#!") ? runInput : `#!/bin/sh\nset -e\n${runInput}\n`;
         return node_fs.writeFileSync(scriptPath, content, {
           mode: 448
         }), scriptPath;
-      }(runInput, dir);
-      return runIsolated({
-        scriptPath: scriptPath,
-        proxyPid: proxyPid,
-        workdir: env.GITHUB_WORKSPACE || "",
-        home: env.HOME || "",
+      }(runInput, dir), baseSpec = function(runcPath, bundleDir) {
+        return node_child_process.execFileSync(runcPath, [ "spec" ], {
+          cwd: bundleDir
+        }), JSON.parse(node_fs.readFileSync(path.join(bundleDir, "config.json"), "utf8"));
+      }(runcPath, dir), config = function(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, netnsPath: netnsPath, rootfsBindDir: rootfsBindDir, resolvConfPath: resolvConfPath, seccompProfile: seccompProfile, scriptPath: scriptPath}) {
+        const disableReadonly = writablePaths.includes("/"), mounts = [ ...baseSpec.mounts, {
+          destination: "/etc/resolv.conf",
+          type: "none",
+          source: resolvConfPath,
+          options: [ "rbind", "ro" ]
+        } ];
+        if (!disableReadonly) {
+          workdir && mounts.push({
+            destination: workdir,
+            type: "none",
+            source: workdir,
+            options: [ "rbind", "rw" ]
+          }), home && mounts.push({
+            destination: home,
+            type: "none",
+            source: home,
+            options: [ "rbind", "rw" ]
+          }), mounts.push({
+            destination: "/tmp",
+            type: "none",
+            source: "/tmp",
+            options: [ "rbind", "rw" ]
+          });
+          for (const p of writablePaths) mounts.push({
+            destination: p,
+            type: "none",
+            source: p,
+            options: [ "rbind", "rw" ]
+          });
+        }
+        const maskedPaths = Array.from(new Set([ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ])), readonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
+          ...ns,
+          path: netnsPath
+        } : ns);
+        return {
+          ...baseSpec,
+          root: {
+            path: rootfsBindDir,
+            readonly: !disableReadonly
+          },
+          mounts: mounts,
+          process: {
+            ...baseSpec.process,
+            terminal: !1,
+            user: {
+              uid: uid,
+              gid: gid
+            },
+            args: [ scriptPath ],
+            env: Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => `${k}=${v}`),
+            cwd: workdir || "/",
+            capabilities: {
+              bounding: [],
+              effective: [],
+              permitted: [],
+              inheritable: [],
+              ambient: []
+            },
+            noNewPrivileges: !0
+          },
+          linux: {
+            ...baseSpec.linux,
+            namespaces: namespaces,
+            seccomp: seccompProfile,
+            maskedPaths: maskedPaths,
+            readonlyPaths: readonlyPaths
+          }
+        };
+      }(baseSpec, {
+        uid: process.getuid(),
+        gid: process.getgid(),
+        workdir: workdir,
+        home: home,
         writablePaths: writablePaths,
         env: env,
-        runScriptDir: dir
+        netnsPath: `/var/run/netns/${netnsName}`,
+        rootfsBindDir: rootfsBindDir,
+        resolvConfPath: resolvConfPath,
+        seccompProfile: seccompProfile,
+        scriptPath: scriptPath
+      });
+      return function(config, bundleDir) {
+        const configPath = path.join(bundleDir, "config.json");
+        node_fs.writeFileSync(configPath, JSON.stringify(config), {
+          mode: 384
+        });
+      }(config, dir), function({runcPath: runcPath, proxyPid: proxyPid, bundleDir: bundleDir, containerId: containerId, netnsName: netnsName, rootfsBindDir: rootfsBindDir, gateway: gateway, dns: dns, targetIp: targetIp}) {
+        const args = [ "-n", "--", path.join(__dirname$2, "..", "scripts", "run-isolated.sh"), "--proxy-pid", String(proxyPid), "--runc", runcPath, "--bundle", bundleDir, "--container-id", containerId, "--netns-name", netnsName, "--rootfs-bind-dir", rootfsBindDir ];
+        args.push("--gateway", gateway), args.push("--dns", dns), args.push("--target-ip", targetIp);
+        try {
+          return node_child_process.execFileSync("sudo", args, {
+            stdio: "inherit"
+          }), 0;
+        } catch (e) {
+          return "number" == typeof e.status ? e.status : 1;
+        }
+      }({
+        runcPath: runcPath,
+        proxyPid: proxyPid,
+        bundleDir: dir,
+        containerId: containerName,
+        netnsName: netnsName,
+        rootfsBindDir: rootfsBindDir,
+        gateway: gateway,
+        dns: dns,
+        targetIp: targetIp
       });
     });
   } finally {
