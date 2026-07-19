@@ -20,15 +20,15 @@ BUNDLE_DIR=""
 CONTAINER_ID=""
 NETNS_NAME=""
 ROOTFS_BIND_DIR=""
-GATEWAY="172.20.0.1"
-DNS="172.20.0.1"
-TARGET_IP="172.20.0.101"
+GATEWAY=""
+DNS=""
+TARGET_IP=""
 
 usage() {
   cat >&2 <<'EOF'
 Usage: run-isolated.sh --proxy-pid <PID> --runc <PATH> --bundle <DIR>
          --container-id <ID> --netns-name <NAME> --rootfs-bind-dir <DIR>
-         [--gateway <IP>] [--dns <IP>] [--target-ip <IP>]
+         --gateway <IP> --dns <IP> --target-ip <IP>
 EOF
 }
 
@@ -54,6 +54,9 @@ done
 [ -z "$CONTAINER_ID" ] && { echo "ERROR: --container-id is required" >&2; usage; exit 1; }
 [ -z "$NETNS_NAME" ] && { echo "ERROR: --netns-name is required" >&2; usage; exit 1; }
 [ -z "$ROOTFS_BIND_DIR" ] && { echo "ERROR: --rootfs-bind-dir is required" >&2; usage; exit 1; }
+[ -z "$GATEWAY" ] && { echo "ERROR: --gateway is required" >&2; usage; exit 1; }
+[ -z "$DNS" ] && { echo "ERROR: --dns is required" >&2; usage; exit 1; }
+[ -z "$TARGET_IP" ] && { echo "ERROR: --target-ip is required" >&2; usage; exit 1; }
 
 if [ "$(id -u)" != "0" ]; then
   echo "ERROR: run-isolated.sh must be run as root (via sudo)" >&2

@@ -100,7 +100,7 @@ test_sandbox_mode: ## Run a sample isolated command in the dev loop and verify i
 	    build-test-bundle.sh --netns-name buildcage-sandbox-dev --script /usr/local/bin/smoke-test.sh --bundle /tmp/bundle; \
 	    run-isolated.sh --proxy-pid $$PROXY_PID --runc /usr/local/bin/runc --bundle /tmp/bundle \
 	      --container-id buildcage-sandbox-dev --netns-name buildcage-sandbox-dev --rootfs-bind-dir /tmp/bundle/rootfs \
-	      --gateway 172.20.0.1 --dns 172.20.0.1"
+	      --gateway 172.20.0.1 --dns 172.20.0.1 --target-ip 172.20.0.101"
 	@$(MAKE) clean_sandbox_mode
 
 .PHONY: clean_sandbox_mode

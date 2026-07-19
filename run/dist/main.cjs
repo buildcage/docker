@@ -7642,8 +7642,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
           mode: 384
         });
       }(config, dir), function({runcPath: runcPath, proxyPid: proxyPid, bundleDir: bundleDir, containerId: containerId, netnsName: netnsName, rootfsBindDir: rootfsBindDir, gateway: gateway, dns: dns, targetIp: targetIp}) {
-        const args = [ "-n", "--", path.join(__dirname$2, "..", "scripts", "run-isolated.sh"), "--proxy-pid", String(proxyPid), "--runc", runcPath, "--bundle", bundleDir, "--container-id", containerId, "--netns-name", netnsName, "--rootfs-bind-dir", rootfsBindDir ];
-        args.push("--gateway", gateway), args.push("--dns", dns), args.push("--target-ip", targetIp);
+        const args = [ "-n", "--", path.join(__dirname$2, "..", "scripts", "run-isolated.sh"), "--proxy-pid", String(proxyPid), "--runc", runcPath, "--bundle", bundleDir, "--container-id", containerId, "--netns-name", netnsName, "--rootfs-bind-dir", rootfsBindDir, "--gateway", gateway, "--dns", dns, "--target-ip", targetIp ];
         try {
           return node_child_process.execFileSync("sudo", args, {
             stdio: "inherit"

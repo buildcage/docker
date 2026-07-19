@@ -272,10 +272,13 @@ export function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsN
     netnsName,
     "--rootfs-bind-dir",
     rootfsBindDir,
+    "--gateway",
+    gateway,
+    "--dns",
+    dns,
+    "--target-ip",
+    targetIp,
   ];
-  if (gateway) args.push("--gateway", gateway);
-  if (dns) args.push("--dns", dns);
-  if (targetIp) args.push("--target-ip", targetIp);
 
   try {
     execFileSync("sudo", args, { stdio: "inherit" });
