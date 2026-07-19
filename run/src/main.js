@@ -169,7 +169,7 @@ async function main() {
       throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
     }
 
-    // Fixed addressing on the proxy's sandbox0 bridge.
+    // Fixed addressing for the direct veth link to the proxy's sandbox0 interface.
     const gateway = "172.20.0.1";
     const dns = "172.20.0.1";
     const targetIp = "172.20.0.101";

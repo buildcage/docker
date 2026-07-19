@@ -3,7 +3,7 @@ services:
     container_name: ${PROXY_CONTAINER_NAME:-buildcage-proxy}
     image: ${BUILDCAGE_PROXY_IMAGE_REF:-placeholder}
     # No buildkitd/runc in this image, so unlike setup/compose.yaml's builder
-    # service, only NET_ADMIN is needed (bridge creation + iptables) — no
+    # service, only NET_ADMIN is needed (interface renaming/addressing + iptables) — no
     # SYS_ADMIN/SYS_PTRACE, no cgroup:host, no default-seccomp/apparmor bypass.
     cap_add:
       - NET_ADMIN

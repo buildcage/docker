@@ -198,8 +198,8 @@ For exactly how the `report` action extracts allowed/denied data from buildkitd'
 > before relying on it.
 
 The `run` action ([Reference](./reference.md#run-action)) applies the same isolation
-technology as the `transparent` engine — bridge network, iptables redirect, DNS redirect,
-SNI/Host-based allowlist proxy — to an arbitrary `run:` command instead of a BuildKit `RUN` step.
+technology as the `transparent` engine — iptables redirect, DNS redirect, SNI/Host-based
+allowlist proxy — to an arbitrary `run:` command instead of a BuildKit `RUN` step.
 Its threat model differs from the two build engines above in one important way: the process being
 isolated is a full shell command chosen by the workflow author, running with the same privileges as
 the Actions runner itself (rather than inside a BuildKit-managed OCI container), so isolating its
@@ -222,14 +222,15 @@ The isolated command runs as an [OCI](https://github.com/opencontainers/runtime-
 under [runc](https://github.com/opencontainers/runc) — the same reference container runtime
 `explicit`/`transparent` already trust indirectly via `moby/buildkit` — rather than being wrapped
 directly by `unshare`/`setpriv` on the runner host. `run-isolated.sh` only sets up what runc cannot:
-wiring a veth pair into the proxy container's bridge, and bind-mounting the host's own `/` for
-runc's rootfs (`pivot_root` can't target `/` itself). Everything else below is declared in an OCI
-`config.json` and enforced by runc natively.
+wiring a veth pair directly into the proxy container's own netns, and bind-mounting the host's own
+`/` for runc's rootfs (`pivot_root` can't target `/` itself). Everything else below is declared in
+an OCI `config.json` and enforced by runc natively.
 
 - **Network namespace**: the isolated command runs in its own network namespace, connected to the
-  proxy container's bridge via a veth pair — the same enforcement `transparent` mode
-  applies to Docker `RUN` steps (iptables `REDIRECT`/`DROP`, DNS redirect, SNI/Host allowlist). runc
-  joins this namespace itself, driven by the OCI spec's `linux.namespaces` path — no wrapper needed.
+  proxy container's netns by a dedicated veth pair (no bridge — it's always a 1:1 connection, one
+  sandbox to one proxy) — the same enforcement `transparent` mode applies to Docker `RUN` steps
+  (iptables `REDIRECT`/`DROP`, DNS redirect, SNI/Host allowlist). runc joins this namespace itself,
+  driven by the OCI spec's `linux.namespaces` path — no wrapper needed.
 - **Seccomp filter**: derived from Docker's own default seccomp profile (allowlist-based;
   `moby/profiles`), resolved against an empty capability set to match the capability drop below —
   so any syscall Docker's default profile only conditionally allows for a *held* capability is

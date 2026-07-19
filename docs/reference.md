@@ -268,15 +268,16 @@ native `run:` step.
 
 ### How It Works
 
-`run` reuses the same isolation technology as the `transparent` engine (CNI-style bridge,
-iptables redirect, DNS redirect, SNI/Host-based allowlist proxy) but applies it to the runner host
-itself instead of a BuildKit `RUN` step:
+`run` reuses the same isolation technology as the `transparent` engine (iptables redirect, DNS
+redirect, SNI/Host-based allowlist proxy) but applies it to the runner host itself instead of a
+BuildKit `RUN` step:
 
-1. A throwaway proxy container starts (no `buildkitd` — just the bridge, iptables, DNS, and
-   HAProxy pieces from `transparent` mode).
+1. A throwaway proxy container starts (no `buildkitd` — just the iptables, DNS, and HAProxy pieces
+   from `transparent` mode).
 2. The `run` command executes directly on the runner host inside a fresh network/PID/mount/UTS/
-   IPC/cgroup namespace, connected to the proxy container's bridge via a veth pair — the same
-   network-level enforcement `transparent` mode gives Docker `RUN` steps.
+   IPC/cgroup namespace, connected to the proxy container's own netns by a dedicated veth pair (no
+   bridge — always a 1:1 connection) — the same network-level enforcement `transparent` mode gives
+   Docker `RUN` steps.
 3. Before executing `run`, all capabilities are dropped, `no_new_privileges` is set, and
    supplementary groups (e.g. `docker`) are cleared — the isolated command cannot re-escalate
    privileges, touch the Docker socket, or reconfigure networking, even if it runs as the same
