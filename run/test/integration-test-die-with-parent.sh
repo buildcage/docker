@@ -51,11 +51,12 @@ sleep 0.5
 # of the actual script, which also matches "run-isolated.sh" in its argv --
 # this must target the real bash instance, not sudo's monitor (see
 # run-isolated.sh's own comment on this same distinction).
-BASH_PID=$(pgrep -f "/bin/bash .*/run/scripts/run-isolated.sh")
-if [ -z "$BASH_PID" ]; then
-  echo "  FAIL  could not find run-isolated.sh's own bash process"
+mapfile -t BASH_PIDS < <(pgrep -f "/bin/bash .*/run/scripts/run-isolated.sh")
+if [ "${#BASH_PIDS[@]}" != "1" ]; then
+  echo "  FAIL  expected exactly 1 run-isolated.sh bash process, found ${#BASH_PIDS[@]}: ${BASH_PIDS[*]:-<none>}"
   exit 1
 fi
+BASH_PID="${BASH_PIDS[0]}"
 
 kill -9 "$BASH_PID"
 sleep 2
