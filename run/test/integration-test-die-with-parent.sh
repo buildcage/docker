@@ -15,7 +15,9 @@ FAILURES=0
 
 cleanup() {
   [ -n "${NODE_PID:-}" ] && kill -9 "$NODE_PID" >/dev/null 2>&1
-  pkill -9 -f "sudo -n -- .*/run/scripts/run-isolated.sh" >/dev/null 2>&1
+  # sudo itself (setuid root) and everything under it run as root, so
+  # this needs the same privilege too.
+  sudo -n pkill -9 -f "sudo -n -- .*/run/scripts/run-isolated.sh" >/dev/null 2>&1
   docker ps -aq --filter "name=buildcage-proxy-" | xargs -r docker rm -f >/dev/null 2>&1
   docker network ls --filter "name=buildcage-proxy-" -q | xargs -r docker network rm >/dev/null 2>&1
   rm -rf "$WORKDIR"
@@ -58,7 +60,9 @@ if [ "${#BASH_PIDS[@]}" != "1" ]; then
 fi
 BASH_PID="${BASH_PIDS[0]}"
 
-kill -9 "$BASH_PID"
+# run-isolated.sh runs as root (via sudo -n), so killing it requires the
+# same privilege.
+sudo -n kill -9 "$BASH_PID"
 sleep 2
 
 echo ""
