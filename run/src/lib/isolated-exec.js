@@ -425,6 +425,33 @@ function unmountAllUnder(dir) {
   }
 }
 
+/**
+ * Removes the scratch dir, retrying on EBUSY. A lazy unmount (see
+ * unmountAllUnder) detaches a mount from the path-resolution tree
+ * immediately -- it stops appearing in /proc/self/mountinfo right away --
+ * but the kernel's underlying teardown of that (now-orphaned) mount can
+ * still lag by a short, bounded window, particularly under the concurrent
+ * load of multiple `run:` steps each recursively bind-mounting "/" at the
+ * same time (each one's snapshot unavoidably nests a copy of every other
+ * concurrently-running step's own rootfs bind-mount, since they all live
+ * under the same shared /tmp). Empirically, this makes a directory rmSync
+ * is about to delete spuriously report EBUSY even though it's no longer
+ * listed as a mountpoint at all -- and resolves on the very next attempt
+ * after a brief wait. Retry a few times before giving up for real.
+ */
+function removeScratchDir(dir) {
+  const maxAttempts = 5;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if (e.code !== "EBUSY" || attempt === maxAttempts) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+    }
+  }
+}
+
 /** Create/remove a scratch directory for this step's OCI bundle + run-script. */
 export function withScratchDir(fn) {
   const dir = mkdtempSync(join(tmpdir(), "buildcage-sandbox-"));
@@ -432,6 +459,6 @@ export function withScratchDir(fn) {
     return fn(dir);
   } finally {
     unmountAllUnder(dir);
-    rmSync(dir, { recursive: true, force: true });
+    removeScratchDir(dir);
   }
 }

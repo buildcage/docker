@@ -7367,6 +7367,25 @@ function unmountAllUnder(dir) {
   }
 }
 
+function withScratchDir(fn) {
+  const dir = node_fs.mkdtempSync(path.join(os.tmpdir(), "buildcage-sandbox-"));
+  try {
+    return fn(dir);
+  } finally {
+    unmountAllUnder(dir), function(dir) {
+      for (let attempt = 1; attempt <= 5; attempt++) try {
+        return void node_fs.rmSync(dir, {
+          recursive: !0,
+          force: !0
+        });
+      } catch (e) {
+        if ("EBUSY" !== e.code || 5 === attempt) throw e;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+      }
+    }(dir);
+  }
+}
+
 const ruleTypeToParam = {
   HTTPS: "allowed_https_rules",
   HTTP: "allowed_http_rules",
@@ -7556,17 +7575,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     }(containerName);
     if (null === proxyPid) throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
     const gateway = "172.20.0.1", dns = "172.20.0.1", targetIp = "172.20.0.101";
-    exitCode = function(fn) {
-      const dir = node_fs.mkdtempSync(path.join(os.tmpdir(), "buildcage-sandbox-"));
-      try {
-        return fn(dir);
-      } finally {
-        unmountAllUnder(dir), node_fs.rmSync(dir, {
-          recursive: !0,
-          force: !0
-        });
-      }
-    }(dir => {
+    exitCode = withScratchDir(dir => {
       let runcPath, seccompProfile, baseSpec;
       try {
         ({runcPath: runcPath, seccompProfile: seccompProfile, baseSpec: baseSpec} = getOrPopulateBootstrapCache({
