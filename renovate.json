@@ -18,7 +18,8 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/^run/docker/Dockerfile$/"
+        "/^run/docker/Dockerfile$/",
+        "/^run/dev/Dockerfile$/"
       ],
       "matchStrings": ["# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG RUNC_VERSION=(?<currentValue>v[\\d.]+)"]
     },
