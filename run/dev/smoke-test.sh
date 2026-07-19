@@ -4,7 +4,34 @@
 set -e
 
 echo "=== capability / privilege-escalation checks ==="
-grep -E 'CapEff|NoNewPrivs' /proc/self/status
+if grep -q '^CapEff:[[:space:]]*0000000000000000$' /proc/self/status; then
+  echo "OK: CapEff is fully cleared"
+else
+  echo "UNEXPECTED: CapEff is not fully cleared"
+  grep 'CapEff' /proc/self/status
+  exit 1
+fi
+if grep -q '^NoNewPrivs:[[:space:]]*1$' /proc/self/status; then
+  echo "OK: NoNewPrivs is set"
+else
+  echo "UNEXPECTED: NoNewPrivs is not set"
+  grep 'NoNewPrivs' /proc/self/status
+  exit 1
+fi
+
+echo "=== filesystem policy: /tmp writable, root read-only elsewhere ==="
+if echo x >> /tmp/.buildcage-smoke-writable-test; then
+  echo "OK: /tmp is writable"
+else
+  echo "UNEXPECTED: /tmp was not writable"
+  exit 1
+fi
+if touch /etc/.buildcage-smoke-should-fail 2>/dev/null; then
+  echo "UNEXPECTED: /etc was writable"
+  exit 1
+else
+  echo "OK: /etc is read-only"
+fi
 
 echo "=== allowlisted host must be reachable ==="
 wget -q -T 5 -O /dev/null http://example.com/ && echo "OK: example.com reachable"
