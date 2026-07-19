@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync } from "node:fs";
+import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDockerCpArgs } from "./container.js";
@@ -168,6 +168,18 @@ export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
     .map(({ mountPoint }) => mountPoint);
 }
 
+// runc resolves process.args[0] against the *sandbox's* PATH (the step's own
+// env, which a user could override to omit /usr/bin), so resolve setpriv to an
+// absolute path up front instead of relying on that lookup. The sandbox rootfs
+// is a bind-mount of the host's own `/`, so a path that exists on the host
+// resolves to the same binary inside. Falls back to bare "setpriv" (PATH
+// lookup) only if none of the usual locations exist -- run-isolated.sh has
+// already verified setpriv is on root's PATH before we get here.
+const SETPRIV_CANDIDATE_PATHS = ["/usr/bin/setpriv", "/bin/setpriv", "/usr/sbin/setpriv", "/sbin/setpriv"];
+function resolveSetprivPath() {
+  return SETPRIV_CANDIDATE_PATHS.find((p) => existsSync(p)) ?? "setpriv";
+}
+
 /**
  * True if `a` and `b` are the same path, or one is an ancestor directory of
  * the other (path-component-wise, not a bare string prefix -- "/var/tmp/bu"
@@ -284,7 +296,7 @@ export function buildOciConfig(
       // No other setpriv flags are needed here -- uid/gid, capabilities,
       // and no_new_privs are already applied by runc itself (above/below)
       // before this execs.
-      args: ["setpriv", "--pdeathsig=KILL", "--", scriptPath],
+      args: [resolveSetprivPath(), "--pdeathsig=KILL", "--", scriptPath],
       env: Object.entries(env)
         .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}=${v}`),

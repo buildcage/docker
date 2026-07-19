@@ -200,7 +200,10 @@ describe("buildOciConfig", () => {
 
   it("wraps the script in `setpriv --pdeathsig=KILL` (die-with-parent, see run-isolated.sh)", () => {
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
-    assert.deepEqual(config.process.args, ["setpriv", "--pdeathsig=KILL", "--", baseArgs.scriptPath]);
+    // args[0] is setpriv resolved to an absolute path where it exists (e.g.
+    // /usr/bin/setpriv on Linux), falling back to bare "setpriv" otherwise.
+    assert.match(config.process.args[0], /(^|\/)setpriv$/);
+    assert.deepEqual(config.process.args.slice(1), ["--pdeathsig=KILL", "--", baseArgs.scriptPath]);
   });
 
   it("replaces process.env with the given env, dropping undefined values", () => {

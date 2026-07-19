@@ -7322,6 +7322,8 @@ function computeReadonlyHostMounts(hostMounts, protectedPaths) {
   return hostMounts.filter(({mountPoint: mountPoint, fsType: fsType}) => "/" !== mountPoint && !TOLERATED_PSEUDO_FSTYPES.has(fsType) && !protectedPaths.has(mountPoint)).map(({mountPoint: mountPoint}) => mountPoint);
 }
 
+const SETPRIV_CANDIDATE_PATHS = [ "/usr/bin/setpriv", "/bin/setpriv", "/usr/sbin/setpriv", "/sbin/setpriv" ];
+
 function buildOciConfig(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: home, runnerTemp: runnerTemp, writablePaths: writablePaths = [], env: env, netnsPath: netnsPath, rootfsBindDir: rootfsBindDir, resolvConfPath: resolvConfPath, seccompProfile: seccompProfile, scriptPath: scriptPath, hostMounts: hostMounts = []}) {
   const disableReadonly = writablePaths.includes("/"), mounts = [ ...baseSpec.mounts, {
     destination: "/etc/resolv.conf",
@@ -7363,7 +7365,7 @@ function buildOciConfig(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: h
         uid: uid,
         gid: gid
       },
-      args: [ "setpriv", "--pdeathsig=KILL", "--", scriptPath ],
+      args: [ SETPRIV_CANDIDATE_PATHS.find(p => node_fs.existsSync(p)) ?? "setpriv", "--pdeathsig=KILL", "--", scriptPath ],
       env: Object.entries(env).filter(([, v]) => void 0 !== v).map(([k, v]) => `${k}=${v}`),
       cwd: workdir || "/",
       capabilities: {
