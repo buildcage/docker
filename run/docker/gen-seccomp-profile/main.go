@@ -10,9 +10,8 @@
 // profile are gated by a real uname(2) call via a minKernel condition), so
 // it must be run on the real target — extracted from the proxy image onto
 // the GitHub Actions runner host (docker cp, same mechanism used for
-// runc) and invoked natively there, once per `run` step, before any
-// namespace isolation is set up for the sandboxed command. See
-// docs/development.md.
+// runc) and invoked natively there, before any namespace isolation is set
+// up for the sandboxed command. See docs/development.md.
 //
 // If the kernel it happens to run on doesn't match the actual runner
 // exactly (not expected in normal operation, since it's the same host),

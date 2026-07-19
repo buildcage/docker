@@ -19,20 +19,11 @@ RUN apk add --no-cache curl && \
     echo "${EXPECTED_SHA256}  /opt/buildcage/bin/runc" | sha256sum -c && \
     chmod +x /opt/buildcage/bin/runc
 
-# gen-seccomp-profile is extracted onto the runner host (docker cp, same as
-# runc below) and run natively there at `run` action startup, before any
-# namespace isolation is set up for the sandboxed command — not run at image
-# build time. Its output depends on the actual host kernel (a real
-# uname(2) call gates a handful of syscalls) and architecture, both of
-# which only match the real runner when resolved on the host itself. On a
-# real GitHub Actions runner this is equivalent to running it inside the
-# still-running proxy container (Linux containers share the host kernel),
-# but extracting it onto the host lets `run` action startup reuse the same
-# docker-cp extraction path already needed for runc, rather than adding a
-# second (docker exec) mechanism. Building it here only compiles the
-# binary; see gen-seccomp-profile/main.go and docs/development.md for why.
-# Pure Go (CGO_ENABLED=0), so this cross-compiles natively via
-# BUILDPLATFORM without needing QEMU, same as buildkit-proxy-build in
+# Building gen-seccomp-profile here only compiles the binary — it's
+# extracted onto the runner host and run natively there, not at image
+# build time; see gen-seccomp-profile/main.go for why. Pure Go
+# (CGO_ENABLED=0), so this cross-compiles natively via BUILDPLATFORM
+# without needing QEMU, same as buildkit-proxy-build in
 # setup/docker/explicit/Dockerfile.
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2 AS gen-seccomp-profile-build
 ARG TARGETOS

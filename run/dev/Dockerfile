@@ -14,8 +14,7 @@
 # ../docker/Dockerfile's own stages) rather than `docker cp`-extracted from
 # the proxy image at runtime, so this dev loop doesn't need the Docker
 # socket mounted in just to reach a sibling container — it stays scoped to
-# testing run-isolated.sh itself, the same as before this file started
-# needing these two binaries at all.
+# testing run-isolated.sh itself.
 # renovate: datasource=github-releases depName=opencontainers/runc
 ARG RUNC_VERSION=v1.5.1
 ARG RUNC_SHA256_AMD64=177df879d50c913eb205e898d5c1c05a18f574053c0ce5524c471208eaf06f6f

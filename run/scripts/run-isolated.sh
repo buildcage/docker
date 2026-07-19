@@ -15,29 +15,20 @@
 set -euo pipefail
 
 # Re-exec into a fresh, private mount namespace before doing anything else.
-# Without this, the mount --rbind / staging below (and `ip netns add`'s own
-# bind-mount of /run/netns) operate directly in the one mount namespace
-# shared by every concurrently running `run:` step on this host. Since
-# each step's own rootfsBindDir lives under the same /tmp, each step's
-# `mount --rbind /` snapshot unavoidably captures a nested copy of every
-# *other* concurrently running step's own rootfs tree too -- whatever
-# happens to exist under "/" at that instant. That doesn't break sandbox
-# isolation itself (runc still creates its own further-nested namespace
-# for the sandboxed process regardless), but it does mean concurrent
-# steps' cleanup (unmount + rmdir) can race against each other's staging;
-# empirically, this was the root cause of an intermittent EBUSY failure in
-# isolated-exec.js's withScratchDir cleanup under concurrent `run:` steps.
-# Doing the rest of this script's work in its own private mount namespace
-# instead means its rootfs bind-mount and netns file are invisible to (and
-# unaffected by) every other concurrent invocation from the moment they're
-# created, the same staging pattern tools like bubblewrap use. `--propagation
-# private` is `unshare`'s shortcut for "unshare + recursively make every
-# mount private" in one step. No `--fork` is used, so this and the
-# subsequent exec replace the current process in place rather than
-# spawning a child -- this script's PID (and therefore its
-# /proc/self/cmdline, matched by
-# run/test/integration-test-die-with-parent.sh's pgrep) stays the same
-# across the re-exec.
+# Every concurrently running `run:` step's own scratch dir lives under the
+# same /tmp, so without this, the `mount --rbind /` staging below (and `ip
+# netns add`'s own bind-mount of /run/netns) would run in the one mount
+# namespace shared by every step on the host -- unavoidably nesting a copy
+# of each concurrently running step's rootfs tree inside every other's
+# snapshot, which races their unmount/rmdir cleanup against each other.
+# With this, everything this script mounts is invisible to (and
+# unaffected by) every other concurrent invocation from the moment it's
+# created. `--propagation private` is `unshare`'s shortcut for "unshare +
+# recursively make every mount private" in one step. No `--fork`, so this
+# and the subsequent exec replace the current process in place -- this
+# script's PID (and /proc/self/cmdline, matched by
+# integration-test-die-with-parent.sh's pgrep) stays the same across the
+# re-exec.
 if [ -z "${BUILDCAGE_UNSHARED:-}" ]; then
   command -v unshare >/dev/null 2>&1 || { echo "ERROR: required command not found: unshare" >&2; exit 1; }
   export BUILDCAGE_UNSHARED=1
@@ -114,9 +105,9 @@ cleanup() {
   "$RUNC_PATH" delete -f "$CONTAINER_ID" >/dev/null 2>&1
   # Not silenced: a failed unmount here (e.g. EBUSY from a lingering
   # process) leaves ROOTFS_BIND_DIR -- a bind-mount of the entire host
-  # filesystem -- still live. isolated-exec.js's withScratchDir has its own
-  # lazy-unmount safety net before it recursively deletes this directory,
-  # but that's defense-in-depth, not a reason to hide this happening.
+  # filesystem -- still live, so it's worth surfacing even though
+  # isolated-exec.js's withScratchDir has its own safety net before it
+  # recursively deletes this directory.
   UMOUNT_ERR_FILE="/tmp/.buildcage-umount-err.$$"
   umount -R "$ROOTFS_BIND_DIR" >/dev/null 2>"$UMOUNT_ERR_FILE" || {
     echo "WARNING: failed to unmount ${ROOTFS_BIND_DIR}: $(cat "$UMOUNT_ERR_FILE" 2>/dev/null)" >&2
@@ -168,33 +159,24 @@ nsenter --net="/proc/${PROXY_PID}/ns/net" -- sh -c "
 echo "run-isolated: executing isolated command via runc..." >&2
 set +e
 # No nsenter wrapper needed here: config.json's linux.namespaces network
-# entry already points at /var/run/netns/${NETNS_NAME} (see
-# isolated-exec.js's buildOciConfig), so runc joins it itself as part of
-# its own container setup -- namespaces, capabilities, mounts, uid/gid,
-# and the seccomp filter are all declared in config.json.
+# entry already points at /var/run/netns/${NETNS_NAME}, so runc joins it
+# itself as part of its own container setup.
 #
 # setpriv --pdeathsig here (targeting this script's own life) is the first
-# half of a two-hop chain: `runc run`'s own process, not the container
-# process it starts, is this script's direct child, so a plain
-# --die-with-parent-style guard on the *sandboxed* process alone (set in
-# config.json's process.args, see buildOciConfig) would only protect
-# against `runc run` itself dying -- if this script gets SIGKILL'd,
-# `runc run` would just become an orphan (still alive, unaffected) without
-# this. Verified empirically: killing this script's own bash process tears
-# down the whole chain (runc and the sandboxed command both die); without
-# the outer setpriv, the sandboxed command survives as an orphan.
+# half of a two-hop die-with-parent chain: `runc run`'s own process, not
+# the container process it starts, is this script's direct child, so a
+# guard on just the *sandboxed* process (config.json's process.args, see
+# buildOciConfig) would only protect against `runc run` itself dying --
+# without this outer hop, SIGKILL-ing this script would leave `runc run`
+# (and the sandboxed process under it) as a still-alive orphan.
 #
-# Known residual gap: `sudo -n` itself (invoked by isolated-exec.js) forks
-# a separate monitor process ahead of this script on distros with the
-# common `Defaults use_pty` sudoers setting -- if *that* specific process
-# were killed in isolation (without this script also dying), this chain
-# wouldn't trigger, since this script would merely become sudo's monitor's
-# orphan, still alive. Not addressed here: this is a low-severity gap
-# (an orphaned, still-fully-sandboxed process, not a security boundary
-# issue -- see docs/security.md), and the realistic failure modes this
-# guards against (the runner process/job being torn down, an OOM kill
-# landing on this script itself) target this script directly, not
-# specifically sudo's monitor process in isolation.
+# Known residual gap: on distros with the common `Defaults use_pty`
+# sudoers setting, `sudo -n` forks a separate monitor process ahead of
+# this script -- killing *that* specific process in isolation wouldn't
+# trigger this chain, since this script would merely become its orphan,
+# still alive. Low-severity (an orphaned but still-fully-sandboxed
+# process, not a security boundary issue -- see docs/security.md), and
+# not addressed here.
 setpriv --pdeathsig=KILL -- "$RUNC_PATH" run --bundle "$BUNDLE_DIR" "$CONTAINER_ID"
 CODE=$?
 set -e

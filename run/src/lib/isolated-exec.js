@@ -5,12 +5,12 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { buildDockerCpArgs } from "./container.js";
-// Sensitive /proc paths masked with /dev/null, matching the previous
-// unshare-based implementation. runc's own `runc spec` default already
-// masks /proc/kcore, /proc/keys, and /proc/timer_list (among others) and
-// leaves /proc/sysrq-trigger merely read-only — buildOciConfig upgrades
-// sysrq-trigger to fully masked (moving it out of readonlyPaths) and adds
-// kallsyms/kmsg, which runc's default doesn't cover at all.
+// Sensitive /proc paths masked with /dev/null. runc's own `runc spec`
+// default already masks /proc/kcore, /proc/keys, and /proc/timer_list
+// (among others) and leaves /proc/sysrq-trigger merely read-only —
+// buildOciConfig upgrades sysrq-trigger to fully masked (moving it out of
+// readonlyPaths) and adds kallsyms/kmsg, which runc's default doesn't
+// cover at all.
 //
 // Imported from a shared JSON file (rather than a JS literal) so run/dev's
 // build-test-bundle.sh — a bash/jq stand-in for this same function, used
@@ -59,9 +59,7 @@ function isBootstrapCachePopulated(cacheDir) {
  * base OCI spec + seccomp profile once per distinct proxy image, reusing
  * the result across every `run:` step in the same job -- and across jobs
  * on a self-hosted runner, since the cache lives under a shared tmpdir
- * path rather than per-run scratch space. Without this, each step redid
- * `docker cp` + `runc spec` + gen-seccomp-profile from scratch even though
- * their output is identical for the same image on the same host.
+ * path rather than per-run scratch space.
  *
  * Keyed by a hash of imageRef, not the image content itself: a digest-pinned
  * production imageRef makes that equivalent (a new digest is a new image),
@@ -69,7 +67,7 @@ function isBootstrapCachePopulated(cacheDir) {
  * typically a floating tag, so rebuilding that same tag with different
  * content on a self-hosted runner could reuse a stale cache entry -- an
  * accepted limitation of a dev/CI-only escape hatch never used in
- * production, not a concern for the digest-pinned real path.
+ * production.
  *
  * Concurrent steps racing to populate the same cache entry are made safe
  * by staging in a private, uniquely-named directory and atomically
@@ -78,18 +76,14 @@ function isBootstrapCachePopulated(cacheDir) {
  * with ENOTEMPTY/EEXIST rather than silently clobbering it).
  *
  * Copies the cached runc binary into the caller's own per-run `destDir`
- * (rather than handing back a path into the shared, long-lived cache dir
- * directly) so the file `runIsolated` actually execs lives only inside
- * this run's own scratch dir. run-isolated.sh's `mount --rbind /`
- * recursively captures the whole host filesystem, including the shared
- * cache dir under tmpdir(); a runc binary living there stays present
- * (and, being actively exec'd, "busy") inside *every* concurrently
- * running sandbox's rootfs snapshot, not just the run that's using it --
- * empirically, that's enough to make a concurrent step's own rootfs
- * bind-mount unmount/rmdir fail with EBUSY at cleanup. A cheap local copy
- * keeps the (expensive) docker-cp/runc-spec/gen-seccomp-profile work
- * cached while keeping the actually-executed file private per run, same
- * as before this cache existed.
+ * rather than handing back a path into the shared, long-lived cache dir
+ * directly: run-isolated.sh's `mount --rbind /` recursively captures the
+ * whole host filesystem, including the shared cache dir under tmpdir(),
+ * so a runc binary living there would stay present (and busy) inside
+ * *every* concurrently running sandbox's rootfs snapshot, not just the
+ * run using it -- enough to make a concurrent step's own rootfs
+ * unmount/rmdir fail with EBUSY at cleanup. The cheap local copy keeps
+ * the actually-executed file private per run.
  */
 export function getOrPopulateBootstrapCache({ imageRef, containerName, destDir }) {
   const cacheKey = createHash("sha256").update(imageRef).digest("hex");
@@ -174,8 +168,7 @@ export function listHostMounts() {
  * `mounts` entries (or from `linux.maskedPaths`/`namespaces` handling)
  * rather than being read from the host-root bind-mount at all, so forcing
  * the host-side copy read-only would be meaningless (and some reject a
- * read-only remount outright). Matches the previous mountinfo-walking
- * implementation's tolerate list exactly.
+ * read-only remount outright).
  */
 const TOLERATED_PSEUDO_FSTYPES = new Set([
   "proc",
@@ -206,12 +199,11 @@ const TOLERATED_PSEUDO_FSTYPES = new Set([
  * forced read-only. This exists because `root.readonly` in OCI/runc only
  * remounts the top-level rootfs mount point — it does *not* recursively
  * apply to separate mount points that `mount --rbind /` duplicates into
- * the sandbox's rootfs (verified empirically: a tmpfs mounted at a path
- * distinct from "/" stayed writable from inside a `root.readonly: true`
- * container). Any real (non-pseudo) host mount point not covered by this
- * list would otherwise remain fully writable despite the sandbox's
- * documented read-only-outside-workdir/home/tmp/writable guarantee. "/"
- * itself is excluded since root.readonly already covers it directly.
+ * the sandbox's rootfs. Any real (non-pseudo) host mount point not
+ * covered by this list would otherwise remain fully writable despite the
+ * sandbox's documented read-only-outside-workdir/home/tmp/writable
+ * guarantee. "/" itself is excluded since root.readonly already covers
+ * it directly.
  */
 export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
   return hostMounts
@@ -229,9 +221,7 @@ export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
  *   itself), made read-only via `root.readonly` plus an explicit
  *   `linux.readonlyPaths` entry per real host mount point `--rbind`
  *   duplicated in (see computeReadonlyHostMounts — root.readonly alone
- *   only covers the top-level mount), except workdir/home/tmp/writablePaths,
- *   mirroring the read-only-by-default policy the previous
- *   mountinfo-walking implementation enforced by hand.
+ *   only covers the top-level mount), except workdir/home/tmp/writablePaths.
  * - linux.namespaces: same six namespace types runc's own default spec
  *   already requests (no user namespace — see docs/security.md's
  *   rationale for preserving the real UID/GID), just adding `path` to the
@@ -240,17 +230,14 @@ export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
  * - process.capabilities: fully cleared (all five sets empty) plus
  *   noNewPrivileges — runc applies this natively, no setpriv needed.
  * - process.env: the step's real environment, replacing runc spec's
- *   invented PATH/TERM defaults (mirrors the previous `env -i` +
- *   re-apply-from-dump behavior: start from nothing, fill in exactly
- *   what the step's env contained).
+ *   invented PATH/TERM defaults.
  * - linux.seccomp: the Docker-default-profile-derived filter (see
  *   gen-seccomp-profile), resolved against this same empty capability
  *   set.
  *
  * `writablePaths` containing "/" is a sentinel meaning "disable the
  * read-only restriction entirely" (see docs/reference.md's `writable`
- * input), matching the previous implementation's `DISABLE_READONLY`
- * handling.
+ * input).
  */
 export function buildOciConfig(
   baseSpec,
@@ -317,8 +304,7 @@ export function buildOciConfig(
  * Write the final OCI config to `bundleDir/config.json` (overwriting the
  * `runc spec` placeholder generateBaseOciSpec left there). Mode 0600:
  * `process.env` embeds the whole step environment, including any secrets
- * passed via `env:` — same reasoning as writeEnvDump had in the previous
- * implementation.
+ * passed via `env:`.
  */
 export function writeOciConfig(config, bundleDir) {
   const configPath = join(bundleDir, "config.json");
@@ -340,10 +326,10 @@ export function writeResolvConf(dns, dir) {
  * command — never throws for a non-zero exit, since that's the user's
  * command failing, not this function.
  *
- * Unlike the previous unshare/setpriv-based implementation, uid/gid,
- * capabilities, mounts, and env are entirely described by `config.json`
- * (see buildOciConfig) — run-isolated.sh only needs enough to set up
- * networking and the rootfs bind-mount before handing off to `runc run`.
+ * uid/gid, capabilities, mounts, and env are entirely described by
+ * `config.json` (see buildOciConfig) — run-isolated.sh only needs enough
+ * to set up networking and the rootfs bind-mount before handing off to
+ * `runc run`.
  */
 export function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsName, rootfsBindDir, gateway, dns, targetIp }) {
   const runIsolatedShPath = join(__dirname, "..", "scripts", "run-isolated.sh");
@@ -404,10 +390,10 @@ export function parseMountsUnder(mountinfoContent, dir) {
  * run-isolated.sh itself is SIGKILL'd, which bypasses traps entirely) or
  * its `umount -R` fails (EBUSY), a plain recursive delete of `dir` would
  * otherwise walk straight through the still-live bind-mount and delete
- * the real files on the host it points at, not a sandboxed copy —
- * verified empirically. `-l` (lazy) detaches each mount from the
- * namespace immediately regardless of busy references, so this step
- * itself can't hang or fail the way a normal (non-lazy) unmount could.
+ * the real files on the host it points at, not a sandboxed copy. `-l`
+ * (lazy) detaches each mount from the namespace immediately regardless of
+ * busy references, so this step itself can't hang or fail the way a
+ * normal (non-lazy) unmount could.
  */
 function unmountAllUnder(dir) {
   let mountPoints;
@@ -429,15 +415,11 @@ function unmountAllUnder(dir) {
  * Removes the scratch dir, retrying on EBUSY. A lazy unmount (see
  * unmountAllUnder) detaches a mount from the path-resolution tree
  * immediately -- it stops appearing in /proc/self/mountinfo right away --
- * but the kernel's underlying teardown of that (now-orphaned) mount can
- * still lag by a short, bounded window, particularly under the concurrent
- * load of multiple `run:` steps each recursively bind-mounting "/" at the
- * same time (each one's snapshot unavoidably nests a copy of every other
- * concurrently-running step's own rootfs bind-mount, since they all live
- * under the same shared /tmp). Empirically, this makes a directory rmSync
- * is about to delete spuriously report EBUSY even though it's no longer
- * listed as a mountpoint at all -- and resolves on the very next attempt
- * after a brief wait. Retry a few times before giving up for real.
+ * but the kernel's underlying teardown of that now-orphaned mount can
+ * still lag behind by a short, bounded window, which can make a
+ * directory rmSync is about to delete spuriously report EBUSY even
+ * though it's no longer listed as a mountpoint at all. Resolves on the
+ * very next attempt after a brief wait.
  */
 function removeScratchDir(dir) {
   const maxAttempts = 5;
