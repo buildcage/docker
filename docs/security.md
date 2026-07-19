@@ -207,6 +207,15 @@ the Actions runner itself (rather than inside a BuildKit-managed OCI container),
 unable to reach outside its sandbox by other means (escalating privileges, reaching the Docker
 socket, or reading another process's memory).
 
+The core design goal is to let you bolt network egress control onto an existing workflow step
+without changing how the rest of that workflow already works. A step that configures AWS
+credentials, an npm/yarn cache directory, or any other action keeps running exactly as it did
+before `run` was introduced — `run` only wraps the specific command whose network access you want
+restricted, rather than requiring the surrounding job to move into a differently-configured
+environment. This is why UID/GID and `$HOME` are preserved rather than switched to a dedicated
+sandbox account (see UID/GID preserved below): tools and caches that assume the runner's own
+identity keep working unmodified.
+
 ### Isolation Mechanisms
 
 The isolated command runs as an [OCI](https://github.com/opencontainers/runtime-spec) container
@@ -299,6 +308,11 @@ runc's rootfs (`pivot_root` can't target `/` itself). Everything else below is d
   sandbox as a second, writable copy. This is a misconfiguration guard against an operator-supplied
   `writable:` value, not a defense against the isolated command itself (see
   [Filesystem Access](./reference.md#filesystem-access) in Reference).
+- **Docker cannot be used inside the isolated command**: supplementary groups (including `docker`)
+  are cleared before the command runs, so even where the Docker socket is visible through the
+  read-only host filesystem, the isolated command has no permission to use it. A `run:` step that
+  itself needs to invoke `docker` (build an image, run a container, etc.) cannot be wrapped by
+  `run`.
 - **Credential retrieval is intentionally not blocked**: `run` restricts *where* the isolated
   command can send network traffic and, since the filesystem is read-only outside
   `$GITHUB_WORKSPACE`/`$HOME`/`/tmp`, *where* it can persist a payload — but not what it reads. A
