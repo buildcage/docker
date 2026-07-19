@@ -35,6 +35,87 @@ export function generateBaseOciSpec(runcPath, bundleDir) {
 }
 
 /**
+ * Pure: extract {mountPoint, fsType} for every line of raw
+ * /proc/self/mountinfo content. Format (space-separated fields):
+ *   ID PARENT-ID MAJOR:MINOR ROOT MOUNT-POINT OPTIONS [OPT-FIELDS...] - FSTYPE SOURCE SUPER-OPTIONS
+ * The mount point is always field 5 (index 4); the filesystem type is
+ * always the field right after the literal "-" separator, regardless of
+ * how many optional fields precede it.
+ */
+export function parseMountinfo(mountinfoContent) {
+  return mountinfoContent
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const fields = line.split(" ");
+      const dashIndex = fields.indexOf("-");
+      return { mountPoint: fields[4], fsType: fields[dashIndex + 1] };
+    });
+}
+
+/**
+ * Reads the real host mount table. Node runs directly on the runner host,
+ * not inside any namespace, so this is exactly the mount table
+ * run-isolated.sh's `mount --rbind /` will duplicate into rootfsBindDir a
+ * moment later (see buildOciConfig's readonlyPaths handling for why this
+ * matters).
+ */
+export function listHostMounts() {
+  return parseMountinfo(readFileSync("/proc/self/mountinfo", "utf8"));
+}
+
+/**
+ * Pseudo-filesystems tolerated as-is (not forced read-only): each of these
+ * gets its own fresh, namespace-scoped mount from runc's own default
+ * `mounts` entries (or from `linux.maskedPaths`/`namespaces` handling)
+ * rather than being read from the host-root bind-mount at all, so forcing
+ * the host-side copy read-only would be meaningless (and some reject a
+ * read-only remount outright). Matches the previous mountinfo-walking
+ * implementation's tolerate list exactly.
+ */
+const TOLERATED_PSEUDO_FSTYPES = new Set([
+  "proc",
+  "procfs",
+  "sysfs",
+  "cgroup",
+  "cgroup2",
+  "devpts",
+  "mqueue",
+  "debugfs",
+  "tracefs",
+  "securityfs",
+  "pstore",
+  "bpf",
+  "configfs",
+  "fusectl",
+  "hugetlbfs",
+  "binfmt_misc",
+  "autofs",
+  "efivarfs",
+  "nsfs",
+  "rpc_pipefs",
+]);
+
+/**
+ * Pure: given the host's real mount table and the set of paths that must
+ * stay writable, return the host mount points that need to be explicitly
+ * forced read-only. This exists because `root.readonly` in OCI/runc only
+ * remounts the top-level rootfs mount point — it does *not* recursively
+ * apply to separate mount points that `mount --rbind /` duplicates into
+ * the sandbox's rootfs (verified empirically: a tmpfs mounted at a path
+ * distinct from "/" stayed writable from inside a `root.readonly: true`
+ * container). Any real (non-pseudo) host mount point not covered by this
+ * list would otherwise remain fully writable despite the sandbox's
+ * documented read-only-outside-workdir/home/tmp/writable guarantee. "/"
+ * itself is excluded since root.readonly already covers it directly.
+ */
+export function computeReadonlyHostMounts(hostMounts, protectedPaths) {
+  return hostMounts
+    .filter(({ mountPoint, fsType }) => mountPoint !== "/" && !TOLERATED_PSEUDO_FSTYPES.has(fsType) && !protectedPaths.has(mountPoint))
+    .map(({ mountPoint }) => mountPoint);
+}
+
+/**
  * Sensitive /proc paths masked with /dev/null, matching the previous
  * unshare-based implementation. runc's own `runc spec` default already
  * masks /proc/kcore, /proc/keys, and /proc/timer_list (among others) and
@@ -51,9 +132,12 @@ const EXTRA_MASKED_PROC_PATHS = ["/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-tr
  *
  * - root: a bind-mounted copy of the host's own `/` (rootfsBindDir, set up
  *   by run-isolated.sh before invoking runc — pivot_root can't target `/`
- *   itself), read-only except workdir/home/tmp/writablePaths, mirroring
- *   the read-only-by-default policy the previous mountinfo-walking
- *   implementation enforced by hand.
+ *   itself), made read-only via `root.readonly` plus an explicit
+ *   `linux.readonlyPaths` entry per real host mount point `--rbind`
+ *   duplicated in (see computeReadonlyHostMounts — root.readonly alone
+ *   only covers the top-level mount), except workdir/home/tmp/writablePaths,
+ *   mirroring the read-only-by-default policy the previous
+ *   mountinfo-walking implementation enforced by hand.
  * - linux.namespaces: same six namespace types runc's own default spec
  *   already requests (no user namespace — see docs/security.md's
  *   rationale for preserving the real UID/GID), just adding `path` to the
@@ -76,11 +160,12 @@ const EXTRA_MASKED_PROC_PATHS = ["/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-tr
  */
 export function buildOciConfig(
   baseSpec,
-  { uid, gid, workdir, home, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath },
+  { uid, gid, workdir, home, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] },
 ) {
   const disableReadonly = writablePaths.includes("/");
 
   const mounts = [...baseSpec.mounts, { destination: "/etc/resolv.conf", type: "none", source: resolvConfPath, options: ["rbind", "ro"] }];
+  const protectedPaths = new Set([workdir, home, "/tmp", ...writablePaths].filter(Boolean));
   if (!disableReadonly) {
     if (workdir) mounts.push({ destination: workdir, type: "none", source: workdir, options: ["rbind", "rw"] });
     if (home) mounts.push({ destination: home, type: "none", source: home, options: ["rbind", "rw"] });
@@ -88,8 +173,11 @@ export function buildOciConfig(
     for (const p of writablePaths) mounts.push({ destination: p, type: "none", source: p, options: ["rbind", "rw"] });
   }
 
-  const maskedPaths = Array.from(new Set([...(baseSpec.linux.maskedPaths ?? []), ...EXTRA_MASKED_PROC_PATHS]));
-  const readonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter((p) => !EXTRA_MASKED_PROC_PATHS.includes(p));
+  const maskedPaths = [...(baseSpec.linux.maskedPaths ?? []), ...EXTRA_MASKED_PROC_PATHS];
+  const baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter((p) => !EXTRA_MASKED_PROC_PATHS.includes(p));
+  const readonlyPaths = disableReadonly
+    ? baseReadonlyPaths
+    : Array.from(new Set([...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths)]));
 
   const namespaces = baseSpec.linux.namespaces.map((ns) => (ns.type === "network" ? { ...ns, path: netnsPath } : ns));
 
@@ -198,12 +286,55 @@ export function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsN
   }
 }
 
+/**
+ * Pure: mount points from raw /proc/self/mountinfo content that are
+ * nested under `dir` (including `dir` itself), deepest-path-first so a
+ * caller can safely unmount children before their parents.
+ */
+export function parseMountsUnder(mountinfoContent, dir) {
+  const prefix = dir.endsWith("/") ? dir : `${dir}/`;
+  return parseMountinfo(mountinfoContent)
+    .map(({ mountPoint }) => mountPoint)
+    .filter((mountPoint) => mountPoint === dir || mountPoint.startsWith(prefix))
+    .sort((a, b) => b.length - a.length);
+}
+
+/**
+ * Force-detaches any mount points still nested under `dir` before it's
+ * recursively deleted. This is the safety net for rootfsBindDir (a
+ * `mount --rbind /` of the entire host filesystem — see main.js) surviving
+ * past run-isolated.sh's own cleanup trap: if that trap never runs (e.g.
+ * run-isolated.sh itself is SIGKILL'd, which bypasses traps entirely) or
+ * its `umount -R` fails (EBUSY), a plain recursive delete of `dir` would
+ * otherwise walk straight through the still-live bind-mount and delete
+ * the real files on the host it points at, not a sandboxed copy —
+ * verified empirically. `-l` (lazy) detaches each mount from the
+ * namespace immediately regardless of busy references, so this step
+ * itself can't hang or fail the way a normal (non-lazy) unmount could.
+ */
+function unmountAllUnder(dir) {
+  let mountPoints;
+  try {
+    mountPoints = parseMountsUnder(readFileSync("/proc/self/mountinfo", "utf8"), dir);
+  } catch {
+    return;
+  }
+  for (const mountPoint of mountPoints) {
+    try {
+      execFileSync("sudo", ["umount", "-R", "-l", mountPoint], { stdio: ["ignore", "ignore", "pipe"] });
+    } catch (e) {
+      console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${e.message}`);
+    }
+  }
+}
+
 /** Create/remove a scratch directory for this step's OCI bundle + run-script. */
 export function withScratchDir(fn) {
   const dir = mkdtempSync(join(tmpdir(), "buildcage-sandbox-"));
   try {
     return fn(dir);
   } finally {
+    unmountAllUnder(dir);
     rmSync(dir, { recursive: true, force: true });
   }
 }

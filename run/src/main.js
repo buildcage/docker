@@ -17,6 +17,7 @@ import {
   writeOciConfig,
   runIsolated,
   withScratchDir,
+  listHostMounts,
 } from "./lib/isolated-exec.js";
 import { fetchReport, writeReport } from "./lib/report.js";
 
@@ -206,6 +207,12 @@ async function main() {
 
       const scriptPath = writeRunScript(runInput, dir);
       const baseSpec = generateBaseOciSpec(runcPath, dir);
+      // Real host mount table, read now (before run-isolated.sh's `mount
+      // --rbind /` duplicates it into rootfsBindDir) so buildOciConfig can
+      // force every real submount read-only individually -- root.readonly
+      // alone only covers the top-level rootfs mount (see
+      // computeReadonlyHostMounts).
+      const hostMounts = listHostMounts();
       const config = buildOciConfig(baseSpec, {
         uid: process.getuid(),
         gid: process.getgid(),
@@ -218,6 +225,7 @@ async function main() {
         resolvConfPath,
         seccompProfile,
         scriptPath,
+        hostMounts,
       });
       writeOciConfig(config, dir);
 

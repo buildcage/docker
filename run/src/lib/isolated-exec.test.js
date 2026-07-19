@@ -3,7 +3,16 @@ import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeRunScript, writeResolvConf, buildOciConfig, writeOciConfig, withScratchDir } from "./isolated-exec.js";
+import {
+  writeRunScript,
+  writeResolvConf,
+  buildOciConfig,
+  writeOciConfig,
+  withScratchDir,
+  parseMountinfo,
+  computeReadonlyHostMounts,
+  parseMountsUnder,
+} from "./isolated-exec.js";
 
 describe("writeRunScript", () => {
   it("wraps plain commands in a #!/bin/sh + set -e preamble", () => {
@@ -37,6 +46,84 @@ describe("writeResolvConf", () => {
       const path = writeResolvConf("172.20.0.1", dir);
       assert.equal(readFileSync(path, "utf8"), "nameserver 172.20.0.1\n");
     });
+  });
+});
+
+// Realistic /proc/self/mountinfo lines (see parseMountinfo's doc comment
+// for the field layout). Each has one optional field ("shared:N") before
+// the "-" separator, matching what a systemd-managed host typically shows.
+const SAMPLE_MOUNTINFO = [
+  "1 0 0:1 / / rw,relatime shared:1 - ext4 /dev/root rw",
+  "2 1 0:2 / /proc rw,relatime shared:2 - proc proc rw",
+  "3 1 0:3 / /run rw,nosuid,relatime shared:3 - tmpfs tmpfs rw,size=100k",
+  "4 3 0:4 / /run/user/1000 rw,nosuid,relatime shared:4 - tmpfs tmpfs rw",
+  "5 1 0:5 / /mnt rw,relatime shared:5 - ext4 /dev/sdb1 rw",
+].join("\n");
+
+describe("parseMountinfo", () => {
+  it("extracts the mount point and filesystem type of every line", () => {
+    assert.deepEqual(parseMountinfo(SAMPLE_MOUNTINFO), [
+      { mountPoint: "/", fsType: "ext4" },
+      { mountPoint: "/proc", fsType: "proc" },
+      { mountPoint: "/run", fsType: "tmpfs" },
+      { mountPoint: "/run/user/1000", fsType: "tmpfs" },
+      { mountPoint: "/mnt", fsType: "ext4" },
+    ]);
+  });
+
+  it("ignores trailing/blank lines", () => {
+    assert.deepEqual(parseMountinfo(`${SAMPLE_MOUNTINFO}\n\n`).length, 5);
+  });
+});
+
+describe("computeReadonlyHostMounts", () => {
+  const hostMounts = parseMountinfo(SAMPLE_MOUNTINFO);
+
+  it("excludes '/' itself (already covered by root.readonly)", () => {
+    const result = computeReadonlyHostMounts(hostMounts, new Set());
+    assert.ok(!result.includes("/"));
+  });
+
+  it("excludes tolerated pseudo-filesystems (proc gets its own fresh mount from runc)", () => {
+    const result = computeReadonlyHostMounts(hostMounts, new Set());
+    assert.ok(!result.includes("/proc"));
+  });
+
+  it("excludes explicitly protected (writable) paths", () => {
+    const result = computeReadonlyHostMounts(hostMounts, new Set(["/run"]));
+    assert.ok(!result.includes("/run"));
+    assert.ok(result.includes("/run/user/1000"), "a nested mount under a protected path is still its own separate mount point");
+  });
+
+  it("includes real, non-pseudo, non-protected host mounts (e.g. a separate disk at /mnt)", () => {
+    const result = computeReadonlyHostMounts(hostMounts, new Set());
+    assert.ok(result.includes("/mnt"));
+    assert.ok(result.includes("/run"));
+    assert.ok(result.includes("/run/user/1000"));
+  });
+});
+
+describe("parseMountsUnder", () => {
+  const mountinfo = [
+    "1 0 0:1 / / rw,relatime shared:1 - ext4 /dev/root rw",
+    "2 1 0:2 / /tmp/buildcage-sandbox-abc rw,relatime shared:2 - tmpfs tmpfs rw",
+    "3 2 0:3 / /tmp/buildcage-sandbox-abc/rootfs rw,relatime shared:3 - ext4 /dev/root rw",
+    "4 1 0:4 / /tmp/other-dir rw,relatime shared:4 - tmpfs tmpfs rw",
+  ].join("\n");
+
+  it("finds only mount points nested under the given directory", () => {
+    const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-abc");
+    assert.deepEqual(result.sort(), ["/tmp/buildcage-sandbox-abc", "/tmp/buildcage-sandbox-abc/rootfs"].sort());
+  });
+
+  it("orders deepest paths first, so children are unmounted before their parents", () => {
+    const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-abc");
+    assert.deepEqual(result, ["/tmp/buildcage-sandbox-abc/rootfs", "/tmp/buildcage-sandbox-abc"]);
+  });
+
+  it("does not match a sibling directory with a similar prefix", () => {
+    const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-ab");
+    assert.deepEqual(result, []);
   });
 });
 
@@ -149,6 +236,26 @@ describe("buildOciConfig", () => {
     assert.equal(config.root.readonly, false);
     const rw = config.mounts.filter((m) => m.options?.includes("rw"));
     assert.equal(rw.length, 0);
+  });
+
+  it("forces real host mount points not already writable into readonlyPaths (root.readonly alone doesn't cover them)", () => {
+    const hostMounts = [
+      { mountPoint: "/", fsType: "ext4" },
+      { mountPoint: "/proc", fsType: "proc" },
+      { mountPoint: "/mnt", fsType: "ext4" },
+      { mountPoint: baseArgs.workdir, fsType: "ext4" },
+    ];
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], hostMounts });
+    assert.ok(config.linux.readonlyPaths.includes("/mnt"), "a real, separate host mount not covered by root.readonly must be listed explicitly");
+    assert.ok(!config.linux.readonlyPaths.includes("/"), "'/' itself is already covered by root.readonly");
+    assert.ok(!config.linux.readonlyPaths.includes("/proc"), "pseudo-filesystems get their own fresh mount, not a readonly remount of the host copy");
+    assert.ok(!config.linux.readonlyPaths.includes(baseArgs.workdir), "workdir must stay writable, not be added to readonlyPaths");
+  });
+
+  it("`writable: /` skips the host-mount readonly pass entirely", () => {
+    const hostMounts = [{ mountPoint: "/mnt", fsType: "ext4" }];
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/"], hostMounts });
+    assert.ok(!config.linux.readonlyPaths.includes("/mnt"));
   });
 });
 

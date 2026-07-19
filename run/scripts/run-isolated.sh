@@ -79,7 +79,16 @@ cleanup() {
   # running (e.g. this trap fired from INT/TERM mid-run), so it must run
   # before the network/mount resources below are torn out from under it.
   "$RUNC_PATH" delete -f "$CONTAINER_ID" >/dev/null 2>&1
-  umount -R "$ROOTFS_BIND_DIR" >/dev/null 2>&1
+  # Not silenced: a failed unmount here (e.g. EBUSY from a lingering
+  # process) leaves ROOTFS_BIND_DIR -- a bind-mount of the entire host
+  # filesystem -- still live. isolated-exec.js's withScratchDir has its own
+  # lazy-unmount safety net before it recursively deletes this directory,
+  # but that's defense-in-depth, not a reason to hide this happening.
+  UMOUNT_ERR_FILE="/tmp/.buildcage-umount-err.$$"
+  umount -R "$ROOTFS_BIND_DIR" >/dev/null 2>"$UMOUNT_ERR_FILE" || {
+    echo "WARNING: failed to unmount ${ROOTFS_BIND_DIR}: $(cat "$UMOUNT_ERR_FILE" 2>/dev/null)" >&2
+  }
+  rm -f "$UMOUNT_ERR_FILE"
   # The proxy-side veth lives in the long-lived proxy container's netns, so
   # it must be explicitly removed -- unlike the target-side end (torn down
   # for free when the sandbox netns below is deleted), a still-alive

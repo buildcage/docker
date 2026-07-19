@@ -7279,7 +7279,42 @@ function buildComposeDownArgs({composeFile: composeFile, projectName: projectNam
 
 const __dirname$2 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href));
 
+function parseMountinfo(mountinfoContent) {
+  return mountinfoContent.split("\n").filter(Boolean).map(line => {
+    const fields = line.split(" "), dashIndex = fields.indexOf("-");
+    return {
+      mountPoint: fields[4],
+      fsType: fields[dashIndex + 1]
+    };
+  });
+}
+
+const TOLERATED_PSEUDO_FSTYPES = new Set([ "proc", "procfs", "sysfs", "cgroup", "cgroup2", "devpts", "mqueue", "debugfs", "tracefs", "securityfs", "pstore", "bpf", "configfs", "fusectl", "hugetlbfs", "binfmt_misc", "autofs", "efivarfs", "nsfs", "rpc_pipefs" ]);
+
+function computeReadonlyHostMounts(hostMounts, protectedPaths) {
+  return hostMounts.filter(({mountPoint: mountPoint, fsType: fsType}) => "/" !== mountPoint && !TOLERATED_PSEUDO_FSTYPES.has(fsType) && !protectedPaths.has(mountPoint)).map(({mountPoint: mountPoint}) => mountPoint);
+}
+
 const EXTRA_MASKED_PROC_PATHS = [ "/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-trigger" ];
+
+function unmountAllUnder(dir) {
+  let mountPoints;
+  try {
+    mountPoints = function(mountinfoContent, dir) {
+      const prefix = dir.endsWith("/") ? dir : `${dir}/`;
+      return parseMountinfo(mountinfoContent).map(({mountPoint: mountPoint}) => mountPoint).filter(mountPoint => mountPoint === dir || mountPoint.startsWith(prefix)).sort((a, b) => b.length - a.length);
+    }(node_fs.readFileSync("/proc/self/mountinfo", "utf8"), dir);
+  } catch {
+    return;
+  }
+  for (const mountPoint of mountPoints) try {
+    node_child_process.execFileSync("sudo", [ "umount", "-R", "-l", mountPoint ], {
+      stdio: [ "ignore", "ignore", "pipe" ]
+    });
+  } catch (e) {
+    console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${e.message}`);
+  }
+}
 
 const ruleTypeToParam = {
   HTTPS: "allowed_https_rules",
@@ -7475,7 +7510,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
       try {
         return fn(dir);
       } finally {
-        node_fs.rmSync(dir, {
+        unmountAllUnder(dir), node_fs.rmSync(dir, {
           recursive: !0,
           force: !0
         });
@@ -7511,13 +7546,13 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         return node_child_process.execFileSync(runcPath, [ "spec" ], {
           cwd: bundleDir
         }), JSON.parse(node_fs.readFileSync(path.join(bundleDir, "config.json"), "utf8"));
-      }(runcPath, dir), config = function(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, netnsPath: netnsPath, rootfsBindDir: rootfsBindDir, resolvConfPath: resolvConfPath, seccompProfile: seccompProfile, scriptPath: scriptPath}) {
+      }(runcPath, dir), hostMounts = parseMountinfo(node_fs.readFileSync("/proc/self/mountinfo", "utf8")), config = function(baseSpec, {uid: uid, gid: gid, workdir: workdir, home: home, writablePaths: writablePaths = [], env: env, netnsPath: netnsPath, rootfsBindDir: rootfsBindDir, resolvConfPath: resolvConfPath, seccompProfile: seccompProfile, scriptPath: scriptPath, hostMounts: hostMounts = []}) {
         const disableReadonly = writablePaths.includes("/"), mounts = [ ...baseSpec.mounts, {
           destination: "/etc/resolv.conf",
           type: "none",
           source: resolvConfPath,
           options: [ "rbind", "ro" ]
-        } ];
+        } ], protectedPaths = new Set([ workdir, home, "/tmp", ...writablePaths ].filter(Boolean));
         if (!disableReadonly) {
           workdir && mounts.push({
             destination: workdir,
@@ -7542,7 +7577,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
             options: [ "rbind", "rw" ]
           });
         }
-        const maskedPaths = Array.from(new Set([ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ])), readonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
+        const maskedPaths = [ ...baseSpec.linux.maskedPaths ?? [], ...EXTRA_MASKED_PROC_PATHS ], baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(p => !EXTRA_MASKED_PROC_PATHS.includes(p)), readonlyPaths = disableReadonly ? baseReadonlyPaths : Array.from(new Set([ ...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths) ])), namespaces = baseSpec.linux.namespaces.map(ns => "network" === ns.type ? {
           ...ns,
           path: netnsPath
         } : ns);
@@ -7591,7 +7626,8 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         rootfsBindDir: rootfsBindDir,
         resolvConfPath: resolvConfPath,
         seccompProfile: seccompProfile,
-        scriptPath: scriptPath
+        scriptPath: scriptPath,
+        hostMounts: hostMounts
       });
       return function(config, bundleDir) {
         const configPath = path.join(bundleDir, "config.json");
