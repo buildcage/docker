@@ -6,7 +6,9 @@ import { buildRestrictExample } from "../../core/lib/build-example.js";
 import { renderCommunicationDetails } from "./lib/command-log.js";
 import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.js";
 import { createAnnotation } from "../../core/lib/annotation.js";
-import { parseKnownBlockedRules, annotateKnownBlocked, determineBlockedOutcome, buildBlockedMessage } from "../../core/lib/known-blocked.js";
+import { evaluateBlockedReport } from "../../core/lib/known-blocked.js";
+import { markdownTable } from "../../core/lib/markdown-table.js";
+import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,7 +24,7 @@ const composeEnv = {
 
 let knownBlockedRules;
 try {
-  knownBlockedRules = parseKnownBlockedRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
+  knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
 } catch (e) {
   console.log(`::error::${e.message}`);
   process.exit(1);
@@ -77,24 +79,6 @@ if (report.mode === null) {
   process.exit(0);
 }
 
-function markdownTable(rows, { showReason = false, showExpected = false } = {}) {
-  const headers = ["Host", "Rule"];
-  const aligns = ["---", "---"];
-  if (showReason) { headers.push("Reason"); aligns.push("---"); }
-  headers.push("Count"); aligns.push("---:");
-  if (showExpected) { headers.push("Expected"); aligns.push(":---:"); }
-
-  const lines = [`| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |`];
-  for (const r of rows) {
-    const cells = [`${r.host}:${r.port}`, r.ruleType];
-    if (showReason) cells.push(r.reason);
-    cells.push(r.count);
-    if (showExpected) cells.push(r.expected ? "✅" : "");
-    lines.push(`| ${cells.join(" | ")} |`);
-  }
-  return lines.join("\n");
-}
-
 const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 const actionRef = process.env.GITHUB_ACTION_REF || "v2";
 const isAudit = report.mode === "audit";
@@ -139,11 +123,12 @@ if (isExplicit) {
   }
 }
 
-let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
+const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
+const { blockedRows: annotatedBlocked, showExpected, outcome, message } = evaluateBlockedReport(report, {
+  knownBlockedRules, failOnBlocked, engineLabel: "proxy",
+});
 
-const blocked = report.sections.blocked || [];
-const annotatedBlocked = annotateKnownBlocked(blocked, knownBlockedRules);
-const showExpected = knownBlockedRules.length > 0;
+let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
 
 if (isAudit) {
   const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
@@ -151,7 +136,7 @@ if (isAudit) {
     markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n";
   }
   markdown += buildRestrictExample(audited, actionRepo, actionRef);
-  if (blocked.length > 0) {
+  if (annotatedBlocked.length > 0) {
     if (audited.length > 0) markdown += "\n";
     markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
@@ -160,10 +145,10 @@ if (isAudit) {
   if (allowed.length > 0) {
     markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n";
   }
-  if (allowed.length > 0 && blocked.length > 0) {
+  if (allowed.length > 0 && annotatedBlocked.length > 0) {
     markdown += "\n";
   }
-  if (blocked.length > 0) {
+  if (annotatedBlocked.length > 0) {
     markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
 }
@@ -191,19 +176,9 @@ if (summaryFile) {
 // 4. Error control for blocked connections
 const outputForAction = Boolean(summaryFile);
 const annotation = createAnnotation(outputForAction);
-const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
-const outcome = determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount: report.blockedCount, blockedRows: annotatedBlocked });
-if (outcome.level !== "none") {
-  const message = buildBlockedMessage({
-    blockedCount: report.blockedCount,
-    blockedRows: annotatedBlocked,
-    knownBlockedRulesUsed: knownBlockedRules.length > 0,
-    engineLabel: "proxy",
-  });
-  if (outcome.level === "error") {
-    annotation.error(message);
-    process.exitCode = 1;
-  } else {
-    annotation.notice(message);
-  }
+if (outcome.level === "error") {
+  annotation.error(message);
+  process.exitCode = 1;
+} else if (outcome.level === "notice") {
+  annotation.notice(message);
 }

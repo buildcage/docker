@@ -4,14 +4,38 @@
  */
 
 /**
+ * Split a whitespace-separated rules string into individual rule tokens.
+ *
+ * @param {string|undefined} rulesInput
+ * @returns {string[]}
+ */
+export function splitRuleTokens(rulesInput) {
+  return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+}
+
+/**
  * Build regex rules from a space-separated input string.
  *
  * @param {string} rulesInput
  * @returns {string[]}
  */
 export function buildRules(rulesInput) {
-  const rules = rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  return rules.map(convertRule);
+  return splitRuleTokens(rulesInput).map(convertRule);
+}
+
+/**
+ * Split+validate a space-separated rules string, returning the raw
+ * (unconverted) rule tokens — for callers that need the original
+ * wildcard/~regex syntax preserved, such as known_blocked_rules.
+ *
+ * @param {string|undefined} rulesInput
+ * @returns {string[]}
+ * @throws {Error} if any rule has invalid wildcard/regex syntax
+ */
+export function parseAndValidateRules(rulesInput) {
+  const rules = splitRuleTokens(rulesInput);
+  rules.forEach(convertRule); // validate eagerly; throws on bad syntax
+  return rules;
 }
 
 /**

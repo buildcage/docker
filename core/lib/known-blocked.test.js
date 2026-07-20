@@ -1,43 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  parseKnownBlockedRules,
   annotateKnownBlocked,
   determineBlockedOutcome,
   buildBlockedMessage,
+  evaluateBlockedReport,
 } from "./known-blocked.js";
-
-describe("parseKnownBlockedRules", () => {
-  it("parses whitespace-separated rules", () => {
-    assert.deepEqual(
-      parseKnownBlockedRules("a.example.com:443 b.example.com:80"),
-      ["a.example.com:443", "b.example.com:80"],
-    );
-  });
-
-  it("returns an empty array for undefined input", () => {
-    assert.deepEqual(parseKnownBlockedRules(undefined), []);
-  });
-
-  it("returns an empty array for empty/whitespace-only input", () => {
-    assert.deepEqual(parseKnownBlockedRules("   "), []);
-  });
-
-  it("throws on invalid wildcard syntax", () => {
-    assert.throws(() => parseKnownBlockedRules("w*x.example.com:443"), /Invalid wildcard/);
-  });
-
-  it("throws on invalid regex syntax", () => {
-    assert.throws(() => parseKnownBlockedRules("~^(unclosed"), /Invalid regex/);
-  });
-
-  it("accepts a mix of wildcard and ~regex rules", () => {
-    assert.deepEqual(
-      parseKnownBlockedRules("*.example.com:443 ~^api\\.example\\.com:443$"),
-      ["*.example.com:443", "~^api\\.example\\.com:443$"],
-    );
-  });
-});
 
 describe("annotateKnownBlocked", () => {
   const row = (overrides = {}) => ({
@@ -150,10 +118,10 @@ describe("determineBlockedOutcome", () => {
 });
 
 describe("buildBlockedMessage", () => {
-  it("matches the legacy wording when known_blocked_rules is unused", () => {
+  it("matches the legacy wording when no rows matched known_blocked_rules", () => {
     const message = buildBlockedMessage({
       blockedCount: 2, blockedRows: [{ expected: false }, { expected: false }],
-      knownBlockedRulesUsed: false, engineLabel: "sandbox",
+      engineLabel: "sandbox", isAudit: false,
     });
     assert.equal(message, "2 blocked connection(s) detected by buildcage sandbox");
   });
@@ -161,7 +129,7 @@ describe("buildBlockedMessage", () => {
   it("notes that all rows matched when every row is expected", () => {
     const message = buildBlockedMessage({
       blockedCount: 3, blockedRows: [{ expected: true }, { expected: true }],
-      knownBlockedRulesUsed: true, engineLabel: "proxy",
+      engineLabel: "proxy", isAudit: false,
     });
     assert.match(message, /all matched known_blocked_rules \(expected\)/);
   });
@@ -169,16 +137,102 @@ describe("buildBlockedMessage", () => {
   it("reports the unmatched count when some rows are unexpected", () => {
     const message = buildBlockedMessage({
       blockedCount: 3, blockedRows: [{ expected: true }, { expected: false }],
-      knownBlockedRulesUsed: true, engineLabel: "sandbox",
+      engineLabel: "sandbox", isAudit: false,
     });
     assert.match(message, /1 of 2 distinct blocked host\(s\) unmatched by known_blocked_rules/);
   });
 
-  it("matches the legacy wording when known_blocked_rules is set but nothing matched", () => {
-    const message = buildBlockedMessage({
-      blockedCount: 2, blockedRows: [{ expected: false }, { expected: false }],
-      knownBlockedRulesUsed: true, engineLabel: "sandbox",
+  // Audit's outcome never depends on matching (see determineBlockedOutcome),
+  // so the message shouldn't either.
+  describe("audit mode — text must never vary with known_blocked_rules matching", () => {
+    const fixedText = "5 blocked connection(s) detected by buildcage sandbox";
+
+    it("stays fixed when every row matched", () => {
+      const message = buildBlockedMessage({
+        blockedCount: 5, blockedRows: [{ expected: true }, { expected: true }],
+        engineLabel: "sandbox", isAudit: true,
+      });
+      assert.equal(message, fixedText);
     });
-    assert.equal(message, "2 blocked connection(s) detected by buildcage sandbox");
+
+    it("stays fixed when some rows are unmatched", () => {
+      const message = buildBlockedMessage({
+        blockedCount: 5, blockedRows: [{ expected: true }, { expected: false }],
+        engineLabel: "sandbox", isAudit: true,
+      });
+      assert.equal(message, fixedText);
+    });
+
+    it("stays fixed when no rows matched", () => {
+      const message = buildBlockedMessage({
+        blockedCount: 5, blockedRows: [{ expected: false }, { expected: false }],
+        engineLabel: "sandbox", isAudit: true,
+      });
+      assert.equal(message, fixedText);
+    });
+  });
+});
+
+describe("evaluateBlockedReport", () => {
+  it("returns level 'none' and a null message when there are no blocked connections", () => {
+    const result = evaluateBlockedReport(
+      { mode: "restrict", blockedCount: 0, sections: {} },
+      { knownBlockedRules: [], failOnBlocked: true, engineLabel: "sandbox" },
+    );
+    assert.deepEqual(result.outcome, { level: "none", shouldFail: false });
+    assert.equal(result.message, null);
+  });
+
+  it("does not crash when report.sections is undefined", () => {
+    const result = evaluateBlockedReport(
+      { mode: "restrict", blockedCount: 0 },
+      { knownBlockedRules: [], failOnBlocked: true, engineLabel: "sandbox" },
+    );
+    assert.deepEqual(result.blockedRows, []);
+    assert.deepEqual(result.outcome, { level: "none", shouldFail: false });
+  });
+
+  it("in audit mode, the message stays fixed even when known_blocked_rules matches", () => {
+    const report = {
+      mode: "audit",
+      blockedCount: 1,
+      sections: { blocked: [{ host: "known.example.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 }] },
+    };
+    const result = evaluateBlockedReport(report, {
+      knownBlockedRules: ["known.example.com:443"], failOnBlocked: true, engineLabel: "sandbox",
+    });
+    assert.equal(result.outcome.level, "notice");
+    assert.equal(result.message, "1 blocked connection(s) detected by buildcage sandbox");
+  });
+
+  it("in restrict mode, returns notice (not error) when every blocked row matches", () => {
+    const report = {
+      mode: "restrict",
+      blockedCount: 1,
+      sections: { blocked: [{ host: "known.example.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 }] },
+    };
+    const result = evaluateBlockedReport(report, {
+      knownBlockedRules: ["known.example.com:443"], failOnBlocked: true, engineLabel: "sandbox",
+    });
+    assert.deepEqual(result.outcome, { level: "notice", shouldFail: false });
+    assert.equal(result.showExpected, true);
+  });
+
+  it("in restrict mode, returns error when a blocked row is unexpected", () => {
+    const report = {
+      mode: "restrict",
+      blockedCount: 1,
+      sections: { blocked: [{ host: "unknown.example.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 }] },
+    };
+    const result = evaluateBlockedReport(report, {
+      knownBlockedRules: ["known.example.com:443"], failOnBlocked: true, engineLabel: "sandbox",
+    });
+    assert.deepEqual(result.outcome, { level: "error", shouldFail: true });
+  });
+
+  it("showExpected is false when known_blocked_rules is empty", () => {
+    const report = { mode: "restrict", blockedCount: 1, sections: { blocked: [{ host: "a.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 }] } };
+    const result = evaluateBlockedReport(report, { knownBlockedRules: [], failOnBlocked: true, engineLabel: "sandbox" });
+    assert.equal(result.showExpected, false);
   });
 });

@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { convertRule, buildRules } from "./rules.js";
+import { convertRule, buildRules, parseAndValidateRules } from "./rules.js";
 
 // ---------------------------------------------------------------------------
 // convertRule / wildcardToRegex
@@ -99,5 +99,38 @@ describe("buildRules – properties", () => {
         },
       ),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseAndValidateRules
+// ---------------------------------------------------------------------------
+
+describe("parseAndValidateRules – properties", () => {
+  it("returns the same tokens buildRules derives its length from, unconverted", () => {
+    const validRule = fc
+      .tuple(
+        fc.stringMatching(/^[a-z][a-z0-9]{0,8}\.[a-z]{2,4}$/),
+        fc.integer({ min: 1, max: 65535 }),
+      )
+      .map(([domain, port]) => `${domain}:${port}`);
+
+    fc.assert(
+      fc.property(fc.array(validRule, { minLength: 0, maxLength: 5 }), (rules) => {
+        const input = rules.join(" ");
+        assert.deepEqual(parseAndValidateRules(input), rules);
+        assert.equal(parseAndValidateRules(input).length, buildRules(input).length);
+      }),
+    );
+  });
+
+  it("returns an empty array for empty/undefined input", () => {
+    assert.deepEqual(parseAndValidateRules(undefined), []);
+    assert.deepEqual(parseAndValidateRules(""), []);
+  });
+
+  it("throws on invalid syntax, matching buildRules' own validation", () => {
+    assert.throws(() => parseAndValidateRules("no-port-specified"));
+    assert.throws(() => buildRules("no-port-specified"));
   });
 });

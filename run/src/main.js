@@ -3,8 +3,7 @@ import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildRules } from "../../core/shared/lib/rules.js";
-import { parseKnownBlockedRules } from "../../core/lib/known-blocked.js";
+import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
 import { verifyImageDigest } from "../../core/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
@@ -59,35 +58,34 @@ async function resolveVerifiedImage({ actionRef, actionRepo }) {
 }
 
 /**
- * Build ACL rules from input strings. Rules are passed through as-is
- * (wildcard format), validated by converting to regex.
+ * Rethrow a rule-parser's syntax errors as a SandboxError with the shared
+ * INVALID_RULES code, used by both buildACLRules and readKnownBlockedRules.
  */
-export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
-  const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  const httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  const ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+function parseRulesOrThrow(rulesInput) {
   try {
-    buildRules(httpsRulesInput);
-    buildRules(httpRulesInput);
-    buildRules(ipRulesInput);
+    return parseAndValidateRules(rulesInput);
   } catch (e) {
     throw new SandboxError(e.message, "INVALID_RULES");
   }
-  return { httpsRules, httpRules, ipRules };
 }
 
 /**
- * Parse+validate `known_blocked_rules` — same wildcard/~regex syntax as the
- * allowed_*_rules inputs, but never sent to the container's ACL (see
- * core/lib/known-blocked.js): it only affects this action's own pass/fail
- * decision and Job Summary table.
+ * Build ACL rules from input strings. Rules are passed through as-is
+ * (wildcard format), validated eagerly.
+ */
+export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+  return {
+    httpsRules: parseRulesOrThrow(httpsRulesInput),
+    httpRules: parseRulesOrThrow(httpRulesInput),
+    ipRules: parseRulesOrThrow(ipRulesInput),
+  };
+}
+
+/**
+ * Never sent to the container's ACL — see core/lib/known-blocked.js.
  */
 export function readKnownBlockedRules(input) {
-  try {
-    return parseKnownBlockedRules(input);
-  } catch (e) {
-    throw new SandboxError(e.message, "INVALID_RULES");
-  }
+  return parseRulesOrThrow(input);
 }
 
 /**

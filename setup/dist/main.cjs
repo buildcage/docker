@@ -3,7 +3,9 @@
 var node_child_process = require("node:child_process"), path = require("node:path"), node_url = require("node:url"), node_fs = require("node:fs"), os = require("node:os"), require$$0 = require("os"), require$$1 = require("path"), require$$0$5 = require("fs"), require$$0$2 = require("util"), require$$0$1 = require("crypto"), require$$0$3 = require("tty"), require$$0$4 = require("fs/promises"), require$$0$6 = require("url"), _documentCurrentScript = "undefined" != typeof document ? document.currentScript : null;
 
 function buildRules(rulesInput) {
-  return (rulesInput?.trim().split(/\s+/).filter(Boolean) ?? []).map(convertRule);
+  return function(rulesInput) {
+    return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+  }(rulesInput).map(convertRule);
 }
 
 function convertRule(rule) {

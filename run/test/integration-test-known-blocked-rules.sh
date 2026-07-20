@@ -1,11 +1,9 @@
 #!/bin/bash
-# Drives run/dist/main.cjs directly (rather than through a real `uses: ./run`
-# step) against a real proxy container/HAProxy log, proving the full
-# INPUT_KNOWN_BLOCKED_RULES -> container report -> pass/fail wiring works —
-# not just the mocked report-object logic already covered by
-# run/src/lib/report.test.js. See test-e2e.yml's
-# test_sandbox_known_blocked_rules for the Actions-level version of the
-# "all matched" case.
+# Drives run/dist/main.cjs directly against a real proxy container/HAProxy
+# log, proving the INPUT_KNOWN_BLOCKED_RULES -> report -> pass/fail wiring
+# end-to-end (the matching logic itself is already unit-tested). See
+# test-e2e.yml's test_sandbox_fail_on_blocked for the Actions-level version
+# of the "all matched" case.
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -15,7 +13,6 @@ FAILURES=0
 
 run_instance() {
   local tmpdir="$1" known_blocked_rules="$2"
-  shift 2
   GITHUB_WORKSPACE="$tmpdir" \
   GITHUB_STATE="$tmpdir/state.env" \
   GITHUB_STEP_SUMMARY="$tmpdir/summary.md" \

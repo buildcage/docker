@@ -279,15 +279,17 @@ jobs:
 
       # No cleanup step: run stops its own proxy container in its finally block.
 
-  # fail_on_blocked defaults to true; verify a blocked connection actually
-  # fails the step (exit-code logic itself is already unit-tested).
+  # fail_on_blocked defaults to true and should fail on a blocked
+  # connection; known_blocked_rules should exempt a matching one. Both are
+  # unit-tested at the logic level — this proves the wiring end-to-end,
+  # reusing the same built image for both cases.
   test_sandbox_fail_on_blocked:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    name: "e2e: test (sandbox, fail_on_blocked)"
+    name: "e2e: test (sandbox, fail_on_blocked & known_blocked_rules)"
 
     steps:
       - name: Checkout
@@ -329,40 +331,6 @@ jobs:
             exit 1
           fi
           echo "OK: fail_on_blocked correctly failed the step"
-
-      # No cleanup step: run stops its own proxy container in its finally block.
-
-  # A blocked connection matching known_blocked_rules must not fail the step
-  # even though fail_on_blocked defaults to true (per-row matching logic
-  # itself is already unit-tested; this proves the INPUT_KNOWN_BLOCKED_RULES
-  # -> container report -> pass/fail wiring works end-to-end).
-  test_sandbox_known_blocked_rules:
-    needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    name: "e2e: test (sandbox, known_blocked_rules)"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-pnpm
-
-      - name: Build local sandbox proxy image
-        run: docker compose build proxy
-
-      - name: Resolve local image ref
-        id: local_image
-        run: echo "ref=$(docker compose config --images proxy)" >> "$GITHUB_OUTPUT"
-
-      - name: Rebuild run action with the local-image test hook enabled
-        env:
-          BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: pnpm build
 
       - name: Run an isolated command whose only blocked connection is known_blocked_rules-listed
         id: known_blocked_connection
@@ -480,7 +448,6 @@ jobs:
         test_sandbox_audit_mode,
         test_sandbox_enforcement,
         test_sandbox_fail_on_blocked,
-        test_sandbox_known_blocked_rules,
         test_sandbox_concurrency,
       ]
     if: always()
