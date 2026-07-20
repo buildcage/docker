@@ -218,6 +218,8 @@ identity keep working unmodified.
 
 ### Isolation Mechanisms
 
+<img src="../assets/diagram-architecture-run.png" alt="Run action sandbox architecture" width="620" height="544">
+
 The isolated command runs as an [OCI](https://github.com/opencontainers/runtime-spec) container
 under [runc](https://github.com/opencontainers/runc) — the same reference container runtime
 `explicit`/`transparent` already trust indirectly via `moby/buildkit` — rather than being wrapped

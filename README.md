@@ -183,6 +183,8 @@ See the [complete example workflow](.github/workflows/example-explicit.yml).
 
 ## The Run Action (Experimental)
 
+<img src="assets/diagram-overview-run.png" alt="How the run action works" width="561" height="274">
+
 Supply-chain attacks aren't limited to Docker builds — a compromised dependency can just as easily
 phone home from a plain `run:` step (`npm install`, `pip install`, a test suite, a build script).
 The `run` action applies the same network-isolation technology to any command. It's
