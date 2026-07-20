@@ -1,4 +1,4 @@
-name: Example (run action)
+name: Example (run action, restrict mode)
 
 on:
   workflow_dispatch:

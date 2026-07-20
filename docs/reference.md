@@ -75,6 +75,9 @@ Set the `proxy_mode` parameter to control how Buildcage handles outbound connect
 </tbody>
 </table>
 
+See the [audit mode](../.github/workflows/example-audit.yml) and
+[restrict mode](../.github/workflows/example-restrict.yml) example workflows for each in full.
+
 ### Proxy Engines
 
 `proxy_engine` selects how Buildcage intercepts and enforces traffic. Two engines are available:
@@ -101,7 +104,9 @@ use identical `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` 
 connection attempt is observed and recorded — this is why it's the default. Use `explicit` if you
 need full URL/path-level visibility integrated into BuildKit's own build output and SLSA provenance,
 and your build's tools are known to respect `HTTP_PROXY`/`HTTPS_PROXY`. See
-[Explicit Proxy Engine](./security.md#explicit-proxy-engine) for the full technical detail.
+[Explicit Proxy Engine](./security.md#explicit-proxy-engine) for the full technical detail. See
+the [complete example workflow](../.github/workflows/example-explicit.yml) for a working
+`explicit` engine setup, including the CA trust workaround below.
 
 #### CA Trust for Tools with Their Own CA Store
 
@@ -225,6 +230,9 @@ In `audit` mode, the Job Summary also includes a ready-to-paste `restrict` mode 
 `run` step with `proxy_mode: restrict` and allowlist rules generated from the hosts observed
 during the audited run — mirroring the same example the `report` action generates for
 `setup`/`report` workflows.
+
+See the [restrict mode](../.github/workflows/example-run-restrict.yml) and
+[audit mode](../.github/workflows/example-run-audit.yml) example workflows for each in full.
 
 ### Parameters
 
