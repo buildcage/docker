@@ -6,7 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs, parseWritablePaths } from "./main.js";
+import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs, parseWritablePaths, readKnownBlockedRules } from "./main.js";
 import { SandboxError } from "./lib/errors.js";
 
 describe("buildACLRules", () => {
@@ -47,6 +47,31 @@ describe("buildACLRules", () => {
           httpRulesInput: "",
           ipRulesInput: "",
         }),
+      (err) => {
+        assert.ok(err instanceof SandboxError);
+        assert.equal(err.code, "INVALID_RULES");
+        return true;
+      },
+    );
+  });
+});
+
+describe("readKnownBlockedRules", () => {
+  it("parses whitespace-separated rules", () => {
+    assert.deepEqual(
+      readKnownBlockedRules("known-bad.example.com:443 *.noisy.example.com:80"),
+      ["known-bad.example.com:443", "*.noisy.example.com:80"],
+    );
+  });
+
+  it("returns an empty array for empty/undefined input", () => {
+    assert.deepEqual(readKnownBlockedRules(undefined), []);
+    assert.deepEqual(readKnownBlockedRules(""), []);
+  });
+
+  it("throws SandboxError with code INVALID_RULES for invalid rule syntax", () => {
+    assert.throws(
+      () => readKnownBlockedRules("no-port-specified"),
       (err) => {
         assert.ok(err instanceof SandboxError);
         assert.equal(err.code, "INVALID_RULES");

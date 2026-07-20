@@ -332,6 +332,61 @@ jobs:
 
       # No cleanup step: run stops its own proxy container in its finally block.
 
+  # A blocked connection matching known_blocked_rules must not fail the step
+  # even though fail_on_blocked defaults to true (per-row matching logic
+  # itself is already unit-tested; this proves the INPUT_KNOWN_BLOCKED_RULES
+  # -> container report -> pass/fail wiring works end-to-end).
+  test_sandbox_known_blocked_rules:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: "e2e: test (sandbox, known_blocked_rules)"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm
+
+      - name: Build local sandbox proxy image
+        run: docker compose build proxy
+
+      - name: Resolve local image ref
+        id: local_image
+        run: echo "ref=$(docker compose config --images proxy)" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild run action with the local-image test hook enabled
+        env:
+          BUILDCAGE_BUILD_TEST_HOOKS: "1"
+        run: pnpm build
+
+      - name: Run an isolated command whose only blocked connection is known_blocked_rules-listed
+        id: known_blocked_connection
+        uses: ./run
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          allowed_https_rules: example.com:443
+          allowed_http_rules: example.com:80
+          known_blocked_rules: neverssl.com:80
+          # fail_on_blocked intentionally left at its default (true).
+          run: wget -q -T 5 -O /dev/null http://neverssl.com/ || true
+
+      - name: Verify known_blocked_rules kept the step from failing
+        if: always()
+        run: |
+          if [ "${{ steps.known_blocked_connection.outcome }}" != "success" ]; then
+            echo "::error::Expected the step to succeed (the only blocked connection matches known_blocked_rules), but it reported '${{ steps.known_blocked_connection.outcome }}'"
+            exit 1
+          fi
+          echo "OK: known_blocked_rules correctly kept the step from failing"
+
+      # No cleanup step: run stops its own proxy container in its finally block.
+
   # Proves container/network/Compose-project namespacing holds under
   # Actions' own `parallel:` keyword; the direct-script counterpart is
   # in test-integration.yml.
@@ -425,6 +480,7 @@ jobs:
         test_sandbox_audit_mode,
         test_sandbox_enforcement,
         test_sandbox_fail_on_blocked,
+        test_sandbox_known_blocked_rules,
         test_sandbox_concurrency,
       ]
     if: always()

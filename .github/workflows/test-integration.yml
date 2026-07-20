@@ -157,7 +157,7 @@ jobs:
         # This job tests proxy enforcement directly, not the report action
         # itself — only test_action's real `uses: ./report` should produce a
         # Job Summary, so print to stdout here instead.
-        run: GITHUB_STEP_SUMMARY= node report/src/main.js ./compose.yaml || true
+        run: GITHUB_STEP_SUMMARY='' node report/src/main.js ./compose.yaml || true
 
       - name: Run assertions
         env:

@@ -6,6 +6,7 @@ import { buildRestrictExample } from "../../core/lib/build-example.js";
 import { renderCommunicationDetails } from "./lib/command-log.js";
 import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.js";
 import { createAnnotation } from "../../core/lib/annotation.js";
+import { parseKnownBlockedRules, annotateKnownBlocked, determineBlockedOutcome, buildBlockedMessage } from "../../core/lib/known-blocked.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +19,14 @@ const composeEnv = {
   ...process.env,
   BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",
 };
+
+let knownBlockedRules;
+try {
+  knownBlockedRules = parseKnownBlockedRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
+} catch (e) {
+  console.log(`::error::${e.message}`);
+  process.exit(1);
+}
 
 let jsonOutput;
 try {
@@ -68,17 +77,20 @@ if (report.mode === null) {
   process.exit(0);
 }
 
-function markdownTable(rows, { showReason = false } = {}) {
-  if (showReason) {
-    const lines = ["| Host | Rule | Reason | Count |", "| --- | --- | --- | ---: |"];
-    for (const r of rows) {
-      lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.reason} | ${r.count} |`);
-    }
-    return lines.join("\n");
-  }
-  const lines = ["| Host | Rule | Count |", "| --- | --- | ---: |"];
+function markdownTable(rows, { showReason = false, showExpected = false } = {}) {
+  const headers = ["Host", "Rule"];
+  const aligns = ["---", "---"];
+  if (showReason) { headers.push("Reason"); aligns.push("---"); }
+  headers.push("Count"); aligns.push("---:");
+  if (showExpected) { headers.push("Expected"); aligns.push(":---:"); }
+
+  const lines = [`| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |`];
   for (const r of rows) {
-    lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.count} |`);
+    const cells = [`${r.host}:${r.port}`, r.ruleType];
+    if (showReason) cells.push(r.reason);
+    cells.push(r.count);
+    if (showExpected) cells.push(r.expected ? "✅" : "");
+    lines.push(`| ${cells.join(" | ")} |`);
   }
   return lines.join("\n");
 }
@@ -129,20 +141,22 @@ if (isExplicit) {
 
 let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
 
+const blocked = report.sections.blocked || [];
+const annotatedBlocked = annotateKnownBlocked(blocked, knownBlockedRules);
+const showExpected = knownBlockedRules.length > 0;
+
 if (isAudit) {
   const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
   if (audited.length > 0) {
     markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n";
   }
   markdown += buildRestrictExample(audited, actionRepo, actionRef);
-  const blocked = report.sections.blocked || [];
   if (blocked.length > 0) {
     if (audited.length > 0) markdown += "\n";
-    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n";
+    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
 } else {
   const allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections.allowed || [];
-  const blocked = report.sections.blocked || [];
   if (allowed.length > 0) {
     markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n";
   }
@@ -150,7 +164,7 @@ if (isAudit) {
     markdown += "\n";
   }
   if (blocked.length > 0) {
-    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n";
+    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
 }
 
@@ -177,23 +191,19 @@ if (summaryFile) {
 // 4. Error control for blocked connections
 const outputForAction = Boolean(summaryFile);
 const annotation = createAnnotation(outputForAction);
-if (report.blockedCount > 0) {
-  if (isAudit) {
-    annotation.notice(
-      `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
-    );
+const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
+const outcome = determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount: report.blockedCount, blockedRows: annotatedBlocked });
+if (outcome.level !== "none") {
+  const message = buildBlockedMessage({
+    blockedCount: report.blockedCount,
+    blockedRows: annotatedBlocked,
+    knownBlockedRulesUsed: knownBlockedRules.length > 0,
+    engineLabel: "proxy",
+  });
+  if (outcome.level === "error") {
+    annotation.error(message);
+    process.exitCode = 1;
   } else {
-    const failOnBlocked =
-      (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
-    if (failOnBlocked) {
-      annotation.error(
-        `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
-      );
-      process.exitCode = 1;
-    } else {
-      annotation.notice(
-        `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
-      );
-    }
+    annotation.notice(message);
   }
 }

@@ -4,6 +4,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildRules } from "../../core/shared/lib/rules.js";
+import { parseKnownBlockedRules } from "../../core/lib/known-blocked.js";
 import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
 import { verifyImageDigest } from "../../core/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
@@ -76,6 +77,20 @@ export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput })
 }
 
 /**
+ * Parse+validate `known_blocked_rules` — same wildcard/~regex syntax as the
+ * allowed_*_rules inputs, but never sent to the container's ACL (see
+ * core/lib/known-blocked.js): it only affects this action's own pass/fail
+ * decision and Job Summary table.
+ */
+export function readKnownBlockedRules(input) {
+  try {
+    return parseKnownBlockedRules(input);
+  } catch (e) {
+    throw new SandboxError(e.message, "INVALID_RULES");
+  }
+}
+
+/**
  * Parse the `writable` input into a list of directories. Newline-separated
  * (not whitespace-split like the ACL rule inputs above) since paths can
  * legitimately contain spaces.
@@ -125,10 +140,13 @@ async function main() {
     ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
   });
 
+  const knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
+
   console.log("::group::Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
   logRules("HTTP", rules.httpRules);
   logRules("IP", rules.ipRules);
+  logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules);
   console.log("::endgroup::");
 
   const writablePaths = parseWritablePaths(env.INPUT_WRITABLE);
@@ -248,6 +266,7 @@ async function main() {
         runCommand: runInput,
         stepLabel: env.INPUT_LABEL || undefined,
         failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
+        knownBlockedRules,
       });
     } catch (e) {
       console.log(`::warning::Failed to fetch sandbox report: ${e.message}`);

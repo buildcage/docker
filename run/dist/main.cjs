@@ -31,6 +31,14 @@ function convertRule(rule) {
   }(rule)}$`;
 }
 
+function annotateKnownBlocked(blockedRows, knownBlockedRules) {
+  const matchers = knownBlockedRules.map(rule => new RegExp(convertRule(rule)));
+  return blockedRows.map(row => ({
+    ...row,
+    expected: matchers.some(re => re.test(`${row.host}:${row.port}`))
+  }));
+}
+
 function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: actionRepository}) {
   return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
@@ -7446,22 +7454,25 @@ const ruleTypeToParam = {
   IP: "allowed_ip_rules"
 };
 
-function markdownTable(rows, {showReason: showReason = !1} = {}) {
-  if (showReason) {
-    const lines = [ "| Host | Rule | Reason | Count |", "| --- | --- | --- | ---: |" ];
-    for (const r of rows) lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.reason} | ${r.count} |`);
-    return lines.join("\n");
+function markdownTable(rows, {showReason: showReason = !1, showExpected: showExpected = !1} = {}) {
+  const headers = [ "Host", "Rule" ], aligns = [ "---", "---" ];
+  showReason && (headers.push("Reason"), aligns.push("---")), headers.push("Count"), 
+  aligns.push("---:"), showExpected && (headers.push("Expected"), aligns.push(":---:"));
+  const lines = [ `| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |` ];
+  for (const r of rows) {
+    const cells = [ `${r.host}:${r.port}`, r.ruleType ];
+    showReason && cells.push(r.reason), cells.push(r.count), showExpected && cells.push(r.expected ? "✅" : ""), 
+    lines.push(`| ${cells.join(" | ")} |`);
   }
-  const lines = [ "| Host | Rule | Count |", "| --- | --- | ---: |" ];
-  for (const r of rows) lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.count} |`);
   return lines.join("\n");
 }
 
-function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand} = {}) {
+function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand, knownBlockedRules: knownBlockedRules = []} = {}) {
   const heading = "Outbound Traffic Report" + (stepLabel ? ` — ${stepLabel}` : "");
   if (null === report.mode) return `## ${heading}\n\nNo proxy logs found.\n`;
   const isAudit = "audit" === report.mode;
   let markdown = `## ${heading} (${report.mode} mode)\n\n`;
+  const blocked = report.sections.blocked || [], annotatedBlocked = annotateKnownBlocked(blocked, knownBlockedRules), showExpected = knownBlockedRules.length > 0;
   if (isAudit) {
     const audited = report.sections.audited || [];
     audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n\n"), 
@@ -7490,28 +7501,28 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
     }(audited, actionRepo, actionRef, {
       actionName: "run",
       runCommand: runCommand
-    });
-    const blocked = report.sections.blocked || [];
-    blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, {
-      showReason: !0
+    }), blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, {
+      showReason: !0,
+      showExpected: showExpected
     }) + "\n\n");
   } else {
     const allowed = report.sections.allowed || [];
-    allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n");
-    const blocked = report.sections.blocked || [];
-    blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, {
-      showReason: !0
+    allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n"), 
+    blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, {
+      showReason: !0,
+      showExpected: showExpected
     }) + "\n\n");
   }
   return markdown;
 }
 
-function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand} = {}) {
+function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand, knownBlockedRules: knownBlockedRules = []} = {}) {
   const markdown = buildReportMarkdown(report, {
     stepLabel: stepLabel,
     actionRepo: actionRepo,
     actionRef: actionRef,
-    runCommand: runCommand
+    runCommand: runCommand,
+    knownBlockedRules: knownBlockedRules
   }), summaryFile = process.env.GITHUB_STEP_SUMMARY;
   summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown);
   const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
@@ -7527,10 +7538,42 @@ function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked
     notice() {},
     error() {}
   };
-  if (report.blockedCount > 0) {
-    const isAudit = "audit" === report.mode, message = `${report.blockedCount} blocked connection(s) detected by buildcage sandbox`;
-    isAudit || !failOnBlocked ? annotation.notice(message) : (annotation.error(message), 
-    process.exitCode = 1);
+  const blockedRows = annotateKnownBlocked(report.sections?.blocked || [], knownBlockedRules), outcome = function({isAudit: isAudit, failOnBlocked: failOnBlocked, blockedCount: blockedCount, blockedRows: blockedRows}) {
+    if (!blockedCount) return {
+      level: "none",
+      shouldFail: !1
+    };
+    if (isAudit) return {
+      level: "notice",
+      shouldFail: !1
+    };
+    const hasUnexpected = 0 === blockedRows.length || blockedRows.some(row => !row.expected);
+    return failOnBlocked && hasUnexpected ? {
+      level: "error",
+      shouldFail: !0
+    } : {
+      level: "notice",
+      shouldFail: !1
+    };
+  }({
+    isAudit: "audit" === report.mode,
+    failOnBlocked: failOnBlocked,
+    blockedCount: report.blockedCount ?? 0,
+    blockedRows: blockedRows
+  });
+  if ("none" !== outcome.level) {
+    const message = function({blockedCount: blockedCount, blockedRows: blockedRows, knownBlockedRulesUsed: knownBlockedRulesUsed, engineLabel: engineLabel}) {
+      const base = `${blockedCount} blocked connection(s) detected by buildcage ${engineLabel}`;
+      if (!knownBlockedRulesUsed) return base;
+      const unexpected = blockedRows.filter(row => !row.expected).length;
+      return 0 === blockedRows.length - unexpected ? base : 0 === unexpected ? `${base}, all matched known_blocked_rules (expected)` : `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
+    }({
+      blockedCount: report.blockedCount,
+      blockedRows: blockedRows,
+      knownBlockedRulesUsed: knownBlockedRules.length > 0,
+      engineLabel: "sandbox"
+    });
+    "error" === outcome.level ? (annotation.error(message), process.exitCode = 1) : annotation.notice(message);
   }
 }
 
@@ -7548,6 +7591,17 @@ function buildACLRules({httpsRulesInput: httpsRulesInput, httpRulesInput: httpRu
     httpRules: httpRules,
     ipRules: ipRules
   };
+}
+
+function readKnownBlockedRules(input) {
+  try {
+    return function(rulesInput) {
+      const rules = rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+      return rules.forEach(convertRule), rules;
+    }(input);
+  } catch (e) {
+    throw new SandboxError(e.message, "INVALID_RULES");
+  }
 }
 
 function parseWritablePaths(input) {
@@ -7591,9 +7645,10 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
     httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
     ipRulesInput: env.INPUT_ALLOWED_IP_RULES
-  });
+  }), knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
   console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), 
-  logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), console.log("::endgroup::");
+  logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules), 
+  console.log("::endgroup::");
   const writablePaths = parseWritablePaths(env.INPUT_WRITABLE), containerName = `buildcage-proxy-${node_crypto.randomBytes(4).toString("hex")}`, projectName = containerName, stateFile = env.GITHUB_STATE;
   stateFile && (node_fs.appendFileSync(stateFile, `container_name=${containerName}\n`), 
   node_fs.appendFileSync(stateFile, `project_name=${projectName}\n`));
@@ -7711,7 +7766,8 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         actionRef: actionRef,
         runCommand: runInput,
         stepLabel: env.INPUT_LABEL || void 0,
-        failOnBlocked: "true" === (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase()
+        failOnBlocked: "true" === (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase(),
+        knownBlockedRules: knownBlockedRules
       });
     } catch (e) {
       console.log(`::warning::Failed to fetch sandbox report: ${e.message}`);
@@ -7729,4 +7785,5 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   err instanceof SandboxError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${err.message}`), 
   process.exit(1);
 }), exports.buildACLRules = buildACLRules, exports.buildComposeDownArgs = buildComposeDownArgs, 
-exports.buildComposeUpArgs = buildComposeUpArgs, exports.parseWritablePaths = parseWritablePaths;
+exports.buildComposeUpArgs = buildComposeUpArgs, exports.parseWritablePaths = parseWritablePaths, 
+exports.readKnownBlockedRules = readKnownBlockedRules;
