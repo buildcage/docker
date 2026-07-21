@@ -10,7 +10,7 @@ Starts the Buildcage builder container.
   uses: dash14/buildcage/setup@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
   with:
     proxy_mode: restrict
-    allowed_https_rules: >-
+    allowed_https_rules: |
       registry.npmjs.org:443
       github.com:443
 ```

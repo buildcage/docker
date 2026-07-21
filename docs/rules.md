@@ -9,7 +9,7 @@ Rules are separated by **whitespace** (spaces, tabs, newlines).
 ```yaml
 # These are equivalent:
 allowed_https_rules: "a.com:443 b.com:443"
-allowed_https_rules: >-
+allowed_https_rules: |
   a.com:443
   b.com:443
 ```
@@ -72,25 +72,25 @@ Since the regex is tested against the `domain:port` string, include a port patte
     proxy_mode: restrict
 
     # Wildcard rules
-    allowed_https_rules: >-
+    allowed_https_rules: |
       registry.npmjs.org:443
       *.githubusercontent.com:443
       fonts.googleapis.com:443
 
     # HTTP rules with port
-    allowed_http_rules: >-
+    allowed_http_rules: |
       deb.debian.org:80
       archive.ubuntu.com:8080
 
     # IP address rules
-    allowed_ip_rules: >-
+    allowed_ip_rules: |
       192.168.1.1:443
       10.0.0.1:8080
 ```
 
 ```yaml
 # Regex rules
-allowed_https_rules: >-
+allowed_https_rules: |
   ~^registry\.npmjs\.org:\d+$
   ~^.*\.githubusercontent\.com:443$
 ```

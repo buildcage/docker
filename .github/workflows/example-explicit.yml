@@ -25,7 +25,7 @@ jobs:
         with:
           proxy_mode: restrict
           proxy_engine: explicit
-          allowed_https_rules: >-
+          allowed_https_rules: |
             registry.npmjs.org:443
             fonts.googleapis.com:443
 
