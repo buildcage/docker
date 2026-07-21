@@ -279,15 +279,17 @@ jobs:
 
       # No cleanup step: run stops its own proxy container in its finally block.
 
-  # fail_on_blocked defaults to true; verify a blocked connection actually
-  # fails the step (exit-code logic itself is already unit-tested).
+  # fail_on_blocked defaults to true and should fail on a blocked
+  # connection; known_blocked_rules should exempt a matching one. Both are
+  # unit-tested at the logic level — this proves the wiring end-to-end,
+  # reusing the same built image for both cases.
   test_sandbox_fail_on_blocked:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    name: "e2e: test (sandbox, fail_on_blocked)"
+    name: "e2e: test (sandbox, fail_on_blocked & known_blocked_rules)"
 
     steps:
       - name: Checkout
@@ -329,6 +331,27 @@ jobs:
             exit 1
           fi
           echo "OK: fail_on_blocked correctly failed the step"
+
+      - name: Run an isolated command whose only blocked connection is known_blocked_rules-listed
+        id: known_blocked_connection
+        uses: ./run
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          allowed_https_rules: example.com:443
+          allowed_http_rules: example.com:80
+          known_blocked_rules: neverssl.com:80
+          # fail_on_blocked intentionally left at its default (true).
+          run: wget -q -T 5 -O /dev/null http://neverssl.com/ || true
+
+      - name: Verify known_blocked_rules kept the step from failing
+        if: always()
+        run: |
+          if [ "${{ steps.known_blocked_connection.outcome }}" != "success" ]; then
+            echo "::error::Expected the step to succeed (the only blocked connection matches known_blocked_rules), but it reported '${{ steps.known_blocked_connection.outcome }}'"
+            exit 1
+          fi
+          echo "OK: known_blocked_rules correctly kept the step from failing"
 
       # No cleanup step: run stops its own proxy container in its finally block.
 

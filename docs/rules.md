@@ -1,6 +1,6 @@
 # Rule Syntax
 
-Buildcage uses `allowed_https_rules`, `allowed_http_rules`, and `allowed_ip_rules` to control which destinations are accessible during Docker builds.
+Buildcage uses `allowed_https_rules`, `allowed_http_rules`, and `allowed_ip_rules` to control which destinations are accessible during Docker builds, and `known_blocked_rules` to mark destinations that are expected to be blocked rather than allowlisting them — see [Reference](./reference.md) for its exact semantics. All four share the syntax below.
 
 ## Delimiters
 

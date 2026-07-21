@@ -3,7 +3,7 @@ import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildRules } from "../../core/shared/lib/rules.js";
+import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
 import { verifyImageDigest } from "../../core/lib/verify-image.js";
 import { SandboxError } from "./lib/errors.js";
@@ -58,21 +58,34 @@ async function resolveVerifiedImage({ actionRef, actionRepo }) {
 }
 
 /**
- * Build ACL rules from input strings. Rules are passed through as-is
- * (wildcard format), validated by converting to regex.
+ * Rethrow a rule-parser's syntax errors as a SandboxError with the shared
+ * INVALID_RULES code, used by both buildACLRules and readKnownBlockedRules.
  */
-export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
-  const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  const httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  const ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+function parseRulesOrThrow(rulesInput) {
   try {
-    buildRules(httpsRulesInput);
-    buildRules(httpRulesInput);
-    buildRules(ipRulesInput);
+    return parseAndValidateRules(rulesInput);
   } catch (e) {
     throw new SandboxError(e.message, "INVALID_RULES");
   }
-  return { httpsRules, httpRules, ipRules };
+}
+
+/**
+ * Build ACL rules from input strings. Rules are passed through as-is
+ * (wildcard format), validated eagerly.
+ */
+export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+  return {
+    httpsRules: parseRulesOrThrow(httpsRulesInput),
+    httpRules: parseRulesOrThrow(httpRulesInput),
+    ipRules: parseRulesOrThrow(ipRulesInput),
+  };
+}
+
+/**
+ * Never sent to the container's ACL — see core/lib/known-blocked.js.
+ */
+export function readKnownBlockedRules(input) {
+  return parseRulesOrThrow(input);
 }
 
 /**
@@ -125,10 +138,13 @@ async function main() {
     ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
   });
 
+  const knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
+
   console.log("::group::Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
   logRules("HTTP", rules.httpRules);
   logRules("IP", rules.ipRules);
+  logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules);
   console.log("::endgroup::");
 
   const writablePaths = parseWritablePaths(env.INPUT_WRITABLE);
@@ -248,6 +264,7 @@ async function main() {
         runCommand: runInput,
         stepLabel: env.INPUT_LABEL || undefined,
         failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
+        knownBlockedRules,
       });
     } catch (e) {
       console.log(`::warning::Failed to fetch sandbox report: ${e.message}`);

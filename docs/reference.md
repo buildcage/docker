@@ -186,12 +186,21 @@ Use the domain names shown in the report to create your allowlist for restrict m
 
 In restrict mode, the report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false`. In audit mode, blocked connections (e.g., protocol errors) are reported but never cause the step to fail.
 
+If some blocked connections are expected — a known-noisy dependency, a domain you're deliberately
+keeping off the allowlist to confirm it stays blocked — list them in `known_blocked_rules` (same
+syntax as `allowed_https_rules`, see [Rule Syntax](./rules.md)). When every blocked connection
+matches `known_blocked_rules`, the step no longer fails even with `fail_on_blocked: true`, and a
+`::notice::` is emitted instead of `::error::`; any other, unmatched blocked connection still fails
+the step as before. Once `known_blocked_rules` is set, the Job Summary's Blocked Hosts table gains
+an extra **Expected** column (✅) marking the matched rows.
+
 ### Parameters
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
 | `builder_name` | No | `buildcage` | Name of the builder container |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
+| `known_blocked_rules` | No | empty | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the step even when `fail_on_blocked` is `true` |
 
 ---
 
@@ -244,10 +253,13 @@ See the [restrict mode](../.github/workflows/example-run-restrict.yml) and
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
+| `known_blocked_rules` | No | empty | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the step even when `fail_on_blocked` is `true` |
 | `writable` | No | empty | Additional writable directories (newline-separated), on top of `$GITHUB_WORKSPACE`, `$HOME`, `/tmp`, and `$RUNNER_TEMP` — see [Filesystem Access](#filesystem-access) below |
 | `label` | No | empty | Label appended to this step's Job Summary heading, e.g. `npm install` — useful to tell steps apart when `run` is used more than once in the same job |
 
-Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above.
+Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above. `known_blocked_rules`
+uses this same syntax; see the [Report Action](#report-action-dash14buildcagereport) section above
+for its exact semantics, which applies here too.
 
 ### Passing Values to `run`
 

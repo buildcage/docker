@@ -3,6 +3,7 @@ import {
   wildcardToRegex,
   convertRule,
   buildRules,
+  parseAndValidateRules,
 } from "./rules.js";
 
 // ---------------------------------------------------------------------------
@@ -159,6 +160,30 @@ describe("buildRules", () => {
       buildRules("~^custom\\.regex:(443|8080)$ example.com:443"),
       ["^custom\\.regex:(443|8080)$", "^example\\.com:443$"],
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseAndValidateRules
+// ---------------------------------------------------------------------------
+describe("parseAndValidateRules", () => {
+  it("returns raw (unconverted) rule tokens", () => {
+    assert.deepEqual(
+      parseAndValidateRules("example.com:443 *.foo.com:8443"),
+      ["example.com:443", "*.foo.com:8443"],
+    );
+  });
+
+  it("empty input → empty array", () => {
+    assert.deepEqual(parseAndValidateRules(""), []);
+  });
+
+  it("validates syntax eagerly, throwing on invalid wildcard rules", () => {
+    assert.throws(() => parseAndValidateRules("w*.example.com:443"), /Invalid wildcard/);
+  });
+
+  it("validates syntax eagerly, throwing on invalid regex rules", () => {
+    assert.throws(() => parseAndValidateRules("~^(unclosed"), /Invalid regex/);
   });
 });
 

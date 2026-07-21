@@ -6,6 +6,9 @@ import { buildRestrictExample } from "../../core/lib/build-example.js";
 import { renderCommunicationDetails } from "./lib/command-log.js";
 import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.js";
 import { createAnnotation } from "../../core/lib/annotation.js";
+import { evaluateBlockedReport } from "../../core/lib/known-blocked.js";
+import { markdownTable } from "../../core/lib/markdown-table.js";
+import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +21,14 @@ const composeEnv = {
   ...process.env,
   BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",
 };
+
+let knownBlockedRules;
+try {
+  knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
+} catch (e) {
+  console.log(`::error::${e.message}`);
+  process.exit(1);
+}
 
 let jsonOutput;
 try {
@@ -68,21 +79,6 @@ if (report.mode === null) {
   process.exit(0);
 }
 
-function markdownTable(rows, { showReason = false } = {}) {
-  if (showReason) {
-    const lines = ["| Host | Rule | Reason | Count |", "| --- | --- | --- | ---: |"];
-    for (const r of rows) {
-      lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.reason} | ${r.count} |`);
-    }
-    return lines.join("\n");
-  }
-  const lines = ["| Host | Rule | Count |", "| --- | --- | ---: |"];
-  for (const r of rows) {
-    lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.count} |`);
-  }
-  return lines.join("\n");
-}
-
 const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 const actionRef = process.env.GITHUB_ACTION_REF || "v2";
 const isAudit = report.mode === "audit";
@@ -127,6 +123,11 @@ if (isExplicit) {
   }
 }
 
+const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
+const { blockedRows: annotatedBlocked, showExpected, outcome, message } = evaluateBlockedReport(report, {
+  knownBlockedRules, failOnBlocked, engineLabel: "proxy",
+});
+
 let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
 
 if (isAudit) {
@@ -135,22 +136,20 @@ if (isAudit) {
     markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n";
   }
   markdown += buildRestrictExample(audited, actionRepo, actionRef);
-  const blocked = report.sections.blocked || [];
-  if (blocked.length > 0) {
+  if (annotatedBlocked.length > 0) {
     if (audited.length > 0) markdown += "\n";
-    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n";
+    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
 } else {
   const allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections.allowed || [];
-  const blocked = report.sections.blocked || [];
   if (allowed.length > 0) {
     markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n";
   }
-  if (allowed.length > 0 && blocked.length > 0) {
+  if (allowed.length > 0 && annotatedBlocked.length > 0) {
     markdown += "\n";
   }
-  if (blocked.length > 0) {
-    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n";
+  if (annotatedBlocked.length > 0) {
+    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
 }
 
@@ -177,23 +176,9 @@ if (summaryFile) {
 // 4. Error control for blocked connections
 const outputForAction = Boolean(summaryFile);
 const annotation = createAnnotation(outputForAction);
-if (report.blockedCount > 0) {
-  if (isAudit) {
-    annotation.notice(
-      `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
-    );
-  } else {
-    const failOnBlocked =
-      (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
-    if (failOnBlocked) {
-      annotation.error(
-        `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
-      );
-      process.exitCode = 1;
-    } else {
-      annotation.notice(
-        `${report.blockedCount} blocked connection(s) detected by buildcage proxy`
-      );
-    }
-  }
+if (outcome.level === "error") {
+  annotation.error(message);
+  process.exitCode = 1;
+} else if (outcome.level === "notice") {
+  annotation.notice(message);
 }

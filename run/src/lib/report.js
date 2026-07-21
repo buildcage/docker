@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { createAnnotation } from "../../../core/lib/annotation.js";
 import { buildRestrictExample } from "../../../core/lib/build-example.js";
+import { evaluateBlockedReport } from "../../../core/lib/known-blocked.js";
+import { markdownTable } from "../../../core/lib/markdown-table.js";
 
 /**
  * Fetch the structured HAProxy-log report from the (still-running) proxy
@@ -18,23 +20,15 @@ export function fetchReport(containerName) {
   return JSON.parse(jsonOutput);
 }
 
-function markdownTable(rows, { showReason = false } = {}) {
-  if (showReason) {
-    const lines = ["| Host | Rule | Reason | Count |", "| --- | --- | --- | ---: |"];
-    for (const r of rows) lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.reason} | ${r.count} |`);
-    return lines.join("\n");
-  }
-  const lines = ["| Host | Rule | Count |", "| --- | --- | ---: |"];
-  for (const r of rows) lines.push(`| ${r.host}:${r.port} | ${r.ruleType} | ${r.count} |`);
-  return lines.join("\n");
-}
-
 /**
  * Build the Job Summary markdown section for this run step's traffic
  * report. Each `run` step gets its own section (rather than one report
  * per job), matching the "one proxy container per step" execution model.
+ *
+ * `blockedRows`/`showExpected` come pre-computed from the caller so
+ * known_blocked_rules matching runs once per report, not once per render.
  */
-export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand } = {}) {
+export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand, blockedRows = [], showExpected = false } = {}) {
   // Mirrors report/src/main.js's "## Outbound Traffic Report during Docker
   // Build (mode)" heading, so both actions read as the same kind of report.
   const heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
@@ -49,13 +43,11 @@ export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, 
     const audited = report.sections.audited || [];
     if (audited.length > 0) markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n\n";
     markdown += buildRestrictExample(audited, actionRepo, actionRef, { actionName: "run", runCommand });
-    const blocked = report.sections.blocked || [];
-    if (blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
+    if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
   } else {
     const allowed = report.sections.allowed || [];
     if (allowed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n";
-    const blocked = report.sections.blocked || [];
-    if (blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blocked, { showReason: true }) + "\n\n";
+    if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
   }
 
   return markdown;
@@ -66,8 +58,12 @@ export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, 
  * set the exit code for blocked connections, mirroring report/src/main.js's
  * behavior but scoped to a single run step's proxy container.
  */
-export function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand } = {}) {
-  const markdown = buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand });
+export function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand, knownBlockedRules = [] } = {}) {
+  const { blockedRows, showExpected, outcome, message } = evaluateBlockedReport(report, {
+    knownBlockedRules, failOnBlocked, engineLabel: "sandbox",
+  });
+
+  const markdown = buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand, blockedRows, showExpected });
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
   if (summaryFile) {
     appendFileSync(summaryFile, markdown);
@@ -86,14 +82,10 @@ export function writeReport(report, { stepLabel, failOnBlocked, actionRepo, acti
   }
 
   const annotation = createAnnotation(Boolean(summaryFile));
-  if (report.blockedCount > 0) {
-    const isAudit = report.mode === "audit";
-    const message = `${report.blockedCount} blocked connection(s) detected by buildcage sandbox`;
-    if (isAudit || !failOnBlocked) {
-      annotation.notice(message);
-    } else {
-      annotation.error(message);
-      process.exitCode = 1;
-    }
+  if (outcome.level === "error") {
+    annotation.error(message);
+    process.exitCode = 1;
+  } else if (outcome.level === "notice") {
+    annotation.notice(message);
   }
 }

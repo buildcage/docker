@@ -183,6 +183,7 @@ test_sandbox_integration: ## Run the run action's integration tests (needs BUILD
 	@./run/test/integration-test-nested-mount-readonly.sh
 	@./run/test/integration-test-non-runc-default-pseudofs-readonly.sh
 	@./run/test/integration-test-concurrent.sh
+	@./run/test/integration-test-known-blocked-rules.sh
 
 .PHONY: test_unit
 test_unit: test_setup test_report test_sandbox_unit test_qjs ## Run unit tests
