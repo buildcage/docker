@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Resolve the buildcage Docker image reference (image@digest). The
  * repository is always derived from the action repository — external image

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * oci-registry.js — OCI registry I/O helpers
  *

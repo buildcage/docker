@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Render the explicit engine's communication detail as a collapsed markdown
  * section, or "" if there's nothing to show. Allowed Urls is listed before

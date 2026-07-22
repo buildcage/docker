@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { parseIdentifier } from "../../../core/shared/lib/parse-identifier.js";
 import { aggregate } from "../../../core/shared/lib/aggregate.js";
 

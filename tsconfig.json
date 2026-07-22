@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2023",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["core/lib/**/*.js", "setup/src/**/*.js", "run/src/**/*.js", "report/src/**/*.js"],
+  "exclude": ["core/shared", "core/scripts", "setup/docker", "**/dist/**"]
+}

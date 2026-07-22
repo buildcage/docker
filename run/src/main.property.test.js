@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Property-based tests for run/main.js and its helpers.
  *

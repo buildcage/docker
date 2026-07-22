@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";

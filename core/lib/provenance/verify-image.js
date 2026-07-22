@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * verify-image.js — Image provenance verification helpers
  *

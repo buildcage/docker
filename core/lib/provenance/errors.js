@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ActionError } from "../general/action-error.js";
 
 /**

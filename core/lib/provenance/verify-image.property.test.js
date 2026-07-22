@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Property-based tests for verify-image.js helpers.
  *

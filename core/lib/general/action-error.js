@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Base class for an action's own "intentional" errors — a caught failure
  * whose message is safe to print directly via ::error::, as opposed to an

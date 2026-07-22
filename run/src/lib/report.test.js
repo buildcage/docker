@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Unit tests for run/lib/report.js — specifically writeReport's
  * exit-code semantics (see main.js's own `if (exitCode !== 0)` for the
