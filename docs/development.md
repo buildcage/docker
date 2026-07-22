@@ -207,7 +207,7 @@ and `test_sandbox_*` jobs in `.github/workflows/test-e2e.yml`) tests the real `s
 actions end-to-end against a locally built image instead, via a build-time-gated mechanism:
 `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build` compiles `setup/dist/main.cjs` and `run/dist/main.cjs`
 where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
-module (`core/lib/local-image-override.js`, shared by both actions), loaded only via a
+module (`core/lib/provenance/local-image-override.js`, shared by both actions), loaded only via a
 dynamic `import()` gated by that build-time flag. Without the flag (i.e. every normal/committed
 build), rollup's own module-graph tree-shaking excludes that entire file from the bundle — it's
 physically absent, not just unreachable. A CI check (`unit_test` job) additionally confirms a normal

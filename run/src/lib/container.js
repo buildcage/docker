@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
-import { describeDockerFailure } from "../../../core/lib/docker-error.js";
+import { describeDockerFailure } from "../../../core/lib/actions/docker-error.js";
 import { SandboxError } from "./errors.js";
 
 /**

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
 import { SandboxError } from "./errors.js";
-import { SLIM_RUNNER_DETECTED_PREFIX, isLikelySlimRunner } from "../../../core/lib/docker-error.js";
+import { SLIM_RUNNER_DETECTED_PREFIX, isLikelySlimRunner } from "../../../core/lib/actions/docker-error.js";
 
 const REQUIREMENT =
   "The run action requires a Linux runner with passwordless sudo for the isolation setup itself " +
@@ -15,7 +15,7 @@ const SLIM_RUNNER_NOTE =
 
 /**
  * Kept pure (takes the error, not execFileSync's raw output) so it's
- * unit-testable the same way as core/lib/docker-error.js's
+ * unit-testable the same way as core/lib/actions/docker-error.js's
  * describeDockerFailure.
  */
 export function describeSudoFailure(e, { env = process.env, exists = existsSync } = {}) {

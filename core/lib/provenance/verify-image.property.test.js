@@ -1,7 +1,7 @@
 /**
  * Property-based tests for verify-image.js helpers.
  *
- * Run with: node --test core/lib/verify-image.property.test.js
+ * Run with: node --test core/lib/provenance/verify-image.property.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

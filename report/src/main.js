@@ -2,14 +2,14 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRestrictExample } from "../../core/lib/build-example.js";
+import { buildRestrictExample } from "../../core/lib/report/build-example.js";
 import { renderCommunicationDetails } from "./lib/command-log.js";
 import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.js";
-import { createAnnotation } from "../../core/lib/annotation.js";
-import { evaluateBlockedReport } from "../../core/lib/known-blocked.js";
-import { renderHostTable } from "../../core/lib/host-table.js";
+import { createAnnotation } from "../../core/lib/actions/annotation.js";
+import { evaluateBlockedReport } from "../../core/lib/report/known-blocked.js";
+import { renderHostTable } from "../../core/lib/report/host-table.js";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
-import { describeDockerFailure } from "../../core/lib/docker-error.js";
+import { describeDockerFailure } from "../../core/lib/actions/docker-error.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
