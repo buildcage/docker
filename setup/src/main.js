@@ -6,6 +6,7 @@ import { buildRules } from "../../core/shared/lib/rules.js";
 import { SetupError } from "./lib/errors.js";
 import { verifyImageDigest } from "../../core/lib/verify-image.js";
 import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
+import { describeDockerFailure } from "../../core/lib/docker-error.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
@@ -92,21 +93,35 @@ async function main() {
     BUILDCAGE_IMAGE_REF: imageRef,
   };
 
-  execFileSync(
-    "docker",
-    ["compose", "-f", composeFile, "down"],
-    { stdio: "inherit", env: composeEnv }
-  );
+  try {
+    execFileSync(
+      "docker",
+      ["compose", "-f", composeFile, "down"],
+      { stdio: "inherit", env: composeEnv }
+    );
+  } catch (e) {
+    throw new SetupError(
+      describeDockerFailure(e, { operation: "docker compose down" }),
+      "DOCKER_UNAVAILABLE",
+    );
+  }
 
-  execFileSync(
-    "docker",
-    [
-      "compose",
-      "-f", composeFile,
-      "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull",
-    ],
-    { stdio: "inherit", env: composeEnv }
-  );
+  try {
+    execFileSync(
+      "docker",
+      [
+        "compose",
+        "-f", composeFile,
+        "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull",
+      ],
+      { stdio: "inherit", env: composeEnv }
+    );
+  } catch (e) {
+    throw new SetupError(
+      describeDockerFailure(e, { operation: "docker compose up" }),
+      "DOCKER_UNAVAILABLE",
+    );
+  }
 }
 
 /**

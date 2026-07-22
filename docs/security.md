@@ -318,7 +318,9 @@ an OCI `config.json` and enforced by runc natively.
   the allowlist. This mirrors the same design principle as the Docker build engines above (see the
   defense-in-depth note in the [README](../README.md#how-it-works)).
 - **Linux only**: requires a Linux runner with passwordless `sudo` for the isolation setup itself
-  (network namespace, veth, iptables) — the default on GitHub-hosted `ubuntu-*` runners. Not
+  (network namespace, veth, iptables) and a working Docker installation (client and daemon) for the
+  sandbox proxy container — both are the default on GitHub-hosted `ubuntu-*` runners, but not on
+  lightweight images such as `ubuntu-slim`, which ships a Docker client with no daemon. Not
   supported on Windows or macOS runners.
 - **Rootful Docker assumed**: the isolation joins the proxy container's network namespace via its
   host-visible PID (`docker inspect .State.Pid`, entered as `/proc/<pid>/ns/net`). This assumes

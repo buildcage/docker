@@ -333,8 +333,9 @@ To disable the read-only restriction entirely, set `writable` to `/`:
 ```
 
 > [!NOTE]
-> `run` runs `run-isolated.sh` directly on the runner host (via `sudo -n`), so it requires a
-> Linux runner with passwordless `sudo` — this is the default on GitHub-hosted `ubuntu-*` runners.
-> It applies a seccomp filter derived from Docker's own default profile; it does not apply an
-> AppArmor/SELinux profile or Landlock rules. See [Security Details](./security.md#run-action) for
-> the full threat model and known limitations.
+> `run` sets up its isolation directly on the runner host (via `sudo -n`), so it requires a
+> Linux runner with passwordless `sudo` and a working Docker installation — both are the default on
+> GitHub-hosted `ubuntu-*` runners, but lightweight images such as `ubuntu-slim` (a Docker client
+> with no daemon) are not supported. It applies a seccomp filter derived from Docker's own default
+> profile; it does not apply an AppArmor/SELinux profile or Landlock rules. See
+> [Security Details](./security.md#run-action) for the full threat model and known limitations.
