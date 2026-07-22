@@ -36,7 +36,8 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-              - 'rollup.config.js'
+              - 'rolldown.config.js'
+              - 'tsconfig.json'
               - '.github/actions/setup-pnpm/**'
             workflow: &workflow
               - '.github/workflows/test-e2e.yml'
