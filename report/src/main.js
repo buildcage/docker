@@ -2,13 +2,14 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRestrictExample } from "../../core/lib/build-example.js";
+import { buildRestrictExample } from "../../core/lib/report/build-example.js";
 import { renderCommunicationDetails } from "./lib/command-log.js";
 import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.js";
-import { createAnnotation } from "../../core/lib/annotation.js";
-import { evaluateBlockedReport } from "../../core/lib/known-blocked.js";
-import { renderHostTable } from "../../core/lib/host-table.js";
+import { createAnnotation } from "../../core/lib/actions/annotation.js";
+import { evaluateBlockedReport } from "../../core/lib/report/known-blocked.js";
+import { renderHostTable } from "../../core/lib/report/host-table.js";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
+import { describeDockerFailure } from "../../core/lib/actions/docker-error.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,11 +23,17 @@ const composeEnv = {
   BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",
 };
 
+// GITHUB_STEP_SUMMARY is unset when this script isn't running as the real
+// report action (e.g. local debugging) — annotation suppresses ::error::/
+// ::notice:: output in that case, same as the outcome annotation below.
+const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+const annotation = createAnnotation(Boolean(summaryFile));
+
 let knownBlockedRules;
 try {
   knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
 } catch (e) {
-  console.log(`::error::${e.message}`);
+  annotation.error(e.message);
   process.exit(1);
 }
 
@@ -41,7 +48,9 @@ try {
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
   );
 } catch (e) {
-  console.log("Failed to get report from container:", e.message);
+  annotation.error(
+    describeDockerFailure(e, { operation: "fetching the sandbox report from the container" }),
+  );
   process.exit(1);
 }
 
@@ -71,7 +80,6 @@ console.log();
 
 // 3. Build summary
 if (report.mode === null) {
-  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
   if (summaryFile) {
     appendFileSync(summaryFile, "No proxy logs found.\n");
   }
@@ -166,7 +174,6 @@ if (!isExplicit) {
 markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
 
 // Write Job Summary
-const summaryFile = process.env.GITHUB_STEP_SUMMARY;
 if (summaryFile) {
   appendFileSync(summaryFile, markdown);
 } else {
@@ -174,8 +181,6 @@ if (summaryFile) {
 }
 
 // 4. Error control for blocked connections
-const outputForAction = Boolean(summaryFile);
-const annotation = createAnnotation(outputForAction);
 if (outcome.level === "error") {
   annotation.error(message);
   process.exitCode = 1;

@@ -155,7 +155,7 @@ jobs:
   # lifecycles) are covered more cheaply in test-integration.yml instead.
   #
   # Verifies audit mode's Job Summary includes the auto-generated
-  # restrict-mode example (core/lib/build-example.js), mirroring `report`.
+  # restrict-mode example, mirroring `report`.
   test_sandbox_audit_mode:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'

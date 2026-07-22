@@ -4,7 +4,7 @@
  * fail_on_blocked is true. Never sent to the container's ACL — only
  * affects this action's pass/fail decision and Job Summary rendering.
  */
-import { convertRule } from "../shared/lib/rules.js";
+import { convertRule } from "../../shared/lib/rules.js";
 
 /**
  * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff

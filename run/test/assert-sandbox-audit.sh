@@ -1,6 +1,6 @@
 #!/bin/bash
 # Verifies audit mode's report: audited-hosts table plus the
-# auto-generated restrict-mode example (core/lib/build-example.js).
+# auto-generated restrict-mode example.
 set -euo pipefail
 
 echo ""

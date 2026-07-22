@@ -4,9 +4,12 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
-import { resolveBuildcageImageRef } from "../../core/lib/image-ref.js";
-import { verifyImageDigest } from "../../core/lib/verify-image.js";
+import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.js";
+import { verifyImageDigest } from "../../core/lib/provenance/verify-image.js";
+import { describeDockerFailure } from "../../core/lib/actions/docker-error.js";
+import { createAnnotation } from "../../core/lib/actions/annotation.js";
 import { SandboxError } from "./lib/errors.js";
+import { checkPasswordlessSudo } from "./lib/sudo-preflight.js";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";
 import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.js";
 import {
@@ -34,7 +37,7 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
 /**
  * Verifies image provenance and resolves the digest-pinned image ref for
  * the run action's (buildkitd-less) proxy image, published under the `-proxy`
- * tag suffix (see imageTagFromRef in core/lib/verify-image.js).
+ * tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.js).
  */
 async function resolveVerifiedImage({ actionRef, actionRepo }) {
   let digest;
@@ -82,7 +85,7 @@ export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput })
 }
 
 /**
- * Never sent to the container's ACL — see core/lib/known-blocked.js.
+ * Never sent to the container's ACL — see core/lib/report/known-blocked.js.
  */
 export function readKnownBlockedRules(input) {
   return parseRulesOrThrow(input);
@@ -119,8 +122,16 @@ async function main() {
     throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
   }
 
+  // Fail fast — before image verification or starting the proxy container —
+  // if the runner can't support the isolation setup at all.
+  checkPasswordlessSudo();
+
+  // Same gate as writeReport() in lib/report.js — suppresses annotations
+  // when this script isn't running as the real action.
+  const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
+
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("../../core/lib/local-image-override.js")).readLocalImageOverride(env)
+    ? (await import("../../core/lib/provenance/local-image-override.js")).readLocalImageOverride(env)
     : null;
   if (localOverride) {
     console.log(
@@ -172,11 +183,18 @@ async function main() {
     BUILDCAGE_PROXY_IMAGE_REF: imageRef,
   };
 
-  execFileSync(
-    "docker",
-    buildComposeUpArgs({ composeFile, projectName, pullPolicy }),
-    { stdio: "inherit", env: composeEnv },
-  );
+  try {
+    execFileSync(
+      "docker",
+      buildComposeUpArgs({ composeFile, projectName, pullPolicy }),
+      { stdio: "inherit", env: composeEnv },
+    );
+  } catch (e) {
+    throw new SandboxError(
+      describeDockerFailure(e, { operation: "docker compose up" }),
+      "DOCKER_UNAVAILABLE",
+    );
+  }
 
   let exitCode = 1;
   try {
@@ -267,9 +285,15 @@ async function main() {
         knownBlockedRules,
       });
     } catch (e) {
-      console.log(`::warning::Failed to fetch sandbox report: ${e.message}`);
+      annotation.warning(`Failed to fetch sandbox report: ${e.message}`);
     }
-    execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), { stdio: "inherit", env: composeEnv });
+    try {
+      execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), { stdio: "inherit", env: composeEnv });
+    } catch (e) {
+      annotation.warning(
+        `Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`,
+      );
+    }
   }
 
   if (exitCode !== 0) {

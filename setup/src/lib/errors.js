@@ -12,6 +12,7 @@
  *   VERIFY_FAILED    – Sigstore bundle verification failed
  *   UNVERIFIABLE_REF – action ref cannot be verified (branch / local path)
  *   INVALID_RULES    – ACL rule syntax error
+ *   DOCKER_UNAVAILABLE – docker CLI missing from PATH or a docker command failed
  */
 export class SetupError extends Error {
   constructor(message, code) {

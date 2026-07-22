@@ -6,7 +6,7 @@
  *
  * assertSignedDigest() is pure synchronous logic and is fully unit-tested here.
  *
- * Run with: node --test core/lib/sigstore.test.js
+ * Run with: node --test core/lib/provenance/sigstore.test.js
  */
 
 import { describe, it } from "node:test";

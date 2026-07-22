@@ -3,7 +3,7 @@
  *
  * Tests use injectable _exec / _fetch arguments to avoid real network/docker calls.
  *
- * Run with: node --test core/lib/oci-registry.test.js
+ * Run with: node --test core/lib/provenance/oci-registry.test.js
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

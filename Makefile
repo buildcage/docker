@@ -186,7 +186,14 @@ test_sandbox_integration: ## Run the run action's integration tests (needs BUILD
 	@./run/test/integration-test-known-blocked-rules.sh
 
 .PHONY: test_unit
-test_unit: test_setup test_report test_sandbox_unit test_qjs ## Run unit tests
+test_unit: test_core test_setup test_report test_sandbox_unit test_qjs ## Run unit tests
+
+# core/shared/lib's own tests target the QuickJS "std" module (see
+# core/shared/test/test-shim.js) and aren't runnable under plain node — they're
+# already covered by test_qjs below instead.
+.PHONY: test_core
+test_core: ## Run core/lib unit tests
+	@node --test 'core/lib/**/*.test.js'
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests

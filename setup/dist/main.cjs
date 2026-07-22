@@ -7268,6 +7268,18 @@ function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: a
   return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 
+function describeDockerFailure(e, {operation: operation = "docker", env: env = process.env, exists: exists = node_fs.existsSync} = {}) {
+  const slimNote = function(_env = process.env, _exists = node_fs.existsSync) {
+    return "Linux" === _env.ImageOS && _exists("/run/.containerenv");
+  }(env, exists) ? ' Detected a container-based GitHub-hosted runner image (e.g. "ubuntu-slim") — these ship a Docker client with no daemon and are not supported for this action.' : "";
+  let whatHappened;
+  if (e && "ENOENT" === e.code) whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`; else {
+    const captured = e && "string" == typeof e.stderr ? e.stderr.trim() : "";
+    whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
+  }
+  return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action — use "ubuntu-latest" (or another runner with a full Docker install) instead. See docs/reference.md and docs/security.md for details.`;
+}
+
 const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
 function resolveProxyEngine(input) {
@@ -7341,13 +7353,26 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
     BUILDCAGE_IMAGE_REF: imageRef
   };
-  node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "down" ], {
-    stdio: "inherit",
-    env: composeEnv
-  }), node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ], {
-    stdio: "inherit",
-    env: composeEnv
-  });
+  try {
+    node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "down" ], {
+      stdio: "inherit",
+      env: composeEnv
+    });
+  } catch (e) {
+    throw new SetupError(describeDockerFailure(e, {
+      operation: "docker compose down"
+    }), "DOCKER_UNAVAILABLE");
+  }
+  try {
+    node_child_process.execFileSync("docker", [ "compose", "-f", composeFile, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull" ], {
+      stdio: "inherit",
+      env: composeEnv
+    });
+  } catch (e) {
+    throw new SetupError(describeDockerFailure(e, {
+      operation: "docker compose up"
+    }), "DOCKER_UNAVAILABLE");
+  }
 }().catch(err => {
   err instanceof SetupError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), 
   process.exit(1);

@@ -7262,9 +7262,55 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
   return await verifyBundle(bundle, verifyOptions, digest), digest;
 }
 
+function describeDockerFailure(e, {operation: operation = "docker", env: env = process.env, exists: exists = node_fs.existsSync} = {}) {
+  const slimNote = isLikelySlimRunner(env, exists) ? ' Detected a container-based GitHub-hosted runner image (e.g. "ubuntu-slim") — these ship a Docker client with no daemon and are not supported for this action.' : "";
+  let whatHappened;
+  if (e && "ENOENT" === e.code) whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`; else {
+    const captured = e && "string" == typeof e.stderr ? e.stderr.trim() : "";
+    whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
+  }
+  return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action — use "ubuntu-latest" (or another runner with a full Docker install) instead. See docs/reference.md and docs/security.md for details.`;
+}
+
+function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
+  return "Linux" === _env.ImageOS && _exists("/run/.containerenv");
+}
+
+function createAnnotation(enabled) {
+  return enabled ? {
+    notice(message) {
+      console.log(`::notice::${message}`);
+    },
+    warning(message) {
+      console.log(`::warning::${message}`);
+    },
+    error(message) {
+      console.log(`::error::${message}`);
+    }
+  } : {
+    notice() {},
+    warning() {},
+    error() {}
+  };
+}
+
 class SandboxError extends Error {
   constructor(message, code) {
     super(message), this.name = "SandboxError", this.code = code;
+  }
+}
+
+function checkPasswordlessSudo() {
+  try {
+    node_child_process.execFileSync("sudo", [ "-n", "true" ], {
+      encoding: "utf8",
+      stdio: [ "ignore", "ignore", "pipe" ]
+    });
+  } catch (e) {
+    throw new SandboxError(function(e, {env: env = process.env, exists: exists = node_fs.existsSync} = {}) {
+      const captured = e && "string" == typeof e.stderr ? e.stderr.trim() : "";
+      return `'sudo' is not available without a password on this runner.${isLikelySlimRunner(env, exists) ? ' Detected a container-based GitHub-hosted runner image (e.g. "ubuntu-slim") — these typically don\'t have passwordless sudo configured for this kind of privileged setup.' : ""} The run action requires a Linux runner with passwordless sudo for the isolation setup itself (network namespace, veth, iptables) — this is the default on GitHub-hosted "ubuntu-*" runners, but NOT on lightweight images such as "ubuntu-slim" or many self-hosted/minimal runners. See docs/reference.md and docs/security.md for details.${captured ? ` (${captured})` : ""}`;
+    }(e), "PASSWORDLESS_SUDO_REQUIRED");
   }
 }
 
@@ -7592,36 +7638,6 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
   return markdown;
 }
 
-function writeReport(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand, knownBlockedRules: knownBlockedRules = []} = {}) {
-  const {blockedRows: blockedRows, showExpected: showExpected, outcome: outcome, message: message} = evaluateBlockedReport(report, {
-    knownBlockedRules: knownBlockedRules,
-    failOnBlocked: failOnBlocked,
-    engineLabel: "sandbox"
-  }), markdown = buildReportMarkdown(report, {
-    stepLabel: stepLabel,
-    actionRepo: actionRepo,
-    actionRef: actionRef,
-    runCommand: runCommand,
-    blockedRows: blockedRows,
-    showExpected: showExpected
-  }), summaryFile = process.env.GITHUB_STEP_SUMMARY;
-  summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown);
-  const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
-  debugSummaryFile && node_fs.appendFileSync(debugSummaryFile, markdown);
-  const annotation = Boolean(summaryFile) ? {
-    notice(message) {
-      console.log(`::notice::${message}`);
-    },
-    error(message) {
-      console.log(`::error::${message}`);
-    }
-  } : {
-    notice() {},
-    error() {}
-  };
-  "error" === outcome.level ? (annotation.error(message), process.exitCode = 1) : "notice" === outcome.level && annotation.notice(message);
-}
-
 const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
 function parseRulesOrThrow(rulesInput) {
@@ -7656,7 +7672,8 @@ function logRules(label, rules) {
 process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href) && async function() {
   const env = process.env, actionRef = env.GITHUB_ACTION_REF || "v2", actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", runInput = env.INPUT_RUN ?? "";
   if (!runInput.trim()) throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
-  const {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo}) {
+  checkPasswordlessSudo();
+  const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY)), {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo}) {
     let digest;
     try {
       digest = await verifyImageDigest({
@@ -7701,26 +7718,44 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
     BUILDCAGE_PROXY_IMAGE_REF: imageRef
   };
-  node_child_process.execFileSync("docker", buildComposeUpArgs({
-    composeFile: composeFile,
-    projectName: projectName,
-    pullPolicy: pullPolicy
-  }), {
-    stdio: "inherit",
-    env: composeEnv
-  });
+  try {
+    node_child_process.execFileSync("docker", buildComposeUpArgs({
+      composeFile: composeFile,
+      projectName: projectName,
+      pullPolicy: pullPolicy
+    }), {
+      stdio: "inherit",
+      env: composeEnv
+    });
+  } catch (e) {
+    throw new SandboxError(describeDockerFailure(e, {
+      operation: "docker compose up"
+    }), "DOCKER_UNAVAILABLE");
+  }
   let exitCode = 1;
   try {
-    const proxyPid = function(containerName) {
+    const proxyPid = function(containerName, {exec: exec = node_child_process.execFileSync} = {}) {
+      let out;
       try {
-        const out = node_child_process.execFileSync("docker", [ "inspect", "--format", "{{.State.Pid}}", containerName ], {
+        out = exec("docker", [ "inspect", "--format", "{{.State.Pid}}", containerName ], {
           encoding: "utf8",
-          stdio: [ "ignore", "pipe", "ignore" ]
-        }).trim(), pid = Number(out);
-        return Number.isInteger(pid) && pid > 0 ? pid : null;
-      } catch {
-        return null;
+          stdio: [ "ignore", "pipe", "pipe" ],
+          env: {
+            ...process.env,
+            LC_ALL: "C"
+          }
+        }).trim();
+      } catch (e) {
+        if (function(e) {
+          const text = `${e?.stderr ?? ""} ${e?.message ?? ""}`.toLowerCase();
+          return text.includes("no such object") || text.includes("no such container");
+        }(e)) return null;
+        throw new SandboxError(describeDockerFailure(e, {
+          operation: "docker inspect"
+        }), "DOCKER_UNAVAILABLE");
       }
+      const pid = Number(out);
+      return Number.isInteger(pid) && pid > 0 ? pid : null;
     }(containerName);
     if (null === proxyPid) throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
     const gateway = "172.20.0.1", dns = "172.20.0.1", targetIp = "172.20.0.101";
@@ -7801,7 +7836,25 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         });
         return JSON.parse(jsonOutput);
       }(containerName);
-      writeReport(report, {
+      !function(report, {stepLabel: stepLabel, failOnBlocked: failOnBlocked, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand, knownBlockedRules: knownBlockedRules = []} = {}) {
+        const {blockedRows: blockedRows, showExpected: showExpected, outcome: outcome, message: message} = evaluateBlockedReport(report, {
+          knownBlockedRules: knownBlockedRules,
+          failOnBlocked: failOnBlocked,
+          engineLabel: "sandbox"
+        }), markdown = buildReportMarkdown(report, {
+          stepLabel: stepLabel,
+          actionRepo: actionRepo,
+          actionRef: actionRef,
+          runCommand: runCommand,
+          blockedRows: blockedRows,
+          showExpected: showExpected
+        }), summaryFile = process.env.GITHUB_STEP_SUMMARY;
+        summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown);
+        const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
+        debugSummaryFile && node_fs.appendFileSync(debugSummaryFile, markdown);
+        const annotation = createAnnotation(Boolean(summaryFile));
+        "error" === outcome.level ? (annotation.error(message), process.exitCode = 1) : "notice" === outcome.level && annotation.notice(message);
+      }(report, {
         actionRepo: actionRepo,
         actionRef: actionRef,
         runCommand: runInput,
@@ -7810,15 +7863,21 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
         knownBlockedRules: knownBlockedRules
       });
     } catch (e) {
-      console.log(`::warning::Failed to fetch sandbox report: ${e.message}`);
+      annotation.warning(`Failed to fetch sandbox report: ${e.message}`);
     }
-    node_child_process.execFileSync("docker", buildComposeDownArgs({
-      composeFile: composeFile,
-      projectName: projectName
-    }), {
-      stdio: "inherit",
-      env: composeEnv
-    });
+    try {
+      node_child_process.execFileSync("docker", buildComposeDownArgs({
+        composeFile: composeFile,
+        projectName: projectName
+      }), {
+        stdio: "inherit",
+        env: composeEnv
+      });
+    } catch (e) {
+      annotation.warning(`Failed to stop the sandbox proxy container: ${describeDockerFailure(e, {
+        operation: "docker compose down"
+      })}`);
+    }
   }
   0 !== exitCode && (process.exitCode = exitCode);
 }().catch(err => {

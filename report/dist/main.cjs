@@ -184,6 +184,20 @@ function renderHostTable(rows, {showReason: showReason = !1, showExpected: showE
 const __dirname$1 = node_path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = process.argv[2] || node_path.join(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
   ...process.env,
   BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage"
+}, summaryFile = process.env.GITHUB_STEP_SUMMARY, annotation = Boolean(summaryFile) ? {
+  notice(message) {
+    console.log(`::notice::${message}`);
+  },
+  warning(message) {
+    console.log(`::warning::${message}`);
+  },
+  error(message) {
+    console.log(`::error::${message}`);
+  }
+} : {
+  notice() {},
+  warning() {},
+  error() {}
 };
 
 let knownBlockedRules, jsonOutput;
@@ -196,7 +210,7 @@ try {
     return rules.forEach(convertRule), rules;
   }(process.env.INPUT_KNOWN_BLOCKED_RULES);
 } catch (e) {
-  console.log(`::error::${e.message}`), process.exit(1);
+  annotation.error(e.message), process.exit(1);
 }
 
 try {
@@ -206,7 +220,19 @@ try {
     env: composeEnv
   });
 } catch (e) {
-  console.log("Failed to get report from container:", e.message), process.exit(1);
+  annotation.error(function(e, {operation: operation = "docker", env: env = process.env, exists: exists = node_fs.existsSync} = {}) {
+    const slimNote = function(_env = process.env, _exists = node_fs.existsSync) {
+      return "Linux" === _env.ImageOS && _exists("/run/.containerenv");
+    }(env, exists) ? ' Detected a container-based GitHub-hosted runner image (e.g. "ubuntu-slim") — these ship a Docker client with no daemon and are not supported for this action.' : "";
+    let whatHappened;
+    if (e && "ENOENT" === e.code) whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`; else {
+      const captured = e && "string" == typeof e.stderr ? e.stderr.trim() : "";
+      whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
+    }
+    return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action — use "ubuntu-latest" (or another runner with a full Docker install) instead. See docs/reference.md and docs/security.md for details.`;
+  }(e, {
+    operation: "fetching the sandbox report from the container"
+  })), process.exit(1);
 }
 
 const report = JSON.parse(jsonOutput);
@@ -224,11 +250,8 @@ try {
   console.log("(failed to read raw log)");
 }
 
-if (console.log("::endgroup::"), console.log(), null === report.mode) {
-  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-  summaryFile && node_fs.appendFileSync(summaryFile, "No proxy logs found.\n"), console.log("No proxy logs found."), 
-  process.exit(0);
-}
+console.log("::endgroup::"), console.log(), null === report.mode && (summaryFile && node_fs.appendFileSync(summaryFile, "No proxy logs found.\n"), 
+console.log("No proxy logs found."), process.exit(0));
 
 const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", actionRef = process.env.GITHUB_ACTION_REF || "v2", isAudit = "audit" === report.mode, isExplicit = void 0 !== report.deniedTimeline;
 
@@ -412,22 +435,5 @@ isExplicit && (markdown += function(builds, deniedTimeline) {
   }
   return md += "</details>\n", md;
 }(builds, report.deniedTimeline)), isExplicit || (markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n"), 
-markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
-
-const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-
-summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown);
-
-const outputForAction = Boolean(summaryFile), annotation = outputForAction ? {
-  notice(message) {
-    console.log(`::notice::${message}`);
-  },
-  error(message) {
-    console.log(`::error::${message}`);
-  }
-} : {
-  notice() {},
-  error() {}
-};
-
+markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`, summaryFile ? node_fs.appendFileSync(summaryFile, markdown) : console.log(markdown), 
 "error" === outcome.level ? (annotation.error(message), process.exitCode = 1) : "notice" === outcome.level && annotation.notice(message);
