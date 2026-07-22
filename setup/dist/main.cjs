@@ -2,10 +2,11 @@
 
 var node_child_process = require("node:child_process"), path = require("node:path"), node_url = require("node:url"), node_fs = require("node:fs"), os = require("node:os"), require$$0 = require("os"), require$$1 = require("path"), require$$0$5 = require("fs"), require$$0$2 = require("util"), require$$0$1 = require("crypto"), require$$0$3 = require("tty"), require$$0$4 = require("fs/promises"), require$$0$6 = require("url"), _documentCurrentScript = "undefined" != typeof document ? document.currentScript : null;
 
-function buildRules(rulesInput) {
-  return function(rulesInput) {
+function parseAndValidateRules(rulesInput) {
+  const rules = function(rulesInput) {
     return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  }(rulesInput).map(convertRule);
+  }(rulesInput);
+  return rules.forEach(convertRule), rules;
 }
 
 function convertRule(rule) {
@@ -33,17 +34,21 @@ function convertRule(rule) {
   }(rule)}$`;
 }
 
-class SetupError extends Error {
+class ActionError extends Error {
   constructor(message, code) {
-    super(message), this.name = "SetupError", this.code = code;
+    super(message), this.name = new.target.name, this.code = code;
   }
 }
+
+class SetupError extends ActionError {}
 
 class VerifyImageError extends Error {
   constructor(message, code) {
     super(message), this.name = "VerifyImageError", this.code = code;
   }
 }
+
+class ProvenanceError extends ActionError {}
 
 const BUNDLE_MEDIA_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 
@@ -7282,23 +7287,54 @@ function describeDockerFailure(e, {operation: operation = "docker", env: env = p
 
 const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
+async function resolveVerifiedImage({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine}) {
+  const digest = await async function({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine, verifyImageDigestFn: verifyImageDigestFn = verifyImageDigest}) {
+    let digest;
+    try {
+      digest = await verifyImageDigestFn({
+        actionRef: actionRef,
+        actionRepo: actionRepo,
+        proxyEngine: proxyEngine
+      });
+    } catch (e) {
+      throw new ProvenanceError(e.message, e.code ?? "VERIFY_FAILED");
+    }
+    if (null === digest) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
+    return digest;
+  }({
+    actionRef: actionRef,
+    actionRepo: actionRepo,
+    proxyEngine: proxyEngine
+  });
+  return console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), 
+  {
+    imageRef: resolveBuildcageImageRef({
+      imageDigest: digest,
+      actionRepository: actionRepo
+    }),
+    pullPolicy: "always"
+  };
+}
+
 function resolveProxyEngine(input) {
   const engine = input?.trim() || "transparent";
   if ("transparent" !== engine && "explicit" !== engine) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`, "INVALID_PROXY_ENGINE");
   return engine;
 }
 
-function buildACLRules({httpsRulesInput: httpsRulesInput, httpRulesInput: httpRulesInput, ipRulesInput: ipRulesInput}) {
-  const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [], ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+function parseRulesOrThrow(rulesInput) {
   try {
-    buildRules(httpsRulesInput), buildRules(httpRulesInput), buildRules(ipRulesInput);
+    return parseAndValidateRules(rulesInput);
   } catch (e) {
     throw new SetupError(e.message, "INVALID_RULES");
   }
+}
+
+function buildACLRules({httpsRulesInput: httpsRulesInput, httpRulesInput: httpRulesInput, ipRulesInput: ipRulesInput}) {
   return {
-    httpsRules: httpsRules,
-    httpRules: httpRules,
-    ipRules: ipRules
+    httpsRules: parseRulesOrThrow(httpsRulesInput),
+    httpRules: parseRulesOrThrow(httpRulesInput),
+    ipRules: parseRulesOrThrow(ipRulesInput)
   };
 }
 
@@ -7310,27 +7346,7 @@ function logRules(label, rules) {
 process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href) && async function() {
   const env = process.env, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", proxyEngine = resolveProxyEngine(env.INPUT_PROXY_ENGINE);
   console.log(`Proxy engine: ${proxyEngine}`);
-  const {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine}) {
-    let digest;
-    try {
-      digest = await verifyImageDigest({
-        actionRef: actionRef,
-        actionRepo: actionRepo,
-        proxyEngine: proxyEngine
-      });
-    } catch (e) {
-      throw new SetupError(e.message, e.code ?? "VERIFY_FAILED");
-    }
-    if (null === digest) throw new SetupError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
-    return console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), 
-    {
-      imageRef: resolveBuildcageImageRef({
-        imageDigest: digest,
-        actionRepository: actionRepo
-      }),
-      pullPolicy: "always"
-    };
-  }({
+  const {imageRef: imageRef, pullPolicy: pullPolicy} = await resolveVerifiedImage({
     actionRef: actionRef,
     actionRepo: actionRepo,
     proxyEngine: proxyEngine
@@ -7374,6 +7390,6 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
     }), "DOCKER_UNAVAILABLE");
   }
 }().catch(err => {
-  err instanceof SetupError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), 
+  err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), 
   process.exit(1);
 }), exports.buildACLRules = buildACLRules, exports.resolveProxyEngine = resolveProxyEngine;

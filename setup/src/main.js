@@ -2,9 +2,10 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildRules } from "../../core/shared/lib/rules.js";
+import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { SetupError } from "./lib/errors.js";
-import { verifyImageDigest } from "../../core/lib/provenance/verify-image.js";
+import { ActionError } from "../../core/lib/general/action-error.js";
+import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.js";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.js";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.js";
 
@@ -20,23 +21,11 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
 
 /**
  * Verifies image provenance and resolves the digest-pinned image ref.
- * Throws SetupError("UNVERIFIABLE_REF") if verification can't be performed
- * (branch ref / local ./setup) — printed by the top-level catch.
+ * Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
+ * performed (branch ref / local ./setup) — printed by the top-level catch.
  */
 async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }) {
-  let digest;
-  try {
-    digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine });
-  } catch (e) {
-    throw new SetupError(e.message, e.code ?? "VERIFY_FAILED");
-  }
-  if (digest === null) {
-    throw new SetupError(
-      `Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. ` +
-        `Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`,
-      "UNVERIFIABLE_REF",
-    );
-  }
+  const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine });
   console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
   return {
     imageRef: resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo }),
@@ -142,22 +131,27 @@ export function resolveProxyEngine(input) {
 }
 
 /**
- * Build ACL rules from input strings.
- * Rules are passed through as-is (wildcard format), validated by converting to regex.
+ * Rethrow a rule-parser's syntax errors as a SetupError with the shared
+ * INVALID_RULES code.
  */
-export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
-  const httpsRules = httpsRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  const httpRules = httpRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-  const ipRules = ipRulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+function parseRulesOrThrow(rulesInput) {
   try {
-    buildRules(httpsRulesInput);
-    buildRules(httpRulesInput);
-    buildRules(ipRulesInput);
+    return parseAndValidateRules(rulesInput);
   } catch (e) {
     throw new SetupError(e.message, "INVALID_RULES");
   }
+}
 
-  return { httpsRules, httpRules, ipRules };
+/**
+ * Build ACL rules from input strings. Rules are passed through as-is
+ * (wildcard format), validated eagerly.
+ */
+export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+  return {
+    httpsRules: parseRulesOrThrow(httpsRulesInput),
+    httpRules: parseRulesOrThrow(httpRulesInput),
+    ipRules: parseRulesOrThrow(ipRulesInput),
+  };
 }
 
 function logRules(label, rules) {
@@ -167,7 +161,7 @@ function logRules(label, rules) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((err) => {
-    if (err instanceof SetupError) {
+    if (err instanceof ActionError) {
       console.log(`::error::${err.message}`);
     } else {
       console.log(`::error::Unexpected error in setup: ${err.message}`);

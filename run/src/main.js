@@ -5,9 +5,10 @@ import { fileURLToPath } from "node:url";
 
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.js";
-import { verifyImageDigest } from "../../core/lib/provenance/verify-image.js";
+import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.js";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.js";
 import { createAnnotation } from "../../core/lib/actions/annotation.js";
+import { ActionError } from "../../core/lib/general/action-error.js";
 import { SandboxError } from "./lib/errors.js";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.js";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";
@@ -40,19 +41,7 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
  * tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.js).
  */
 async function resolveVerifiedImage({ actionRef, actionRepo }) {
-  let digest;
-  try {
-    digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine: "proxy" });
-  } catch (e) {
-    throw new SandboxError(e.message, e.code ?? "VERIFY_FAILED");
-  }
-  if (digest === null) {
-    throw new SandboxError(
-      `Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. ` +
-        `Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`,
-      "UNVERIFIABLE_REF",
-    );
-  }
+  const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine: "proxy" });
   console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
   return {
     imageRef: resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo }),
@@ -303,7 +292,7 @@ async function main() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((err) => {
-    if (err instanceof SandboxError) {
+    if (err instanceof ActionError) {
       console.log(`::error::${err.message}`);
     } else {
       console.log(`::error::Unexpected error in sandbox: ${err.message}`);
