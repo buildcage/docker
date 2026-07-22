@@ -7,7 +7,7 @@ import { renderCommunicationDetails } from "./lib/command-log.js";
 import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.js";
 import { createAnnotation } from "../../core/lib/annotation.js";
 import { evaluateBlockedReport } from "../../core/lib/known-blocked.js";
-import { markdownTable } from "../../core/lib/markdown-table.js";
+import { renderHostTable } from "../../core/lib/host-table.js";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -133,23 +133,23 @@ let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} m
 if (isAudit) {
   const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
   if (audited.length > 0) {
-    markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n";
+    markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n";
   }
   markdown += buildRestrictExample(audited, actionRepo, actionRef);
   if (annotatedBlocked.length > 0) {
     if (audited.length > 0) markdown += "\n";
-    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
+    markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
 } else {
   const allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections.allowed || [];
   if (allowed.length > 0) {
-    markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n";
+    markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n";
   }
   if (allowed.length > 0 && annotatedBlocked.length > 0) {
     markdown += "\n";
   }
   if (annotatedBlocked.length > 0) {
-    markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
+    markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
 }
 
