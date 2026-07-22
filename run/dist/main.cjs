@@ -7497,17 +7497,51 @@ function evaluateBlockedReport(report, {knownBlockedRules: knownBlockedRules, fa
   };
 }
 
-function markdownTable(rows, {showReason: showReason = !1, showExpected: showExpected = !1} = {}) {
-  const headers = [ "Host", "Rule" ], aligns = [ "---", "---" ];
-  showReason && (headers.push("Reason"), aligns.push("---")), headers.push("Count"), 
-  aligns.push("---:"), showExpected && (headers.push("Expected"), aligns.push(":---:"));
-  const lines = [ `| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |` ];
-  for (const r of rows) {
-    const cells = [ `${r.host}:${r.port}`, r.ruleType ];
-    showReason && cells.push(r.reason), cells.push(r.count), showExpected && cells.push(r.expected ? "✅" : ""), 
+const ALIGN_MARKERS = {
+  left: "---",
+  right: "---:",
+  center: ":---:"
+};
+
+function markdownTable(formats, rows) {
+  const headers = formats.map(f => f.title), aligns = formats.map(f => {
+    return align = f.align, ALIGN_MARKERS[align] ?? ALIGN_MARKERS.left;
+    var align;
+  }), lines = [ `| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |` ];
+  for (const row of rows) {
+    const cells = formats.map(f => row[f.key]);
     lines.push(`| ${cells.join(" | ")} |`);
   }
   return lines.join("\n");
+}
+
+function renderHostTable(rows, {showReason: showReason = !1, showExpected: showExpected = !1} = {}) {
+  const formats = [ {
+    key: "host",
+    title: "Host"
+  }, {
+    key: "ruleType",
+    title: "Rule"
+  } ];
+  showReason && formats.push({
+    key: "reason",
+    title: "Reason"
+  }), formats.push({
+    key: "count",
+    title: "Count",
+    align: "right"
+  }), showExpected && formats.push({
+    key: "expected",
+    title: "Expected",
+    align: "center"
+  });
+  return markdownTable(formats, rows.map(r => ({
+    host: `${r.host}:${r.port}`,
+    ruleType: r.ruleType,
+    reason: r.reason,
+    count: r.count,
+    expected: r.expected ? "✅" : ""
+  })));
 }
 
 function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRepo, actionRef: actionRef, runCommand: runCommand, blockedRows: blockedRows = [], showExpected: showExpected = !1} = {}) {
@@ -7517,7 +7551,7 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
   let markdown = `## ${heading} (${report.mode} mode)\n\n`;
   if (isAudit) {
     const audited = report.sections.audited || [];
-    audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n\n"), 
+    audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n\n"), 
     markdown += function(auditedRows, actionRepo, actionRef, {actionName: actionName = "setup", runCommand: runCommand} = {}) {
       if (!auditedRows || 0 === auditedRows.length) return "";
       const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = new Map;
@@ -7543,14 +7577,14 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
     }(audited, actionRepo, actionRef, {
       actionName: "run",
       runCommand: runCommand
-    }), blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blockedRows, {
+    }), blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, {
       showReason: !0,
       showExpected: showExpected
     }) + "\n\n");
   } else {
     const allowed = report.sections.allowed || [];
-    allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n"), 
-    blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blockedRows, {
+    allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n\n"), 
+    blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, {
       showReason: !0,
       showExpected: showExpected
     }) + "\n\n");

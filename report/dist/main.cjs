@@ -134,17 +134,51 @@ function convertRule(rule) {
   }(rule)}$`;
 }
 
-function markdownTable(rows, {showReason: showReason = !1, showExpected: showExpected = !1} = {}) {
-  const headers = [ "Host", "Rule" ], aligns = [ "---", "---" ];
-  showReason && (headers.push("Reason"), aligns.push("---")), headers.push("Count"), 
-  aligns.push("---:"), showExpected && (headers.push("Expected"), aligns.push(":---:"));
-  const lines = [ `| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |` ];
-  for (const r of rows) {
-    const cells = [ `${r.host}:${r.port}`, r.ruleType ];
-    showReason && cells.push(r.reason), cells.push(r.count), showExpected && cells.push(r.expected ? "✅" : ""), 
+const ALIGN_MARKERS = {
+  left: "---",
+  right: "---:",
+  center: ":---:"
+};
+
+function markdownTable(formats, rows) {
+  const headers = formats.map(f => f.title), aligns = formats.map(f => {
+    return align = f.align, ALIGN_MARKERS[align] ?? ALIGN_MARKERS.left;
+    var align;
+  }), lines = [ `| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |` ];
+  for (const row of rows) {
+    const cells = formats.map(f => row[f.key]);
     lines.push(`| ${cells.join(" | ")} |`);
   }
   return lines.join("\n");
+}
+
+function renderHostTable(rows, {showReason: showReason = !1, showExpected: showExpected = !1} = {}) {
+  const formats = [ {
+    key: "host",
+    title: "Host"
+  }, {
+    key: "ruleType",
+    title: "Rule"
+  } ];
+  showReason && formats.push({
+    key: "reason",
+    title: "Reason"
+  }), formats.push({
+    key: "count",
+    title: "Count",
+    align: "right"
+  }), showExpected && formats.push({
+    key: "expected",
+    title: "Expected",
+    align: "center"
+  });
+  return markdownTable(formats, rows.map(r => ({
+    host: `${r.host}:${r.port}`,
+    ruleType: r.ruleType,
+    reason: r.reason,
+    count: r.count,
+    expected: r.expected ? "✅" : ""
+  })));
 }
 
 const __dirname$1 = node_path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = process.argv[2] || node_path.join(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
@@ -321,7 +355,7 @@ let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} m
 
 if (isAudit) {
   const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
-  audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n"), 
+  audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n"), 
   markdown += function(auditedRows, actionRepo, actionRef, {actionName: actionName = "setup", runCommand: runCommand} = {}) {
     if (!auditedRows || 0 === auditedRows.length) return "";
     const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = new Map;
@@ -345,14 +379,14 @@ if (isAudit) {
     return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", 
     md += yaml, md += "```\n\n", md += "</details>\n", md;
   }(audited, actionRepo, actionRef), annotatedBlocked.length > 0 && (audited.length > 0 && (markdown += "\n"), 
-  markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, {
+  markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, {
     showReason: !0,
     showExpected: showExpected
   }) + "\n");
 } else {
   const allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections.allowed || [];
-  allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n"), 
-  allowed.length > 0 && annotatedBlocked.length > 0 && (markdown += "\n"), annotatedBlocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(annotatedBlocked, {
+  allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n"), 
+  allowed.length > 0 && annotatedBlocked.length > 0 && (markdown += "\n"), annotatedBlocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, {
     showReason: !0,
     showExpected: showExpected
   }) + "\n");

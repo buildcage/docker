@@ -3,7 +3,7 @@ import { appendFileSync } from "node:fs";
 import { createAnnotation } from "../../../core/lib/annotation.js";
 import { buildRestrictExample } from "../../../core/lib/build-example.js";
 import { evaluateBlockedReport } from "../../../core/lib/known-blocked.js";
-import { markdownTable } from "../../../core/lib/markdown-table.js";
+import { renderHostTable } from "../../../core/lib/host-table.js";
 
 /**
  * Fetch the structured HAProxy-log report from the (still-running) proxy
@@ -41,13 +41,13 @@ export function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, 
 
   if (isAudit) {
     const audited = report.sections.audited || [];
-    if (audited.length > 0) markdown += "### 📋 Audited Hosts\n\n" + markdownTable(audited) + "\n\n";
+    if (audited.length > 0) markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n\n";
     markdown += buildRestrictExample(audited, actionRepo, actionRef, { actionName: "run", runCommand });
-    if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
+    if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
   } else {
     const allowed = report.sections.allowed || [];
-    if (allowed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + markdownTable(allowed) + "\n\n";
-    if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + markdownTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
+    if (allowed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n\n";
+    if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
   }
 
   return markdown;
