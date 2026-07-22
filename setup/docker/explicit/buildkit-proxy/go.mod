@@ -4,7 +4,7 @@ go 1.25.9
 
 require (
 	github.com/moby/buildkit v0.31.1
-	google.golang.org/grpc v1.82.0
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 )
 
