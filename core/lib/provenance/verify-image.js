@@ -11,6 +11,7 @@
 
 import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.js";
 import { derUtf8, verifyBundle } from "./sigstore.js";
+import { ProvenanceError } from "./errors.js";
 
 const REGISTRY = "ghcr.io";
 const EXPECTED_ISSUER = "https://token.actions.githubusercontent.com";
@@ -110,5 +111,32 @@ export async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "
   const digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
   const bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken);
   await verifyBundle(bundle, verifyOptions, digest);
+  return digest;
+}
+
+/**
+ * Like verifyImageDigest, but throws ProvenanceError (see errors.js) instead
+ * of the low-level VerifyImageError, so a caller gets one already-typed
+ * error to catch rather than having to translate the result itself.
+ *
+ * `verifyImageDigestFn` is an injectable seam (defaults to the real
+ * verifyImageDigest) for unit-testing without hitting the network/sigstore.
+ */
+export async function verifyImageDigestOrThrow({
+  actionRef, actionRepo, proxyEngine, verifyImageDigestFn = verifyImageDigest,
+}) {
+  let digest;
+  try {
+    digest = await verifyImageDigestFn({ actionRef, actionRepo, proxyEngine });
+  } catch (e) {
+    throw new ProvenanceError(e.message, e.code ?? "VERIFY_FAILED");
+  }
+  if (digest === null) {
+    throw new ProvenanceError(
+      `Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. ` +
+        `Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`,
+      "UNVERIFIABLE_REF",
+    );
+  }
   return digest;
 }

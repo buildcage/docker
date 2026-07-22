@@ -38,11 +38,19 @@ function resolveBuildcageImageRef({imageDigest: imageDigest, actionRepository: a
   return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 
+class ActionError extends Error {
+  constructor(message, code) {
+    super(message), this.name = new.target.name, this.code = code;
+  }
+}
+
 class VerifyImageError extends Error {
   constructor(message, code) {
     super(message), this.name = "VerifyImageError", this.code = code;
   }
 }
+
+class ProvenanceError extends ActionError {}
 
 const BUNDLE_MEDIA_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 
@@ -7147,6 +7155,7 @@ async function verifyImageDigest({actionRef: actionRef, actionRepo: actionRepo, 
   });
   if (!verifyOptions) return null;
   const tag = function(actionRef, proxyEngine = "transparent") {
+    if (!actionRef) return "";
     let base;
     return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, 
     "explicit" === proxyEngine || "proxy" === proxyEngine ? `${base}-${proxyEngine}` : base;
@@ -7294,11 +7303,7 @@ function createAnnotation(enabled) {
   };
 }
 
-class SandboxError extends Error {
-  constructor(message, code) {
-    super(message), this.name = "SandboxError", this.code = code;
-  }
-}
+class SandboxError extends ActionError {}
 
 function checkPasswordlessSudo() {
   try {
@@ -7640,6 +7645,35 @@ function buildReportMarkdown(report, {stepLabel: stepLabel, actionRepo: actionRe
 
 const __dirname$1 = path.dirname(node_url.fileURLToPath("undefined" == typeof document ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && "SCRIPT" === _documentCurrentScript.tagName.toUpperCase() && _documentCurrentScript.src || new URL("main.cjs", document.baseURI).href)), composeFile = path.join(__dirname$1, "../compose.yaml");
 
+async function resolveVerifiedImage({actionRef: actionRef, actionRepo: actionRepo}) {
+  const digest = await async function({actionRef: actionRef, actionRepo: actionRepo, proxyEngine: proxyEngine, verifyImageDigestFn: verifyImageDigestFn = verifyImageDigest}) {
+    let digest;
+    try {
+      digest = await verifyImageDigestFn({
+        actionRef: actionRef,
+        actionRepo: actionRepo,
+        proxyEngine: proxyEngine
+      });
+    } catch (e) {
+      throw new ProvenanceError(e.message, e.code ?? "VERIFY_FAILED");
+    }
+    if (null === digest) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
+    return digest;
+  }({
+    actionRef: actionRef,
+    actionRepo: actionRepo,
+    proxyEngine: "proxy"
+  });
+  return console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), 
+  {
+    imageRef: resolveBuildcageImageRef({
+      imageDigest: digest,
+      actionRepository: actionRepo
+    }),
+    pullPolicy: "always"
+  };
+}
+
 function parseRulesOrThrow(rulesInput) {
   try {
     return parseAndValidateRules(rulesInput);
@@ -7673,27 +7707,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   const env = process.env, actionRef = env.GITHUB_ACTION_REF || "v2", actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", runInput = env.INPUT_RUN ?? "";
   if (!runInput.trim()) throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
   checkPasswordlessSudo();
-  const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY)), {imageRef: imageRef, pullPolicy: pullPolicy} = await async function({actionRef: actionRef, actionRepo: actionRepo}) {
-    let digest;
-    try {
-      digest = await verifyImageDigest({
-        actionRef: actionRef,
-        actionRepo: actionRepo,
-        proxyEngine: "proxy"
-      });
-    } catch (e) {
-      throw new SandboxError(e.message, e.code ?? "VERIFY_FAILED");
-    }
-    if (null === digest) throw new SandboxError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
-    return console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), 
-    {
-      imageRef: resolveBuildcageImageRef({
-        imageDigest: digest,
-        actionRepository: actionRepo
-      }),
-      pullPolicy: "always"
-    };
-  }({
+  const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY)), {imageRef: imageRef, pullPolicy: pullPolicy} = await resolveVerifiedImage({
     actionRef: actionRef,
     actionRepo: actionRepo
   });
@@ -7881,7 +7895,7 @@ process.argv[1] === node_url.fileURLToPath("undefined" == typeof document ? requ
   }
   0 !== exitCode && (process.exitCode = exitCode);
 }().catch(err => {
-  err instanceof SandboxError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${err.message}`), 
+  err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${err.message}`), 
   process.exit(1);
 }), exports.buildACLRules = buildACLRules, exports.buildComposeDownArgs = buildComposeDownArgs, 
 exports.buildComposeUpArgs = buildComposeUpArgs, exports.parseWritablePaths = parseWritablePaths, 

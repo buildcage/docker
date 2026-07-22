@@ -16,7 +16,9 @@ import assert from "node:assert/strict";
 import {
   imageTagFromRef,
   buildVerifyOptions,
+  verifyImageDigestOrThrow,
 } from "./verify-image.js";
+import { ProvenanceError } from "./errors.js";
 
 // ── Constants mirrored from verify-image.js (for assertion readability) ──────
 
@@ -179,5 +181,62 @@ describe("buildVerifyOptions — unverifiable refs", () => {
 
   it("returns null for an empty ref", () => {
     assert.equal(buildVerifyOptions({ actionRef: "", actionRepo: REPO }), null);
+  });
+});
+
+describe("verifyImageDigestOrThrow", () => {
+  it("returns the digest on success", async () => {
+    const digest = await verifyImageDigestOrThrow({
+      actionRef: "v2.1.0",
+      actionRepo: REPO,
+      proxyEngine: "transparent",
+      verifyImageDigestFn: async () => "sha256:abc123",
+    });
+    assert.equal(digest, "sha256:abc123");
+  });
+
+  it("throws ProvenanceError carrying the original error's code on failure", async () => {
+    await assert.rejects(
+      () =>
+        verifyImageDigestOrThrow({
+          actionRef: "v2.1.0",
+          actionRepo: REPO,
+          proxyEngine: "transparent",
+          verifyImageDigestFn: async () => {
+            const e = new Error("registry token request failed");
+            e.code = "TOKEN_ERROR";
+            throw e;
+          },
+        }),
+      (err) => err instanceof ProvenanceError && err.code === "TOKEN_ERROR" && err.message === "registry token request failed",
+    );
+  });
+
+  it("defaults to VERIFY_FAILED when the original error has no code", async () => {
+    await assert.rejects(
+      () =>
+        verifyImageDigestOrThrow({
+          actionRef: "v2.1.0",
+          actionRepo: REPO,
+          proxyEngine: "transparent",
+          verifyImageDigestFn: async () => {
+            throw new Error("boom");
+          },
+        }),
+      (err) => err instanceof ProvenanceError && err.code === "VERIFY_FAILED",
+    );
+  });
+
+  it("throws ProvenanceError with UNVERIFIABLE_REF when the digest is null", async () => {
+    await assert.rejects(
+      () =>
+        verifyImageDigestOrThrow({
+          actionRef: "main",
+          actionRepo: REPO,
+          proxyEngine: "transparent",
+          verifyImageDigestFn: async () => null,
+        }),
+      (err) => err instanceof ProvenanceError && err.code === "UNVERIFIABLE_REF",
+    );
   });
 });
