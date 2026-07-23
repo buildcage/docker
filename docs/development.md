@@ -209,7 +209,7 @@ actions end-to-end against a locally built image instead, via a build-time-gated
 where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
 module (`core/lib/provenance/local-image-override.js`, shared by both actions), loaded only via a
 dynamic `import()` gated by that build-time flag. Without the flag (i.e. every normal/committed
-build), rollup's own module-graph tree-shaking excludes that entire file from the bundle — it's
+build), rolldown's own module-graph tree-shaking excludes that entire file from the bundle — it's
 physically absent, not just unreachable. A CI check (`unit_test` job) additionally confirms a normal
 build never contains a live runtime read of `BUILDCAGE_BUILD_TEST_HOOKS` in either action's `dist`,
 guarding against a future refactor silently breaking that guarantee.
@@ -306,7 +306,7 @@ reports for the allowed side.
 ├── setup/                    # GitHub Actions setup action
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs, dist/post.cjs)
 │   ├── src/                  # Source (ESM): verify image provenance, resolve image ref, compose up
-│   ├── dist/                 # Bundled output (rollup → CommonJS)
+│   ├── dist/                 # Bundled output (rolldown → CommonJS)
 │   ├── compose.yaml          # Runtime compose file the action itself uses (verified, digest-pinned
 │   │                         # image ref) — distinct from the top-level compose.yaml below
 │   ├── docker/               # proxy_engine build contexts
@@ -321,11 +321,11 @@ reports for the allowed side.
 ├── report/                   # GitHub Actions report action
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
-│   └── dist/                 # Bundled output (rollup → CommonJS)
+│   └── dist/                 # Bundled output (rolldown → CommonJS)
 ├── run/                      # GitHub Actions run action (isolates an arbitrary run: command)
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs, dist/post.cjs)
 │   ├── src/                  # Source (ESM): start proxy, run isolated command, report, stop
-│   ├── dist/                 # Bundled output (rollup → CommonJS)
+│   ├── dist/                 # Bundled output (rolldown → CommonJS)
 │   ├── scripts/run-isolated.sh  # netns/veth/rootfs-bind setup around `runc run`, invoked via
 │   │                         # `sudo -n` (see Run Action Internals)
 │   ├── compose.yaml          # Runtime compose file the action itself uses (verified, digest-pinned

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Unit tests for core/lib/verify-image.js
  *

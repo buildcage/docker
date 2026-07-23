@@ -1,3 +1,4 @@
+// @ts-nocheck
 const ruleTypeToParam = {
   HTTPS: "allowed_https_rules",
   HTTP: "allowed_http_rules",

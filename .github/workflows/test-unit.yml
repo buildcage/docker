@@ -30,7 +30,8 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-              - 'rollup.config.js'
+              - 'rolldown.config.js'
+              - 'tsconfig.json'
               - '.github/actions/setup-pnpm/**'
               - '.github/workflows/test-unit.yml'
               - 'core/**'
@@ -54,6 +55,9 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm
 
+      - name: Typecheck
+        run: pnpm typecheck
+
       - name: Build
         run: pnpm build
 
@@ -64,7 +68,7 @@ jobs:
         run: |
           for f in setup/dist/main.cjs run/dist/main.cjs; do
             if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
-              echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — @rollup/plugin-replace failed to substitute it (see rollup.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published action step. Do not merge until this passes."
+              echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — rolldown's replacePlugin failed to substitute it (see rolldown.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published action step. Do not merge until this passes."
               exit 1
             fi
             echo "confirmed: $f has no live BUILDCAGE_BUILD_TEST_HOOKS read — the local-image bypass is unreachable in this build."

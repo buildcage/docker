@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Property-based tests for setup/main.js and its helpers.
  *

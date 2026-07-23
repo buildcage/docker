@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { createAnnotation } from "../../../core/lib/actions/annotation.js";

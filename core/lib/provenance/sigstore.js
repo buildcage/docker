@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { bundleFromJSON } from "@sigstore/bundle";
 import { getTrustedRoot } from "@sigstore/tuf";
 import { toSignedEntity, toTrustMaterial, Verifier } from "@sigstore/verify";

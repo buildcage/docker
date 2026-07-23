@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Shared logic for `known_blocked_rules`: domains expected to be blocked,
  * so a matching blocked connection doesn't fail the step even when

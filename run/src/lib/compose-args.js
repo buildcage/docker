@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Build the `docker compose ... up`/`down` argv. Kept in its own module
  * (rather than inside run/src/main.js) so post.js can reuse it without
