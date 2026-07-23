@@ -122,7 +122,7 @@ test_transparent_audit_mode: ## Run transparent-engine audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.transparent-audit setup/test/ \
 	  --load -t buildcage-test
-	@node report/src/main.js ./compose.yaml
+	@node report/src/main.ts ./compose.yaml
 	@./setup/test/assert-transparent-audit.sh
 	@$(MAKE) clean
 
@@ -136,7 +136,7 @@ test_transparent_restrict_mode: ## Run transparent-engine restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.transparent-restrict setup/test/ \
 	  --load -t buildcage-test
-	@node report/src/main.js ./compose.yaml || true
+	@node report/src/main.ts ./compose.yaml || true
 	@./setup/test/assert-transparent-restrict.sh
 	@$(MAKE) clean
 
@@ -150,7 +150,7 @@ test_explicit_audit_mode: ## Run explicit-engine audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.explicit-audit setup/test/ \
 	  --load -t buildcage-test
-	@PROXY_ENGINE=explicit node report/src/main.js ./compose.yaml || true
+	@PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml || true
 	@./setup/test/assert-explicit-audit.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
@@ -164,7 +164,7 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.explicit-restrict setup/test/ \
 	  --load -t buildcage-test
-	@PROXY_ENGINE=explicit node report/src/main.js ./compose.yaml || true
+	@PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml || true
 	@./setup/test/assert-explicit-restrict.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
@@ -193,19 +193,19 @@ test_unit: test_core test_setup test_report test_sandbox_unit test_qjs ## Run un
 # already covered by test_qjs below instead.
 .PHONY: test_core
 test_core: ## Run core/lib unit tests
-	@node --test 'core/lib/**/*.test.js'
+	@node --test 'core/lib/**/*.test.ts'
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests
-	@node --test 'setup/src/**/*.test.js'
+	@node --test 'setup/src/**/*.test.ts'
 
 .PHONY: test_report
 test_report: ## Run report unit tests
-	@node --test 'report/src/**/*.test.js'
+	@node --test 'report/src/**/*.test.ts'
 
 .PHONY: test_sandbox_unit
 test_sandbox_unit: ## Run the run action's unit tests
-	@node --test 'run/src/**/*.test.js'
+	@node --test 'run/src/**/*.test.ts'
 
 # *.test.js is excluded from the built images (see .dockerignore), so bind-mount it back in for qjs to exec.
 # qjs itself and the scripts/shared sources are identical across images, so one representative build
@@ -242,7 +242,7 @@ run_audit_example: ## Run audit mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.js ./compose.yaml
+	@node report/src/main.ts ./compose.yaml
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
 
@@ -263,6 +263,6 @@ run_restrict_example: ## Run restrict mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.js ./compose.yaml || true
+	@node report/src/main.ts ./compose.yaml || true
 	@$(MAKE) clean
 	rm -fr /tmp/build-context

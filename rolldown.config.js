@@ -17,23 +17,23 @@ const mainPlugins = [
 
 const configs = [
   {
-    input: "setup/src/main.js",
+    input: "setup/src/main.ts",
     file: "setup/dist/main.cjs",
     plugins: mainPlugins,
     // sigstore uses dynamic imports; inline them so dist is a single file.
     codeSplitting: false,
   },
-  { input: "setup/src/post.js", file: "setup/dist/post.cjs" },
-  { input: "report/src/main.js", file: "report/dist/main.cjs" },
+  { input: "setup/src/post.ts", file: "setup/dist/post.cjs" },
+  { input: "report/src/main.ts", file: "report/dist/main.cjs" },
   {
-    input: "run/src/main.js",
+    input: "run/src/main.ts",
     file: "run/dist/main.cjs",
     // Pulls in setup/src/lib/verify-image.js, which uses sigstore the same
     // way setup/src/main.js does — same plugin set for the same reason.
     plugins: mainPlugins,
     codeSplitting: false,
   },
-  { input: "run/src/post.js", file: "run/dist/post.cjs" },
+  { input: "run/src/post.ts", file: "run/dist/post.cjs" },
 ];
 
 export default defineConfig(

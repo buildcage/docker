@@ -1,5 +1,5 @@
 let node_child_process = require("node:child_process"), node_path = require("node:path"), node_url = require("node:url");
-//#region setup/src/post.js
+//#region setup/src/post.ts
 (0, node_child_process.execFileSync)("docker", [
 	"compose",
 	"-f",

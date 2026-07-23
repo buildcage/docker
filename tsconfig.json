@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": true,
+    "allowJs": false,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "strict": true,
     "module": "nodenext",
     "moduleResolution": "nodenext",
@@ -12,6 +12,11 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["core/lib/**/*.js", "setup/src/**/*.js", "run/src/**/*.js", "report/src/**/*.js"],
+  "include": [
+    "core/lib/**/*.ts",
+    "setup/src/**/*.ts",
+    "run/src/**/*.ts",
+    "report/src/**/*.ts"
+  ],
   "exclude": ["core/shared", "core/scripts", "setup/docker", "**/dist/**"]
 }

@@ -1,5 +1,5 @@
 let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_path = require("node:path"), node_url = require("node:url");
-//#region run/src/lib/compose-args.js
+//#region run/src/lib/compose-args.ts
 /** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
 function buildComposeDownArgs({ composeFile, projectName }) {
 	return [
@@ -10,6 +10,15 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 		projectName,
 		"down"
 	];
+}
+//#endregion
+//#region core/lib/general/error-message.ts
+/**
+* Safely extract a message from a caught value of unknown shape — a plain
+* `Error` most of the time, but `catch` doesn't guarantee that.
+*/
+function errorMessage(e) {
+	return e instanceof Error ? e.message : String(e);
 }
 (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
 /**
@@ -70,7 +79,7 @@ function unmountAllUnder(dir) {
 			"pipe"
 		] });
 	} catch (e) {
-		console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${e.message}`);
+		console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${errorMessage(e)}`);
 	}
 }
 /**
@@ -115,13 +124,13 @@ function scratchDirFor(containerName) {
 	return (0, node_path.join)("/var/tmp/buildcage", containerName.replace(/^buildcage-proxy-/, "sandbox-"));
 }
 //#endregion
-//#region run/src/post.js
+//#region run/src/post.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), containerName = process.env.STATE_container_name, projectName = process.env.STATE_project_name;
 if (containerName?.startsWith("buildcage-proxy-")) try {
 	let scratchDir = scratchDirFor(containerName);
 	(0, node_fs.existsSync)(scratchDir) && cleanupScratchDir(scratchDir);
 } catch (e) {
-	console.log(`::warning::run post-cleanup: failed to remove sandbox scratch dir: ${e.message}`);
+	console.log(`::warning::run post-cleanup: failed to remove sandbox scratch dir: ${errorMessage(e)}`);
 }
 containerName && projectName ? (0, node_child_process.execFileSync)("docker", buildComposeDownArgs({
 	composeFile: (0, node_path.join)(__dirname$1, "../compose.yaml"),

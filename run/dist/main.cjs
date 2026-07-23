@@ -16,91 +16,12 @@ node_path = __toESM(node_path, 1);
 let node_url = require("node:url"), node_os = require("node:os");
 node_os = __toESM(node_os, 1);
 let node_crypto = require("node:crypto");
-//#region core/shared/lib/rules.js
-/**
-* Rule conversion library for buildcage container.
-* Converts wildcard patterns to regex strings for HAProxy ACLs.
-*/
-/**
-* Split a whitespace-separated rules string into individual rule tokens.
-*
-* @param {string|undefined} rulesInput
-* @returns {string[]}
-*/
-function splitRuleTokens(rulesInput) {
-	return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-}
-/**
-* Split+validate a space-separated rules string, returning the raw
-* (unconverted) rule tokens — for callers that need the original
-* wildcard/~regex syntax preserved, such as known_blocked_rules.
-*
-* @param {string|undefined} rulesInput
-* @returns {string[]}
-* @throws {Error} if any rule has invalid wildcard/regex syntax
-*/
-function parseAndValidateRules(rulesInput) {
-	let rules = splitRuleTokens(rulesInput);
-	return rules.forEach(convertRule), rules;
-}
-/**
-* Convert a single rule (wildcard or `~`-prefixed regex) to a regex string.
-*/
-function convertRule(rule) {
-	if (rule.startsWith("~")) {
-		let regex = rule.slice(1);
-		try {
-			new RegExp(regex);
-		} catch (e) {
-			throw Error(`Invalid regex in rule "${rule}": ${e.message}`);
-		}
-		return regex;
-	}
-	return `^${wildcardToRegex(rule)}$`;
-}
-/**
-* Convert a domain wildcard to a regex string (without anchors or port).
-*
-* Supported wildcards:
-*   `**` — matches one or more characters including dots
-*   `*`  — matches one or more characters excluding dots
-*   `?`  — matches a single character excluding dots
-*
-* A dot-separated part containing `*` must be exactly `*` or `**`.
-*/
-function domainToRegex(domain) {
-	return domain.split(".").map((part) => {
-		if (part === "**") return ".+";
-		if (part === "*") return "[^.]+";
-		if (part.includes("*")) throw Error(`Invalid wildcard in "${domain}": part "${part}" mixes "*" with other characters`);
-		return part.replace(/[.+^$()[\]{}|\\]/g, "\\$&").replace(/\?/g, "[^.]");
-	}).join("\\.");
-}
-/**
-* Convert a wildcard pattern (`<domain>:<port|*>`) to a regex string (without anchors).
-*/
-function wildcardToRegex(pattern) {
-	if (!/^[^:]+:(?:\d+|\*)$/.test(pattern)) throw Error(`Invalid pattern "${pattern}"`);
-	let [domain, port] = pattern.split(":"), portRegex = port === "*" ? "\\d+" : port;
-	return `${domainToRegex(domain)}:${portRegex}`;
-}
-//#endregion
-//#region core/lib/provenance/image-ref.js
-/**
-* Resolve the buildcage Docker image reference (image@digest). The
-* repository is always derived from the action repository — external image
-* overrides are intentionally not supported to preserve Sigstore verification
-* integrity.
-*
-* Kept in its own module (rather than inside setup/src/main.js) so other
-* entry points (e.g. run/src/main.js) can reuse it without also
-* bundling setup/src/main.js's own self-invocation guard.
-*/
+//#region core/lib/provenance/image-ref.ts
 function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 //#endregion
-//#region core/lib/general/action-error.js
+//#region core/lib/general/action-error.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -109,16 +30,27 @@ function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 * of its own to get its own name.
 */
 var ActionError = class extends Error {
+	code;
 	constructor(message, code) {
 		super(message), this.name = new.target.name, this.code = code;
 	}
 }, VerifyImageError = class extends Error {
+	code;
 	constructor(message, code) {
 		super(message), this.name = "VerifyImageError", this.code = code;
 	}
 }, ProvenanceError = class extends ActionError {};
 //#endregion
-//#region core/lib/provenance/oci-registry.js
+//#region core/lib/general/error-message.ts
+/**
+* Safely extract a message from a caught value of unknown shape — a plain
+* `Error` most of the time, but `catch` doesn't guarantee that.
+*/
+function errorMessage(e) {
+	return e instanceof Error ? e.message : String(e);
+}
+//#endregion
+//#region core/lib/provenance/oci-registry.ts
 /**
 * oci-registry.js — OCI registry I/O helpers
 *
@@ -166,7 +98,7 @@ async function fetchManifestDigest(registry, repo, tag, token, _fetch = fetch) {
 		if (!digest) throw new VerifyImageError(`No digest in manifest response for ${registry}/${repo}:${tag}`, "TRANSIENT");
 		return digest;
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 /**
@@ -175,11 +107,6 @@ async function fetchManifestDigest(registry, repo, tag, token, _fetch = fetch) {
 * If Docker credentials for the registry are available (basicAuth from
 * readGhcrBasicAuth), uses Basic auth directly — no anonymous attempt.
 * Otherwise falls back to anonymous access (public packages).
-*
-* @param {string} registry  - Registry hostname (e.g. "ghcr.io")
-* @param {string} repo      - Repository path (e.g. "owner/repo")
-* @param {string|null} basicAuth - base64 auth from Docker config, or null
-* @param {function} [_fetch]
 */
 async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fetch) {
 	let url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
@@ -189,7 +116,7 @@ async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fetch) {
 		if (resp.ok) return (await resp.json()).token;
 		throw new VerifyImageError(`Registry authentication failed: HTTP ${resp.status}. The credentials in Docker config may be expired — run \`docker login ${registry}\` again.`, "TOKEN_ERROR");
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching registry token: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching registry token: ${errorMessage(err)}`, "TRANSIENT");
 	}
 	try {
 		let resp = await _fetch(url);
@@ -197,7 +124,7 @@ async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fetch) {
 		if (resp.ok) return (await resp.json()).token;
 		throw new VerifyImageError(`Failed to get registry token: HTTP ${resp.status}. The package may be private. Run \`docker login ${registry}\` (or use docker/login-action with 'packages: read') before this action.`, "TOKEN_ERROR");
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching registry token: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching registry token: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 /**
@@ -217,7 +144,7 @@ async function fetchBundle(registry, repo, digest, token, _fetch = fetch) {
 			if (manifest) return fetchBundleFromManifestDigest(api, manifest.digest, headers, _fetch);
 		}
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching referrers: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching referrers: ${errorMessage(err)}`, "TRANSIENT");
 	}
 	let fallbackTag = digest.replace(":", "-");
 	try {
@@ -250,7 +177,7 @@ async function fetchBundle(registry, repo, digest, token, _fetch = fetch) {
 		if (!layer) throw new VerifyImageError(`No Sigstore bundle found for digest ${digest}. The image may not have been signed with --new-bundle-format.`, "NOT_FOUND");
 		return fetchBundleBlob(api, layer.digest, headers, _fetch);
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching fallback tag: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching fallback tag: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 async function fetchBundleFromManifestDigest(api, manifestDigest, headers, _fetch = fetch) {
@@ -266,7 +193,7 @@ async function fetchBundleFromManifestDigest(api, manifestDigest, headers, _fetc
 		if (!layer) throw new VerifyImageError("No Sigstore bundle layer found in bundle manifest", "NOT_FOUND");
 		return fetchBundleBlob(api, layer.digest, headers, _fetch);
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching bundle manifest: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching bundle manifest: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 async function fetchBundleBlob(api, blobDigest, headers, _fetch = fetch) {
@@ -277,7 +204,7 @@ async function fetchBundleBlob(api, blobDigest, headers, _fetch = fetch) {
 		if (!resp.ok) throw new VerifyImageError(`Failed to fetch bundle blob: HTTP ${resp.status}`, "NOT_FOUND");
 		return resp.json();
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching bundle blob: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching bundle blob: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 //#endregion
@@ -6900,9 +6827,6 @@ const derUtf8 = (s) => String.fromCharCode(12, s.length) + s;
 * image; this assertion prevents accepting such a re-attached bundle.
 *
 * Exported for unit testing; callers should use verifyBundle() instead.
-*
-* @param {object} bundleJson   — raw bundle JSON object
-* @param {string} expectedDigest — "sha256:<hex>" from getManifestDigest()
 */
 function assertSignedDigest(bundleJson, expectedDigest) {
 	let dsse = bundleJson?.dsseEnvelope, payload = dsse?.payload;
@@ -6934,10 +6858,8 @@ function assertSignedDigest(bundleJson, expectedDigest) {
 *   tlogThreshold          – minimum transparency log entries (default 1)
 *   ctLogThreshold         – minimum CT log entries (default 1)
 *
-* @param {object} bundleJson     — raw bundle JSON object
-* @param {object} options        — policy options
-* @param {string} expectedDigest — "sha256:<hex>" fetched from the registry;
-*                                  must match the digest inside the signed payload
+* expectedDigest — "sha256:<hex>" fetched from the registry;
+* must match the digest inside the signed payload.
 */
 async function verifyBundle(bundleJson, options, expectedDigest) {
 	let verifier = new import_dist$2.Verifier((0, import_dist$2.toTrustMaterial)(await (0, import_dist$1.getTrustedRoot)()), {
@@ -6952,12 +6874,12 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 	try {
 		verifier.verify(signedEntity, policy);
 	} catch (err) {
-		throw new VerifyImageError(`Image provenance verification failed: ${err.message}`, "VERIFY_FAILED");
+		throw new VerifyImageError(`Image provenance verification failed: ${errorMessage(err)}`, "VERIFY_FAILED");
 	}
 	assertSignedDigest(bundleJson, expectedDigest);
 }
 //#endregion
-//#region core/lib/provenance/verify-image.js
+//#region core/lib/provenance/verify-image.ts
 /**
 * verify-image.js — Image provenance verification helpers
 *
@@ -7018,7 +6940,6 @@ function buildVerifyOptions({ actionRef, actionRepo }) {
 * On failure, throws VerifyImageError — the caller is responsible for printing
 * the error message.
 *
-* @param {{ actionRef: string, actionRepo: string, proxyEngine?: string }} opts
 */
 async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transparent" }) {
 	let repoPath = actionRepo.toLowerCase(), verifyOptions = buildVerifyOptions({
@@ -7046,13 +6967,13 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, ve
 			proxyEngine
 		});
 	} catch (e) {
-		throw new ProvenanceError(e.message, e.code ?? "VERIFY_FAILED");
+		throw e instanceof VerifyImageError ? new ProvenanceError(e.message, e.code) : new ProvenanceError(errorMessage(e), "VERIFY_FAILED");
 	}
 	if (digest === null) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
 	return digest;
 }
 //#endregion
-//#region core/lib/actions/docker-error.js
+//#region core/lib/actions/docker-error.ts
 const SLIM_RUNNER_DETECTED_PREFIX = " Detected a container-based GitHub-hosted runner image (e.g. \"ubuntu-slim\")", SLIM_RUNNER_NOTE$1 = `${SLIM_RUNNER_DETECTED_PREFIX} — these ship a Docker client with no daemon and are not supported for this action.`;
 /**
 * Turns a caught `docker` invocation error into an actionable message,
@@ -7063,10 +6984,10 @@ const SLIM_RUNNER_DETECTED_PREFIX = " Detected a container-based GitHub-hosted r
 * since otherwise nothing points the reader back to it.
 */
 function describeDockerFailure(e, { operation = "docker", env = process.env, exists = node_fs.existsSync } = {}) {
-	let slimNote = isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE$1 : "", whatHappened;
-	if (e && e.code === "ENOENT") whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
+	let err = e && typeof e == "object" ? e : {}, slimNote = isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE$1 : "", whatHappened;
+	if (err.code === "ENOENT") whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
 	else {
-		let captured = e && typeof e.stderr == "string" ? e.stderr.trim() : "";
+		let captured = typeof err.stderr == "string" ? err.stderr.trim() : "";
 		whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
 	}
 	return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action — use "ubuntu-latest" (or another runner with a full Docker install) instead. See docs/reference.md and docs/security.md for details.`;
@@ -7089,14 +7010,11 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region core/lib/actions/annotation.js
+//#region core/lib/actions/annotation.ts
 /**
 * Build a GitHub Actions annotation emitter. When `enabled` is false, every
 * method is a no-op — used to suppress annotations when this script isn't
 * running as the real action.
-*
-* @param {boolean} enabled
-* @returns {{ notice(message: string): void, warning(message: string): void, error(message: string): void }}
 */
 function createAnnotation(enabled) {
 	return enabled ? {
@@ -7116,32 +7034,111 @@ function createAnnotation(enabled) {
 	};
 }
 //#endregion
-//#region run/src/lib/errors.js
+//#region core/shared/lib/rules.js
 /**
-* SandboxError — intentional error in the run action's own logic. Image
-* provenance failures throw ProvenanceError instead (see
-* core/lib/provenance/errors.js).
-*
-* Codes:
-*   INVALID_RULES              – ACL rule syntax error
-*   MISSING_RUN                – required `run` input was empty
-*   PROXY_NOT_RUNNING          – sandbox proxy container isn't running after `docker compose up`
-*   RUNC_EXTRACT_FAILED        – failed to `docker cp` runc/gen-seccomp-profile out of the proxy image
-*   OCI_CONFIG_BUILD_FAILED    – failed to run gen-seccomp-profile/runc spec or assemble config.json
-*   DOCKER_UNAVAILABLE         – docker CLI missing from PATH or a docker command failed
-*   PASSWORDLESS_SUDO_REQUIRED – sudo -n check failed; passwordless sudo isn't configured
+* Rule conversion library for buildcage container.
+* Converts wildcard patterns to regex strings for HAProxy ACLs.
 */
+/**
+* Split a whitespace-separated rules string into individual rule tokens.
+*
+* @param {string|undefined} rulesInput
+* @returns {string[]}
+*/
+function splitRuleTokens(rulesInput) {
+	return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+}
+/**
+* Split+validate a space-separated rules string, returning the raw
+* (unconverted) rule tokens — for callers that need the original
+* wildcard/~regex syntax preserved, such as known_blocked_rules.
+*
+* @param {string|undefined} rulesInput
+* @returns {string[]}
+* @throws {Error} if any rule has invalid wildcard/regex syntax
+*/
+function parseAndValidateRules(rulesInput) {
+	let rules = splitRuleTokens(rulesInput);
+	return rules.forEach(convertRule), rules;
+}
+/**
+* Convert a single rule (wildcard or `~`-prefixed regex) to a regex string.
+*/
+function convertRule(rule) {
+	if (rule.startsWith("~")) {
+		let regex = rule.slice(1);
+		try {
+			new RegExp(regex);
+		} catch (e) {
+			throw Error(`Invalid regex in rule "${rule}": ${e.message}`);
+		}
+		return regex;
+	}
+	return `^${wildcardToRegex(rule)}$`;
+}
+/**
+* Convert a domain wildcard to a regex string (without anchors or port).
+*
+* Supported wildcards:
+*   `**` — matches one or more characters including dots
+*   `*`  — matches one or more characters excluding dots
+*   `?`  — matches a single character excluding dots
+*
+* A dot-separated part containing `*` must be exactly `*` or `**`.
+*/
+function domainToRegex(domain) {
+	return domain.split(".").map((part) => {
+		if (part === "**") return ".+";
+		if (part === "*") return "[^.]+";
+		if (part.includes("*")) throw Error(`Invalid wildcard in "${domain}": part "${part}" mixes "*" with other characters`);
+		return part.replace(/[.+^$()[\]{}|\\]/g, "\\$&").replace(/\?/g, "[^.]");
+	}).join("\\.");
+}
+/**
+* Convert a wildcard pattern (`<domain>:<port|*>`) to a regex string (without anchors).
+*/
+function wildcardToRegex(pattern) {
+	if (!/^[^:]+:(?:\d+|\*)$/.test(pattern)) throw Error(`Invalid pattern "${pattern}"`);
+	let [domain, port] = pattern.split(":"), portRegex = port === "*" ? "\\d+" : port;
+	return `${domainToRegex(domain)}:${portRegex}`;
+}
+//#endregion
+//#region core/lib/acl/rules.ts
+/**
+* Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
+* allowed_ip_rules/known_blocked_rules) fails to parse — shared by the
+* setup and run actions, which both accept the same rule syntax.
+*/
+var InvalidRulesError = class extends ActionError {};
+/**
+* Rethrow a rule-parser's syntax errors as an InvalidRulesError.
+*/
+function parseRulesOrThrow(rulesInput) {
+	try {
+		return parseAndValidateRules(rulesInput);
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+	}
+}
+/**
+* Build ACL rules from input strings. Rules are passed through as-is
+* (wildcard format), validated eagerly.
+*/
+function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+	return {
+		httpsRules: parseRulesOrThrow(httpsRulesInput),
+		httpRules: parseRulesOrThrow(httpRulesInput),
+		ipRules: parseRulesOrThrow(ipRulesInput)
+	};
+}
+//#endregion
+//#region run/src/lib/errors.ts
 var SandboxError = class extends ActionError {};
 //#endregion
-//#region run/src/lib/sudo-preflight.js
+//#region run/src/lib/sudo-preflight.ts
 const SLIM_RUNNER_NOTE = `${SLIM_RUNNER_DETECTED_PREFIX} — these typically don't have passwordless sudo configured for this kind of privileged setup.`;
-/**
-* Kept pure (takes the error, not execFileSync's raw output) so it's
-* unit-testable the same way as core/lib/actions/docker-error.js's
-* describeDockerFailure.
-*/
 function describeSudoFailure(e, { env = process.env, exists = node_fs.existsSync } = {}) {
-	let captured = e && typeof e.stderr == "string" ? e.stderr.trim() : "";
+	let err = e && typeof e == "object" ? e : {}, captured = typeof err.stderr == "string" ? err.stderr.trim() : "";
 	return `'sudo' is not available without a password on this runner.${isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE : ""} The run action requires a Linux runner with passwordless sudo for the isolation setup itself (network namespace, veth, iptables) — this is the default on GitHub-hosted "ubuntu-*" runners, but NOT on lightweight images such as "ubuntu-slim" or many self-hosted/minimal runners. See docs/reference.md and docs/security.md for details.${captured ? ` (${captured})` : ""}`;
 }
 /**
@@ -7166,7 +7163,7 @@ function checkPasswordlessSudo() {
 	}
 }
 //#endregion
-//#region run/src/lib/container.js
+//#region run/src/lib/container.ts
 /**
 * Each `run` step gets its own throwaway proxy container (start -> run ->
 * report -> stop) rather than reusing one across steps, so a random name
@@ -7187,10 +7184,6 @@ function generateContainerName() {
 function deriveProjectName(containerName) {
 	return containerName;
 }
-/**
-* Used to pull runc and gen-seccomp-profile out of the proxy image before
-* the isolated command runs (see lib/isolated-exec.js).
-*/
 function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	return [
 		"cp",
@@ -7204,17 +7197,9 @@ function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 * phrasings are matched for resilience across docker CLI versions.
 */
 function isContainerNotFoundError(e) {
-	let text = `${e?.stderr ?? ""} ${e?.message ?? ""}`.toLowerCase();
+	let err = e && typeof e == "object" ? e : {}, text = `${err.stderr ?? ""} ${err.message ?? ""}`.toLowerCase();
 	return text.includes("no such object") || text.includes("no such container");
 }
-/**
-* Null means "container doesn't exist yet" (see isContainerNotFoundError);
-* any other docker failure throws a SandboxError instead, so it isn't
-* confused with that case at the call site.
-*
-* `exec` is an injectable seam for testing without a real Docker daemon —
-* not a caller-facing precondition.
-*/
 function getContainerPid(containerName, { exec = node_child_process.execFileSync } = {}) {
 	let out;
 	try {
@@ -7243,22 +7228,7 @@ function getContainerPid(containerName, { exec = node_child_process.execFileSync
 	return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 //#endregion
-//#region run/src/lib/compose-args.js
-/**
-* Build the `docker compose ... up`/`down` argv. Kept in its own module
-* (rather than inside run/src/main.js) so post.js can reuse it without
-* also bundling main.js's self-invocation guard — importing main.js
-* directly would pull in its
-* `if (process.argv[1] === fileURLToPath(import.meta.url))` check too,
-* which fires a second time once rollup merges both files'
-* `import.meta.url` into a single bundle (see core/lib/provenance/image-ref.js
-* for the same issue hit previously).
-*
-* `-p projectName` is required on both so that fully concurrent `run`
-* steps in the same job (see GitHub Actions' `background`/`wait`/`parallel`
-* step keywords) never share Compose's implicit, directory-derived project
-* name — see lib/container.js's deriveProjectName for why that matters.
-*/
+//#region run/src/lib/compose-args.ts
 function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
 	return [
 		"compose",
@@ -7294,7 +7264,7 @@ var extra_masked_proc_paths_default = [
 	"/proc/sysrq-trigger"
 ];
 //#endregion
-//#region run/src/lib/isolated-exec.js
+//#region run/src/lib/isolated-exec.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), SANDBOX_SCRATCH_BASE = "/var/tmp/buildcage";
 /**
 * Write the user-supplied `run:` input to an executable script file.
@@ -7317,19 +7287,6 @@ function writeRunScript(runInput, dir) {
 function generateBaseOciSpec(runcPath, bundleDir) {
 	return (0, node_child_process.execFileSync)(runcPath, ["spec"], { cwd: bundleDir }), JSON.parse((0, node_fs.readFileSync)((0, node_path.join)(bundleDir, "config.json"), "utf8"));
 }
-/**
-* Extract runc and gen-seccomp-profile from the proxy image into this run's
-* own `destDir` (its per-step scratch dir), then resolve the base OCI spec
-* and the seccomp profile from them. Run once per `run:` step; each
-* invocation is independent, and everything written here is torn down with
-* the scratch dir (see withScratchDir / cleanupScratchDir).
-*
-* Both binaries ship inside the proxy image and are pulled onto the host via
-* `docker cp`, then run natively there (not `docker exec`) since the seccomp
-* profile's content depends on the real host kernel/arch -- see
-* gen-seccomp-profile/main.go. gen-seccomp-profile is only needed transiently
-* to resolve the profile, so it's removed once read; runc stays for `runc run`.
-*/
 function extractRuncBootstrap({ containerName, destDir }) {
 	let runcPath = (0, node_path.join)(destDir, "runc"), genSeccompProfilePath = (0, node_path.join)(destDir, "gen-seccomp-profile");
 	(0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
@@ -7397,17 +7354,6 @@ function listHostMounts() {
 function computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinations) {
 	return hostMounts.filter(({ mountPoint }) => mountPoint !== "/" && !freshMountDestinations.has(mountPoint) && !protectedPaths.has(mountPoint)).map(({ mountPoint }) => mountPoint);
 }
-/**
-* Pure: the set of destination paths `baseSpec.mounts` already declares a
-* mount for. Derived directly from the actual `runc spec` output already
-* being used to build config.json (see generateBaseOciSpec), rather than a
-* hardcoded list of filesystem types -- this stays correct automatically
-* if a future runc version changes its own default mounts, and sidesteps
-* fstype ambiguity (e.g. runc's default spec declares a `cgroup`-type
-* mount at /sys/fs/cgroup that transparently resolves to the host's real
-* cgroup v1 or v2 hierarchy, so matching by destination path covers both
-* without needing to special-case a literal "cgroup2" fstype name).
-*/
 function freshMountDestinationsFrom(baseSpec) {
 	return new Set(baseSpec.mounts.map((m) => m.destination));
 }
@@ -7447,39 +7393,6 @@ function assertScratchBaseNotWritable(writableDirs) {
 	let overlapping = writableDirs.find((p) => pathsOverlap(p, SANDBOX_SCRATCH_BASE));
 	if (overlapping) throw Error(`writable path ${JSON.stringify(overlapping)} overlaps the sandbox's own scratch directory (${SANDBOX_SCRATCH_BASE}); this would re-expose the sandboxed host filesystem read-write inside the sandbox itself. Choose a writable path outside ${SANDBOX_SCRATCH_BASE}.`);
 }
-/**
-* Build the final OCI Runtime Spec (config.json) for the isolated command,
-* starting from runc's own `baseSpec` (see generateBaseOciSpec) and
-* overriding only what this sandbox needs to control:
-*
-* - root: a bind-mounted copy of the host's own `/` (rootfsBindDir, set up
-*   by run-isolated.sh before invoking runc — pivot_root can't target `/`
-*   itself), made read-only via `root.readonly` plus an explicit
-*   `linux.readonlyPaths` entry per real host mount point `--rbind`
-*   duplicated in (see computeReadonlyHostMounts — root.readonly alone
-*   only covers the top-level mount), except workdir/home/tmp/runnerTemp/
-*   writablePaths. rootfsBindDir itself lives under SANDBOX_SCRATCH_BASE,
-*   which is never one of those writable exceptions, so the recursive
-*   writable rbinds don't re-expose the host-`/` rootfs as a second, writable
-*   copy inside the sandbox (see assertScratchBaseNotWritable, which fails
-*   closed if a `writable:` input would break that invariant).
-* - linux.namespaces: same six namespace types runc's own default spec
-*   already requests (no user namespace — see docs/security.md's
-*   rationale for preserving the real UID/GID), just adding `path` to the
-*   network entry so it joins the netns run-isolated.sh already wired a
-*   veth into, instead of creating a fresh, unconnected one.
-* - process.capabilities: fully cleared (all five sets empty) plus
-*   noNewPrivileges — runc applies this natively, no setpriv needed.
-* - process.env: the step's real environment, replacing runc spec's
-*   invented PATH/TERM defaults.
-* - linux.seccomp: the Docker-default-profile-derived filter (see
-*   gen-seccomp-profile), resolved against this same empty capability
-*   set.
-*
-* `writablePaths` containing "/" is a sentinel meaning "disable the
-* read-only restriction entirely" (see docs/reference.md's `writable`
-* input).
-*/
 function buildOciConfig(baseSpec, { uid, gid, workdir, home, runnerTemp, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] }) {
 	let disableReadonly = writablePaths.includes("/"), mounts = [...baseSpec.mounts, {
 		destination: "/etc/resolv.conf",
@@ -7492,7 +7405,7 @@ function buildOciConfig(baseSpec, { uid, gid, workdir, home, runnerTemp, writabl
 		"/tmp",
 		runnerTemp,
 		...writablePaths
-	].filter(Boolean))], protectedPaths = new Set(writableDirs);
+	].filter((p) => !!p))], protectedPaths = new Set(writableDirs);
 	if (!disableReadonly) {
 		assertScratchBaseNotWritable(writableDirs);
 		for (let p of writableDirs) mounts.push({
@@ -7561,18 +7474,6 @@ function writeResolvConf(dns, dir) {
 	let resolvConfPath = (0, node_path.join)(dir, "resolv.conf");
 	return (0, node_fs.writeFileSync)(resolvConfPath, `nameserver ${dns}\n`, { mode: 420 }), resolvConfPath;
 }
-/**
-* Run the user's command inside the isolated sandbox via run-isolated.sh
-* (invoked with `sudo -n`, since setting up namespaces/veth/iptables/the
-* rootfs bind-mount requires root). Returns the exit code of the isolated
-* command — never throws for a non-zero exit, since that's the user's
-* command failing, not this function.
-*
-* uid/gid, capabilities, mounts, and env are entirely described by
-* `config.json` (see buildOciConfig) — run-isolated.sh only needs enough
-* to set up networking and the rootfs bind-mount before handing off to
-* `runc run`.
-*/
 function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsName, rootfsBindDir, gateway, dns, targetIp }) {
 	let args = [
 		"-n",
@@ -7600,7 +7501,8 @@ function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsName, ro
 	try {
 		return (0, node_child_process.execFileSync)("sudo", args, { stdio: "inherit" }), 0;
 	} catch (e) {
-		return typeof e.status == "number" ? e.status : 1;
+		let status = e.status;
+		return typeof status == "number" ? status : 1;
 	}
 }
 /**
@@ -7644,7 +7546,7 @@ function unmountAllUnder(dir) {
 			"pipe"
 		] });
 	} catch (e) {
-		console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${e.message}`);
+		console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${errorMessage(e)}`);
 	}
 }
 /**
@@ -7711,7 +7613,7 @@ function withScratchDir(fn, containerName) {
 	}
 }
 //#endregion
-//#region core/lib/report/build-example.js
+//#region core/lib/report/build-example.ts
 const ruleTypeToParam = {
 	HTTPS: "allowed_https_rules",
 	HTTP: "allowed_http_rules",
@@ -7721,11 +7623,7 @@ const ruleTypeToParam = {
 * Build a restrict-mode YAML configuration example from audited rows.
 * Returns a markdown string wrapped in <details> tags, or "" if no rows.
 *
-* @param {Array<{host: string, port: string, ruleType: string}>} auditedRows
-* @param {string} actionRepo
-* @param {string} actionRef - the ref (tag or commit SHA) this action was invoked with
-* @param {{actionName?: string, runCommand?: string}} [options] - actionName: "setup" (default) or "run"; runCommand: the `run:` input, included only when actionName is "run"
-* @returns {string}
+* actionRef is the ref (tag or commit SHA) this action was invoked with.
 */
 function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName = "setup", runCommand } = {}) {
 	if (!auditedRows || auditedRows.length === 0) return "";
@@ -7749,7 +7647,7 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 	return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", md += yaml, md += "```\n\n", md += "</details>\n", md;
 }
 //#endregion
-//#region core/lib/report/known-blocked.js
+//#region core/lib/report/known-blocked.ts
 /**
 * Shared logic for `known_blocked_rules`: domains expected to be blocked,
 * so a matching blocked connection doesn't fail the step even when
@@ -7760,9 +7658,7 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
 * its `host:port` matches at least one known_blocked_rules pattern.
 *
-* @param {{host:string, port:string, ruleType:string, reason:string, count:number}[]} blockedRows
-* @param {string[]} knownBlockedRules - as returned by parseAndValidateRules
-* @returns {({host:string, port:string, ruleType:string, reason:string, count:number, expected:boolean})[]}
+* knownBlockedRules is as returned by parseAndValidateRules.
 */
 function annotateKnownBlocked(blockedRows, knownBlockedRules) {
 	let matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
@@ -7771,20 +7667,6 @@ function annotateKnownBlocked(blockedRows, knownBlockedRules) {
 		expected: matchers.some((re) => re.test(`${row.host}:${row.port}`))
 	}));
 }
-/**
-* Decide whether blocked connections should fail the step.
-*
-* `blockedRows` must already be annotated via annotateKnownBlocked. Uses
-* per-row matching rather than count arithmetic because `blockedCount`'s
-* meaning differs by proxy engine (transparent: total blocked events;
-* explicit: aggregated row count — see setup/docker/explicit/scripts/report.js),
-* so subtracting summed row counts from it isn't reliable. An empty
-* `blockedRows` with a nonzero `blockedCount` (malformed/incomplete report
-* data) is treated as unexpected too (fail closed).
-*
-* @param {{isAudit: boolean, failOnBlocked: boolean, blockedCount: number, blockedRows: object[]}} params
-* @returns {{level: "none"|"notice"|"error", shouldFail: boolean}}
-*/
 function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedRows }) {
 	if (!blockedCount) return {
 		level: "none",
@@ -7803,41 +7685,19 @@ function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blocked
 		shouldFail: !1
 	};
 }
-/**
-* Build the annotation message text for a blocked-connections check.
-*
-* In audit mode the text always stays the fixed-format base string,
-* regardless of known_blocked_rules matching — audit mode's pass/fail
-* outcome is unaffected by matching (see determineBlockedOutcome), so
-* varying the notice text there would be misleading and would silently
-* break any tooling that matches the old fixed-format notice.
-*
-* @param {{blockedCount: number, blockedRows: object[], engineLabel: "sandbox"|"proxy", isAudit: boolean}} params
-* @returns {string}
-*/
 function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }) {
 	let base = `${blockedCount} blocked connection(s) detected by buildcage ${engineLabel}`;
 	if (isAudit) return base;
 	let unexpected = blockedRows.filter((row) => !row.expected).length;
 	return unexpected === blockedRows.length ? base : unexpected === 0 ? `${base}, all matched known_blocked_rules (expected)` : `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
 }
-/**
-* Single entry point composing the three functions above. Both
-* run/src/lib/report.js and report/src/main.js call this once and thread
-* the result through their table rendering and annotation code, rather
-* than each recomputing annotateKnownBlocked independently.
-*
-* @param {{mode: string|null, blockedCount?: number, sections?: {blocked?: object[]}}} report
-* @param {{knownBlockedRules: string[], failOnBlocked: boolean, engineLabel: "sandbox"|"proxy"}} options
-* @returns {{blockedRows: object[], showExpected: boolean, outcome: {level: string, shouldFail: boolean}, message: string|null}}
-*/
 function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engineLabel }) {
 	let isAudit = report.mode === "audit", blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules), outcome = determineBlockedOutcome({
 		isAudit,
 		failOnBlocked,
 		blockedCount: report.blockedCount ?? 0,
 		blockedRows
-	}), message = outcome.level === "none" ? null : buildBlockedMessage({
+	}), message = buildBlockedMessage({
 		blockedCount: report.blockedCount ?? 0,
 		blockedRows,
 		engineLabel,
@@ -7851,18 +7711,14 @@ function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engin
 	};
 }
 //#endregion
-//#region core/lib/report/markdown-table.js
+//#region core/lib/actions/markdown-table.ts
 const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
 	center: ":---:"
-}, alignMarker = (align) => ALIGN_MARKERS[align] ?? ALIGN_MARKERS.left;
+}, alignMarker = (align) => ALIGN_MARKERS[align ?? "left"] ?? ALIGN_MARKERS.left;
 /**
 * Render a generic GitHub-flavored markdown table.
-*
-* @param {{key: string, title: string, align?: "left"|"right"|"center"}[]} formats
-* @param {Record<string, string|number>[]} rows
-* @returns {string}
 */
 function markdownTable(formats, rows) {
 	let headers = formats.map((f) => f.title), aligns = formats.map((f) => alignMarker(f.align)), lines = [`| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |`];
@@ -7873,13 +7729,9 @@ function markdownTable(formats, rows) {
 	return lines.join("\n");
 }
 //#endregion
-//#region core/lib/report/host-table.js
+//#region core/lib/report/host-table.ts
 /**
 * Render aggregated host rows as a GitHub-flavored markdown table.
-*
-* @param {{host:string, port:string, ruleType:string, reason?:string, count:number, expected?:boolean}[]} rows
-* @param {{showReason?: boolean, showExpected?: boolean}} [options]
-* @returns {string}
 */
 function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	let formats = [{
@@ -7909,7 +7761,7 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	})));
 }
 //#endregion
-//#region run/src/lib/report.js
+//#region run/src/lib/report.ts
 /**
 * Fetch the structured HAProxy-log report from the (still-running) proxy
 * container. Unlike report/src/main.js (which supports both engines), the
@@ -7933,29 +7785,21 @@ function fetchReport(containerName) {
 	});
 	return JSON.parse(jsonOutput);
 }
-/**
-* Build the Job Summary markdown section for this run step's traffic
-* report. Each `run` step gets its own section (rather than one report
-* per job), matching the "one proxy container per step" execution model.
-*
-* `blockedRows`/`showExpected` come pre-computed from the caller so
-* known_blocked_rules matching runs once per report, not once per render.
-*/
 function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand, blockedRows = [], showExpected = !1 } = {}) {
 	let heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
 	if (report.mode === null) return `## ${heading}\n\nNo proxy logs found.\n`;
 	let isAudit = report.mode === "audit", markdown = `## ${heading} (${report.mode} mode)\n\n`;
 	if (isAudit) {
-		let audited = report.sections.audited || [];
-		audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n\n"), markdown += buildRestrictExample(audited, actionRepo, actionRef, {
+		let audited = report.sections?.audited || [];
+		audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n\n"), actionRepo && (markdown += buildRestrictExample(audited, actionRepo, actionRef, {
 			actionName: "run",
 			runCommand
-		}), blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, {
+		})), blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, {
 			showReason: !0,
 			showExpected
 		}) + "\n\n");
 	} else {
-		let allowed = report.sections.allowed || [];
+		let allowed = report.sections?.allowed || [];
 		allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n\n"), blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, {
 			showReason: !0,
 			showExpected
@@ -7963,15 +7807,10 @@ function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runComm
 	}
 	return markdown;
 }
-/**
-* Append this step's report to the Job Summary and emit annotations /
-* set the exit code for blocked connections, mirroring report/src/main.js's
-* behavior but scoped to a single run step's proxy container.
-*/
 function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand, knownBlockedRules = [] } = {}) {
 	let { blockedRows, showExpected, outcome, message } = evaluateBlockedReport(report, {
 		knownBlockedRules,
-		failOnBlocked,
+		failOnBlocked: failOnBlocked ?? !1,
 		engineLabel: "sandbox"
 	}), markdown = buildReportMarkdown(report, {
 		stepLabel,
@@ -7988,7 +7827,7 @@ function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, 
 	outcome.level === "error" ? (annotation.error(message), process.exitCode = 1) : outcome.level === "notice" && annotation.notice(message);
 }
 //#endregion
-//#region run/src/main.js
+//#region run/src/main.ts
 const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
 /**
 * Verifies image provenance and resolves the digest-pinned image ref for
@@ -8007,28 +7846,6 @@ async function resolveVerifiedImage({ actionRef, actionRepo }) {
 			actionRepository: actionRepo
 		}),
 		pullPolicy: "always"
-	};
-}
-/**
-* Rethrow a rule-parser's syntax errors as a SandboxError with the shared
-* INVALID_RULES code, used by both buildACLRules and readKnownBlockedRules.
-*/
-function parseRulesOrThrow(rulesInput) {
-	try {
-		return parseAndValidateRules(rulesInput);
-	} catch (e) {
-		throw new SandboxError(e.message, "INVALID_RULES");
-	}
-}
-/**
-* Build ACL rules from input strings. Rules are passed through as-is
-* (wildcard format), validated eagerly.
-*/
-function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
-	return {
-		httpsRules: parseRulesOrThrow(httpsRulesInput),
-		httpRules: parseRulesOrThrow(httpRulesInput),
-		ipRules: parseRulesOrThrow(ipRulesInput)
 	};
 }
 /**
@@ -8100,7 +7917,7 @@ async function main() {
 					destDir: dir
 				}));
 			} catch (e) {
-				throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
+				throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${errorMessage(e)}`, "RUNC_EXTRACT_FAILED");
 			}
 			let workdir = env.GITHUB_WORKSPACE || "", home = env.HOME || "", netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-"), rootfsBindDir = (0, node_path.join)(dir, "rootfs"), config;
 			try {
@@ -8121,7 +7938,7 @@ async function main() {
 					hostMounts
 				});
 			} catch (e) {
-				throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${e.message}`, "OCI_CONFIG_BUILD_FAILED");
+				throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
 			}
 			return writeOciConfig(config, dir), runIsolated({
 				runcPath,
@@ -8146,7 +7963,7 @@ async function main() {
 				knownBlockedRules
 			});
 		} catch (e) {
-			annotation.warning(`Failed to fetch sandbox report: ${e.message}`);
+			annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
 		}
 		try {
 			(0, node_child_process.execFileSync)("docker", buildComposeDownArgs({
@@ -8163,5 +7980,5 @@ async function main() {
 	exitCode !== 0 && (process.exitCode = exitCode);
 }
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
-	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${err.message}`), process.exit(1);
+	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${errorMessage(err)}`), process.exit(1);
 }), exports.buildACLRules = buildACLRules, exports.buildComposeDownArgs = buildComposeDownArgs, exports.buildComposeUpArgs = buildComposeUpArgs, exports.parseWritablePaths = parseWritablePaths, exports.readKnownBlockedRules = readKnownBlockedRules;

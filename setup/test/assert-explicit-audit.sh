@@ -54,7 +54,7 @@ echo ""
 # markdown there instead of stdout whenever it's set, which it always is
 # inside an actual GitHub Actions job (including this one) — so leaving it
 # set would make $REPORT_MARKDOWN capture nothing.
-REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= PROXY_ENGINE=explicit node report/src/main.js ./compose.yaml 2>&1 || true)
+REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml 2>&1 || true)
 
 # The "Audited Hosts" table is built by report/src/main.js itself (not
 # report.js) from buildctl's build-history vertex log, aggregated by

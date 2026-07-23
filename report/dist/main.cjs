@@ -1,5 +1,5 @@
 let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_path = require("node:path"), node_url = require("node:url");
-//#region core/lib/report/build-example.js
+//#region core/lib/report/build-example.ts
 const ruleTypeToParam = {
 	HTTPS: "allowed_https_rules",
 	HTTP: "allowed_http_rules",
@@ -9,11 +9,7 @@ const ruleTypeToParam = {
 * Build a restrict-mode YAML configuration example from audited rows.
 * Returns a markdown string wrapped in <details> tags, or "" if no rows.
 *
-* @param {Array<{host: string, port: string, ruleType: string}>} auditedRows
-* @param {string} actionRepo
-* @param {string} actionRef - the ref (tag or commit SHA) this action was invoked with
-* @param {{actionName?: string, runCommand?: string}} [options] - actionName: "setup" (default) or "run"; runCommand: the `run:` input, included only when actionName is "run"
-* @returns {string}
+* actionRef is the ref (tag or commit SHA) this action was invoked with.
 */
 function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName = "setup", runCommand } = {}) {
 	if (!auditedRows || auditedRows.length === 0) return "";
@@ -37,7 +33,7 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 	return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", md += yaml, md += "```\n\n", md += "</details>\n", md;
 }
 //#endregion
-//#region report/src/lib/command-log.js
+//#region report/src/lib/command-log.ts
 /**
 * Render the explicit engine's communication detail as a collapsed markdown
 * section, or "" if there's nothing to show. Allowed Urls is listed before
@@ -50,10 +46,6 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 *
 * Command text is escaped since it's embedded directly in markdown; request
 * lines go inside a fenced code block instead, where escaping isn't needed.
-*
-* @param {Array<Array<{ command: string, started: string, completed: string, entries: Array<{ method: string, url: string, status?: number }> }>>} builds
-* @param {Array<{ url: string, timestamp: string }>} deniedTimeline
-* @returns {string}
 */
 function renderCommunicationDetails(builds, deniedTimeline) {
 	let nonEmptyBuilds = (builds || []).filter((b) => b && b.length > 0), hasVertexLog = nonEmptyBuilds.length > 0, hasDenied = deniedTimeline && deniedTimeline.length > 0;
@@ -149,20 +141,7 @@ function aggregate(filtered) {
 	}).sort((a, b) => b.count - a.count || (a.host < b.host ? -1 : +(a.host > b.host)) || Number(a.port) - Number(b.port));
 }
 //#endregion
-//#region report/src/lib/vertex-log.js
-/**
-* Parse `buildctl debug histories --format '{{json .}}'`'s newline-delimited
-* JSON output and return every build's ref, oldest first. A workflow may run
-* several builds against the same long-lived buildcage container before
-* calling the report action once, and each is its own independent build
-* history record, so a table sourced from only the "latest" ref would
-* silently omit every earlier build's steps. Each record's `CreatedAt` is a
-* protobuf-style `{seconds, nanos}` object (not an ISO string), so records
-* are ordered numerically rather than by string.
-*
-* @param {string} historiesText
-* @returns {string[]}
-*/
+//#region report/src/lib/vertex-log.ts
 function selectAllRefs(historiesText) {
 	let byRef = /* @__PURE__ */ new Map();
 	for (let line of historiesText.split("\n")) {
@@ -187,16 +166,6 @@ function stageKeyOf(bracketContent) {
 	return parts.length > 1 ? parts[0] : "";
 }
 const requestLineDetailPattern = /^-\s+(\S+)\s+(\S+?)(?:\s+->\s+(\d+))?$/;
-/**
-* Scan arbitrary text for a "proxy network requests:" block and return its
-* raw entries, in order, with no host/port resolution or aggregation. Used
-* by parseVertexAllowedLog() below, applied to a single RUN vertex's own
-* isolated stderr (decoded from `buildctl debug logs --progress=rawjson`),
-* for both the per-command breakdown and the host-aggregated allowed table.
-*
-* @param {string} text
-* @returns {{ method: string, url: string, status?: number }[]}
-*/
 function parseAllowedRequestsFromText(text) {
 	let entries = [], lines = text.split("\n");
 	for (let i = 0; i < lines.length; i++) if (lines[i].trim() === "proxy network requests:") for (let j = i + 1; j < lines.length; j++) {
@@ -214,19 +183,6 @@ function parseAllowedRequestsFromText(text) {
 	}
 	return entries;
 }
-/**
-* Parse `buildctl debug logs --progress=rawjson <ref>`'s single JSON object
-* into a per-RUN-vertex breakdown, ordered for human debugging: grouped by
-* build stage (each stage's vertices kept together, in `started` order),
-* with stages themselves ordered by their earliest vertex's `started` time.
-* Independent stages can run concurrently, with overlapping `started`
-* timestamps, so vertex.digest (not physical log position) is the only
-* reliable way to attribute a "proxy network requests:" block to the RUN
-* step that produced it.
-*
-* @param {string} rawJsonText
-* @returns {{ command: string, started: string, completed: string, entries: { method: string, url: string, status?: number }[] }[]}
-*/
 function parseVertexAllowedLog(rawJsonText) {
 	let vertexes = [], logs = [];
 	for (let line of rawJsonText.split("\n")) {
@@ -260,14 +216,6 @@ function parseVertexAllowedLog(rawJsonText) {
 		};
 	});
 }
-/**
-* Build the host-aggregated allowed/audited table from the same per-build
-* vertex data parseVertexAllowedLog() produces for the per-command breakdown.
-*
-* @param {Array<ReturnType<typeof parseVertexAllowedLog>>} builds
-* @param {string} decision "ALLOWED" (restrict mode) or "AUDIT" (audit mode)
-* @returns {{ host: string, port: string, ruleType: string, reason: string, count: number }[]}
-*/
 function aggregateAllowedHosts(builds, decision) {
 	let entries = [];
 	for (let vertices of builds) for (let { entries: vertexEntries } of vertices) for (let { url } of vertexEntries) {
@@ -283,14 +231,11 @@ function aggregateAllowedHosts(builds, decision) {
 	return aggregate(entries);
 }
 //#endregion
-//#region core/lib/actions/annotation.js
+//#region core/lib/actions/annotation.ts
 /**
 * Build a GitHub Actions annotation emitter. When `enabled` is false, every
 * method is a no-op — used to suppress annotations when this script isn't
 * running as the real action.
-*
-* @param {boolean} enabled
-* @returns {{ notice(message: string): void, warning(message: string): void, error(message: string): void }}
 */
 function createAnnotation(enabled) {
 	return enabled ? {
@@ -379,7 +324,7 @@ function wildcardToRegex(pattern) {
 	return `${domainToRegex(domain)}:${portRegex}`;
 }
 //#endregion
-//#region core/lib/report/known-blocked.js
+//#region core/lib/report/known-blocked.ts
 /**
 * Shared logic for `known_blocked_rules`: domains expected to be blocked,
 * so a matching blocked connection doesn't fail the step even when
@@ -390,9 +335,7 @@ function wildcardToRegex(pattern) {
 * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
 * its `host:port` matches at least one known_blocked_rules pattern.
 *
-* @param {{host:string, port:string, ruleType:string, reason:string, count:number}[]} blockedRows
-* @param {string[]} knownBlockedRules - as returned by parseAndValidateRules
-* @returns {({host:string, port:string, ruleType:string, reason:string, count:number, expected:boolean})[]}
+* knownBlockedRules is as returned by parseAndValidateRules.
 */
 function annotateKnownBlocked(blockedRows, knownBlockedRules) {
 	let matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
@@ -401,20 +344,6 @@ function annotateKnownBlocked(blockedRows, knownBlockedRules) {
 		expected: matchers.some((re) => re.test(`${row.host}:${row.port}`))
 	}));
 }
-/**
-* Decide whether blocked connections should fail the step.
-*
-* `blockedRows` must already be annotated via annotateKnownBlocked. Uses
-* per-row matching rather than count arithmetic because `blockedCount`'s
-* meaning differs by proxy engine (transparent: total blocked events;
-* explicit: aggregated row count — see setup/docker/explicit/scripts/report.js),
-* so subtracting summed row counts from it isn't reliable. An empty
-* `blockedRows` with a nonzero `blockedCount` (malformed/incomplete report
-* data) is treated as unexpected too (fail closed).
-*
-* @param {{isAudit: boolean, failOnBlocked: boolean, blockedCount: number, blockedRows: object[]}} params
-* @returns {{level: "none"|"notice"|"error", shouldFail: boolean}}
-*/
 function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedRows }) {
 	if (!blockedCount) return {
 		level: "none",
@@ -433,41 +362,19 @@ function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blocked
 		shouldFail: !1
 	};
 }
-/**
-* Build the annotation message text for a blocked-connections check.
-*
-* In audit mode the text always stays the fixed-format base string,
-* regardless of known_blocked_rules matching — audit mode's pass/fail
-* outcome is unaffected by matching (see determineBlockedOutcome), so
-* varying the notice text there would be misleading and would silently
-* break any tooling that matches the old fixed-format notice.
-*
-* @param {{blockedCount: number, blockedRows: object[], engineLabel: "sandbox"|"proxy", isAudit: boolean}} params
-* @returns {string}
-*/
 function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }) {
 	let base = `${blockedCount} blocked connection(s) detected by buildcage ${engineLabel}`;
 	if (isAudit) return base;
 	let unexpected = blockedRows.filter((row) => !row.expected).length;
 	return unexpected === blockedRows.length ? base : unexpected === 0 ? `${base}, all matched known_blocked_rules (expected)` : `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
 }
-/**
-* Single entry point composing the three functions above. Both
-* run/src/lib/report.js and report/src/main.js call this once and thread
-* the result through their table rendering and annotation code, rather
-* than each recomputing annotateKnownBlocked independently.
-*
-* @param {{mode: string|null, blockedCount?: number, sections?: {blocked?: object[]}}} report
-* @param {{knownBlockedRules: string[], failOnBlocked: boolean, engineLabel: "sandbox"|"proxy"}} options
-* @returns {{blockedRows: object[], showExpected: boolean, outcome: {level: string, shouldFail: boolean}, message: string|null}}
-*/
 function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engineLabel }) {
 	let isAudit = report.mode === "audit", blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules), outcome = determineBlockedOutcome({
 		isAudit,
 		failOnBlocked,
 		blockedCount: report.blockedCount ?? 0,
 		blockedRows
-	}), message = outcome.level === "none" ? null : buildBlockedMessage({
+	}), message = buildBlockedMessage({
 		blockedCount: report.blockedCount ?? 0,
 		blockedRows,
 		engineLabel,
@@ -481,18 +388,14 @@ function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engin
 	};
 }
 //#endregion
-//#region core/lib/report/markdown-table.js
+//#region core/lib/actions/markdown-table.ts
 const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
 	center: ":---:"
-}, alignMarker = (align) => ALIGN_MARKERS[align] ?? ALIGN_MARKERS.left;
+}, alignMarker = (align) => ALIGN_MARKERS[align ?? "left"] ?? ALIGN_MARKERS.left;
 /**
 * Render a generic GitHub-flavored markdown table.
-*
-* @param {{key: string, title: string, align?: "left"|"right"|"center"}[]} formats
-* @param {Record<string, string|number>[]} rows
-* @returns {string}
 */
 function markdownTable(formats, rows) {
 	let headers = formats.map((f) => f.title), aligns = formats.map((f) => alignMarker(f.align)), lines = [`| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |`];
@@ -503,13 +406,9 @@ function markdownTable(formats, rows) {
 	return lines.join("\n");
 }
 //#endregion
-//#region core/lib/report/host-table.js
+//#region core/lib/report/host-table.ts
 /**
 * Render aggregated host rows as a GitHub-flavored markdown table.
-*
-* @param {{host:string, port:string, ruleType:string, reason?:string, count:number, expected?:boolean}[]} rows
-* @param {{showReason?: boolean, showExpected?: boolean}} [options]
-* @returns {string}
 */
 function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	let formats = [{
@@ -538,6 +437,48 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 		expected: r.expected ? "✅" : ""
 	})));
 }
+//#endregion
+//#region core/lib/general/action-error.ts
+/**
+* Base class for an action's own "intentional" errors — a caught failure
+* whose message is safe to print directly via ::error::, as opposed to an
+* unexpected one. A top-level catch checks `instanceof ActionError`.
+* `name` is derived from `new.target`, so a subclass needs no constructor
+* of its own to get its own name.
+*/
+var ActionError = class extends Error {
+	code;
+	constructor(message, code) {
+		super(message), this.name = new.target.name, this.code = code;
+	}
+};
+//#endregion
+//#region core/lib/general/error-message.ts
+/**
+* Safely extract a message from a caught value of unknown shape — a plain
+* `Error` most of the time, but `catch` doesn't guarantee that.
+*/
+function errorMessage(e) {
+	return e instanceof Error ? e.message : String(e);
+}
+//#endregion
+//#region core/lib/acl/rules.ts
+/**
+* Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
+* allowed_ip_rules/known_blocked_rules) fails to parse — shared by the
+* setup and run actions, which both accept the same rule syntax.
+*/
+var InvalidRulesError = class extends ActionError {};
+/**
+* Rethrow a rule-parser's syntax errors as an InvalidRulesError.
+*/
+function parseRulesOrThrow(rulesInput) {
+	try {
+		return parseAndValidateRules(rulesInput);
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+	}
+}
 /**
 * Turns a caught `docker` invocation error into an actionable message,
 * pointing at the runner requirement instead of surfacing execFileSync's
@@ -547,10 +488,10 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 * since otherwise nothing points the reader back to it.
 */
 function describeDockerFailure(e, { operation = "docker", env = process.env, exists = node_fs.existsSync } = {}) {
-	let slimNote = isLikelySlimRunner(env, exists) ? " Detected a container-based GitHub-hosted runner image (e.g. \"ubuntu-slim\") — these ship a Docker client with no daemon and are not supported for this action." : "", whatHappened;
-	if (e && e.code === "ENOENT") whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
+	let err = e && typeof e == "object" ? e : {}, slimNote = isLikelySlimRunner(env, exists) ? " Detected a container-based GitHub-hosted runner image (e.g. \"ubuntu-slim\") — these ship a Docker client with no daemon and are not supported for this action." : "", whatHappened;
+	if (err.code === "ENOENT") whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
 	else {
-		let captured = e && typeof e.stderr == "string" ? e.stderr.trim() : "";
+		let captured = typeof err.stderr == "string" ? err.stderr.trim() : "";
 		whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
 	}
 	return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action — use "ubuntu-latest" (or another runner with a full Docker install) instead. See docs/reference.md and docs/security.md for details.`;
@@ -573,130 +514,138 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region report/src/main.js
-const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), composeFile = process.argv[2] || (0, node_path.join)(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
-	...process.env,
-	BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage"
-}, summaryFile = process.env.GITHUB_STEP_SUMMARY, annotation = createAnnotation(!!summaryFile);
-let knownBlockedRules;
-try {
-	knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
-} catch (e) {
-	annotation.error(e.message), process.exit(1);
+//#region report/src/lib/errors.ts
+/**
+* ReportError — intentional error in the report action's own logic. Invalid
+* ACL rule syntax throws InvalidRulesError instead (see
+* core/lib/acl/rules.js).
+*
+* Codes:
+*   DOCKER_UNAVAILABLE – docker CLI missing from PATH or a docker command failed
+*/
+var ReportError = class extends ActionError {};
+//#endregion
+//#region report/src/main.ts
+const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
+async function main() {
+	let composeFile = process.argv[2] || (0, node_path.join)(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
+		...process.env,
+		BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage"
+	}, summaryFile = process.env.GITHUB_STEP_SUMMARY, annotation = createAnnotation(!!summaryFile), knownBlockedRules = parseRulesOrThrow(process.env.INPUT_KNOWN_BLOCKED_RULES), jsonOutput;
+	try {
+		jsonOutput = (0, node_child_process.execFileSync)("docker", [
+			"compose",
+			"-f",
+			composeFile,
+			"exec",
+			"builder",
+			"sh",
+			"-c",
+			"qjs -m /opt/buildcage/scripts/report.js"
+		], {
+			encoding: "utf8",
+			stdio: [
+				"ignore",
+				"pipe",
+				"pipe"
+			],
+			env: composeEnv
+		});
+	} catch (e) {
+		throw new ReportError(describeDockerFailure(e, { operation: "fetching the sandbox report from the container" }), "DOCKER_UNAVAILABLE");
+	}
+	let report = JSON.parse(jsonOutput);
+	console.log("::group::HTTP Proxy communication logs");
+	try {
+		let rawLog = (0, node_child_process.execFileSync)("docker", [
+			"compose",
+			"-f",
+			composeFile,
+			"exec",
+			"builder",
+			"sh",
+			"-c",
+			"cat /var/log/buildkitd/current 2>/dev/null || cat /var/log/haproxy/current 2>/dev/null"
+		], {
+			encoding: "utf8",
+			stdio: [
+				"ignore",
+				"pipe",
+				"pipe"
+			],
+			env: composeEnv
+		});
+		process.stdout.write(rawLog);
+	} catch {
+		console.log("(failed to read raw log)");
+	}
+	console.log("::endgroup::"), console.log(), report.mode === null && (summaryFile && (0, node_fs.appendFileSync)(summaryFile, "No proxy logs found.\n"), console.log("No proxy logs found."), process.exit(0));
+	let actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", actionRef = process.env.GITHUB_ACTION_REF || "v2", isAudit = report.mode === "audit", isExplicit = report.deniedTimeline !== void 0, builds = [];
+	if (isExplicit) try {
+		builds = selectAllRefs((0, node_child_process.execFileSync)("docker", [
+			"compose",
+			"-f",
+			composeFile,
+			"exec",
+			"builder",
+			"buildctl",
+			"debug",
+			"histories",
+			"--format",
+			"{{json .}}"
+		], {
+			encoding: "utf8",
+			stdio: [
+				"ignore",
+				"pipe",
+				"pipe"
+			],
+			env: composeEnv
+		})).map((ref) => parseVertexAllowedLog((0, node_child_process.execFileSync)("docker", [
+			"compose",
+			"-f",
+			composeFile,
+			"exec",
+			"builder",
+			"buildctl",
+			"debug",
+			"logs",
+			"--progress=rawjson",
+			ref
+		], {
+			encoding: "utf8",
+			stdio: [
+				"ignore",
+				"pipe",
+				"pipe"
+			],
+			env: composeEnv,
+			maxBuffer: 64 * 1024 * 1024
+		})));
+	} catch (e) {
+		console.log("(failed to fetch allowed/audited traffic detail via buildctl:", errorMessage(e), ")");
+	}
+	let { blockedRows: annotatedBlocked, showExpected, outcome, message } = evaluateBlockedReport(report, {
+		knownBlockedRules,
+		failOnBlocked: (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
+		engineLabel: "proxy"
+	}), markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
+	if (isAudit) {
+		let audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections?.audited || [];
+		audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n"), markdown += buildRestrictExample(audited, actionRepo, actionRef), annotatedBlocked.length > 0 && (audited.length > 0 && (markdown += "\n"), markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, {
+			showReason: !0,
+			showExpected
+		}) + "\n");
+	} else {
+		let allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections?.allowed || [];
+		allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n"), allowed.length > 0 && annotatedBlocked.length > 0 && (markdown += "\n"), annotatedBlocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, {
+			showReason: !0,
+			showExpected
+		}) + "\n");
+	}
+	isExplicit && (markdown += renderCommunicationDetails(builds, report.deniedTimeline)), isExplicit || (markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n"), markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`, summaryFile ? (0, node_fs.appendFileSync)(summaryFile, markdown) : console.log(markdown), outcome.level === "error" ? (annotation.error(message), process.exitCode = 1) : outcome.level === "notice" && annotation.notice(message);
 }
-let jsonOutput;
-try {
-	jsonOutput = (0, node_child_process.execFileSync)("docker", [
-		"compose",
-		"-f",
-		composeFile,
-		"exec",
-		"builder",
-		"sh",
-		"-c",
-		"qjs -m /opt/buildcage/scripts/report.js"
-	], {
-		encoding: "utf8",
-		stdio: [
-			"ignore",
-			"pipe",
-			"pipe"
-		],
-		env: composeEnv
-	});
-} catch (e) {
-	annotation.error(describeDockerFailure(e, { operation: "fetching the sandbox report from the container" })), process.exit(1);
-}
-const report = JSON.parse(jsonOutput);
-console.log("::group::HTTP Proxy communication logs");
-try {
-	let rawLog = (0, node_child_process.execFileSync)("docker", [
-		"compose",
-		"-f",
-		composeFile,
-		"exec",
-		"builder",
-		"sh",
-		"-c",
-		"cat /var/log/buildkitd/current 2>/dev/null || cat /var/log/haproxy/current 2>/dev/null"
-	], {
-		encoding: "utf8",
-		stdio: [
-			"ignore",
-			"pipe",
-			"pipe"
-		],
-		env: composeEnv
-	});
-	process.stdout.write(rawLog);
-} catch {
-	console.log("(failed to read raw log)");
-}
-console.log("::endgroup::"), console.log(), report.mode === null && (summaryFile && (0, node_fs.appendFileSync)(summaryFile, "No proxy logs found.\n"), console.log("No proxy logs found."), process.exit(0));
-const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", actionRef = process.env.GITHUB_ACTION_REF || "v2", isAudit = report.mode === "audit", isExplicit = report.deniedTimeline !== void 0;
-let builds = [];
-if (isExplicit) try {
-	builds = selectAllRefs((0, node_child_process.execFileSync)("docker", [
-		"compose",
-		"-f",
-		composeFile,
-		"exec",
-		"builder",
-		"buildctl",
-		"debug",
-		"histories",
-		"--format",
-		"{{json .}}"
-	], {
-		encoding: "utf8",
-		stdio: [
-			"ignore",
-			"pipe",
-			"pipe"
-		],
-		env: composeEnv
-	})).map((ref) => parseVertexAllowedLog((0, node_child_process.execFileSync)("docker", [
-		"compose",
-		"-f",
-		composeFile,
-		"exec",
-		"builder",
-		"buildctl",
-		"debug",
-		"logs",
-		"--progress=rawjson",
-		ref
-	], {
-		encoding: "utf8",
-		stdio: [
-			"ignore",
-			"pipe",
-			"pipe"
-		],
-		env: composeEnv,
-		maxBuffer: 64 * 1024 * 1024
-	})));
-} catch (e) {
-	console.log("(failed to fetch allowed/audited traffic detail via buildctl:", e.message, ")");
-}
-const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true", { blockedRows: annotatedBlocked, showExpected, outcome, message } = evaluateBlockedReport(report, {
-	knownBlockedRules,
-	failOnBlocked,
-	engineLabel: "proxy"
+process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
+	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in report: ${errorMessage(err)}`), process.exit(1);
 });
-let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
-if (isAudit) {
-	let audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
-	audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n"), markdown += buildRestrictExample(audited, actionRepo, actionRef), annotatedBlocked.length > 0 && (audited.length > 0 && (markdown += "\n"), markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, {
-		showReason: !0,
-		showExpected
-	}) + "\n");
-} else {
-	let allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections.allowed || [];
-	allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n"), allowed.length > 0 && annotatedBlocked.length > 0 && (markdown += "\n"), annotatedBlocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, {
-		showReason: !0,
-		showExpected
-	}) + "\n");
-}
-isExplicit && (markdown += renderCommunicationDetails(builds, report.deniedTimeline)), isExplicit || (markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n"), markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`, summaryFile ? (0, node_fs.appendFileSync)(summaryFile, markdown) : console.log(markdown), outcome.level === "error" ? (annotation.error(message), process.exitCode = 1) : outcome.level === "notice" && annotation.notice(message);
 //#endregion
