@@ -11,7 +11,8 @@ import { ActionError } from "../general/action-error.ts";
  *   TOKEN_ERROR      – registry token endpoint returned a client error
  *   VERIFY_FAILED    – Sigstore bundle verification failed
  */
-export type VerifyImageErrorCode = "NOT_FOUND" | "TRANSIENT" | "TOKEN_ERROR" | "VERIFY_FAILED";
+export const VERIFY_IMAGE_ERROR_CODES = ["NOT_FOUND", "TRANSIENT", "TOKEN_ERROR", "VERIFY_FAILED"] as const;
+export type VerifyImageErrorCode = (typeof VERIFY_IMAGE_ERROR_CODES)[number];
 
 export class VerifyImageError extends Error {
   code: VerifyImageErrorCode;
@@ -36,6 +37,11 @@ export class VerifyImageError extends Error {
  *   VERIFY_FAILED    – Sigstore bundle verification failed
  *   UNVERIFIABLE_REF – action ref cannot be verified (branch / local path)
  */
-export type ProvenanceErrorCode = VerifyImageErrorCode | "UNVERIFIABLE_REF";
+export const PROVENANCE_ERROR_CODES = [...VERIFY_IMAGE_ERROR_CODES, "UNVERIFIABLE_REF"] as const;
+export type ProvenanceErrorCode = (typeof PROVENANCE_ERROR_CODES)[number];
+
+export function isProvenanceErrorCode(code: unknown): code is ProvenanceErrorCode {
+  return typeof code === "string" && (PROVENANCE_ERROR_CODES as readonly string[]).includes(code);
+}
 
 export class ProvenanceError extends ActionError<ProvenanceErrorCode> {}
