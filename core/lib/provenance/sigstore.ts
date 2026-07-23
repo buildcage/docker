@@ -14,7 +14,7 @@ import { VerifyImageError } from "./errors.ts";
 // the DER tag (0x0C) and length prefix. Assumes len < 128.
 export const derUtf8 = (s: string): string => String.fromCharCode(0x0c, s.length) + s;
 
-interface DsseBundle {
+export interface DsseBundle {
   dsseEnvelope?: {
     payload?: string;
     payloadType?: string;

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * verify-image.js — Image provenance verification helpers
  *
@@ -11,7 +10,7 @@
  */
 
 import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.ts";
-import { derUtf8, verifyBundle } from "./sigstore.ts";
+import { derUtf8, verifyBundle, type VerifyBundleOptions, type DsseBundle } from "./sigstore.ts";
 import { ProvenanceError } from "./errors.ts";
 
 const REGISTRY = "ghcr.io";
@@ -22,7 +21,7 @@ const RELEASE_WORKFLOW = ".github/workflows/docker-publish.yml";
 // Value encoding: DER UTF8String ([0x0C, len, ...utf8bytes]) inside OCTET STRING.
 const OID_SOURCE_REPO_DIGEST = "1.3.6.1.4.1.57264.1.13";
 
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * Convert an action ref into the base Docker image tag, then append the
@@ -35,7 +34,7 @@ const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * (same workflow, same git ref) — only the published Docker tag differs, so
  * this does not affect buildVerifyOptions below.
  */
-export function imageTagFromRef(actionRef, proxyEngine = "transparent") {
+export function imageTagFromRef(actionRef: string, proxyEngine: string = "transparent"): string {
   if (!actionRef) return "";
   let base;
   if (/^[0-9a-f]{40}$/i.test(actionRef)) {
@@ -60,7 +59,13 @@ export function imageTagFromRef(actionRef, proxyEngine = "transparent") {
  *
  * Returns null for unverifiable refs (branch names, local paths).
  */
-export function buildVerifyOptions({ actionRef, actionRepo }) {
+export function buildVerifyOptions({
+  actionRef,
+  actionRepo,
+}: {
+  actionRef: string;
+  actionRepo: string;
+}): VerifyBundleOptions | null {
   const sanPrefix = `^${escapeRegex(`https://github.com/${actionRepo}/${RELEASE_WORKFLOW}@refs/tags/`)}`;
   const base = {
     certificateIssuer: EXPECTED_ISSUER,
@@ -99,9 +104,16 @@ export function buildVerifyOptions({ actionRef, actionRepo }) {
  * On failure, throws VerifyImageError — the caller is responsible for printing
  * the error message.
  *
- * @param {{ actionRef: string, actionRepo: string, proxyEngine?: string }} opts
  */
-export async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transparent" }) {
+export async function verifyImageDigest({
+  actionRef,
+  actionRepo,
+  proxyEngine = "transparent",
+}: {
+  actionRef: string;
+  actionRepo: string;
+  proxyEngine?: string;
+}): Promise<string | null> {
   const repoPath = actionRepo.toLowerCase();
 
   const verifyOptions = buildVerifyOptions({ actionRef, actionRepo });
@@ -111,7 +123,7 @@ export async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "
   const regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth());
   const digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
   const bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken);
-  await verifyBundle(bundle, verifyOptions, digest);
+  await verifyBundle(bundle as DsseBundle, verifyOptions, digest);
   return digest;
 }
 
@@ -124,13 +136,22 @@ export async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "
  * verifyImageDigest) for unit-testing without hitting the network/sigstore.
  */
 export async function verifyImageDigestOrThrow({
-  actionRef, actionRepo, proxyEngine, verifyImageDigestFn = verifyImageDigest,
-}) {
+  actionRef,
+  actionRepo,
+  proxyEngine,
+  verifyImageDigestFn = verifyImageDigest,
+}: {
+  actionRef: string;
+  actionRepo: string;
+  proxyEngine?: string;
+  verifyImageDigestFn?: typeof verifyImageDigest;
+}): Promise<string> {
   let digest;
   try {
     digest = await verifyImageDigestFn({ actionRef, actionRepo, proxyEngine });
   } catch (e) {
-    throw new ProvenanceError(e.message, e.code ?? "VERIFY_FAILED");
+    const err = e as Error & { code?: string };
+    throw new ProvenanceError(err.message, err.code ?? "VERIFY_FAILED");
   }
   if (digest === null) {
     throw new ProvenanceError(
