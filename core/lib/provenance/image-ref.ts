@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Resolve the buildcage Docker image reference (image@digest). The
  * repository is always derived from the action repository — external image
@@ -9,7 +8,13 @@
  * entry points (e.g. run/src/main.js) can reuse it without also
  * bundling setup/src/main.js's own self-invocation guard.
  */
-export function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
+export function resolveBuildcageImageRef({
+  imageDigest,
+  actionRepository,
+}: {
+  imageDigest: string;
+  actionRepository: string;
+}): string {
   const repository = `ghcr.io/${actionRepository}`.toLowerCase();
   // Pull by verified digest to close the TOCTOU window between verification and docker pull.
   return `${repository}@${imageDigest}`;
