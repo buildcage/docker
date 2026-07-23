@@ -30,15 +30,17 @@ export function deriveProjectName(containerName: string): string {
  * Used to pull runc and gen-seccomp-profile out of the proxy image before
  * the isolated command runs (see lib/isolated-exec.js).
  */
+export interface BuildDockerCpArgsOptions {
+  containerName: string;
+  containerPath: string;
+  hostPath: string;
+}
+
 export function buildDockerCpArgs({
   containerName,
   containerPath,
   hostPath,
-}: {
-  containerName: string;
-  containerPath: string;
-  hostPath: string;
-}): string[] {
+}: BuildDockerCpArgsOptions): string[] {
   return ["cp", `${containerName}:${containerPath}`, hostPath];
 }
 
@@ -61,15 +63,21 @@ export function isContainerNotFoundError(e: unknown): boolean {
  * `exec` is an injectable seam for testing without a real Docker daemon —
  * not a caller-facing precondition.
  */
-type ExecFileSyncLike = (
-  command: string,
-  args: string[],
-  options: { encoding: string; stdio: string[]; env: NodeJS.ProcessEnv },
-) => string;
+interface ExecFileSyncOptions {
+  encoding: string;
+  stdio: string[];
+  env: NodeJS.ProcessEnv;
+}
+
+type ExecFileSyncLike = (command: string, args: string[], options: ExecFileSyncOptions) => string;
+
+export interface GetContainerPidOptions {
+  exec?: ExecFileSyncLike;
+}
 
 export function getContainerPid(
   containerName: string,
-  { exec = execFileSync as unknown as ExecFileSyncLike }: { exec?: ExecFileSyncLike } = {},
+  { exec = execFileSync as unknown as ExecFileSyncLike }: GetContainerPidOptions = {},
 ): number | null {
   let out;
   try {

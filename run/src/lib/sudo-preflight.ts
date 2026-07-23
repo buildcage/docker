@@ -22,9 +22,14 @@ const SLIM_RUNNER_NOTE =
  * unit-testable the same way as core/lib/actions/docker-error.js's
  * describeDockerFailure.
  */
+export interface DescribeSudoFailureOptions {
+  env?: NodeJS.ProcessEnv;
+  exists?: (path: string) => boolean;
+}
+
 export function describeSudoFailure(
   e: unknown,
-  { env = process.env, exists = existsSync }: { env?: NodeJS.ProcessEnv; exists?: (path: string) => boolean } = {},
+  { env = process.env, exists = existsSync }: DescribeSudoFailureOptions = {},
 ): string {
   const err = (e && typeof e === "object" ? e : {}) as DockerErrorLike;
   const captured = typeof err.stderr === "string" ? err.stderr.trim() : "";
