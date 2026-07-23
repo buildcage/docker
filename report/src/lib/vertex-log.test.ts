@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { selectAllRefs, parseAllowedRequestsFromText, parseVertexAllowedLog, aggregateAllowedHosts } from "./vertex-log.js";
+import { selectAllRefs, parseAllowedRequestsFromText, parseVertexAllowedLog, aggregateAllowedHosts } from "./vertex-log.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "__fixtures__");

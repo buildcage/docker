@@ -24,7 +24,7 @@ const configs = [
     codeSplitting: false,
   },
   { input: "setup/src/post.js", file: "setup/dist/post.cjs" },
-  { input: "report/src/main.js", file: "report/dist/main.cjs" },
+  { input: "report/src/main.ts", file: "report/dist/main.cjs" },
   {
     input: "run/src/main.js",
     file: "run/dist/main.cjs",
