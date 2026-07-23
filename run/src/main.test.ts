@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs, parseWritablePaths, readKnownBlockedRules } from "./main.ts";
-import { SandboxError } from "./lib/errors.ts";
+import { InvalidRulesError } from "../../core/lib/general/acl-rules.ts";
 
 describe("buildACLRules", () => {
   it("parses whitespace-separated HTTPS rules", () => {
@@ -39,7 +39,7 @@ describe("buildACLRules", () => {
     assert.deepEqual(result.ipRules, []);
   });
 
-  it("throws SandboxError with code INVALID_RULES for invalid rule syntax", () => {
+  it("throws InvalidRulesError with code INVALID_RULES for invalid rule syntax", () => {
     assert.throws(
       () =>
         buildACLRules({
@@ -48,7 +48,7 @@ describe("buildACLRules", () => {
           ipRulesInput: "",
         }),
       (err) => {
-        assert.ok(err instanceof SandboxError);
+        assert.ok(err instanceof InvalidRulesError);
         assert.equal(err.code, "INVALID_RULES");
         return true;
       },
@@ -69,11 +69,11 @@ describe("readKnownBlockedRules", () => {
     assert.deepEqual(readKnownBlockedRules(""), []);
   });
 
-  it("throws SandboxError with code INVALID_RULES for invalid rule syntax", () => {
+  it("throws InvalidRulesError with code INVALID_RULES for invalid rule syntax", () => {
     assert.throws(
       () => readKnownBlockedRules("no-port-specified"),
       (err) => {
-        assert.ok(err instanceof SandboxError);
+        assert.ok(err instanceof InvalidRulesError);
         assert.equal(err.code, "INVALID_RULES");
         return true;
       },

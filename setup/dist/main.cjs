@@ -15,6 +15,30 @@ let node_child_process = require("node:child_process"), node_path = require("nod
 node_path = __toESM(node_path, 1);
 let node_url = require("node:url"), node_fs = require("node:fs"), node_os = require("node:os");
 node_os = __toESM(node_os, 1);
+//#region core/lib/general/action-error.ts
+/**
+* Base class for an action's own "intentional" errors — a caught failure
+* whose message is safe to print directly via ::error::, as opposed to an
+* unexpected one. A top-level catch checks `instanceof ActionError`.
+* `name` is derived from `new.target`, so a subclass needs no constructor
+* of its own to get its own name.
+*/
+var ActionError = class extends Error {
+	code;
+	constructor(message, code) {
+		super(message), this.name = new.target.name, this.code = code;
+	}
+}, SetupError = class extends ActionError {};
+//#endregion
+//#region core/lib/general/error-message.ts
+/**
+* Safely extract a message from a caught value of unknown shape — a plain
+* `Error` most of the time, but `catch` doesn't guarantee that.
+*/
+function errorMessage(e) {
+	return e instanceof Error ? e.message : String(e);
+}
+//#endregion
 //#region core/shared/lib/rules.js
 /**
 * Rule conversion library for buildcage container.
@@ -84,28 +108,33 @@ function wildcardToRegex(pattern) {
 	return `${domainToRegex(domain)}:${portRegex}`;
 }
 //#endregion
-//#region core/lib/general/action-error.ts
+//#region core/lib/general/acl-rules.ts
 /**
-* Base class for an action's own "intentional" errors — a caught failure
-* whose message is safe to print directly via ::error::, as opposed to an
-* unexpected one. A top-level catch checks `instanceof ActionError`.
-* `name` is derived from `new.target`, so a subclass needs no constructor
-* of its own to get its own name.
+* Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
+* allowed_ip_rules/known_blocked_rules) fails to parse — shared by the
+* setup and run actions, which both accept the same rule syntax.
 */
-var ActionError = class extends Error {
-	code;
-	constructor(message, code) {
-		super(message), this.name = new.target.name, this.code = code;
+var InvalidRulesError = class extends ActionError {};
+/**
+* Rethrow a rule-parser's syntax errors as an InvalidRulesError.
+*/
+function parseRulesOrThrow(rulesInput) {
+	try {
+		return parseAndValidateRules(rulesInput);
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
 	}
-}, SetupError = class extends ActionError {};
-//#endregion
-//#region core/lib/general/error-message.ts
+}
 /**
-* Safely extract a message from a caught value of unknown shape — a plain
-* `Error` most of the time, but `catch` doesn't guarantee that.
+* Build ACL rules from input strings. Rules are passed through as-is
+* (wildcard format), validated eagerly.
 */
-function errorMessage(e) {
-	return e instanceof Error ? e.message : String(e);
+function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+	return {
+		httpsRules: parseRulesOrThrow(httpsRulesInput),
+		httpRules: parseRulesOrThrow(httpRulesInput),
+		ipRules: parseRulesOrThrow(ipRulesInput)
+	};
 }
 //#endregion
 //#region core/lib/provenance/errors.ts
@@ -7080,6 +7109,11 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 //#endregion
 //#region setup/src/main.ts
 const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
+/**
+* Verifies image provenance and resolves the digest-pinned image ref.
+* Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
+* performed (branch ref / local ./setup) — printed by the top-level catch.
+*/
 async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }) {
 	let digest = await verifyImageDigestOrThrow({
 		actionRef,
@@ -7162,24 +7196,6 @@ function resolveProxyEngine(input) {
 	let engine = input?.trim() || "transparent";
 	if (engine !== "transparent" && engine !== "explicit") throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`, "INVALID_PROXY_ENGINE");
 	return engine;
-}
-/**
-* Rethrow a rule-parser's syntax errors as a SetupError with the shared
-* INVALID_RULES code.
-*/
-function parseRulesOrThrow(rulesInput) {
-	try {
-		return parseAndValidateRules(rulesInput);
-	} catch (e) {
-		throw new SetupError(errorMessage(e), "INVALID_RULES");
-	}
-}
-function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
-	return {
-		httpsRules: parseRulesOrThrow(httpsRulesInput),
-		httpRules: parseRulesOrThrow(httpRulesInput),
-		ipRules: parseRulesOrThrow(ipRulesInput)
-	};
 }
 function logRules(label, rules) {
 	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);

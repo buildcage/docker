@@ -3,10 +3,10 @@ import { ActionError } from "../../../core/lib/general/action-error.ts";
 /**
  * SandboxError — intentional error in the run action's own logic. Image
  * provenance failures throw ProvenanceError instead (see
- * core/lib/provenance/errors.js).
+ * core/lib/provenance/errors.js); invalid ACL rule syntax throws
+ * InvalidRulesError instead (see core/lib/general/acl-rules.js).
  *
  * Codes:
- *   INVALID_RULES              – ACL rule syntax error
  *   MISSING_RUN                – required `run` input was empty
  *   PROXY_NOT_RUNNING          – sandbox proxy container isn't running after `docker compose up`
  *   RUNC_EXTRACT_FAILED        – failed to `docker cp` runc/gen-seccomp-profile out of the proxy image
@@ -15,7 +15,6 @@ import { ActionError } from "../../../core/lib/general/action-error.ts";
  *   PASSWORDLESS_SUDO_REQUIRED – sudo -n check failed; passwordless sudo isn't configured
  */
 export type SandboxErrorCode =
-  | "INVALID_RULES"
   | "MISSING_RUN"
   | "PROXY_NOT_RUNNING"
   | "RUNC_EXTRACT_FAILED"

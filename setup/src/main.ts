@@ -2,13 +2,18 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { SetupError } from "./lib/errors.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
-import { errorMessage } from "../../core/lib/general/error-message.ts";
-import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
+import { buildACLRules } from "../../core/lib/general/acl-rules.ts";
+import {
+  verifyImageDigestOrThrow,
+  type VerifyImageDigestOptions,
+  type ResolvedImage,
+} from "../../core/lib/provenance/verify-image.ts";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
+
+export { buildACLRules };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
@@ -25,22 +30,11 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
  * Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
  * performed (branch ref / local ./setup) — printed by the top-level catch.
  */
-interface ResolveVerifiedImageOptions {
-  actionRef: string;
-  actionRepo: string;
-  proxyEngine: string;
-}
-
-interface ResolvedImage {
-  imageRef: string;
-  pullPolicy: "always";
-}
-
 async function resolveVerifiedImage({
   actionRef,
   actionRepo,
   proxyEngine,
-}: ResolveVerifiedImageOptions): Promise<ResolvedImage> {
+}: VerifyImageDigestOptions): Promise<ResolvedImage> {
   const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine });
   console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
   return {
@@ -144,46 +138,6 @@ export function resolveProxyEngine(input: string | undefined): "transparent" | "
     );
   }
   return engine;
-}
-
-/**
- * Rethrow a rule-parser's syntax errors as a SetupError with the shared
- * INVALID_RULES code.
- */
-function parseRulesOrThrow(rulesInput: string | undefined): string[] {
-  try {
-    return parseAndValidateRules(rulesInput);
-  } catch (e) {
-    throw new SetupError(errorMessage(e), "INVALID_RULES");
-  }
-}
-
-/**
- * Build ACL rules from input strings. Rules are passed through as-is
- * (wildcard format), validated eagerly.
- */
-export interface BuildACLRulesInput {
-  httpsRulesInput: string | undefined;
-  httpRulesInput: string | undefined;
-  ipRulesInput: string | undefined;
-}
-
-export interface ACLRules {
-  httpsRules: string[];
-  httpRules: string[];
-  ipRules: string[];
-}
-
-export function buildACLRules({
-  httpsRulesInput,
-  httpRulesInput,
-  ipRulesInput,
-}: BuildACLRulesInput): ACLRules {
-  return {
-    httpsRules: parseRulesOrThrow(httpsRulesInput),
-    httpRules: parseRulesOrThrow(httpRulesInput),
-    ipRules: parseRulesOrThrow(ipRulesInput),
-  };
 }
 
 function logRules(label: string, rules: string[]): void {

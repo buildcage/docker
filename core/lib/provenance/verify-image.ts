@@ -37,6 +37,12 @@ export interface VerifyImageDigestOrThrowOptions extends VerifyImageDigestOption
   verifyImageDigestFn?: typeof verifyImageDigest;
 }
 
+/** The verified, digest-pinned image ref an action is about to pull. */
+export interface ResolvedImage {
+  imageRef: string;
+  pullPolicy: "always";
+}
+
 /**
  * Convert an action ref into the base Docker image tag, then append the
  * proxy engine suffix for non-default engines. The `transparent` engine

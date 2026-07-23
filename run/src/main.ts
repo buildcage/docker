@@ -3,13 +3,17 @@ import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
-import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
+import {
+  verifyImageDigestOrThrow,
+  type VerifyImageIdentity,
+  type ResolvedImage,
+} from "../../core/lib/provenance/verify-image.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
+import { buildACLRules, parseRulesOrThrow } from "../../core/lib/general/acl-rules.ts";
 import { SandboxError } from "./lib/errors.ts";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.ts";
@@ -26,7 +30,7 @@ import {
 } from "./lib/isolated-exec.ts";
 import { fetchReport, writeReport } from "./lib/report.ts";
 
-export { buildComposeUpArgs, buildComposeDownArgs };
+export { buildComposeUpArgs, buildComposeDownArgs, buildACLRules };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
@@ -41,65 +45,15 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
  * the run action's (buildkitd-less) proxy image, published under the `-proxy`
  * tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.js).
  */
-interface ResolveVerifiedImageOptions {
-  actionRef: string;
-  actionRepo: string;
-}
-
-interface ResolvedImage {
-  imageRef: string;
-  pullPolicy: "always";
-}
-
 async function resolveVerifiedImage({
   actionRef,
   actionRepo,
-}: ResolveVerifiedImageOptions): Promise<ResolvedImage> {
+}: VerifyImageIdentity): Promise<ResolvedImage> {
   const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine: "proxy" });
   console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
   return {
     imageRef: resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo }),
     pullPolicy: "always",
-  };
-}
-
-/**
- * Rethrow a rule-parser's syntax errors as a SandboxError with the shared
- * INVALID_RULES code, used by both buildACLRules and readKnownBlockedRules.
- */
-function parseRulesOrThrow(rulesInput: string | undefined): string[] {
-  try {
-    return parseAndValidateRules(rulesInput);
-  } catch (e) {
-    throw new SandboxError(errorMessage(e), "INVALID_RULES");
-  }
-}
-
-/**
- * Build ACL rules from input strings. Rules are passed through as-is
- * (wildcard format), validated eagerly.
- */
-export interface BuildACLRulesInput {
-  httpsRulesInput: string | undefined;
-  httpRulesInput: string | undefined;
-  ipRulesInput: string | undefined;
-}
-
-export interface ACLRules {
-  httpsRules: string[];
-  httpRules: string[];
-  ipRules: string[];
-}
-
-export function buildACLRules({
-  httpsRulesInput,
-  httpRulesInput,
-  ipRulesInput,
-}: BuildACLRulesInput): ACLRules {
-  return {
-    httpsRules: parseRulesOrThrow(httpsRulesInput),
-    httpRules: parseRulesOrThrow(httpRulesInput),
-    ipRules: parseRulesOrThrow(ipRulesInput),
   };
 }
 
