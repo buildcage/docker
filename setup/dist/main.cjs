@@ -7076,16 +7076,6 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, ve
 }
 //#endregion
 //#region core/lib/provenance/image-ref.ts
-/**
-* Resolve the buildcage Docker image reference (image@digest). The
-* repository is always derived from the action repository — external image
-* overrides are intentionally not supported to preserve Sigstore verification
-* integrity.
-*
-* Kept in its own module (rather than inside setup/src/main.js) so other
-* entry points (e.g. run/src/main.js) can reuse it without also
-* bundling setup/src/main.js's own self-invocation guard.
-*/
 function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
@@ -7126,11 +7116,6 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 //#endregion
 //#region setup/src/main.ts
 const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
-/**
-* Verifies image provenance and resolves the digest-pinned image ref.
-* Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
-* performed (branch ref / local ./setup) — printed by the top-level catch.
-*/
 async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }) {
 	let digest = await verifyImageDigestOrThrow({
 		actionRef,
@@ -7225,10 +7210,6 @@ function parseRulesOrThrow(rulesInput) {
 		throw new SetupError(errorMessage(e), "INVALID_RULES");
 	}
 }
-/**
-* Build ACL rules from input strings. Rules are passed through as-is
-* (wildcard format), validated eagerly.
-*/
 function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 	return {
 		httpsRules: parseRulesOrThrow(httpsRulesInput),

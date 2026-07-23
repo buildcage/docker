@@ -86,16 +86,6 @@ function wildcardToRegex(pattern) {
 }
 //#endregion
 //#region core/lib/provenance/image-ref.ts
-/**
-* Resolve the buildcage Docker image reference (image@digest). The
-* repository is always derived from the action repository — external image
-* overrides are intentionally not supported to preserve Sigstore verification
-* integrity.
-*
-* Kept in its own module (rather than inside setup/src/main.js) so other
-* entry points (e.g. run/src/main.js) can reuse it without also
-* bundling setup/src/main.js's own self-invocation guard.
-*/
 function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
@@ -7157,11 +7147,6 @@ var SandboxError = class extends ActionError {};
 //#endregion
 //#region run/src/lib/sudo-preflight.ts
 const SLIM_RUNNER_NOTE = `${SLIM_RUNNER_DETECTED_PREFIX} — these typically don't have passwordless sudo configured for this kind of privileged setup.`;
-/**
-* Kept pure (takes the error, not execFileSync's raw output) so it's
-* unit-testable the same way as core/lib/actions/docker-error.js's
-* describeDockerFailure.
-*/
 function describeSudoFailure(e, { env = process.env, exists = node_fs.existsSync } = {}) {
 	let err = e && typeof e == "object" ? e : {}, captured = typeof err.stderr == "string" ? err.stderr.trim() : "";
 	return `'sudo' is not available without a password on this runner.${isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE : ""} The run action requires a Linux runner with passwordless sudo for the isolation setup itself (network namespace, veth, iptables) — this is the default on GitHub-hosted "ubuntu-*" runners, but NOT on lightweight images such as "ubuntu-slim" or many self-hosted/minimal runners. See docs/reference.md and docs/security.md for details.${captured ? ` (${captured})` : ""}`;
@@ -7209,10 +7194,6 @@ function generateContainerName() {
 function deriveProjectName(containerName) {
 	return containerName;
 }
-/**
-* Used to pull runc and gen-seccomp-profile out of the proxy image before
-* the isolated command runs (see lib/isolated-exec.js).
-*/
 function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	return [
 		"cp",
@@ -7258,21 +7239,6 @@ function getContainerPid(containerName, { exec = node_child_process.execFileSync
 }
 //#endregion
 //#region run/src/lib/compose-args.ts
-/**
-* Build the `docker compose ... up`/`down` argv. Kept in its own module
-* (rather than inside run/src/main.js) so post.js can reuse it without
-* also bundling main.js's self-invocation guard — importing main.js
-* directly would pull in its
-* `if (process.argv[1] === fileURLToPath(import.meta.url))` check too,
-* which fires a second time once rollup merges both files'
-* `import.meta.url` into a single bundle (see core/lib/provenance/image-ref.js
-* for the same issue hit previously).
-*
-* `-p projectName` is required on both so that fully concurrent `run`
-* steps in the same job (see GitHub Actions' `background`/`wait`/`parallel`
-* step keywords) never share Compose's implicit, directory-derived project
-* name — see lib/container.js's deriveProjectName for why that matters.
-*/
 function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
 	return [
 		"compose",
@@ -7331,19 +7297,6 @@ function writeRunScript(runInput, dir) {
 function generateBaseOciSpec(runcPath, bundleDir) {
 	return (0, node_child_process.execFileSync)(runcPath, ["spec"], { cwd: bundleDir }), JSON.parse((0, node_fs.readFileSync)((0, node_path.join)(bundleDir, "config.json"), "utf8"));
 }
-/**
-* Extract runc and gen-seccomp-profile from the proxy image into this run's
-* own `destDir` (its per-step scratch dir), then resolve the base OCI spec
-* and the seccomp profile from them. Run once per `run:` step; each
-* invocation is independent, and everything written here is torn down with
-* the scratch dir (see withScratchDir / cleanupScratchDir).
-*
-* Both binaries ship inside the proxy image and are pulled onto the host via
-* `docker cp`, then run natively there (not `docker exec`) since the seccomp
-* profile's content depends on the real host kernel/arch -- see
-* gen-seccomp-profile/main.go. gen-seccomp-profile is only needed transiently
-* to resolve the profile, so it's removed once read; runc stays for `runc run`.
-*/
 function extractRuncBootstrap({ containerName, destDir }) {
 	let runcPath = (0, node_path.join)(destDir, "runc"), genSeccompProfilePath = (0, node_path.join)(destDir, "gen-seccomp-profile");
 	(0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
@@ -7411,17 +7364,6 @@ function listHostMounts() {
 function computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinations) {
 	return hostMounts.filter(({ mountPoint }) => mountPoint !== "/" && !freshMountDestinations.has(mountPoint) && !protectedPaths.has(mountPoint)).map(({ mountPoint }) => mountPoint);
 }
-/**
-* Pure: the set of destination paths `baseSpec.mounts` already declares a
-* mount for. Derived directly from the actual `runc spec` output already
-* being used to build config.json (see generateBaseOciSpec), rather than a
-* hardcoded list of filesystem types -- this stays correct automatically
-* if a future runc version changes its own default mounts, and sidesteps
-* fstype ambiguity (e.g. runc's default spec declares a `cgroup`-type
-* mount at /sys/fs/cgroup that transparently resolves to the host's real
-* cgroup v1 or v2 hierarchy, so matching by destination path covers both
-* without needing to special-case a literal "cgroup2" fstype name).
-*/
 function freshMountDestinationsFrom(baseSpec) {
 	return new Set(baseSpec.mounts.map((m) => m.destination));
 }
@@ -7542,18 +7484,6 @@ function writeResolvConf(dns, dir) {
 	let resolvConfPath = (0, node_path.join)(dir, "resolv.conf");
 	return (0, node_fs.writeFileSync)(resolvConfPath, `nameserver ${dns}\n`, { mode: 420 }), resolvConfPath;
 }
-/**
-* Run the user's command inside the isolated sandbox via run-isolated.sh
-* (invoked with `sudo -n`, since setting up namespaces/veth/iptables/the
-* rootfs bind-mount requires root). Returns the exit code of the isolated
-* command — never throws for a non-zero exit, since that's the user's
-* command failing, not this function.
-*
-* uid/gid, capabilities, mounts, and env are entirely described by
-* `config.json` (see buildOciConfig) — run-isolated.sh only needs enough
-* to set up networking and the rootfs bind-mount before handing off to
-* `runc run`.
-*/
 function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsName, rootfsBindDir, gateway, dns, targetIp }) {
 	let args = [
 		"-n",
@@ -7765,29 +7695,12 @@ function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blocked
 		shouldFail: !1
 	};
 }
-/**
-* Build the annotation message text for a blocked-connections check.
-*
-* In audit mode the text always stays the fixed-format base string,
-* regardless of known_blocked_rules matching — audit mode's pass/fail
-* outcome is unaffected by matching (see determineBlockedOutcome), so
-* varying the notice text there would be misleading and would silently
-* break any tooling that matches the old fixed-format notice.
-*
-*/
 function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }) {
 	let base = `${blockedCount} blocked connection(s) detected by buildcage ${engineLabel}`;
 	if (isAudit) return base;
 	let unexpected = blockedRows.filter((row) => !row.expected).length;
 	return unexpected === blockedRows.length ? base : unexpected === 0 ? `${base}, all matched known_blocked_rules (expected)` : `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
 }
-/**
-* Single entry point composing the three functions above. Both
-* run/src/lib/report.js and report/src/main.js call this once and thread
-* the result through their table rendering and annotation code, rather
-* than each recomputing annotateKnownBlocked independently.
-*
-*/
 function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engineLabel }) {
 	let isAudit = report.mode === "audit", blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules), outcome = determineBlockedOutcome({
 		isAudit,
@@ -7882,14 +7795,6 @@ function fetchReport(containerName) {
 	});
 	return JSON.parse(jsonOutput);
 }
-/**
-* Build the Job Summary markdown section for this run step's traffic
-* report. Each `run` step gets its own section (rather than one report
-* per job), matching the "one proxy container per step" execution model.
-*
-* `blockedRows`/`showExpected` come pre-computed from the caller so
-* known_blocked_rules matching runs once per report, not once per render.
-*/
 function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand, blockedRows = [], showExpected = !1 } = {}) {
 	let heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
 	if (report.mode === null) return `## ${heading}\n\nNo proxy logs found.\n`;
@@ -7934,11 +7839,6 @@ function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, 
 //#endregion
 //#region run/src/main.ts
 const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
-/**
-* Verifies image provenance and resolves the digest-pinned image ref for
-* the run action's (buildkitd-less) proxy image, published under the `-proxy`
-* tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.js).
-*/
 async function resolveVerifiedImage({ actionRef, actionRepo }) {
 	let digest = await verifyImageDigestOrThrow({
 		actionRef,
@@ -7964,10 +7864,6 @@ function parseRulesOrThrow(rulesInput) {
 		throw new SandboxError(errorMessage(e), "INVALID_RULES");
 	}
 }
-/**
-* Build ACL rules from input strings. Rules are passed through as-is
-* (wildcard format), validated eagerly.
-*/
 function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 	return {
 		httpsRules: parseRulesOrThrow(httpsRulesInput),

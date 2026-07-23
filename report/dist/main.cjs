@@ -203,12 +203,6 @@ function parseVertexAllowedLog(rawJsonText) {
 		};
 	});
 }
-/**
-* Build the host-aggregated allowed/audited table from the same per-build
-* vertex data parseVertexAllowedLog() produces for the per-command breakdown.
-*
-* decision is "ALLOWED" (restrict mode) or "AUDIT" (audit mode).
-*/
 function aggregateAllowedHosts(builds, decision) {
 	let entries = [];
 	for (let vertices of builds) for (let { entries: vertexEntries } of vertices) for (let { url } of vertexEntries) {
@@ -355,29 +349,12 @@ function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blocked
 		shouldFail: !1
 	};
 }
-/**
-* Build the annotation message text for a blocked-connections check.
-*
-* In audit mode the text always stays the fixed-format base string,
-* regardless of known_blocked_rules matching — audit mode's pass/fail
-* outcome is unaffected by matching (see determineBlockedOutcome), so
-* varying the notice text there would be misleading and would silently
-* break any tooling that matches the old fixed-format notice.
-*
-*/
 function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }) {
 	let base = `${blockedCount} blocked connection(s) detected by buildcage ${engineLabel}`;
 	if (isAudit) return base;
 	let unexpected = blockedRows.filter((row) => !row.expected).length;
 	return unexpected === blockedRows.length ? base : unexpected === 0 ? `${base}, all matched known_blocked_rules (expected)` : `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
 }
-/**
-* Single entry point composing the three functions above. Both
-* run/src/lib/report.js and report/src/main.js call this once and thread
-* the result through their table rendering and annotation code, rather
-* than each recomputing annotateKnownBlocked independently.
-*
-*/
 function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engineLabel }) {
 	let isAudit = report.mode === "audit", blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules), outcome = determineBlockedOutcome({
 		isAudit,
