@@ -7711,7 +7711,7 @@ function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engin
 	};
 }
 //#endregion
-//#region core/lib/report/markdown-table.ts
+//#region core/lib/actions/markdown-table.ts
 const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",

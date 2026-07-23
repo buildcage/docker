@@ -388,7 +388,7 @@ function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engin
 	};
 }
 //#endregion
-//#region core/lib/report/markdown-table.ts
+//#region core/lib/actions/markdown-table.ts
 const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
@@ -437,6 +437,48 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 		expected: r.expected ? "✅" : ""
 	})));
 }
+//#endregion
+//#region core/lib/general/action-error.ts
+/**
+* Base class for an action's own "intentional" errors — a caught failure
+* whose message is safe to print directly via ::error::, as opposed to an
+* unexpected one. A top-level catch checks `instanceof ActionError`.
+* `name` is derived from `new.target`, so a subclass needs no constructor
+* of its own to get its own name.
+*/
+var ActionError = class extends Error {
+	code;
+	constructor(message, code) {
+		super(message), this.name = new.target.name, this.code = code;
+	}
+};
+//#endregion
+//#region core/lib/general/error-message.ts
+/**
+* Safely extract a message from a caught value of unknown shape — a plain
+* `Error` most of the time, but `catch` doesn't guarantee that.
+*/
+function errorMessage(e) {
+	return e instanceof Error ? e.message : String(e);
+}
+//#endregion
+//#region core/lib/acl/rules.ts
+/**
+* Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
+* allowed_ip_rules/known_blocked_rules) fails to parse — shared by the
+* setup and run actions, which both accept the same rule syntax.
+*/
+var InvalidRulesError = class extends ActionError {};
+/**
+* Rethrow a rule-parser's syntax errors as an InvalidRulesError.
+*/
+function parseRulesOrThrow(rulesInput) {
+	try {
+		return parseAndValidateRules(rulesInput);
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+	}
+}
 /**
 * Turns a caught `docker` invocation error into an actionable message,
 * pointing at the runner requirement instead of surfacing execFileSync's
@@ -472,15 +514,6 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region core/lib/general/error-message.ts
-/**
-* Safely extract a message from a caught value of unknown shape — a plain
-* `Error` most of the time, but `catch` doesn't guarantee that.
-*/
-function errorMessage(e) {
-	return e instanceof Error ? e.message : String(e);
-}
-//#endregion
 //#region report/src/main.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), composeFile = process.argv[2] || (0, node_path.join)(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
 	...process.env,
@@ -488,7 +521,7 @@ const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("
 }, summaryFile = process.env.GITHUB_STEP_SUMMARY, annotation = createAnnotation(!!summaryFile);
 let knownBlockedRules;
 try {
-	knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
+	knownBlockedRules = parseRulesOrThrow(process.env.INPUT_KNOWN_BLOCKED_RULES);
 } catch (e) {
 	annotation.error(errorMessage(e)), process.exit(1);
 }

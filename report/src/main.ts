@@ -13,7 +13,7 @@ import {
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { evaluateBlockedReport } from "../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../core/lib/report/host-table.ts";
-import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
+import { parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 import type { ReportData } from "../../core/lib/report/report-data.ts";
@@ -38,7 +38,7 @@ const annotation = createAnnotation(Boolean(summaryFile));
 
 let knownBlockedRules: string[];
 try {
-  knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
+  knownBlockedRules = parseRulesOrThrow(process.env.INPUT_KNOWN_BLOCKED_RULES);
 } catch (e) {
   annotation.error(errorMessage(e));
   process.exit(1);

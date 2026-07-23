@@ -1,4 +1,4 @@
-import { markdownTable, type ColumnFormat } from "./markdown-table.ts";
+import { markdownTable, type ColumnFormat } from "../actions/markdown-table.ts";
 import type { AggregatedEntry } from "../../shared/lib/aggregate.js";
 
 export interface HostTableRow extends Omit<AggregatedEntry, "reason"> {
