@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Unit tests for run/lib/report.js — specifically writeReport's
  * exit-code semantics (see main.js's own `if (exitCode !== 0)` for the
@@ -13,7 +12,7 @@ import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeReport, buildReportMarkdown } from "./report.ts";
+import { writeReport, buildReportMarkdown, type Report, type WriteReportOptions } from "./report.ts";
 import { annotateKnownBlocked } from "../../../core/lib/report/known-blocked.ts";
 import { withScratchDir } from "./isolated-exec.ts";
 
@@ -22,8 +21,8 @@ import { withScratchDir } from "./isolated-exec.ts";
 // main.js itself does) -- both are saved/restored per test so a test here
 // can never leak into another test in this file, another test file, or
 // (critically) into `node --test`'s own final exit status.
-let prevEnv;
-let prevExitCode;
+let prevEnv: NodeJS.ProcessEnv;
+let prevExitCode: number | string | null | undefined;
 
 beforeEach(() => {
   prevEnv = { ...process.env };
@@ -36,7 +35,7 @@ afterEach(() => {
   process.exitCode = prevExitCode;
 });
 
-function writeReportWithSummary(report, opts) {
+function writeReportWithSummary(report: Report, opts: WriteReportOptions) {
   return withScratchDir((dir) => {
     const summaryPath = join(dir, "summary.md");
     writeFileSync(summaryPath, "");

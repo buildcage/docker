@@ -7862,7 +7862,7 @@ function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runComm
 	if (report.mode === null) return `## ${heading}\n\nNo proxy logs found.\n`;
 	let isAudit = report.mode === "audit", markdown = `## ${heading} (${report.mode} mode)\n\n`;
 	if (isAudit) {
-		let audited = report.sections.audited || [];
+		let audited = report.sections?.audited || [];
 		audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n\n"), markdown += buildRestrictExample(audited, actionRepo, actionRef, {
 			actionName: "run",
 			runCommand
@@ -7871,7 +7871,7 @@ function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runComm
 			showExpected
 		}) + "\n\n");
 	} else {
-		let allowed = report.sections.allowed || [];
+		let allowed = report.sections?.allowed || [];
 		allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n\n"), blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, {
 			showReason: !0,
 			showExpected
@@ -7879,15 +7879,10 @@ function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runComm
 	}
 	return markdown;
 }
-/**
-* Append this step's report to the Job Summary and emit annotations /
-* set the exit code for blocked connections, mirroring report/src/main.js's
-* behavior but scoped to a single run step's proxy container.
-*/
 function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand, knownBlockedRules = [] } = {}) {
 	let { blockedRows, showExpected, outcome, message } = evaluateBlockedReport(report, {
 		knownBlockedRules,
-		failOnBlocked,
+		failOnBlocked: failOnBlocked ?? !1,
 		engineLabel: "sandbox"
 	}), markdown = buildReportMarkdown(report, {
 		stepLabel,
