@@ -16,6 +16,7 @@ import { renderHostTable } from "../../core/lib/report/host-table.ts";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
+import type { ReportData } from "../../core/lib/report/report-data.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -60,7 +61,7 @@ try {
   process.exit(1);
 }
 
-const report = JSON.parse(jsonOutput);
+const report = JSON.parse(jsonOutput) as ReportData;
 
 // 2. Console output — raw log lines (read directly from container log file)
 console.log("::group::HTTP Proxy communication logs");
@@ -145,7 +146,7 @@ const { blockedRows: annotatedBlocked, showExpected, outcome, message } = evalua
 let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
 
 if (isAudit) {
-  const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
+  const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections?.audited || [];
   if (audited.length > 0) {
     markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n";
   }
@@ -155,7 +156,7 @@ if (isAudit) {
     markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
   }
 } else {
-  const allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections.allowed || [];
+  const allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections?.allowed || [];
   if (allowed.length > 0) {
     markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n";
   }

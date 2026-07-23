@@ -1,4 +1,5 @@
 import type { AllowedRequest, VertexAllowedEntry } from "./vertex-log.ts";
+import type { DeniedEntry } from "../../../core/lib/report/report-data.ts";
 
 /**
  * Render the explicit engine's communication detail as a collapsed markdown
@@ -13,11 +14,6 @@ import type { AllowedRequest, VertexAllowedEntry } from "./vertex-log.ts";
  * Command text is escaped since it's embedded directly in markdown; request
  * lines go inside a fenced code block instead, where escaping isn't needed.
  */
-export interface DeniedEntry {
-  url: string;
-  timestamp: string;
-}
-
 export function renderCommunicationDetails(
   builds: VertexAllowedEntry[][] | null | undefined,
   deniedTimeline: DeniedEntry[] | null | undefined,

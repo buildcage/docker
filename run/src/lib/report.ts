@@ -2,20 +2,11 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { createAnnotation } from "../../../core/lib/actions/annotation.ts";
 import { buildRestrictExample } from "../../../core/lib/report/build-example.ts";
-import { evaluateBlockedReport, type AnnotatedBlockedRow, type BlockedRow } from "../../../core/lib/report/known-blocked.ts";
-import { renderHostTable, type HostTableRow } from "../../../core/lib/report/host-table.ts";
+import { evaluateBlockedReport, type AnnotatedBlockedRow } from "../../../core/lib/report/known-blocked.ts";
+import { renderHostTable } from "../../../core/lib/report/host-table.ts";
+import type { ReportData } from "../../../core/lib/report/report-data.ts";
 
-export interface ReportSections {
-  audited?: HostTableRow[];
-  allowed?: HostTableRow[];
-  blocked?: BlockedRow[];
-}
-
-export interface Report {
-  mode: string | null;
-  sections?: ReportSections;
-  blockedCount?: number;
-}
+export type Report = ReportData;
 
 /**
  * Fetch the structured HAProxy-log report from the (still-running) proxy
@@ -33,6 +24,17 @@ export function fetchReport(containerName: string): Report {
 }
 
 /**
+ * Fields shared by buildReportMarkdown/writeReport's option bags — both
+ * describe the same run step (label, provenance-example context).
+ */
+export interface ReportRenderContext {
+  stepLabel?: string;
+  actionRepo?: string;
+  actionRef?: string;
+  runCommand?: string;
+}
+
+/**
  * Build the Job Summary markdown section for this run step's traffic
  * report. Each `run` step gets its own section (rather than one report
  * per job), matching the "one proxy container per step" execution model.
@@ -40,11 +42,7 @@ export function fetchReport(containerName: string): Report {
  * `blockedRows`/`showExpected` come pre-computed from the caller so
  * known_blocked_rules matching runs once per report, not once per render.
  */
-export interface BuildReportMarkdownOptions {
-  stepLabel?: string;
-  actionRepo?: string;
-  actionRef?: string;
-  runCommand?: string;
+export interface BuildReportMarkdownOptions extends ReportRenderContext {
   blockedRows?: AnnotatedBlockedRow[];
   showExpected?: boolean;
 }
@@ -91,12 +89,8 @@ export function buildReportMarkdown(
  * set the exit code for blocked connections, mirroring report/src/main.js's
  * behavior but scoped to a single run step's proxy container.
  */
-export interface WriteReportOptions {
-  stepLabel?: string;
+export interface WriteReportOptions extends ReportRenderContext {
   failOnBlocked?: boolean;
-  actionRepo?: string;
-  actionRef?: string;
-  runCommand?: string;
   knownBlockedRules?: string[];
 }
 

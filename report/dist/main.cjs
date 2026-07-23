@@ -34,6 +34,19 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 }
 //#endregion
 //#region report/src/lib/command-log.ts
+/**
+* Render the explicit engine's communication detail as a collapsed markdown
+* section, or "" if there's nothing to show. Allowed Urls is listed before
+* Blocked Urls, matching the Allowed Hosts / Blocked Hosts tables above.
+*
+* Blocked entries aren't attributed to a specific RUN step — buildkitd's
+* denial log carries no vertex/span identifier to attribute it with. A
+* "Build N" item separates builds only when there's more than one, since
+* step labels like "[2/15] RUN ..." repeat across builds.
+*
+* Command text is escaped since it's embedded directly in markdown; request
+* lines go inside a fenced code block instead, where escaping isn't needed.
+*/
 function renderCommunicationDetails(builds, deniedTimeline) {
 	let nonEmptyBuilds = (builds || []).filter((b) => b && b.length > 0), hasVertexLog = nonEmptyBuilds.length > 0, hasDenied = deniedTimeline && deniedTimeline.length > 0;
 	if (!hasVertexLog && !hasDenied) return "";
@@ -581,13 +594,13 @@ const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase(
 });
 let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
 if (isAudit) {
-	let audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections.audited || [];
+	let audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections?.audited || [];
 	audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n"), markdown += buildRestrictExample(audited, actionRepo, actionRef), annotatedBlocked.length > 0 && (audited.length > 0 && (markdown += "\n"), markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, {
 		showReason: !0,
 		showExpected
 	}) + "\n");
 } else {
-	let allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections.allowed || [];
+	let allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections?.allowed || [];
 	allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n"), allowed.length > 0 && annotatedBlocked.length > 0 && (markdown += "\n"), annotatedBlocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, {
 		showReason: !0,
 		showExpected
