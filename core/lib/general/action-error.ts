@@ -5,10 +5,10 @@
  * `name` is derived from `new.target`, so a subclass needs no constructor
  * of its own to get its own name.
  */
-export class ActionError extends Error {
-  code: string;
+export class ActionError<Code extends string = string> extends Error {
+  code: Code;
 
-  constructor(message: string, code: string) {
+  constructor(message: string, code: Code) {
     super(message);
     this.name = new.target.name;
     this.code = code;

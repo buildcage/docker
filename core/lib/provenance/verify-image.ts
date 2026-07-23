@@ -11,7 +11,7 @@
 
 import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.ts";
 import { derUtf8, verifyBundle, type VerifyBundleOptions, type DsseBundle } from "./sigstore.ts";
-import { ProvenanceError } from "./errors.ts";
+import { ProvenanceError, type ProvenanceErrorCode } from "./errors.ts";
 
 const REGISTRY = "ghcr.io";
 const EXPECTED_ISSUER = "https://token.actions.githubusercontent.com";
@@ -153,7 +153,7 @@ export async function verifyImageDigestOrThrow({
   try {
     digest = await verifyImageDigestFn({ actionRef, actionRepo, proxyEngine });
   } catch (e) {
-    const err = e as Error & { code?: string };
+    const err = e as Error & { code?: ProvenanceErrorCode };
     throw new ProvenanceError(err.message, err.code ?? "VERIFY_FAILED");
   }
   if (digest === null) {

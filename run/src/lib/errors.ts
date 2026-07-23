@@ -14,4 +14,13 @@ import { ActionError } from "../../../core/lib/general/action-error.ts";
  *   DOCKER_UNAVAILABLE         – docker CLI missing from PATH or a docker command failed
  *   PASSWORDLESS_SUDO_REQUIRED – sudo -n check failed; passwordless sudo isn't configured
  */
-export class SandboxError extends ActionError {}
+export type SandboxErrorCode =
+  | "INVALID_RULES"
+  | "MISSING_RUN"
+  | "PROXY_NOT_RUNNING"
+  | "RUNC_EXTRACT_FAILED"
+  | "OCI_CONFIG_BUILD_FAILED"
+  | "DOCKER_UNAVAILABLE"
+  | "PASSWORDLESS_SUDO_REQUIRED";
+
+export class SandboxError extends ActionError<SandboxErrorCode> {}

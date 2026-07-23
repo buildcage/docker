@@ -11,10 +11,12 @@ import { ActionError } from "../general/action-error.ts";
  *   TOKEN_ERROR      – registry token endpoint returned a client error
  *   VERIFY_FAILED    – Sigstore bundle verification failed
  */
-export class VerifyImageError extends Error {
-  code: string;
+export type VerifyImageErrorCode = "NOT_FOUND" | "TRANSIENT" | "TOKEN_ERROR" | "VERIFY_FAILED";
 
-  constructor(message: string, code: string) {
+export class VerifyImageError extends Error {
+  code: VerifyImageErrorCode;
+
+  constructor(message: string, code: VerifyImageErrorCode) {
     super(message);
     this.name = "VerifyImageError";
     this.code = code;
@@ -34,4 +36,6 @@ export class VerifyImageError extends Error {
  *   VERIFY_FAILED    – Sigstore bundle verification failed
  *   UNVERIFIABLE_REF – action ref cannot be verified (branch / local path)
  */
-export class ProvenanceError extends ActionError {}
+export type ProvenanceErrorCode = VerifyImageErrorCode | "UNVERIFIABLE_REF";
+
+export class ProvenanceError extends ActionError<ProvenanceErrorCode> {}

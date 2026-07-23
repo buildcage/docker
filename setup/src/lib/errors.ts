@@ -10,4 +10,6 @@ import { ActionError } from "../../../core/lib/general/action-error.ts";
  *   DOCKER_UNAVAILABLE    – docker CLI missing from PATH or a docker command failed
  *   INVALID_PROXY_ENGINE  – proxy_engine input isn't "transparent" or "explicit"
  */
-export class SetupError extends ActionError {}
+export type SetupErrorCode = "INVALID_RULES" | "DOCKER_UNAVAILABLE" | "INVALID_PROXY_ENGINE";
+
+export class SetupError extends ActionError<SetupErrorCode> {}
