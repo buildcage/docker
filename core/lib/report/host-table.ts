@@ -1,15 +1,27 @@
-// @ts-nocheck
-import { markdownTable } from "./markdown-table.ts";
+import { markdownTable, type ColumnFormat } from "./markdown-table.ts";
+
+export interface HostTableRow {
+  host: string;
+  port: string;
+  ruleType: string;
+  reason?: string;
+  count: number;
+  expected?: boolean;
+}
+
+export interface RenderHostTableOptions {
+  showReason?: boolean;
+  showExpected?: boolean;
+}
 
 /**
  * Render aggregated host rows as a GitHub-flavored markdown table.
- *
- * @param {{host:string, port:string, ruleType:string, reason?:string, count:number, expected?:boolean}[]} rows
- * @param {{showReason?: boolean, showExpected?: boolean}} [options]
- * @returns {string}
  */
-export function renderHostTable(rows, { showReason = false, showExpected = false } = {}) {
-  const formats = [
+export function renderHostTable(
+  rows: HostTableRow[],
+  { showReason = false, showExpected = false }: RenderHostTableOptions = {},
+): string {
+  const formats: ColumnFormat[] = [
     { key: "host", title: "Host" },
     { key: "ruleType", title: "Rule" },
   ];
