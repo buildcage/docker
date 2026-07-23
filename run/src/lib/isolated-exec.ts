@@ -113,13 +113,21 @@ export function generateBaseOciSpec(runcPath: string, bundleDir: string): OciSpe
  * gen-seccomp-profile/main.go. gen-seccomp-profile is only needed transiently
  * to resolve the profile, so it's removed once read; runc stays for `runc run`.
  */
+export interface ExtractRuncBootstrapOptions {
+  containerName: string;
+  destDir: string;
+}
+
+export interface RuncBootstrap {
+  runcPath: string;
+  seccompProfile: unknown;
+  baseSpec: OciSpec;
+}
+
 export function extractRuncBootstrap({
   containerName,
   destDir,
-}: {
-  containerName: string;
-  destDir: string;
-}): { runcPath: string; seccompProfile: unknown; baseSpec: OciSpec } {
+}: ExtractRuncBootstrapOptions): RuncBootstrap {
   const runcPath = join(destDir, "runc");
   const genSeccompProfilePath = join(destDir, "gen-seccomp-profile");
   execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/runc", hostPath: runcPath }));
@@ -206,7 +214,11 @@ export function computeReadonlyHostMounts(
  * cgroup v1 or v2 hierarchy, so matching by destination path covers both
  * without needing to special-case a literal "cgroup2" fstype name).
  */
-export function freshMountDestinationsFrom(baseSpec: { mounts: MountEntry[] }): Set<string> {
+export interface HasMounts {
+  mounts: MountEntry[];
+}
+
+export function freshMountDestinationsFrom(baseSpec: HasMounts): Set<string> {
   return new Set(baseSpec.mounts.map((m) => m.destination));
 }
 
@@ -421,6 +433,18 @@ export function writeResolvConf(dns: string, dir: string): string {
  * to set up networking and the rootfs bind-mount before handing off to
  * `runc run`.
  */
+export interface RunIsolatedOptions {
+  runcPath: string;
+  proxyPid: number;
+  bundleDir: string;
+  containerId: string;
+  netnsName: string;
+  rootfsBindDir: string;
+  gateway: string;
+  dns: string;
+  targetIp: string;
+}
+
 export function runIsolated({
   runcPath,
   proxyPid,
@@ -431,17 +455,7 @@ export function runIsolated({
   gateway,
   dns,
   targetIp,
-}: {
-  runcPath: string;
-  proxyPid: number;
-  bundleDir: string;
-  containerId: string;
-  netnsName: string;
-  rootfsBindDir: string;
-  gateway: string;
-  dns: string;
-  targetIp: string;
-}): number {
+}: RunIsolatedOptions): number {
   const runIsolatedShPath = join(__dirname, "..", "scripts", "run-isolated.sh");
 
   const args = [
