@@ -1,34 +1,47 @@
-// @ts-nocheck
-const ruleTypeToParam = {
+const ruleTypeToParam: Record<string, string> = {
   HTTPS: "allowed_https_rules",
   HTTP: "allowed_http_rules",
   IP: "allowed_ip_rules",
 };
 
+export interface AuditedRow {
+  host: string;
+  port: string;
+  ruleType: string;
+}
+
+export interface BuildRestrictExampleOptions {
+  /** "setup" (default) or "run" */
+  actionName?: "setup" | "run";
+  /** the `run:` input, included only when actionName is "run" */
+  runCommand?: string;
+}
+
 /**
  * Build a restrict-mode YAML configuration example from audited rows.
  * Returns a markdown string wrapped in <details> tags, or "" if no rows.
  *
- * @param {Array<{host: string, port: string, ruleType: string}>} auditedRows
- * @param {string} actionRepo
- * @param {string} actionRef - the ref (tag or commit SHA) this action was invoked with
- * @param {{actionName?: string, runCommand?: string}} [options] - actionName: "setup" (default) or "run"; runCommand: the `run:` input, included only when actionName is "run"
- * @returns {string}
+ * actionRef is the ref (tag or commit SHA) this action was invoked with.
  */
-export function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName = "setup", runCommand } = {}) {
+export function buildRestrictExample(
+  auditedRows: AuditedRow[] | null | undefined,
+  actionRepo: string,
+  actionRef?: string,
+  { actionName = "setup", runCommand }: BuildRestrictExampleOptions = {},
+): string {
   if (!auditedRows || auditedRows.length === 0) return "";
 
   // A 40-char SHA is opaque to the reader and specific to this run, so show a
   // placeholder instead; a tag (e.g. v2, v2.1.0) is stable and useful as-is.
-  const ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef;
+  const ref = /^[0-9a-f]{40}$/i.test(actionRef!) ? "<sha>" : actionRef;
 
   // Group by ruleType, preserving order of first appearance
-  const groups = new Map();
+  const groups = new Map<string, string[]>();
   for (const r of auditedRows) {
     const param = ruleTypeToParam[r.ruleType];
     if (!param) continue;
     if (!groups.has(param)) groups.set(param, []);
-    groups.get(param).push(`${r.host}:${r.port}`);
+    groups.get(param)!.push(`${r.host}:${r.port}`);
   }
 
   if (groups.size === 0) return "";

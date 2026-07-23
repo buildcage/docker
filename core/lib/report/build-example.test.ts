@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildRestrictExample } from "./build-example.ts";
@@ -6,7 +5,7 @@ import { buildRestrictExample } from "./build-example.ts";
 const REPO = "dash14/buildcage";
 const REF = "v2";
 
-function wrap(yaml) {
+function wrap(yaml: string) {
   return (
     "\n<details>\n" +
     "<summary>🛡️ Switch to restrict mode</summary>\n\n" +
