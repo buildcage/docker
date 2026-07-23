@@ -482,6 +482,15 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
+//#region core/lib/general/error-message.ts
+/**
+* Safely extract a message from a caught value of unknown shape — a plain
+* `Error` most of the time, but `catch` doesn't guarantee that.
+*/
+function errorMessage(e) {
+	return e instanceof Error ? e.message : String(e);
+}
+//#endregion
 //#region report/src/main.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), composeFile = process.argv[2] || (0, node_path.join)(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
 	...process.env,
@@ -491,7 +500,7 @@ let knownBlockedRules;
 try {
 	knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
 } catch (e) {
-	annotation.error(e.message), process.exit(1);
+	annotation.error(errorMessage(e)), process.exit(1);
 }
 let jsonOutput;
 try {
@@ -586,7 +595,7 @@ if (isExplicit) try {
 		maxBuffer: 64 * 1024 * 1024
 	})));
 } catch (e) {
-	console.log("(failed to fetch allowed/audited traffic detail via buildctl:", e.message, ")");
+	console.log("(failed to fetch allowed/audited traffic detail via buildctl:", errorMessage(e), ")");
 }
 const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true", { blockedRows: annotatedBlocked, showExpected, outcome, message } = evaluateBlockedReport(report, {
 	knownBlockedRules,

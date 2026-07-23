@@ -99,6 +99,15 @@ var ActionError = class extends Error {
 	}
 }, SetupError = class extends ActionError {};
 //#endregion
+//#region core/lib/general/error-message.ts
+/**
+* Safely extract a message from a caught value of unknown shape — a plain
+* `Error` most of the time, but `catch` doesn't guarantee that.
+*/
+function errorMessage(e) {
+	return e instanceof Error ? e.message : String(e);
+}
+//#endregion
 //#region core/lib/provenance/errors.ts
 /**
 * VerifyImageError — intentional error in the image provenance verification
@@ -190,7 +199,7 @@ async function fetchManifestDigest(registry, repo, tag, token, _fetch = fetch) {
 		if (!digest) throw new VerifyImageError(`No digest in manifest response for ${registry}/${repo}:${tag}`, "TRANSIENT");
 		return digest;
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 /**
@@ -208,7 +217,7 @@ async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fetch) {
 		if (resp.ok) return (await resp.json()).token;
 		throw new VerifyImageError(`Registry authentication failed: HTTP ${resp.status}. The credentials in Docker config may be expired — run \`docker login ${registry}\` again.`, "TOKEN_ERROR");
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching registry token: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching registry token: ${errorMessage(err)}`, "TRANSIENT");
 	}
 	try {
 		let resp = await _fetch(url);
@@ -216,7 +225,7 @@ async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fetch) {
 		if (resp.ok) return (await resp.json()).token;
 		throw new VerifyImageError(`Failed to get registry token: HTTP ${resp.status}. The package may be private. Run \`docker login ${registry}\` (or use docker/login-action with 'packages: read') before this action.`, "TOKEN_ERROR");
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching registry token: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching registry token: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 /**
@@ -236,7 +245,7 @@ async function fetchBundle(registry, repo, digest, token, _fetch = fetch) {
 			if (manifest) return fetchBundleFromManifestDigest(api, manifest.digest, headers, _fetch);
 		}
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching referrers: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching referrers: ${errorMessage(err)}`, "TRANSIENT");
 	}
 	let fallbackTag = digest.replace(":", "-");
 	try {
@@ -269,7 +278,7 @@ async function fetchBundle(registry, repo, digest, token, _fetch = fetch) {
 		if (!layer) throw new VerifyImageError(`No Sigstore bundle found for digest ${digest}. The image may not have been signed with --new-bundle-format.`, "NOT_FOUND");
 		return fetchBundleBlob(api, layer.digest, headers, _fetch);
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching fallback tag: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching fallback tag: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 async function fetchBundleFromManifestDigest(api, manifestDigest, headers, _fetch = fetch) {
@@ -285,7 +294,7 @@ async function fetchBundleFromManifestDigest(api, manifestDigest, headers, _fetc
 		if (!layer) throw new VerifyImageError("No Sigstore bundle layer found in bundle manifest", "NOT_FOUND");
 		return fetchBundleBlob(api, layer.digest, headers, _fetch);
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching bundle manifest: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching bundle manifest: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 async function fetchBundleBlob(api, blobDigest, headers, _fetch = fetch) {
@@ -296,7 +305,7 @@ async function fetchBundleBlob(api, blobDigest, headers, _fetch = fetch) {
 		if (!resp.ok) throw new VerifyImageError(`Failed to fetch bundle blob: HTTP ${resp.status}`, "NOT_FOUND");
 		return resp.json();
 	} catch (err) {
-		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching bundle blob: ${err.message}`, "TRANSIENT");
+		throw err instanceof VerifyImageError ? err : new VerifyImageError(`Transient error fetching bundle blob: ${errorMessage(err)}`, "TRANSIENT");
 	}
 }
 //#endregion
@@ -6966,7 +6975,7 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 	try {
 		verifier.verify(signedEntity, policy);
 	} catch (err) {
-		throw new VerifyImageError(`Image provenance verification failed: ${err.message}`, "VERIFY_FAILED");
+		throw new VerifyImageError(`Image provenance verification failed: ${errorMessage(err)}`, "VERIFY_FAILED");
 	}
 	assertSignedDigest(bundleJson, expectedDigest);
 }
@@ -7213,7 +7222,7 @@ function parseRulesOrThrow(rulesInput) {
 	try {
 		return parseAndValidateRules(rulesInput);
 	} catch (e) {
-		throw new SetupError(e.message, "INVALID_RULES");
+		throw new SetupError(errorMessage(e), "INVALID_RULES");
 	}
 }
 /**
