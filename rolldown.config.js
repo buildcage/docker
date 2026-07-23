@@ -17,13 +17,13 @@ const mainPlugins = [
 
 const configs = [
   {
-    input: "setup/src/main.js",
+    input: "setup/src/main.ts",
     file: "setup/dist/main.cjs",
     plugins: mainPlugins,
     // sigstore uses dynamic imports; inline them so dist is a single file.
     codeSplitting: false,
   },
-  { input: "setup/src/post.js", file: "setup/dist/post.cjs" },
+  { input: "setup/src/post.ts", file: "setup/dist/post.cjs" },
   { input: "report/src/main.ts", file: "report/dist/main.cjs" },
   {
     input: "run/src/main.js",

@@ -4,7 +4,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
-import { SetupError } from "./lib/errors.js";
+import { SetupError } from "./lib/errors.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";

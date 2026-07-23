@@ -197,7 +197,7 @@ test_core: ## Run core/lib unit tests
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests
-	@node --test 'setup/src/**/*.test.js'
+	@node --test 'setup/src/**/*.test.js' 'setup/src/**/*.test.ts'
 
 .PHONY: test_report
 test_report: ## Run report unit tests

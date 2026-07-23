@@ -7077,7 +7077,7 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region setup/src/main.js
+//#region setup/src/main.ts
 const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
 /**
 * Verifies image provenance and resolves the digest-pinned image ref.
