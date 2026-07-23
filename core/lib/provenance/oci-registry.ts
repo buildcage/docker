@@ -18,6 +18,25 @@ interface OciDescriptor {
   digest: string;
 }
 
+// Narrowed to the subset of the global fetch() signature this module
+// actually uses, so tests can pass lightweight mock responses/functions
+// instead of constructing real Response objects.
+export interface FetchLikeResponse {
+  ok: boolean;
+  status: number;
+  headers?: { get(name: string): string | null };
+  json?(): Promise<any>;
+}
+
+export type FetchLike = (
+  url: string,
+  init?: { method?: string; headers?: Record<string, string> },
+) => Promise<FetchLikeResponse>;
+
+// Narrowed to the one overload of node:fs's readFileSync this module actually
+// calls, so tests can pass a simple stub instead of the fully overloaded type.
+export type ReadFileSyncLike = (path: string, encoding: string) => string;
+
 /**
  * Read the base64 Basic-auth credential for ghcr.io from Docker's config.json.
  * Returns the raw `auth` string (base64) if found, or null if not logged in.
@@ -26,7 +45,7 @@ interface OciDescriptor {
  */
 export function readGhcrBasicAuth(
   _env: NodeJS.ProcessEnv = process.env,
-  _readFileSync: typeof readFileSync = readFileSync,
+  _readFileSync: ReadFileSyncLike = readFileSync as ReadFileSyncLike,
 ): string | null {
   try {
     const configDir = _env.DOCKER_CONFIG ?? path.join(os.homedir(), ".docker");
@@ -57,7 +76,7 @@ export async function fetchManifestDigest(
   repo: string,
   tag: string,
   token: string,
-  _fetch: typeof fetch = fetch,
+  _fetch: FetchLike = fetch,
 ): Promise<string> {
   const url = `https://${registry}/v2/${repo}/manifests/${tag}`;
   // Accept only index/manifest-list types so the registry returns the image index
@@ -100,7 +119,7 @@ export async function fetchManifestDigest(
         "TRANSIENT",
       );
     }
-    const digest = resp.headers.get("Docker-Content-Digest");
+    const digest = resp.headers!.get("Docker-Content-Digest");
     if (!digest) {
       throw new VerifyImageError(
         `No digest in manifest response for ${registry}/${repo}:${tag}`,
@@ -128,7 +147,7 @@ export async function fetchRegistryToken(
   registry: string,
   repo: string,
   basicAuth: string | null,
-  _fetch: typeof fetch = fetch,
+  _fetch: FetchLike = fetch,
 ): Promise<string> {
   const url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
 
@@ -143,7 +162,7 @@ export async function fetchRegistryToken(
         );
       }
       if (resp.ok) {
-        return (await resp.json()).token;
+        return (await resp.json!()).token;
       }
       throw new VerifyImageError(
         `Registry authentication failed: HTTP ${resp.status}. ` +
@@ -169,7 +188,7 @@ export async function fetchRegistryToken(
       );
     }
     if (resp.ok) {
-      return (await resp.json()).token;
+      return (await resp.json!()).token;
     }
     throw new VerifyImageError(
       `Failed to get registry token: HTTP ${resp.status}. ` +
@@ -198,7 +217,7 @@ export async function fetchBundle(
   repo: string,
   digest: string,
   token: string,
-  _fetch: typeof fetch = fetch,
+  _fetch: FetchLike = fetch,
 ): Promise<unknown> {
   const api = `https://${registry}/v2/${repo}`;
   const headers = { Authorization: `Bearer ${token}` };
@@ -216,7 +235,7 @@ export async function fetchBundle(
       );
     }
     if (refResp.ok) {
-      const referrers = await refResp.json();
+      const referrers = await refResp.json!();
       const manifest = (referrers.manifests ?? []).find(
         (m: OciDescriptor) => m.artifactType === BUNDLE_MEDIA_TYPE,
       );
@@ -280,7 +299,7 @@ export async function fetchBundle(
       );
     }
 
-    const tagManifest = await tagResp.json();
+    const tagManifest = await tagResp.json!();
 
     // OCI Referrers Tag Schema: the tag is an Image Index whose manifests[] entries
     // are descriptors for individual referrer artifacts.
@@ -303,7 +322,7 @@ export async function fetchBundle(
           },
         });
         if (!subResp.ok) continue;
-        const sub = await subResp.json();
+        const sub = await subResp.json!();
         if (sub.artifactType !== BUNDLE_MEDIA_TYPE) continue;
         const layer = (sub.layers ?? []).find((l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE);
         if (!layer) continue;
@@ -343,7 +362,7 @@ async function fetchBundleFromManifestDigest(
   api: string,
   manifestDigest: string,
   headers: Record<string, string>,
-  _fetch: typeof fetch = fetch,
+  _fetch: FetchLike = fetch,
 ): Promise<unknown> {
   try {
     const resp = await _fetch(`${api}/manifests/${manifestDigest}`, {
@@ -367,7 +386,7 @@ async function fetchBundleFromManifestDigest(
         "TRANSIENT",
       );
     }
-    const manifest = await resp.json();
+    const manifest = await resp.json!();
     const layer = (manifest.layers ?? []).find((l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE);
     if (!layer) {
       throw new VerifyImageError(
@@ -389,7 +408,7 @@ async function fetchBundleBlob(
   api: string,
   blobDigest: string,
   headers: Record<string, string>,
-  _fetch: typeof fetch = fetch,
+  _fetch: FetchLike = fetch,
 ): Promise<unknown> {
   try {
     const resp = await _fetch(`${api}/blobs/${blobDigest}`, { headers });
@@ -412,7 +431,7 @@ async function fetchBundleBlob(
         "NOT_FOUND",
       );
     }
-    return resp.json();
+    return resp.json!();
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(

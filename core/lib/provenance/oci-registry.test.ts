@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Unit tests for core/lib/oci-registry.js
  *
@@ -21,20 +20,20 @@ import {
 describe("fetchManifestDigest", () => {
   const digest = "sha256:" + "a".repeat(64);
 
-  function makeResp(status, digestValue) {
+  function makeResp(status: number, digestValue: string | null) {
     return {
       ok: status >= 200 && status < 300,
       status,
-      headers: { get: (name) => name === "Docker-Content-Digest" ? digestValue : null },
+      headers: { get: (name: string) => name === "Docker-Content-Digest" ? digestValue : null },
     };
   }
 
   it("returns digest from Docker-Content-Digest header on success", async () => {
-    let capturedOpts;
-    const mockFetch = async (url, opts) => { capturedOpts = opts; return makeResp(200, digest); };
+    let capturedOpts: { method?: string } | undefined;
+    const mockFetch = async (url: string, opts?: { method?: string }) => { capturedOpts = opts; return makeResp(200, digest); };
     const result = await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
     assert.equal(result, digest);
-    assert.equal(capturedOpts.method, "HEAD");
+    assert.equal(capturedOpts?.method, "HEAD");
   });
 
   it("throws NOT_FOUND on 404", async () => {
@@ -42,7 +41,7 @@ describe("fetchManifestDigest", () => {
     try {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "NOT_FOUND");
     }
   });
@@ -52,7 +51,7 @@ describe("fetchManifestDigest", () => {
     try {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
     }
   });
@@ -62,7 +61,7 @@ describe("fetchManifestDigest", () => {
     try {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
       assert.ok(err.message.includes("authenticated"), "error message should hint at authentication");
     }
@@ -73,7 +72,7 @@ describe("fetchManifestDigest", () => {
     try {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
       assert.ok(err.message.includes("authenticated"), "error message should hint at authentication");
     }
@@ -84,7 +83,7 @@ describe("fetchManifestDigest", () => {
     try {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
     }
   });
@@ -94,7 +93,7 @@ describe("fetchManifestDigest", () => {
     try {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
     }
   });
@@ -107,7 +106,7 @@ describe("fetchRegistryToken", () => {
 
   it("returns anonymous token when no Docker credentials and registry responds 200", async () => {
     let callCount = 0;
-    const mockFetch = async (url, opts) => {
+    const mockFetch = async (url: string, opts?: { headers?: Record<string, string> }) => {
       callCount++;
       assert.equal(opts, undefined, "should send no auth header");
       return { ok: true, status: 200, json: async () => ({ token: "anon-token" }) };
@@ -122,7 +121,7 @@ describe("fetchRegistryToken", () => {
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TOKEN_ERROR");
       assert.ok(err.message.includes("docker login"), "error message should mention docker login");
     }
@@ -133,7 +132,7 @@ describe("fetchRegistryToken", () => {
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TOKEN_ERROR");
     }
   });
@@ -143,7 +142,7 @@ describe("fetchRegistryToken", () => {
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
     }
   });
@@ -153,7 +152,7 @@ describe("fetchRegistryToken", () => {
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
     }
   });
@@ -163,8 +162,8 @@ describe("fetchRegistryToken", () => {
   it("uses Basic auth directly (no anonymous attempt) when Docker credentials are available", async () => {
     const basicAuth = Buffer.from("actor:ghp_token").toString("base64");
     let callCount = 0;
-    let capturedAuth;
-    const mockFetch = async (url, opts) => {
+    let capturedAuth: string | undefined;
+    const mockFetch = async (url: string, opts?: { headers?: Record<string, string> }) => {
       callCount++;
       capturedAuth = opts?.headers?.Authorization;
       return { ok: true, status: 200, json: async () => ({ token: "jwt-token" }) };
@@ -182,7 +181,7 @@ describe("fetchRegistryToken", () => {
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TOKEN_ERROR");
       assert.ok(err.message.includes("docker login"), "error message should mention docker login");
       assert.equal(callCount, 1, "should not retry with anonymous");
@@ -195,7 +194,7 @@ describe("fetchRegistryToken", () => {
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TOKEN_ERROR");
     }
   });
@@ -206,7 +205,7 @@ describe("fetchRegistryToken", () => {
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
     }
   });
@@ -215,7 +214,7 @@ describe("fetchRegistryToken", () => {
 // ── readGhcrBasicAuth ─────────────────────────────────────────────────────
 
 describe("readGhcrBasicAuth", () => {
-  const mockReadFileSync = (content) => (_path, _enc) => content;
+  const mockReadFileSync = (content: string) => (_path: string, _enc: string) => content;
 
   it("returns auth when auths['ghcr.io'].auth is present", () => {
     const config = JSON.stringify({ auths: { "ghcr.io": { auth: "dGVzdDp0b2tlbg==" } } });
@@ -254,10 +253,10 @@ describe("readGhcrBasicAuth", () => {
   });
 
   it("uses DOCKER_CONFIG env var to resolve config path", () => {
-    let capturedPath;
-    const readSpy = (p) => { capturedPath = p; return JSON.stringify({ auths: {} }); };
+    let capturedPath: string | undefined;
+    const readSpy = (p: string) => { capturedPath = p; return JSON.stringify({ auths: {} }); };
     readGhcrBasicAuth({ DOCKER_CONFIG: "/custom/docker" }, readSpy);
-    assert.ok(capturedPath.startsWith("/custom/docker"), `expected path under DOCKER_CONFIG, got: ${capturedPath}`);
+    assert.ok(capturedPath?.startsWith("/custom/docker"), `expected path under DOCKER_CONFIG, got: ${capturedPath}`);
   });
 });
 
@@ -265,9 +264,9 @@ describe("readGhcrBasicAuth", () => {
 
 const BUNDLE_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 
-function makeFetchReturning(responses) {
+function makeFetchReturning(responses: any[]) {
   let i = 0;
-  return async (url) => {
+  return async (url: string) => {
     const resp = responses[i++] ?? responses[responses.length - 1];
     return typeof resp === "function" ? resp(url) : resp;
   };
@@ -316,7 +315,7 @@ describe("fetchBundle — Referrers API path", () => {
     try {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "NOT_FOUND");
     }
   });
@@ -424,7 +423,7 @@ describe("fetchBundle — fallback tag path", () => {
     try {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
     }
   });
@@ -434,7 +433,7 @@ describe("fetchBundle — fallback tag path", () => {
     try {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT");
     }
   });
@@ -456,7 +455,7 @@ describe("fetchBundle — fallback tag path", () => {
     try {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
-    } catch (err) {
+    } catch (err: any) {
       assert.equal(err.code, "TRANSIENT",
         "auth error must not be reported as NOT_FOUND (unsigned image)");
     }
