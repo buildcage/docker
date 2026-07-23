@@ -19,20 +19,26 @@ interface OciDescriptor {
   digest: string;
 }
 
+export interface HeadersLike {
+  get(name: string): string | null;
+}
+
 // Narrowed to the subset of the global fetch() signature this module
 // actually uses, so tests can pass lightweight mock responses/functions
 // instead of constructing real Response objects.
 export interface FetchLikeResponse {
   ok: boolean;
   status: number;
-  headers?: { get(name: string): string | null };
+  headers?: HeadersLike;
   json?(): Promise<any>;
 }
 
-export type FetchLike = (
-  url: string,
-  init?: { method?: string; headers?: Record<string, string> },
-) => Promise<FetchLikeResponse>;
+export interface FetchInit {
+  method?: string;
+  headers?: Record<string, string>;
+}
+
+export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchLikeResponse>;
 
 // Narrowed to the one overload of node:fs's readFileSync this module actually
 // calls, so tests can pass a simple stub instead of the fully overloaded type.
