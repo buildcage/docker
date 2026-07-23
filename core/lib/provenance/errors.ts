@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ActionError } from "../general/action-error.ts";
 
 /**
@@ -13,7 +12,9 @@ import { ActionError } from "../general/action-error.ts";
  *   VERIFY_FAILED    – Sigstore bundle verification failed
  */
 export class VerifyImageError extends Error {
-  constructor(message, code) {
+  code: string;
+
+  constructor(message: string, code: string) {
     super(message);
     this.name = "VerifyImageError";
     this.code = code;
