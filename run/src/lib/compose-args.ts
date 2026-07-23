@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Build the `docker compose ... up`/`down` argv. Kept in its own module
  * (rather than inside run/src/main.js) so post.js can reuse it without
@@ -14,11 +13,25 @@
  * step keywords) never share Compose's implicit, directory-derived project
  * name — see lib/container.js's deriveProjectName for why that matters.
  */
-export function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
+export function buildComposeUpArgs({
+  composeFile,
+  projectName,
+  pullPolicy,
+}: {
+  composeFile: string;
+  projectName: string;
+  pullPolicy: string;
+}): string[] {
   return ["compose", "-f", composeFile, "-p", projectName, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull"];
 }
 
 /** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
-export function buildComposeDownArgs({ composeFile, projectName }) {
+export function buildComposeDownArgs({
+  composeFile,
+  projectName,
+}: {
+  composeFile: string;
+  projectName: string;
+}): string[] {
   return ["compose", "-f", composeFile, "-p", projectName, "down"];
 }
