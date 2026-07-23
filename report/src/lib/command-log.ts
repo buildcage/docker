@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Render the explicit engine's communication detail as a collapsed markdown
  * section, or "" if there's nothing to show. Allowed Urls is listed before
@@ -11,12 +10,29 @@
  *
  * Command text is escaped since it's embedded directly in markdown; request
  * lines go inside a fenced code block instead, where escaping isn't needed.
- *
- * @param {Array<Array<{ command: string, started: string, completed: string, entries: Array<{ method: string, url: string, status?: number }> }>>} builds
- * @param {Array<{ url: string, timestamp: string }>} deniedTimeline
- * @returns {string}
  */
-export function renderCommunicationDetails(builds, deniedTimeline) {
+export interface RequestLogEntry {
+  method: string;
+  url: string;
+  status?: number;
+}
+
+export interface CommandLogEntry {
+  command: string;
+  started: string;
+  completed: string;
+  entries: RequestLogEntry[];
+}
+
+export interface DeniedEntry {
+  url: string;
+  timestamp: string;
+}
+
+export function renderCommunicationDetails(
+  builds: CommandLogEntry[][] | null | undefined,
+  deniedTimeline: DeniedEntry[] | null | undefined,
+): string {
   const nonEmptyBuilds = (builds || []).filter((b) => b && b.length > 0);
   const hasVertexLog = nonEmptyBuilds.length > 0;
   const hasDenied = deniedTimeline && deniedTimeline.length > 0;
@@ -46,7 +62,10 @@ export function renderCommunicationDetails(builds, deniedTimeline) {
   return md;
 }
 
-function renderVertexItem({ command, started, completed, entries }, indent) {
+function renderVertexItem(
+  { command, started, completed, entries }: CommandLogEntry,
+  indent: string,
+): string {
   const inner = indent + "   ";
   let s = `${indent}* ${escapeMarkdown(command)}\n\n`;
   s += `${inner}(${formatSeconds(started)} · duration ${formatDuration(started, completed)})\n\n`;
@@ -60,7 +79,7 @@ function renderVertexItem({ command, started, completed, entries }, indent) {
   return s;
 }
 
-function renderRequestLine({ method, url, status }) {
+function renderRequestLine({ method, url, status }: RequestLogEntry): string {
   const line = `- ${escapeMarkdown(method)} ${escapeMarkdown(url)}`;
   return status === undefined ? line : `${line} -> ${status}`;
 }
@@ -74,17 +93,17 @@ function renderRequestLine({ method, url, status }) {
 // Deliberately narrower than a "full" markdown escaper (e.g. doesn't touch
 // "." or "-"), since the text is usually a full URL or shell command and
 // over-escaping would make those needlessly hard to read.
-function escapeMarkdown(text) {
+function escapeMarkdown(text: string): string {
   return text.replace(/([\\`*_[\]<>])/g, "\\$1");
 }
 
 // Whole-second precision, matching what buildkitd's own denial log records
 // (no fractional seconds) — used for vertex started times too, for consistency.
-function formatSeconds(iso) {
+function formatSeconds(iso: string): string {
   return new Date(iso).toISOString().slice(11, 19) + "Z";
 }
 
-function formatDuration(started, completed) {
+function formatDuration(started: string, completed: string): string {
   const seconds = (Date.parse(completed) - Date.parse(started)) / 1000;
   return `${seconds.toFixed(3)}s`;
 }

@@ -1,9 +1,8 @@
-// @ts-nocheck
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { renderCommunicationDetails } from "./command-log.ts";
 
-function wrap(body) {
+function wrap(body: string) {
   return "\n<details>\n<summary>💬 Communication details</summary>\n\n" + body + "</details>\n";
 }
 
