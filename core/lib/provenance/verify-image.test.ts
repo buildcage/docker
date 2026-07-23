@@ -18,7 +18,7 @@ import {
   buildVerifyOptions,
   verifyImageDigestOrThrow,
 } from "./verify-image.ts";
-import { ProvenanceError } from "./errors.ts";
+import { ProvenanceError, VerifyImageError } from "./errors.ts";
 import type { VerifyBundleOptions } from "./sigstore.ts";
 
 // ── Constants mirrored from verify-image.js (for assertion readability) ──────
@@ -196,7 +196,7 @@ describe("verifyImageDigestOrThrow", () => {
     assert.equal(digest, "sha256:abc123");
   });
 
-  it("throws ProvenanceError carrying the original error's code on failure", async () => {
+  it("throws ProvenanceError carrying the original VerifyImageError's code on failure", async () => {
     await assert.rejects(
       () =>
         verifyImageDigestOrThrow({
@@ -204,9 +204,7 @@ describe("verifyImageDigestOrThrow", () => {
           actionRepo: REPO,
           proxyEngine: "transparent",
           verifyImageDigestFn: async () => {
-            const e: Error & { code?: string } = new Error("registry token request failed");
-            e.code = "TOKEN_ERROR";
-            throw e;
+            throw new VerifyImageError("registry token request failed", "TOKEN_ERROR");
           },
         }),
       (err: unknown) => err instanceof ProvenanceError && err.code === "TOKEN_ERROR" && err.message === "registry token request failed",
