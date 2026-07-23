@@ -9,11 +9,7 @@ const ruleTypeToParam = {
 * Build a restrict-mode YAML configuration example from audited rows.
 * Returns a markdown string wrapped in <details> tags, or "" if no rows.
 *
-* @param {Array<{host: string, port: string, ruleType: string}>} auditedRows
-* @param {string} actionRepo
-* @param {string} actionRef - the ref (tag or commit SHA) this action was invoked with
-* @param {{actionName?: string, runCommand?: string}} [options] - actionName: "setup" (default) or "run"; runCommand: the `run:` input, included only when actionName is "run"
-* @returns {string}
+* actionRef is the ref (tag or commit SHA) this action was invoked with.
 */
 function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName = "setup", runCommand } = {}) {
 	if (!auditedRows || auditedRows.length === 0) return "";
@@ -387,9 +383,7 @@ function wildcardToRegex(pattern) {
 * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
 * its `host:port` matches at least one known_blocked_rules pattern.
 *
-* @param {{host:string, port:string, ruleType:string, reason:string, count:number}[]} blockedRows
-* @param {string[]} knownBlockedRules - as returned by parseAndValidateRules
-* @returns {({host:string, port:string, ruleType:string, reason:string, count:number, expected:boolean})[]}
+* knownBlockedRules is as returned by parseAndValidateRules.
 */
 function annotateKnownBlocked(blockedRows, knownBlockedRules) {
 	let matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
@@ -398,20 +392,6 @@ function annotateKnownBlocked(blockedRows, knownBlockedRules) {
 		expected: matchers.some((re) => re.test(`${row.host}:${row.port}`))
 	}));
 }
-/**
-* Decide whether blocked connections should fail the step.
-*
-* `blockedRows` must already be annotated via annotateKnownBlocked. Uses
-* per-row matching rather than count arithmetic because `blockedCount`'s
-* meaning differs by proxy engine (transparent: total blocked events;
-* explicit: aggregated row count — see setup/docker/explicit/scripts/report.js),
-* so subtracting summed row counts from it isn't reliable. An empty
-* `blockedRows` with a nonzero `blockedCount` (malformed/incomplete report
-* data) is treated as unexpected too (fail closed).
-*
-* @param {{isAudit: boolean, failOnBlocked: boolean, blockedCount: number, blockedRows: object[]}} params
-* @returns {{level: "none"|"notice"|"error", shouldFail: boolean}}
-*/
 function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedRows }) {
 	if (!blockedCount) return {
 		level: "none",
@@ -439,8 +419,6 @@ function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blocked
 * varying the notice text there would be misleading and would silently
 * break any tooling that matches the old fixed-format notice.
 *
-* @param {{blockedCount: number, blockedRows: object[], engineLabel: "sandbox"|"proxy", isAudit: boolean}} params
-* @returns {string}
 */
 function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }) {
 	let base = `${blockedCount} blocked connection(s) detected by buildcage ${engineLabel}`;
@@ -454,9 +432,6 @@ function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }
 * the result through their table rendering and annotation code, rather
 * than each recomputing annotateKnownBlocked independently.
 *
-* @param {{mode: string|null, blockedCount?: number, sections?: {blocked?: object[]}}} report
-* @param {{knownBlockedRules: string[], failOnBlocked: boolean, engineLabel: "sandbox"|"proxy"}} options
-* @returns {{blockedRows: object[], showExpected: boolean, outcome: {level: string, shouldFail: boolean}, message: string|null}}
 */
 function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engineLabel }) {
 	let isAudit = report.mode === "audit", blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules), outcome = determineBlockedOutcome({
@@ -483,13 +458,9 @@ const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
 	center: ":---:"
-}, alignMarker = (align) => ALIGN_MARKERS[align] ?? ALIGN_MARKERS.left;
+}, alignMarker = (align) => ALIGN_MARKERS[align ?? "left"];
 /**
 * Render a generic GitHub-flavored markdown table.
-*
-* @param {{key: string, title: string, align?: "left"|"right"|"center"}[]} formats
-* @param {Record<string, string|number>[]} rows
-* @returns {string}
 */
 function markdownTable(formats, rows) {
 	let headers = formats.map((f) => f.title), aligns = formats.map((f) => alignMarker(f.align)), lines = [`| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |`];
@@ -503,10 +474,6 @@ function markdownTable(formats, rows) {
 //#region core/lib/report/host-table.ts
 /**
 * Render aggregated host rows as a GitHub-flavored markdown table.
-*
-* @param {{host:string, port:string, ruleType:string, reason?:string, count:number, expected?:boolean}[]} rows
-* @param {{showReason?: boolean, showExpected?: boolean}} [options]
-* @returns {string}
 */
 function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	let formats = [{

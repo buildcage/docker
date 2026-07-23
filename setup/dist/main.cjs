@@ -98,6 +98,7 @@ var ActionError = class extends Error {
 		super(message), this.name = new.target.name, this.code = code;
 	}
 }, SetupError = class extends ActionError {}, VerifyImageError = class extends Error {
+	code;
 	constructor(message, code) {
 		super(message), this.name = "VerifyImageError", this.code = code;
 	}
@@ -160,11 +161,6 @@ async function fetchManifestDigest(registry, repo, tag, token, _fetch = fetch) {
 * If Docker credentials for the registry are available (basicAuth from
 * readGhcrBasicAuth), uses Basic auth directly — no anonymous attempt.
 * Otherwise falls back to anonymous access (public packages).
-*
-* @param {string} registry  - Registry hostname (e.g. "ghcr.io")
-* @param {string} repo      - Repository path (e.g. "owner/repo")
-* @param {string|null} basicAuth - base64 auth from Docker config, or null
-* @param {function} [_fetch]
 */
 async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fetch) {
 	let url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
@@ -6885,9 +6881,6 @@ const derUtf8 = (s) => String.fromCharCode(12, s.length) + s;
 * image; this assertion prevents accepting such a re-attached bundle.
 *
 * Exported for unit testing; callers should use verifyBundle() instead.
-*
-* @param {object} bundleJson   — raw bundle JSON object
-* @param {string} expectedDigest — "sha256:<hex>" from getManifestDigest()
 */
 function assertSignedDigest(bundleJson, expectedDigest) {
 	let dsse = bundleJson?.dsseEnvelope, payload = dsse?.payload;
@@ -6919,10 +6912,8 @@ function assertSignedDigest(bundleJson, expectedDigest) {
 *   tlogThreshold          – minimum transparency log entries (default 1)
 *   ctLogThreshold         – minimum CT log entries (default 1)
 *
-* @param {object} bundleJson     — raw bundle JSON object
-* @param {object} options        — policy options
-* @param {string} expectedDigest — "sha256:<hex>" fetched from the registry;
-*                                  must match the digest inside the signed payload
+* expectedDigest — "sha256:<hex>" fetched from the registry;
+* must match the digest inside the signed payload.
 */
 async function verifyBundle(bundleJson, options, expectedDigest) {
 	let verifier = new import_dist$2.Verifier((0, import_dist$2.toTrustMaterial)(await (0, import_dist$1.getTrustedRoot)()), {
@@ -7003,7 +6994,6 @@ function buildVerifyOptions({ actionRef, actionRepo }) {
 * On failure, throws VerifyImageError — the caller is responsible for printing
 * the error message.
 *
-* @param {{ actionRef: string, actionRepo: string, proxyEngine?: string }} opts
 */
 async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transparent" }) {
 	let repoPath = actionRepo.toLowerCase(), verifyOptions = buildVerifyOptions({
@@ -7031,7 +7021,8 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, ve
 			proxyEngine
 		});
 	} catch (e) {
-		throw new ProvenanceError(e.message, e.code ?? "VERIFY_FAILED");
+		let err = e;
+		throw new ProvenanceError(err.message, err.code ?? "VERIFY_FAILED");
 	}
 	if (digest === null) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
 	return digest;
