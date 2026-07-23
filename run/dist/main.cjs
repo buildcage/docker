@@ -103,50 +103,12 @@ var ActionError = class extends Error {
 	constructor(message, code) {
 		super(message), this.name = new.target.name, this.code = code;
 	}
-};
-//#endregion
-//#region core/lib/provenance/errors.ts
-/**
-* VerifyImageError — intentional error in the image provenance verification
-* flow (Sigstore bundle fetch/verify, OCI registry lookups, image ref
-* resolution).
-*
-* Codes:
-*   NOT_FOUND        – resource does not exist (missing tag or bundle)
-*   TRANSIENT        – network or 5xx error; do not treat as "resource absent"
-*   TOKEN_ERROR      – registry token endpoint returned a client error
-*   VERIFY_FAILED    – Sigstore bundle verification failed
-*/
-const VERIFY_IMAGE_ERROR_CODES = [
-	"NOT_FOUND",
-	"TRANSIENT",
-	"TOKEN_ERROR",
-	"VERIFY_FAILED"
-];
-var VerifyImageError = class extends Error {
+}, VerifyImageError = class extends Error {
 	code;
 	constructor(message, code) {
 		super(message), this.name = "VerifyImageError", this.code = code;
 	}
-};
-/**
-* ProvenanceError — thrown by verifyImageDigestOrThrow (see verify-image.js)
-* when image provenance can't be established. Extends ActionError so a
-* caller's own top-level catch (checking `instanceof ActionError`)
-* recognizes it as a safe-to-print error.
-*
-* Codes:
-*   NOT_FOUND        – resource does not exist (missing tag or bundle)
-*   TRANSIENT        – network or 5xx error; do not treat as "resource absent"
-*   TOKEN_ERROR      – registry token endpoint returned a client error
-*   VERIFY_FAILED    – Sigstore bundle verification failed
-*   UNVERIFIABLE_REF – action ref cannot be verified (branch / local path)
-*/
-const PROVENANCE_ERROR_CODES = [...VERIFY_IMAGE_ERROR_CODES, "UNVERIFIABLE_REF"];
-function isProvenanceErrorCode(code) {
-	return typeof code == "string" && PROVENANCE_ERROR_CODES.includes(code);
-}
-var ProvenanceError = class extends ActionError {};
+}, ProvenanceError = class extends ActionError {};
 //#endregion
 //#region core/lib/general/error-message.ts
 /**
@@ -7074,8 +7036,7 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, ve
 			proxyEngine
 		});
 	} catch (e) {
-		let err = e, code = isProvenanceErrorCode(err.code) ? err.code : "VERIFY_FAILED";
-		throw new ProvenanceError(err.message ?? String(e), code);
+		throw e instanceof VerifyImageError ? new ProvenanceError(e.message, e.code) : new ProvenanceError(errorMessage(e), "VERIFY_FAILED");
 	}
 	if (digest === null) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
 	return digest;
