@@ -193,19 +193,19 @@ test_unit: test_core test_setup test_report test_sandbox_unit test_qjs ## Run un
 # already covered by test_qjs below instead.
 .PHONY: test_core
 test_core: ## Run core/lib unit tests
-	@node --test 'core/lib/**/*.test.js' 'core/lib/**/*.test.ts'
+	@node --test 'core/lib/**/*.test.ts'
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests
-	@node --test 'setup/src/**/*.test.js' 'setup/src/**/*.test.ts'
+	@node --test 'setup/src/**/*.test.ts'
 
 .PHONY: test_report
 test_report: ## Run report unit tests
-	@node --test 'report/src/**/*.test.js' 'report/src/**/*.test.ts'
+	@node --test 'report/src/**/*.test.ts'
 
 .PHONY: test_sandbox_unit
 test_sandbox_unit: ## Run the run action's unit tests
-	@node --test 'run/src/**/*.test.js' 'run/src/**/*.test.ts'
+	@node --test 'run/src/**/*.test.ts'
 
 # *.test.js is excluded from the built images (see .dockerignore), so bind-mount it back in for qjs to exec.
 # qjs itself and the scripts/shared sources are identical across images, so one representative build
