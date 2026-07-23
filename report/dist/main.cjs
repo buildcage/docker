@@ -384,7 +384,7 @@ function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engin
 		failOnBlocked,
 		blockedCount: report.blockedCount ?? 0,
 		blockedRows
-	}), message = outcome.level === "none" ? null : buildBlockedMessage({
+	}), message = buildBlockedMessage({
 		blockedCount: report.blockedCount ?? 0,
 		blockedRows,
 		engineLabel,
@@ -403,7 +403,7 @@ const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
 	center: ":---:"
-}, alignMarker = (align) => ALIGN_MARKERS[align ?? "left"];
+}, alignMarker = (align) => ALIGN_MARKERS[align ?? "left"] ?? ALIGN_MARKERS.left;
 /**
 * Render a generic GitHub-flavored markdown table.
 */
