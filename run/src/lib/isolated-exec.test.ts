@@ -15,7 +15,7 @@ import {
   computeReadonlyHostMounts,
   freshMountDestinationsFrom,
   parseMountsUnder,
-} from "./isolated-exec.js";
+} from "./isolated-exec.ts";
 
 describe("writeRunScript", () => {
   it("wraps plain commands in a #!/bin/sh + set -e preamble", () => {

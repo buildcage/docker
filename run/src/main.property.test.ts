@@ -8,7 +8,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { buildACLRules } from "./main.js";
+import { buildACLRules } from "./main.ts";
 
 describe("buildACLRules – properties", () => {
   it("empty / whitespace-only inputs always return empty arrays", () => {

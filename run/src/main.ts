@@ -10,10 +10,10 @@ import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
-import { SandboxError } from "./lib/errors.js";
-import { checkPasswordlessSudo } from "./lib/sudo-preflight.js";
-import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";
-import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.js";
+import { SandboxError } from "./lib/errors.ts";
+import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
+import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.ts";
+import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.ts";
 import {
   writeRunScript,
   writeResolvConf,
@@ -23,8 +23,8 @@ import {
   runIsolated,
   withScratchDir,
   listHostMounts,
-} from "./lib/isolated-exec.js";
-import { fetchReport, writeReport } from "./lib/report.js";
+} from "./lib/isolated-exec.ts";
+import { fetchReport, writeReport } from "./lib/report.ts";
 
 export { buildComposeUpArgs, buildComposeDownArgs };
 
@@ -121,7 +121,7 @@ async function main() {
   const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("../../core/lib/provenance/local-image-override.js")).readLocalImageOverride(env)
+    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(env)
     : null;
   if (localOverride) {
     console.log(

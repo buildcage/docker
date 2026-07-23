@@ -6,8 +6,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs, parseWritablePaths, readKnownBlockedRules } from "./main.js";
-import { SandboxError } from "./lib/errors.js";
+import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs, parseWritablePaths, readKnownBlockedRules } from "./main.ts";
+import { SandboxError } from "./lib/errors.ts";
 
 describe("buildACLRules", () => {
   it("parses whitespace-separated HTTPS rules", () => {

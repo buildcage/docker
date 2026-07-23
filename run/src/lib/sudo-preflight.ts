@@ -2,7 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
-import { SandboxError } from "./errors.js";
+import { SandboxError } from "./errors.ts";
 import { SLIM_RUNNER_DETECTED_PREFIX, isLikelySlimRunner } from "../../../core/lib/actions/docker-error.ts";
 
 const REQUIREMENT =

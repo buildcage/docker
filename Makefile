@@ -205,7 +205,7 @@ test_report: ## Run report unit tests
 
 .PHONY: test_sandbox_unit
 test_sandbox_unit: ## Run the run action's unit tests
-	@node --test 'run/src/**/*.test.js'
+	@node --test 'run/src/**/*.test.js' 'run/src/**/*.test.ts'
 
 # *.test.js is excluded from the built images (see .dockerignore), so bind-mount it back in for qjs to exec.
 # qjs itself and the scripts/shared sources are identical across images, so one representative build

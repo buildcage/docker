@@ -13,9 +13,9 @@ import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeReport, buildReportMarkdown } from "./report.js";
+import { writeReport, buildReportMarkdown } from "./report.ts";
 import { annotateKnownBlocked } from "../../../core/lib/report/known-blocked.ts";
-import { withScratchDir } from "./isolated-exec.js";
+import { withScratchDir } from "./isolated-exec.ts";
 
 // writeReport reads GITHUB_STEP_SUMMARY/BUILDCAGE_RUN_DEBUG_SUMMARY_FILE
 // from process.env and mutates process.exitCode directly (mirroring what

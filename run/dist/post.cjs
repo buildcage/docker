@@ -1,5 +1,5 @@
 let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_path = require("node:path"), node_url = require("node:url");
-//#region run/src/lib/compose-args.js
+//#region run/src/lib/compose-args.ts
 /** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
 function buildComposeDownArgs({ composeFile, projectName }) {
 	return [
@@ -115,7 +115,7 @@ function scratchDirFor(containerName) {
 	return (0, node_path.join)("/var/tmp/buildcage", containerName.replace(/^buildcage-proxy-/, "sandbox-"));
 }
 //#endregion
-//#region run/src/post.js
+//#region run/src/post.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), containerName = process.env.STATE_container_name, projectName = process.env.STATE_project_name;
 if (containerName?.startsWith("buildcage-proxy-")) try {
 	let scratchDir = scratchDirFor(containerName);

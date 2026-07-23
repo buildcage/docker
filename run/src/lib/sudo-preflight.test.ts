@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { describeSudoFailure } from "./sudo-preflight.js";
+import { describeSudoFailure } from "./sudo-preflight.ts";
 
 describe("describeSudoFailure", () => {
   const noSlimRunner = { env: {}, exists: () => false };

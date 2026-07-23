@@ -4,8 +4,8 @@ import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildComposeDownArgs } from "./lib/compose-args.js";
-import { cleanupScratchDir, scratchDirFor } from "./lib/isolated-exec.js";
+import { buildComposeDownArgs } from "./lib/compose-args.ts";
+import { cleanupScratchDir, scratchDirFor } from "./lib/isolated-exec.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

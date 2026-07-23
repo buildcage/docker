@@ -2,8 +2,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { generateContainerName, getContainerPid, deriveProjectName, buildDockerCpArgs, isContainerNotFoundError } from "./container.js";
-import { SandboxError } from "./errors.js";
+import { generateContainerName, getContainerPid, deriveProjectName, buildDockerCpArgs, isContainerNotFoundError } from "./container.ts";
+import { SandboxError } from "./errors.ts";
 
 describe("generateContainerName", () => {
   it("always starts with the buildcage-proxy- prefix", () => {

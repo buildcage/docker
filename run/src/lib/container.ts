@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
 import { describeDockerFailure } from "../../../core/lib/actions/docker-error.ts";
-import { SandboxError } from "./errors.js";
+import { SandboxError } from "./errors.ts";
 
 /**
  * Each `run` step gets its own throwaway proxy container (start -> run ->

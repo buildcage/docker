@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildDockerCpArgs } from "./container.js";
+import { buildDockerCpArgs } from "./container.ts";
 // Sensitive /proc paths masked with /dev/null. runc's own `runc spec`
 // default already masks /proc/kcore, /proc/keys, and /proc/timer_list
 // (among others) and leaves /proc/sysrq-trigger merely read-only —

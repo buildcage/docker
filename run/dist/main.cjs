@@ -7105,7 +7105,7 @@ function createAnnotation(enabled) {
 	};
 }
 //#endregion
-//#region run/src/lib/errors.js
+//#region run/src/lib/errors.ts
 /**
 * SandboxError — intentional error in the run action's own logic. Image
 * provenance failures throw ProvenanceError instead (see
@@ -7122,7 +7122,7 @@ function createAnnotation(enabled) {
 */
 var SandboxError = class extends ActionError {};
 //#endregion
-//#region run/src/lib/sudo-preflight.js
+//#region run/src/lib/sudo-preflight.ts
 const SLIM_RUNNER_NOTE = `${SLIM_RUNNER_DETECTED_PREFIX} — these typically don't have passwordless sudo configured for this kind of privileged setup.`;
 /**
 * Kept pure (takes the error, not execFileSync's raw output) so it's
@@ -7155,7 +7155,7 @@ function checkPasswordlessSudo() {
 	}
 }
 //#endregion
-//#region run/src/lib/container.js
+//#region run/src/lib/container.ts
 /**
 * Each `run` step gets its own throwaway proxy container (start -> run ->
 * report -> stop) rather than reusing one across steps, so a random name
@@ -7232,7 +7232,7 @@ function getContainerPid(containerName, { exec = node_child_process.execFileSync
 	return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 //#endregion
-//#region run/src/lib/compose-args.js
+//#region run/src/lib/compose-args.ts
 /**
 * Build the `docker compose ... up`/`down` argv. Kept in its own module
 * (rather than inside run/src/main.js) so post.js can reuse it without
@@ -7283,7 +7283,7 @@ var extra_masked_proc_paths_default = [
 	"/proc/sysrq-trigger"
 ];
 //#endregion
-//#region run/src/lib/isolated-exec.js
+//#region run/src/lib/isolated-exec.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), SANDBOX_SCRATCH_BASE = "/var/tmp/buildcage";
 /**
 * Write the user-supplied `run:` input to an executable script file.
@@ -7865,7 +7865,7 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	})));
 }
 //#endregion
-//#region run/src/lib/report.js
+//#region run/src/lib/report.ts
 /**
 * Fetch the structured HAProxy-log report from the (still-running) proxy
 * container. Unlike report/src/main.js (which supports both engines), the
@@ -7944,7 +7944,7 @@ function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, 
 	outcome.level === "error" ? (annotation.error(message), process.exitCode = 1) : outcome.level === "notice" && annotation.notice(message);
 }
 //#endregion
-//#region run/src/main.js
+//#region run/src/main.ts
 const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
 /**
 * Verifies image provenance and resolves the digest-pinned image ref for
