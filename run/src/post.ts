@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -30,7 +29,7 @@ if (containerName?.startsWith("buildcage-proxy-")) {
     const scratchDir = scratchDirFor(containerName);
     if (existsSync(scratchDir)) cleanupScratchDir(scratchDir);
   } catch (e) {
-    console.log(`::warning::run post-cleanup: failed to remove sandbox scratch dir: ${e.message}`);
+    console.log(`::warning::run post-cleanup: failed to remove sandbox scratch dir: ${(e as Error).message}`);
   }
 }
 
