@@ -7202,5 +7202,5 @@ function logRules(label, rules) {
 	for (let r of rules) console.log(`  ${r}`);
 }
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
-	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${err.message}`), process.exit(1);
+	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${errorMessage(err)}`), process.exit(1);
 }), exports.buildACLRules = buildACLRules, exports.resolveProxyEngine = resolveProxyEngine;

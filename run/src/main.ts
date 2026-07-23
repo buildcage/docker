@@ -279,7 +279,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (err instanceof ActionError) {
       console.log(`::error::${err.message}`);
     } else {
-      console.log(`::error::Unexpected error in sandbox: ${err.message}`);
+      console.log(`::error::Unexpected error in sandbox: ${errorMessage(err)}`);
     }
     process.exit(1);
   });

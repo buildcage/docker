@@ -7980,5 +7980,5 @@ async function main() {
 	exitCode !== 0 && (process.exitCode = exitCode);
 }
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
-	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${err.message}`), process.exit(1);
+	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${errorMessage(err)}`), process.exit(1);
 }), exports.buildACLRules = buildACLRules, exports.buildComposeDownArgs = buildComposeDownArgs, exports.buildComposeUpArgs = buildComposeUpArgs, exports.parseWritablePaths = parseWritablePaths, exports.readKnownBlockedRules = readKnownBlockedRules;

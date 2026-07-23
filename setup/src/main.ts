@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { SetupError } from "./lib/errors.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
+import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { buildACLRules } from "../../core/lib/acl/rules.ts";
 import {
   verifyImageDigestOrThrow,
@@ -150,7 +151,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (err instanceof ActionError) {
       console.log(`::error::${err.message}`);
     } else {
-      console.log(`::error::Unexpected error in setup: ${err.message}`);
+      console.log(`::error::Unexpected error in setup: ${errorMessage(err)}`);
     }
     process.exit(1);
   });
