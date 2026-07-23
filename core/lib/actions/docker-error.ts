@@ -1,5 +1,17 @@
-// @ts-nocheck
 import { existsSync } from "node:fs";
+
+interface DockerErrorLike {
+  code?: string;
+  status?: number;
+  message?: string;
+  stderr?: string;
+}
+
+interface DescribeDockerFailureOptions {
+  operation?: string;
+  env?: NodeJS.ProcessEnv;
+  exists?: (path: string) => boolean;
+}
 
 const REQUIREMENT =
   'Buildcage requires a working Docker installation (client and daemon) on the runner. ' +
@@ -21,7 +33,10 @@ const SLIM_RUNNER_NOTE =
  * Actions log) — only captured stderr (e.g. from a piped call) is included,
  * since otherwise nothing points the reader back to it.
  */
-export function describeDockerFailure(e, { operation = "docker", env = process.env, exists = existsSync } = {}) {
+export function describeDockerFailure(
+  e: DockerErrorLike | null | undefined,
+  { operation = "docker", env = process.env, exists = existsSync }: DescribeDockerFailureOptions = {},
+): string {
   const slimNote = isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE : "";
 
   let whatHappened;
@@ -50,6 +65,9 @@ export function describeDockerFailure(e, { operation = "docker", env = process.e
  * back to the generic message in describeDockerFailure, so this is safe to
  * get wrong.
  */
-export function isLikelySlimRunner(_env = process.env, _exists = existsSync) {
+export function isLikelySlimRunner(
+  _env: NodeJS.ProcessEnv = process.env,
+  _exists: (path: string) => boolean = existsSync,
+): boolean {
   return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
