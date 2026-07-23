@@ -3,6 +3,7 @@ import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync,
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDockerCpArgs } from "./container.ts";
+import { errorMessage } from "../../../core/lib/general/error-message.ts";
 // Sensitive /proc paths masked with /dev/null. runc's own `runc spec`
 // default already masks /proc/kcore, /proc/keys, and /proc/timer_list
 // (among others) and leaves /proc/sysrq-trigger merely read-only —
@@ -46,11 +47,10 @@ interface OciSpec {
     maskedPaths?: string[];
     readonlyPaths?: string[];
     namespaces: { type: string; path?: string }[];
-    [key: string]: unknown;
+    seccomp?: unknown;
   };
   root?: unknown;
   process: Record<string, unknown>;
-  [key: string]: unknown;
 }
 
 // buildOciConfig's actual, guaranteed-populated output shape — narrower than
@@ -66,7 +66,7 @@ interface BuiltOciSpec extends OciSpec {
     capabilities: unknown;
     noNewPrivileges: boolean;
   };
-  linux: OciSpec["linux"] & { maskedPaths: string[]; readonlyPaths: string[] };
+  linux: OciSpec["linux"] & { maskedPaths: string[]; readonlyPaths: string[]; seccomp: unknown };
 }
 
 interface HostMount {
@@ -517,7 +517,7 @@ function unmountAllUnder(dir: string): void {
     try {
       execFileSync("sudo", ["umount", "-R", "-l", mountPoint], { stdio: ["ignore", "ignore", "pipe"] });
     } catch (e) {
-      console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${(e as Error).message}`);
+      console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${errorMessage(e)}`);
     }
   }
 }
