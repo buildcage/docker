@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { buildComposeDownArgs } from "./lib/compose-args.ts";
 import { cleanupScratchDir, scratchDirFor } from "./lib/isolated-exec.ts";
+import { errorMessage } from "../../core/lib/general/error-message.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -29,7 +30,7 @@ if (containerName?.startsWith("buildcage-proxy-")) {
     const scratchDir = scratchDirFor(containerName);
     if (existsSync(scratchDir)) cleanupScratchDir(scratchDir);
   } catch (e) {
-    console.log(`::warning::run post-cleanup: failed to remove sandbox scratch dir: ${(e as Error).message}`);
+    console.log(`::warning::run post-cleanup: failed to remove sandbox scratch dir: ${errorMessage(e)}`);
   }
 }
 

@@ -9,6 +9,7 @@ import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image
 import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
+import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { SandboxError } from "./lib/errors.ts";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.ts";
@@ -63,7 +64,7 @@ function parseRulesOrThrow(rulesInput: string | undefined): string[] {
   try {
     return parseAndValidateRules(rulesInput);
   } catch (e) {
-    throw new SandboxError((e as Error).message, "INVALID_RULES");
+    throw new SandboxError(errorMessage(e), "INVALID_RULES");
   }
 }
 
@@ -220,7 +221,7 @@ async function main(): Promise<void> {
         // one) — see gen-seccomp-profile/main.go.
         ({ runcPath, seccompProfile, baseSpec } = extractRuncBootstrap({ containerName, destDir: dir }));
       } catch (e) {
-        throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${(e as Error).message}`, "RUNC_EXTRACT_FAILED");
+        throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${errorMessage(e)}`, "RUNC_EXTRACT_FAILED");
       }
 
       const workdir = env.GITHUB_WORKSPACE || "";
@@ -260,7 +261,7 @@ async function main(): Promise<void> {
           hostMounts,
         });
       } catch (e) {
-        throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${(e as Error).message}`, "OCI_CONFIG_BUILD_FAILED");
+        throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
       }
       writeOciConfig(config, dir);
 
@@ -288,7 +289,7 @@ async function main(): Promise<void> {
         knownBlockedRules,
       });
     } catch (e) {
-      annotation.warning(`Failed to fetch sandbox report: ${(e as Error).message}`);
+      annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
     }
     try {
       execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), { stdio: "inherit", env: composeEnv });

@@ -8,6 +8,7 @@ import {
   type VerificationPolicy,
 } from "@sigstore/verify";
 import { VerifyImageError } from "./errors.ts";
+import { errorMessage } from "../general/error-message.ts";
 
 // Encode a string as DER UTF8String for Fulcio OID extension values.
 // sigstore-js compares the raw OCTET STRING bytes, so we must include
@@ -150,7 +151,7 @@ export async function verifyBundle(
     verifier.verify(signedEntity, policy);
   } catch (err) {
     throw new VerifyImageError(
-      `Image provenance verification failed: ${(err as Error).message}`,
+      `Image provenance verification failed: ${errorMessage(err)}`,
       "VERIFY_FAILED",
     );
   }

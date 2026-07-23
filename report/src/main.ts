@@ -15,6 +15,7 @@ import { evaluateBlockedReport } from "../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../core/lib/report/host-table.ts";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
+import { errorMessage } from "../../core/lib/general/error-message.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -38,7 +39,7 @@ let knownBlockedRules: string[];
 try {
   knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
 } catch (e) {
-  annotation.error((e as Error).message);
+  annotation.error(errorMessage(e));
   process.exit(1);
 }
 
@@ -132,7 +133,7 @@ if (isExplicit) {
       return parseVertexAllowedLog(rawJsonOutput);
     });
   } catch (e) {
-    console.log("(failed to fetch allowed/audited traffic detail via buildctl:", (e as Error).message, ")");
+    console.log("(failed to fetch allowed/audited traffic detail via buildctl:", errorMessage(e), ")");
   }
 }
 

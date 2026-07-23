@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { SetupError } from "./lib/errors.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
+import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
@@ -146,7 +147,7 @@ function parseRulesOrThrow(rulesInput: string | undefined): string[] {
   try {
     return parseAndValidateRules(rulesInput);
   } catch (e) {
-    throw new SetupError((e as Error).message, "INVALID_RULES");
+    throw new SetupError(errorMessage(e), "INVALID_RULES");
   }
 }
 

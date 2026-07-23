@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { VerifyImageError } from "./errors.ts";
+import { errorMessage } from "../general/error-message.ts";
 
 const BUNDLE_MEDIA_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 
@@ -130,7 +131,7 @@ export async function fetchManifestDigest(
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${(err as Error).message}`,
+      `Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${errorMessage(err)}`,
       "TRANSIENT",
     );
   }
@@ -172,7 +173,7 @@ export async function fetchRegistryToken(
     } catch (err) {
       if (err instanceof VerifyImageError) throw err;
       throw new VerifyImageError(
-        `Transient error fetching registry token: ${(err as Error).message}`,
+        `Transient error fetching registry token: ${errorMessage(err)}`,
         "TRANSIENT",
       );
     }
@@ -199,7 +200,7 @@ export async function fetchRegistryToken(
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching registry token: ${(err as Error).message}`,
+      `Transient error fetching registry token: ${errorMessage(err)}`,
       "TRANSIENT",
     );
   }
@@ -247,7 +248,7 @@ export async function fetchBundle(
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching referrers: ${(err as Error).message}`,
+      `Transient error fetching referrers: ${errorMessage(err)}`,
       "TRANSIENT",
     );
   }
@@ -350,7 +351,7 @@ export async function fetchBundle(
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching fallback tag: ${(err as Error).message}`,
+      `Transient error fetching fallback tag: ${errorMessage(err)}`,
       "TRANSIENT",
     );
   }
@@ -398,7 +399,7 @@ async function fetchBundleFromManifestDigest(
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching bundle manifest: ${(err as Error).message}`,
+      `Transient error fetching bundle manifest: ${errorMessage(err)}`,
       "TRANSIENT",
     );
   }
@@ -435,7 +436,7 @@ async function fetchBundleBlob(
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching bundle blob: ${(err as Error).message}`,
+      `Transient error fetching bundle blob: ${errorMessage(err)}`,
       "TRANSIENT",
     );
   }
