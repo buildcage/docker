@@ -7,7 +7,7 @@ export interface ColumnFormat {
 }
 
 const ALIGN_MARKERS: Record<Align, string> = { left: "---", right: "---:", center: ":---:" };
-const alignMarker = (align?: Align): string => ALIGN_MARKERS[align ?? "left"];
+const alignMarker = (align?: Align): string => ALIGN_MARKERS[align ?? "left"] ?? ALIGN_MARKERS.left;
 
 /**
  * Render a generic GitHub-flavored markdown table.
