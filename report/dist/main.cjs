@@ -33,7 +33,7 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 	return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", md += yaml, md += "```\n\n", md += "</details>\n", md;
 }
 //#endregion
-//#region report/src/lib/command-log.js
+//#region report/src/lib/command-log.ts
 /**
 * Render the explicit engine's communication detail as a collapsed markdown
 * section, or "" if there's nothing to show. Allowed Urls is listed before
@@ -145,7 +145,7 @@ function aggregate(filtered) {
 	}).sort((a, b) => b.count - a.count || (a.host < b.host ? -1 : +(a.host > b.host)) || Number(a.port) - Number(b.port));
 }
 //#endregion
-//#region report/src/lib/vertex-log.js
+//#region report/src/lib/vertex-log.ts
 /**
 * Parse `buildctl debug histories --format '{{json .}}'`'s newline-delimited
 * JSON output and return every build's ref, oldest first. A workflow may run
@@ -537,7 +537,7 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region report/src/main.js
+//#region report/src/main.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), composeFile = process.argv[2] || (0, node_path.join)(__dirname$1, "../..", "setup", "compose.yaml"), composeEnv = {
 	...process.env,
 	BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage"
