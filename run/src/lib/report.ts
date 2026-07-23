@@ -5,13 +5,15 @@ import { buildRestrictExample } from "../../../core/lib/report/build-example.ts"
 import { evaluateBlockedReport, type AnnotatedBlockedRow, type BlockedRow } from "../../../core/lib/report/known-blocked.ts";
 import { renderHostTable, type HostTableRow } from "../../../core/lib/report/host-table.ts";
 
+export interface ReportSections {
+  audited?: HostTableRow[];
+  allowed?: HostTableRow[];
+  blocked?: BlockedRow[];
+}
+
 export interface Report {
   mode: string | null;
-  sections?: {
-    audited?: HostTableRow[];
-    allowed?: HostTableRow[];
-    blocked?: BlockedRow[];
-  };
+  sections?: ReportSections;
   blockedCount?: number;
 }
 
@@ -38,6 +40,15 @@ export function fetchReport(containerName: string): Report {
  * `blockedRows`/`showExpected` come pre-computed from the caller so
  * known_blocked_rules matching runs once per report, not once per render.
  */
+export interface BuildReportMarkdownOptions {
+  stepLabel?: string;
+  actionRepo?: string;
+  actionRef?: string;
+  runCommand?: string;
+  blockedRows?: AnnotatedBlockedRow[];
+  showExpected?: boolean;
+}
+
 export function buildReportMarkdown(
   report: Report,
   {
@@ -47,14 +58,7 @@ export function buildReportMarkdown(
     runCommand,
     blockedRows = [],
     showExpected = false,
-  }: {
-    stepLabel?: string;
-    actionRepo?: string;
-    actionRef?: string;
-    runCommand?: string;
-    blockedRows?: AnnotatedBlockedRow[];
-    showExpected?: boolean;
-  } = {},
+  }: BuildReportMarkdownOptions = {},
 ): string {
   // Mirrors report/src/main.js's "## Outbound Traffic Report during Docker
   // Build (mode)" heading, so both actions read as the same kind of report.
