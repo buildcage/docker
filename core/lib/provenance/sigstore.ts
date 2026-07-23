@@ -1,13 +1,33 @@
-// @ts-nocheck
 import { bundleFromJSON } from "@sigstore/bundle";
 import { getTrustedRoot } from "@sigstore/tuf";
-import { toSignedEntity, toTrustMaterial, Verifier } from "@sigstore/verify";
+import {
+  toSignedEntity,
+  toTrustMaterial,
+  Verifier,
+  type ObjectIdentifierValuePair,
+  type VerificationPolicy,
+} from "@sigstore/verify";
 import { VerifyImageError } from "./errors.ts";
 
 // Encode a string as DER UTF8String for Fulcio OID extension values.
 // sigstore-js compares the raw OCTET STRING bytes, so we must include
 // the DER tag (0x0C) and length prefix. Assumes len < 128.
-export const derUtf8 = (s) => String.fromCharCode(0x0c, s.length) + s;
+export const derUtf8 = (s: string): string => String.fromCharCode(0x0c, s.length) + s;
+
+interface DsseBundle {
+  dsseEnvelope?: {
+    payload?: string;
+    payloadType?: string;
+  };
+}
+
+export interface VerifyBundleOptions {
+  certificateIssuer?: string;
+  certificateIdentityURI?: string;
+  certificateOIDs?: Record<string, string>;
+  tlogThreshold?: number;
+  ctLogThreshold?: number;
+}
 
 /**
  * Extract and assert the signed manifest digest from a cosign DSSE bundle.
@@ -27,11 +47,8 @@ export const derUtf8 = (s) => String.fromCharCode(0x0c, s.length) + s;
  * image; this assertion prevents accepting such a re-attached bundle.
  *
  * Exported for unit testing; callers should use verifyBundle() instead.
- *
- * @param {object} bundleJson   — raw bundle JSON object
- * @param {string} expectedDigest — "sha256:<hex>" from getManifestDigest()
  */
-export function assertSignedDigest(bundleJson, expectedDigest) {
+export function assertSignedDigest(bundleJson: DsseBundle, expectedDigest: string): void {
   const dsse = bundleJson?.dsseEnvelope;
   const payload = dsse?.payload;
   if (!payload) {
@@ -46,7 +63,7 @@ export function assertSignedDigest(bundleJson, expectedDigest) {
 
     if (dsse.payloadType === "application/vnd.in-toto+json") {
       // in-toto Statement v1: subject[].digest.sha256 holds the manifest digest.
-      const subjects = sl?.subject ?? [];
+      const subjects: { digest?: { sha256?: string } }[] = sl?.subject ?? [];
       const matched = subjects.some(
         (s) => s?.digest?.sha256 && `sha256:${s.digest.sha256}` === expectedDigest,
       );
@@ -98,19 +115,21 @@ export function assertSignedDigest(bundleJson, expectedDigest) {
  *   tlogThreshold          – minimum transparency log entries (default 1)
  *   ctLogThreshold         – minimum CT log entries (default 1)
  *
- * @param {object} bundleJson     — raw bundle JSON object
- * @param {object} options        — policy options
- * @param {string} expectedDigest — "sha256:<hex>" fetched from the registry;
- *                                  must match the digest inside the signed payload
+ * expectedDigest — "sha256:<hex>" fetched from the registry;
+ * must match the digest inside the signed payload.
  */
-export async function verifyBundle(bundleJson, options, expectedDigest) {
+export async function verifyBundle(
+  bundleJson: DsseBundle,
+  options: VerifyBundleOptions,
+  expectedDigest: string,
+): Promise<void> {
   const trustedRoot = await getTrustedRoot();
   const verifier = new Verifier(toTrustMaterial(trustedRoot), {
     ctlogThreshold: options.ctLogThreshold,
     tlogThreshold: options.tlogThreshold,
   });
 
-  const policy = {};
+  const policy: VerificationPolicy = {};
   if (options.certificateIdentityURI) {
     policy.subjectAlternativeName = options.certificateIdentityURI;
   }
@@ -119,7 +138,7 @@ export async function verifyBundle(bundleJson, options, expectedDigest) {
   }
   if (options.certificateOIDs) {
     policy.oids = Object.entries(options.certificateOIDs).map(
-      ([oid, value]) => ({
+      ([oid, value]): ObjectIdentifierValuePair => ({
         oid: { id: oid.split(".").map(Number) },
         value: Buffer.from(value),
       }),
@@ -131,7 +150,7 @@ export async function verifyBundle(bundleJson, options, expectedDigest) {
     verifier.verify(signedEntity, policy);
   } catch (err) {
     throw new VerifyImageError(
-      `Image provenance verification failed: ${err.message}`,
+      `Image provenance verification failed: ${(err as Error).message}`,
       "VERIFY_FAILED",
     );
   }
