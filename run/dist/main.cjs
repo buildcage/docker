@@ -7428,39 +7428,6 @@ function assertScratchBaseNotWritable(writableDirs) {
 	let overlapping = writableDirs.find((p) => pathsOverlap(p, SANDBOX_SCRATCH_BASE));
 	if (overlapping) throw Error(`writable path ${JSON.stringify(overlapping)} overlaps the sandbox's own scratch directory (${SANDBOX_SCRATCH_BASE}); this would re-expose the sandboxed host filesystem read-write inside the sandbox itself. Choose a writable path outside ${SANDBOX_SCRATCH_BASE}.`);
 }
-/**
-* Build the final OCI Runtime Spec (config.json) for the isolated command,
-* starting from runc's own `baseSpec` (see generateBaseOciSpec) and
-* overriding only what this sandbox needs to control:
-*
-* - root: a bind-mounted copy of the host's own `/` (rootfsBindDir, set up
-*   by run-isolated.sh before invoking runc — pivot_root can't target `/`
-*   itself), made read-only via `root.readonly` plus an explicit
-*   `linux.readonlyPaths` entry per real host mount point `--rbind`
-*   duplicated in (see computeReadonlyHostMounts — root.readonly alone
-*   only covers the top-level mount), except workdir/home/tmp/runnerTemp/
-*   writablePaths. rootfsBindDir itself lives under SANDBOX_SCRATCH_BASE,
-*   which is never one of those writable exceptions, so the recursive
-*   writable rbinds don't re-expose the host-`/` rootfs as a second, writable
-*   copy inside the sandbox (see assertScratchBaseNotWritable, which fails
-*   closed if a `writable:` input would break that invariant).
-* - linux.namespaces: same six namespace types runc's own default spec
-*   already requests (no user namespace — see docs/security.md's
-*   rationale for preserving the real UID/GID), just adding `path` to the
-*   network entry so it joins the netns run-isolated.sh already wired a
-*   veth into, instead of creating a fresh, unconnected one.
-* - process.capabilities: fully cleared (all five sets empty) plus
-*   noNewPrivileges — runc applies this natively, no setpriv needed.
-* - process.env: the step's real environment, replacing runc spec's
-*   invented PATH/TERM defaults.
-* - linux.seccomp: the Docker-default-profile-derived filter (see
-*   gen-seccomp-profile), resolved against this same empty capability
-*   set.
-*
-* `writablePaths` containing "/" is a sentinel meaning "disable the
-* read-only restriction entirely" (see docs/reference.md's `writable`
-* input).
-*/
 function buildOciConfig(baseSpec, { uid, gid, workdir, home, runnerTemp, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] }) {
 	let disableReadonly = writablePaths.includes("/"), mounts = [...baseSpec.mounts, {
 		destination: "/etc/resolv.conf",
@@ -7473,7 +7440,7 @@ function buildOciConfig(baseSpec, { uid, gid, workdir, home, runnerTemp, writabl
 		"/tmp",
 		runnerTemp,
 		...writablePaths
-	].filter(Boolean))], protectedPaths = new Set(writableDirs);
+	].filter((p) => !!p))], protectedPaths = new Set(writableDirs);
 	if (!disableReadonly) {
 		assertScratchBaseNotWritable(writableDirs);
 		for (let p of writableDirs) mounts.push({
@@ -7581,7 +7548,8 @@ function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsName, ro
 	try {
 		return (0, node_child_process.execFileSync)("sudo", args, { stdio: "inherit" }), 0;
 	} catch (e) {
-		return typeof e.status == "number" ? e.status : 1;
+		let status = e.status;
+		return typeof status == "number" ? status : 1;
 	}
 }
 /**

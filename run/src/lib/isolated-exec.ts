@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -34,12 +33,53 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // assertScratchBaseNotWritable.
 const SANDBOX_SCRATCH_BASE = "/var/tmp/buildcage";
 
+interface MountEntry {
+  destination: string;
+  type?: string;
+  source?: string;
+  options?: string[];
+}
+
+interface OciSpec {
+  mounts: MountEntry[];
+  linux: {
+    maskedPaths?: string[];
+    readonlyPaths?: string[];
+    namespaces: { type: string; path?: string }[];
+    [key: string]: unknown;
+  };
+  root?: unknown;
+  process: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// buildOciConfig's actual, guaranteed-populated output shape — narrower than
+// the general OciSpec above, which also stands in for runc's raw, more
+// loosely-known `runc spec` input.
+interface BuiltOciSpec extends OciSpec {
+  root: { path: string; readonly: boolean };
+  process: Record<string, unknown> & {
+    args: string[];
+    env: string[];
+    cwd: string;
+    user: { uid: number; gid: number };
+    capabilities: unknown;
+    noNewPrivileges: boolean;
+  };
+  linux: OciSpec["linux"] & { maskedPaths: string[]; readonlyPaths: string[] };
+}
+
+interface HostMount {
+  mountPoint: string;
+  fsType: string;
+}
+
 /**
  * Write the user-supplied `run:` input to an executable script file.
  * Routing through a file (rather than passing the command inline to a
  * shell) avoids any shell-injection surface from the input string.
  */
-export function writeRunScript(runInput, dir) {
+export function writeRunScript(runInput: string, dir: string): string {
   const scriptPath = join(dir, "run-script.sh");
   const content = runInput.startsWith("#!") ? runInput : `#!/bin/sh\nset -e\n${runInput}\n`;
   writeFileSync(scriptPath, content, { mode: 0o700 });
@@ -55,7 +95,7 @@ export function writeRunScript(runInput, dir) {
  * and buildOciConfig only needs to override/extend the handful of fields
  * this sandbox actually cares about.
  */
-export function generateBaseOciSpec(runcPath, bundleDir) {
+export function generateBaseOciSpec(runcPath: string, bundleDir: string): OciSpec {
   execFileSync(runcPath, ["spec"], { cwd: bundleDir });
   return JSON.parse(readFileSync(join(bundleDir, "config.json"), "utf8"));
 }
@@ -73,7 +113,13 @@ export function generateBaseOciSpec(runcPath, bundleDir) {
  * gen-seccomp-profile/main.go. gen-seccomp-profile is only needed transiently
  * to resolve the profile, so it's removed once read; runc stays for `runc run`.
  */
-export function extractRuncBootstrap({ containerName, destDir }) {
+export function extractRuncBootstrap({
+  containerName,
+  destDir,
+}: {
+  containerName: string;
+  destDir: string;
+}): { runcPath: string; seccompProfile: unknown; baseSpec: OciSpec } {
   const runcPath = join(destDir, "runc");
   const genSeccompProfilePath = join(destDir, "gen-seccomp-profile");
   execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/runc", hostPath: runcPath }));
@@ -98,7 +144,7 @@ export function extractRuncBootstrap({ containerName, destDir }) {
  * always the field right after the literal "-" separator, regardless of
  * how many optional fields precede it.
  */
-export function parseMountinfo(mountinfoContent) {
+export function parseMountinfo(mountinfoContent: string): HostMount[] {
   return mountinfoContent
     .split("\n")
     .filter(Boolean)
@@ -116,7 +162,7 @@ export function parseMountinfo(mountinfoContent) {
  * moment later (see buildOciConfig's readonlyPaths handling for why this
  * matters).
  */
-export function listHostMounts() {
+export function listHostMounts(): HostMount[] {
   return parseMountinfo(readFileSync("/proc/self/mountinfo", "utf8"));
 }
 
@@ -139,7 +185,11 @@ export function listHostMounts() {
  * writable guarantee. "/" itself is excluded since root.readonly already
  * covers it directly.
  */
-export function computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinations) {
+export function computeReadonlyHostMounts(
+  hostMounts: HostMount[],
+  protectedPaths: Set<string>,
+  freshMountDestinations: Set<string>,
+): string[] {
   return hostMounts
     .filter(({ mountPoint }) => mountPoint !== "/" && !freshMountDestinations.has(mountPoint) && !protectedPaths.has(mountPoint))
     .map(({ mountPoint }) => mountPoint);
@@ -156,7 +206,7 @@ export function computeReadonlyHostMounts(hostMounts, protectedPaths, freshMount
  * cgroup v1 or v2 hierarchy, so matching by destination path covers both
  * without needing to special-case a literal "cgroup2" fstype name).
  */
-export function freshMountDestinationsFrom(baseSpec) {
+export function freshMountDestinationsFrom(baseSpec: { mounts: MountEntry[] }): Set<string> {
   return new Set(baseSpec.mounts.map((m) => m.destination));
 }
 
@@ -168,7 +218,7 @@ export function freshMountDestinationsFrom(baseSpec) {
 // lookup) only if none of the usual locations exist -- run-isolated.sh has
 // already verified setpriv is on root's PATH before we get here.
 const SETPRIV_CANDIDATE_PATHS = ["/usr/bin/setpriv", "/bin/setpriv", "/usr/sbin/setpriv", "/sbin/setpriv"];
-function resolveSetprivPath() {
+function resolveSetprivPath(): string {
   return SETPRIV_CANDIDATE_PATHS.find((p) => existsSync(p)) ?? "setpriv";
 }
 
@@ -177,9 +227,9 @@ function resolveSetprivPath() {
  * the other (path-component-wise, not a bare string prefix -- "/var/tmp/bu"
  * must not count as overlapping "/var/tmp/buildcage").
  */
-function pathsOverlap(a, b) {
+function pathsOverlap(a: string, b: string): boolean {
   if (a === b) return true;
-  const withSlash = (p) => (p.endsWith("/") ? p : `${p}/`);
+  const withSlash = (p: string) => (p.endsWith("/") ? p : `${p}/`);
   return a.startsWith(withSlash(b)) || b.startsWith(withSlash(a));
 }
 
@@ -196,7 +246,7 @@ function pathsOverlap(a, b) {
  * attacker-controlled), so this is a misconfiguration guard, not a
  * hardening measure against a hostile isolated command.
  */
-function assertScratchBaseNotWritable(writableDirs) {
+function assertScratchBaseNotWritable(writableDirs: string[]): void {
   const overlapping = writableDirs.find((p) => pathsOverlap(p, SANDBOX_SCRATCH_BASE));
   if (overlapping) {
     throw new Error(
@@ -239,10 +289,40 @@ function assertScratchBaseNotWritable(writableDirs) {
  * read-only restriction entirely" (see docs/reference.md's `writable`
  * input).
  */
+export interface BuildOciConfigOptions {
+  uid: number;
+  gid: number;
+  workdir?: string;
+  home?: string;
+  runnerTemp?: string;
+  writablePaths?: string[];
+  env: NodeJS.ProcessEnv;
+  netnsPath: string;
+  rootfsBindDir: string;
+  resolvConfPath: string;
+  seccompProfile: unknown;
+  scriptPath: string;
+  hostMounts?: HostMount[];
+}
+
 export function buildOciConfig(
-  baseSpec,
-  { uid, gid, workdir, home, runnerTemp, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] },
-) {
+  baseSpec: OciSpec,
+  {
+    uid,
+    gid,
+    workdir,
+    home,
+    runnerTemp,
+    writablePaths = [],
+    env,
+    netnsPath,
+    rootfsBindDir,
+    resolvConfPath,
+    seccompProfile,
+    scriptPath,
+    hostMounts = [],
+  }: BuildOciConfigOptions,
+): BuiltOciSpec {
   const disableReadonly = writablePaths.includes("/");
 
   const mounts = [...baseSpec.mounts, { destination: "/etc/resolv.conf", type: "none", source: resolvConfPath, options: ["rbind", "ro"] }];
@@ -251,7 +331,9 @@ export function buildOciConfig(
   // (self-hosted runners can place it elsewhere), so the $HOME exception
   // wouldn't otherwise cover it. Deduped so an overlapping entry (RUNNER_TEMP
   // nested under $HOME, or a writablePaths duplicate) isn't bind-mounted twice.
-  const writableDirs = [...new Set([workdir, home, "/tmp", runnerTemp, ...writablePaths].filter(Boolean))];
+  const writableDirs = [
+    ...new Set([workdir, home, "/tmp", runnerTemp, ...writablePaths].filter((p): p is string => Boolean(p))),
+  ];
   const protectedPaths = new Set(writableDirs);
   if (!disableReadonly) {
     // `writable: /` (disableReadonly) is an intentional, documented full
@@ -314,14 +396,14 @@ export function buildOciConfig(
  * `process.env` embeds the whole step environment, including any secrets
  * passed via `env:`.
  */
-export function writeOciConfig(config, bundleDir) {
+export function writeOciConfig(config: unknown, bundleDir: string): string {
   const configPath = join(bundleDir, "config.json");
   writeFileSync(configPath, JSON.stringify(config), { mode: 0o600 });
   return configPath;
 }
 
 /** Write the resolv.conf bind-mount source referenced by buildOciConfig. */
-export function writeResolvConf(dns, dir) {
+export function writeResolvConf(dns: string, dir: string): string {
   const resolvConfPath = join(dir, "resolv.conf");
   writeFileSync(resolvConfPath, `nameserver ${dns}\n`, { mode: 0o644 });
   return resolvConfPath;
@@ -339,7 +421,27 @@ export function writeResolvConf(dns, dir) {
  * to set up networking and the rootfs bind-mount before handing off to
  * `runc run`.
  */
-export function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsName, rootfsBindDir, gateway, dns, targetIp }) {
+export function runIsolated({
+  runcPath,
+  proxyPid,
+  bundleDir,
+  containerId,
+  netnsName,
+  rootfsBindDir,
+  gateway,
+  dns,
+  targetIp,
+}: {
+  runcPath: string;
+  proxyPid: number;
+  bundleDir: string;
+  containerId: string;
+  netnsName: string;
+  rootfsBindDir: string;
+  gateway: string;
+  dns: string;
+  targetIp: string;
+}): number {
   const runIsolatedShPath = join(__dirname, "..", "scripts", "run-isolated.sh");
 
   const args = [
@@ -373,7 +475,8 @@ export function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsN
     // A non-zero exit from the isolated command (or run-isolated.sh itself)
     // surfaces here as an ExecException; e.status is the actual exit code.
     // e.status is null if the process was killed by a signal.
-    return typeof e.status === "number" ? e.status : 1;
+    const status = (e as { status?: number | null }).status;
+    return typeof status === "number" ? status : 1;
   }
 }
 
@@ -382,7 +485,7 @@ export function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsN
  * nested under `dir` (including `dir` itself), deepest-path-first so a
  * caller can safely unmount children before their parents.
  */
-export function parseMountsUnder(mountinfoContent, dir) {
+export function parseMountsUnder(mountinfoContent: string, dir: string): string[] {
   const prefix = dir.endsWith("/") ? dir : `${dir}/`;
   return parseMountinfo(mountinfoContent)
     .map(({ mountPoint }) => mountPoint)
@@ -403,7 +506,7 @@ export function parseMountsUnder(mountinfoContent, dir) {
  * busy references, so this step itself can't hang or fail the way a
  * normal (non-lazy) unmount could.
  */
-function unmountAllUnder(dir) {
+function unmountAllUnder(dir: string): void {
   let mountPoints;
   try {
     mountPoints = parseMountsUnder(readFileSync("/proc/self/mountinfo", "utf8"), dir);
@@ -414,7 +517,7 @@ function unmountAllUnder(dir) {
     try {
       execFileSync("sudo", ["umount", "-R", "-l", mountPoint], { stdio: ["ignore", "ignore", "pipe"] });
     } catch (e) {
-      console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${e.message}`);
+      console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${(e as Error).message}`);
     }
   }
 }
@@ -429,14 +532,14 @@ function unmountAllUnder(dir) {
  * though it's no longer listed as a mountpoint at all. Resolves on the
  * very next attempt after a brief wait.
  */
-function removeScratchDir(dir) {
+function removeScratchDir(dir: string): void {
   const maxAttempts = 5;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       rmSync(dir, { recursive: true, force: true });
       return;
     } catch (e) {
-      if (e.code !== "EBUSY" || attempt === maxAttempts) throw e;
+      if ((e as NodeJS.ErrnoException).code !== "EBUSY" || attempt === maxAttempts) throw e;
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
     }
   }
@@ -448,7 +551,7 @@ function removeScratchDir(dir) {
  * so post.js can reclaim a scratch dir orphaned by a hard kill that bypassed
  * withScratchDir's own finally. No-ops safely when `dir` doesn't exist.
  */
-export function cleanupScratchDir(dir) {
+export function cleanupScratchDir(dir: string): void {
   unmountAllUnder(dir);
   removeScratchDir(dir);
 }
@@ -460,7 +563,7 @@ export function cleanupScratchDir(dir) {
  * reconstruct and reclaim the exact same directory from `STATE_container_name`
  * alone.
  */
-export function scratchDirFor(containerName) {
+export function scratchDirFor(containerName: string): string {
   return join(SANDBOX_SCRATCH_BASE, containerName.replace(/^buildcage-proxy-/, "sandbox-"));
 }
 
@@ -471,8 +574,8 @@ export function scratchDirFor(containerName) {
  * is used (unit tests). Cleaned up on every exit path that unwinds — a
  * SIGKILL bypasses this finally, which is exactly what post.js covers.
  */
-export function withScratchDir(fn, containerName) {
-  let dir;
+export function withScratchDir<T>(fn: (dir: string) => T, containerName?: string): T {
+  let dir: string;
   mkdirSync(SANDBOX_SCRATCH_BASE, { recursive: true, mode: 0o755 });
   if (containerName) {
     dir = scratchDirFor(containerName);

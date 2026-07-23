@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
@@ -234,7 +233,7 @@ describe("buildOciConfig", () => {
   it("adds `path` to the network namespace entry, leaving other namespace types untouched", () => {
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
     const netNs = config.linux.namespaces.find((ns) => ns.type === "network");
-    assert.equal(netNs.path, baseArgs.netnsPath);
+    assert.equal(netNs!.path, baseArgs.netnsPath);
     assert.equal(config.linux.namespaces.length, 6);
   });
 
@@ -376,7 +375,7 @@ describe("writeOciConfig", () => {
 
 describe("withScratchDir", () => {
   it("removes the directory after the callback returns", () => {
-    let capturedDir;
+    let capturedDir: string;
     withScratchDir((dir) => {
       capturedDir = dir;
       writeRunScript("echo hi", dir);
@@ -385,7 +384,7 @@ describe("withScratchDir", () => {
   });
 
   it("removes the directory even if the callback throws", () => {
-    let capturedDir;
+    let capturedDir: string;
     assert.throws(() => {
       withScratchDir((dir) => {
         capturedDir = dir;
