@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { SetupError } from "./lib/errors.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
-import { buildACLRules } from "../../core/lib/general/acl-rules.ts";
+import { buildACLRules } from "../../core/lib/acl/rules.ts";
 import {
   verifyImageDigestOrThrow,
   type VerifyImageDigestOptions,

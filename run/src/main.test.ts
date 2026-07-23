@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs, parseWritablePaths, readKnownBlockedRules } from "./main.ts";
-import { InvalidRulesError } from "../../core/lib/general/acl-rules.ts";
+import { InvalidRulesError } from "../../core/lib/acl/rules.ts";
 
 describe("buildACLRules", () => {
   it("parses whitespace-separated HTTPS rules", () => {

@@ -13,7 +13,7 @@ import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
-import { buildACLRules, parseRulesOrThrow } from "../../core/lib/general/acl-rules.ts";
+import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import { SandboxError } from "./lib/errors.ts";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.ts";

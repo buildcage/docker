@@ -7103,7 +7103,7 @@ function wildcardToRegex(pattern) {
 	return `${domainToRegex(domain)}:${portRegex}`;
 }
 //#endregion
-//#region core/lib/general/acl-rules.ts
+//#region core/lib/acl/rules.ts
 /**
 * Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
 * allowed_ip_rules/known_blocked_rules) fails to parse — shared by the
