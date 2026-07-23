@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Property-based tests for run/main.js and its helpers.
  *
@@ -65,7 +64,7 @@ describe("buildACLRules – properties", () => {
             }),
           (err) => {
             assert.ok(err instanceof Error);
-            assert.equal(err.code, "INVALID_RULES");
+            assert.equal((err as Error & { code?: string }).code, "INVALID_RULES");
             return true;
           },
         );
