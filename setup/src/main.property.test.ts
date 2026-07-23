@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Property-based tests for setup/main.js and its helpers.
  *
@@ -18,7 +17,7 @@ import { buildACLRules, resolveProxyEngine } from "./main.ts";
 
 // Only the `explicit` engine appends a suffix; `transparent` (the default)
 // publishes the plain tag, matching the pre-multi-engine tagging scheme.
-const suffixFor = (engine) => (engine === "explicit" ? "-explicit" : "");
+const suffixFor = (engine: string) => (engine === "explicit" ? "-explicit" : "");
 
 describe("imageTagFromRef – properties", () => {
   it("40-char hex SHA always produces sha-<lowercase sha>, suffixed only for explicit", () => {
