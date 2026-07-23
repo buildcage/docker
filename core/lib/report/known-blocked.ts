@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Shared logic for `known_blocked_rules`: domains expected to be blocked,
  * so a matching blocked connection doesn't fail the step even when
@@ -7,15 +6,28 @@
  */
 import { convertRule } from "../../shared/lib/rules.js";
 
+export interface BlockedRow {
+  host: string;
+  port: string;
+  ruleType: string;
+  reason: string;
+  count: number;
+}
+
+export interface AnnotatedBlockedRow extends BlockedRow {
+  expected: boolean;
+}
+
 /**
  * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
  * its `host:port` matches at least one known_blocked_rules pattern.
  *
- * @param {{host:string, port:string, ruleType:string, reason:string, count:number}[]} blockedRows
- * @param {string[]} knownBlockedRules - as returned by parseAndValidateRules
- * @returns {({host:string, port:string, ruleType:string, reason:string, count:number, expected:boolean})[]}
+ * knownBlockedRules is as returned by parseAndValidateRules.
  */
-export function annotateKnownBlocked(blockedRows, knownBlockedRules) {
+export function annotateKnownBlocked(
+  blockedRows: BlockedRow[],
+  knownBlockedRules: string[],
+): AnnotatedBlockedRow[] {
   const matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
   return blockedRows.map((row) => ({
     ...row,
@@ -34,10 +46,23 @@ export function annotateKnownBlocked(blockedRows, knownBlockedRules) {
  * `blockedRows` with a nonzero `blockedCount` (malformed/incomplete report
  * data) is treated as unexpected too (fail closed).
  *
- * @param {{isAudit: boolean, failOnBlocked: boolean, blockedCount: number, blockedRows: object[]}} params
- * @returns {{level: "none"|"notice"|"error", shouldFail: boolean}}
  */
-export function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedRows }) {
+export interface BlockedOutcome {
+  level: "none" | "notice" | "error";
+  shouldFail: boolean;
+}
+
+export function determineBlockedOutcome({
+  isAudit,
+  failOnBlocked,
+  blockedCount,
+  blockedRows,
+}: {
+  isAudit: boolean;
+  failOnBlocked: boolean;
+  blockedCount: number;
+  blockedRows: { expected: boolean }[];
+}): BlockedOutcome {
   if (!blockedCount) return { level: "none", shouldFail: false };
   if (isAudit) return { level: "notice", shouldFail: false };
   const hasUnexpected = blockedRows.length === 0 || blockedRows.some((row) => !row.expected);
@@ -54,10 +79,18 @@ export function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, 
  * varying the notice text there would be misleading and would silently
  * break any tooling that matches the old fixed-format notice.
  *
- * @param {{blockedCount: number, blockedRows: object[], engineLabel: "sandbox"|"proxy", isAudit: boolean}} params
- * @returns {string}
  */
-export function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }) {
+export function buildBlockedMessage({
+  blockedCount,
+  blockedRows,
+  engineLabel,
+  isAudit,
+}: {
+  blockedCount: number;
+  blockedRows: { expected: boolean }[];
+  engineLabel: "sandbox" | "proxy";
+  isAudit: boolean;
+}): string {
   const base = `${blockedCount} blocked connection(s) detected by buildcage ${engineLabel}`;
   if (isAudit) return base;
   const unexpected = blockedRows.filter((row) => !row.expected).length;
@@ -72,11 +105,20 @@ export function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, is
  * the result through their table rendering and annotation code, rather
  * than each recomputing annotateKnownBlocked independently.
  *
- * @param {{mode: string|null, blockedCount?: number, sections?: {blocked?: object[]}}} report
- * @param {{knownBlockedRules: string[], failOnBlocked: boolean, engineLabel: "sandbox"|"proxy"}} options
- * @returns {{blockedRows: object[], showExpected: boolean, outcome: {level: string, shouldFail: boolean}, message: string|null}}
  */
-export function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engineLabel }) {
+export function evaluateBlockedReport(
+  report: { mode: string | null; blockedCount?: number; sections?: { blocked?: BlockedRow[] } },
+  {
+    knownBlockedRules,
+    failOnBlocked,
+    engineLabel,
+  }: { knownBlockedRules: string[]; failOnBlocked: boolean; engineLabel: "sandbox" | "proxy" },
+): {
+  blockedRows: AnnotatedBlockedRow[];
+  showExpected: boolean;
+  outcome: BlockedOutcome;
+  message: string | null;
+} {
   const isAudit = report.mode === "audit";
   const blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules);
   const outcome = determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount: report.blockedCount ?? 0, blockedRows });
