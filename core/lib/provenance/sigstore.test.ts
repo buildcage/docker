@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Unit tests for core/lib/sigstore.js
  *
@@ -21,7 +20,15 @@ const DIGEST = "sha256:abc123";
  * - payloadType omitted / "simple-signing": legacy critical.image format
  * - payloadType "application/vnd.in-toto+json": in-toto Statement v1 format
  */
-function makeBundle(signedDigest, { payloadType, subjects } = {}) {
+interface Subject {
+  digest: { sha256?: string; md5?: string };
+  annotations: object;
+}
+
+function makeBundle(
+  signedDigest: string,
+  { payloadType, subjects }: { payloadType?: string; subjects?: Subject[] } = {},
+) {
   let payloadObj;
   if (payloadType === "application/vnd.in-toto+json") {
     const subjectList = subjects ?? [
@@ -53,7 +60,7 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
   it("throws VERIFY_FAILED when the signed digest does not match", () => {
     assert.throws(
       () => assertSignedDigest(makeBundle("sha256:different"), DIGEST),
-      (err) => {
+      (err: any) => {
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /does not match/);
         return true;
@@ -66,7 +73,7 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
     const bundle = { dsseEnvelope: { payload } };
     assert.throws(
       () => assertSignedDigest(bundle, DIGEST),
-      (err) => {
+      (err: any) => {
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /missing/);
         return true;
@@ -77,7 +84,7 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
   it("throws VERIFY_FAILED when the DSSE payload field is absent", () => {
     assert.throws(
       () => assertSignedDigest({ dsseEnvelope: {} }, DIGEST),
-      (err) => {
+      (err: any) => {
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /missing a signed payload/);
         return true;
@@ -88,7 +95,7 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
   it("throws VERIFY_FAILED when dsseEnvelope is absent", () => {
     assert.throws(
       () => assertSignedDigest({}, DIGEST),
-      (err) => {
+      (err: any) => {
         assert.equal(err.code, "VERIFY_FAILED");
         return true;
       },
@@ -99,7 +106,7 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
     const bundle = { dsseEnvelope: { payload: "!!!not-base64!!!" } };
     assert.throws(
       () => assertSignedDigest(bundle, DIGEST),
-      (err) => {
+      (err: any) => {
         assert.equal(err.code, "VERIFY_FAILED");
         return true;
       },
@@ -134,7 +141,7 @@ describe("assertSignedDigest — in-toto Statement v1 (cosign --new-bundle-forma
           makeBundle("sha256:different", { payloadType: IN_TOTO }),
           DIGEST,
         ),
-      (err) => {
+      (err: any) => {
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /does not match/);
         return true;
@@ -146,7 +153,7 @@ describe("assertSignedDigest — in-toto Statement v1 (cosign --new-bundle-forma
     const bundle = makeBundle(DIGEST, { payloadType: IN_TOTO, subjects: [] });
     assert.throws(
       () => assertSignedDigest(bundle, DIGEST),
-      (err) => {
+      (err: any) => {
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /missing/);
         return true;
@@ -161,7 +168,7 @@ describe("assertSignedDigest — in-toto Statement v1 (cosign --new-bundle-forma
     });
     assert.throws(
       () => assertSignedDigest(bundle, DIGEST),
-      (err) => {
+      (err: any) => {
         assert.equal(err.code, "VERIFY_FAILED");
         return true;
       },
