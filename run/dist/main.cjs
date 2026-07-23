@@ -7196,14 +7196,6 @@ function isContainerNotFoundError(e) {
 	let text = `${e?.stderr ?? ""} ${e?.message ?? ""}`.toLowerCase();
 	return text.includes("no such object") || text.includes("no such container");
 }
-/**
-* Null means "container doesn't exist yet" (see isContainerNotFoundError);
-* any other docker failure throws a SandboxError instead, so it isn't
-* confused with that case at the call site.
-*
-* `exec` is an injectable seam for testing without a real Docker daemon —
-* not a caller-facing precondition.
-*/
 function getContainerPid(containerName, { exec = node_child_process.execFileSync } = {}) {
 	let out;
 	try {

@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
-import { describeDockerFailure } from "../../../core/lib/actions/docker-error.ts";
+import { describeDockerFailure, type DockerErrorLike } from "../../../core/lib/actions/docker-error.ts";
 import { SandboxError } from "./errors.ts";
 
 /**
@@ -10,7 +9,7 @@ import { SandboxError } from "./errors.ts";
  * report -> stop) rather than reusing one across steps, so a random name
  * avoids collisions across concurrent/successive steps by construction.
  */
-export function generateContainerName() {
+export function generateContainerName(): string {
   return `buildcage-proxy-${randomBytes(4).toString("hex")}`;
 }
 
@@ -23,7 +22,7 @@ export function generateContainerName() {
  * name, and a concurrent `up`/`down` from a different step can recreate or
  * tear down another step's still-running proxy container.
  */
-export function deriveProjectName(containerName) {
+export function deriveProjectName(containerName: string): string {
   return containerName;
 }
 
@@ -31,7 +30,15 @@ export function deriveProjectName(containerName) {
  * Used to pull runc and gen-seccomp-profile out of the proxy image before
  * the isolated command runs (see lib/isolated-exec.js).
  */
-export function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
+export function buildDockerCpArgs({
+  containerName,
+  containerPath,
+  hostPath,
+}: {
+  containerName: string;
+  containerPath: string;
+  hostPath: string;
+}): string[] {
   return ["cp", `${containerName}:${containerPath}`, hostPath];
 }
 
@@ -40,7 +47,7 @@ export function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
  * `no such object`) from "docker itself is unusable on this runner" — both
  * phrasings are matched for resilience across docker CLI versions.
  */
-export function isContainerNotFoundError(e) {
+export function isContainerNotFoundError(e: DockerErrorLike | null | undefined): boolean {
   const text = `${e?.stderr ?? ""} ${e?.message ?? ""}`.toLowerCase();
   return text.includes("no such object") || text.includes("no such container");
 }
@@ -53,7 +60,16 @@ export function isContainerNotFoundError(e) {
  * `exec` is an injectable seam for testing without a real Docker daemon —
  * not a caller-facing precondition.
  */
-export function getContainerPid(containerName, { exec = execFileSync } = {}) {
+type ExecFileSyncLike = (
+  command: string,
+  args: string[],
+  options: { encoding: string; stdio: string[]; env: NodeJS.ProcessEnv },
+) => string;
+
+export function getContainerPid(
+  containerName: string,
+  { exec = execFileSync as unknown as ExecFileSyncLike }: { exec?: ExecFileSyncLike } = {},
+): number | null {
   let out;
   try {
     out = exec(
@@ -65,9 +81,9 @@ export function getContainerPid(containerName, { exec = execFileSync } = {}) {
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, LC_ALL: "C" } },
     ).trim();
   } catch (e) {
-    if (isContainerNotFoundError(e)) return null;
+    if (isContainerNotFoundError(e as DockerErrorLike)) return null;
     throw new SandboxError(
-      describeDockerFailure(e, { operation: "docker inspect" }),
+      describeDockerFailure(e as DockerErrorLike, { operation: "docker inspect" }),
       "DOCKER_UNAVAILABLE",
     );
   }
