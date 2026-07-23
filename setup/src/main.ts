@@ -8,7 +8,7 @@ import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
-import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
+import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
@@ -99,7 +99,7 @@ async function main(): Promise<void> {
     );
   } catch (e) {
     throw new SetupError(
-      describeDockerFailure(e as DockerErrorLike, { operation: "docker compose down" }),
+      describeDockerFailure(e, { operation: "docker compose down" }),
       "DOCKER_UNAVAILABLE",
     );
   }
@@ -116,7 +116,7 @@ async function main(): Promise<void> {
     );
   } catch (e) {
     throw new SetupError(
-      describeDockerFailure(e as DockerErrorLike, { operation: "docker compose up" }),
+      describeDockerFailure(e, { operation: "docker compose up" }),
       "DOCKER_UNAVAILABLE",
     );
   }

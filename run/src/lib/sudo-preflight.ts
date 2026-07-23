@@ -23,10 +23,11 @@ const SLIM_RUNNER_NOTE =
  * describeDockerFailure.
  */
 export function describeSudoFailure(
-  e: DockerErrorLike | null | undefined,
+  e: unknown,
   { env = process.env, exists = existsSync }: { env?: NodeJS.ProcessEnv; exists?: (path: string) => boolean } = {},
 ): string {
-  const captured = e && typeof e.stderr === "string" ? e.stderr.trim() : "";
+  const err = (e && typeof e === "object" ? e : {}) as DockerErrorLike;
+  const captured = typeof err.stderr === "string" ? err.stderr.trim() : "";
   const slimNote = isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE : "";
   return `'sudo' is not available without a password on this runner.${slimNote} ${REQUIREMENT}${captured ? ` (${captured})` : ""}`;
 }
@@ -42,6 +43,6 @@ export function checkPasswordlessSudo(): void {
   try {
     execFileSync("sudo", ["-n", "true"], { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"] });
   } catch (e) {
-    throw new SandboxError(describeSudoFailure(e as DockerErrorLike), "PASSWORDLESS_SUDO_REQUIRED");
+    throw new SandboxError(describeSudoFailure(e), "PASSWORDLESS_SUDO_REQUIRED");
   }
 }

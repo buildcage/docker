@@ -14,7 +14,7 @@ import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { evaluateBlockedReport } from "../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../core/lib/report/host-table.ts";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
-import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
+import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -55,7 +55,7 @@ try {
   );
 } catch (e) {
   annotation.error(
-    describeDockerFailure(e as DockerErrorLike, { operation: "fetching the sandbox report from the container" }),
+    describeDockerFailure(e, { operation: "fetching the sandbox report from the container" }),
   );
   process.exit(1);
 }

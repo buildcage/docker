@@ -47,8 +47,9 @@ export function buildDockerCpArgs({
  * `no such object`) from "docker itself is unusable on this runner" — both
  * phrasings are matched for resilience across docker CLI versions.
  */
-export function isContainerNotFoundError(e: DockerErrorLike | null | undefined): boolean {
-  const text = `${e?.stderr ?? ""} ${e?.message ?? ""}`.toLowerCase();
+export function isContainerNotFoundError(e: unknown): boolean {
+  const err = (e && typeof e === "object" ? e : {}) as DockerErrorLike;
+  const text = `${err.stderr ?? ""} ${err.message ?? ""}`.toLowerCase();
   return text.includes("no such object") || text.includes("no such container");
 }
 
@@ -81,9 +82,9 @@ export function getContainerPid(
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, LC_ALL: "C" } },
     ).trim();
   } catch (e) {
-    if (isContainerNotFoundError(e as DockerErrorLike)) return null;
+    if (isContainerNotFoundError(e)) return null;
     throw new SandboxError(
-      describeDockerFailure(e as DockerErrorLike, { operation: "docker inspect" }),
+      describeDockerFailure(e, { operation: "docker inspect" }),
       "DOCKER_UNAVAILABLE",
     );
   }

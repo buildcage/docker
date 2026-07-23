@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
-import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
+import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
@@ -195,7 +195,7 @@ async function main(): Promise<void> {
     );
   } catch (e) {
     throw new SandboxError(
-      describeDockerFailure(e as DockerErrorLike, { operation: "docker compose up" }),
+      describeDockerFailure(e, { operation: "docker compose up" }),
       "DOCKER_UNAVAILABLE",
     );
   }
@@ -295,7 +295,7 @@ async function main(): Promise<void> {
       execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), { stdio: "inherit", env: composeEnv });
     } catch (e) {
       annotation.warning(
-        `Failed to stop the sandbox proxy container: ${describeDockerFailure(e as DockerErrorLike, { operation: "docker compose down" })}`,
+        `Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`,
       );
     }
   }

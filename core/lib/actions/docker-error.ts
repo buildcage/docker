@@ -34,16 +34,17 @@ const SLIM_RUNNER_NOTE =
  * since otherwise nothing points the reader back to it.
  */
 export function describeDockerFailure(
-  e: DockerErrorLike | null | undefined,
+  e: unknown,
   { operation = "docker", env = process.env, exists = existsSync }: DescribeDockerFailureOptions = {},
 ): string {
+  const err = (e && typeof e === "object" ? e : {}) as DockerErrorLike;
   const slimNote = isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE : "";
 
   let whatHappened;
-  if (e && e.code === "ENOENT") {
+  if (err.code === "ENOENT") {
     whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
   } else {
-    const captured = e && typeof e.stderr === "string" ? e.stderr.trim() : "";
+    const captured = typeof err.stderr === "string" ? err.stderr.trim() : "";
     const detail = captured ? `: ${captured}` : " (see the Docker output above for the underlying error)";
     whatHappened = `${operation} failed${detail}.`;
   }
