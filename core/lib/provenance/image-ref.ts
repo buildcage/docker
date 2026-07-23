@@ -8,13 +8,15 @@
  * entry points (e.g. run/src/main.js) can reuse it without also
  * bundling setup/src/main.js's own self-invocation guard.
  */
+export interface ResolveBuildcageImageRefOptions {
+  imageDigest: string;
+  actionRepository: string;
+}
+
 export function resolveBuildcageImageRef({
   imageDigest,
   actionRepository,
-}: {
-  imageDigest: string;
-  actionRepository: string;
-}): string {
+}: ResolveBuildcageImageRefOptions): string {
   const repository = `ghcr.io/${actionRepository}`.toLowerCase();
   // Pull by verified digest to close the TOCTOU window between verification and docker pull.
   return `${repository}@${imageDigest}`;

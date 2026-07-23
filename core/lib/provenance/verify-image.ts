@@ -23,6 +23,19 @@ const OID_SOURCE_REPO_DIGEST = "1.3.6.1.4.1.57264.1.13";
 
 const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+export interface VerifyImageIdentity {
+  actionRef: string;
+  actionRepo: string;
+}
+
+export interface VerifyImageDigestOptions extends VerifyImageIdentity {
+  proxyEngine?: string;
+}
+
+export interface VerifyImageDigestOrThrowOptions extends VerifyImageDigestOptions {
+  verifyImageDigestFn?: typeof verifyImageDigest;
+}
+
 /**
  * Convert an action ref into the base Docker image tag, then append the
  * proxy engine suffix for non-default engines. The `transparent` engine
@@ -65,10 +78,7 @@ export function imageTagFromRef(
 export function buildVerifyOptions({
   actionRef,
   actionRepo,
-}: {
-  actionRef: string;
-  actionRepo: string;
-}): VerifyBundleOptions | null {
+}: VerifyImageIdentity): VerifyBundleOptions | null {
   const sanPrefix = `^${escapeRegex(`https://github.com/${actionRepo}/${RELEASE_WORKFLOW}@refs/tags/`)}`;
   const base = {
     certificateIssuer: EXPECTED_ISSUER,
@@ -112,11 +122,7 @@ export async function verifyImageDigest({
   actionRef,
   actionRepo,
   proxyEngine = "transparent",
-}: {
-  actionRef: string;
-  actionRepo: string;
-  proxyEngine?: string;
-}): Promise<string | null> {
+}: VerifyImageDigestOptions): Promise<string | null> {
   const repoPath = actionRepo.toLowerCase();
 
   const verifyOptions = buildVerifyOptions({ actionRef, actionRepo });
@@ -143,12 +149,7 @@ export async function verifyImageDigestOrThrow({
   actionRepo,
   proxyEngine,
   verifyImageDigestFn = verifyImageDigest,
-}: {
-  actionRef: string;
-  actionRepo: string;
-  proxyEngine?: string;
-  verifyImageDigestFn?: typeof verifyImageDigest;
-}): Promise<string> {
+}: VerifyImageDigestOrThrowOptions): Promise<string> {
   let digest;
   try {
     digest = await verifyImageDigestFn({ actionRef, actionRepo, proxyEngine });
