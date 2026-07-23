@@ -1,3 +1,5 @@
+import type { AllowedRequest, VertexAllowedEntry } from "./vertex-log.ts";
+
 /**
  * Render the explicit engine's communication detail as a collapsed markdown
  * section, or "" if there's nothing to show. Allowed Urls is listed before
@@ -11,26 +13,13 @@
  * Command text is escaped since it's embedded directly in markdown; request
  * lines go inside a fenced code block instead, where escaping isn't needed.
  */
-export interface RequestLogEntry {
-  method: string;
-  url: string;
-  status?: number;
-}
-
-export interface CommandLogEntry {
-  command: string;
-  started: string;
-  completed: string;
-  entries: RequestLogEntry[];
-}
-
 export interface DeniedEntry {
   url: string;
   timestamp: string;
 }
 
 export function renderCommunicationDetails(
-  builds: CommandLogEntry[][] | null | undefined,
+  builds: VertexAllowedEntry[][] | null | undefined,
   deniedTimeline: DeniedEntry[] | null | undefined,
 ): string {
   const nonEmptyBuilds = (builds || []).filter((b) => b && b.length > 0);
@@ -63,7 +52,7 @@ export function renderCommunicationDetails(
 }
 
 function renderVertexItem(
-  { command, started, completed, entries }: CommandLogEntry,
+  { command, started, completed, entries }: VertexAllowedEntry,
   indent: string,
 ): string {
   const inner = indent + "   ";
@@ -79,7 +68,7 @@ function renderVertexItem(
   return s;
 }
 
-function renderRequestLine({ method, url, status }: RequestLogEntry): string {
+function renderRequestLine({ method, url, status }: AllowedRequest): string {
   const line = `- ${escapeMarkdown(method)} ${escapeMarkdown(url)}`;
   return status === undefined ? line : `${line} -> ${status}`;
 }
