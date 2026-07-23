@@ -13,15 +13,20 @@
  * step keywords) never share Compose's implicit, directory-derived project
  * name — see lib/container.js's deriveProjectName for why that matters.
  */
+export interface ComposeArgsOptions {
+  composeFile: string;
+  projectName: string;
+}
+
+export interface BuildComposeUpArgsOptions extends ComposeArgsOptions {
+  pullPolicy: string;
+}
+
 export function buildComposeUpArgs({
   composeFile,
   projectName,
   pullPolicy,
-}: {
-  composeFile: string;
-  projectName: string;
-  pullPolicy: string;
-}): string[] {
+}: BuildComposeUpArgsOptions): string[] {
   return ["compose", "-f", composeFile, "-p", projectName, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull"];
 }
 
@@ -29,9 +34,6 @@ export function buildComposeUpArgs({
 export function buildComposeDownArgs({
   composeFile,
   projectName,
-}: {
-  composeFile: string;
-  projectName: string;
-}): string[] {
+}: ComposeArgsOptions): string[] {
   return ["compose", "-f", composeFile, "-p", projectName, "down"];
 }
