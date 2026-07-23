@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Base class for an action's own "intentional" errors — a caught failure
  * whose message is safe to print directly via ::error::, as opposed to an
@@ -7,7 +6,9 @@
  * of its own to get its own name.
  */
 export class ActionError extends Error {
-  constructor(message, code) {
+  code: string;
+
+  constructor(message: string, code: string) {
     super(message);
     this.name = new.target.name;
     this.code = code;
