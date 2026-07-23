@@ -199,8 +199,12 @@ export function parseVertexAllowedLog(rawJsonText: string): VertexAllowedEntry[]
  *
  * decision is "ALLOWED" (restrict mode) or "AUDIT" (audit mode).
  */
+export interface HasEntries {
+  entries: AllowedRequest[];
+}
+
 export function aggregateAllowedHosts(
-  builds: { entries: AllowedRequest[] }[][],
+  builds: HasEntries[][],
   decision: string,
 ): AggregatedEntry[] {
   const entries = [];
