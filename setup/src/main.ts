@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +7,7 @@ import { SetupError } from "./lib/errors.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
-import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
+import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
@@ -16,7 +15,7 @@ const composeFile = join(__dirname, "../compose.yaml");
 // Gates a local-image override used only by this repo's own CI/dev testing
 // (see test_action in .github/workflows/test-e2e.yml), never by a consumer of
 // a published action. A normal build physically excludes
-// core/lib/provenance/local-image-override.js (rollup tree-shakes the dead import); the
+// core/lib/provenance/local-image-override.ts (rolldown tree-shakes the dead import); the
 // unit_test CI job also greps the built output as a backstop.
 const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1";
 
@@ -25,7 +24,15 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
  * Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
  * performed (branch ref / local ./setup) — printed by the top-level catch.
  */
-async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }) {
+async function resolveVerifiedImage({
+  actionRef,
+  actionRepo,
+  proxyEngine,
+}: {
+  actionRef: string;
+  actionRepo: string;
+  proxyEngine: string;
+}): Promise<{ imageRef: string; pullPolicy: "always" }> {
   const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine });
   console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
   return {
@@ -34,7 +41,7 @@ async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }) {
   };
 }
 
-async function main() {
+async function main(): Promise<void> {
   const env = process.env;
   const actionRef = env.GITHUB_ACTION_REF ?? "";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
@@ -43,7 +50,7 @@ async function main() {
   console.log(`Proxy engine: ${proxyEngine}`);
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("../../core/lib/provenance/local-image-override.js")).readLocalImageOverride(env)
+    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(env)
     : null;
   if (localOverride) {
     console.log(
@@ -91,7 +98,7 @@ async function main() {
     );
   } catch (e) {
     throw new SetupError(
-      describeDockerFailure(e, { operation: "docker compose down" }),
+      describeDockerFailure(e as DockerErrorLike, { operation: "docker compose down" }),
       "DOCKER_UNAVAILABLE",
     );
   }
@@ -108,7 +115,7 @@ async function main() {
     );
   } catch (e) {
     throw new SetupError(
-      describeDockerFailure(e, { operation: "docker compose up" }),
+      describeDockerFailure(e as DockerErrorLike, { operation: "docker compose up" }),
       "DOCKER_UNAVAILABLE",
     );
   }
@@ -120,7 +127,7 @@ async function main() {
  * separately published, separately tagged Docker image (see
  * lib/verify-image.js's imageTagFromRef).
  */
-export function resolveProxyEngine(input) {
+export function resolveProxyEngine(input: string | undefined): "transparent" | "explicit" {
   const engine = input?.trim() || "transparent";
   if (engine !== "transparent" && engine !== "explicit") {
     throw new SetupError(
@@ -135,11 +142,11 @@ export function resolveProxyEngine(input) {
  * Rethrow a rule-parser's syntax errors as a SetupError with the shared
  * INVALID_RULES code.
  */
-function parseRulesOrThrow(rulesInput) {
+function parseRulesOrThrow(rulesInput: string | undefined): string[] {
   try {
     return parseAndValidateRules(rulesInput);
   } catch (e) {
-    throw new SetupError(e.message, "INVALID_RULES");
+    throw new SetupError((e as Error).message, "INVALID_RULES");
   }
 }
 
@@ -147,7 +154,15 @@ function parseRulesOrThrow(rulesInput) {
  * Build ACL rules from input strings. Rules are passed through as-is
  * (wildcard format), validated eagerly.
  */
-export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+export function buildACLRules({
+  httpsRulesInput,
+  httpRulesInput,
+  ipRulesInput,
+}: {
+  httpsRulesInput: string | undefined;
+  httpRulesInput: string | undefined;
+  ipRulesInput: string | undefined;
+}): { httpsRules: string[]; httpRules: string[]; ipRules: string[] } {
   return {
     httpsRules: parseRulesOrThrow(httpsRulesInput),
     httpRules: parseRulesOrThrow(httpRulesInput),
@@ -155,7 +170,7 @@ export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput })
   };
 }
 
-function logRules(label, rules) {
+function logRules(label: string, rules: string[]): void {
   console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
   for (const r of rules) console.log(`  ${r}`);
 }
