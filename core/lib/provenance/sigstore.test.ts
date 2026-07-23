@@ -21,14 +21,24 @@ const DIGEST = "sha256:abc123";
  * - payloadType omitted / "simple-signing": legacy critical.image format
  * - payloadType "application/vnd.in-toto+json": in-toto Statement v1 format
  */
+interface SubjectDigest {
+  sha256?: string;
+  md5?: string;
+}
+
 interface Subject {
-  digest: { sha256?: string; md5?: string };
+  digest: SubjectDigest;
   annotations: object;
+}
+
+interface MakeBundleOptions {
+  payloadType?: string;
+  subjects?: Subject[];
 }
 
 function makeBundle(
   signedDigest: string,
-  { payloadType, subjects }: { payloadType?: string; subjects?: Subject[] } = {},
+  { payloadType, subjects }: MakeBundleOptions = {},
 ) {
   let payloadObj;
   if (payloadType === "application/vnd.in-toto+json") {
