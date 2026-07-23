@@ -209,7 +209,7 @@ describe("verifyImageDigestOrThrow", () => {
             throw e;
           },
         }),
-      (err: any) => err instanceof ProvenanceError && err.code === "TOKEN_ERROR" && err.message === "registry token request failed",
+      (err: unknown) => err instanceof ProvenanceError && err.code === "TOKEN_ERROR" && err.message === "registry token request failed",
     );
   });
 
@@ -224,7 +224,7 @@ describe("verifyImageDigestOrThrow", () => {
             throw new Error("boom");
           },
         }),
-      (err: any) => err instanceof ProvenanceError && err.code === "VERIFY_FAILED",
+      (err: unknown) => err instanceof ProvenanceError && err.code === "VERIFY_FAILED",
     );
   });
 
@@ -237,7 +237,7 @@ describe("verifyImageDigestOrThrow", () => {
           proxyEngine: "transparent",
           verifyImageDigestFn: async () => null,
         }),
-      (err: any) => err instanceof ProvenanceError && err.code === "UNVERIFIABLE_REF",
+      (err: unknown) => err instanceof ProvenanceError && err.code === "UNVERIFIABLE_REF",
     );
   });
 });

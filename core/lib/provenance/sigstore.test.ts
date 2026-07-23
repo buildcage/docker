@@ -12,6 +12,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { assertSignedDigest } from "./sigstore.ts";
+import { VerifyImageError } from "./errors.ts";
 
 const DIGEST = "sha256:abc123";
 
@@ -60,7 +61,8 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
   it("throws VERIFY_FAILED when the signed digest does not match", () => {
     assert.throws(
       () => assertSignedDigest(makeBundle("sha256:different"), DIGEST),
-      (err: any) => {
+      (err: unknown) => {
+        assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /does not match/);
         return true;
@@ -73,7 +75,8 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
     const bundle = { dsseEnvelope: { payload } };
     assert.throws(
       () => assertSignedDigest(bundle, DIGEST),
-      (err: any) => {
+      (err: unknown) => {
+        assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /missing/);
         return true;
@@ -84,7 +87,8 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
   it("throws VERIFY_FAILED when the DSSE payload field is absent", () => {
     assert.throws(
       () => assertSignedDigest({ dsseEnvelope: {} }, DIGEST),
-      (err: any) => {
+      (err: unknown) => {
+        assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /missing a signed payload/);
         return true;
@@ -95,7 +99,8 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
   it("throws VERIFY_FAILED when dsseEnvelope is absent", () => {
     assert.throws(
       () => assertSignedDigest({}, DIGEST),
-      (err: any) => {
+      (err: unknown) => {
+        assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");
         return true;
       },
@@ -106,7 +111,8 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
     const bundle = { dsseEnvelope: { payload: "!!!not-base64!!!" } };
     assert.throws(
       () => assertSignedDigest(bundle, DIGEST),
-      (err: any) => {
+      (err: unknown) => {
+        assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");
         return true;
       },
@@ -141,7 +147,8 @@ describe("assertSignedDigest — in-toto Statement v1 (cosign --new-bundle-forma
           makeBundle("sha256:different", { payloadType: IN_TOTO }),
           DIGEST,
         ),
-      (err: any) => {
+      (err: unknown) => {
+        assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /does not match/);
         return true;
@@ -153,7 +160,8 @@ describe("assertSignedDigest — in-toto Statement v1 (cosign --new-bundle-forma
     const bundle = makeBundle(DIGEST, { payloadType: IN_TOTO, subjects: [] });
     assert.throws(
       () => assertSignedDigest(bundle, DIGEST),
-      (err: any) => {
+      (err: unknown) => {
+        assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");
         assert.match(err.message, /missing/);
         return true;
@@ -168,7 +176,8 @@ describe("assertSignedDigest — in-toto Statement v1 (cosign --new-bundle-forma
     });
     assert.throws(
       () => assertSignedDigest(bundle, DIGEST),
-      (err: any) => {
+      (err: unknown) => {
+        assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");
         return true;
       },
