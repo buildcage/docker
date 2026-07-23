@@ -12,7 +12,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { assertSignedDigest } from "./sigstore.js";
+import { assertSignedDigest } from "./sigstore.ts";
 
 const DIGEST = "sha256:abc123";
 

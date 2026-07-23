@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { markdownTable } from "./markdown-table.js";
+import { markdownTable } from "./markdown-table.ts";
 
 /**
  * Render aggregated host rows as a GitHub-flavored markdown table.

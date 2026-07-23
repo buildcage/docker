@@ -5,11 +5,11 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
-import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.js";
-import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.js";
-import { describeDockerFailure } from "../../core/lib/actions/docker-error.js";
-import { createAnnotation } from "../../core/lib/actions/annotation.js";
-import { ActionError } from "../../core/lib/general/action-error.js";
+import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
+import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
+import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
+import { createAnnotation } from "../../core/lib/actions/annotation.ts";
+import { ActionError } from "../../core/lib/general/action-error.ts";
 import { SandboxError } from "./lib/errors.js";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.js";
 import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.js";

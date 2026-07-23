@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { markdownTable } from "./markdown-table.js";
+import { markdownTable } from "./markdown-table.ts";
 
 describe("markdownTable", () => {
   it("renders headers, a left-aligned divider row, and cells pulled by key", () => {

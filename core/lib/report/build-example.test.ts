@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildRestrictExample } from "./build-example.js";
+import { buildRestrictExample } from "./build-example.ts";
 
 const REPO = "dash14/buildcage";
 const REF = "v2";

@@ -85,7 +85,7 @@ function wildcardToRegex(pattern) {
 	return `${domainToRegex(domain)}:${portRegex}`;
 }
 //#endregion
-//#region core/lib/provenance/image-ref.js
+//#region core/lib/provenance/image-ref.ts
 /**
 * Resolve the buildcage Docker image reference (image@digest). The
 * repository is always derived from the action repository — external image
@@ -100,7 +100,7 @@ function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 //#endregion
-//#region core/lib/general/action-error.js
+//#region core/lib/general/action-error.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -109,6 +109,7 @@ function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 * of its own to get its own name.
 */
 var ActionError = class extends Error {
+	code;
 	constructor(message, code) {
 		super(message), this.name = new.target.name, this.code = code;
 	}
@@ -118,7 +119,7 @@ var ActionError = class extends Error {
 	}
 }, ProvenanceError = class extends ActionError {};
 //#endregion
-//#region core/lib/provenance/oci-registry.js
+//#region core/lib/provenance/oci-registry.ts
 /**
 * oci-registry.js — OCI registry I/O helpers
 *
@@ -6957,7 +6958,7 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 	assertSignedDigest(bundleJson, expectedDigest);
 }
 //#endregion
-//#region core/lib/provenance/verify-image.js
+//#region core/lib/provenance/verify-image.ts
 /**
 * verify-image.js — Image provenance verification helpers
 *
@@ -7052,7 +7053,7 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, ve
 	return digest;
 }
 //#endregion
-//#region core/lib/actions/docker-error.js
+//#region core/lib/actions/docker-error.ts
 const SLIM_RUNNER_DETECTED_PREFIX = " Detected a container-based GitHub-hosted runner image (e.g. \"ubuntu-slim\")", SLIM_RUNNER_NOTE$1 = `${SLIM_RUNNER_DETECTED_PREFIX} — these ship a Docker client with no daemon and are not supported for this action.`;
 /**
 * Turns a caught `docker` invocation error into an actionable message,
@@ -7089,14 +7090,11 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region core/lib/actions/annotation.js
+//#region core/lib/actions/annotation.ts
 /**
 * Build a GitHub Actions annotation emitter. When `enabled` is false, every
 * method is a no-op — used to suppress annotations when this script isn't
 * running as the real action.
-*
-* @param {boolean} enabled
-* @returns {{ notice(message: string): void, warning(message: string): void, error(message: string): void }}
 */
 function createAnnotation(enabled) {
 	return enabled ? {
@@ -7711,7 +7709,7 @@ function withScratchDir(fn, containerName) {
 	}
 }
 //#endregion
-//#region core/lib/report/build-example.js
+//#region core/lib/report/build-example.ts
 const ruleTypeToParam = {
 	HTTPS: "allowed_https_rules",
 	HTTP: "allowed_http_rules",
@@ -7749,7 +7747,7 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 	return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", md += yaml, md += "```\n\n", md += "</details>\n", md;
 }
 //#endregion
-//#region core/lib/report/known-blocked.js
+//#region core/lib/report/known-blocked.ts
 /**
 * Shared logic for `known_blocked_rules`: domains expected to be blocked,
 * so a matching blocked connection doesn't fail the step even when
@@ -7851,7 +7849,7 @@ function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engin
 	};
 }
 //#endregion
-//#region core/lib/report/markdown-table.js
+//#region core/lib/report/markdown-table.ts
 const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
@@ -7873,7 +7871,7 @@ function markdownTable(formats, rows) {
 	return lines.join("\n");
 }
 //#endregion
-//#region core/lib/report/host-table.js
+//#region core/lib/report/host-table.ts
 /**
 * Render aggregated host rows as a GitHub-flavored markdown table.
 *

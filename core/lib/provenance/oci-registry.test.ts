@@ -14,7 +14,7 @@ import {
   fetchRegistryToken,
   fetchBundle,
   readGhcrBasicAuth,
-} from "./oci-registry.js";
+} from "./oci-registry.ts";
 
 // ── fetchManifestDigest ───────────────────────────────────────────────────
 

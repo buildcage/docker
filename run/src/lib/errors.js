@@ -1,4 +1,4 @@
-import { ActionError } from "../../../core/lib/general/action-error.js";
+import { ActionError } from "../../../core/lib/general/action-error.ts";
 
 /**
  * SandboxError — intentional error in the run action's own logic. Image

@@ -5,7 +5,7 @@ import {
   determineBlockedOutcome,
   buildBlockedMessage,
   evaluateBlockedReport,
-} from "./known-blocked.js";
+} from "./known-blocked.ts";
 
 describe("annotateKnownBlocked", () => {
   const row = (overrides = {}) => ({

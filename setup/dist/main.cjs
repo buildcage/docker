@@ -84,7 +84,7 @@ function wildcardToRegex(pattern) {
 	return `${domainToRegex(domain)}:${portRegex}`;
 }
 //#endregion
-//#region core/lib/general/action-error.js
+//#region core/lib/general/action-error.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -93,6 +93,7 @@ function wildcardToRegex(pattern) {
 * of its own to get its own name.
 */
 var ActionError = class extends Error {
+	code;
 	constructor(message, code) {
 		super(message), this.name = new.target.name, this.code = code;
 	}
@@ -102,7 +103,7 @@ var ActionError = class extends Error {
 	}
 }, ProvenanceError = class extends ActionError {};
 //#endregion
-//#region core/lib/provenance/oci-registry.js
+//#region core/lib/provenance/oci-registry.ts
 /**
 * oci-registry.js — OCI registry I/O helpers
 *
@@ -6941,7 +6942,7 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 	assertSignedDigest(bundleJson, expectedDigest);
 }
 //#endregion
-//#region core/lib/provenance/verify-image.js
+//#region core/lib/provenance/verify-image.ts
 /**
 * verify-image.js — Image provenance verification helpers
 *
@@ -7036,7 +7037,7 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, ve
 	return digest;
 }
 //#endregion
-//#region core/lib/provenance/image-ref.js
+//#region core/lib/provenance/image-ref.ts
 /**
 * Resolve the buildcage Docker image reference (image@digest). The
 * repository is always derived from the action repository — external image

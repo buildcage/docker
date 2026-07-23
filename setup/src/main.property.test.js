@@ -8,8 +8,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { imageTagFromRef } from "../../core/lib/provenance/verify-image.js";
-import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.js";
+import { imageTagFromRef } from "../../core/lib/provenance/verify-image.ts";
+import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import { buildACLRules, resolveProxyEngine } from "./main.js";
 
 // ---------------------------------------------------------------------------

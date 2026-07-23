@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { ActionError } from "../general/action-error.js";
+import { ActionError } from "../general/action-error.ts";
 
 /**
  * VerifyImageError — intentional error in the image provenance verification

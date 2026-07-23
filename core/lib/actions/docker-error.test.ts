@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { describeDockerFailure, isLikelySlimRunner } from "./docker-error.js";
+import { describeDockerFailure, isLikelySlimRunner } from "./docker-error.ts";
 
 describe("describeDockerFailure", () => {
   const noSlimRunner = { env: {}, exists: () => false };

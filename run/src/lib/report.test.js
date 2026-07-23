@@ -14,7 +14,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { writeReport, buildReportMarkdown } from "./report.js";
-import { annotateKnownBlocked } from "../../../core/lib/report/known-blocked.js";
+import { annotateKnownBlocked } from "../../../core/lib/report/known-blocked.ts";
 import { withScratchDir } from "./isolated-exec.js";
 
 // writeReport reads GITHUB_STEP_SUMMARY/BUILDCAGE_RUN_DEBUG_SUMMARY_FILE

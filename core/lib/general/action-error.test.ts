@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { ActionError } from "./action-error.js";
+import { ActionError } from "./action-error.ts";
 
 describe("ActionError", () => {
   it("sets name, message, and code, and is an instanceof Error", () => {

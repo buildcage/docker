@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderHostTable } from "./host-table.js";
+import { renderHostTable } from "./host-table.ts";
 
 describe("renderHostTable", () => {
   const row = (overrides = {}) => ({

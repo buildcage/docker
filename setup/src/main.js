@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { SetupError } from "./lib/errors.js";
-import { ActionError } from "../../core/lib/general/action-error.js";
-import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.js";
-import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.js";
-import { describeDockerFailure } from "../../core/lib/actions/docker-error.js";
+import { ActionError } from "../../core/lib/general/action-error.ts";
+import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
+import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
+import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");

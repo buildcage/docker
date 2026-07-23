@@ -193,7 +193,7 @@ test_unit: test_core test_setup test_report test_sandbox_unit test_qjs ## Run un
 # already covered by test_qjs below instead.
 .PHONY: test_core
 test_core: ## Run core/lib unit tests
-	@node --test 'core/lib/**/*.test.js'
+	@node --test 'core/lib/**/*.test.js' 'core/lib/**/*.test.ts'
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests

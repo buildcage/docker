@@ -18,8 +18,8 @@ import {
   imageTagFromRef,
   buildVerifyOptions,
   verifyImageDigestOrThrow,
-} from "./verify-image.js";
-import { ProvenanceError } from "./errors.js";
+} from "./verify-image.ts";
+import { ProvenanceError } from "./errors.ts";
 
 // ── Constants mirrored from verify-image.js (for assertion readability) ──────
 

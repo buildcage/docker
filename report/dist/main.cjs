@@ -1,5 +1,5 @@
 let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_path = require("node:path"), node_url = require("node:url");
-//#region core/lib/report/build-example.js
+//#region core/lib/report/build-example.ts
 const ruleTypeToParam = {
 	HTTPS: "allowed_https_rules",
 	HTTP: "allowed_http_rules",
@@ -283,14 +283,11 @@ function aggregateAllowedHosts(builds, decision) {
 	return aggregate(entries);
 }
 //#endregion
-//#region core/lib/actions/annotation.js
+//#region core/lib/actions/annotation.ts
 /**
 * Build a GitHub Actions annotation emitter. When `enabled` is false, every
 * method is a no-op — used to suppress annotations when this script isn't
 * running as the real action.
-*
-* @param {boolean} enabled
-* @returns {{ notice(message: string): void, warning(message: string): void, error(message: string): void }}
 */
 function createAnnotation(enabled) {
 	return enabled ? {
@@ -379,7 +376,7 @@ function wildcardToRegex(pattern) {
 	return `${domainToRegex(domain)}:${portRegex}`;
 }
 //#endregion
-//#region core/lib/report/known-blocked.js
+//#region core/lib/report/known-blocked.ts
 /**
 * Shared logic for `known_blocked_rules`: domains expected to be blocked,
 * so a matching blocked connection doesn't fail the step even when
@@ -481,7 +478,7 @@ function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engin
 	};
 }
 //#endregion
-//#region core/lib/report/markdown-table.js
+//#region core/lib/report/markdown-table.ts
 const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
@@ -503,7 +500,7 @@ function markdownTable(formats, rows) {
 	return lines.join("\n");
 }
 //#endregion
-//#region core/lib/report/host-table.js
+//#region core/lib/report/host-table.ts
 /**
 * Render aggregated host rows as a GitHub-flavored markdown table.
 *

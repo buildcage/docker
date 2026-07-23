@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createAnnotation } from "./annotation.js";
+import { createAnnotation } from "./annotation.ts";
 
 describe("createAnnotation", () => {
   describe("enabled", () => {

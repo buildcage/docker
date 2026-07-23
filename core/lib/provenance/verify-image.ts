@@ -10,9 +10,9 @@
  *   - Unverifiable ref (branch / local ./setup) → returns null.
  */
 
-import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.js";
-import { derUtf8, verifyBundle } from "./sigstore.js";
-import { ProvenanceError } from "./errors.js";
+import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.ts";
+import { derUtf8, verifyBundle } from "./sigstore.ts";
+import { ProvenanceError } from "./errors.ts";
 
 const REGISTRY = "ghcr.io";
 const EXPECTED_ISSUER = "https://token.actions.githubusercontent.com";

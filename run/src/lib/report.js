@@ -1,10 +1,10 @@
 // @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import { createAnnotation } from "../../../core/lib/actions/annotation.js";
-import { buildRestrictExample } from "../../../core/lib/report/build-example.js";
-import { evaluateBlockedReport } from "../../../core/lib/report/known-blocked.js";
-import { renderHostTable } from "../../../core/lib/report/host-table.js";
+import { createAnnotation } from "../../../core/lib/actions/annotation.ts";
+import { buildRestrictExample } from "../../../core/lib/report/build-example.ts";
+import { evaluateBlockedReport } from "../../../core/lib/report/known-blocked.ts";
+import { renderHostTable } from "../../../core/lib/report/host-table.ts";
 
 /**
  * Fetch the structured HAProxy-log report from the (still-running) proxy
