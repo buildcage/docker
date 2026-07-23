@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Property-based tests for verify-image.js helpers.
  *
@@ -25,8 +24,8 @@ describe("buildVerifyOptions – properties", () => {
           const result = buildVerifyOptions({ actionRef, actionRepo });
           assert.ok(result !== null);
           assert.ok(result.certificateOIDs !== undefined, "SHA ref must set certificateOIDs");
-          assert.ok(result.certificateIdentityURI.endsWith("v"), "SAN URI must accept any v-tag");
-          assert.doesNotThrow(() => new RegExp(result.certificateIdentityURI));
+          assert.ok(result.certificateIdentityURI!.endsWith("v"), "SAN URI must accept any v-tag");
+          assert.doesNotThrow(() => new RegExp(result.certificateIdentityURI!));
         },
       ),
     );
@@ -43,7 +42,7 @@ describe("buildVerifyOptions – properties", () => {
           const result = buildVerifyOptions({ actionRef, actionRepo });
           assert.ok(result !== null);
           assert.equal(result.certificateOIDs, undefined, "version tag must not set certificateOIDs");
-          assert.doesNotThrow(() => new RegExp(result.certificateIdentityURI));
+          assert.doesNotThrow(() => new RegExp(result.certificateIdentityURI!));
         },
       ),
     );

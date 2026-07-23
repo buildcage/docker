@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Unit tests for core/lib/verify-image.js
  *
@@ -20,6 +19,7 @@ import {
   verifyImageDigestOrThrow,
 } from "./verify-image.ts";
 import { ProvenanceError } from "./errors.ts";
+import type { VerifyBundleOptions } from "./sigstore.ts";
 
 // ── Constants mirrored from verify-image.js (for assertion readability) ──────
 
@@ -29,7 +29,7 @@ const OID_SOURCE_REPO_DIGEST = "1.3.6.1.4.1.57264.1.13";
 const REPO                   = "dash14/buildcage";
 
 /** Build a sample SAN URI as Fulcio would embed it. */
-function makeSAN(ref) {
+function makeSAN(ref: string) {
   return `https://github.com/${REPO}/${RELEASE_WORKFLOW}@${ref}`;
 }
 
@@ -78,13 +78,13 @@ describe("imageTagFromRef", () => {
 // RegExp and matching sample SAN strings — the same test cosign would apply.
 
 describe("buildVerifyOptions — version tag", () => {
-  function getOpts(ref) {
+  function getOpts(ref: string): VerifyBundleOptions {
     const opts = buildVerifyOptions({ actionRef: ref, actionRepo: REPO });
     assert.ok(opts, `expected non-null options for ref "${ref}"`);
-    return opts;
+    return opts!;
   }
-  function matchesSAN(opts, san) {
-    return new RegExp(opts.certificateIdentityURI).test(san);
+  function matchesSAN(opts: VerifyBundleOptions, san: string) {
+    return new RegExp(opts.certificateIdentityURI!).test(san);
   }
 
   it("sets certificateIssuer", () => {
@@ -138,14 +138,14 @@ describe("buildVerifyOptions — SHA pin", () => {
   const pinSha = "a".repeat(40);
 
   it("sets certificateIssuer", () => {
-    const opts = buildVerifyOptions({ actionRef: pinSha, actionRepo: REPO });
+    const opts = buildVerifyOptions({ actionRef: pinSha, actionRepo: REPO })!;
     assert.equal(opts.certificateIssuer, EXPECTED_ISSUER);
   });
 
   it("sets certificateOIDs for OID 1.13 with DER UTF8String-encoded SHA", () => {
-    const opts = buildVerifyOptions({ actionRef: pinSha, actionRepo: REPO });
+    const opts = buildVerifyOptions({ actionRef: pinSha, actionRepo: REPO })!;
     assert.ok(opts.certificateOIDs, "certificateOIDs must be present for SHA pin");
-    const oidValue = opts.certificateOIDs[OID_SOURCE_REPO_DIGEST];
+    const oidValue = opts.certificateOIDs![OID_SOURCE_REPO_DIGEST];
     assert.ok(oidValue !== undefined, `OID ${OID_SOURCE_REPO_DIGEST} must be set`);
 
     // DER UTF8String: [0x0C, len, ...utf8bytes]
@@ -157,14 +157,14 @@ describe("buildVerifyOptions — SHA pin", () => {
   });
 
   it("lowercases the SHA in the OID value", () => {
-    const opts = buildVerifyOptions({ actionRef: pinSha.toUpperCase(), actionRepo: REPO });
-    const oidValue = opts.certificateOIDs[OID_SOURCE_REPO_DIGEST];
+    const opts = buildVerifyOptions({ actionRef: pinSha.toUpperCase(), actionRepo: REPO })!;
+    const oidValue = opts.certificateOIDs![OID_SOURCE_REPO_DIGEST];
     assert.ok(oidValue.includes(pinSha.toLowerCase()), "SHA must be lowercased");
   });
 
   it("certificateIdentityURI accepts any version tag SAN (SHA checked via OID)", () => {
-    const opts = buildVerifyOptions({ actionRef: pinSha, actionRepo: REPO });
-    const regexp = new RegExp(opts.certificateIdentityURI);
+    const opts = buildVerifyOptions({ actionRef: pinSha, actionRepo: REPO })!;
+    const regexp = new RegExp(opts.certificateIdentityURI!);
     // should match some version tags (the SHA in OID is what pins to the commit)
     assert.ok(regexp.test(makeSAN("refs/tags/v2.1.0")));
     assert.ok(regexp.test(makeSAN("refs/tags/v3.0.0")));
@@ -204,12 +204,12 @@ describe("verifyImageDigestOrThrow", () => {
           actionRepo: REPO,
           proxyEngine: "transparent",
           verifyImageDigestFn: async () => {
-            const e = new Error("registry token request failed");
+            const e: Error & { code?: string } = new Error("registry token request failed");
             e.code = "TOKEN_ERROR";
             throw e;
           },
         }),
-      (err) => err instanceof ProvenanceError && err.code === "TOKEN_ERROR" && err.message === "registry token request failed",
+      (err: any) => err instanceof ProvenanceError && err.code === "TOKEN_ERROR" && err.message === "registry token request failed",
     );
   });
 
@@ -224,7 +224,7 @@ describe("verifyImageDigestOrThrow", () => {
             throw new Error("boom");
           },
         }),
-      (err) => err instanceof ProvenanceError && err.code === "VERIFY_FAILED",
+      (err: any) => err instanceof ProvenanceError && err.code === "VERIFY_FAILED",
     );
   });
 
@@ -237,7 +237,7 @@ describe("verifyImageDigestOrThrow", () => {
           proxyEngine: "transparent",
           verifyImageDigestFn: async () => null,
         }),
-      (err) => err instanceof ProvenanceError && err.code === "UNVERIFIABLE_REF",
+      (err: any) => err instanceof ProvenanceError && err.code === "UNVERIFIABLE_REF",
     );
   });
 });

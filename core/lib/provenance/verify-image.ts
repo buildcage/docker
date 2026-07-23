@@ -34,7 +34,10 @@ const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$
  * (same workflow, same git ref) — only the published Docker tag differs, so
  * this does not affect buildVerifyOptions below.
  */
-export function imageTagFromRef(actionRef: string, proxyEngine: string = "transparent"): string {
+export function imageTagFromRef(
+  actionRef: string | undefined,
+  proxyEngine: string = "transparent",
+): string {
   if (!actionRef) return "";
   let base;
   if (/^[0-9a-f]{40}$/i.test(actionRef)) {
