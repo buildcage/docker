@@ -1,15 +1,21 @@
-// @ts-nocheck
-const ALIGN_MARKERS = { left: "---", right: "---:", center: ":---:" };
-const alignMarker = (align) => ALIGN_MARKERS[align] ?? ALIGN_MARKERS.left;
+export type Align = "left" | "right" | "center";
+
+export interface ColumnFormat {
+  key: string;
+  title: string;
+  align?: Align;
+}
+
+const ALIGN_MARKERS: Record<Align, string> = { left: "---", right: "---:", center: ":---:" };
+const alignMarker = (align?: Align): string => ALIGN_MARKERS[align ?? "left"];
 
 /**
  * Render a generic GitHub-flavored markdown table.
- *
- * @param {{key: string, title: string, align?: "left"|"right"|"center"}[]} formats
- * @param {Record<string, string|number>[]} rows
- * @returns {string}
  */
-export function markdownTable(formats, rows) {
+export function markdownTable(
+  formats: ColumnFormat[],
+  rows: Record<string, string | number | undefined>[],
+): string {
   const headers = formats.map((f) => f.title);
   const aligns = formats.map((f) => alignMarker(f.align));
   const lines = [`| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |`];
