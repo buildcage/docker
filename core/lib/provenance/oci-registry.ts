@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * oci-registry.js — OCI registry I/O helpers
  *
@@ -13,16 +12,27 @@ import { VerifyImageError } from "./errors.ts";
 
 const BUNDLE_MEDIA_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 
+interface OciDescriptor {
+  mediaType?: string;
+  artifactType?: string;
+  digest: string;
+}
+
 /**
  * Read the base64 Basic-auth credential for ghcr.io from Docker's config.json.
  * Returns the raw `auth` string (base64) if found, or null if not logged in.
  * Credential helpers (credsStore/credHelpers) are not supported — only direct
  * base64 auth written by `docker login` / `docker/login-action` is detected.
  */
-export function readGhcrBasicAuth(_env = process.env, _readFileSync = readFileSync) {
+export function readGhcrBasicAuth(
+  _env: NodeJS.ProcessEnv = process.env,
+  _readFileSync: typeof readFileSync = readFileSync,
+): string | null {
   try {
     const configDir = _env.DOCKER_CONFIG ?? path.join(os.homedir(), ".docker");
-    const config = JSON.parse(_readFileSync(path.join(configDir, "config.json"), "utf8"));
+    const config: { auths?: Record<string, { auth?: string }> } = JSON.parse(
+      _readFileSync(path.join(configDir, "config.json"), "utf8"),
+    );
     for (const [key, value] of Object.entries(config.auths ?? {})) {
       const normalized = key.replace(/^https?:\/\//, "").replace(/\/$/, "");
       if (normalized === "ghcr.io" && typeof value.auth === "string" && value.auth) {
@@ -42,7 +52,13 @@ export function readGhcrBasicAuth(_env = process.env, _readFileSync = readFileSy
  * Throws VerifyImageError(NOT_FOUND) when the tag does not exist.
  * Throws VerifyImageError(TRANSIENT) on network or 5xx errors.
  */
-export async function fetchManifestDigest(registry, repo, tag, token, _fetch = fetch) {
+export async function fetchManifestDigest(
+  registry: string,
+  repo: string,
+  tag: string,
+  token: string,
+  _fetch: typeof fetch = fetch,
+): Promise<string> {
   const url = `https://${registry}/v2/${repo}/manifests/${tag}`;
   // Accept only index/manifest-list types so the registry returns the image index
   // digest — not a per-platform manifest digest. The Sigstore bundle is signed
@@ -95,7 +111,7 @@ export async function fetchManifestDigest(registry, repo, tag, token, _fetch = f
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${err.message}`,
+      `Transient error fetching manifest digest for ${registry}/${repo}:${tag}: ${(err as Error).message}`,
       "TRANSIENT",
     );
   }
@@ -107,13 +123,13 @@ export async function fetchManifestDigest(registry, repo, tag, token, _fetch = f
  * If Docker credentials for the registry are available (basicAuth from
  * readGhcrBasicAuth), uses Basic auth directly — no anonymous attempt.
  * Otherwise falls back to anonymous access (public packages).
- *
- * @param {string} registry  - Registry hostname (e.g. "ghcr.io")
- * @param {string} repo      - Repository path (e.g. "owner/repo")
- * @param {string|null} basicAuth - base64 auth from Docker config, or null
- * @param {function} [_fetch]
  */
-export async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fetch) {
+export async function fetchRegistryToken(
+  registry: string,
+  repo: string,
+  basicAuth: string | null,
+  _fetch: typeof fetch = fetch,
+): Promise<string> {
   const url = `https://${registry}/token?scope=repository:${repo}:pull&service=${registry}`;
 
   if (basicAuth) {
@@ -137,7 +153,7 @@ export async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fet
     } catch (err) {
       if (err instanceof VerifyImageError) throw err;
       throw new VerifyImageError(
-        `Transient error fetching registry token: ${err.message}`,
+        `Transient error fetching registry token: ${(err as Error).message}`,
         "TRANSIENT",
       );
     }
@@ -164,7 +180,7 @@ export async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fet
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching registry token: ${err.message}`,
+      `Transient error fetching registry token: ${(err as Error).message}`,
       "TRANSIENT",
     );
   }
@@ -177,7 +193,13 @@ export async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fet
  * Throws VerifyImageError(NOT_FOUND) when no bundle exists for this digest.
  * Throws VerifyImageError(TRANSIENT) on network or 5xx errors.
  */
-export async function fetchBundle(registry, repo, digest, token, _fetch = fetch) {
+export async function fetchBundle(
+  registry: string,
+  repo: string,
+  digest: string,
+  token: string,
+  _fetch: typeof fetch = fetch,
+): Promise<unknown> {
   const api = `https://${registry}/v2/${repo}`;
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -196,7 +218,7 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
     if (refResp.ok) {
       const referrers = await refResp.json();
       const manifest = (referrers.manifests ?? []).find(
-        (m) => m.artifactType === BUNDLE_MEDIA_TYPE,
+        (m: OciDescriptor) => m.artifactType === BUNDLE_MEDIA_TYPE,
       );
       if (manifest) {
         return fetchBundleFromManifestDigest(api, manifest.digest, headers, _fetch);
@@ -206,7 +228,7 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching referrers: ${err.message}`,
+      `Transient error fetching referrers: ${(err as Error).message}`,
       "TRANSIENT",
     );
   }
@@ -263,7 +285,7 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
     // OCI Referrers Tag Schema: the tag is an Image Index whose manifests[] entries
     // are descriptors for individual referrer artifacts.
     if (Array.isArray(tagManifest.manifests)) {
-      for (const m of tagManifest.manifests) {
+      for (const m of tagManifest.manifests as OciDescriptor[]) {
         if (m.mediaType !== "application/vnd.oci.image.manifest.v1+json") continue;
         // Standard: m.artifactType matches directly.
         if (m.artifactType === BUNDLE_MEDIA_TYPE) {
@@ -283,7 +305,7 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
         if (!subResp.ok) continue;
         const sub = await subResp.json();
         if (sub.artifactType !== BUNDLE_MEDIA_TYPE) continue;
-        const layer = (sub.layers ?? []).find((l) => l.mediaType === BUNDLE_MEDIA_TYPE);
+        const layer = (sub.layers ?? []).find((l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE);
         if (!layer) continue;
         return fetchBundleBlob(api, layer.digest, headers, _fetch);
       }
@@ -296,7 +318,7 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
 
     // Legacy format: the bundle is stored directly as a layer in the manifest.
     const layer = (tagManifest.layers ?? []).find(
-      (l) => l.mediaType === BUNDLE_MEDIA_TYPE,
+      (l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE,
     );
     if (!layer) {
       throw new VerifyImageError(
@@ -309,7 +331,7 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching fallback tag: ${err.message}`,
+      `Transient error fetching fallback tag: ${(err as Error).message}`,
       "TRANSIENT",
     );
   }
@@ -317,7 +339,12 @@ export async function fetchBundle(registry, repo, digest, token, _fetch = fetch)
 
 // Fetch an OCI image manifest by digest, then fetch the bundle blob from its first
 // layer with mediaType === BUNDLE_MEDIA_TYPE.
-async function fetchBundleFromManifestDigest(api, manifestDigest, headers, _fetch = fetch) {
+async function fetchBundleFromManifestDigest(
+  api: string,
+  manifestDigest: string,
+  headers: Record<string, string>,
+  _fetch: typeof fetch = fetch,
+): Promise<unknown> {
   try {
     const resp = await _fetch(`${api}/manifests/${manifestDigest}`, {
       headers: { ...headers, Accept: "application/vnd.oci.image.manifest.v1+json" },
@@ -341,7 +368,7 @@ async function fetchBundleFromManifestDigest(api, manifestDigest, headers, _fetc
       );
     }
     const manifest = await resp.json();
-    const layer = (manifest.layers ?? []).find((l) => l.mediaType === BUNDLE_MEDIA_TYPE);
+    const layer = (manifest.layers ?? []).find((l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE);
     if (!layer) {
       throw new VerifyImageError(
         "No Sigstore bundle layer found in bundle manifest",
@@ -352,13 +379,18 @@ async function fetchBundleFromManifestDigest(api, manifestDigest, headers, _fetc
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching bundle manifest: ${err.message}`,
+      `Transient error fetching bundle manifest: ${(err as Error).message}`,
       "TRANSIENT",
     );
   }
 }
 
-async function fetchBundleBlob(api, blobDigest, headers, _fetch = fetch) {
+async function fetchBundleBlob(
+  api: string,
+  blobDigest: string,
+  headers: Record<string, string>,
+  _fetch: typeof fetch = fetch,
+): Promise<unknown> {
   try {
     const resp = await _fetch(`${api}/blobs/${blobDigest}`, { headers });
     if (resp.status >= 500) {
@@ -384,7 +416,7 @@ async function fetchBundleBlob(api, blobDigest, headers, _fetch = fetch) {
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
     throw new VerifyImageError(
-      `Transient error fetching bundle blob: ${err.message}`,
+      `Transient error fetching bundle blob: ${(err as Error).message}`,
       "TRANSIENT",
     );
   }
