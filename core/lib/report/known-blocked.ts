@@ -117,13 +117,14 @@ export function evaluateBlockedReport(
   blockedRows: AnnotatedBlockedRow[];
   showExpected: boolean;
   outcome: BlockedOutcome;
-  message: string | null;
+  message: string;
 } {
   const isAudit = report.mode === "audit";
   const blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules);
   const outcome = determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount: report.blockedCount ?? 0, blockedRows });
-  const message = outcome.level === "none"
-    ? null
-    : buildBlockedMessage({ blockedCount: report.blockedCount ?? 0, blockedRows, engineLabel, isAudit });
+  // Always computed, even when outcome.level is "none" (nothing to report) —
+  // callers only read this when level isn't "none", but a plain string here
+  // lets them do so without a null check/assertion.
+  const message = buildBlockedMessage({ blockedCount: report.blockedCount ?? 0, blockedRows, engineLabel, isAudit });
   return { blockedRows, showExpected: knownBlockedRules.length > 0, outcome, message };
 }

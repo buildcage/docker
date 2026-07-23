@@ -174,13 +174,13 @@ describe("buildBlockedMessage", () => {
 });
 
 describe("evaluateBlockedReport", () => {
-  it("returns level 'none' and a null message when there are no blocked connections", () => {
+  it("returns level 'none' when there are no blocked connections (message is unused at that level, but still a plain string)", () => {
     const result = evaluateBlockedReport(
       { mode: "restrict", blockedCount: 0, sections: {} },
       { knownBlockedRules: [], failOnBlocked: true, engineLabel: "sandbox" },
     );
     assert.deepEqual(result.outcome, { level: "none", shouldFail: false });
-    assert.equal(result.message, null);
+    assert.equal(result.message, "0 blocked connection(s) detected by buildcage sandbox");
   });
 
   it("does not crash when report.sections is undefined", () => {

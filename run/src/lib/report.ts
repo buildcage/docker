@@ -69,7 +69,9 @@ export function buildReportMarkdown(
   if (isAudit) {
     const audited = report.sections?.audited || [];
     if (audited.length > 0) markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n\n";
-    markdown += buildRestrictExample(audited, actionRepo!, actionRef, { actionName: "run", runCommand });
+    if (actionRepo) {
+      markdown += buildRestrictExample(audited, actionRepo, actionRef, { actionName: "run", runCommand });
+    }
     if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
   } else {
     const allowed = report.sections?.allowed || [];
@@ -122,9 +124,9 @@ export function writeReport(
 
   const annotation = createAnnotation(Boolean(summaryFile));
   if (outcome.level === "error") {
-    annotation.error(message!);
+    annotation.error(message);
     process.exitCode = 1;
   } else if (outcome.level === "notice") {
-    annotation.notice(message!);
+    annotation.notice(message);
   }
 }

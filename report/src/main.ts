@@ -187,8 +187,8 @@ if (summaryFile) {
 
 // 4. Error control for blocked connections
 if (outcome.level === "error") {
-  annotation.error(message!);
+  annotation.error(message);
   process.exitCode = 1;
 } else if (outcome.level === "notice") {
-  annotation.notice(message!);
+  annotation.notice(message);
 }
