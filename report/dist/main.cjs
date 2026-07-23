@@ -34,23 +34,6 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 }
 //#endregion
 //#region report/src/lib/command-log.ts
-/**
-* Render the explicit engine's communication detail as a collapsed markdown
-* section, or "" if there's nothing to show. Allowed Urls is listed before
-* Blocked Urls, matching the Allowed Hosts / Blocked Hosts tables above.
-*
-* Blocked entries aren't attributed to a specific RUN step — buildkitd's
-* denial log carries no vertex/span identifier to attribute it with. A
-* "Build N" item separates builds only when there's more than one, since
-* step labels like "[2/15] RUN ..." repeat across builds.
-*
-* Command text is escaped since it's embedded directly in markdown; request
-* lines go inside a fenced code block instead, where escaping isn't needed.
-*
-* @param {Array<Array<{ command: string, started: string, completed: string, entries: Array<{ method: string, url: string, status?: number }> }>>} builds
-* @param {Array<{ url: string, timestamp: string }>} deniedTimeline
-* @returns {string}
-*/
 function renderCommunicationDetails(builds, deniedTimeline) {
 	let nonEmptyBuilds = (builds || []).filter((b) => b && b.length > 0), hasVertexLog = nonEmptyBuilds.length > 0, hasDenied = deniedTimeline && deniedTimeline.length > 0;
 	if (!hasVertexLog && !hasDenied) return "";
@@ -146,19 +129,6 @@ function aggregate(filtered) {
 }
 //#endregion
 //#region report/src/lib/vertex-log.ts
-/**
-* Parse `buildctl debug histories --format '{{json .}}'`'s newline-delimited
-* JSON output and return every build's ref, oldest first. A workflow may run
-* several builds against the same long-lived buildcage container before
-* calling the report action once, and each is its own independent build
-* history record, so a table sourced from only the "latest" ref would
-* silently omit every earlier build's steps. Each record's `CreatedAt` is a
-* protobuf-style `{seconds, nanos}` object (not an ISO string), so records
-* are ordered numerically rather than by string.
-*
-* @param {string} historiesText
-* @returns {string[]}
-*/
 function selectAllRefs(historiesText) {
 	let byRef = /* @__PURE__ */ new Map();
 	for (let line of historiesText.split("\n")) {
@@ -183,16 +153,6 @@ function stageKeyOf(bracketContent) {
 	return parts.length > 1 ? parts[0] : "";
 }
 const requestLineDetailPattern = /^-\s+(\S+)\s+(\S+?)(?:\s+->\s+(\d+))?$/;
-/**
-* Scan arbitrary text for a "proxy network requests:" block and return its
-* raw entries, in order, with no host/port resolution or aggregation. Used
-* by parseVertexAllowedLog() below, applied to a single RUN vertex's own
-* isolated stderr (decoded from `buildctl debug logs --progress=rawjson`),
-* for both the per-command breakdown and the host-aggregated allowed table.
-*
-* @param {string} text
-* @returns {{ method: string, url: string, status?: number }[]}
-*/
 function parseAllowedRequestsFromText(text) {
 	let entries = [], lines = text.split("\n");
 	for (let i = 0; i < lines.length; i++) if (lines[i].trim() === "proxy network requests:") for (let j = i + 1; j < lines.length; j++) {
@@ -210,19 +170,6 @@ function parseAllowedRequestsFromText(text) {
 	}
 	return entries;
 }
-/**
-* Parse `buildctl debug logs --progress=rawjson <ref>`'s single JSON object
-* into a per-RUN-vertex breakdown, ordered for human debugging: grouped by
-* build stage (each stage's vertices kept together, in `started` order),
-* with stages themselves ordered by their earliest vertex's `started` time.
-* Independent stages can run concurrently, with overlapping `started`
-* timestamps, so vertex.digest (not physical log position) is the only
-* reliable way to attribute a "proxy network requests:" block to the RUN
-* step that produced it.
-*
-* @param {string} rawJsonText
-* @returns {{ command: string, started: string, completed: string, entries: { method: string, url: string, status?: number }[] }[]}
-*/
 function parseVertexAllowedLog(rawJsonText) {
 	let vertexes = [], logs = [];
 	for (let line of rawJsonText.split("\n")) {
@@ -260,9 +207,7 @@ function parseVertexAllowedLog(rawJsonText) {
 * Build the host-aggregated allowed/audited table from the same per-build
 * vertex data parseVertexAllowedLog() produces for the per-command breakdown.
 *
-* @param {Array<ReturnType<typeof parseVertexAllowedLog>>} builds
-* @param {string} decision "ALLOWED" (restrict mode) or "AUDIT" (audit mode)
-* @returns {{ host: string, port: string, ruleType: string, reason: string, count: number }[]}
+* decision is "ALLOWED" (restrict mode) or "AUDIT" (audit mode).
 */
 function aggregateAllowedHosts(builds, decision) {
 	let entries = [];

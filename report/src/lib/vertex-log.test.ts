@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -24,7 +23,7 @@ const MULTISTAGE_RAWJSON = readFileSync(join(fixturesDir, "multistage-rawjson.js
 // runVertexPattern correctly matching a padded counter like that.
 const PADDED_STEPS_RAWJSON = readFileSync(join(fixturesDir, "padded-steps-rawjson.json"), "utf8");
 
-function encode(text) {
+function encode(text: string) {
   return Buffer.from(text, "utf8").toString("base64");
 }
 
@@ -124,7 +123,7 @@ describe("parseVertexAllowedLog", () => {
     assert.deepEqual(result[1].entries, [{ method: "GET", url: "https://allowed.example.com/", status: 200 }]);
     // step numbers stay in ascending order despite the "[ 2/15]" vs "[10/15]" width difference
     assert.deepEqual(
-      result.map((v) => v.command.match(/^\[\s*(\d+)\/15\]/)[1]),
+      result.map((v) => v.command.match(/^\[\s*(\d+)\/15\]/)![1]),
       ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]
     );
   });

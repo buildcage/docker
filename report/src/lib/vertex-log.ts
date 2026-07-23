@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { parseIdentifier } from "../../../core/shared/lib/parse-identifier.js";
-import { aggregate } from "../../../core/shared/lib/aggregate.js";
+import { aggregate, type AggregatedEntry } from "../../../core/shared/lib/aggregate.js";
 
 /**
  * Parse `buildctl debug histories --format '{{json .}}'`'s newline-delimited
@@ -12,15 +11,18 @@ import { aggregate } from "../../../core/shared/lib/aggregate.js";
  * protobuf-style `{seconds, nanos}` object (not an ISO string), so records
  * are ordered numerically rather than by string.
  *
- * @param {string} historiesText
- * @returns {string[]}
  */
-export function selectAllRefs(historiesText) {
+interface CreatedAt {
+  seconds: number;
+  nanos?: number;
+}
+
+export function selectAllRefs(historiesText: string): string[] {
   // Keyed by ref: buildctl reports each build's history record more than
   // once as it progresses (e.g. started, then completed), so the same ref
   // can appear on multiple lines — the last one wins, though CreatedAt is
   // fixed at build start and doesn't actually change across those lines.
-  const byRef = new Map();
+  const byRef = new Map<string, CreatedAt>();
   for (const line of historiesText.split("\n")) {
     if (!line.trim()) continue;
     let event;
@@ -37,7 +39,7 @@ export function selectAllRefs(historiesText) {
   return [...byRef.entries()].sort((a, b) => compareCreatedAt(a[1], b[1])).map(([ref]) => ref);
 }
 
-function compareCreatedAt(a, b) {
+function compareCreatedAt(a: CreatedAt, b: CreatedAt): number {
   if (a.seconds !== b.seconds) return a.seconds - b.seconds;
   return (a.nanos || 0) - (b.nanos || 0);
 }
@@ -60,7 +62,7 @@ const runVertexPattern = /^\[([^\]]+)\]\s+RUN\s/;
 // regex on the stage name means this doesn't need to know Docker's `AS
 // <name>` grammar at all, and can't misparse the padded step counter itself
 // as a stage name the way a generic `\S+` capture would.
-function stageKeyOf(bracketContent) {
+function stageKeyOf(bracketContent: string): string {
   const parts = bracketContent.trim().split(/\s+/);
   return parts.length > 1 ? parts[0] : "";
 }
@@ -75,11 +77,15 @@ const requestLineDetailPattern = /^-\s+(\S+)\s+(\S+?)(?:\s+->\s+(\d+))?$/;
  * isolated stderr (decoded from `buildctl debug logs --progress=rawjson`),
  * for both the per-command breakdown and the host-aggregated allowed table.
  *
- * @param {string} text
- * @returns {{ method: string, url: string, status?: number }[]}
  */
-export function parseAllowedRequestsFromText(text) {
-  const entries = [];
+export interface AllowedRequest {
+  method: string;
+  url: string;
+  status?: number;
+}
+
+export function parseAllowedRequestsFromText(text: string): AllowedRequest[] {
+  const entries: AllowedRequest[] = [];
   const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim() !== proxyRequestsHeader) continue;
@@ -103,10 +109,29 @@ export function parseAllowedRequestsFromText(text) {
  * reliable way to attribute a "proxy network requests:" block to the RUN
  * step that produced it.
  *
- * @param {string} rawJsonText
- * @returns {{ command: string, started: string, completed: string, entries: { method: string, url: string, status?: number }[] }[]}
  */
-export function parseVertexAllowedLog(rawJsonText) {
+interface Vertex {
+  name: string;
+  digest: string;
+  started?: string;
+  completed?: string;
+}
+
+interface LogLine {
+  vertex: string;
+  stream: number;
+  timestamp: string;
+  data: string;
+}
+
+export interface VertexAllowedEntry {
+  command: string;
+  started: string;
+  completed: string;
+  entries: AllowedRequest[];
+}
+
+export function parseVertexAllowedLog(rawJsonText: string): VertexAllowedEntry[] {
   // Usually a single JSON object, but buildctl can flush a large build's
   // rawjson history as several newline-separated JSON documents instead —
   // mirroring selectAllRefs's line-by-line parsing above, concatenate them
@@ -116,8 +141,8 @@ export function parseVertexAllowedLog(rawJsonText) {
   // below already drops each vertex's earlier partial occurrence(s) within
   // a single document, preserving the array-order semantics the ordering
   // below (and its tests) depend on.
-  const vertexes = [];
-  const logs = [];
+  const vertexes: Vertex[] = [];
+  const logs: LogLine[] = [];
   for (const line of rawJsonText.split("\n")) {
     if (!line.trim()) continue;
     let data;
@@ -130,28 +155,28 @@ export function parseVertexAllowedLog(rawJsonText) {
     logs.push(...(data.logs || []));
   }
 
-  const groups = new Map(); // stageKey -> vertex[]
+  const groups = new Map<string, Vertex[]>(); // stageKey -> vertex[]
   for (const v of vertexes) {
     if (!v.started || !v.completed) continue;
     const m = v.name.match(runVertexPattern);
     if (!m) continue;
     const stageKey = stageKeyOf(m[1]);
     if (!groups.has(stageKey)) groups.set(stageKey, []);
-    groups.get(stageKey).push(v);
+    groups.get(stageKey)!.push(v);
   }
 
   for (const list of groups.values()) {
-    list.sort((a, b) => Date.parse(a.started) - Date.parse(b.started));
+    list.sort((a, b) => Date.parse(a.started!) - Date.parse(b.started!));
   }
   const orderedGroups = [...groups.values()].sort(
-    (a, b) => Date.parse(a[0].started) - Date.parse(b[0].started)
+    (a, b) => Date.parse(a[0].started!) - Date.parse(b[0].started!)
   );
 
-  const logsByDigest = new Map();
+  const logsByDigest = new Map<string, LogLine[]>();
   for (const l of logs) {
     if (l.stream !== 2) continue;
     if (!logsByDigest.has(l.vertex)) logsByDigest.set(l.vertex, []);
-    logsByDigest.get(l.vertex).push(l);
+    logsByDigest.get(l.vertex)!.push(l);
   }
 
   return orderedGroups.flat().map((v) => {
@@ -161,8 +186,8 @@ export function parseVertexAllowedLog(rawJsonText) {
     const text = stderrLogs.map((l) => Buffer.from(l.data, "base64").toString("utf8")).join("");
     return {
       command: v.name,
-      started: v.started,
-      completed: v.completed,
+      started: v.started!,
+      completed: v.completed!,
       entries: parseAllowedRequestsFromText(text),
     };
   });
@@ -172,11 +197,12 @@ export function parseVertexAllowedLog(rawJsonText) {
  * Build the host-aggregated allowed/audited table from the same per-build
  * vertex data parseVertexAllowedLog() produces for the per-command breakdown.
  *
- * @param {Array<ReturnType<typeof parseVertexAllowedLog>>} builds
- * @param {string} decision "ALLOWED" (restrict mode) or "AUDIT" (audit mode)
- * @returns {{ host: string, port: string, ruleType: string, reason: string, count: number }[]}
+ * decision is "ALLOWED" (restrict mode) or "AUDIT" (audit mode).
  */
-export function aggregateAllowedHosts(builds, decision) {
+export function aggregateAllowedHosts(
+  builds: { entries: AllowedRequest[] }[][],
+  decision: string,
+): AggregatedEntry[] {
   const entries = [];
   for (const vertices of builds) {
     for (const { entries: vertexEntries } of vertices) {
