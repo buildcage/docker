@@ -13,6 +13,10 @@ export interface AnnotatedBlockedRow extends BlockedRow {
   expected: boolean;
 }
 
+export interface ExpectedFlag {
+  expected: boolean;
+}
+
 /**
  * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
  * its `host:port` matches at least one known_blocked_rules pattern.
@@ -47,17 +51,19 @@ export interface BlockedOutcome {
   shouldFail: boolean;
 }
 
+export interface DetermineBlockedOutcomeOptions {
+  isAudit: boolean;
+  failOnBlocked: boolean;
+  blockedCount: number;
+  blockedRows: ExpectedFlag[];
+}
+
 export function determineBlockedOutcome({
   isAudit,
   failOnBlocked,
   blockedCount,
   blockedRows,
-}: {
-  isAudit: boolean;
-  failOnBlocked: boolean;
-  blockedCount: number;
-  blockedRows: { expected: boolean }[];
-}): BlockedOutcome {
+}: DetermineBlockedOutcomeOptions): BlockedOutcome {
   if (!blockedCount) return { level: "none", shouldFail: false };
   if (isAudit) return { level: "notice", shouldFail: false };
   const hasUnexpected = blockedRows.length === 0 || blockedRows.some((row) => !row.expected);
@@ -75,17 +81,19 @@ export function determineBlockedOutcome({
  * break any tooling that matches the old fixed-format notice.
  *
  */
+export interface BuildBlockedMessageOptions {
+  blockedCount: number;
+  blockedRows: ExpectedFlag[];
+  engineLabel: "sandbox" | "proxy";
+  isAudit: boolean;
+}
+
 export function buildBlockedMessage({
   blockedCount,
   blockedRows,
   engineLabel,
   isAudit,
-}: {
-  blockedCount: number;
-  blockedRows: { expected: boolean }[];
-  engineLabel: "sandbox" | "proxy";
-  isAudit: boolean;
-}): string {
+}: BuildBlockedMessageOptions): string {
   const base = `${blockedCount} blocked connection(s) detected by buildcage ${engineLabel}`;
   if (isAudit) return base;
   const unexpected = blockedRows.filter((row) => !row.expected).length;
@@ -101,19 +109,33 @@ export function buildBlockedMessage({
  * than each recomputing annotateKnownBlocked independently.
  *
  */
-export function evaluateBlockedReport(
-  report: { mode: string | null; blockedCount?: number; sections?: { blocked?: BlockedRow[] } },
-  {
-    knownBlockedRules,
-    failOnBlocked,
-    engineLabel,
-  }: { knownBlockedRules: string[]; failOnBlocked: boolean; engineLabel: "sandbox" | "proxy" },
-): {
+export interface BlockedReportSections {
+  blocked?: BlockedRow[];
+}
+
+export interface BlockedReportInput {
+  mode: string | null;
+  blockedCount?: number;
+  sections?: BlockedReportSections;
+}
+
+export interface EvaluateBlockedReportOptions {
+  knownBlockedRules: string[];
+  failOnBlocked: boolean;
+  engineLabel: "sandbox" | "proxy";
+}
+
+export interface EvaluateBlockedReportResult {
   blockedRows: AnnotatedBlockedRow[];
   showExpected: boolean;
   outcome: BlockedOutcome;
   message: string;
-} {
+}
+
+export function evaluateBlockedReport(
+  report: BlockedReportInput,
+  { knownBlockedRules, failOnBlocked, engineLabel }: EvaluateBlockedReportOptions,
+): EvaluateBlockedReportResult {
   const isAudit = report.mode === "audit";
   const blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules);
   const outcome = determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount: report.blockedCount ?? 0, blockedRows });
