@@ -1,9 +1,12 @@
-// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
 import { SandboxError } from "./errors.ts";
-import { SLIM_RUNNER_DETECTED_PREFIX, isLikelySlimRunner } from "../../../core/lib/actions/docker-error.ts";
+import {
+  SLIM_RUNNER_DETECTED_PREFIX,
+  isLikelySlimRunner,
+  type DockerErrorLike,
+} from "../../../core/lib/actions/docker-error.ts";
 
 const REQUIREMENT =
   "The run action requires a Linux runner with passwordless sudo for the isolation setup itself " +
@@ -19,7 +22,10 @@ const SLIM_RUNNER_NOTE =
  * unit-testable the same way as core/lib/actions/docker-error.js's
  * describeDockerFailure.
  */
-export function describeSudoFailure(e, { env = process.env, exists = existsSync } = {}) {
+export function describeSudoFailure(
+  e: DockerErrorLike | null | undefined,
+  { env = process.env, exists = existsSync }: { env?: NodeJS.ProcessEnv; exists?: (path: string) => boolean } = {},
+): string {
   const captured = e && typeof e.stderr === "string" ? e.stderr.trim() : "";
   const slimNote = isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE : "";
   return `'sudo' is not available without a password on this runner.${slimNote} ${REQUIREMENT}${captured ? ` (${captured})` : ""}`;
@@ -32,10 +38,10 @@ export function describeSudoFailure(e, { env = process.env, exists = existsSync 
  * a specific command (rather than blanket NOPASSWD:ALL) can pass this probe
  * yet still fail runIsolated()'s later, differently-shaped invocation.
  */
-export function checkPasswordlessSudo() {
+export function checkPasswordlessSudo(): void {
   try {
     execFileSync("sudo", ["-n", "true"], { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"] });
   } catch (e) {
-    throw new SandboxError(describeSudoFailure(e), "PASSWORDLESS_SUDO_REQUIRED");
+    throw new SandboxError(describeSudoFailure(e as DockerErrorLike), "PASSWORDLESS_SUDO_REQUIRED");
   }
 }
