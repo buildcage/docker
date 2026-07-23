@@ -1,16 +1,20 @@
-// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildRestrictExample } from "../../core/lib/report/build-example.ts";
 import { renderCommunicationDetails } from "./lib/command-log.ts";
-import { selectAllRefs, parseVertexAllowedLog, aggregateAllowedHosts } from "./lib/vertex-log.ts";
+import {
+  selectAllRefs,
+  parseVertexAllowedLog,
+  aggregateAllowedHosts,
+  type VertexAllowedEntry,
+} from "./lib/vertex-log.ts";
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { evaluateBlockedReport } from "../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../core/lib/report/host-table.ts";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
-import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
+import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -30,11 +34,11 @@ const composeEnv = {
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;
 const annotation = createAnnotation(Boolean(summaryFile));
 
-let knownBlockedRules;
+let knownBlockedRules: string[];
 try {
   knownBlockedRules = parseAndValidateRules(process.env.INPUT_KNOWN_BLOCKED_RULES);
 } catch (e) {
-  annotation.error(e.message);
+  annotation.error((e as Error).message);
   process.exit(1);
 }
 
@@ -50,7 +54,7 @@ try {
   );
 } catch (e) {
   annotation.error(
-    describeDockerFailure(e, { operation: "fetching the sandbox report from the container" }),
+    describeDockerFailure(e as DockerErrorLike, { operation: "fetching the sandbox report from the container" }),
   );
   process.exit(1);
 }
@@ -106,7 +110,7 @@ const isExplicit = report.deniedTimeline !== undefined;
 // buildctl's build-history vertex log instead, which needs no special
 // buildkitd configuration and tags each entry with the RUN step (vertex)
 // that produced it (see report/src/lib/vertex-log.js).
-let builds = [];
+let builds: VertexAllowedEntry[][] = [];
 if (isExplicit) {
   try {
     const historiesOutput = execFileSync(
@@ -128,7 +132,7 @@ if (isExplicit) {
       return parseVertexAllowedLog(rawJsonOutput);
     });
   } catch (e) {
-    console.log("(failed to fetch allowed/audited traffic detail via buildctl:", e.message, ")");
+    console.log("(failed to fetch allowed/audited traffic detail via buildctl:", (e as Error).message, ")");
   }
 }
 
@@ -183,8 +187,8 @@ if (summaryFile) {
 
 // 4. Error control for blocked connections
 if (outcome.level === "error") {
-  annotation.error(message);
+  annotation.error(message!);
   process.exitCode = 1;
 } else if (outcome.level === "notice") {
-  annotation.notice(message);
+  annotation.notice(message!);
 }

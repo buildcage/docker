@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 
-interface DockerErrorLike {
+export interface DockerErrorLike {
   code?: string;
   status?: number;
   message?: string;
