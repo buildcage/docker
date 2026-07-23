@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -7,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseAndValidateRules } from "../../core/shared/lib/rules.js";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import { verifyImageDigestOrThrow } from "../../core/lib/provenance/verify-image.ts";
-import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
+import { describeDockerFailure, type DockerErrorLike } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { SandboxError } from "./lib/errors.ts";
@@ -41,7 +40,13 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
  * the run action's (buildkitd-less) proxy image, published under the `-proxy`
  * tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.js).
  */
-async function resolveVerifiedImage({ actionRef, actionRepo }) {
+async function resolveVerifiedImage({
+  actionRef,
+  actionRepo,
+}: {
+  actionRef: string;
+  actionRepo: string;
+}): Promise<{ imageRef: string; pullPolicy: "always" }> {
   const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine: "proxy" });
   console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
   return {
@@ -54,11 +59,11 @@ async function resolveVerifiedImage({ actionRef, actionRepo }) {
  * Rethrow a rule-parser's syntax errors as a SandboxError with the shared
  * INVALID_RULES code, used by both buildACLRules and readKnownBlockedRules.
  */
-function parseRulesOrThrow(rulesInput) {
+function parseRulesOrThrow(rulesInput: string | undefined): string[] {
   try {
     return parseAndValidateRules(rulesInput);
   } catch (e) {
-    throw new SandboxError(e.message, "INVALID_RULES");
+    throw new SandboxError((e as Error).message, "INVALID_RULES");
   }
 }
 
@@ -66,7 +71,15 @@ function parseRulesOrThrow(rulesInput) {
  * Build ACL rules from input strings. Rules are passed through as-is
  * (wildcard format), validated eagerly.
  */
-export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+export function buildACLRules({
+  httpsRulesInput,
+  httpRulesInput,
+  ipRulesInput,
+}: {
+  httpsRulesInput: string | undefined;
+  httpRulesInput: string | undefined;
+  ipRulesInput: string | undefined;
+}): { httpsRules: string[]; httpRules: string[]; ipRules: string[] } {
   return {
     httpsRules: parseRulesOrThrow(httpsRulesInput),
     httpRules: parseRulesOrThrow(httpRulesInput),
@@ -77,7 +90,7 @@ export function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput })
 /**
  * Never sent to the container's ACL — see core/lib/report/known-blocked.js.
  */
-export function readKnownBlockedRules(input) {
+export function readKnownBlockedRules(input: string | undefined): string[] {
   return parseRulesOrThrow(input);
 }
 
@@ -86,7 +99,7 @@ export function readKnownBlockedRules(input) {
  * (not whitespace-split like the ACL rule inputs above) since paths can
  * legitimately contain spaces.
  */
-export function parseWritablePaths(input) {
+export function parseWritablePaths(input: string | undefined): string[] {
   return (
     input
       ?.split(/\r?\n/)
@@ -95,12 +108,12 @@ export function parseWritablePaths(input) {
   );
 }
 
-function logRules(label, rules) {
+function logRules(label: string, rules: string[]): void {
   console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
   for (const r of rules) console.log(`  ${r}`);
 }
 
-async function main() {
+async function main(): Promise<void> {
   const env = process.env;
   // Empty (not `??`-catchable) for local-path `uses: ./run` invocations —
   // mirrors report/src/main.js's fallback for the same case.
@@ -181,7 +194,7 @@ async function main() {
     );
   } catch (e) {
     throw new SandboxError(
-      describeDockerFailure(e, { operation: "docker compose up" }),
+      describeDockerFailure(e as DockerErrorLike, { operation: "docker compose up" }),
       "DOCKER_UNAVAILABLE",
     );
   }
@@ -207,7 +220,7 @@ async function main() {
         // one) — see gen-seccomp-profile/main.go.
         ({ runcPath, seccompProfile, baseSpec } = extractRuncBootstrap({ containerName, destDir: dir }));
       } catch (e) {
-        throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${e.message}`, "RUNC_EXTRACT_FAILED");
+        throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${(e as Error).message}`, "RUNC_EXTRACT_FAILED");
       }
 
       const workdir = env.GITHUB_WORKSPACE || "";
@@ -230,8 +243,8 @@ async function main() {
         // computeReadonlyHostMounts).
         const hostMounts = listHostMounts();
         config = buildOciConfig(baseSpec, {
-          uid: process.getuid(),
-          gid: process.getgid(),
+          uid: process.getuid!(),
+          gid: process.getgid!(),
           workdir,
           home,
           // Standard writable runner scratch; not always under $HOME on
@@ -247,7 +260,7 @@ async function main() {
           hostMounts,
         });
       } catch (e) {
-        throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${e.message}`, "OCI_CONFIG_BUILD_FAILED");
+        throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${(e as Error).message}`, "OCI_CONFIG_BUILD_FAILED");
       }
       writeOciConfig(config, dir);
 
@@ -275,13 +288,13 @@ async function main() {
         knownBlockedRules,
       });
     } catch (e) {
-      annotation.warning(`Failed to fetch sandbox report: ${e.message}`);
+      annotation.warning(`Failed to fetch sandbox report: ${(e as Error).message}`);
     }
     try {
       execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), { stdio: "inherit", env: composeEnv });
     } catch (e) {
       annotation.warning(
-        `Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`,
+        `Failed to stop the sandbox proxy container: ${describeDockerFailure(e as DockerErrorLike, { operation: "docker compose down" })}`,
       );
     }
   }
