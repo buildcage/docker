@@ -1,14 +1,12 @@
+import type { AggregatedEntry } from "../../shared/lib/aggregate.js";
+
 const ruleTypeToParam: Record<string, string> = {
   HTTPS: "allowed_https_rules",
   HTTP: "allowed_http_rules",
   IP: "allowed_ip_rules",
 };
 
-export interface AuditedRow {
-  host: string;
-  port: string;
-  ruleType: string;
-}
+export type AuditedRow = Pick<AggregatedEntry, "host" | "port" | "ruleType">;
 
 export interface BuildRestrictExampleOptions {
   /** "setup" (default) or "run" */

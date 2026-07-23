@@ -5,14 +5,9 @@
  * affects this action's pass/fail decision and Job Summary rendering.
  */
 import { convertRule } from "../../shared/lib/rules.js";
+import type { AggregatedEntry } from "../../shared/lib/aggregate.js";
 
-export interface BlockedRow {
-  host: string;
-  port: string;
-  ruleType: string;
-  reason: string;
-  count: number;
-}
+export type BlockedRow = AggregatedEntry;
 
 export interface AnnotatedBlockedRow extends BlockedRow {
   expected: boolean;
