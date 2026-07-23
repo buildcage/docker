@@ -41,13 +41,20 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
  * the run action's (buildkitd-less) proxy image, published under the `-proxy`
  * tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.js).
  */
+interface ResolveVerifiedImageOptions {
+  actionRef: string;
+  actionRepo: string;
+}
+
+interface ResolvedImage {
+  imageRef: string;
+  pullPolicy: "always";
+}
+
 async function resolveVerifiedImage({
   actionRef,
   actionRepo,
-}: {
-  actionRef: string;
-  actionRepo: string;
-}): Promise<{ imageRef: string; pullPolicy: "always" }> {
+}: ResolveVerifiedImageOptions): Promise<ResolvedImage> {
   const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine: "proxy" });
   console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
   return {
@@ -72,15 +79,23 @@ function parseRulesOrThrow(rulesInput: string | undefined): string[] {
  * Build ACL rules from input strings. Rules are passed through as-is
  * (wildcard format), validated eagerly.
  */
+export interface BuildACLRulesInput {
+  httpsRulesInput: string | undefined;
+  httpRulesInput: string | undefined;
+  ipRulesInput: string | undefined;
+}
+
+export interface ACLRules {
+  httpsRules: string[];
+  httpRules: string[];
+  ipRules: string[];
+}
+
 export function buildACLRules({
   httpsRulesInput,
   httpRulesInput,
   ipRulesInput,
-}: {
-  httpsRulesInput: string | undefined;
-  httpRulesInput: string | undefined;
-  ipRulesInput: string | undefined;
-}): { httpsRules: string[]; httpRules: string[]; ipRules: string[] } {
+}: BuildACLRulesInput): ACLRules {
   return {
     httpsRules: parseRulesOrThrow(httpsRulesInput),
     httpRules: parseRulesOrThrow(httpRulesInput),
