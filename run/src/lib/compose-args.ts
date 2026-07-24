@@ -1,17 +1,17 @@
 /**
  * Build the `docker compose ... up`/`down` argv. Kept in its own module
- * (rather than inside run/src/main.js) so post.js can reuse it without
- * also bundling main.js's self-invocation guard — importing main.js
+ * (rather than inside run/src/main.ts) so post.ts can reuse it without
+ * also bundling main.ts's self-invocation guard — importing main.ts
  * directly would pull in its
  * `if (process.argv[1] === fileURLToPath(import.meta.url))` check too,
  * which fires a second time once rollup merges both files'
- * `import.meta.url` into a single bundle (see core/lib/provenance/image-ref.js
+ * `import.meta.url` into a single bundle (see core/lib/provenance/image-ref.ts
  * for the same issue hit previously).
  *
  * `-p projectName` is required on both so that fully concurrent `run`
  * steps in the same job (see GitHub Actions' `background`/`wait`/`parallel`
  * step keywords) never share Compose's implicit, directory-derived project
- * name — see lib/container.js's deriveProjectName for why that matters.
+ * name — see lib/container.ts's deriveProjectName for why that matters.
  */
 export interface ComposeArgsOptions {
   composeFile: string;

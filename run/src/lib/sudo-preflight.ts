@@ -19,7 +19,7 @@ const SLIM_RUNNER_NOTE =
 
 /**
  * Kept pure (takes the error, not execFileSync's raw output) so it's
- * unit-testable the same way as core/lib/actions/docker-error.js's
+ * unit-testable the same way as core/lib/actions/docker-error.ts's
  * describeDockerFailure.
  */
 export interface DescribeSudoFailureOptions {

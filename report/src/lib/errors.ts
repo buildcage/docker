@@ -3,7 +3,7 @@ import { ActionError } from "../../../core/lib/general/action-error.ts";
 /**
  * ReportError — intentional error in the report action's own logic. Invalid
  * ACL rule syntax throws InvalidRulesError instead (see
- * core/lib/acl/rules.js).
+ * core/lib/acl/rules.ts).
  *
  * Codes:
  *   DOCKER_UNAVAILABLE – docker CLI missing from PATH or a docker command failed

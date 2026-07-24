@@ -27,7 +27,7 @@ async function main(): Promise<void> {
   const composeFile = process.argv[2] || join(__dirname, "../..", "setup", "compose.yaml");
   // "buildcage" here is a fallback for running outside the Actions runtime
   // (action.yml's own `default: 'buildcage'` covers the normal case) — keep
-  // both, and setup/src/main.js's copy, in sync.
+  // both, and setup/src/main.ts's copy, in sync.
   const composeEnv = {
     ...process.env,
     BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   // report.js has no "allowed"/"audited" section — that data comes from
   // buildctl's build-history vertex log instead, which needs no special
   // buildkitd configuration and tags each entry with the RUN step (vertex)
-  // that produced it (see report/src/lib/vertex-log.js).
+  // that produced it (see report/src/lib/vertex-log.ts).
   let builds: VertexAllowedEntry[][] = [];
   if (isExplicit) {
     try {
@@ -120,7 +120,7 @@ async function main(): Promise<void> {
       // Every build since the container started, not just the latest one — a
       // workflow may run several builds against the same buildcage container
       // before calling this action once, and each is its own independent
-      // buildctl history record (see vertex-log.js's selectAllRefs()).
+      // buildctl history record (see vertex-log.ts's selectAllRefs()).
       const refs = selectAllRefs(historiesOutput);
       builds = refs.map((ref) => {
         const rawJsonOutput = execFileSync(

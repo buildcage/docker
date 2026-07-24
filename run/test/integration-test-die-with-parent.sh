@@ -1,6 +1,6 @@
 #!/bin/bash
 # Verifies the setpriv --pdeathsig chain (see run-isolated.sh and
-# isolated-exec.js's buildOciConfig): SIGKILL-ing run-isolated.sh's own
+# isolated-exec.ts's buildOciConfig): SIGKILL-ing run-isolated.sh's own
 # process must tear down the whole sandboxed process tree rather than
 # leaving it running as an orphan. Drives run/dist/main.cjs directly, not
 # through the real action wrapper, so this script can reach in and kill

@@ -24,7 +24,7 @@ export class VerifyImageError extends Error {
 }
 
 /**
- * ProvenanceError — thrown by verifyImageDigestOrThrow (see verify-image.js)
+ * ProvenanceError — thrown by verifyImageDigestOrThrow (see verify-image.ts)
  * when image provenance can't be established. Extends ActionError so a
  * caller's own top-level catch (checking `instanceof ActionError`)
  * recognizes it as a safe-to-print error.

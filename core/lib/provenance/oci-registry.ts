@@ -1,7 +1,7 @@
 /**
- * oci-registry.js — OCI registry I/O helpers
+ * oci-registry.ts — OCI registry I/O helpers
  *
- * All errors are thrown as VerifyImageError (see errors.js).
+ * All errors are thrown as VerifyImageError (see errors.ts).
  * Callers do not need to catch and re-wrap; just let them propagate.
  */
 

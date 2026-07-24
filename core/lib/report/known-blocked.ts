@@ -104,7 +104,7 @@ export function buildBlockedMessage({
 
 /**
  * Single entry point composing the three functions above. Both
- * run/src/lib/report.js and report/src/main.js call this once and thread
+ * run/src/lib/report.ts and report/src/main.ts call this once and thread
  * the result through their table rendering and annotation code, rather
  * than each recomputing annotateKnownBlocked independently.
  *

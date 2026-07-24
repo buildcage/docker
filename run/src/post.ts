@@ -9,17 +9,17 @@ import { errorMessage } from "../../core/lib/general/error-message.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Fallback-only cleanup: main.js already stops the proxy container in its
+// Fallback-only cleanup: main.ts already stops the proxy container in its
 // own finally block on every normal exit path. This only matters if the
 // process was killed outright before reaching that finally (e.g. the
 // runner cancels the step). GITHUB_STATE's container_name=.../project_name=...
-// (written by main.js) surface here as STATE_container_name/STATE_project_name
+// (written by main.ts) surface here as STATE_container_name/STATE_project_name
 // — see
 // https://docs.github.com/en/actions/creating-actions/dockerfile-support-for-github-actions#saving-state.
 const containerName = process.env.STATE_container_name;
 const projectName = process.env.STATE_project_name;
 
-// Reclaim this step's sandbox scratch dir if a hard kill bypassed main.js's
+// Reclaim this step's sandbox scratch dir if a hard kill bypassed main.ts's
 // own withScratchDir finally. Its path is derived deterministically from
 // containerName (scratchDirFor), so no separately recorded path is needed.
 // cleanupScratchDir force-detaches the rootfs bind-mount before deleting, so

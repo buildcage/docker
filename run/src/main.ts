@@ -37,13 +37,13 @@ const composeFile = join(__dirname, "../compose.yaml");
 
 // Gates a local-image override used only by this repo's own CI/dev testing
 // (see test_action in .github/workflows/test.yml), never by a consumer of a
-// published action. Mirrors setup/src/main.js's LOCAL_IMAGE_OVERRIDE_ENABLED.
+// published action. Mirrors setup/src/main.ts's LOCAL_IMAGE_OVERRIDE_ENABLED.
 const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1";
 
 /**
  * Verifies image provenance and resolves the digest-pinned image ref for
  * the run action's (buildkitd-less) proxy image, published under the `-proxy`
- * tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.js).
+ * tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.ts).
  */
 async function resolveVerifiedImage({
   actionRef,
@@ -58,7 +58,7 @@ async function resolveVerifiedImage({
 }
 
 /**
- * Never sent to the container's ACL — see core/lib/report/known-blocked.js.
+ * Never sent to the container's ACL — see core/lib/report/known-blocked.ts.
  */
 export function readKnownBlockedRules(input: string | undefined): string[] {
   return parseRulesOrThrow(input);
@@ -86,7 +86,7 @@ function logRules(label: string, rules: string[]): void {
 async function main(): Promise<void> {
   const env = process.env;
   // Empty (not `??`-catchable) for local-path `uses: ./run` invocations —
-  // mirrors report/src/main.js's fallback for the same case.
+  // mirrors report/src/main.ts's fallback for the same case.
   const actionRef = env.GITHUB_ACTION_REF || "v2";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 
@@ -99,7 +99,7 @@ async function main(): Promise<void> {
   // if the runner can't support the isolation setup at all.
   checkPasswordlessSudo();
 
-  // Same gate as writeReport() in lib/report.js — suppresses annotations
+  // Same gate as writeReport() in lib/report.ts — suppresses annotations
   // when this script isn't running as the real action.
   const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
 
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
   const containerName = generateContainerName();
   const projectName = deriveProjectName(containerName);
   const stateFile = env.GITHUB_STATE;
-  // Recorded so post.js can still clean up if this run is killed outright
+  // Recorded so post.ts can still clean up if this run is killed outright
   // before reaching its own finally block below.
   if (stateFile) {
     appendFileSync(stateFile, `container_name=${containerName}\n`);

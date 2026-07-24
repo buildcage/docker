@@ -1,7 +1,7 @@
 /**
- * Unit tests for setup/main.js
+ * Unit tests for setup/main.ts
  *
- * Run with: node --test setup/src/main.test.js
+ * Run with: node --test setup/src/main.test.ts
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

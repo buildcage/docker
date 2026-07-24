@@ -61,7 +61,7 @@ func generateSourcePolicy(outPath string) error {
 // BuildKit's source-policy engine logs denials into this stream via its own
 // structured logger.
 //
-// Allowed requests are not read from this log file: report/src/lib/vertex-log.js
+// Allowed requests are not read from this log file: report/src/lib/vertex-log.ts
 // fetches those separately via `buildctl debug logs --progress=rawjson`, which
 // tags every entry with the vertex (RUN step) that produced it. Getting that
 // same data from buildkitd's own log instead would require running it with

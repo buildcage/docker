@@ -1,5 +1,5 @@
 /**
- * verify-image.js — Image provenance verification helpers
+ * verify-image.ts — Image provenance verification helpers
  *
  * Verifies the Docker image's Sigstore provenance bundle.
  *
@@ -144,7 +144,7 @@ export async function verifyImageDigest({
 }
 
 /**
- * Like verifyImageDigest, but throws ProvenanceError (see errors.js) instead
+ * Like verifyImageDigest, but throws ProvenanceError (see errors.ts) instead
  * of the low-level VerifyImageError, so a caller gets one already-typed
  * error to catch rather than having to translate the result itself.
  *
