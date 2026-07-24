@@ -1,4 +1,4 @@
-import type { AggregatedEntry } from "../../shared/lib/aggregate.ts";
+import type { AggregatedEntry } from "../log/aggregate.ts";
 
 const ruleTypeToParam: Record<string, string> = {
   HTTPS: "allowed_https_rules",

@@ -4,7 +4,7 @@
  * Usage: echo "*.example.com:443 other.com:80" | qjs --std -m convert-rule.js
  */
 import * as std from "qjs:std";
-import { buildRules } from "../shared/lib/rules.js";
+import { buildRules } from "../lib/acl/wildcard-rules.js";
 
 const input = std.in.readAsString();
 

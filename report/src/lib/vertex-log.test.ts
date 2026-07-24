@@ -292,7 +292,7 @@ describe("aggregateAllowedHosts", () => {
     assert.deepEqual(aggregateAllowedHosts([], "ALLOWED"), []);
   });
 
-  it("resolves host/port the same way as core/shared/lib/parse-identifier.ts's parseIdentifier", () => {
+  it("resolves host/port the same way as core/lib/log/parse-identifier.ts's parseIdentifier", () => {
     const builds = [[{ entries: [{ method: "GET", url: "http://allowed.example.com:8080/path" }] }]];
     assert.deepEqual(aggregateAllowedHosts(builds, "ALLOWED"), [
       { host: "allowed.example.com", port: "8080", ruleType: "HTTP", reason: "-", count: 1 },

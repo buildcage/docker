@@ -1,6 +1,6 @@
 import { ActionError } from "../general/action-error.ts";
 import { errorMessage } from "../general/error-message.ts";
-import { parseAndValidateRules } from "../../shared/lib/rules.ts";
+import { parseAndValidateRules } from "./wildcard-rules.ts";
 
 /**
  * Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
