@@ -19,7 +19,20 @@
  * BUILDKIT_DEBUG_EXEC_OUTPUT=1, which also mirrors every RUN step's own
  * console output into this same log.
  */
-import { parseIdentifier } from "../../shared/lib/parse-identifier.js";
+import { parseIdentifier } from "../../../../../core/shared/lib/parse-identifier.js";
+
+export interface DenialEntry {
+  decision: string;
+  ruleType: string;
+  host: string;
+  port: string;
+  reason: string;
+}
+
+export interface DenialTimelineEntry {
+  url: string;
+  timestamp: string;
+}
 
 const deniedLinePattern = /msg="Evaluated source policy".*denied by policy/;
 const refFieldPattern = /\bref="((?:[^"\\]|\\.)*)"/;
@@ -27,7 +40,7 @@ const timeFieldPattern = /^time="([^"]*)"/;
 
 // Shared for logrus text-format quoted values ("ref=\"...\"", "span=\"...\""),
 // which escape embedded quotes as \" and backslashes as \\.
-function unescapeLogrusValue(s) {
+function unescapeLogrusValue(s: string): string {
   return s.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
 }
 
@@ -36,12 +49,9 @@ function unescapeLogrusValue(s) {
  * identifier and timestamp, in log order, with no host/port resolution or
  * aggregation. Shared by parseEntries() (host-aggregated) and
  * parseDenialTimeline() (chronological) below.
- *
- * @param {string} logText
- * @returns {{ url: string, timestamp: string }[]}
  */
-function parseDenialEntries(logText) {
-  const entries = [];
+function parseDenialEntries(logText: string): DenialTimelineEntry[] {
+  const entries: DenialTimelineEntry[] = [];
   for (const line of logText.split("\n")) {
     if (!deniedLinePattern.test(line)) continue;
     const refMatch = line.match(refFieldPattern);
@@ -52,12 +62,8 @@ function parseDenialEntries(logText) {
   return entries;
 }
 
-/**
- * @param {string} logText
- * @returns {{ decision: string, ruleType: string, host: string, port: string, reason: string }[]}
- */
-export function parseEntries(logText) {
-  const entries = [];
+export function parseEntries(logText: string): DenialEntry[] {
+  const entries: DenialEntry[] = [];
   for (const { url } of parseDenialEntries(logText)) {
     const parsed = parseIdentifier(url);
     if (!parsed) continue;
@@ -79,10 +85,7 @@ export function parseEntries(logText) {
  * identifier to attribute it with). Timestamps are whole-seconds only (no
  * sub-second precision), since that is all buildkitd's own logrus text
  * formatter records.
- *
- * @param {string} logText
- * @returns {{ url: string, timestamp: string }[]}
  */
-export function parseDenialTimeline(logText) {
+export function parseDenialTimeline(logText: string): DenialTimelineEntry[] {
   return parseDenialEntries(logText);
 }

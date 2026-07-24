@@ -15,16 +15,16 @@
  * internal MITM proxy at all (non-cooperative apps bypassing HTTP_PROXY)
  * leave no trace anywhere.
  *
- * Usage: qjs -m /opt/buildcage/scripts/report.js [logfile]
+ * Usage: qjs --std -m /opt/buildcage/scripts/report.js [logfile]
  *   Default logfile: /var/log/buildkitd/current
  */
-import * as std from "std";
+import * as std from "qjs:std";
 import { parseEntries, parseDenialTimeline } from "./lib/buildkitd-log-parser.js";
-import { aggregate } from "../shared/lib/aggregate.js";
+import { aggregate, type AggregatedEntry } from "../../../../core/shared/lib/aggregate.js";
 
 const logFile = scriptArgs[1] || "/var/log/buildkitd/current";
 
-function readFile(path) {
+function readFile(path: string): string {
   const f = std.open(path, "r");
   if (!f) return "";
   const content = f.readAsString();
@@ -38,7 +38,7 @@ const mode = std.getenv("PROXY_MODE") || "restrict";
 const blocked = aggregate(parseEntries(logText));
 const deniedTimeline = parseDenialTimeline(logText);
 
-const sections = {};
+const sections: { blocked?: AggregatedEntry[] } = {};
 if (blocked.length > 0) sections.blocked = blocked;
 
 const result = { mode, sections, blockedCount: blocked.length, deniedTimeline };

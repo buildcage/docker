@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "../../shared/test/test-shim.js";
+import { describe, it, assert, reportResults } from "../../../../../core/shared/test/test-shim.js";
 import { buildSourcePolicy } from "./source-policy.js";
 
 // Simulates BuildKit's sourcepolicy engine evaluation order exactly
@@ -7,7 +7,7 @@ import { buildSourcePolicy } from "./source-policy.js";
 // rule wins. This is the real, load-bearing semantics our rule ORDER must
 // produce correct results under — verified against a live buildkitd
 // container (see docs/security.md).
-function evaluate(policy, identifier) {
+function evaluate(policy: { rules: { action: string; selector: { identifier: string } }[] }, identifier: string) {
   let deny = false;
   for (const rule of policy.rules) {
     if (!new RegExp(rule.selector.identifier).test(identifier)) continue;
