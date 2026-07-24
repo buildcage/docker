@@ -47,7 +47,7 @@ async function main(): Promise<void> {
       "docker",
       [
         "compose", "-f", composeFile, "exec", "builder", "sh", "-c",
-        "qjs -m /opt/buildcage/scripts/report.js",
+        "qjs --std -m /opt/buildcage/scripts/report.js",
       ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
     );

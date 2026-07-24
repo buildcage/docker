@@ -17,7 +17,7 @@ export type Report = ReportData;
 export function fetchReport(containerName: string): Report {
   const jsonOutput = execFileSync(
     "docker",
-    ["exec", containerName, "qjs", "-m", "/opt/buildcage/scripts/report.js"],
+    ["exec", containerName, "qjs", "--std", "-m", "/opt/buildcage/scripts/report.js"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   );
   return JSON.parse(jsonOutput);

@@ -24,7 +24,7 @@ fi
 echo ""
 
 echo "[report action] JSON round-trip through the explicit-mode report.js:"
-REPORT_JSON=$(docker compose exec builder qjs -m /opt/buildcage/scripts/report.js 2>/dev/null)
+REPORT_JSON=$(docker compose exec builder qjs --std -m /opt/buildcage/scripts/report.js 2>/dev/null)
 MODE=$(echo "$REPORT_JSON" | sed -n 's/.*"mode": *"\([a-z]*\)".*/\1/p')
 BLOCKED_COUNT=$(echo "$REPORT_JSON" | grep -o '"blockedCount": *[0-9]*' | grep -o '[0-9]*$' || echo "")
 if [ "$MODE" = "audit" ] && [ "$BLOCKED_COUNT" = "0" ]; then

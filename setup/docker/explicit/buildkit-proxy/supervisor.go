@@ -35,12 +35,12 @@ func writeResolvConf(externalResolver string) error {
 }
 
 // generateSourcePolicy invokes the QuickJS policy generator (which reuses
-// core/shared/lib/rules.js's wildcard/regex compiler) and writes its
+// core/shared/lib/rules.ts's wildcard/regex compiler) and writes its
 // stdout — a sourcepolicy.pb.Policy protobuf-JSON document — to outPath.
 // Fails closed: any error here aborts startup rather than running without a
 // policy.
 func generateSourcePolicy(outPath string) error {
-	cmd := exec.Command("qjs", "-m", "/opt/buildcage/scripts/gen-source-policy.js",
+	cmd := exec.Command("qjs", "--std", "-m", "/opt/buildcage/scripts/gen-source-policy.js",
 		getenv("PROXY_MODE", "restrict"),
 		os.Getenv("ALLOWED_HTTPS_RULES"),
 		os.Getenv("ALLOWED_HTTP_RULES"),

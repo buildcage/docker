@@ -22,9 +22,9 @@ if [ "$PROXY_MODE" = "audit" ]; then
     echo ".*" > /etc/haproxy/rules/allowed_http.lst
     echo ".*" > /etc/haproxy/rules/allowed_ips.lst
 else
-    echo "$ALLOWED_HTTPS_RULES" | qjs -m /opt/buildcage/scripts/convert-rule.js > /etc/haproxy/rules/allowed_https.lst
-    echo "$ALLOWED_HTTP_RULES"  | qjs -m /opt/buildcage/scripts/convert-rule.js > /etc/haproxy/rules/allowed_http.lst
-    echo "$ALLOWED_IP_RULES"    | qjs -m /opt/buildcage/scripts/convert-rule.js > /etc/haproxy/rules/allowed_ips.lst
+    echo "$ALLOWED_HTTPS_RULES" | qjs --std -m /opt/buildcage/scripts/convert-rule.js > /etc/haproxy/rules/allowed_https.lst
+    echo "$ALLOWED_HTTP_RULES"  | qjs --std -m /opt/buildcage/scripts/convert-rule.js > /etc/haproxy/rules/allowed_http.lst
+    echo "$ALLOWED_IP_RULES"    | qjs --std -m /opt/buildcage/scripts/convert-rule.js > /etc/haproxy/rules/allowed_ips.lst
 fi
 
 # Generate nameserver lines from EXTERNAL_RESOLVER (comma-separated IPs).

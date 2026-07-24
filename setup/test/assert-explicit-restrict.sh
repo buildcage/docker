@@ -62,7 +62,7 @@ fi
 echo ""
 
 echo "[report action] JSON round-trip through the explicit-mode report.js:"
-REPORT_JSON=$(docker compose exec builder qjs -m /opt/buildcage/scripts/report.js 2>/dev/null)
+REPORT_JSON=$(docker compose exec builder qjs --std -m /opt/buildcage/scripts/report.js 2>/dev/null)
 BLOCKED_COUNT=$(echo "$REPORT_JSON" | grep -o '"blockedCount": *[0-9]*' | grep -o '[0-9]*$' || echo "")
 if [ -n "$BLOCKED_COUNT" ] && [ "$BLOCKED_COUNT" -ge 6 ]; then
   echo "  PASS  report.js blockedCount=$BLOCKED_COUNT (>= 6 expected)"
