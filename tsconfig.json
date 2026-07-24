@@ -21,12 +21,5 @@
     "run/src/**/*.ts",
     "report/src/**/*.ts"
   ],
-  "exclude": [
-    "core/shared/lib/rules.test.ts",
-    "core/shared/lib/aggregate.test.ts",
-    "core/shared/lib/parse-identifier.test.ts",
-    "core/scripts/lib/log-parser.test.ts",
-    "setup/docker",
-    "**/dist/**"
-  ]
+  "exclude": ["setup/docker", "**/dist/**"]
 }
