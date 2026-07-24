@@ -1,5 +1,5 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.js";
-import { aggregate } from "./aggregate.js";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { aggregate } from "./aggregate.ts";
 
 describe("aggregate", () => {
   it("groups entries by host:port:ruleType:reason", () => {

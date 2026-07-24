@@ -5,10 +5,10 @@ import { defineConfig } from "rolldown";
 const productionInputs = globSync(["core/scripts/*.ts", "setup/docker/explicit/scripts/*.ts"]);
 
 // *.property.test.ts run under node:test, not qjs — excluded here.
-// Output paths must mirror the source tree 1:1: run-tests.js discovers these
-// by scanning directories at runtime (os.readdir).
+// Output paths must mirror the source tree 1:1: run-tests.qjs.js discovers
+// these by scanning directories at runtime (os.readdir).
 const testInputs = [
-  "core/shared/test/run-tests.ts",
+  "core/shared/test/run-tests.qjs.ts",
   ...globSync(
     [
       "core/scripts/**/*.test.ts",

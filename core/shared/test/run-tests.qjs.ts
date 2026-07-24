@@ -3,14 +3,14 @@
  * directory, in a single qjs process — qjs itself only accepts one file
  * argument, so this replaces invoking qjs once per test file.
  *
- * Usage: qjs --std -m run-tests.js <dir> [<dir> ...]
+ * Usage: qjs --std -m run-tests.qjs.js <dir> [<dir> ...]
  */
 import * as std from "qjs:std";
 import * as os from "qjs:os";
 
 const dirs = scriptArgs.slice(1);
 if (dirs.length === 0) {
-  std.err.puts("usage: qjs --std -m run-tests.js <dir> [<dir> ...]\n");
+  std.err.puts("usage: qjs --std -m run-tests.qjs.js <dir> [<dir> ...]\n");
   std.exit(1);
 }
 
