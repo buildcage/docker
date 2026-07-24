@@ -314,7 +314,8 @@ reports for the allowed side.
 │   │   │                     # s6-overlay config
 │   │   └── explicit/         # proxy_engine: explicit — Dockerfile + buildkit-proxy/ (Go module:
 │   │                         # entrypoint/PID1, supervises buildkitd, injects the source policy
-│   │                         # into Solve via a gRPC proxy) + scripts/ (QuickJS report/policy tools)
+│   │                         # into Solve via a gRPC proxy) + scripts/ (QuickJS report/policy tools,
+│   │                         # TypeScript, rolldown-bundled at image build time)
 │   ├── test/                 # Dockerfile.*/assert-*.sh per {engine}-{mode} combination, plus
 │   │                         # test-server(-explicit)/test-dns(-explicit) fixture containers
 │   └── compose.test-*.yaml   # Test override config, one per engine
@@ -341,8 +342,9 @@ reports for the allowed side.
 ├── core/                     # Code shared across actions
 │   ├── lib/                  # Image verification: Sigstore, OCI registry lookups, image ref
 │   │                         # resolution, local-image test-hook override
-│   ├── scripts/              # QuickJS report/rule-conversion scripts, run inside the built images
-│   │                         # (COPYed into /opt/buildcage/scripts/)
+│   ├── scripts/              # QuickJS report/rule-conversion scripts (TypeScript), run inside the
+│   │                         # built images (rolldown-bundled into /opt/buildcage/scripts/ at image
+│   │                         # build time — see rolldown.qjs.config.js)
 │   └── shared/               # Rule/log parsing + aggregation shared by scripts/ and report/;
 │                             # shared/test/ is a qjs test runner + node:test shim
 ├── docs/                     # development.md, rules.md, security.md, self-hosting.md
