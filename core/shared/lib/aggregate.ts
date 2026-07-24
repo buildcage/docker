@@ -1,12 +1,20 @@
+export interface LogEntry {
+  host: string;
+  port: string;
+  ruleType: string;
+  reason: string;
+}
+
+export interface AggregatedEntry extends LogEntry {
+  count: number;
+}
+
 /**
  * Aggregate log entries by (host, port, ruleType, reason) with counts, sorted
  * descending.
- *
- * @param {{ host: string, port: string, ruleType: string, reason: string }[]} filtered
- * @returns {{ host: string, port: string, ruleType: string, reason: string, count: number }[]}
  */
-export function aggregate(filtered) {
-  const map = {};
+export function aggregate(filtered: LogEntry[]): AggregatedEntry[] {
+  const map: Record<string, number> = {};
   for (const e of filtered) {
     const key = `${e.host}\t${e.port}\t${e.ruleType}\t${e.reason}`;
     map[key] = (map[key] || 0) + 1;

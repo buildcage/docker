@@ -5,21 +5,15 @@
 
 /**
  * Split a whitespace-separated rules string into individual rule tokens.
- *
- * @param {string|undefined} rulesInput
- * @returns {string[]}
  */
-export function splitRuleTokens(rulesInput) {
+export function splitRuleTokens(rulesInput: string | undefined): string[] {
   return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
 }
 
 /**
  * Build regex rules from a space-separated input string.
- *
- * @param {string} rulesInput
- * @returns {string[]}
  */
-export function buildRules(rulesInput) {
+export function buildRules(rulesInput: string): string[] {
   return splitRuleTokens(rulesInput).map(convertRule);
 }
 
@@ -28,11 +22,9 @@ export function buildRules(rulesInput) {
  * (unconverted) rule tokens — for callers that need the original
  * wildcard/~regex syntax preserved, such as known_blocked_rules.
  *
- * @param {string|undefined} rulesInput
- * @returns {string[]}
  * @throws {Error} if any rule has invalid wildcard/regex syntax
  */
-export function parseAndValidateRules(rulesInput) {
+export function parseAndValidateRules(rulesInput: string | undefined): string[] {
   const rules = splitRuleTokens(rulesInput);
   rules.forEach(convertRule); // validate eagerly; throws on bad syntax
   return rules;
@@ -41,11 +33,13 @@ export function parseAndValidateRules(rulesInput) {
 /**
  * Convert a single rule (wildcard or `~`-prefixed regex) to a regex string.
  */
-export function convertRule(rule) {
+export function convertRule(rule: string): string {
   if (rule.startsWith("~")) {
     const regex = rule.slice(1);
-    try { new RegExp(regex); } catch (e) {
-      throw new Error(`Invalid regex in rule "${rule}": ${e.message}`);
+    try {
+      new RegExp(regex);
+    } catch (e) {
+      throw new Error(`Invalid regex in rule "${rule}": ${(e as Error).message}`);
     }
     return regex;
   }
@@ -62,8 +56,8 @@ export function convertRule(rule) {
  *
  * A dot-separated part containing `*` must be exactly `*` or `**`.
  */
-function domainToRegex(domain) {
-  const regexParts = domain.split(".").map(part => {
+function domainToRegex(domain: string): string {
+  const regexParts = domain.split(".").map((part) => {
     if (part === "**") return ".+";
     if (part === "*") return "[^.]+";
     if (part.includes("*")) {
@@ -81,7 +75,7 @@ function domainToRegex(domain) {
 /**
  * Convert a wildcard pattern (`<domain>:<port|*>`) to a regex string (without anchors).
  */
-export function wildcardToRegex(pattern) {
+export function wildcardToRegex(pattern: string): string {
   if (!/^[^:]+:(?:\d+|\*)$/.test(pattern)) {
     throw new Error(`Invalid pattern "${pattern}"`);
   }

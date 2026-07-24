@@ -14,9 +14,17 @@
   },
   "include": [
     "core/lib/**/*.ts",
+    "core/shared/lib/**/*.ts",
     "setup/src/**/*.ts",
     "run/src/**/*.ts",
     "report/src/**/*.ts"
   ],
-  "exclude": ["core/shared", "core/scripts", "setup/docker", "**/dist/**"]
+  "exclude": [
+    "core/shared/lib/rules.test.ts",
+    "core/shared/lib/aggregate.test.ts",
+    "core/shared/lib/parse-identifier.test.ts",
+    "core/scripts",
+    "setup/docker",
+    "**/dist/**"
+  ]
 }
