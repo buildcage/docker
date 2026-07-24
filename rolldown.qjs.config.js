@@ -1,33 +1,35 @@
+import { globSync } from "node:fs";
 import { defineConfig } from "rolldown";
 
-// Production QuickJS entry points. Each is bundled into a single
-// self-contained ESM file (relative imports like core/shared/lib/rules.ts
-// are inlined) so the Dockerfiles can COPY one file per script instead of a
-// whole source tree — see rolldown.qjs.test.config.js for the test-only
-// counterpart.
-const entries = [
-  { input: "core/scripts/convert-rule.ts", file: "dist/qjs/core/scripts/convert-rule.js" },
-  { input: "core/scripts/report.ts", file: "dist/qjs/core/scripts/report.js" },
-  {
-    input: "setup/docker/explicit/scripts/gen-source-policy.ts",
-    file: "dist/qjs/setup/docker/explicit/scripts/gen-source-policy.js",
-  },
-  {
-    input: "setup/docker/explicit/scripts/report.ts",
-    file: "dist/qjs/setup/docker/explicit/scripts/report.js",
-  },
+// Non-recursive: lib/ subdirectories hold dependencies, not entry points.
+const productionInputs = globSync(["core/scripts/*.ts", "setup/docker/explicit/scripts/*.ts"]);
+
+// *.property.test.ts run under node:test, not qjs — excluded here.
+// Output paths must mirror the source tree 1:1: run-tests.js discovers these
+// by scanning directories at runtime (os.readdir).
+const testInputs = [
+  "core/shared/test/run-tests.ts",
+  ...globSync(
+    [
+      "core/scripts/**/*.test.ts",
+      "core/shared/lib/*.test.ts",
+      "setup/docker/explicit/scripts/**/*.test.ts",
+    ],
+    { exclude: ["**/*.property.test.ts"] },
+  ),
 ];
 
+const [inputs, outDir] =
+  process.env.QJS_BUILD_TARGET === "test" ? [testInputs, "dist/test-qjs"] : [productionInputs, "dist/qjs"];
+
 export default defineConfig(
-  entries.map(({ input, file }) => ({
+  inputs.map((input) => ({
     input,
-    // "qjs:std"/"qjs:os" are QuickJS-native builtin modules, not npm
-    // packages — leave them as-is instead of trying (and failing) to
-    // resolve them.
+    // QuickJS-native builtins, not npm packages — don't try to resolve them.
     external: ["qjs:std", "qjs:os"],
     platform: "neutral",
     output: {
-      file,
+      file: `${outDir}/${input.replace(/\.ts$/, ".js")}`,
       format: "esm",
       codeSplitting: false,
       minify: {

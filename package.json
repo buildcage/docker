@@ -22,7 +22,7 @@
   "scripts": {
     "build": "rolldown -c",
     "build:qjs": "rolldown -c rolldown.qjs.config.js",
-    "build:qjs-test": "rolldown -c rolldown.qjs.test.config.js",
+    "build:qjs-test": "QJS_BUILD_TARGET=test rolldown -c rolldown.qjs.config.js",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.qjs.json"
   },
   "dependencies": {

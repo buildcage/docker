@@ -32,7 +32,6 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'rolldown.config.js'
               - 'rolldown.qjs.config.js'
-              - 'rolldown.qjs.test.config.js'
               - 'tsconfig.json'
               - 'tsconfig.qjs.json'
               - '.dockerignore'
