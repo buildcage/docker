@@ -39,16 +39,13 @@ function errorMessage(e) {
 	return e instanceof Error ? e.message : String(e);
 }
 //#endregion
-//#region core/shared/lib/rules.js
+//#region core/shared/lib/rules.ts
 /**
 * Rule conversion library for buildcage container.
 * Converts wildcard patterns to regex strings for HAProxy ACLs.
 */
 /**
 * Split a whitespace-separated rules string into individual rule tokens.
-*
-* @param {string|undefined} rulesInput
-* @returns {string[]}
 */
 function splitRuleTokens(rulesInput) {
 	return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -58,8 +55,6 @@ function splitRuleTokens(rulesInput) {
 * (unconverted) rule tokens — for callers that need the original
 * wildcard/~regex syntax preserved, such as known_blocked_rules.
 *
-* @param {string|undefined} rulesInput
-* @returns {string[]}
 * @throws {Error} if any rule has invalid wildcard/regex syntax
 */
 function parseAndValidateRules(rulesInput) {

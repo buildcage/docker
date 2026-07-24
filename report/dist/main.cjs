@@ -87,7 +87,7 @@ function formatDuration(started, completed) {
 	return `${((Date.parse(completed) - Date.parse(started)) / 1e3).toFixed(3)}s`;
 }
 //#endregion
-//#region core/shared/lib/parse-identifier.js
+//#region core/shared/lib/parse-identifier.ts
 const DEFAULT_PORT = {
 	https: "443",
 	http: "80"
@@ -115,13 +115,10 @@ function parseIdentifier(identifier) {
 	};
 }
 //#endregion
-//#region core/shared/lib/aggregate.js
+//#region core/shared/lib/aggregate.ts
 /**
 * Aggregate log entries by (host, port, ruleType, reason) with counts, sorted
 * descending.
-*
-* @param {{ host: string, port: string, ruleType: string, reason: string }[]} filtered
-* @returns {{ host: string, port: string, ruleType: string, reason: string, count: number }[]}
 */
 function aggregate(filtered) {
 	let map = {};
@@ -255,16 +252,13 @@ function createAnnotation(enabled) {
 	};
 }
 //#endregion
-//#region core/shared/lib/rules.js
+//#region core/shared/lib/rules.ts
 /**
 * Rule conversion library for buildcage container.
 * Converts wildcard patterns to regex strings for HAProxy ACLs.
 */
 /**
 * Split a whitespace-separated rules string into individual rule tokens.
-*
-* @param {string|undefined} rulesInput
-* @returns {string[]}
 */
 function splitRuleTokens(rulesInput) {
 	return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -274,8 +268,6 @@ function splitRuleTokens(rulesInput) {
 * (unconverted) rule tokens — for callers that need the original
 * wildcard/~regex syntax preserved, such as known_blocked_rules.
 *
-* @param {string|undefined} rulesInput
-* @returns {string[]}
 * @throws {Error} if any rule has invalid wildcard/regex syntax
 */
 function parseAndValidateRules(rulesInput) {
@@ -541,7 +533,7 @@ async function main() {
 			"builder",
 			"sh",
 			"-c",
-			"qjs -m /opt/buildcage/scripts/report.js"
+			"qjs --std -m /opt/buildcage/scripts/report.js"
 		], {
 			encoding: "utf8",
 			stdio: [
