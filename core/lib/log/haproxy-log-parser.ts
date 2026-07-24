@@ -1,6 +1,6 @@
 /**
  * Log parsing library for HAProxy buildcage logs. aggregate() lives
- * separately in core/shared/lib/aggregate.js and is not re-exported here.
+ * separately in core/lib/log/aggregate.js and is not re-exported here.
  */
 
 export interface LogEntry {

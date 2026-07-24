@@ -1,20 +1,17 @@
 import { globSync } from "node:fs";
 import { defineConfig } from "rolldown";
 
-// Non-recursive: lib/ subdirectories hold dependencies, not entry points.
+// Non-recursive: these directories hold only qjs entry points; their shared
+// dependencies live in core/lib and get pulled in transitively by rolldown.
 const productionInputs = globSync(["core/scripts/*.ts", "setup/docker/explicit/scripts/*.ts"]);
 
 // *.property.test.ts run under node:test, not qjs — excluded here.
 // Output paths must mirror the source tree 1:1: run-tests.qjs.js discovers
 // these by scanning directories at runtime (os.readdir).
 const testInputs = [
-  "core/shared/test/run-tests.qjs.ts",
+  "core/scripts/test/run-tests.qjs.ts",
   ...globSync(
-    [
-      "core/scripts/**/*.test.ts",
-      "core/shared/lib/*.test.ts",
-      "setup/docker/explicit/scripts/**/*.test.ts",
-    ],
+    ["core/lib/acl/*.test.ts", "core/lib/log/*.test.ts"],
     { exclude: ["**/*.property.test.ts"] },
   ),
 ];

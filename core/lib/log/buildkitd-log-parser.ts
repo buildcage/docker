@@ -19,7 +19,7 @@
  * BUILDKIT_DEBUG_EXEC_OUTPUT=1, which also mirrors every RUN step's own
  * console output into this same log.
  */
-import { parseIdentifier } from "../../../../../core/shared/lib/parse-identifier.js";
+import { parseIdentifier } from "./parse-identifier.ts";
 
 export interface DenialEntry {
   decision: string;

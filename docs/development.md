@@ -340,13 +340,17 @@ reports for the allowed side.
 │   └── dev/                  # Mac dev-loop-only Dockerfile + smoke-test.sh + build-test-bundle.sh
 │                             # (see compose.sandbox-dev.yaml) — not used in production or CI
 ├── core/                     # Code shared across actions
-│   ├── lib/                  # Image verification: Sigstore, OCI registry lookups, image ref
-│   │                         # resolution, local-image test-hook override
-│   ├── scripts/              # QuickJS report/rule-conversion scripts (TypeScript), run inside the
-│   │                         # built images (rolldown-bundled into /opt/buildcage/scripts/ at image
-│   │                         # build time — see rolldown.qjs.config.js)
-│   └── shared/               # Rule/log parsing + aggregation shared by scripts/ and report/;
-│                             # shared/test/ is a qjs test runner + node:test shim
+│   ├── lib/                  # All shared library code, consolidated: acl/ and log/ (rule/log
+│   │                         # parsing + aggregation) are dual-consumed (Node and QuickJS both
+│   │                         # import them; test/test-shim.ts is the portable node:test shim
+│   │                         # used by their *.test.ts), while provenance/ (Sigstore, OCI
+│   │                         # registry lookups, image ref resolution, local-image test-hook
+│   │                         # override) and actions/docker-error.ts are Node-only — used solely
+│   │                         # by setup/report/run's Node runtime, never by the QuickJS scripts
+│   └── scripts/              # QuickJS entry points only (report.ts, convert-rule.ts), run inside
+│                             # the built images (rolldown-bundled into /opt/buildcage/scripts/ at
+│                             # image build time — see rolldown.qjs.config.js); test/ is a qjs test
+│                             # runner, types/ is the qjs:std/qjs:os ambient type declaration
 ├── docs/                     # development.md, rules.md, security.md, self-hosting.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
 │                             # PROXY_ENGINE; also defines the local-dev `proxy` service)

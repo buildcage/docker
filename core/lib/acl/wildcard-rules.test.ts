@@ -4,7 +4,7 @@ import {
   convertRule,
   buildRules,
   parseAndValidateRules,
-} from "./rules.ts";
+} from "./wildcard-rules.ts";
 
 // ---------------------------------------------------------------------------
 // wildcardToRegex

@@ -5,7 +5,7 @@
  * Usage: qjs --std -m gen-source-policy.js <proxy_mode> <https_rules> <http_rules> <ip_rules>
  */
 import * as std from "qjs:std";
-import { buildSourcePolicy } from "./lib/source-policy.js";
+import { buildSourcePolicy } from "../../../../core/lib/acl/source-policy.js";
 
 const [proxyMode, httpsRulesInput, httpRulesInput, ipRulesInput] = scriptArgs.slice(1);
 

@@ -1,13 +1,13 @@
 /**
- * Property-based tests for core/shared/lib/rules.ts.
+ * Property-based tests for core/lib/acl/wildcard-rules.ts.
  *
- * Run with: node --test core/shared/lib/rules.property.test.ts
+ * Run with: node --test core/lib/acl/wildcard-rules.property.test.ts
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { convertRule, buildRules, parseAndValidateRules } from "./rules.ts";
+import { convertRule, buildRules, parseAndValidateRules } from "./wildcard-rules.ts";
 
 // ---------------------------------------------------------------------------
 // convertRule / wildcardToRegex

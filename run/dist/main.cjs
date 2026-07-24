@@ -7034,7 +7034,7 @@ function createAnnotation(enabled) {
 	};
 }
 //#endregion
-//#region core/shared/lib/rules.ts
+//#region core/lib/acl/wildcard-rules.ts
 /**
 * Rule conversion library for buildcage container.
 * Converts wildcard patterns to regex strings for HAProxy ACLs.

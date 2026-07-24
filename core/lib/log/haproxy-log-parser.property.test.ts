@@ -1,14 +1,14 @@
 /**
- * Property-based tests for core/scripts/lib/log-parser.ts.
+ * Property-based tests for core/lib/log/haproxy-log-parser.ts.
  *
- * Run with: node --test core/scripts/lib/log-parser.property.test.ts
+ * Run with: node --test core/lib/log/haproxy-log-parser.property.test.ts
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { parseEntries } from "./log-parser.ts";
-import { aggregate } from "../../shared/lib/aggregate.ts";
+import { parseEntries } from "./haproxy-log-parser.ts";
+import { aggregate } from "./aggregate.ts";
 
 // ---------------------------------------------------------------------------
 // parseEntries

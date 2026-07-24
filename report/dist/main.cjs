@@ -87,7 +87,7 @@ function formatDuration(started, completed) {
 	return `${((Date.parse(completed) - Date.parse(started)) / 1e3).toFixed(3)}s`;
 }
 //#endregion
-//#region core/shared/lib/parse-identifier.ts
+//#region core/lib/log/parse-identifier.ts
 const DEFAULT_PORT = {
 	https: "443",
 	http: "80"
@@ -115,7 +115,7 @@ function parseIdentifier(identifier) {
 	};
 }
 //#endregion
-//#region core/shared/lib/aggregate.ts
+//#region core/lib/log/aggregate.ts
 /**
 * Aggregate log entries by (host, port, ruleType, reason) with counts, sorted
 * descending.
@@ -252,7 +252,7 @@ function createAnnotation(enabled) {
 	};
 }
 //#endregion
-//#region core/shared/lib/rules.ts
+//#region core/lib/acl/wildcard-rules.ts
 /**
 * Rule conversion library for buildcage container.
 * Converts wildcard patterns to regex strings for HAProxy ACLs.
