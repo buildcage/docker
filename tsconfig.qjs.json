@@ -6,20 +6,16 @@
     "strict": true,
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "target": "es2023",
+    "target": "es2022",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": []
   },
   "include": [
-    "core/lib/**/*.ts",
-    "core/shared/lib/**/*.ts",
-    "core/shared/test/test-shim.ts",
-    "core/scripts/lib/**/*.ts",
-    "setup/src/**/*.ts",
-    "run/src/**/*.ts",
-    "report/src/**/*.ts"
+    "core/scripts/**/*.ts",
+    "core/shared/**/*.ts",
+    "setup/docker/explicit/scripts/**/*.ts"
   ],
-  "exclude": ["setup/docker", "**/dist/**"]
+  "exclude": ["**/*.property.test.ts"]
 }

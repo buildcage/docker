@@ -1,5 +1,5 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.js";
-import { parseIdentifier } from "./parse-identifier.js";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { parseIdentifier } from "./parse-identifier.ts";
 
 describe("parseIdentifier", () => {
   it("fills in the default port when none is present", () => {

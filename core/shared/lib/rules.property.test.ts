@@ -1,13 +1,13 @@
 /**
- * Property-based tests for core/shared/lib/rules.js.
+ * Property-based tests for core/shared/lib/rules.ts.
  *
- * Run with: node --test core/shared/lib/rules.property.test.js
+ * Run with: node --test core/shared/lib/rules.property.test.ts
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { convertRule, buildRules, parseAndValidateRules } from "./rules.js";
+import { convertRule, buildRules, parseAndValidateRules } from "./rules.ts";
 
 // ---------------------------------------------------------------------------
 // convertRule / wildcardToRegex

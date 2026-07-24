@@ -10,14 +10,14 @@ export type Report = ReportData;
 
 /**
  * Fetch the structured HAProxy-log report from the (still-running) proxy
- * container. Unlike report/src/main.js (which supports both engines), the
+ * container. Unlike report/src/main.ts (which supports both engines), the
  * run action always runs the transparent-engine proxy stack, so this
  * only ever needs core/scripts/report.js.
  */
 export function fetchReport(containerName: string): Report {
   const jsonOutput = execFileSync(
     "docker",
-    ["exec", containerName, "qjs", "-m", "/opt/buildcage/scripts/report.js"],
+    ["exec", containerName, "qjs", "--std", "-m", "/opt/buildcage/scripts/report.js"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   );
   return JSON.parse(jsonOutput);
@@ -58,7 +58,7 @@ export function buildReportMarkdown(
     showExpected = false,
   }: BuildReportMarkdownOptions = {},
 ): string {
-  // Mirrors report/src/main.js's "## Outbound Traffic Report during Docker
+  // Mirrors report/src/main.ts's "## Outbound Traffic Report during Docker
   // Build (mode)" heading, so both actions read as the same kind of report.
   const heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
   if (report.mode === null) {
@@ -86,7 +86,7 @@ export function buildReportMarkdown(
 
 /**
  * Append this step's report to the Job Summary and emit annotations /
- * set the exit code for blocked connections, mirroring report/src/main.js's
+ * set the exit code for blocked connections, mirroring report/src/main.ts's
  * behavior but scoped to a single run step's proxy container.
  */
 export interface WriteReportOptions extends ReportRenderContext {

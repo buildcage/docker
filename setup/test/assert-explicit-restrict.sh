@@ -62,7 +62,7 @@ fi
 echo ""
 
 echo "[report action] JSON round-trip through the explicit-mode report.js:"
-REPORT_JSON=$(docker compose exec builder qjs -m /opt/buildcage/scripts/report.js 2>/dev/null)
+REPORT_JSON=$(docker compose exec builder qjs --std -m /opt/buildcage/scripts/report.js 2>/dev/null)
 BLOCKED_COUNT=$(echo "$REPORT_JSON" | grep -o '"blockedCount": *[0-9]*' | grep -o '[0-9]*$' || echo "")
 if [ -n "$BLOCKED_COUNT" ] && [ "$BLOCKED_COUNT" -ge 6 ]; then
   echo "  PASS  report.js blockedCount=$BLOCKED_COUNT (>= 6 expected)"
@@ -72,12 +72,12 @@ else
 fi
 
 # report.js has no "allowed" section at all (see report.js's header comment)
-# — that table is built by report/src/main.js itself from buildctl's
-# build-history vertex log (see report/src/lib/vertex-log.js's
+# — that table is built by report/src/main.ts itself from buildctl's
+# build-history vertex log (see report/src/lib/vertex-log.ts's
 # aggregateAllowedHosts). Verified further down via the rendered markdown.
 
 # Parsed from BuildKit's own source-policy denials, with a timestamp each —
-# see setup/docker/explicit/scripts/lib/buildkitd-log-parser.js's parseDenialTimeline.
+# see setup/docker/explicit/scripts/lib/buildkitd-log-parser.ts's parseDenialTimeline.
 DENIED_TIMELINE_COUNT=$(echo "$REPORT_JSON" | sed -n '/"deniedTimeline":/,/\]/p' | grep -c '"url":' || true)
 if [ "$DENIED_TIMELINE_COUNT" -ge 6 ]; then
   echo "  PASS  report.js deniedTimeline has $DENIED_TIMELINE_COUNT entries (>= 6 expected)"
@@ -87,19 +87,19 @@ else
 fi
 echo ""
 
-# The per-command "Communication details" section is built by report/src/main.js
+# The per-command "Communication details" section is built by report/src/main.ts
 # itself (not report.js) via buildctl debug histories/logs — see
-# report/src/lib/vertex-log.js. Verify the rendered markdown directly.
+# report/src/lib/vertex-log.ts. Verify the rendered markdown directly.
 #
-# GITHUB_STEP_SUMMARY is unset here on purpose: main.js writes the rendered
+# GITHUB_STEP_SUMMARY is unset here on purpose: main.ts writes the rendered
 # markdown there instead of stdout whenever it's set, which it always is
 # inside an actual GitHub Actions job (including this one) — so leaving it
 # set would make $REPORT_MARKDOWN capture nothing.
 REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml 2>&1 || true)
 
-# The "Allowed Hosts" table is built by report/src/main.js itself (not
+# The "Allowed Hosts" table is built by report/src/main.ts itself (not
 # report.js) from buildctl's build-history vertex log, aggregated by
-# aggregateAllowedHosts — see report/src/lib/vertex-log.js.
+# aggregateAllowedHosts — see report/src/lib/vertex-log.ts.
 echo "[report action] Allowed Hosts table (rendered markdown, from buildctl aggregation):"
 if grep -qF "### ✅ Allowed Hosts" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| allowed.example.com:443 | HTTPS | 1 |" <<< "$REPORT_MARKDOWN" \
@@ -111,10 +111,10 @@ else
 fi
 echo ""
 
-# The per-command "Communication details" section is built by report/src/main.js
+# The per-command "Communication details" section is built by report/src/main.ts
 # itself (not report.js) via buildctl debug histories/logs — see
-# report/src/lib/vertex-log.js. Step-counter brackets are escaped in the
-# rendered markdown (see command-log.js's escapeMarkdown) — "* \[ 3/15\] RUN ...".
+# report/src/lib/vertex-log.ts. Step-counter brackets are escaped in the
+# rendered markdown (see command-log.ts's escapeMarkdown) — "* \[ 3/15\] RUN ...".
 echo "[report action] per-command communication detail (rendered markdown):"
 if grep -qF "Communication details" <<< "$REPORT_MARKDOWN" \
   && grep -qF "Allowed Urls" <<< "$REPORT_MARKDOWN" \

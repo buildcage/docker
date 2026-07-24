@@ -1,14 +1,14 @@
 /**
- * Property-based tests for core/scripts/lib/log-parser.js.
+ * Property-based tests for core/scripts/lib/log-parser.ts.
  *
- * Run with: node --test core/scripts/lib/log-parser.property.test.js
+ * Run with: node --test core/scripts/lib/log-parser.property.test.ts
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { parseEntries } from "./log-parser.js";
-import { aggregate } from "../../shared/lib/aggregate.js";
+import { parseEntries } from "./log-parser.ts";
+import { aggregate } from "../../shared/lib/aggregate.ts";
 
 // ---------------------------------------------------------------------------
 // parseEntries

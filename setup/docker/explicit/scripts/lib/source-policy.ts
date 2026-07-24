@@ -9,11 +9,33 @@
  * FROM/git sources remain unfiltered by buildcage, matching transparent
  * mode's documented behavior that only RUN-step network is controlled.
  */
-import { convertRule, wildcardToRegex } from "../../shared/lib/rules.js";
+import { convertRule, wildcardToRegex } from "../../../../../core/shared/lib/rules.js";
 
-const DEFAULT_PORT = { https: "443", http: "80" };
+const DEFAULT_PORT: Record<string, string> = { https: "443", http: "80" };
 
-export function buildSourcePolicy({ proxyMode, httpsRulesInput, httpRulesInput, ipRulesInput }) {
+export interface SourcePolicyInput {
+  proxyMode: string;
+  httpsRulesInput: string | undefined;
+  httpRulesInput: string | undefined;
+  ipRulesInput: string | undefined;
+}
+
+interface SourcePolicyRule {
+  action: "ALLOW" | "DENY";
+  selector: { identifier: string; matchType: "REGEX" };
+}
+
+interface SourcePolicy {
+  version: number;
+  rules: SourcePolicyRule[];
+}
+
+export function buildSourcePolicy({
+  proxyMode,
+  httpsRulesInput,
+  httpRulesInput,
+  ipRulesInput,
+}: SourcePolicyInput): SourcePolicy {
   if (proxyMode === "audit") {
     // No rules at all: BuildKit's own "proxy network requests:" build output
     // already provides audit visibility for every request.
@@ -26,7 +48,7 @@ export function buildSourcePolicy({ proxyMode, httpsRulesInput, httpRulesInput, 
   // AFTER it — an ALLOW rule that also matches the (deliberately universal)
   // catch-all then overrides it, since it is evaluated later. Reversing this
   // order would make the catch-all always win, denying everything.
-  const rules = [
+  const rules: SourcePolicyRule[] = [
     {
       action: "DENY",
       selector: { identifier: "^https?://.*", matchType: "REGEX" },
@@ -38,7 +60,7 @@ export function buildSourcePolicy({ proxyMode, httpsRulesInput, httpRulesInput, 
   return { version: 1, rules };
 }
 
-function allowRule(rawRule, scheme) {
+function allowRule(rawRule: string, scheme: string): SourcePolicyRule {
   const identifier = rawRule.startsWith("~")
     ? toUrlIdentifierFromRegex(convertRule(rawRule), scheme)
     : toUrlIdentifierFromWildcard(rawRule, scheme);
@@ -52,7 +74,7 @@ function allowRule(rawRule, scheme) {
 // scheme's default port (or "any port") must treat the port as OPTIONAL in
 // the generated identifier, or requests using the implicit default port
 // would wrongly fall through to the DENY catch-all.
-function toUrlIdentifierFromWildcard(rawRule, scheme) {
+function toUrlIdentifierFromWildcard(rawRule: string, scheme: string): string {
   const combined = wildcardToRegex(rawRule); // e.g. "example\.com:443" or "example\.com:\d+" (no colon inside the domain part)
   const colonIdx = combined.lastIndexOf(":");
   const domainRegex = combined.slice(0, colonIdx);
@@ -66,7 +88,7 @@ function toUrlIdentifierFromWildcard(rawRule, scheme) {
 // True if the character at index i in s is escaped, i.e. preceded by an odd
 // number of consecutive backslashes (each adjacent pair of backslashes is
 // one literal backslash; a leftover single backslash escapes what follows).
-function isEscapedAt(s, i) {
+function isEscapedAt(s: string, i: number): boolean {
   let backslashes = 0;
   for (let j = i - 1; j >= 0 && s[j] === "\\"; j--) backslashes++;
   return backslashes % 2 === 1;
@@ -78,7 +100,7 @@ function isEscapedAt(s, i) {
 // Confining it to "[^/]*" keeps the match inside the domain:port segment.
 // The captured backslash run applies the same escape-parity check as
 // isEscapedAt above, inline as part of the replace.
-function confineDotStarToDomain(s) {
+function confineDotStarToDomain(s: string): string {
   return s.replace(/(\\*)\.\*/g, (match, backslashes) =>
     backslashes.length % 2 === 1 ? match : `${backslashes}[^/]*`
   );
@@ -91,7 +113,7 @@ function confineDotStarToDomain(s) {
 // match anywhere within the domain — e.g. `~example` matches `example.com`.
 // A missing anchor is filled with `[^/]*` rather than left unconstrained,
 // for the same domain/path-boundary reason as confineDotStarToDomain above.
-function toUrlIdentifierFromRegex(core, scheme) {
+function toUrlIdentifierFromRegex(core: string, scheme: string): string {
   const hasLeadingAnchor = core.startsWith("^");
   const hasTrailingAnchor = core.endsWith("$") && !isEscapedAt(core, core.length - 1);
 
@@ -105,6 +127,6 @@ function toUrlIdentifierFromRegex(core, scheme) {
   return `^${scheme}://${body}(/.*)?$`;
 }
 
-function splitInput(input) {
+function splitInput(input: string | undefined): string[] {
   return input?.trim().split(/\s+/).filter(Boolean) ?? [];
 }

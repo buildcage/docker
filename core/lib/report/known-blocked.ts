@@ -4,8 +4,8 @@
  * fail_on_blocked is true. Never sent to the container's ACL — only
  * affects this action's pass/fail decision and Job Summary rendering.
  */
-import { convertRule } from "../../shared/lib/rules.js";
-import type { AggregatedEntry } from "../../shared/lib/aggregate.js";
+import { convertRule } from "../../shared/lib/rules.ts";
+import type { AggregatedEntry } from "../../shared/lib/aggregate.ts";
 
 export type BlockedRow = AggregatedEntry;
 
@@ -104,7 +104,7 @@ export function buildBlockedMessage({
 
 /**
  * Single entry point composing the three functions above. Both
- * run/src/lib/report.js and report/src/main.js call this once and thread
+ * run/src/lib/report.ts and report/src/main.ts call this once and thread
  * the result through their table rendering and annotation code, rather
  * than each recomputing annotateKnownBlocked independently.
  *

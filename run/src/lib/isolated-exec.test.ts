@@ -48,7 +48,7 @@ describe("scratchDirFor", () => {
     assert.equal(dir, "/var/tmp/buildcage/sandbox-abcd1234");
   });
 
-  it("is deterministic for the same container name (so post.js can reconstruct it)", () => {
+  it("is deterministic for the same container name (so post.ts can reconstruct it)", () => {
     assert.equal(scratchDirFor("buildcage-proxy-xyz"), scratchDirFor("buildcage-proxy-xyz"));
   });
 });
@@ -159,7 +159,7 @@ describe("parseMountsUnder", () => {
 });
 
 // A minimal stand-in for what `runc spec` actually produces (see
-// isolated-exec.js's generateBaseOciSpec) — only the fields buildOciConfig
+// isolated-exec.ts's generateBaseOciSpec) — only the fields buildOciConfig
 // reads/overrides are included.
 function fakeBaseSpec() {
   return {

@@ -28,7 +28,7 @@ export function deriveProjectName(containerName: string): string {
 
 /**
  * Used to pull runc and gen-seccomp-profile out of the proxy image before
- * the isolated command runs (see lib/isolated-exec.js).
+ * the isolated command runs (see lib/isolated-exec.ts).
  */
 export interface BuildDockerCpArgsOptions {
   containerName: string;

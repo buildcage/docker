@@ -1,4 +1,10 @@
-const DEFAULT_PORT = { https: "443", http: "80" };
+export interface ParsedIdentifier {
+  scheme: string;
+  host: string;
+  port: string;
+}
+
+const DEFAULT_PORT: Record<string, string> = { https: "443", http: "80" };
 
 /**
  * Parse a proxy-network source identifier ("https://host[:port]/path...")
@@ -8,7 +14,7 @@ const DEFAULT_PORT = { https: "443", http: "80" };
  * identifiers — buildcage's generated policy only ever denies ^https?://
  * sources, but this guards against unexpected input.
  */
-export function parseIdentifier(identifier) {
+export function parseIdentifier(identifier: string): ParsedIdentifier | null {
   const m = identifier.match(/^(https?):\/\/([^/]+)/);
   if (!m) return null;
   const [, scheme, hostPort] = m;

@@ -1,10 +1,10 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.js";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
 import {
   wildcardToRegex,
   convertRule,
   buildRules,
   parseAndValidateRules,
-} from "./rules.js";
+} from "./rules.ts";
 
 // ---------------------------------------------------------------------------
 // wildcardToRegex

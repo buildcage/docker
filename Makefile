@@ -188,12 +188,14 @@ test_sandbox_integration: ## Run the run action's integration tests (needs BUILD
 .PHONY: test_unit
 test_unit: test_core test_setup test_report test_sandbox_unit test_qjs ## Run unit tests
 
-# core/shared/lib's own tests target the QuickJS "std" module (see
-# core/shared/test/test-shim.js) and aren't runnable under plain node — they're
-# already covered by test_qjs below instead.
+# core/shared/lib is dual-consumed (Node and QuickJS both import it), and its
+# *.test.ts run under both here and test_qjs below via the portable shim in
+# core/shared/test/test-shim.ts. core/scripts/lib/log-parser.test.ts targets
+# qjs:std directly and is qjs-only (see test_qjs); its *.property.test.ts
+# sibling uses node:test/fast-check only, so it runs here instead.
 .PHONY: test_core
 test_core: ## Run core/lib unit tests
-	@node --test 'core/lib/**/*.test.ts'
+	@node --test 'core/lib/**/*.test.ts' 'core/shared/lib/**/*.test.ts' 'core/scripts/lib/*.property.test.ts'
 
 .PHONY: test_setup
 test_setup: ## Run setup action unit tests
@@ -207,15 +209,18 @@ test_report: ## Run report unit tests
 test_sandbox_unit: ## Run the run action's unit tests
 	@node --test 'run/src/**/*.test.ts'
 
-# *.test.js is excluded from the built images (see .dockerignore), so bind-mount it back in for qjs to exec.
-# qjs itself and the scripts/shared sources are identical across images, so one representative build
-# (setup's transparent engine) is enough. core/scripts and setup/docker/explicit/scripts both map to
-# /opt/buildcage/scripts in their respective (mutually exclusive) images, so the latter is mounted at
-# an alias here to avoid colliding with the former in this single test container.
+# *.test.ts is excluded from the built images (see .dockerignore) and qjs can't execute
+# .ts directly, so compile fresh on the host (pnpm run build:qjs-test, output to
+# dist/test-qjs/) and bind-mount that compiled output in for qjs to exec. qjs itself is
+# identical across images, so one representative build (setup's transparent engine) is
+# enough — the qjs-build stage's own bundles are unused here (bind-mounted over). core/scripts
+# and setup/docker/explicit/scripts both map to /opt/buildcage/scripts in their respective
+# (mutually exclusive) images, so the latter is mounted at an alias here to avoid colliding
+# with the former in this single test container.
 QJS_MOUNTS := \
-	-v "$(CURDIR)/core/scripts:/opt/buildcage/scripts:ro" \
-	-v "$(CURDIR)/core/shared:/opt/buildcage/shared:ro" \
-	-v "$(CURDIR)/setup/docker/explicit/scripts:/opt/buildcage/explicit-scripts:ro"
+	-v "$(CURDIR)/dist/test-qjs/core/scripts:/opt/buildcage/scripts:ro" \
+	-v "$(CURDIR)/dist/test-qjs/core/shared:/opt/buildcage/shared:ro" \
+	-v "$(CURDIR)/dist/test-qjs/setup/docker/explicit/scripts:/opt/buildcage/explicit-scripts:ro"
 QJS_TEST_DIRS := \
 	/opt/buildcage/scripts/lib \
 	/opt/buildcage/shared/lib \
@@ -223,9 +228,10 @@ QJS_TEST_DIRS := \
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker
+	@pnpm run build:qjs-test
 	@docker build -f setup/docker/transparent/Dockerfile -t buildcage-qjs-test .
 	@docker run --rm --entrypoint qjs $(QJS_MOUNTS) buildcage-qjs-test \
-		-m /opt/buildcage/shared/test/run-tests.js $(QJS_TEST_DIRS)
+		--std -m /opt/buildcage/shared/test/run-tests.qjs.js $(QJS_TEST_DIRS)
 
 .PHONY: test_audit_example
 run_audit_example: ## Run audit mode example tests

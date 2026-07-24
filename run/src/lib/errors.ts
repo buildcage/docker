@@ -3,8 +3,8 @@ import { ActionError } from "../../../core/lib/general/action-error.ts";
 /**
  * SandboxError — intentional error in the run action's own logic. Image
  * provenance failures throw ProvenanceError instead (see
- * core/lib/provenance/errors.js); invalid ACL rule syntax throws
- * InvalidRulesError instead (see core/lib/acl/rules.js).
+ * core/lib/provenance/errors.ts); invalid ACL rule syntax throws
+ * InvalidRulesError instead (see core/lib/acl/rules.ts).
  *
  * Codes:
  *   MISSING_RUN                – required `run` input was empty

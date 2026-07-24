@@ -66,7 +66,7 @@ echo ""
 
 # Misconfiguration guard: `writable: /var/tmp/buildcage` (or an ancestor of
 # it) would recursively re-expose the sandbox's own rootfs read-write --
-# assertScratchBaseNotWritable in isolated-exec.js must fail the step closed
+# assertScratchBaseNotWritable in isolated-exec.ts must fail the step closed
 # rather than silently running with that hole open.
 touch "$WORKDIR2/state.env"
 

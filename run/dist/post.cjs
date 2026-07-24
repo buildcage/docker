@@ -50,7 +50,7 @@ function parseMountsUnder(mountinfoContent, dir) {
 /**
 * Force-detaches any mount points still nested under `dir` before it's
 * recursively deleted. This is the safety net for rootfsBindDir (a
-* `mount --rbind /` of the entire host filesystem — see main.js) surviving
+* `mount --rbind /` of the entire host filesystem — see main.ts) surviving
 * past run-isolated.sh's own cleanup trap: if that trap never runs (e.g.
 * run-isolated.sh itself is SIGKILL'd, which bypasses traps entirely) or
 * its `umount -R` fails (EBUSY), a plain recursive delete of `dir` would
@@ -107,7 +107,7 @@ function removeScratchDir(dir) {
 /**
 * Force-detach anything still mounted under `dir` (the rootfs bind-mount
 * safety net — see unmountAllUnder) and then recursively remove it. Exported
-* so post.js can reclaim a scratch dir orphaned by a hard kill that bypassed
+* so post.ts can reclaim a scratch dir orphaned by a hard kill that bypassed
 * withScratchDir's own finally. No-ops safely when `dir` doesn't exist.
 */
 function cleanupScratchDir(dir) {

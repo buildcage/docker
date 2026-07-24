@@ -1,7 +1,7 @@
 /**
- * Property-based tests for setup/main.js and its helpers.
+ * Property-based tests for setup/main.ts and its helpers.
  *
- * Run with: node --test setup/src/main.property.test.js
+ * Run with: node --test setup/src/main.property.test.ts
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

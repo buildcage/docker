@@ -83,7 +83,7 @@ async function main(): Promise<void> {
     ...env,
     // "buildcage" here is a fallback for running outside the Actions runtime
     // (action.yml's own `default: 'buildcage'` covers the normal case) — keep
-    // both, and report/src/main.js's copy, in sync.
+    // both, and report/src/main.ts's copy, in sync.
     BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
     PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
     PROXY_ENGINE: proxyEngine,
@@ -128,7 +128,7 @@ async function main(): Promise<void> {
  * Resolve and validate the proxy_engine input.
  * Only "transparent" (default) and "explicit" are accepted — each maps to a
  * separately published, separately tagged Docker image (see
- * lib/verify-image.js's imageTagFromRef).
+ * lib/verify-image.ts's imageTagFromRef).
  */
 export function resolveProxyEngine(input: string | undefined): "transparent" | "explicit" {
   const engine = input?.trim() || "transparent";

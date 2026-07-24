@@ -35,12 +35,12 @@ func writeResolvConf(externalResolver string) error {
 }
 
 // generateSourcePolicy invokes the QuickJS policy generator (which reuses
-// core/shared/lib/rules.js's wildcard/regex compiler) and writes its
+// core/shared/lib/rules.ts's wildcard/regex compiler) and writes its
 // stdout — a sourcepolicy.pb.Policy protobuf-JSON document — to outPath.
 // Fails closed: any error here aborts startup rather than running without a
 // policy.
 func generateSourcePolicy(outPath string) error {
-	cmd := exec.Command("qjs", "-m", "/opt/buildcage/scripts/gen-source-policy.js",
+	cmd := exec.Command("qjs", "--std", "-m", "/opt/buildcage/scripts/gen-source-policy.js",
 		getenv("PROXY_MODE", "restrict"),
 		os.Getenv("ALLOWED_HTTPS_RULES"),
 		os.Getenv("ALLOWED_HTTP_RULES"),
@@ -61,7 +61,7 @@ func generateSourcePolicy(outPath string) error {
 // BuildKit's source-policy engine logs denials into this stream via its own
 // structured logger.
 //
-// Allowed requests are not read from this log file: report/src/lib/vertex-log.js
+// Allowed requests are not read from this log file: report/src/lib/vertex-log.ts
 // fetches those separately via `buildctl debug logs --progress=rawjson`, which
 // tags every entry with the vertex (RUN step) that produced it. Getting that
 // same data from buildkitd's own log instead would require running it with

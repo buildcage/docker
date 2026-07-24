@@ -50,7 +50,7 @@ describe("parseEntries", () => {
   });
 });
 
-// aggregate() is tested in core/shared/lib/aggregate.test.js.
+// aggregate() is tested in core/shared/lib/aggregate.test.ts.
 
 // ---------------------------------------------------------------------------
 // mode detection

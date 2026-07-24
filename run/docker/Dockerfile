@@ -34,6 +34,28 @@ RUN go mod download
 COPY run/docker/gen-seccomp-profile/main.go ./
 RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -o /out/gen-seccomp-profile .
 
+# Compile the QuickJS-targeted TypeScript sources to plain ESM JavaScript
+# that `qjs --std -m` can execute directly (QuickJS has no TypeScript
+# support). tsc only strips types; rolldown does the actual bundling — same
+# division of labor as the Actions entrypoints (see rolldown.config.js), just
+# targeting quickjs-ng's ESM runtime (format esm, "qjs:std"/"qjs:os" left
+# external) instead of Node's CJS. Output is architecture-independent, so —
+# same reasoning as gen-seccomp-profile-build above — this stage is pinned to
+# --platform=$BUILDPLATFORM to always run natively (no QEMU). Keep this stage
+# byte-identical across setup/docker/transparent/Dockerfile,
+# setup/docker/explicit/Dockerfile, and run/docker/Dockerfile.
+FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS qjs-build
+WORKDIR /build
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+COPY rolldown.qjs.config.js tsconfig.qjs.json ./
+COPY core/scripts/ ./core/scripts/
+COPY core/shared/  ./core/shared/
+COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm run build:qjs
+
 # Final image
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
@@ -50,7 +72,7 @@ RUN apk add --no-cache \
       iproute2 \
       gettext \
       curl \
-      quickjs
+      quickjs-ng
 
 ENV S6_KEEP_ENV=1
 ENV S6_LOGGING=0
@@ -62,10 +84,12 @@ COPY run/docker/files/dnsmasq.conf /etc/dnsmasq.conf
 RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
 COPY run/docker/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
-# Tools (QuickJS scripts) — convert-rule.js is used by init-haproxy-cfg,
-# report.js/lib/log-parser.js by the run action's report step
-COPY core/scripts/ /opt/buildcage/scripts/
-COPY core/shared/  /opt/buildcage/shared/
+# Tools (QuickJS scripts, rolldown-bundled by qjs-build above) — convert-rule.js is used
+# by init-haproxy-cfg, report.js by the run action's report step. Each is a self-contained
+# bundle — no separate /opt/buildcage/shared/ copy is needed, unlike before TypeScript
+# migration.
+COPY --from=qjs-build /build/dist/qjs/core/scripts/convert-rule.js /opt/buildcage/scripts/convert-rule.js
+COPY --from=qjs-build /build/dist/qjs/core/scripts/report.js       /opt/buildcage/scripts/report.js
 
 # runc — extracted onto the runner host at `run` action startup and used by
 # run-isolated.sh to execute the isolated command (see docs/development.md)

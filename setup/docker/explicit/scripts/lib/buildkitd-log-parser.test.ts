@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "../../shared/test/test-shim.js";
+import { describe, it, assert, reportResults } from "../../../../../core/shared/test/test-shim.js";
 import { parseEntries, parseDenialTimeline } from "./buildkitd-log-parser.js";
 
 // Real line captured from a live moby/buildkit v0.31.1 explicit-mode container.
@@ -74,7 +74,7 @@ describe("parseDenialTimeline", () => {
   });
 });
 
-// aggregate() itself is tested in core/shared/lib/aggregate.test.js.
-// parseIdentifier() itself is tested in core/shared/lib/parse-identifier.test.js.
+// aggregate() itself is tested in core/shared/lib/aggregate.test.ts.
+// parseIdentifier() itself is tested in core/shared/lib/parse-identifier.test.ts.
 
 reportResults();

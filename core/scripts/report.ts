@@ -1,20 +1,20 @@
 /**
  * Parse HAProxy logs and output structured JSON.
  *
- * Usage: qjs -m /opt/buildcage/scripts/report.js [logfile]
+ * Usage: qjs --std -m /opt/buildcage/scripts/report.js [logfile]
  *   Default logfile: /var/log/haproxy/current
  *
  * Output JSON:
  *   { mode, sections: { allowed, blocked, audited }, blockedCount }
  */
-import * as std from "std";
+import * as std from "qjs:std";
 import { parseEntries } from "./lib/log-parser.js";
-import { aggregate } from "../shared/lib/aggregate.js";
+import { aggregate, type AggregatedEntry } from "../shared/lib/aggregate.js";
 
 const logFile = scriptArgs[1] || "/var/log/haproxy/current";
 
 // Read entire file
-function readFile(path) {
+function readFile(path: string): string {
   const f = std.open(path, "r");
   if (!f) return "";
   const content = f.readAsString();
@@ -31,23 +31,23 @@ if (entries.length === 0) {
   std.exit(0);
 }
 
-const isAudit = entries.some(e => e.decision === "AUDIT");
+const isAudit = entries.some((e) => e.decision === "AUDIT");
 const mode = isAudit ? "audit" : "restrict";
 
-const sections = {};
+const sections: { allowed?: AggregatedEntry[]; audited?: AggregatedEntry[]; blocked?: AggregatedEntry[] } = {};
 if (isAudit) {
-  const audited = aggregate(entries.filter(e => e.decision === "AUDIT"));
+  const audited = aggregate(entries.filter((e) => e.decision === "AUDIT"));
   if (audited.length > 0) sections.audited = audited;
-  const blocked = aggregate(entries.filter(e => e.decision === "BLOCKED"));
+  const blocked = aggregate(entries.filter((e) => e.decision === "BLOCKED"));
   if (blocked.length > 0) sections.blocked = blocked;
 } else {
-  const allowed = aggregate(entries.filter(e => e.decision === "ALLOWED"));
+  const allowed = aggregate(entries.filter((e) => e.decision === "ALLOWED"));
   if (allowed.length > 0) sections.allowed = allowed;
-  const blocked = aggregate(entries.filter(e => e.decision === "BLOCKED"));
+  const blocked = aggregate(entries.filter((e) => e.decision === "BLOCKED"));
   if (blocked.length > 0) sections.blocked = blocked;
 }
 
-const blockedCount = entries.filter(e => e.decision === "BLOCKED").length;
+const blockedCount = entries.filter((e) => e.decision === "BLOCKED").length;
 
 const result = { mode, sections, blockedCount };
 std.out.puts(JSON.stringify(result, null, 2) + "\n");

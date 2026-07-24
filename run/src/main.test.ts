@@ -1,7 +1,7 @@
 /**
- * Unit tests for run/main.js
+ * Unit tests for run/main.ts
  *
- * Run with: node --test run/src/main.test.js
+ * Run with: node --test run/src/main.test.ts
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -87,7 +87,7 @@ describe("readKnownBlockedRules", () => {
 // Regression guard for the concurrent-step container/network collision:
 // both must always include "-p" + the project name, or Compose falls back
 // to an implicit, directory-derived project name shared by every
-// concurrent `run` step in the job (see lib/container.js's
+// concurrent `run` step in the job (see lib/container.ts's
 // deriveProjectName).
 // -----------------------------------------------------------------------
 

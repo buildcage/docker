@@ -248,7 +248,7 @@ function pathsOverlap(a: string, b: string): boolean {
 /**
  * Fail closed if any writable-exception directory is, or contains, or is
  * contained in, SANDBOX_SCRATCH_BASE. That directory holds the run's own
- * `mount --rbind /` rootfs (see rootfsBindDir in main.js); the writable
+ * `mount --rbind /` rootfs (see rootfsBindDir in main.ts); the writable
  * exceptions are recursive bind-mounts, so any overlap would recursively
  * re-expose that rootfs inside the sandbox as a second, *writable* copy of
  * the whole host `/` -- the exact escape SANDBOX_SCRATCH_BASE's placement
@@ -510,7 +510,7 @@ export function parseMountsUnder(mountinfoContent: string, dir: string): string[
 /**
  * Force-detaches any mount points still nested under `dir` before it's
  * recursively deleted. This is the safety net for rootfsBindDir (a
- * `mount --rbind /` of the entire host filesystem — see main.js) surviving
+ * `mount --rbind /` of the entire host filesystem — see main.ts) surviving
  * past run-isolated.sh's own cleanup trap: if that trap never runs (e.g.
  * run-isolated.sh itself is SIGKILL'd, which bypasses traps entirely) or
  * its `umount -R` fails (EBUSY), a plain recursive delete of `dir` would
@@ -562,7 +562,7 @@ function removeScratchDir(dir: string): void {
 /**
  * Force-detach anything still mounted under `dir` (the rootfs bind-mount
  * safety net — see unmountAllUnder) and then recursively remove it. Exported
- * so post.js can reclaim a scratch dir orphaned by a hard kill that bypassed
+ * so post.ts can reclaim a scratch dir orphaned by a hard kill that bypassed
  * withScratchDir's own finally. No-ops safely when `dir` doesn't exist.
  */
 export function cleanupScratchDir(dir: string): void {
@@ -584,9 +584,9 @@ export function scratchDirFor(containerName: string): string {
 /**
  * Create/remove a scratch directory for this step's OCI bundle + run-script.
  * With `containerName` the dir is named deterministically (scratchDirFor) so
- * post.js can reclaim it after a hard kill; without it a random mkdtemp name
+ * post.ts can reclaim it after a hard kill; without it a random mkdtemp name
  * is used (unit tests). Cleaned up on every exit path that unwinds — a
- * SIGKILL bypasses this finally, which is exactly what post.js covers.
+ * SIGKILL bypasses this finally, which is exactly what post.ts covers.
  */
 export function withScratchDir<T>(fn: (dir: string) => T, containerName?: string): T {
   let dir: string;

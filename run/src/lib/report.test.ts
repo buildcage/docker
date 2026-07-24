@@ -1,11 +1,11 @@
 /**
- * Unit tests for run/lib/report.js — specifically writeReport's
- * exit-code semantics (see main.js's own `if (exitCode !== 0)` for the
+ * Unit tests for run/lib/report.ts — specifically writeReport's
+ * exit-code semantics (see main.ts's own `if (exitCode !== 0)` for the
  * other half: the isolated command's own exit code always fails the step
  * regardless of blocked connections, and this file's `process.exitCode = 1`
  * is only ever additive on top of that, never resetting it back to success).
  *
- * Run with: node --test run/src/lib/report.test.js
+ * Run with: node --test run/src/lib/report.test.ts
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -18,7 +18,7 @@ import { withScratchDir } from "./isolated-exec.ts";
 
 // writeReport reads GITHUB_STEP_SUMMARY/BUILDCAGE_RUN_DEBUG_SUMMARY_FILE
 // from process.env and mutates process.exitCode directly (mirroring what
-// main.js itself does) -- both are saved/restored per test so a test here
+// main.ts itself does) -- both are saved/restored per test so a test here
 // can never leak into another test in this file, another test file, or
 // (critically) into `node --test`'s own final exit status.
 let prevEnv: NodeJS.ProcessEnv;

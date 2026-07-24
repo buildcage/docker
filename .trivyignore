@@ -2,11 +2,6 @@
 CVE-2025-22870
 CVE-2025-22872
 
-# QuickJS stack overflow via deeply nested JS input.
-# Only internal tool scripts (convert-rule.js, report.js) are executed;
-# no untrusted JavaScript is evaluated.
-CVE-2023-31922
-
 # Go stdlib html/template: XSS via escaping bugs in meta content URL and script type attribute.
 # No component in this product generates or serves HTML.
 CVE-2026-27142
