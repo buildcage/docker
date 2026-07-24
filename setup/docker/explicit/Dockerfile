@@ -23,6 +23,26 @@ RUN go mod download
 COPY setup/docker/explicit/buildkit-proxy/ ./
 RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -tags="${BUILDKIT_PROXY_BUILD_TAGS}" -o /out/buildkit-proxy .
 
+# Compile the QuickJS-targeted TypeScript sources to plain ESM JavaScript
+# that `qjs --std -m` can execute directly (QuickJS has no TypeScript
+# support). tsc only strips types; rolldown does the actual bundling — same
+# division of labor as the Actions entrypoints (see rolldown.config.js), just
+# targeting quickjs-ng's ESM runtime (format esm, "qjs:std"/"qjs:os" left
+# external) instead of Node's CJS. Output is architecture-independent, so —
+# same reasoning as buildkit-proxy-build above — this stage is pinned to
+# --platform=$BUILDPLATFORM to always run natively (no QEMU). Keep this stage
+# byte-identical across setup/docker/transparent/Dockerfile,
+# setup/docker/explicit/Dockerfile, and run/docker/Dockerfile.
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS qjs-build
+WORKDIR /build
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml rolldown.qjs.config.js tsconfig.qjs.json ./
+RUN pnpm install --frozen-lockfile
+COPY core/scripts/ ./core/scripts/
+COPY core/shared/  ./core/shared/
+COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
+RUN pnpm exec rolldown -c rolldown.qjs.config.js
+
 # Final image
 FROM moby/buildkit:v0.31.1@sha256:6b59b7df63a8cb9902736f9ddf7fcff8261613d3e7449b8ea8b7537fc399c03a
 
@@ -31,8 +51,8 @@ LABEL org.opencontainers.image.title="buildcage (explicit proxy engine)" \
       org.opencontainers.image.licenses="MIT AND Apache-2.0" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage"
 
-# quickjs is the only extra package needed, for source-policy generation.
-RUN apk add --no-cache quickjs
+# quickjs-ng is the only extra package needed, for source-policy generation.
+RUN apk add --no-cache quickjs-ng
 
 # buildkit-proxy binary
 COPY --from=buildkit-proxy-build /out/buildkit-proxy /opt/buildcage/bin/buildkit-proxy
@@ -41,11 +61,12 @@ COPY --from=buildkit-proxy-build /out/buildkit-proxy /opt/buildcage/bin/buildkit
 RUN mkdir -p /etc/buildkit /var/log/buildkitd
 COPY setup/docker/explicit/files/buildkitd.toml /etc/buildkit/buildkitd.toml
 
-# Tools (QuickJS scripts). gen-source-policy.js/report.js are explicit-only,
-# so they live next to this Dockerfile instead of core/ (see
-# setup/docker/explicit/scripts/).
-COPY setup/docker/explicit/scripts/ /opt/buildcage/scripts/
-COPY core/shared/                   /opt/buildcage/shared/
+# Tools (QuickJS scripts, rolldown-bundled by qjs-build above). gen-source-policy.js/report.js
+# are explicit-only, so they live next to this Dockerfile instead of core/ (see
+# setup/docker/explicit/scripts/). Each is a self-contained bundle — no separate
+# /opt/buildcage/shared/ copy is needed, unlike before TypeScript migration.
+COPY --from=qjs-build /build/dist/qjs/setup/docker/explicit/scripts/gen-source-policy.js /opt/buildcage/scripts/gen-source-policy.js
+COPY --from=qjs-build /build/dist/qjs/setup/docker/explicit/scripts/report.js            /opt/buildcage/scripts/report.js
 
 # License
 COPY setup/docker/explicit/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES

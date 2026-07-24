@@ -17,6 +17,26 @@ RUN apk add --no-cache curl gettext && \
     echo "${EXPECTED_SHA256}  /tmp/cni.tgz" | sha256sum -c && \
     tar -C /opt/cni/bin -xz -f /tmp/cni.tgz ./bridge ./host-local ./loopback
 
+# Compile the QuickJS-targeted TypeScript sources to plain ESM JavaScript
+# that `qjs --std -m` can execute directly (QuickJS has no TypeScript
+# support). tsc only strips types; rolldown does the actual bundling — same
+# division of labor as the Actions entrypoints (see rolldown.config.js), just
+# targeting quickjs-ng's ESM runtime (format esm, "qjs:std"/"qjs:os" left
+# external) instead of Node's CJS. Output is architecture-independent, so —
+# same reasoning as the `deps` stage above — this stage is pinned to
+# --platform=$BUILDPLATFORM to always run natively (no QEMU). Keep this stage
+# byte-identical across setup/docker/transparent/Dockerfile,
+# setup/docker/explicit/Dockerfile, and run/docker/Dockerfile.
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS qjs-build
+WORKDIR /build
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml rolldown.qjs.config.js tsconfig.qjs.json ./
+RUN pnpm install --frozen-lockfile
+COPY core/scripts/ ./core/scripts/
+COPY core/shared/  ./core/shared/
+COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
+RUN pnpm exec rolldown -c rolldown.qjs.config.js
+
 # Final image
 FROM moby/buildkit:v0.31.1@sha256:6b59b7df63a8cb9902736f9ddf7fcff8261613d3e7449b8ea8b7537fc399c03a
 
@@ -31,7 +51,7 @@ RUN apk add --no-cache \
       dnsmasq \
       iptables \
       curl \
-      quickjs
+      quickjs-ng
 
 ENV S6_KEEP_ENV=1
 ENV S6_LOGGING=0
@@ -55,9 +75,11 @@ COPY setup/docker/transparent/files/dnsmasq.conf /etc/dnsmasq.conf
 RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
 COPY setup/docker/transparent/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
-# Tools (QuickJS scripts)
-COPY core/scripts/ /opt/buildcage/scripts/
-COPY core/shared/  /opt/buildcage/shared/
+# Tools (QuickJS scripts, rolldown-bundled by qjs-build above). Each is a self-contained
+# bundle — no separate /opt/buildcage/shared/ copy is needed, unlike before TypeScript
+# migration.
+COPY --from=qjs-build /build/dist/qjs/core/scripts/convert-rule.js /opt/buildcage/scripts/convert-rule.js
+COPY --from=qjs-build /build/dist/qjs/core/scripts/report.js       /opt/buildcage/scripts/report.js
 
 # License
 COPY setup/docker/transparent/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
