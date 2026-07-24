@@ -14,9 +14,6 @@
   },
   "include": [
     "core/lib/**/*.ts",
-    "core/shared/lib/**/*.ts",
-    "core/shared/test/test-shim.ts",
-    "core/scripts/lib/**/*.ts",
     "setup/src/**/*.ts",
     "run/src/**/*.ts",
     "report/src/**/*.ts"

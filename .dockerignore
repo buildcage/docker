@@ -5,4 +5,4 @@ report/dist
 sandbox/dist
 /dist
 **/*.test.ts
-core/shared/test
+core/scripts/test
