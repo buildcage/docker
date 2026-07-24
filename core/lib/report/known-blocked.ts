@@ -4,8 +4,8 @@
  * fail_on_blocked is true. Never sent to the container's ACL — only
  * affects this action's pass/fail decision and Job Summary rendering.
  */
-import { convertRule } from "../../shared/lib/rules.js";
-import type { AggregatedEntry } from "../../shared/lib/aggregate.js";
+import { convertRule } from "../../shared/lib/rules.ts";
+import type { AggregatedEntry } from "../../shared/lib/aggregate.ts";
 
 export type BlockedRow = AggregatedEntry;
 
