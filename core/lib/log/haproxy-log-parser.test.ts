@@ -1,5 +1,5 @@
-import { describe, it, assert, reportResults } from "../../shared/test/test-shim.js";
-import { parseEntries } from "./log-parser.js";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { parseEntries } from "./haproxy-log-parser.ts";
 
 // ---------------------------------------------------------------------------
 // parseEntries
@@ -50,7 +50,7 @@ describe("parseEntries", () => {
   });
 });
 
-// aggregate() is tested in core/shared/lib/aggregate.test.ts.
+// aggregate() is tested in core/lib/log/aggregate.test.ts.
 
 // ---------------------------------------------------------------------------
 // mode detection
