@@ -19,8 +19,8 @@
  *   Default logfile: /var/log/buildkitd/current
  */
 import * as std from "qjs:std";
-import { parseEntries, parseDenialTimeline } from "./lib/buildkitd-log-parser.js";
-import { aggregate, type AggregatedEntry } from "../../../../core/shared/lib/aggregate.js";
+import { parseEntries, parseDenialTimeline } from "../../../../core/lib/log/buildkitd-log-parser.js";
+import { aggregate, type AggregatedEntry } from "../../../../core/lib/log/aggregate.js";
 
 const logFile = scriptArgs[1] || "/var/log/buildkitd/current";
 

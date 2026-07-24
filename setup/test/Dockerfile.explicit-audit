@@ -6,7 +6,7 @@ RUN echo "=== DNS Configuration ===" && \
     cat /etc/resolv.conf
 
 # In audit mode, gen-source-policy.js emits an empty rule set (see
-# setup/docker/explicit/scripts/lib/source-policy.js) — every domain is allowed, and
+# core/lib/acl/source-policy.js) — every domain is allowed, and
 # BuildKit's own "proxy network requests:" build output provides audit
 # visibility instead of a custom denial log.
 

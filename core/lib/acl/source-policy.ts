@@ -9,7 +9,7 @@
  * FROM/git sources remain unfiltered by buildcage, matching transparent
  * mode's documented behavior that only RUN-step network is controlled.
  */
-import { convertRule, wildcardToRegex } from "../../../../../core/shared/lib/rules.js";
+import { convertRule, wildcardToRegex } from "./wildcard-rules.ts";
 
 const DEFAULT_PORT: Record<string, string> = { https: "443", http: "80" };
 

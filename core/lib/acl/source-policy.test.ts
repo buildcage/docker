@@ -1,5 +1,5 @@
-import { describe, it, assert, reportResults } from "../../../../../core/shared/test/test-shim.js";
-import { buildSourcePolicy } from "./source-policy.js";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { buildSourcePolicy } from "./source-policy.ts";
 
 // Simulates BuildKit's sourcepolicy engine evaluation order exactly
 // (sourcepolicy/engine.go's evaluatePolicy): rules are applied in array
