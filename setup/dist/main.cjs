@@ -142,9 +142,9 @@ var VerifyImageError = class extends Error {
 //#endregion
 //#region core/lib/provenance/oci-registry.ts
 /**
-* oci-registry.js — OCI registry I/O helpers
+* oci-registry.ts — OCI registry I/O helpers
 *
-* All errors are thrown as VerifyImageError (see errors.js).
+* All errors are thrown as VerifyImageError (see errors.ts).
 * Callers do not need to catch and re-wrap; just let them propagate.
 */
 const BUNDLE_MEDIA_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
@@ -6971,7 +6971,7 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 //#endregion
 //#region core/lib/provenance/verify-image.ts
 /**
-* verify-image.js — Image provenance verification helpers
+* verify-image.ts — Image provenance verification helpers
 *
 * Verifies the Docker image's Sigstore provenance bundle.
 *
@@ -7041,7 +7041,7 @@ async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transpa
 	return await verifyBundle(await fetchBundle(REGISTRY, repoPath, digest, regToken), verifyOptions, digest), digest;
 }
 /**
-* Like verifyImageDigest, but throws ProvenanceError (see errors.js) instead
+* Like verifyImageDigest, but throws ProvenanceError (see errors.ts) instead
 * of the low-level VerifyImageError, so a caller gets one already-typed
 * error to catch rather than having to translate the result itself.
 *
@@ -7185,7 +7185,7 @@ async function main() {
 * Resolve and validate the proxy_engine input.
 * Only "transparent" (default) and "explicit" are accepted — each maps to a
 * separately published, separately tagged Docker image (see
-* lib/verify-image.js's imageTagFromRef).
+* lib/verify-image.ts's imageTagFromRef).
 */
 function resolveProxyEngine(input) {
 	let engine = input?.trim() || "transparent";

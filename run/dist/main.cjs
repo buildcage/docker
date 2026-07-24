@@ -52,9 +52,9 @@ function errorMessage(e) {
 //#endregion
 //#region core/lib/provenance/oci-registry.ts
 /**
-* oci-registry.js — OCI registry I/O helpers
+* oci-registry.ts — OCI registry I/O helpers
 *
-* All errors are thrown as VerifyImageError (see errors.js).
+* All errors are thrown as VerifyImageError (see errors.ts).
 * Callers do not need to catch and re-wrap; just let them propagate.
 */
 const BUNDLE_MEDIA_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
@@ -6881,7 +6881,7 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 //#endregion
 //#region core/lib/provenance/verify-image.ts
 /**
-* verify-image.js — Image provenance verification helpers
+* verify-image.ts — Image provenance verification helpers
 *
 * Verifies the Docker image's Sigstore provenance bundle.
 *
@@ -6951,7 +6951,7 @@ async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transpa
 	return await verifyBundle(await fetchBundle(REGISTRY, repoPath, digest, regToken), verifyOptions, digest), digest;
 }
 /**
-* Like verifyImageDigest, but throws ProvenanceError (see errors.js) instead
+* Like verifyImageDigest, but throws ProvenanceError (see errors.ts) instead
 * of the low-level VerifyImageError, so a caller gets one already-typed
 * error to catch rather than having to translate the result itself.
 *
@@ -7374,7 +7374,7 @@ function pathsOverlap(a, b) {
 /**
 * Fail closed if any writable-exception directory is, or contains, or is
 * contained in, SANDBOX_SCRATCH_BASE. That directory holds the run's own
-* `mount --rbind /` rootfs (see rootfsBindDir in main.js); the writable
+* `mount --rbind /` rootfs (see rootfsBindDir in main.ts); the writable
 * exceptions are recursive bind-mounts, so any overlap would recursively
 * re-expose that rootfs inside the sandbox as a second, *writable* copy of
 * the whole host `/` -- the exact escape SANDBOX_SCRATCH_BASE's placement
@@ -7512,7 +7512,7 @@ function parseMountsUnder(mountinfoContent, dir) {
 /**
 * Force-detaches any mount points still nested under `dir` before it's
 * recursively deleted. This is the safety net for rootfsBindDir (a
-* `mount --rbind /` of the entire host filesystem — see main.js) surviving
+* `mount --rbind /` of the entire host filesystem — see main.ts) surviving
 * past run-isolated.sh's own cleanup trap: if that trap never runs (e.g.
 * run-isolated.sh itself is SIGKILL'd, which bypasses traps entirely) or
 * its `umount -R` fails (EBUSY), a plain recursive delete of `dir` would
@@ -7569,7 +7569,7 @@ function removeScratchDir(dir) {
 /**
 * Force-detach anything still mounted under `dir` (the rootfs bind-mount
 * safety net — see unmountAllUnder) and then recursively remove it. Exported
-* so post.js can reclaim a scratch dir orphaned by a hard kill that bypassed
+* so post.ts can reclaim a scratch dir orphaned by a hard kill that bypassed
 * withScratchDir's own finally. No-ops safely when `dir` doesn't exist.
 */
 function cleanupScratchDir(dir) {
@@ -7588,9 +7588,9 @@ function scratchDirFor(containerName) {
 /**
 * Create/remove a scratch directory for this step's OCI bundle + run-script.
 * With `containerName` the dir is named deterministically (scratchDirFor) so
-* post.js can reclaim it after a hard kill; without it a random mkdtemp name
+* post.ts can reclaim it after a hard kill; without it a random mkdtemp name
 * is used (unit tests). Cleaned up on every exit path that unwinds — a
-* SIGKILL bypasses this finally, which is exactly what post.js covers.
+* SIGKILL bypasses this finally, which is exactly what post.ts covers.
 */
 function withScratchDir(fn, containerName) {
 	let dir;
@@ -7759,7 +7759,7 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 //#region run/src/lib/report.ts
 /**
 * Fetch the structured HAProxy-log report from the (still-running) proxy
-* container. Unlike report/src/main.js (which supports both engines), the
+* container. Unlike report/src/main.ts (which supports both engines), the
 * run action always runs the transparent-engine proxy stack, so this
 * only ever needs core/scripts/report.js.
 */
@@ -7828,7 +7828,7 @@ const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.file
 /**
 * Verifies image provenance and resolves the digest-pinned image ref for
 * the run action's (buildkitd-less) proxy image, published under the `-proxy`
-* tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.js).
+* tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.ts).
 */
 async function resolveVerifiedImage({ actionRef, actionRepo }) {
 	let digest = await verifyImageDigestOrThrow({
@@ -7845,7 +7845,7 @@ async function resolveVerifiedImage({ actionRef, actionRepo }) {
 	};
 }
 /**
-* Never sent to the container's ACL — see core/lib/report/known-blocked.js.
+* Never sent to the container's ACL — see core/lib/report/known-blocked.ts.
 */
 function readKnownBlockedRules(input) {
 	return parseRulesOrThrow(input);
