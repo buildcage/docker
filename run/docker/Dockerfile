@@ -44,15 +44,17 @@ RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -
 # --platform=$BUILDPLATFORM to always run natively (no QEMU). Keep this stage
 # byte-identical across setup/docker/transparent/Dockerfile,
 # setup/docker/explicit/Dockerfile, and run/docker/Dockerfile.
-FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS qjs-build
+FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS qjs-build
 WORKDIR /build
-RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml rolldown.qjs.config.js tsconfig.qjs.json ./
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+COPY rolldown.qjs.config.js tsconfig.qjs.json ./
 COPY core/scripts/ ./core/scripts/
 COPY core/shared/  ./core/shared/
 COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
-RUN pnpm exec rolldown -c rolldown.qjs.config.js
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm run build:qjs
 
 # Final image
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
