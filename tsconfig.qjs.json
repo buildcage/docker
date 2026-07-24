@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "noEmit": true,
+    "strict": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": [
+    "core/scripts/**/*.ts",
+    "core/shared/**/*.ts",
+    "setup/docker/explicit/scripts/**/*.ts"
+  ],
+  "exclude": ["**/*.property.test.ts"]
+}
