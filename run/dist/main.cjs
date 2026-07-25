@@ -7168,25 +7168,6 @@ function generateContainerName() {
 	return `buildcage-proxy-${(0, node_crypto.randomBytes)(4).toString("hex")}`;
 }
 /**
-* Reused as the Compose project name (separate Docker namespace from
-* container names, so no collision). Passing an explicit, per-container
-* project name matters when `run` steps in the same job run truly
-* concurrently (GitHub Actions' `background`/`wait`/`parallel` keywords):
-* without it, Compose falls back to one shared, directory-derived project
-* name, and a concurrent `up`/`down` from a different step can recreate or
-* tear down another step's still-running proxy container.
-*/
-function deriveProjectName(containerName) {
-	return containerName;
-}
-function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
-	return [
-		"cp",
-		`${containerName}:${containerPath}`,
-		hostPath
-	];
-}
-/**
 * Distinguishes "this container doesn't exist" (docker's own wording, e.g.
 * `no such object`) from "docker itself is unusable on this runner" — both
 * phrasings are matched for resilience across docker CLI versions.
@@ -7221,6 +7202,26 @@ function getContainerPid(containerName, { exec = node_child_process.execFileSync
 	}
 	let pid = Number(out);
 	return Number.isInteger(pid) && pid > 0 ? pid : null;
+}
+//#endregion
+//#region core/lib/docker/container.ts
+/**
+* Reused as the Compose project name (separate Docker namespace from
+* container names, so no collision). Passing an explicit, per-container
+* project name matters when multiple steps/containers in the same job run
+* concurrently: without it, Compose falls back to one shared, directory-
+* derived project name, and a concurrent `up`/`down`/`ps` from a different
+* step can recreate, tear down, or misidentify another step's container.
+*/
+function deriveProjectName(containerName) {
+	return containerName;
+}
+function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
+	return [
+		"cp",
+		`${containerName}:${containerPath}`,
+		hostPath
+	];
 }
 //#endregion
 //#region run/src/lib/compose-args.ts
