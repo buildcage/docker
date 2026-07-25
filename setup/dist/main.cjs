@@ -7102,6 +7102,19 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
+//#region core/lib/docker/container.ts
+/**
+* Reused as the Compose project name (separate Docker namespace from
+* container names, so no collision). Passing an explicit, per-container
+* project name matters when multiple steps/containers in the same job run
+* concurrently: without it, Compose falls back to one shared, directory-
+* derived project name, and a concurrent `up`/`down`/`ps` from a different
+* step can recreate, tear down, or misidentify another step's container.
+*/
+function deriveProjectName(containerName) {
+	return containerName;
+}
+//#endregion
 //#region setup/src/main.ts
 const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
 /**
@@ -7136,21 +7149,24 @@ async function main() {
 		httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
 		httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
 		ipRulesInput: env.INPUT_ALLOWED_IP_RULES
-	});
-	console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), console.log("::endgroup::");
-	let composeEnv = {
+	}), knownBlockedRules = parseRulesOrThrow(env.INPUT_KNOWN_BLOCKED_RULES);
+	console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known blocked", knownBlockedRules), console.log("::endgroup::");
+	let builderName = env.INPUT_BUILDER_NAME || "buildcage", projectName = deriveProjectName(builderName), composeEnv = {
 		...env,
-		BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
+		BUILDER_NAME: builderName,
 		PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
 		PROXY_ENGINE: proxyEngine,
 		ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
 		ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
 		ALLOWED_IP_RULES: rules.ipRules.join("\n"),
+		KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
 		BUILDCAGE_IMAGE_REF: imageRef
 	};
 	try {
 		(0, node_child_process.execFileSync)("docker", [
 			"compose",
+			"-p",
+			projectName,
 			"-f",
 			composeFile,
 			"down"
@@ -7164,6 +7180,8 @@ async function main() {
 	try {
 		(0, node_child_process.execFileSync)("docker", [
 			"compose",
+			"-p",
+			projectName,
 			"-f",
 			composeFile,
 			"up",
