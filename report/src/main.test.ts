@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseContainerIds, shouldFailOnBlocked, substituteActionPlaceholders } from "./main.ts";
+import { parseContainerIds, shouldFailOnBlocked, substituteActionPlaceholders, consoleMethodForLevel } from "./main.ts";
 
 describe("parseContainerIds", () => {
   it("splits one ID per line", () => {
@@ -66,5 +66,18 @@ describe("substituteActionPlaceholders", () => {
 
   it("leaves text with no placeholders untouched", () => {
     assert.equal(substituteActionPlaceholders("no placeholders here", {}), "no placeholders here");
+  });
+});
+
+describe("consoleMethodForLevel", () => {
+  it("maps each known level to its console method", () => {
+    assert.equal(consoleMethodForLevel("info"), "log");
+    assert.equal(consoleMethodForLevel("debug"), "debug");
+    assert.equal(consoleMethodForLevel("warning"), "warn");
+    assert.equal(consoleMethodForLevel("error"), "error");
+  });
+
+  it("falls back to \"log\" for an unrecognized level", () => {
+    assert.equal(consoleMethodForLevel("trace"), "log");
   });
 });

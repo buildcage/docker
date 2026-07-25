@@ -19,14 +19,17 @@ import { ReportError } from "./lib/errors.ts";
  * placeholders — see substituteActionPlaceholders below. `blocked` is only
  * ever present when mode is "restrict" (audit mode never fails regardless
  * of blocked connections); `message` is present whenever there's a blocked
- * connection to report, audit or restrict.
+ * connection to report, audit or restrict. `logs` (see
+ * core/lib/log/log-entries.ts) is printed one entry at a time via
+ * console[level] below — unrecognized levels fall back to console.log so
+ * an older report build stays usable against a newer report.js.
  */
 export interface ReportResult {
   mode: string | null;
   blocked?: boolean;
   message?: string;
   stepSummary: string;
-  rawLog?: string;
+  logs?: { level: string; log: string }[];
 }
 
 /**
@@ -49,13 +52,31 @@ export function shouldFailOnBlocked(report: Pick<ReportResult, "mode" | "blocked
 }
 
 /**
+ * Maps a LogEntry's level (see core/lib/log/log-entries.ts) to the console
+ * method that prints it. Unrecognized levels fall back to "log" so an older
+ * report build stays usable against a newer report.js.
+ */
+export function consoleMethodForLevel(level: string): "log" | "debug" | "warn" | "error" {
+  switch (level) {
+    case "debug":
+      return "debug";
+    case "warning":
+      return "warn";
+    case "error":
+      return "error";
+    default:
+      return "log";
+  }
+}
+
+/**
  * report.js can't know its own actionRepo/actionRef (those only exist in
  * the `report` action step's own GitHub Actions runtime, not inside the
  * container), so it leaves these two placeholders in stepSummary instead.
  * Substituting them here in JS, scoped to just the stepSummary string
- * (never rawLog, never the raw JSON text), means: no shell quoting/sed
+ * (never logs, never the raw JSON text), means: no shell quoting/sed
  * delimiter concerns with ref/repo values, and proxy-log content a build
- * step could influence — which flows into rawLog and stepSummary's own
+ * step could influence — which flows into logs and stepSummary's own
  * host/URL tables — is never in scope for the substitution to begin with.
  */
 export function substituteActionPlaceholders(stepSummary: string, env: NodeJS.ProcessEnv): string {
@@ -154,12 +175,9 @@ async function main(): Promise<void> {
   const report = JSON.parse(jsonOutput) as ReportResult;
   report.stepSummary = substituteActionPlaceholders(report.stepSummary, process.env);
 
-  // 3. Console output — raw log lines, unchanged from before this redesign.
-  if (report.rawLog) {
-    console.log("::group::HTTP Proxy communication logs");
-    process.stdout.write(report.rawLog);
-    console.log("::endgroup::");
-    console.log();
+  // 3. Console output — one entry at a time, at its own level.
+  for (const entry of report.logs ?? []) {
+    console[consoleMethodForLevel(entry.level)](entry.log);
   }
 
   // 4. Write Job Summary — report.sh already rendered the full markdown.

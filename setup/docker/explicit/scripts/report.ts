@@ -1,7 +1,7 @@
 /**
  * Parse buildkitd's own debug log file plus buildctl's own build-history/log
  * APIs, and print a single JSON report to stdout:
- *   { mode, blocked?, message?, stepSummary, rawLog }
+ *   { mode, blocked?, message?, stepSummary, logs }
  *
  * Runs inside the container, invoked by report.sh (see
  * setup/docker/explicit/files/report.sh) — this way the log format, the log's
@@ -53,6 +53,7 @@ import {
 import { renderHostTable } from "../../../../core/lib/report/host-table.js";
 import { buildRestrictExample } from "../../../../core/lib/report/build-example.js";
 import { renderCommunicationDetails } from "../../../../core/lib/report/command-log.js";
+import { wrapLogGroup, type LogEntry } from "../../../../core/lib/log/log-entries.js";
 
 const ACTION_REPO_PLACEHOLDER = "{{GITHUB_ACTION_REPOSITORY}}";
 const ACTION_REF_PLACEHOLDER = "{{GITHUB_ACTION_REF}}";
@@ -165,10 +166,10 @@ if (isAudit) {
 markdown += renderCommunicationDetails(builds, deniedTimeline);
 markdown += `\n*Reported by [Buildcage](https://github.com/${ACTION_REPO_PLACEHOLDER})*\n`;
 
-const result: { mode: string; blocked?: boolean; message?: string; stepSummary: string; rawLog: string } = {
+const result: { mode: string; blocked?: boolean; message?: string; stepSummary: string; logs: LogEntry[] } = {
   mode,
   stepSummary: markdown,
-  rawLog: logText,
+  logs: wrapLogGroup("HTTP Proxy communication logs", logText),
 };
 
 // `message` is set whenever there's something to report, audit or restrict.

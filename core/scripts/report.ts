@@ -1,6 +1,6 @@
 /**
  * Parse HAProxy's own log file and print a single JSON report to stdout:
- * `{ mode, sections, blockedCount, blocked?, message?, stepSummary, rawLog }`.
+ * `{ mode, sections, blockedCount, blocked?, message?, stepSummary, logs }`.
  * Runs inside the container, invoked by report.sh (see
  * setup/docker/transparent/files/report.sh) — this way both the log format
  * and the log's file path always match whatever this same image actually
@@ -13,8 +13,12 @@
  * (with its own known_blocked_rules/fail_on_blocked input, its own
  * actionRepo/actionRef) directly from this container's log rather than
  * going through report.sh/the `report` action at all. `stepSummary`/
- * `blocked`/`message`/`rawLog` are the newer, already-fully-rendered fields
- * the `report` action consumes instead — see report/src/main.ts.
+ * `blocked`/`message`/`logs` are the newer, already-fully-rendered fields
+ * the `report` action consumes instead — see report/src/main.ts. `logs` is
+ * a flat `{level, log}[]` (see core/lib/log/log-entries.ts) that report
+ * prints one entry at a time via console[level] — the ::group::/::endgroup::
+ * markers around the raw log ride along as ordinary info-level entries
+ * rather than needing special-case handling on the report side.
  *
  * `mode` and `known_blocked_rules` are read from this container's own
  * environment (set by `setup`, not passed as arguments) so that report.sh's
@@ -34,6 +38,7 @@ import { splitRuleTokens } from "../lib/acl/wildcard-rules.js";
 import { annotateKnownBlocked, buildBlockedMessage, type AnnotatedBlockedRow } from "../lib/report/known-blocked.js";
 import { renderHostTable } from "../lib/report/host-table.js";
 import { buildRestrictExample } from "../lib/report/build-example.js";
+import { wrapLogGroup, type LogEntry } from "../lib/log/log-entries.js";
 
 const ACTION_REPO_PLACEHOLDER = "{{GITHUB_ACTION_REPOSITORY}}";
 const ACTION_REF_PLACEHOLDER = "{{GITHUB_ACTION_REF}}";
@@ -55,7 +60,13 @@ const entries = parseEntries(logText);
 
 if (entries.length === 0) {
   std.out.puts(
-    JSON.stringify({ mode: null, sections: {}, blockedCount: 0, stepSummary: "No proxy logs found.\n", rawLog: logText }) + "\n",
+    JSON.stringify({
+      mode: null,
+      sections: {},
+      blockedCount: 0,
+      stepSummary: "No proxy logs found.\n",
+      logs: wrapLogGroup("HTTP Proxy communication logs", logText),
+    }) + "\n",
   );
   std.exit(0);
 }
@@ -104,13 +115,13 @@ const result: {
   blocked?: boolean;
   message?: string;
   stepSummary: string;
-  rawLog: string;
+  logs: LogEntry[];
 } = {
   mode,
   sections,
   blockedCount,
   stepSummary: markdown,
-  rawLog: logText,
+  logs: wrapLogGroup("HTTP Proxy communication logs", logText),
 };
 
 // `message` is set whenever there's something to report, audit or restrict

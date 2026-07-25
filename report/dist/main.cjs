@@ -144,13 +144,26 @@ function shouldFailOnBlocked(report, failOnBlocked) {
 	return report.mode === "restrict" && report.blocked === !0 && failOnBlocked;
 }
 /**
+* Maps a LogEntry's level (see core/lib/log/log-entries.ts) to the console
+* method that prints it. Unrecognized levels fall back to "log" so an older
+* report build stays usable against a newer report.js.
+*/
+function consoleMethodForLevel(level) {
+	switch (level) {
+		case "debug": return "debug";
+		case "warning": return "warn";
+		case "error": return "error";
+		default: return "log";
+	}
+}
+/**
 * report.js can't know its own actionRepo/actionRef (those only exist in
 * the `report` action step's own GitHub Actions runtime, not inside the
 * container), so it leaves these two placeholders in stepSummary instead.
 * Substituting them here in JS, scoped to just the stepSummary string
-* (never rawLog, never the raw JSON text), means: no shell quoting/sed
+* (never logs, never the raw JSON text), means: no shell quoting/sed
 * delimiter concerns with ref/repo values, and proxy-log content a build
-* step could influence — which flows into rawLog and stepSummary's own
+* step could influence — which flows into logs and stepSummary's own
 * host/URL tables — is never in scope for the substitution to begin with.
 */
 function substituteActionPlaceholders(stepSummary, env) {
@@ -216,10 +229,12 @@ async function main() {
 		});
 	}
 	let report = JSON.parse(jsonOutput);
-	report.stepSummary = substituteActionPlaceholders(report.stepSummary, process.env), report.rawLog && (console.log("::group::HTTP Proxy communication logs"), process.stdout.write(report.rawLog), console.log("::endgroup::"), console.log()), summaryFile ? (0, node_fs.appendFileSync)(summaryFile, report.stepSummary) : console.log(report.stepSummary), report.mode === null && process.exit(0);
+	report.stepSummary = substituteActionPlaceholders(report.stepSummary, process.env);
+	for (let entry of report.logs ?? []) console[consoleMethodForLevel(entry.level)](entry.log);
+	summaryFile ? (0, node_fs.appendFileSync)(summaryFile, report.stepSummary) : console.log(report.stepSummary), report.mode === null && process.exit(0);
 	let failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
 	report.message && (shouldFailOnBlocked(report, failOnBlocked) ? (annotation.error(report.message), process.exitCode = 1) : annotation.notice(report.message));
 }
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
 	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in report: ${errorMessage(err)}`), process.exit(1);
-}), exports.parseContainerIds = parseContainerIds, exports.shouldFailOnBlocked = shouldFailOnBlocked, exports.substituteActionPlaceholders = substituteActionPlaceholders;
+}), exports.consoleMethodForLevel = consoleMethodForLevel, exports.parseContainerIds = parseContainerIds, exports.shouldFailOnBlocked = shouldFailOnBlocked, exports.substituteActionPlaceholders = substituteActionPlaceholders;
