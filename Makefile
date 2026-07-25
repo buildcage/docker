@@ -155,6 +155,15 @@ test_transparent_restrict_mode: ## Run transparent-engine restrict mode tests
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
 	@./setup/test/assert-transparent-restrict.sh
+	@echo ""
+	@echo "[setup post] verifying post.ts actually removes the builder/proxy containers:"
+	@node setup/src/post.ts
+	@if docker inspect buildcage buildcage-proxy >/dev/null 2>&1; then \
+	  echo "  FAIL  buildcage/buildcage-proxy still exist after post.ts cleanup"; \
+	  exit 1; \
+	else \
+	  echo "  PASS  buildcage/buildcage-proxy removed by post.ts"; \
+	fi
 	@$(MAKE) clean
 
 .PHONY: test_explicit_audit_mode
