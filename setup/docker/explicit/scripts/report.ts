@@ -1,18 +1,19 @@
 /**
- * Parse buildkitd's own debug log (piped in on stdin) plus buildctl's own
- * build-history/log APIs, and print a single JSON report to stdout:
+ * Parse buildkitd's own debug log file plus buildctl's own build-history/log
+ * APIs, and print a single JSON report to stdout:
  *   { mode, blocked?, message?, stepSummary, rawLog }
  *
  * Runs inside the container, invoked by report.sh (see
- * setup/docker/explicit/files/report.sh) — this way both the log format and
- * the buildctl invocation this depends on always match whatever buildkitd
- * version this same image ships, regardless of which version of the
- * `report` action is calling it. Unlike the transparent engine's report.js,
- * this script shells out to `buildctl debug histories`/`debug logs` itself
- * (via qjs:os) rather than expecting an outside caller to have already
- * gathered that — buildkitd's own debug log has no reliable way to
- * attribute allowed requests to a specific RUN step, so the per-command
- * allowed/audited breakdown can only come from buildctl's build-history API.
+ * setup/docker/explicit/files/report.sh) — this way the log format, the log's
+ * file path, and the buildctl invocation this depends on always match
+ * whatever buildkitd version this same image ships, regardless of which
+ * version of the `report` action is calling it. Unlike the transparent
+ * engine's report.js, this script shells out to `buildctl debug
+ * histories`/`debug logs` itself (via qjs:os) rather than expecting an
+ * outside caller to have already gathered that — buildkitd's own debug log
+ * has no reliable way to attribute allowed requests to a specific RUN step,
+ * so the per-command allowed/audited breakdown can only come from
+ * buildctl's build-history API.
  *
  * "blocked"/deniedTimeline both come from source-policy denial entries,
  * which buildkitd logs via its own structured logger — aggregated by host
@@ -27,9 +28,10 @@
  * environment (set by `setup`), not passed as arguments. `stepSummary`
  * still contains `{{GITHUB_ACTION_REPOSITORY}}`/`{{GITHUB_ACTION_REF}}`
  * placeholders — those are only known to the actual `report` action step's
- * own runtime, so report.sh substitutes them in after this script exits.
+ * own runtime, so report/src/main.ts substitutes them in (scoped to just
+ * this field, not the whole JSON payload) after this script exits.
  *
- * Usage: qjs --std -m /opt/buildcage/scripts/report.js < <raw buildkitd log>
+ * Usage: qjs --std -m /opt/buildcage/scripts/report.js
  */
 import * as std from "qjs:std";
 import * as os from "qjs:os";
@@ -59,6 +61,13 @@ const ACTION_REF_PLACEHOLDER = "{{GITHUB_ACTION_REF}}";
  * Run a subprocess and capture its stdout as text. Reads in a loop since a
  * single os.read() call isn't guaranteed to drain a large pipe (buildctl's
  * rawjson build logs can be substantial) in one shot.
+ *
+ * Throws if the child didn't exit cleanly — os.waitpid() returns a raw
+ * POSIX wait status (verified against a real quickjs-ng 0.11.0 binary:
+ * a clean exit is 0, a nonzero exit code is left-shifted into the high
+ * byte, e.g. `exit 7` -> 1792 = 7 << 8), not an already-decoded exit code.
+ * A zero status is the only "succeeded" case; anything else (nonzero exit
+ * or signal termination) is a failure.
  */
 function execCapture(args: string[]): string {
   const [rd, wr] = os.pipe();
@@ -72,7 +81,10 @@ function execCapture(args: string[]): string {
     chunks.push(buf.slice(0, n));
   }
   os.close(rd);
-  os.waitpid(pid, 0);
+  const [, status] = os.waitpid(pid, 0);
+  if (status !== 0) {
+    throw new Error(`${args.join(" ")} exited with status ${status >> 8}`);
+  }
   const total = chunks.reduce((sum, c) => sum + c.length, 0);
   const all = new Uint8Array(total);
   let offset = 0;
@@ -105,7 +117,17 @@ function collectBuilds(): VertexAllowedEntry[][] {
   }
 }
 
-const logText = std.in.readAsString();
+const LOG_FILE = "/var/log/buildkitd/current";
+
+function readFile(path: string): string {
+  const f = std.open(path, "r");
+  if (!f) return "";
+  const content = f.readAsString();
+  f.close();
+  return content;
+}
+
+const logText = readFile(LOG_FILE);
 const mode = std.getenv("PROXY_MODE") || "restrict";
 const knownBlockedRules = splitRuleTokens(std.getenv("KNOWN_BLOCKED_RULES"));
 
@@ -149,14 +171,21 @@ const result: { mode: string; blocked?: boolean; message?: string; stepSummary: 
   rawLog: logText,
 };
 
-// Only meaningful in restrict mode — audit mode never fails regardless of
-// blocked connections (mirrors core/lib/report/known-blocked.ts's
-// determineBlockedOutcome, including its fail-closed-on-empty-rows case).
+// `message` is set whenever there's something to report, audit or restrict.
+// `blocked` (the fail/pass signal) is restrict-mode-only — audit mode never
+// fails regardless of blocked connections (mirrors
+// core/lib/report/known-blocked.ts's determineBlockedOutcome, including its
+// fail-closed-on-empty-rows case). In practice blockedCount is always 0 in
+// this engine's audit mode (see core/lib/acl/source-policy.ts — audit mode
+// emits an empty policy, so buildkitd's source-policy denial log, which
+// blockedCount is derived from, never has anything to report), but this
+// mirrors the transparent engine's handling rather than assuming that stays
+// true forever.
+if (blockedCount > 0) {
+  result.message = buildBlockedMessage({ blockedCount, blockedRows, engineLabel: "proxy", isAudit });
+}
 if (!isAudit) {
   result.blocked = blockedCount > 0 && (blockedRows.length === 0 || blockedRows.some((r) => !r.expected));
-  if (blockedCount > 0) {
-    result.message = buildBlockedMessage({ blockedCount, blockedRows, engineLabel: "proxy", isAudit });
-  }
 }
 
 std.out.puts(JSON.stringify(result) + "\n");

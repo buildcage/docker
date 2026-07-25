@@ -5,27 +5,22 @@
 # staged/cached anywhere on the runner between invocations), not inside the
 # container: reaches into the container purely via `docker exec`, so the
 # `report` action itself never needs to know this engine's log path or how
-# to invoke the in-container report mechanism. buildctl itself is invoked by
-# report.js, inside the container — not from here — since only buildctl's
-# build-history API (not this log file) can attribute allowed requests to a
-# specific RUN step.
+# to invoke the in-container report mechanism. report.js itself reads the
+# buildkitd log file directly (and calls buildctl itself for the
+# per-command breakdown) rather than this script fetching and piping
+# anything in — that keeps this script to a single `docker exec` with
+# nothing to fail independently of the report generation itself.
 #
 # Usage: report.sh <container-id>
-#   Reads GITHUB_ACTION_REPOSITORY/GITHUB_ACTION_REF from its own
-#   environment (inherited from the report action's process) to substitute
-#   into the {{...}} placeholders report.js's step summary leaves behind —
-#   those two values only exist in the report action step's own runtime,
-#   not inside the container.
 #
-# Prints the final JSON report to stdout.
+# Prints report.js's JSON output verbatim to stdout — including its
+# unsubstituted {{GITHUB_ACTION_REPOSITORY}}/{{GITHUB_ACTION_REF}}
+# placeholders. Those are only known to the actual `report` action step's
+# own runtime, not inside the container, so report/src/main.ts substitutes
+# them in afterwards (scoped to just the stepSummary field, not blindly
+# across this whole payload — see its own comment for why).
 set -euo pipefail
 
 container_id="$1"
 
-raw_log=$(docker exec "$container_id" sh -c 'cat /var/log/buildkitd/current 2>/dev/null || true')
-
-json=$(printf '%s' "$raw_log" | docker exec -i "$container_id" qjs --std -m /opt/buildcage/scripts/report.js)
-
-printf '%s' "$json" | sed \
-  -e "s|{{GITHUB_ACTION_REPOSITORY}}|${GITHUB_ACTION_REPOSITORY:-}|g" \
-  -e "s|{{GITHUB_ACTION_REF}}|${GITHUB_ACTION_REF:-}|g"
+docker exec "$container_id" qjs --std -m /opt/buildcage/scripts/report.js
