@@ -25,6 +25,7 @@ Starts the Buildcage builder container.
 | `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
 | `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
 | `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
+| `known_blocked_rules` | No | empty | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the `report` step even when `fail_on_blocked` is `true` — see [Report Action](#report-action-dash14buildcagereport) below |
 
 ### Rule Syntax
 
@@ -187,12 +188,12 @@ Use the domain names shown in the report to create your allowlist for restrict m
 In restrict mode, the report step fails if blocked connections are detected, causing the workflow to fail. You can disable this by setting `fail_on_blocked: false`. In audit mode, blocked connections (e.g., protocol errors) are reported but never cause the step to fail.
 
 If some blocked connections are expected — a known-noisy dependency, a domain you're deliberately
-keeping off the allowlist to confirm it stays blocked — list them in `known_blocked_rules` (same
-syntax as `allowed_https_rules`, see [Rule Syntax](./rules.md)). When every blocked connection
-matches `known_blocked_rules`, the step no longer fails even with `fail_on_blocked: true`, and a
-`::notice::` is emitted instead of `::error::`; any other, unmatched blocked connection still fails
-the step as before. Once `known_blocked_rules` is set, the Job Summary's Blocked Hosts table gains
-an extra **Expected** column (✅) marking the matched rows.
+keeping off the allowlist to confirm it stays blocked — list them in `setup`'s `known_blocked_rules`
+input (same syntax as `allowed_https_rules`, see [Rule Syntax](./rules.md)). When every blocked
+connection matches `known_blocked_rules`, the step no longer fails even with `fail_on_blocked: true`,
+and a `::notice::` is emitted instead of `::error::`; any other, unmatched blocked connection still
+fails the step as before. Once `known_blocked_rules` is set, the Job Summary's Blocked Hosts table
+gains an extra **Expected** column (✅) marking the matched rows.
 
 ### Parameters
 
@@ -200,7 +201,6 @@ an extra **Expected** column (✅) marking the matched rows.
 |-----------|----------|---------|-------------|
 | `builder_name` | No | `buildcage` | Name of the builder container |
 | `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
-| `known_blocked_rules` | No | empty | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the step even when `fail_on_blocked` is `true` |
 
 ---
 
