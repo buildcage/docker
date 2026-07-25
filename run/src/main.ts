@@ -16,7 +16,8 @@ import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import { SandboxError } from "./lib/errors.ts";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
-import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.ts";
+import { generateContainerName, getContainerPid } from "./lib/container.ts";
+import { deriveProjectName } from "../../core/lib/docker/container.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.ts";
 import {
   writeRunScript,
