@@ -1,7 +1,7 @@
 /**
  * Parse buildkitd's own debug log (piped in on stdin) plus buildctl's own
  * build-history/log APIs, and print a single JSON report to stdout:
- *   { mode, blocked?, message?, stepSummary }
+ *   { mode, blocked?, message?, stepSummary, rawLog }
  *
  * Runs inside the container, invoked by report.sh (see
  * setup/docker/explicit/files/report.sh) — this way both the log format and
@@ -143,9 +143,10 @@ if (isAudit) {
 markdown += renderCommunicationDetails(builds, deniedTimeline);
 markdown += `\n*Reported by [Buildcage](https://github.com/${ACTION_REPO_PLACEHOLDER})*\n`;
 
-const result: { mode: string; blocked?: boolean; message?: string; stepSummary: string } = {
+const result: { mode: string; blocked?: boolean; message?: string; stepSummary: string; rawLog: string } = {
   mode,
   stepSummary: markdown,
+  rawLog: logText,
 };
 
 // Only meaningful in restrict mode — audit mode never fails regardless of

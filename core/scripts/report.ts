@@ -1,6 +1,6 @@
 /**
  * Parse HAProxy logs (piped in on stdin) and print a single JSON report to
- * stdout: `{ mode, blocked?, message?, stepSummary }`. Runs inside the
+ * stdout: `{ mode, blocked?, message?, stepSummary, rawLog }`. Runs inside the
  * container, invoked by report.sh (see setup/docker/transparent/files/report.sh)
  * — this way the parsing logic always matches whatever HAProxy log format
  * this same image produces, regardless of which version of the `report`
@@ -34,7 +34,7 @@ const knownBlockedRules = splitRuleTokens(std.getenv("KNOWN_BLOCKED_RULES"));
 const entries = parseEntries(logText);
 
 if (entries.length === 0) {
-  std.out.puts(JSON.stringify({ mode: null, stepSummary: "No proxy logs found.\n" }) + "\n");
+  std.out.puts(JSON.stringify({ mode: null, stepSummary: "No proxy logs found.\n", rawLog: logText }) + "\n");
   std.exit(0);
 }
 
@@ -70,9 +70,10 @@ if (isAudit) {
 markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
 markdown += `\n*Reported by [Buildcage](https://github.com/${ACTION_REPO_PLACEHOLDER})*\n`;
 
-const result: { mode: string; blocked?: boolean; message?: string; stepSummary: string } = {
+const result: { mode: string; blocked?: boolean; message?: string; stepSummary: string; rawLog: string } = {
   mode,
   stepSummary: markdown,
+  rawLog: logText,
 };
 
 // Only meaningful in restrict mode — audit mode never fails regardless of
