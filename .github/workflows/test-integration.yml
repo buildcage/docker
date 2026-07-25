@@ -173,6 +173,7 @@ jobs:
       - name: Run assertions
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
+          INPUT_BUILDER_NAME: ${{ matrix.builder_name }}
         run: |
           COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
           export COMPOSE_PROJECT_NAME
