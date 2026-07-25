@@ -34,6 +34,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
 COPY rolldown.qjs.config.js tsconfig.qjs.json ./
 COPY core/scripts/ ./core/scripts/
+COPY core/lib/actions/ ./core/lib/actions/
 COPY core/lib/acl/ ./core/lib/acl/
 COPY core/lib/log/ ./core/lib/log/
 COPY core/lib/report/ ./core/lib/report/
@@ -85,6 +86,10 @@ COPY setup/docker/transparent/files/haproxy.cfg.template /etc/haproxy/haproxy.cf
 # migration.
 COPY --from=qjs-build /build/dist/qjs/core/scripts/convert-rule.js /opt/buildcage/scripts/convert-rule.js
 COPY --from=qjs-build /build/dist/qjs/core/scripts/report.js       /opt/buildcage/scripts/report.js
+
+# report.sh — the runner-side orchestration script `docker cp`'d out by the
+# report action itself (never staged elsewhere); see the script for details.
+COPY --chmod=755 setup/docker/transparent/files/report.sh /opt/buildcage/scripts/report.sh
 
 # License
 COPY setup/docker/transparent/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES

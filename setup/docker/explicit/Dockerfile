@@ -40,6 +40,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
 COPY rolldown.qjs.config.js tsconfig.qjs.json ./
 COPY core/scripts/ ./core/scripts/
+COPY core/lib/actions/ ./core/lib/actions/
 COPY core/lib/acl/ ./core/lib/acl/
 COPY core/lib/log/ ./core/lib/log/
 COPY core/lib/report/ ./core/lib/report/
@@ -72,6 +73,10 @@ COPY setup/docker/explicit/files/buildkitd.toml /etc/buildkit/buildkitd.toml
 # /opt/buildcage/shared/ copy is needed, unlike before TypeScript migration.
 COPY --from=qjs-build /build/dist/qjs/setup/docker/explicit/scripts/gen-source-policy.js /opt/buildcage/scripts/gen-source-policy.js
 COPY --from=qjs-build /build/dist/qjs/setup/docker/explicit/scripts/report.js            /opt/buildcage/scripts/report.js
+
+# report.sh — the runner-side orchestration script `docker cp`'d out by the
+# report action itself (never staged elsewhere); see the script for details.
+COPY --chmod=755 setup/docker/explicit/files/report.sh /opt/buildcage/scripts/report.sh
 
 # License
 COPY setup/docker/explicit/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES

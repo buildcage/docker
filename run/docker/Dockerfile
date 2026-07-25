@@ -51,6 +51,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
 COPY rolldown.qjs.config.js tsconfig.qjs.json ./
 COPY core/scripts/ ./core/scripts/
+COPY core/lib/actions/ ./core/lib/actions/
 COPY core/lib/acl/ ./core/lib/acl/
 COPY core/lib/log/ ./core/lib/log/
 COPY core/lib/report/ ./core/lib/report/
