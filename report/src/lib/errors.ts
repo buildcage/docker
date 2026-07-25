@@ -9,9 +9,10 @@ import { ActionError } from "../../../core/lib/general/action-error.ts";
  *   DOCKER_UNAVAILABLE   – docker CLI missing from PATH, or `docker ps`/`docker cp` failed
  *   CONTAINER_NOT_FOUND  – `docker ps --filter` didn't find exactly one
  *                          report-source container for this builder_name
- *   REPORT_SCRIPT_FAILED – report.sh itself (or making it executable) failed
- *                          after being fetched from the container — not
- *                          necessarily a Docker/runner problem, so this is
- *                          kept distinct from DOCKER_UNAVAILABLE
+ *   REPORT_SCRIPT_FAILED – report.sh couldn't even be launched (e.g. chmod
+ *                          or exec itself failed) — a report.sh that ran
+ *                          and exited nonzero on its own is reproduced via
+ *                          this action's own exit code instead, not this
+ *                          error
  */
 export class ReportError extends ActionError<"DOCKER_UNAVAILABLE" | "CONTAINER_NOT_FOUND" | "REPORT_SCRIPT_FAILED"> {}

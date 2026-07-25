@@ -28,8 +28,12 @@
  * environment (set by `setup`), not passed as arguments. `stepSummary`
  * still contains `{{GITHUB_ACTION_REPOSITORY}}`/`{{GITHUB_ACTION_REF}}`
  * placeholders — those are only known to the actual `report` action step's
- * own runtime, so report/src/main.ts substitutes them in (scoped to just
- * this field, not the whole JSON payload) after this script exits.
+ * own runtime, so report.sh substitutes them in (scoped to just this
+ * field, not the whole JSON payload) after this script exits. report.sh
+ * owns everything downstream of this JSON (Job Summary, `logs` output,
+ * fail_on_blocked exit code) — see setup/docker/explicit/files/report.sh —
+ * so this script's output shape is never a cross-version contract with the
+ * `report` action itself.
  *
  * Usage: qjs --std -m /opt/buildcage/scripts/report.js
  */
@@ -53,7 +57,7 @@ import {
 import { renderHostTable } from "../../../../core/lib/report/host-table.js";
 import { buildRestrictExample } from "../../../../core/lib/report/build-example.js";
 import { renderCommunicationDetails } from "../../../../core/lib/report/command-log.js";
-import { wrapLogGroup, type LogEntry } from "../../../../core/lib/log/log-entries.js";
+import { wrapLogGroup } from "../../../../core/lib/log/log-entries.js";
 
 const ACTION_REPO_PLACEHOLDER = "{{GITHUB_ACTION_REPOSITORY}}";
 const ACTION_REF_PLACEHOLDER = "{{GITHUB_ACTION_REF}}";
@@ -166,7 +170,7 @@ if (isAudit) {
 markdown += renderCommunicationDetails(builds, deniedTimeline);
 markdown += `\n*Reported by [Buildcage](https://github.com/${ACTION_REPO_PLACEHOLDER})*\n`;
 
-const result: { mode: string; blocked?: boolean; message?: string; stepSummary: string; logs: LogEntry[] } = {
+const result: { mode: string; blocked?: boolean; message?: string; stepSummary: string; logs: string[] } = {
   mode,
   stepSummary: markdown,
   logs: wrapLogGroup("HTTP Proxy communication logs", logText),

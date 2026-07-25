@@ -13,21 +13,23 @@
  * (with its own known_blocked_rules/fail_on_blocked input, its own
  * actionRepo/actionRef) directly from this container's log rather than
  * going through report.sh/the `report` action at all. `stepSummary`/
- * `blocked`/`message`/`logs` are the newer, already-fully-rendered fields
- * the `report` action consumes instead — see report/src/main.ts. `logs` is
- * a flat `{level, log}[]` (see core/lib/log/log-entries.ts) that report
- * prints one entry at a time via console[level] — the ::group::/::endgroup::
- * markers around the raw log ride along as ordinary info-level entries
- * rather than needing special-case handling on the report side.
+ * `blocked`/`message`/`logs` are consumed by report.sh instead (see
+ * setup/docker/transparent/files/report.sh) — report.sh owns everything
+ * downstream of this JSON (Job Summary, log output, fail_on_blocked exit
+ * code), so this script's own output shape is never a cross-version
+ * contract with the `report` action itself. `logs` is a flat `string[]`
+ * (see core/lib/log/log-entries.ts) report.sh prints as-is, one per line —
+ * the ::group::/::endgroup:: markers around the raw log are just plain
+ * entries in that array.
  *
  * `mode` and `known_blocked_rules` are read from this container's own
  * environment (set by `setup`, not passed as arguments) so that report.sh's
  * invocation of this script never needs updating when those inputs change.
  * `stepSummary` still contains `{{GITHUB_ACTION_REPOSITORY}}`/
  * `{{GITHUB_ACTION_REF}}` placeholders — those are only known to the actual
- * `report` action step's own runtime, so report/src/main.ts substitutes
- * them in (scoped to just this field, not the whole JSON payload) after
- * this script exits.
+ * `report` action step's own runtime, so report.sh substitutes them in
+ * (scoped to just this field, not the whole JSON payload) after this
+ * script exits.
  *
  * Usage: qjs --std -m /opt/buildcage/scripts/report.js
  */
@@ -38,7 +40,7 @@ import { splitRuleTokens } from "../lib/acl/wildcard-rules.js";
 import { annotateKnownBlocked, buildBlockedMessage, type AnnotatedBlockedRow } from "../lib/report/known-blocked.js";
 import { renderHostTable } from "../lib/report/host-table.js";
 import { buildRestrictExample } from "../lib/report/build-example.js";
-import { wrapLogGroup, type LogEntry } from "../lib/log/log-entries.js";
+import { wrapLogGroup } from "../lib/log/log-entries.js";
 
 const ACTION_REPO_PLACEHOLDER = "{{GITHUB_ACTION_REPOSITORY}}";
 const ACTION_REF_PLACEHOLDER = "{{GITHUB_ACTION_REF}}";
@@ -115,7 +117,7 @@ const result: {
   blocked?: boolean;
   message?: string;
   stepSummary: string;
-  logs: LogEntry[];
+  logs: string[];
 } = {
   mode,
   sections,
