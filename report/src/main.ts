@@ -14,11 +14,12 @@ import { ReportError } from "./lib/errors.ts";
 /**
  * report.sh/report.js's JSON contract — see
  * setup/docker/{transparent,explicit}/files/report.sh and
- * core/scripts/report.ts. `stepSummary` already has
- * {{GITHUB_ACTION_REPOSITORY}}/{{GITHUB_ACTION_REF}} substituted by
- * report.sh; `blocked`/`message` are absent when there's nothing to report
- * (audit mode never sets `blocked` at all — it never fails regardless of
- * blocked connections).
+ * core/scripts/report.ts. `stepSummary` still contains report.js's
+ * unsubstituted {{GITHUB_ACTION_REPOSITORY}}/{{GITHUB_ACTION_REF}}
+ * placeholders — see substituteActionPlaceholders below. `blocked` is only
+ * ever present when mode is "restrict" (audit mode never fails regardless
+ * of blocked connections); `message` is present whenever there's a blocked
+ * connection to report, audit or restrict.
  */
 export interface ReportResult {
   mode: string | null;
@@ -45,6 +46,22 @@ export function parseContainerIds(psOutput: string): string[] {
  */
 export function shouldFailOnBlocked(report: Pick<ReportResult, "mode" | "blocked">, failOnBlocked: boolean): boolean {
   return report.mode === "restrict" && report.blocked === true && failOnBlocked;
+}
+
+/**
+ * report.js can't know its own actionRepo/actionRef (those only exist in
+ * the `report` action step's own GitHub Actions runtime, not inside the
+ * container), so it leaves these two placeholders in stepSummary instead.
+ * Substituting them here in JS, scoped to just the stepSummary string
+ * (never rawLog, never the raw JSON text), means: no shell quoting/sed
+ * delimiter concerns with ref/repo values, and proxy-log content a build
+ * step could influence — which flows into rawLog and stepSummary's own
+ * host/URL tables — is never in scope for the substitution to begin with.
+ */
+export function substituteActionPlaceholders(stepSummary: string, env: NodeJS.ProcessEnv): string {
+  return stepSummary
+    .replaceAll("{{GITHUB_ACTION_REPOSITORY}}", env.GITHUB_ACTION_REPOSITORY || "")
+    .replaceAll("{{GITHUB_ACTION_REF}}", env.GITHUB_ACTION_REF || "");
 }
 
 async function main(): Promise<void> {
@@ -94,28 +111,48 @@ async function main(): Promise<void> {
   let jsonOutput: string;
   try {
     const reportScriptPath = join(scratchDir, "report.sh");
-    execFileSync(
-      "docker",
-      buildDockerCpArgs({
-        containerName: containerId,
-        containerPath: "/opt/buildcage/scripts/report.sh",
-        hostPath: reportScriptPath,
-      }),
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
-    chmodSync(reportScriptPath, 0o700);
 
-    jsonOutput = execFileSync(reportScriptPath, [containerId], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  } catch (e) {
-    throw new ReportError(
-      describeDockerFailure(e, { operation: "fetching the report from the container" }),
-      "DOCKER_UNAVAILABLE",
-    );
+    // `docker cp` failing is a genuine Docker/runner problem — same
+    // diagnosis as the container-lookup step above.
+    try {
+      execFileSync(
+        "docker",
+        buildDockerCpArgs({
+          containerName: containerId,
+          containerPath: "/opt/buildcage/scripts/report.sh",
+          hostPath: reportScriptPath,
+        }),
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+    } catch (e) {
+      throw new ReportError(
+        describeDockerFailure(e, { operation: "docker cp (fetching report.sh from the container)" }),
+        "DOCKER_UNAVAILABLE",
+      );
+    }
+
+    // Anything past this point is report.sh's own problem (or ours in
+    // preparing to run it) rather than "Docker isn't set up on this
+    // runner" — keeping it a separate catch means the error the user sees
+    // names the actual failure (report.sh's captured stderr, which
+    // includes whatever the in-container report.js itself failed with)
+    // instead of a misleading "Docker isn't installed" message.
+    try {
+      chmodSync(reportScriptPath, 0o700);
+      jsonOutput = execFileSync(reportScriptPath, [containerId], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) {
+      const stderr = typeof (e as { stderr?: unknown }).stderr === "string" ? (e as { stderr: string }).stderr.trim() : "";
+      throw new ReportError(
+        `report.sh failed${stderr ? `: ${stderr}` : ` (${errorMessage(e)})`}`,
+        "REPORT_SCRIPT_FAILED",
+      );
+    }
   } finally {
     rmSync(scratchDir, { recursive: true, force: true });
   }
 
   const report = JSON.parse(jsonOutput) as ReportResult;
+  report.stepSummary = substituteActionPlaceholders(report.stepSummary, process.env);
 
   // 3. Console output — raw log lines, unchanged from before this redesign.
   if (report.rawLog) {

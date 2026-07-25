@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseContainerIds, shouldFailOnBlocked } from "./main.ts";
+import { parseContainerIds, shouldFailOnBlocked, substituteActionPlaceholders } from "./main.ts";
 
 describe("parseContainerIds", () => {
   it("splits one ID per line", () => {
@@ -40,5 +40,31 @@ describe("shouldFailOnBlocked", () => {
 
   it("never fails when mode is null (no proxy logs found)", () => {
     assert.equal(shouldFailOnBlocked({ mode: null, blocked: true }, true), false);
+  });
+});
+
+describe("substituteActionPlaceholders", () => {
+  it("substitutes both placeholders from the given env", () => {
+    const env = { GITHUB_ACTION_REPOSITORY: "dash14/buildcage", GITHUB_ACTION_REF: "v2" };
+    assert.equal(
+      substituteActionPlaceholders("uses: {{GITHUB_ACTION_REPOSITORY}}/setup@{{GITHUB_ACTION_REF}}", env),
+      "uses: dash14/buildcage/setup@v2",
+    );
+  });
+
+  it("substitutes every occurrence, not just the first", () => {
+    const env = { GITHUB_ACTION_REPOSITORY: "dash14/buildcage" };
+    assert.equal(
+      substituteActionPlaceholders("{{GITHUB_ACTION_REPOSITORY}} and {{GITHUB_ACTION_REPOSITORY}}", env),
+      "dash14/buildcage and dash14/buildcage",
+    );
+  });
+
+  it("falls back to an empty string when the env var is unset", () => {
+    assert.equal(substituteActionPlaceholders("repo: {{GITHUB_ACTION_REPOSITORY}}", {}), "repo: ");
+  });
+
+  it("leaves text with no placeholders untouched", () => {
+    assert.equal(substituteActionPlaceholders("no placeholders here", {}), "no placeholders here");
   });
 });
