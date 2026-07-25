@@ -109,9 +109,13 @@ function errorMessage(e) {
 * core/lib/acl/rules.ts).
 *
 * Codes:
-*   DOCKER_UNAVAILABLE  – docker CLI missing from PATH or a docker command failed
-*   CONTAINER_NOT_FOUND – `docker ps --filter` didn't find exactly one
-*                         report-source container for this builder_name
+*   DOCKER_UNAVAILABLE   – docker CLI missing from PATH, or `docker ps`/`docker cp` failed
+*   CONTAINER_NOT_FOUND  – `docker ps --filter` didn't find exactly one
+*                          report-source container for this builder_name
+*   REPORT_SCRIPT_FAILED – report.sh itself (or making it executable) failed
+*                          after being fetched from the container — not
+*                          necessarily a Docker/runner problem, so this is
+*                          kept distinct from DOCKER_UNAVAILABLE
 */
 var ReportError = class extends ActionError {};
 //#endregion
@@ -129,6 +133,19 @@ function parseContainerIds(psOutput) {
 */
 function shouldFailOnBlocked(report, failOnBlocked) {
 	return report.mode === "restrict" && report.blocked === !0 && failOnBlocked;
+}
+/**
+* report.js can't know its own actionRepo/actionRef (those only exist in
+* the `report` action step's own GitHub Actions runtime, not inside the
+* container), so it leaves these two placeholders in stepSummary instead.
+* Substituting them here in JS, scoped to just the stepSummary string
+* (never rawLog, never the raw JSON text), means: no shell quoting/sed
+* delimiter concerns with ref/repo values, and proxy-log content a build
+* step could influence — which flows into rawLog and stepSummary's own
+* host/URL tables — is never in scope for the substitution to begin with.
+*/
+function substituteActionPlaceholders(stepSummary, env) {
+	return stepSummary.replaceAll("{{GITHUB_ACTION_REPOSITORY}}", env.GITHUB_ACTION_REPOSITORY || "").replaceAll("{{GITHUB_ACTION_REF}}", env.GITHUB_ACTION_REF || "");
 }
 async function main() {
 	let builderName = process.env.INPUT_BUILDER_NAME || "buildcage", projectName = deriveProjectName(builderName), summaryFile = process.env.GITHUB_STEP_SUMMARY, annotation = createAnnotation(!!summaryFile), containerId;
@@ -157,24 +174,32 @@ async function main() {
 	let scratchDir = (0, node_fs.mkdtempSync)((0, node_path.join)((0, node_os.tmpdir)(), "buildcage-report-")), jsonOutput;
 	try {
 		let reportScriptPath = (0, node_path.join)(scratchDir, "report.sh");
-		(0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
-			containerName: containerId,
-			containerPath: "/opt/buildcage/scripts/report.sh",
-			hostPath: reportScriptPath
-		}), { stdio: [
-			"ignore",
-			"pipe",
-			"pipe"
-		] }), (0, node_fs.chmodSync)(reportScriptPath, 448), jsonOutput = (0, node_child_process.execFileSync)(reportScriptPath, [containerId], {
-			encoding: "utf8",
-			stdio: [
+		try {
+			(0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
+				containerName: containerId,
+				containerPath: "/opt/buildcage/scripts/report.sh",
+				hostPath: reportScriptPath
+			}), { stdio: [
 				"ignore",
 				"pipe",
 				"pipe"
-			]
-		});
-	} catch (e) {
-		throw new ReportError(describeDockerFailure(e, { operation: "fetching the report from the container" }), "DOCKER_UNAVAILABLE");
+			] });
+		} catch (e) {
+			throw new ReportError(describeDockerFailure(e, { operation: "docker cp (fetching report.sh from the container)" }), "DOCKER_UNAVAILABLE");
+		}
+		try {
+			(0, node_fs.chmodSync)(reportScriptPath, 448), jsonOutput = (0, node_child_process.execFileSync)(reportScriptPath, [containerId], {
+				encoding: "utf8",
+				stdio: [
+					"ignore",
+					"pipe",
+					"pipe"
+				]
+			});
+		} catch (e) {
+			let stderr = typeof e.stderr == "string" ? e.stderr.trim() : "";
+			throw new ReportError(`report.sh failed${stderr ? `: ${stderr}` : ` (${errorMessage(e)})`}`, "REPORT_SCRIPT_FAILED");
+		}
 	} finally {
 		(0, node_fs.rmSync)(scratchDir, {
 			recursive: !0,
@@ -182,10 +207,10 @@ async function main() {
 		});
 	}
 	let report = JSON.parse(jsonOutput);
-	report.rawLog && (console.log("::group::HTTP Proxy communication logs"), process.stdout.write(report.rawLog), console.log("::endgroup::"), console.log()), summaryFile ? (0, node_fs.appendFileSync)(summaryFile, report.stepSummary) : console.log(report.stepSummary), report.mode === null && process.exit(0);
+	report.stepSummary = substituteActionPlaceholders(report.stepSummary, process.env), report.rawLog && (console.log("::group::HTTP Proxy communication logs"), process.stdout.write(report.rawLog), console.log("::endgroup::"), console.log()), summaryFile ? (0, node_fs.appendFileSync)(summaryFile, report.stepSummary) : console.log(report.stepSummary), report.mode === null && process.exit(0);
 	let failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
 	report.message && (shouldFailOnBlocked(report, failOnBlocked) ? (annotation.error(report.message), process.exitCode = 1) : annotation.notice(report.message));
 }
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
 	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in report: ${errorMessage(err)}`), process.exit(1);
-}), exports.parseContainerIds = parseContainerIds, exports.shouldFailOnBlocked = shouldFailOnBlocked;
+}), exports.parseContainerIds = parseContainerIds, exports.shouldFailOnBlocked = shouldFailOnBlocked, exports.substituteActionPlaceholders = substituteActionPlaceholders;
