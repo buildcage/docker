@@ -3,6 +3,23 @@ COMPOSE_FILE ?= compose.yaml
 # containers/images instead of the default transparent-engine test overlay.
 TEST_COMPOSE_FILE ?= setup/compose.test-transparent.yaml
 
+# All run_{engine}_{mode}_mode targets below use the same implicit
+# builder_name ("buildcage", matching setup/action.yml's own default). This
+# value isn't an arbitrary choice — report/src/main.ts independently computes
+# deriveProjectName("buildcage") itself (see core/lib/docker/container.ts)
+# and finds its container purely via `docker ps --filter
+# label=com.docker.compose.project=...`, so it must match exactly what that
+# function returns. Importing the real function (rather than reimplementing
+# its SHA256 hashing here) means this can never drift from it.
+#
+# Exported (not just a make variable) so it also reaches the plain `docker
+# compose exec` calls in setup/test/helpers.sh and setup/test/assert-explicit-*.sh
+# — those run as standalone scripts, invoked without -p, and would otherwise
+# fall back to Compose's own implicit directory-derived project name instead
+# of the one these targets actually started containers under.
+export COMPOSE_PROJECT_NAME := $(shell node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName('buildcage')))")
+BUILDER_PROJECT_NAME := $(COMPOSE_PROJECT_NAME)
+
 # Self-Documented Makefile
 .PHONY: help
 help:
@@ -12,7 +29,7 @@ help:
 clean: ## Clean up all resources
 	@echo "Stopping and removing all containers..."
 	@docker buildx rm buildcage 2>/dev/null || true
-	@docker compose -f compose.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi all
+	@docker compose -p $(BUILDER_PROJECT_NAME) -f compose.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi all
 	@docker rmi buildcage-test 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
@@ -25,7 +42,7 @@ run_transparent_audit_mode: ## Start transparent engine in audit mode
 	@echo "Starting buildcage (transparent engine) in AUDIT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=audit \
-	  docker compose up -d --wait --build
+	  docker compose -p $(BUILDER_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
@@ -39,7 +56,7 @@ run_transparent_restrict_mode: ## Start transparent engine in restrict mode
 	  PROXY_MODE=restrict \
 	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
 	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
-	  docker compose up -d --wait --build
+	  docker compose -p $(BUILDER_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
@@ -52,7 +69,7 @@ run_explicit_audit_mode: ## Start explicit proxy engine in audit mode
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_ENGINE=explicit \
 	  PROXY_MODE=audit \
-	  docker compose up -d --wait --build
+	  docker compose -p $(BUILDER_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
@@ -67,7 +84,7 @@ run_explicit_restrict_mode: ## Start explicit proxy engine in restrict mode
 	  PROXY_MODE=restrict \
 	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
 	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
-	  docker compose up -d --wait --build
+	  docker compose -p $(BUILDER_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
@@ -122,7 +139,7 @@ test_transparent_audit_mode: ## Run transparent-engine audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.transparent-audit setup/test/ \
 	  --load -t buildcage-test
-	@node report/src/main.ts ./compose.yaml
+	@node report/src/main.ts
 	@./setup/test/assert-transparent-audit.sh
 	@$(MAKE) clean
 
@@ -136,7 +153,7 @@ test_transparent_restrict_mode: ## Run transparent-engine restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.transparent-restrict setup/test/ \
 	  --load -t buildcage-test
-	@node report/src/main.ts ./compose.yaml || true
+	@node report/src/main.ts || true
 	@./setup/test/assert-transparent-restrict.sh
 	@$(MAKE) clean
 
@@ -150,7 +167,7 @@ test_explicit_audit_mode: ## Run explicit-engine audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.explicit-audit setup/test/ \
 	  --load -t buildcage-test
-	@PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml || true
+	@node report/src/main.ts || true
 	@./setup/test/assert-explicit-audit.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
@@ -164,7 +181,7 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.explicit-restrict setup/test/ \
 	  --load -t buildcage-test
-	@PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml || true
+	@node report/src/main.ts || true
 	@./setup/test/assert-explicit-restrict.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
@@ -242,7 +259,7 @@ run_audit_example: ## Run audit mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.ts ./compose.yaml
+	@node report/src/main.ts
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
 
@@ -263,6 +280,6 @@ run_restrict_example: ## Run restrict mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.ts ./compose.yaml || true
+	@node report/src/main.ts || true
 	@$(MAKE) clean
 	rm -fr /tmp/build-context

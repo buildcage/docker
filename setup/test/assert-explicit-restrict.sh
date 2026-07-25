@@ -63,43 +63,28 @@ echo ""
 
 echo "[report action] JSON round-trip through the explicit-mode report.js:"
 REPORT_JSON=$(docker compose exec builder qjs --std -m /opt/buildcage/scripts/report.js 2>/dev/null)
-BLOCKED_COUNT=$(echo "$REPORT_JSON" | grep -o '"blockedCount": *[0-9]*' | grep -o '[0-9]*$' || echo "")
-if [ -n "$BLOCKED_COUNT" ] && [ "$BLOCKED_COUNT" -ge 6 ]; then
-  echo "  PASS  report.js blockedCount=$BLOCKED_COUNT (>= 6 expected)"
+MODE=$(echo "$REPORT_JSON" | sed -n 's/.*"mode": *"\([a-z]*\)".*/\1/p')
+BLOCKED=$(echo "$REPORT_JSON" | grep -o '"blocked":true' || echo "")
+if [ "$MODE" = "restrict" ] && [ -n "$BLOCKED" ]; then
+  echo "  PASS  report.js mode=restrict blocked=true"
 else
-  echo "  FAIL  report.js blockedCount='$BLOCKED_COUNT', expected >= 6"
-  FAILURES=$((FAILURES + 1))
-fi
-
-# report.js has no "allowed" section at all (see report.js's header comment)
-# — that table is built by report/src/main.ts itself from buildctl's
-# build-history vertex log (see report/src/lib/vertex-log.ts's
-# aggregateAllowedHosts). Verified further down via the rendered markdown.
-
-# Parsed from BuildKit's own source-policy denials, with a timestamp each —
-# see setup/docker/explicit/scripts/lib/buildkitd-log-parser.ts's parseDenialTimeline.
-DENIED_TIMELINE_COUNT=$(echo "$REPORT_JSON" | sed -n '/"deniedTimeline":/,/\]/p' | grep -c '"url":' || true)
-if [ "$DENIED_TIMELINE_COUNT" -ge 6 ]; then
-  echo "  PASS  report.js deniedTimeline has $DENIED_TIMELINE_COUNT entries (>= 6 expected)"
-else
-  echo "  FAIL  report.js deniedTimeline has $DENIED_TIMELINE_COUNT entries, expected >= 6"
+  echo "  FAIL  report.js mode='$MODE' blocked='$BLOCKED', expected mode=restrict blocked=true"
   FAILURES=$((FAILURES + 1))
 fi
 echo ""
 
-# The per-command "Communication details" section is built by report/src/main.ts
-# itself (not report.js) via buildctl debug histories/logs — see
-# report/src/lib/vertex-log.ts. Verify the rendered markdown directly.
+# report.js already renders the full stepSummary itself (Allowed/Blocked
+# Hosts tables, per-command Communication details) — report/src/main.ts just
+# relays report.sh's stdout (see report/src/main.ts's header comment on
+# ReportResult) rather than building any of this itself. Verify that
+# end-to-end via the same path report/src/main.ts uses.
 #
 # GITHUB_STEP_SUMMARY is unset here on purpose: main.ts writes the rendered
 # markdown there instead of stdout whenever it's set, which it always is
 # inside an actual GitHub Actions job (including this one) — so leaving it
 # set would make $REPORT_MARKDOWN capture nothing.
-REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml 2>&1 || true)
+REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= node report/src/main.ts 2>&1 || true)
 
-# The "Allowed Hosts" table is built by report/src/main.ts itself (not
-# report.js) from buildctl's build-history vertex log, aggregated by
-# aggregateAllowedHosts — see report/src/lib/vertex-log.ts.
 echo "[report action] Allowed Hosts table (rendered markdown, from buildctl aggregation):"
 if grep -qF "### ✅ Allowed Hosts" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| allowed.example.com:443 | HTTPS | 1 |" <<< "$REPORT_MARKDOWN" \
@@ -111,10 +96,20 @@ else
 fi
 echo ""
 
-# The per-command "Communication details" section is built by report/src/main.ts
-# itself (not report.js) via buildctl debug histories/logs — see
-# report/src/lib/vertex-log.ts. Step-counter brackets are escaped in the
-# rendered markdown (see command-log.ts's escapeMarkdown) — "* \[ 3/15\] RUN ...".
+echo "[report action] Blocked Hosts table (rendered markdown, from buildkitd's source-policy denial log):"
+if grep -qF "### 🚫 Blocked Hosts" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| blocked.example.com:443 | HTTPS | not-allowed | 1 |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| deep.sub.wildcard.example.com:443 | HTTPS | not-allowed | 1 |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| 10.200.0.100:80" <<< "$REPORT_MARKDOWN"; then
+  echo "  PASS  rendered markdown has a Blocked Hosts table incl. blocked.example.com, deep.sub.wildcard.example.com, and 10.200.0.100"
+else
+  echo "  FAIL  rendered markdown missing expected Blocked Hosts table content"
+  FAILURES=$((FAILURES + 1))
+fi
+echo ""
+
+# Step-counter brackets are escaped in the rendered markdown (see
+# command-log.ts's escapeMarkdown) — "* \[ 3/15\] RUN ...".
 echo "[report action] per-command communication detail (rendered markdown):"
 if grep -qF "Communication details" <<< "$REPORT_MARKDOWN" \
   && grep -qF "Allowed Urls" <<< "$REPORT_MARKDOWN" \
