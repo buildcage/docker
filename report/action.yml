@@ -10,10 +10,6 @@ inputs:
     description: "Fail the step if blocked connections are detected"
     required: false
     default: 'true'
-  known_blocked_rules:
-    description: "Domains expected to be blocked intentionally (wildcard or ~regex), separated by whitespace. Port required. Blocked connections matching these rules don't fail the step even when fail_on_blocked is true — only unmatched (unexpected) blocked connections do. e.g., 'known-noisy.example.com:443'"
-    required: false
-    default: ''
 
 runs:
   using: node24
