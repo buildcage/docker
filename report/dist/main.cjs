@@ -138,6 +138,41 @@ function aggregate(filtered) {
 	}).sort((a, b) => b.count - a.count || (a.host < b.host ? -1 : +(a.host > b.host)) || Number(a.port) - Number(b.port));
 }
 //#endregion
+//#region core/lib/log/bytes.ts
+/**
+* Portable byte-array -> UTF-8 string decoder. Neither Buffer nor
+* TextDecoder exist under QuickJS, so this hand-rolls the UTF-8
+* re-assembly; used to decode base64-embedded log data (vertex-log.ts)
+* and subprocess stdout captured via qjs:os's exec/pipe/read (explicit
+* engine's report.ts, which shells out to buildctl itself).
+*/
+function bytesToUtf8(bytes) {
+	let result = "", i = 0;
+	for (; i < bytes.length;) {
+		let b0 = bytes[i];
+		if (b0 < 128) result += String.fromCharCode(b0), i += 1;
+		else if ((b0 & 224) == 192 && i + 1 < bytes.length) result += String.fromCharCode((b0 & 31) << 6 | bytes[i + 1] & 63), i += 2;
+		else if ((b0 & 240) == 224 && i + 2 < bytes.length) result += String.fromCharCode((b0 & 15) << 12 | (bytes[i + 1] & 63) << 6 | bytes[i + 2] & 63), i += 3;
+		else if ((b0 & 248) == 240 && i + 3 < bytes.length) {
+			let codePoint = (b0 & 7) << 18 | (bytes[i + 1] & 63) << 12 | (bytes[i + 2] & 63) << 6 | bytes[i + 3] & 63;
+			result += String.fromCodePoint(codePoint), i += 4;
+		} else i += 1;
+	}
+	return result;
+}
+function base64ToBytes(b64) {
+	let bytes = [], buffer = 0, bits = 0;
+	for (let ch of b64) {
+		if (ch === "=") break;
+		let index = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".indexOf(ch);
+		index !== -1 && (buffer = buffer << 6 | index, bits += 6, bits >= 8 && (bits -= 8, bytes.push(buffer >> bits & 255)));
+	}
+	return bytes;
+}
+function base64ToUtf8(b64) {
+	return bytesToUtf8(base64ToBytes(b64));
+}
+//#endregion
 //#region core/lib/log/vertex-log.ts
 function selectAllRefs(historiesText) {
 	let byRef = /* @__PURE__ */ new Map();
@@ -180,32 +215,6 @@ function parseAllowedRequestsFromText(text) {
 	}
 	return entries;
 }
-function base64ToBytes(b64) {
-	let bytes = [], buffer = 0, bits = 0;
-	for (let ch of b64) {
-		if (ch === "=") break;
-		let index = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".indexOf(ch);
-		index !== -1 && (buffer = buffer << 6 | index, bits += 6, bits >= 8 && (bits -= 8, bytes.push(buffer >> bits & 255)));
-	}
-	return bytes;
-}
-function bytesToUtf8(bytes) {
-	let result = "", i = 0;
-	for (; i < bytes.length;) {
-		let b0 = bytes[i];
-		if (b0 < 128) result += String.fromCharCode(b0), i += 1;
-		else if ((b0 & 224) == 192 && i + 1 < bytes.length) result += String.fromCharCode((b0 & 31) << 6 | bytes[i + 1] & 63), i += 2;
-		else if ((b0 & 240) == 224 && i + 2 < bytes.length) result += String.fromCharCode((b0 & 15) << 12 | (bytes[i + 1] & 63) << 6 | bytes[i + 2] & 63), i += 3;
-		else if ((b0 & 248) == 240 && i + 3 < bytes.length) {
-			let codePoint = (b0 & 7) << 18 | (bytes[i + 1] & 63) << 12 | (bytes[i + 2] & 63) << 6 | bytes[i + 3] & 63;
-			result += String.fromCodePoint(codePoint), i += 4;
-		} else i += 1;
-	}
-	return result;
-}
-function base64Decode(b64) {
-	return bytesToUtf8(base64ToBytes(b64));
-}
 function parseVertexAllowedLog(rawJsonText) {
 	let vertexes = [], logs = [];
 	for (let line of rawJsonText.split("\n")) {
@@ -230,7 +239,7 @@ function parseVertexAllowedLog(rawJsonText) {
 	let orderedGroups = [...groups.values()].sort((a, b) => Date.parse(a[0].started) - Date.parse(b[0].started)), logsByDigest = /* @__PURE__ */ new Map();
 	for (let l of logs) l.stream === 2 && (logsByDigest.has(l.vertex) || logsByDigest.set(l.vertex, []), logsByDigest.get(l.vertex).push(l));
 	return orderedGroups.flat().map((v) => {
-		let text = (logsByDigest.get(v.digest) || []).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)).map((l) => base64Decode(l.data)).join("");
+		let text = (logsByDigest.get(v.digest) || []).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)).map((l) => base64ToUtf8(l.data)).join("");
 		return {
 			command: v.name,
 			started: v.started,
