@@ -47,7 +47,8 @@ FROM moby/buildkit:v0.31.1@sha256:6b59b7df63a8cb9902736f9ddf7fcff8261613d3e7449b
 LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
       org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later" \
-      org.opencontainers.image.source="https://github.com/dash14/buildcage"
+      org.opencontainers.image.source="https://github.com/dash14/buildcage" \
+      io.github.dash14.buildcage.report-source="true"
 
 RUN apk add --no-cache \
       s6-overlay \

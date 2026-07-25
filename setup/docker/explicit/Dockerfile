@@ -53,7 +53,8 @@ FROM moby/buildkit:v0.31.1@sha256:6b59b7df63a8cb9902736f9ddf7fcff8261613d3e7449b
 LABEL org.opencontainers.image.title="buildcage (explicit proxy engine)" \
       org.opencontainers.image.description="Secure Docker build environment using BuildKit's native --proxy-network" \
       org.opencontainers.image.licenses="MIT AND Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/dash14/buildcage"
+      org.opencontainers.image.source="https://github.com/dash14/buildcage" \
+      io.github.dash14.buildcage.report-source="true"
 
 # quickjs-ng is the only extra package needed, for source-policy generation.
 RUN apk add --no-cache quickjs-ng
