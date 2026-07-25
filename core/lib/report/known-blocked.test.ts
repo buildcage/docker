@@ -1,5 +1,4 @@
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
 import {
   annotateKnownBlocked,
   determineBlockedOutcome,
@@ -236,3 +235,5 @@ describe("evaluateBlockedReport", () => {
     assert.equal(result.showExpected, false);
   });
 });
+
+reportResults();

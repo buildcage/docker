@@ -1,5 +1,4 @@
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
 import { buildRestrictExample } from "./build-example.ts";
 
 const REPO = "dash14/buildcage";
@@ -255,3 +254,5 @@ describe("buildRestrictExample", () => {
     );
   });
 });
+
+reportResults();

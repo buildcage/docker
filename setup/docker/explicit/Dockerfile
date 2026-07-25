@@ -42,6 +42,7 @@ COPY rolldown.qjs.config.js tsconfig.qjs.json ./
 COPY core/scripts/ ./core/scripts/
 COPY core/lib/acl/ ./core/lib/acl/
 COPY core/lib/log/ ./core/lib/log/
+COPY core/lib/report/ ./core/lib/report/
 COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:qjs

@@ -11,8 +11,8 @@ const productionInputs = globSync(["core/scripts/*.ts", "setup/docker/explicit/s
 const testInputs = [
   "core/scripts/test/run-tests.qjs.ts",
   ...globSync(
-    ["core/lib/acl/*.test.ts", "core/lib/log/*.test.ts"],
-    { exclude: ["**/*.property.test.ts"] },
+    ["core/lib/acl/*.test.ts", "core/lib/log/*.test.ts", "core/lib/report/*.test.ts"],
+    { exclude: ["**/*.property.test.ts", "core/lib/log/vertex-log.test.ts"] },
   ),
 ];
 

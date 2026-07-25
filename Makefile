@@ -217,7 +217,8 @@ QJS_MOUNTS := \
 	-v "$(CURDIR)/dist/test-qjs/core:/opt/buildcage/core:ro"
 QJS_TEST_DIRS := \
 	/opt/buildcage/core/lib/acl \
-	/opt/buildcage/core/lib/log
+	/opt/buildcage/core/lib/log \
+	/opt/buildcage/core/lib/report
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker

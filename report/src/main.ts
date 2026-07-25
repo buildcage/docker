@@ -3,13 +3,13 @@ import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildRestrictExample } from "../../core/lib/report/build-example.ts";
-import { renderCommunicationDetails } from "./lib/command-log.ts";
+import { renderCommunicationDetails } from "../../core/lib/report/command-log.ts";
 import {
   selectAllRefs,
   parseVertexAllowedLog,
   aggregateAllowedHosts,
   type VertexAllowedEntry,
-} from "./lib/vertex-log.ts";
+} from "../../core/lib/log/vertex-log.ts";
 import { createAnnotation } from "../../core/lib/actions/annotation.ts";
 import { evaluateBlockedReport } from "../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../core/lib/report/host-table.ts";
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   // report.js has no "allowed"/"audited" section — that data comes from
   // buildctl's build-history vertex log instead, which needs no special
   // buildkitd configuration and tags each entry with the RUN step (vertex)
-  // that produced it (see report/src/lib/vertex-log.ts).
+  // that produced it (see core/lib/log/vertex-log.ts).
   let builds: VertexAllowedEntry[][] = [];
   if (isExplicit) {
     try {
