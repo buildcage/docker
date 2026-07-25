@@ -1,5 +1,5 @@
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
-let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_os = require("node:os"), node_path = require("node:path"), node_url = require("node:url");
+let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_os = require("node:os"), node_path = require("node:path"), node_url = require("node:url"), node_crypto = require("node:crypto");
 //#region core/lib/actions/annotation.ts
 /**
 * Build a GitHub Actions annotation emitter. When `enabled` is false, every
@@ -60,15 +60,24 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 //#endregion
 //#region core/lib/docker/container.ts
 /**
-* Reused as the Compose project name (separate Docker namespace from
-* container names, so no collision). Passing an explicit, per-container
-* project name matters when multiple steps/containers in the same job run
-* concurrently: without it, Compose falls back to one shared, directory-
-* derived project name, and a concurrent `up`/`down`/`ps` from a different
-* step can recreate, tear down, or misidentify another step's container.
+* Derives a Compose project name (a separate Docker namespace from
+* container names, so no collision risk there) from a container/builder
+* name. Passing an explicit, deterministic project name matters when
+* multiple steps/containers in the same job run concurrently: without it,
+* Compose falls back to one shared, directory-derived project name, and a
+* concurrent `up`/`down`/`ps` from a different step can recreate, tear
+* down, or misidentify another step's container.
+*
+* Hashed rather than used verbatim: Compose project names are constrained
+* to `^[a-z0-9][a-z0-9_-]*$`, but the input here can be a user-supplied
+* `builder_name` (setup/report's own input, which only ever had to be a
+* valid Docker container name — a wider character set, e.g. uppercase) or
+* run's own randomly-generated container name. A hex digest is always
+* within Compose's charset regardless of what the input looked like, so
+* this never needs to validate or reject its input.
 */
 function deriveProjectName(containerName) {
-	return containerName;
+	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
 }
 function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	return [
