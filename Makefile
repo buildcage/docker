@@ -3,20 +3,11 @@ COMPOSE_FILE ?= compose.yaml
 # containers/images instead of the default transparent-engine test overlay.
 TEST_COMPOSE_FILE ?= setup/compose.test-transparent.yaml
 
-# All run_{engine}_{mode}_mode targets below use the same implicit
-# builder_name ("buildcage", matching setup/action.yml's own default). This
-# value isn't an arbitrary choice — report/src/main.ts independently computes
-# deriveProjectName("buildcage") itself (see core/lib/docker/container.ts)
-# and finds its container purely via `docker ps --filter
-# label=com.docker.compose.project=...`, so it must match exactly what that
-# function returns. Importing the real function (rather than reimplementing
-# its SHA256 hashing here) means this can never drift from it.
-#
-# Exported (not just a make variable) so it also reaches the plain `docker
-# compose exec` calls in setup/test/helpers.sh and setup/test/assert-explicit-*.sh
-# — those run as standalone scripts, invoked without -p, and would otherwise
-# fall back to Compose's own implicit directory-derived project name instead
-# of the one these targets actually started containers under.
+# Must equal report/src/main.ts's own deriveProjectName("buildcage") (see
+# core/lib/docker/container.ts) — imported directly, not reimplemented, so
+# it can't drift. Exported as COMPOSE_PROJECT_NAME so setup/test/helpers.sh
+# and assert-explicit-*.sh's plain `docker compose exec` calls pick it up
+# too, without needing -p on every invocation.
 export COMPOSE_PROJECT_NAME := $(shell node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName('buildcage')))")
 BUILDER_PROJECT_NAME := $(COMPOSE_PROJECT_NAME)
 
@@ -141,6 +132,8 @@ test_transparent_audit_mode: ## Run transparent-engine audit mode tests
 	  --load -t buildcage-test
 	@node report/src/main.ts
 	@./setup/test/assert-transparent-audit.sh
+	@node setup/src/post.ts
+	@./setup/test/assert-post.sh
 	@$(MAKE) clean
 
 .PHONY: test_transparent_restrict_mode
@@ -155,15 +148,8 @@ test_transparent_restrict_mode: ## Run transparent-engine restrict mode tests
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
 	@./setup/test/assert-transparent-restrict.sh
-	@echo ""
-	@echo "[setup post] verifying post.ts actually removes the builder/proxy containers:"
 	@node setup/src/post.ts
-	@if docker inspect buildcage buildcage-proxy >/dev/null 2>&1; then \
-	  echo "  FAIL  buildcage/buildcage-proxy still exist after post.ts cleanup"; \
-	  exit 1; \
-	else \
-	  echo "  PASS  buildcage/buildcage-proxy removed by post.ts"; \
-	fi
+	@./setup/test/assert-post.sh
 	@$(MAKE) clean
 
 .PHONY: test_explicit_audit_mode
@@ -178,6 +164,8 @@ test_explicit_audit_mode: ## Run explicit-engine audit mode tests
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
 	@./setup/test/assert-explicit-audit.sh
+	@node setup/src/post.ts
+	@./setup/test/assert-post.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
 .PHONY: test_explicit_restrict_mode
@@ -192,6 +180,8 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
 	@./setup/test/assert-explicit-restrict.sh
+	@node setup/src/post.ts
+	@./setup/test/assert-post.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
 # Unlike test_{engine}_{mode}_mode above, this drives run/dist/main.cjs

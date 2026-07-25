@@ -73,16 +73,9 @@ else
 fi
 echo ""
 
-# report.js already renders the full stepSummary itself (Allowed/Blocked
-# Hosts tables, per-command Communication details) — report/src/main.ts just
-# relays report.sh's stdout (see report/src/main.ts's header comment on
-# ReportResult) rather than building any of this itself. Verify that
-# end-to-end via the same path report/src/main.ts uses.
-#
-# GITHUB_STEP_SUMMARY is unset here on purpose: main.ts writes the rendered
-# markdown there instead of stdout whenever it's set, which it always is
-# inside an actual GitHub Actions job (including this one) — so leaving it
-# set would make $REPORT_MARKDOWN capture nothing.
+# report.js renders the full stepSummary itself; report/src/main.ts just
+# relays it. GITHUB_STEP_SUMMARY is unset so it prints to stdout instead of
+# a job-summary file.
 REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= node report/src/main.ts 2>&1 || true)
 
 echo "[report action] Allowed Hosts table (rendered markdown, from buildctl aggregation):"
