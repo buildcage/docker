@@ -108,19 +108,30 @@ jobs:
       - name: Build containers
         env:
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
+          BUILDER_NAME: ${{ matrix.builder_name }}
         # Scoped to the services this job actually needs: builder, plus the
         # test-server/test-dns fixtures added by matrix.compose_file's
         # overlay (compose.test-{transparent,explicit}.yaml). compose.yaml
         # also defines a proxy service (see the run action's own
         # test_sandbox job) that this job has no reason to build/start.
-        run: docker compose build builder test-server test-dns
+        #
+        # COMPOSE_PROJECT_NAME must match report/src/main.ts's own
+        # deriveProjectName(builder_name) (core/lib/docker/container.ts), or
+        # it can't find this job's container.
+        run: |
+          COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
+          export COMPOSE_PROJECT_NAME
+          docker compose build builder test-server test-dns
 
       - name: Start containers
         env:
           PROXY_MODE: ${{ matrix.proxy_mode }}
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: docker compose up -d --wait builder test-server test-dns
+        run: |
+          COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
+          export COMPOSE_PROJECT_NAME
+          docker compose up -d --wait builder test-server test-dns
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -157,12 +168,15 @@ jobs:
         # This job tests proxy enforcement directly, not the report action
         # itself — only test_action's real `uses: ./report` should produce a
         # Job Summary, so print to stdout here instead.
-        run: GITHUB_STEP_SUMMARY='' node report/src/main.ts ./compose.yaml || true
+        run: GITHUB_STEP_SUMMARY='' node report/src/main.ts || true
 
       - name: Run assertions
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: ${{ matrix.assert_script }}
+        run: |
+          COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
+          export COMPOSE_PROJECT_NAME
+          ${{ matrix.assert_script }}
 
       - name: Run source-policy conflict assertions
         if: matrix.mode == 'explicit-restrict'
@@ -174,7 +188,10 @@ jobs:
         if: always()
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: docker compose down -v --rmi all 2>/dev/null || true
+        run: |
+          COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
+          export COMPOSE_PROJECT_NAME
+          docker compose down -v --rmi all 2>/dev/null || true
 
   test_multiarch:
     needs: changes
