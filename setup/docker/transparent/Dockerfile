@@ -34,13 +34,27 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
 COPY rolldown.qjs.config.js tsconfig.qjs.json ./
 COPY core/scripts/ ./core/scripts/
-COPY core/lib/actions/ ./core/lib/actions/
 COPY core/lib/acl/ ./core/lib/acl/
-COPY core/lib/log/ ./core/lib/log/
-COPY core/lib/report/ ./core/lib/report/
 COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:qjs
+
+# Compile report-action.node.ts (Node-targeted, unlike qjs-build above) to a
+# single-file CommonJS bundle `node` can execute standalone — see
+# rolldown.report-action.config.js. Keep this stage byte-identical across
+# setup/docker/transparent/Dockerfile and setup/docker/explicit/Dockerfile
+# (run/docker/Dockerfile doesn't need it: run/src/lib/report.ts builds its
+# own report in-process instead of fetching one from the container).
+FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS report-action-build
+WORKDIR /build
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+COPY rolldown.report-action.config.js tsconfig.json ./
+COPY core/lib/ ./core/lib/
+COPY setup/docker/transparent/scripts/ ./setup/docker/transparent/scripts/
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm run build:report-action
 
 # Final image
 FROM moby/buildkit:v0.31.1@sha256:6b59b7df63a8cb9902736f9ddf7fcff8261613d3e7449b8ea8b7537fc399c03a
@@ -85,11 +99,11 @@ COPY setup/docker/transparent/files/haproxy.cfg.template /etc/haproxy/haproxy.cf
 # bundle — no separate /opt/buildcage/shared/ copy is needed, unlike before TypeScript
 # migration.
 COPY --from=qjs-build /build/dist/qjs/core/scripts/convert-rule.js /opt/buildcage/scripts/convert-rule.js
-COPY --from=qjs-build /build/dist/qjs/core/scripts/report.js       /opt/buildcage/scripts/report.js
 
-# report.sh — the runner-side orchestration script `docker cp`'d out by the
-# report action itself (never staged elsewhere); see the script for details.
-COPY --chmod=755 setup/docker/transparent/files/report.sh /opt/buildcage/scripts/report.sh
+# report-action.js — the runner-side report generator `docker cp`'d out by
+# the report action itself (never staged elsewhere); see its own header
+# comment for details.
+COPY --from=report-action-build /build/dist/report-action/setup/docker/transparent/scripts/report-action.js /opt/buildcage/scripts/report-action.js
 
 # License
 COPY setup/docker/transparent/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
