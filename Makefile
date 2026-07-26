@@ -8,8 +8,16 @@ TEST_COMPOSE_FILE ?= setup/compose.test-transparent.yaml
 # it can't drift. Exported as COMPOSE_PROJECT_NAME so setup/test/helpers.sh
 # and assert-explicit-*.sh's plain `docker compose exec` calls pick it up
 # too, without needing -p on every invocation.
+#
+# Skipped when the only goal is `help` (or no goal at all — `help` is the
+# default), so `make` / `make help` don't pay for a Node startup just to
+# print the command list.
+ifeq ($(strip $(filter-out help,$(or $(MAKECMDGOALS),help))),)
+BUILDER_PROJECT_NAME :=
+else
 export COMPOSE_PROJECT_NAME := $(shell node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName('buildcage')))")
 BUILDER_PROJECT_NAME := $(COMPOSE_PROJECT_NAME)
+endif
 
 # Self-Documented Makefile
 .PHONY: help
