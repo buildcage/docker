@@ -17,8 +17,7 @@ import { createDocker } from "../../../../core/lib/docker/client.ts";
 import { buildReportParameters } from "../../../../core/lib/report/report-parameters.ts";
 import { buildTransparentReportData } from "../../../../core/lib/report/build-transparent-report-data.ts";
 import { renderReportMarkdown } from "../../../../core/lib/report/render-report-markdown.ts";
-import { determineBlockedOutcome, buildBlockedMessage } from "../../../../core/lib/report/known-blocked.ts";
-import { createAnnotation } from "../../../../core/lib/actions/annotation.ts";
+import { emitBlockedOutcome } from "../../../../core/lib/report/emit-blocked-outcome.ts";
 import { errorMessage } from "../../../../core/lib/general/error-message.ts";
 
 const LOG_FILE = "/var/log/haproxy/current";
@@ -37,8 +36,8 @@ function main(): void {
 
   const markdown = renderReportMarkdown(
     report,
-    process.env.GITHUB_ACTION_REPOSITORY || "",
-    process.env.GITHUB_ACTION_REF || "",
+    process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage",
+    process.env.GITHUB_ACTION_REF || "v2",
   );
 
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -48,28 +47,8 @@ function main(): void {
     console.log(markdown);
   }
 
-  const isAudit = parameters.mode === "audit";
   const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
-  const outcome = determineBlockedOutcome({
-    isAudit,
-    failOnBlocked,
-    blockedCount: report.blockedCount,
-    blockedRows: report.blocked,
-  });
-
-  if (outcome.level !== "none") {
-    const message = buildBlockedMessage({
-      blockedCount: report.blockedCount,
-      blockedRows: report.blocked,
-      engineLabel: "proxy",
-      isAudit,
-    });
-    const annotation = createAnnotation(Boolean(summaryFile));
-    if (outcome.level === "error") annotation.error(message);
-    else annotation.notice(message);
-  }
-
-  if (outcome.shouldFail) process.exitCode = 1;
+  emitBlockedOutcome(report, { failOnBlocked, summaryFile });
 }
 
 try {
