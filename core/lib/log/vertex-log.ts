@@ -1,6 +1,5 @@
 import { parseIdentifier } from "./parse-identifier.ts";
 import { aggregate, type AggregatedEntry } from "./aggregate.ts";
-import { base64ToUtf8 } from "./bytes.ts";
 
 /**
  * Parse `buildctl debug histories --format '{{json .}}'`'s newline-delimited
@@ -184,7 +183,7 @@ export function parseVertexAllowedLog(rawJsonText: string): VertexAllowedEntry[]
     const stderrLogs = (logsByDigest.get(v.digest) || []).sort(
       (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)
     );
-    const text = stderrLogs.map((l) => base64ToUtf8(l.data)).join("");
+    const text = stderrLogs.map((l) => Buffer.from(l.data, "base64").toString("utf8")).join("");
     return {
       command: v.name,
       started: v.started!,
