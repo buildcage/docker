@@ -1,4 +1,3 @@
-Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_os = require("node:os"), node_path = require("node:path"), node_url = require("node:url"), node_crypto = require("node:crypto");
 /**
 * Turns a caught `docker` invocation error into an actionable message,
@@ -37,21 +36,14 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 //#endregion
 //#region core/lib/docker/container.ts
 /**
-* Derives a Compose project name (a separate Docker namespace from
-* container names, so no collision risk there) from a container/builder
-* name. Passing an explicit, deterministic project name matters when
-* multiple steps/containers in the same job run concurrently: without it,
-* Compose falls back to one shared, directory-derived project name, and a
-* concurrent `up`/`down`/`ps` from a different step can recreate, tear
-* down, or misidentify another step's container.
+* An explicit, deterministic Compose project name, so concurrent
+* `up`/`down`/`ps` from different steps in the same job never collide on
+* Compose's shared, directory-derived default.
 *
 * Hashed rather than used verbatim: Compose project names are constrained
-* to `^[a-z0-9][a-z0-9_-]*$`, but the input here can be a user-supplied
-* `builder_name` (setup/report's own input, which only ever had to be a
-* valid Docker container name — a wider character set, e.g. uppercase) or
-* run's own randomly-generated container name. A hex digest is always
-* within Compose's charset regardless of what the input looked like, so
-* this never needs to validate or reject its input.
+* to `^[a-z0-9][a-z0-9_-]*$`, but the input can be a wider-charset
+* user-supplied `builder_name` — a hex digest is always in-charset
+* regardless, so this never needs to validate its input.
 */
 function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
@@ -62,6 +54,81 @@ function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 		`${containerName}:${containerPath}`,
 		hostPath
 	];
+}
+//#endregion
+//#region core/lib/docker/container-env.ts
+/**
+* Parses `docker inspect <id> --format '{{json .Config.Env}}'`'s output — a
+* JSON array of "KEY=VALUE" strings — into a lookup map. Used to read a
+* running container's own env from the runner side (report-action.node.ts
+* doesn't run inside the container, so it can't read process.env directly).
+*/
+function parseDockerInspectEnv(inspectOutput) {
+	let entries = JSON.parse(inspectOutput), env = {};
+	for (let entry of entries) {
+		let i = entry.indexOf("=");
+		i !== -1 && (env[entry.slice(0, i)] = entry.slice(i + 1));
+	}
+	return env;
+}
+//#endregion
+//#region core/lib/docker/client.ts
+/** `docker ps --format '{{.ID}}'` prints one ID per line, possibly with
+*  trailing blank lines. */
+function parseContainerIds(psOutput) {
+	return psOutput.split("\n").map((s) => s.trim()).filter(Boolean);
+}
+function defaultRunCommand(args) {
+	return (0, node_child_process.execFileSync)("docker", args, {
+		encoding: "utf8",
+		stdio: [
+			"ignore",
+			"pipe",
+			"pipe"
+		],
+		maxBuffer: 64 * 1024 * 1024
+	});
+}
+/** `run` is injectable so tests can assert on argv instead of mocking
+*  node:child_process directly. */
+function createDocker(run = defaultRunCommand) {
+	return {
+		findContainers(filters) {
+			let args = ["ps"];
+			for (let filter of filters) args.push("--filter", filter);
+			return args.push("--format", "{{.ID}}"), parseContainerIds(run(args));
+		},
+		copyFromContainer(containerId, containerPath, hostPath) {
+			run(buildDockerCpArgs({
+				containerName: containerId,
+				containerPath,
+				hostPath
+			}));
+		},
+		readFile(containerId, path) {
+			return run([
+				"exec",
+				containerId,
+				"cat",
+				path
+			]);
+		},
+		readEnv(containerId) {
+			return parseDockerInspectEnv(run([
+				"inspect",
+				containerId,
+				"--format",
+				"{{json .Config.Env}}"
+			]));
+		},
+		exec(containerId, args) {
+			return run([
+				"exec",
+				containerId,
+				...args
+			]);
+		}
+	};
 }
 //#endregion
 //#region core/lib/general/action-error.ts
@@ -98,41 +165,17 @@ function errorMessage(e) {
 *   DOCKER_UNAVAILABLE   – docker CLI missing from PATH, or `docker ps`/`docker cp` failed
 *   CONTAINER_NOT_FOUND  – `docker ps --filter` didn't find exactly one
 *                          report-source container for this builder_name
-*   REPORT_SCRIPT_FAILED – report.sh couldn't even be launched (e.g. chmod
-*                          or exec itself failed) — a report.sh that ran
-*                          and exited nonzero on its own is reproduced via
-*                          this action's own exit code instead, not this
-*                          error
+*   REPORT_SCRIPT_FAILED – report-action.js couldn't even be launched (a
+*                          report-action.js that ran and exited nonzero is
+*                          reproduced via this action's exit code instead)
 */
 var ReportError = class extends ActionError {};
 //#endregion
 //#region report/src/main.ts
-/**
-* `docker ps --format '{{.ID}}'` prints one ID per line, possibly with
-* trailing blank lines — exported for unit testing without a real daemon.
-*/
-function parseContainerIds(psOutput) {
-	return psOutput.split("\n").map((s) => s.trim()).filter(Boolean);
-}
 async function main() {
-	let builderName = process.env.INPUT_BUILDER_NAME || "buildcage", projectName = deriveProjectName(builderName), containerId;
+	let builderName = process.env.INPUT_BUILDER_NAME || "buildcage", projectName = deriveProjectName(builderName), docker = createDocker(), containerId;
 	try {
-		let ids = parseContainerIds((0, node_child_process.execFileSync)("docker", [
-			"ps",
-			"--filter",
-			`label=com.docker.compose.project=${projectName}`,
-			"--filter",
-			"label=io.github.dash14.buildcage.report-source=true",
-			"--format",
-			"{{.ID}}"
-		], {
-			encoding: "utf8",
-			stdio: [
-				"ignore",
-				"pipe",
-				"pipe"
-			]
-		}));
+		let ids = docker.findContainers([`label=com.docker.compose.project=${projectName}`, "label=io.github.dash14.buildcage.report-source=true"]);
 		if (ids.length !== 1) throw new ReportError(`Expected exactly one buildcage container for builder_name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder_name?`, "CONTAINER_NOT_FOUND");
 		containerId = ids[0];
 	} catch (e) {
@@ -140,29 +183,21 @@ async function main() {
 	}
 	let scratchDir = (0, node_fs.mkdtempSync)((0, node_path.join)((0, node_os.tmpdir)(), "buildcage-report-"));
 	try {
-		let reportScriptPath = (0, node_path.join)(scratchDir, "report.sh");
+		let reportActionPath = (0, node_path.join)(scratchDir, "report-action.js");
 		try {
-			(0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
-				containerName: containerId,
-				containerPath: "/opt/buildcage/scripts/report.sh",
-				hostPath: reportScriptPath
-			}), { stdio: [
-				"ignore",
-				"pipe",
-				"pipe"
-			] });
+			docker.copyFromContainer(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath);
 		} catch (e) {
-			throw new ReportError(describeDockerFailure(e, { operation: "docker cp (fetching report.sh from the container)" }), "DOCKER_UNAVAILABLE");
+			throw new ReportError(describeDockerFailure(e, { operation: "docker cp (fetching report-action.js from the container)" }), "DOCKER_UNAVAILABLE");
 		}
 		try {
-			(0, node_fs.chmodSync)(reportScriptPath, 448), (0, node_child_process.execFileSync)(reportScriptPath, [containerId], { stdio: "inherit" });
+			(0, node_child_process.execFileSync)("node", [reportActionPath, containerId], { stdio: "inherit" });
 		} catch (e) {
 			let status = e.status;
 			if (typeof status == "number") {
 				process.exitCode = status;
 				return;
 			}
-			throw new ReportError(`Failed to run report.sh: ${errorMessage(e)}`, "REPORT_SCRIPT_FAILED");
+			throw new ReportError(`Failed to run report-action.js: ${errorMessage(e)}`, "REPORT_SCRIPT_FAILED");
 		}
 	} finally {
 		(0, node_fs.rmSync)(scratchDir, {
@@ -171,7 +206,7 @@ async function main() {
 		});
 	}
 }
-//#endregion
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
 	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in report: ${errorMessage(err)}`), process.exit(1);
-}), exports.parseContainerIds = parseContainerIds;
+});
+//#endregion
