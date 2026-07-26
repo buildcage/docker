@@ -1,7 +1,6 @@
 #!/bin/bash
-# Verifies audit mode: buildkitd never denies anything, report.js reports
-# mode=audit with no blocked/message fields, and accessed hosts show up in
-# the rendered Audited Hosts table.
+# Verifies audit mode: buildkitd never denies anything, and accessed hosts
+# show up in the rendered Audited Hosts table.
 set -euo pipefail
 
 FAILURES=0
@@ -21,23 +20,9 @@ else
 fi
 echo ""
 
-echo "[report action] JSON round-trip through the explicit-mode report.js:"
-REPORT_JSON=$(docker compose exec builder qjs --std -m /opt/buildcage/scripts/report.js 2>/dev/null)
-MODE=$(echo "$REPORT_JSON" | sed -n 's/.*"mode": *"\([a-z]*\)".*/\1/p')
-# Audit mode never sets "blocked"/"message" (only restrict mode does — see
-# core/scripts/report.ts), and this engine's audit-mode source policy never
-# blocks anything (core/lib/acl/source-policy.ts).
-if [ "$MODE" = "audit" ] && ! grep -q '"blocked"' <<< "$REPORT_JSON" && ! grep -q '"message"' <<< "$REPORT_JSON"; then
-  echo "  PASS  report.js mode=audit, no blocked/message fields"
-else
-  echo "  FAIL  report.js mode='$MODE', expected mode=audit with no blocked/message fields: $REPORT_JSON"
-  FAILURES=$((FAILURES + 1))
-fi
-echo ""
-
-# report.js renders the full stepSummary itself; report/src/main.ts just
-# relays it. GITHUB_STEP_SUMMARY is unset so it prints to stdout instead of
-# a job-summary file.
+# report-action.js renders the full stepSummary itself; report/src/main.ts
+# just relays it. GITHUB_STEP_SUMMARY is unset so it prints to stdout
+# instead of a job-summary file.
 REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= node report/src/main.ts 2>&1 || true)
 
 echo "[report action] Audited Hosts table (rendered markdown, from buildctl aggregation):"

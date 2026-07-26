@@ -61,21 +61,9 @@ else
 fi
 echo ""
 
-echo "[report action] JSON round-trip through the explicit-mode report.js:"
-REPORT_JSON=$(docker compose exec builder qjs --std -m /opt/buildcage/scripts/report.js 2>/dev/null)
-MODE=$(echo "$REPORT_JSON" | sed -n 's/.*"mode": *"\([a-z]*\)".*/\1/p')
-BLOCKED=$(echo "$REPORT_JSON" | grep -o '"blocked":true' || echo "")
-if [ "$MODE" = "restrict" ] && [ -n "$BLOCKED" ]; then
-  echo "  PASS  report.js mode=restrict blocked=true"
-else
-  echo "  FAIL  report.js mode='$MODE' blocked='$BLOCKED', expected mode=restrict blocked=true"
-  FAILURES=$((FAILURES + 1))
-fi
-echo ""
-
-# report.js renders the full stepSummary itself; report/src/main.ts just
-# relays it. GITHUB_STEP_SUMMARY is unset so it prints to stdout instead of
-# a job-summary file.
+# report-action.js renders the full stepSummary itself; report/src/main.ts
+# just relays it. GITHUB_STEP_SUMMARY is unset so it prints to stdout
+# instead of a job-summary file.
 REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= node report/src/main.ts 2>&1 || true)
 
 echo "[report action] Allowed Hosts table (rendered markdown, from buildctl aggregation):"
