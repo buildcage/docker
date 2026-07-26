@@ -24,7 +24,7 @@ jobs:
 
       - name: Discover required domains with the run action
         # For self-hosting, replace with: <your-org>/buildcage/run@<SHA>
-        uses: dash14/buildcage/run@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
+        uses: dash14/buildcage/run@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
         with:
           proxy_mode: audit
           # Audit mode allows and logs every connection instead of blocking any

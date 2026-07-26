@@ -48,7 +48,7 @@ tool works the same way, including `docker/bake-action`: just point its `driver:
 ```yaml
 - name: Start Buildcage in audit mode
   id: buildcage
-  uses: dash14/buildcage/setup@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
+  uses: dash14/buildcage/setup@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
   with:
     proxy_mode: audit  # Log every destination, block nothing
 
@@ -66,7 +66,7 @@ tool works the same way, including `docker/bake-action`: just point its `driver:
 
 - name: Show Buildcage report
   if: always()
-  uses: dash14/buildcage/report@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
+  uses: dash14/buildcage/report@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
 ```
 
 See the [complete example workflow](.github/workflows/example-audit.yml).
@@ -86,7 +86,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 ```yaml
 - name: Start Buildcage in restrict mode
   id: buildcage
-  uses: dash14/buildcage/setup@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
+  uses: dash14/buildcage/setup@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
   with:
     proxy_mode: restrict  # Block every destination except the ones you allow
     allowed_https_rules: |
@@ -107,7 +107,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 
 - name: Show Buildcage report
   if: always()
-  uses: dash14/buildcage/report@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
+  uses: dash14/buildcage/report@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
   # Build fails if any unexpected connections were blocked
 ```
 
@@ -121,7 +121,7 @@ report, just applied to one step rather than a whole `docker build`.
 
 ```yaml
 - name: Run tests with outbound network isolation
-  uses: dash14/buildcage/run@39444cc894f62cc065d088f4a07821179d560f5e # v2.2.3
+  uses: dash14/buildcage/run@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
   with:
     proxy_mode: restrict
     allowed_https_rules: |
