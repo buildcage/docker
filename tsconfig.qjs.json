@@ -15,10 +15,8 @@
   "include": [
     "core/scripts/**/*.ts",
     "core/lib/acl/**/*.ts",
-    "core/lib/log/**/*.ts",
-    "core/lib/report/**/*.ts",
     "core/lib/test/**/*.ts",
     "setup/docker/explicit/scripts/**/*.ts"
   ],
-  "exclude": ["**/*.property.test.ts", "core/lib/log/vertex-log.test.ts"]
+  "exclude": ["**/*.property.test.ts", "**/*.node.ts"]
 }
