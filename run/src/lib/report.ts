@@ -1,26 +1,29 @@
-import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
+import { createDocker } from "../../../core/lib/docker/client.ts";
 import { createAnnotation } from "../../../core/lib/actions/annotation.ts";
 import { buildRestrictExample } from "../../../core/lib/report/build-example.ts";
-import { evaluateBlockedReport, type AnnotatedBlockedRow } from "../../../core/lib/report/known-blocked.ts";
+import { determineBlockedOutcome, buildBlockedMessage } from "../../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../../core/lib/report/host-table.ts";
-import type { ReportData } from "../../../core/lib/report/report-data.ts";
+import { buildTransparentReportData } from "../../../core/lib/report/build-transparent-report-data.ts";
+import type { GenReportParameters, TransparentReportData } from "../../../core/lib/report/report-data.ts";
 
-export type Report = ReportData;
+export type Report = TransparentReportData;
+
+const LOG_FILE = "/var/log/haproxy/current";
 
 /**
- * Fetch the structured HAProxy-log report from the (still-running) proxy
- * container. Unlike report/src/main.ts (which supports both engines), the
- * run action always runs the transparent-engine proxy stack, so this
- * only ever needs core/scripts/report.js.
+ * Fetch the report from the (still-running) sandbox proxy container. run
+ * always runs the transparent-engine proxy stack (never explicit), and —
+ * unlike report/src/main.ts, whose report-action.js is version-matched to
+ * whatever setup started — has no version-skew concern of its own (this
+ * whole action, from starting the container to reporting on it, runs at
+ * one pinned version), so it fetches the raw log itself and calls the
+ * same shared builder function report-action.js uses, in-process, instead
+ * of shelling out to a qjs script.
  */
-export function fetchReport(containerName: string): Report {
-  const jsonOutput = execFileSync(
-    "docker",
-    ["exec", containerName, "qjs", "--std", "-m", "/opt/buildcage/scripts/report.js"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
-  return JSON.parse(jsonOutput);
+export function fetchReport(containerName: string, parameters: GenReportParameters): Report {
+  const logText = createDocker().readFile(containerName, LOG_FILE);
+  return buildTransparentReportData(logText, parameters);
 }
 
 /**
@@ -38,47 +41,27 @@ export interface ReportRenderContext {
  * Build the Job Summary markdown section for this run step's traffic
  * report. Each `run` step gets its own section (rather than one report
  * per job), matching the "one proxy container per step" execution model.
- *
- * `blockedRows`/`showExpected` come pre-computed from the caller so
- * known_blocked_rules matching runs once per report, not once per render.
  */
-export interface BuildReportMarkdownOptions extends ReportRenderContext {
-  blockedRows?: AnnotatedBlockedRow[];
-  showExpected?: boolean;
-}
-
 export function buildReportMarkdown(
   report: Report,
-  {
-    stepLabel,
-    actionRepo,
-    actionRef,
-    runCommand,
-    blockedRows = [],
-    showExpected = false,
-  }: BuildReportMarkdownOptions = {},
+  { stepLabel, actionRepo, actionRef, runCommand }: ReportRenderContext = {},
 ): string {
   // Mirrors report/src/main.ts's "## Outbound Traffic Report during Docker
   // Build (mode)" heading, so both actions read as the same kind of report.
   const heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
-  if (report.mode === null) {
-    return `## ${heading}\n\nNo proxy logs found.\n`;
-  }
-
-  const isAudit = report.mode === "audit";
-  let markdown = `## ${heading} (${report.mode} mode)\n\n`;
+  const isAudit = report.parameters.mode === "audit";
+  const showExpected = report.parameters.knownBlockedRules.length > 0;
+  let markdown = `## ${heading} (${report.parameters.mode} mode)\n\n`;
 
   if (isAudit) {
-    const audited = report.sections?.audited || [];
-    if (audited.length > 0) markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n\n";
+    if (report.passed.length > 0) markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
     if (actionRepo) {
-      markdown += buildRestrictExample(audited, actionRepo, actionRef, { actionName: "run", runCommand });
+      markdown += buildRestrictExample(report.passed, actionRepo, actionRef, { actionName: "run", runCommand });
     }
-    if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
+    if (report.blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, { showReason: true, showExpected }) + "\n\n";
   } else {
-    const allowed = report.sections?.allowed || [];
-    if (allowed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n\n";
-    if (blockedRows.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, { showReason: true, showExpected }) + "\n\n";
+    if (report.passed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
+    if (report.blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, { showReason: true, showExpected }) + "\n\n";
   }
 
   return markdown;
@@ -86,23 +69,32 @@ export function buildReportMarkdown(
 
 /**
  * Append this step's report to the Job Summary and emit annotations /
- * set the exit code for blocked connections, mirroring report/src/main.ts's
+ * set the exit code for blocked connections, mirroring report-action.js's
  * behavior but scoped to a single run step's proxy container.
  */
 export interface WriteReportOptions extends ReportRenderContext {
   failOnBlocked?: boolean;
-  knownBlockedRules?: string[];
 }
 
 export function writeReport(
   report: Report,
-  { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand, knownBlockedRules = [] }: WriteReportOptions = {},
+  { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand }: WriteReportOptions = {},
 ): void {
-  const { blockedRows, showExpected, outcome, message } = evaluateBlockedReport(report, {
-    knownBlockedRules, failOnBlocked: failOnBlocked ?? false, engineLabel: "sandbox",
+  const isAudit = report.parameters.mode === "audit";
+  const outcome = determineBlockedOutcome({
+    isAudit,
+    failOnBlocked: failOnBlocked ?? false,
+    blockedCount: report.blockedCount,
+    blockedRows: report.blocked,
+  });
+  const message = buildBlockedMessage({
+    blockedCount: report.blockedCount,
+    blockedRows: report.blocked,
+    engineLabel: "sandbox",
+    isAudit,
   });
 
-  const markdown = buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand, blockedRows, showExpected });
+  const markdown = buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand });
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
   if (summaryFile) {
     appendFileSync(summaryFile, markdown);

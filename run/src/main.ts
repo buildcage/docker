@@ -249,14 +249,19 @@ async function main(): Promise<void> {
     }, containerName);
   } finally {
     try {
-      const report = fetchReport(containerName);
+      const report = fetchReport(containerName, {
+        mode: env.INPUT_PROXY_MODE || "restrict",
+        allowedHttpsRules: rules.httpsRules,
+        allowedHttpRules: rules.httpRules,
+        allowedIpRules: rules.ipRules,
+        knownBlockedRules,
+      });
       writeReport(report, {
         actionRepo,
         actionRef,
         runCommand: runInput,
         stepLabel: env.INPUT_LABEL || undefined,
         failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
-        knownBlockedRules,
       });
     } catch (e) {
       annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);

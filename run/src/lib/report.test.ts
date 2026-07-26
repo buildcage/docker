@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { writeReport, buildReportMarkdown, type Report, type WriteReportOptions } from "./report.ts";
 import { annotateKnownBlocked } from "../../../core/lib/report/known-blocked.ts";
 import { withScratchDir } from "./isolated-exec.ts";
+import type { GenReportParameters } from "../../../core/lib/report/report-data.ts";
 
 // writeReport reads GITHUB_STEP_SUMMARY/BUILDCAGE_RUN_DEBUG_SUMMARY_FILE
 // from process.env and mutates process.exitCode directly (mirroring what
@@ -35,91 +36,139 @@ afterEach(() => {
   process.exitCode = prevExitCode;
 });
 
-function writeReportWithSummary(report: Report, opts: WriteReportOptions) {
+function parameters(overrides: Partial<GenReportParameters> = {}): GenReportParameters {
+  return {
+    mode: "restrict",
+    allowedHttpsRules: [],
+    allowedHttpRules: [],
+    allowedIpRules: [],
+    knownBlockedRules: [],
+    ...overrides,
+  };
+}
+
+// blocked rows are already expected to be annotated by the time a Report
+// reaches writeReport/buildReportMarkdown (see build-transparent-report-data.ts)
+// — this mirrors that, applying parameters.knownBlockedRules the same way.
+function report(overrides: Partial<Report> = {}): Report {
+  const params = overrides.parameters ?? parameters();
+  return {
+    engine: "transparent",
+    parameters: params,
+    passed: [],
+    blocked: [],
+    blockedCount: 0,
+    ...overrides,
+  };
+}
+
+function writeReportWithSummary(r: Report, opts: WriteReportOptions) {
   return withScratchDir((dir) => {
     const summaryPath = join(dir, "summary.md");
     writeFileSync(summaryPath, "");
     process.env.GITHUB_STEP_SUMMARY = summaryPath;
     delete process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
-    writeReport(report, opts);
+    writeReport(r, opts);
     return process.exitCode;
   });
 }
 
 describe("writeReport", () => {
   it("leaves exitCode untouched when there are no blocked connections", () => {
-    const report = { mode: "restrict", blockedCount: 0, sections: {} };
-    assert.equal(writeReportWithSummary(report, { failOnBlocked: true }), undefined);
+    const r = report({ blockedCount: 0 });
+    assert.equal(writeReportWithSummary(r, { failOnBlocked: true }), undefined);
   });
 
   it("sets exitCode=1 when blocked connections are detected and failOnBlocked is true", () => {
-    const report = { mode: "restrict", blockedCount: 2, sections: {} };
-    assert.equal(writeReportWithSummary(report, { failOnBlocked: true }), 1);
+    const r = report({
+      blockedCount: 2,
+      blocked: annotateKnownBlocked(
+        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 2 }],
+        [],
+      ),
+    });
+    assert.equal(writeReportWithSummary(r, { failOnBlocked: true }), 1);
   });
 
   it("leaves exitCode untouched when failOnBlocked is false, even with blocked connections", () => {
-    const report = { mode: "restrict", blockedCount: 2, sections: {} };
-    assert.equal(writeReportWithSummary(report, { failOnBlocked: false }), undefined);
+    const r = report({
+      blockedCount: 2,
+      blocked: annotateKnownBlocked(
+        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 2 }],
+        [],
+      ),
+    });
+    assert.equal(writeReportWithSummary(r, { failOnBlocked: false }), undefined);
   });
 
   it("leaves exitCode untouched in audit mode even when failOnBlocked is true", () => {
-    const report = { mode: "audit", blockedCount: 2, sections: {} };
-    assert.equal(writeReportWithSummary(report, { failOnBlocked: true }), undefined);
+    const r = report({
+      parameters: parameters({ mode: "audit" }),
+      blockedCount: 2,
+      blocked: annotateKnownBlocked(
+        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 2 }],
+        [],
+      ),
+    });
+    assert.equal(writeReportWithSummary(r, { failOnBlocked: true }), undefined);
   });
 
   it("leaves exitCode untouched when every blocked connection matches known_blocked_rules", () => {
-    const report = {
-      mode: "restrict",
+    const knownBlockedRules = ["known-bad.example.com:443"];
+    const r = report({
+      parameters: parameters({ knownBlockedRules }),
       blockedCount: 3,
-      sections: {
-        blocked: [{ host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 3 }],
-      },
-    };
-    assert.equal(
-      writeReportWithSummary(report, { failOnBlocked: true, knownBlockedRules: ["known-bad.example.com:443"] }),
-      undefined,
-    );
+      blocked: annotateKnownBlocked(
+        [{ host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 3 }],
+        knownBlockedRules,
+      ),
+    });
+    assert.equal(writeReportWithSummary(r, { failOnBlocked: true }), undefined);
   });
 
   it("sets exitCode=1 when some blocked rows don't match known_blocked_rules", () => {
-    const report = {
-      mode: "restrict",
+    const knownBlockedRules = ["known-bad.example.com:443"];
+    const r = report({
+      parameters: parameters({ knownBlockedRules }),
       blockedCount: 4,
-      sections: {
-        blocked: [
+      blocked: annotateKnownBlocked(
+        [
           { host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 3 },
           { host: "unexpected.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 },
         ],
-      },
-    };
-    assert.equal(
-      writeReportWithSummary(report, { failOnBlocked: true, knownBlockedRules: ["known-bad.example.com:443"] }),
-      1,
-    );
+        knownBlockedRules,
+      ),
+    });
+    assert.equal(writeReportWithSummary(r, { failOnBlocked: true }), 1);
   });
 
   it("leaves exitCode untouched in audit mode even with known_blocked_rules set", () => {
-    const report = {
-      mode: "audit",
+    const knownBlockedRules = ["known-bad.example.com:443"];
+    const r = report({
+      parameters: parameters({ mode: "audit", knownBlockedRules }),
       blockedCount: 1,
-      sections: { blocked: [{ host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 }] },
-    };
-    assert.equal(
-      writeReportWithSummary(report, { failOnBlocked: true, knownBlockedRules: ["known-bad.example.com:443"] }),
-      undefined,
-    );
+      blocked: annotateKnownBlocked(
+        [{ host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 }],
+        knownBlockedRules,
+      ),
+    });
+    assert.equal(writeReportWithSummary(r, { failOnBlocked: true }), undefined);
   });
 
   // Audit's outcome never depends on known_blocked_rules matching, so the
   // notice text shouldn't either.
   it("audit-mode notice text stays fixed even when known_blocked_rules matches every blocked connection", (t) => {
     const log = t.mock.method(console, "log", () => {});
-    const report = {
-      mode: "audit",
+    const knownBlockedRules = ["known-bad.example.com:443"];
+    const r = report({
+      parameters: parameters({ mode: "audit", knownBlockedRules }),
       blockedCount: 2,
-      sections: { blocked: [{ host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "-", count: 2 }] },
-    };
-    writeReportWithSummary(report, { failOnBlocked: true, knownBlockedRules: ["known-bad.example.com:443"] });
+      blocked: annotateKnownBlocked(
+        [{ host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "-", count: 2 }],
+        knownBlockedRules,
+      ),
+    });
+    writeReportWithSummary(r, { failOnBlocked: true });
     assert.equal(log.mock.calls.length, 1);
     assert.equal(log.mock.calls[0].arguments[0], "::notice::2 blocked connection(s) detected by buildcage sandbox");
   });
@@ -127,14 +176,11 @@ describe("writeReport", () => {
 
 describe("buildReportMarkdown", () => {
   it("includes a restrict-mode example (as a `run` step) in audit mode with audited hosts", () => {
-    const report = {
-      mode: "audit",
-      blockedCount: 0,
-      sections: {
-        audited: [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 3 }],
-      },
-    };
-    const markdown = buildReportMarkdown(report, {
+    const r = report({
+      parameters: parameters({ mode: "audit" }),
+      passed: [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", reason: "-", count: 3 }],
+    });
+    const markdown = buildReportMarkdown(r, {
       actionRepo: "dash14/buildcage",
       actionRef: "v2",
       runCommand: "npm install",
@@ -146,30 +192,26 @@ describe("buildReportMarkdown", () => {
   });
 
   it("omits the restrict-mode example in restrict mode", () => {
-    const report = {
-      mode: "restrict",
-      blockedCount: 0,
-      sections: { allowed: [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 3 }] },
-    };
-    const markdown = buildReportMarkdown(report, { actionRepo: "dash14/buildcage", actionRef: "v2" });
+    const r = report({
+      passed: [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", reason: "-", count: 3 }],
+    });
+    const markdown = buildReportMarkdown(r, { actionRepo: "dash14/buildcage", actionRef: "v2" });
     assert.doesNotMatch(markdown, /Switch to restrict mode/);
   });
 
   it("omits the restrict-mode example in audit mode with no audited hosts", () => {
-    const report = { mode: "audit", blockedCount: 0, sections: {} };
-    const markdown = buildReportMarkdown(report, { actionRepo: "dash14/buildcage", actionRef: "v2" });
+    const r = report({ parameters: parameters({ mode: "audit" }) });
+    const markdown = buildReportMarkdown(r, { actionRepo: "dash14/buildcage", actionRef: "v2" });
     assert.doesNotMatch(markdown, /Switch to restrict mode/);
   });
 
   it("uses a level-2 heading matching the report action's wording", () => {
-    const report = { mode: "restrict", blockedCount: 0, sections: {} };
-    const markdown = buildReportMarkdown(report, { actionRepo: "dash14/buildcage", actionRef: "v2" });
+    const markdown = buildReportMarkdown(report(), { actionRepo: "dash14/buildcage", actionRef: "v2" });
     assert.match(markdown, /^## Outbound Traffic Report \(restrict mode\)\n/);
   });
 
   it("appends stepLabel to the heading to tell steps apart", () => {
-    const report = { mode: "restrict", blockedCount: 0, sections: {} };
-    const markdown = buildReportMarkdown(report, {
+    const markdown = buildReportMarkdown(report(), {
       actionRepo: "dash14/buildcage",
       actionRef: "v2",
       stepLabel: "npm install",
@@ -177,39 +219,34 @@ describe("buildReportMarkdown", () => {
     assert.match(markdown, /^## Outbound Traffic Report — npm install \(restrict mode\)\n/);
   });
 
-  it("appends stepLabel to the heading even when there are no proxy logs", () => {
-    const report = { mode: null };
-    const markdown = buildReportMarkdown(report, { stepLabel: "npm install" });
-    assert.match(markdown, /^## Outbound Traffic Report — npm install\n\nNo proxy logs found\.\n$/);
+  it("renders just the heading, no tables, when nothing passed or was blocked", () => {
+    const markdown = buildReportMarkdown(report(), { stepLabel: "npm install" });
+    assert.match(markdown, /^## Outbound Traffic Report — npm install \(restrict mode\)\n\n$/);
   });
 
   it("adds an Expected column marking known_blocked_rules matches when set", () => {
-    const blockedRows = annotateKnownBlocked(
+    const knownBlockedRules = ["known-bad.example.com:443"];
+    const blocked = annotateKnownBlocked(
       [
         { host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 },
         { host: "unexpected.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 },
       ],
-      ["known-bad.example.com:443"],
+      knownBlockedRules,
     );
-    const report = { mode: "restrict", sections: {} };
-    const markdown = buildReportMarkdown(report, {
-      actionRepo: "dash14/buildcage",
-      actionRef: "v2",
-      blockedRows,
-      showExpected: true,
-    });
+    const r = report({ parameters: parameters({ knownBlockedRules }), blocked, blockedCount: 2 });
+    const markdown = buildReportMarkdown(r, { actionRepo: "dash14/buildcage", actionRef: "v2" });
     assert.match(markdown, /\| Host \| Rule \| Reason \| Count \| Expected \|/);
     assert.match(markdown, /\| known-bad\.example\.com:443 \| HTTPS \| not in allowlist \| 1 \| ✅ \|/);
     assert.match(markdown, /\| unexpected\.example\.com:443 \| HTTPS \| not in allowlist \| 1 \| {2}\|/);
   });
 
   it("omits the Expected column when known_blocked_rules is not set", () => {
-    const blockedRows = annotateKnownBlocked(
+    const blocked = annotateKnownBlocked(
       [{ host: "evil.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 }],
       [],
     );
-    const report = { mode: "restrict", sections: {} };
-    const markdown = buildReportMarkdown(report, { actionRepo: "dash14/buildcage", actionRef: "v2", blockedRows });
+    const r = report({ blocked, blockedCount: 1 });
+    const markdown = buildReportMarkdown(r, { actionRepo: "dash14/buildcage", actionRef: "v2" });
     assert.doesNotMatch(markdown, /Expected/);
   });
 });
