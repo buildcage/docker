@@ -1,11 +1,6 @@
-/**
- * Shared by report-action.node.ts (transparent/explicit): decide pass/fail
- * from a built ReportData, emit the ::notice::/::error:: annotation, and set
- * process.exitCode on failure. Both engines' entry points call this
- * identically (engineLabel is always "proxy" here — run/src/lib/report.ts
- * calls determineBlockedOutcome/buildBlockedMessage directly instead, since
- * it uses engineLabel "sandbox" and its own summary-writing).
- */
+/** Shared by both report-action.node.ts entry points; run/src/lib/report.ts
+ *  calls determineBlockedOutcome/buildBlockedMessage directly instead,
+ *  since it uses a different engineLabel and its own summary-writing. */
 import { createAnnotation } from "../actions/annotation.ts";
 import { determineBlockedOutcome, buildBlockedMessage } from "./known-blocked.ts";
 import type { ReportDataCommon } from "./report-data.ts";

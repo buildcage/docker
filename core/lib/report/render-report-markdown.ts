@@ -3,13 +3,9 @@ import { buildRestrictExample } from "./build-example.ts";
 import { renderCommunicationDetails } from "./command-log.ts";
 import type { ReportData } from "./report-data.ts";
 
-/**
- * Renders a ReportData into the Job Summary markdown, branching on
- * `report.engine`/`report.parameters.mode` rather than being duplicated
- * per engine like the two old qjs scripts were. actionRepo/actionRef are
- * the real values (no {{...}} placeholders) — the caller already has them
- * from its own process.env, since this runs on the runner now.
- */
+/** Branches on `report.engine`/`report.parameters.mode` rather than being
+ *  duplicated per engine. actionRepo/actionRef are real values, not
+ *  placeholders — this runs on the runner, with process.env available. */
 export function renderReportMarkdown(report: ReportData, actionRepo: string, actionRef: string): string {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;

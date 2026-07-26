@@ -5,13 +5,8 @@ import { deriveProjectName } from "../../core/lib/docker/container.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// builder_name is a real input (unlike run's randomly-generated container
-// name), so post.ts can just recompute the same project name main.ts used
-// directly from it — no need to round-trip it through GITHUB_STATE. Without
-// -p here, this would target Compose's own implicit, directory-derived
-// project name instead of the one main.ts actually started the container
-// under (see core/lib/docker/container.ts's deriveProjectName), leaving the
-// real container running.
+// builder_name is a real input, so post.ts can recompute the same project
+// name main.ts used directly, without round-tripping it through GITHUB_STATE.
 const builderName = process.env.INPUT_BUILDER_NAME || "buildcage";
 const projectName = deriveProjectName(builderName);
 

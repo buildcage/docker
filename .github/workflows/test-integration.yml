@@ -109,15 +109,12 @@ jobs:
         env:
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
           BUILDER_NAME: ${{ matrix.builder_name }}
-        # Scoped to the services this job actually needs: builder, plus the
-        # test-server/test-dns fixtures added by matrix.compose_file's
-        # overlay (compose.test-{transparent,explicit}.yaml). compose.yaml
-        # also defines a proxy service (see the run action's own
-        # test_sandbox job) that this job has no reason to build/start.
+        # Scoped to the services this job needs: builder, plus the
+        # test-server/test-dns fixtures from matrix.compose_file's overlay.
         #
-        # COMPOSE_PROJECT_NAME must match report/src/main.ts's own
-        # deriveProjectName(builder_name) (core/lib/docker/container.ts), or
-        # it can't find this job's container.
+        # COMPOSE_PROJECT_NAME must match deriveProjectName(builder_name)
+        # (core/lib/docker/container.ts), or report can't find this job's
+        # container.
         run: |
           COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
           export COMPOSE_PROJECT_NAME

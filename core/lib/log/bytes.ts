@@ -1,10 +1,4 @@
-/**
- * Portable byte-array -> UTF-8 string decoder. Neither Buffer nor
- * TextDecoder exist under QuickJS, so this hand-rolls the UTF-8
- * re-assembly; used to decode base64-embedded log data (vertex-log.ts)
- * and subprocess stdout captured via qjs:os's exec/pipe/read (explicit
- * engine's report.ts, which shells out to buildctl itself).
- */
+/** Decodes base64-embedded log data (vertex-log.ts). */
 export function bytesToUtf8(bytes: ArrayLike<number>): string {
   let result = "";
   let i = 0;

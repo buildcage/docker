@@ -34,13 +34,8 @@ export interface Docker {
   exec(containerId: string, args: string[]): string;
 }
 
-/**
- * All docker-facing I/O (container discovery, file/log/env fetch) that
- * report generation needs, behind one small interface. Every caller takes
- * a `Docker` instance rather than shelling out itself, so tests can inject
- * a fake `run` and assert on the argv it was called with, instead of
- * mocking node:child_process directly.
- */
+/** `run` is injectable so tests can assert on argv instead of mocking
+ *  node:child_process directly. */
 export function createDocker(run: RunCommand = defaultRunCommand): Docker {
   return {
     findContainers(filters) {

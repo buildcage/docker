@@ -1,11 +1,8 @@
 /**
- * Unit tests for run/lib/report.ts — specifically writeReport's
- * exit-code semantics (see main.ts's own `if (exitCode !== 0)` for the
- * other half: the isolated command's own exit code always fails the step
- * regardless of blocked connections, and this file's `process.exitCode = 1`
- * is only ever additive on top of that, never resetting it back to success).
- *
- * Run with: node --test run/src/lib/report.test.ts
+ * Unit tests for run/lib/report.ts — specifically writeReport's exit-code
+ * semantics. `process.exitCode = 1` here is only ever additive on top of
+ * the isolated command's own exit code (see main.ts), never resetting it
+ * back to success.
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

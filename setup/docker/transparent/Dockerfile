@@ -39,12 +39,10 @@ COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:qjs
 
-# Compile report-action.node.ts (Node-targeted, unlike qjs-build above) to a
-# single-file CommonJS bundle `node` can execute standalone — see
-# rolldown.report-action.config.js. Keep this stage byte-identical across
-# setup/docker/transparent/Dockerfile and setup/docker/explicit/Dockerfile
-# (run/docker/Dockerfile doesn't need it: run/src/lib/report.ts builds its
-# own report in-process instead of fetching one from the container).
+# Compiles report-action.node.ts (Node-targeted) to a single-file CJS
+# bundle `node` can execute standalone. Keep byte-identical to the same
+# stage in setup/docker/explicit/Dockerfile (run/docker/Dockerfile doesn't
+# need it — run builds its own report in-process instead).
 FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS report-action-build
 WORKDIR /build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

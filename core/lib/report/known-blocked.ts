@@ -39,12 +39,9 @@ export function annotateKnownBlocked(
  *
  * `blockedRows` must already be annotated via annotateKnownBlocked. Uses
  * per-row matching rather than count arithmetic because `blockedCount`'s
- * meaning differs by proxy engine (transparent: total blocked events;
- * explicit: aggregated row count — see setup/docker/explicit/scripts/report.js),
- * so subtracting summed row counts from it isn't reliable. An empty
- * `blockedRows` with a nonzero `blockedCount` (malformed/incomplete report
- * data) is treated as unexpected too (fail closed).
- *
+ * meaning differs by proxy engine (see report-data.ts), so subtracting
+ * summed row counts from it isn't reliable. An empty `blockedRows` with a
+ * nonzero `blockedCount` is treated as unexpected too (fail closed).
  */
 export interface BlockedOutcome {
   level: "none" | "notice" | "error";

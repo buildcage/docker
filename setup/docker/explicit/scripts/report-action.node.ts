@@ -1,19 +1,11 @@
 /**
- * report-action.js — generate and emit the outbound-traffic report for the
- * explicit proxy engine. Baked into the image, fetched fresh via
- * `docker cp` by the `report` action on every run (never staged on the
- * runner between invocations — see report/src/main.ts), then executed
- * with `node report-action.js <container-id>`.
- *
- * Runs entirely on the GitHub Actions runner, not inside the container:
- * reaches in purely via the shared Docker client (core/lib/docker/client.ts),
- * including for `buildctl debug histories`/`debug logs` (run inside the
- * container via `docker exec` rather than needing buildctl reachable from
- * the runner itself). So the `report` action itself never needs to know
- * this engine's log path, env var names, buildctl invocation, or JSON
- * shape — none of that crosses a process boundary as JSON at all, since
- * this script and the container it reads from always come from the same
- * image build.
+ * Generates and emits the explicit engine's outbound-traffic report.
+ * Baked into the image, fetched fresh via `docker cp` by the `report`
+ * action on every run (never staged on the runner — see report/src/main.ts)
+ * and run with `node report-action.js <container-id>`. Runs on the runner,
+ * not inside the container, reaching in via core/lib/docker/client.ts —
+ * including `buildctl` itself, run inside the container via `docker exec`
+ * rather than needing buildctl reachable from the runner.
  */
 import { appendFileSync } from "node:fs";
 import { createDocker, type Docker } from "../../../../core/lib/docker/client.ts";
@@ -28,13 +20,9 @@ import { selectAllRefs, parseVertexAllowedLog, type VertexAllowedEntry } from ".
 
 const LOG_FILE = "/var/log/buildkitd/current";
 
-/**
- * Every build since the container started, not just the latest one — a
- * workflow may run several builds against the same long-lived buildcage
- * container before calling report once, and each is its own independent
- * buildctl history record. Best-effort: a buildctl failure here shouldn't
- * take down the whole report, just leave the per-command breakdown empty.
- */
+/** Every build since the container started, not just the latest — a
+ *  workflow may run several before calling report once. Best-effort: a
+ *  buildctl failure here leaves the per-command breakdown empty. */
 function collectBuilds(docker: Docker, containerId: string): VertexAllowedEntry[][] {
   try {
     const historiesOutput = docker.exec(containerId, ["buildctl", "debug", "histories", "--format", "{{json .}}"]);

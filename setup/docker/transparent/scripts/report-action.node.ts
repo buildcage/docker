@@ -1,16 +1,11 @@
 /**
- * report-action.js — generate and emit the outbound-traffic report for the
- * transparent proxy engine. Baked into the image, fetched fresh via
- * `docker cp` by the `report` action on every run (never staged on the
- * runner between invocations — see report/src/main.ts), then executed
- * with `node report-action.js <container-id>`.
- *
- * Runs entirely on the GitHub Actions runner, not inside the container:
- * reaches in purely via the shared Docker client (core/lib/docker/client.ts),
- * so the `report` action itself never needs to know this engine's log
- * path, env var names, or JSON shape — none of that crosses a process
- * boundary as JSON at all, since this script and the container it reads
- * from always come from the same image build.
+ * Generates and emits the transparent engine's outbound-traffic report.
+ * Baked into the image, fetched fresh via `docker cp` by the `report`
+ * action on every run (never staged on the runner — see report/src/main.ts)
+ * and run with `node report-action.js <container-id>`. Runs on the runner,
+ * not inside the container, reaching in via core/lib/docker/client.ts —
+ * so `report` itself never needs to know this engine's log path or env
+ * var names.
  */
 import { appendFileSync } from "node:fs";
 import { createDocker } from "../../../../core/lib/docker/client.ts";

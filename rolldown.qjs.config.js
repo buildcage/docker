@@ -3,9 +3,8 @@ import { defineConfig } from "rolldown";
 
 // Non-recursive: these directories hold only qjs entry points; their shared
 // dependencies live in core/lib and get pulled in transitively by rolldown.
-// *.node.ts (report-action.node.ts, Node-targeted) lives alongside
-// gen-source-policy.ts in setup/docker/explicit/scripts/ but must not be
-// bundled here — it has its own config (rolldown.report-action.config.js).
+// *.node.ts (report-action.node.ts) lives alongside gen-source-policy.ts
+// but is Node-targeted — excluded here, built by rolldown.report-action.config.js.
 const productionInputs = globSync(
   ["core/scripts/*.ts", "setup/docker/explicit/scripts/*.ts"],
   { exclude: ["**/*.node.ts"] },
@@ -13,10 +12,8 @@ const productionInputs = globSync(
 
 // *.property.test.ts run under node:test, not qjs — excluded here.
 // Output paths must mirror the source tree 1:1: run-tests.qjs.js discovers
-// these by scanning directories at runtime (os.readdir). core/lib/log and
-// core/lib/report no longer need to run under qjs at all now that report
-// generation is Node-only (report-action.node.ts) — only core/lib/acl
-// (used by convert-rule.ts/gen-source-policy.ts) still does.
+// these by scanning directories at runtime (os.readdir). Only core/lib/acl
+// still runs under qjs — report generation is Node-only now.
 const testInputs = [
   "core/scripts/test/run-tests.qjs.ts",
   ...globSync(["core/lib/acl/*.test.ts"], { exclude: ["**/*.property.test.ts"] }),

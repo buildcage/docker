@@ -86,11 +86,8 @@ async function main(): Promise<void> {
   // (action.yml's own `default: 'buildcage'` covers the normal case) — keep
   // both, and report/src/main.ts's copy, in sync.
   const builderName = env.INPUT_BUILDER_NAME || "buildcage";
-  // Passed explicitly so report can independently derive the same Compose
-  // project name (from its own builder_name input) and find this container
-  // via `docker ps --filter label=com.docker.compose.project=...` without
-  // ever touching this compose file — see core/lib/docker/container.ts's
-  // deriveProjectName for why an explicit project name matters at all.
+  // So report can independently derive the same project name from its own
+  // builder_name input and find this container via `docker ps --filter`.
   const projectName = deriveProjectName(builderName);
 
   const composeEnv = {

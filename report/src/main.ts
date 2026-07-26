@@ -13,10 +13,8 @@ import { ReportError } from "./lib/errors.ts";
 
 async function main(): Promise<void> {
   const builderName = process.env.INPUT_BUILDER_NAME || "buildcage";
-  // Same derivation setup uses for its own `-p` — see
-  // core/lib/docker/container.ts's deriveProjectName. Matching it here,
-  // independently, is what lets this step find the right container without
-  // ever touching setup's compose file (or even knowing it exists).
+  // Same derivation setup uses for its own `-p` — lets this step find the
+  // right container without ever touching setup's compose file.
   const projectName = deriveProjectName(builderName);
   const docker = createDocker();
 
@@ -41,19 +39,14 @@ async function main(): Promise<void> {
   }
 
   // 2. Pull report-action.js out of the (Sigstore-verified) image and run
-  // it with node, inheriting stdio so it can write logs/annotations
-  // directly. report-action.js owns everything downstream — fetching the
-  // container's own env/logs, rendering the Job Summary, and the
-  // fail_on_blocked exit decision — so this step's only job is to
-  // reproduce its exit code as its own. None of that ever crosses this
-  // process as JSON, so a report-action.js change alone can never cause a
-  // version-skew failure here.
+  // it with node, inheriting stdio. It owns everything downstream —
+  // fetching the container's env/logs, rendering the Job Summary, the
+  // fail_on_blocked exit decision — so this step just reproduces its exit
+  // code as its own.
   const scratchDir = mkdtempSync(join(tmpdir(), "buildcage-report-"));
   try {
     const reportActionPath = join(scratchDir, "report-action.js");
 
-    // `docker cp` failing is a genuine Docker/runner problem — same
-    // diagnosis as the container-lookup step above.
     try {
       docker.copyFromContainer(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath);
     } catch (e) {
@@ -63,19 +56,13 @@ async function main(): Promise<void> {
       );
     }
 
-    // Anything past this point is report-action.js's own problem (or ours
-    // in preparing to run it) rather than "Docker isn't set up on this
-    // runner" — keeping it a separate catch means the error the user sees
-    // names the actual failure instead of a misleading "Docker isn't
-    // installed" message.
+    // A separate catch from the docker cp above, so the error the user
+    // sees names the actual failure instead of a misleading Docker message.
     try {
       execFileSync("node", [reportActionPath, containerId], { stdio: "inherit" });
     } catch (e) {
-      // A numeric exit status means report-action.js ran and has already
-      // explained itself (via its own ::error::/stderr output, visible
-      // through the inherited stdio above) — just reproduce it. Anything
-      // else (e.g. ENOENT) means we couldn't even launch it, which is our
-      // own problem to report.
+      // A numeric exit status means report-action.js ran and already
+      // explained itself via its own inherited stdio — just reproduce it.
       const status = (e as { status?: number | null }).status;
       if (typeof status === "number") {
         process.exitCode = status;

@@ -66,9 +66,8 @@ describe("isContainerNotFoundError", () => {
   });
 });
 
-// buildDockerCpArgs/deriveProjectName's own unit tests live in
-// core/lib/docker/container.test.ts now (shared by setup/report/run) — this
-// one is specific to run's own container-name format.
+// General deriveProjectName tests live in core/lib/docker/container.test.ts;
+// this one is specific to run's own container-name format.
 describe("deriveProjectName", () => {
   it("matches docker compose's project-name character constraints for any generated container name", () => {
     for (let i = 0; i < 20; i++) {

@@ -3,15 +3,12 @@ COMPOSE_FILE ?= compose.yaml
 # containers/images instead of the default transparent-engine test overlay.
 TEST_COMPOSE_FILE ?= setup/compose.test-transparent.yaml
 
-# Must equal report/src/main.ts's own deriveProjectName("buildcage") (see
-# core/lib/docker/container.ts) — imported directly, not reimplemented, so
-# it can't drift. Exported as COMPOSE_PROJECT_NAME so setup/test/helpers.sh
-# and assert-explicit-*.sh's plain `docker compose exec` calls pick it up
-# too, without needing -p on every invocation.
+# Must equal deriveProjectName("buildcage") (core/lib/docker/container.ts).
+# Exported so setup/test/helpers.sh and assert-explicit-*.sh's plain
+# `docker compose exec` calls pick it up without needing -p every time.
 #
-# Skipped when the only goal is `help` (or no goal at all — `help` is the
-# default), so `make` / `make help` don't pay for a Node startup just to
-# print the command list.
+# Skipped for `help` (the default goal), so it doesn't pay for a Node
+# startup just to print the command list.
 ifeq ($(strip $(filter-out help,$(or $(MAKECMDGOALS),help))),)
 BUILDER_PROJECT_NAME :=
 else

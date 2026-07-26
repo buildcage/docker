@@ -5,15 +5,9 @@ import { annotateKnownBlocked } from "./known-blocked.ts";
 import type { GenReportParameters, ExplicitReportData } from "./report-data.ts";
 
 /**
- * Builds the explicit engine's report data from its own buildkitd log text
- * plus the per-build allowed-request breakdown (already fetched via
- * buildctl debug histories/logs — see setup/docker/explicit/scripts/
- * report-action.node.ts) and the container's configured parameters. Pure —
- * no I/O.
- *
- * blockedCount here equals blocked.length (the aggregated row count) —
- * unlike the transparent engine, buildkitd's denial log has no finer
- * per-event granularity to count separately.
+ * Pure — no I/O; `builds` is already fetched via buildctl by the caller.
+ * blockedCount equals blocked.length here, unlike the transparent engine:
+ * buildkitd's denial log has no finer per-event granularity to count.
  */
 export function buildExplicitReportData(
   logText: string,

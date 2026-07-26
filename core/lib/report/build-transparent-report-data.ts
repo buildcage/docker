@@ -4,14 +4,9 @@ import { annotateKnownBlocked } from "./known-blocked.ts";
 import type { GenReportParameters, TransparentReportData } from "./report-data.ts";
 
 /**
- * Builds the transparent engine's report data from its own HAProxy log
- * text plus the container's configured parameters. Pure — no I/O; callers
- * (setup/docker/transparent/scripts/report-action.node.ts, run/src/lib/report.ts)
- * fetch logText/parameters themselves.
- *
- * No special-case branch for "no log entries at all" — an empty logText
- * naturally yields passed:[]/blocked:[]/blockedCount:0, which is already
- * how "nothing to report" is expressed.
+ * Pure — no I/O; callers (report-action.node.ts, run/src/lib/report.ts)
+ * fetch logText/parameters themselves. An empty logText naturally yields
+ * passed:[]/blocked:[]/blockedCount:0, so no special-case branch is needed.
  */
 export function buildTransparentReportData(logText: string, parameters: GenReportParameters): TransparentReportData {
   const isAudit = parameters.mode === "audit";
