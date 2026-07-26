@@ -1,0 +1,80 @@
+/**
+ * report-action.js — generate and emit the outbound-traffic report for the
+ * transparent proxy engine. Baked into the image, fetched fresh via
+ * `docker cp` by the `report` action on every run (never staged on the
+ * runner between invocations — see report/src/main.ts), then executed
+ * with `node report-action.js <container-id>`.
+ *
+ * Runs entirely on the GitHub Actions runner, not inside the container:
+ * reaches in purely via the shared Docker client (core/lib/docker/client.ts),
+ * so the `report` action itself never needs to know this engine's log
+ * path, env var names, or JSON shape — none of that crosses a process
+ * boundary as JSON at all, since this script and the container it reads
+ * from always come from the same image build.
+ */
+import { appendFileSync } from "node:fs";
+import { createDocker } from "../../../../core/lib/docker/client.ts";
+import { buildReportParameters } from "../../../../core/lib/report/report-parameters.ts";
+import { buildTransparentReportData } from "../../../../core/lib/report/build-transparent-report-data.ts";
+import { renderReportMarkdown } from "../../../../core/lib/report/render-report-markdown.ts";
+import { determineBlockedOutcome, buildBlockedMessage } from "../../../../core/lib/report/known-blocked.ts";
+import { createAnnotation } from "../../../../core/lib/actions/annotation.ts";
+import { errorMessage } from "../../../../core/lib/general/error-message.ts";
+
+const LOG_FILE = "/var/log/haproxy/current";
+
+function main(): void {
+  const containerId = process.argv[2];
+  if (!containerId) {
+    throw new Error("Usage: report-action.js <container-id>");
+  }
+
+  const docker = createDocker();
+  const parameters = buildReportParameters(docker.readEnv(containerId));
+  const logText = docker.readFile(containerId, LOG_FILE);
+
+  const report = buildTransparentReportData(logText, parameters);
+
+  const markdown = renderReportMarkdown(
+    report,
+    process.env.GITHUB_ACTION_REPOSITORY || "",
+    process.env.GITHUB_ACTION_REF || "",
+  );
+
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryFile) {
+    appendFileSync(summaryFile, markdown);
+  } else {
+    console.log(markdown);
+  }
+
+  const isAudit = parameters.mode === "audit";
+  const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
+  const outcome = determineBlockedOutcome({
+    isAudit,
+    failOnBlocked,
+    blockedCount: report.blockedCount,
+    blockedRows: report.blocked,
+  });
+
+  if (outcome.level !== "none") {
+    const message = buildBlockedMessage({
+      blockedCount: report.blockedCount,
+      blockedRows: report.blocked,
+      engineLabel: "proxy",
+      isAudit,
+    });
+    const annotation = createAnnotation(Boolean(summaryFile));
+    if (outcome.level === "error") annotation.error(message);
+    else annotation.notice(message);
+  }
+
+  if (outcome.shouldFail) process.exitCode = 1;
+}
+
+try {
+  main();
+} catch (e) {
+  console.log(`::error::Unexpected error in report-action: ${errorMessage(e)}`);
+  process.exit(1);
+}
