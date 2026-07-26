@@ -1,0 +1,63 @@
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { buildTransparentReportData } from "./build-transparent-report-data.ts";
+import type { GenReportParameters } from "./report-data.ts";
+
+function params(overrides: Partial<GenReportParameters> = {}): GenReportParameters {
+  return {
+    mode: "restrict",
+    allowedHttpsRules: [],
+    allowedHttpRules: [],
+    allowedIpRules: [],
+    knownBlockedRules: [],
+    ...overrides,
+  };
+}
+
+describe("buildTransparentReportData", () => {
+  it("aggregates allowed/blocked in restrict mode", () => {
+    const log = [
+      '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "good.com:443" -',
+      '[2024-01-01T00:00:00] buildcage [BLOCKED] (HTTP) "bad.com:80" not-allowed',
+    ].join("\n");
+    const result = buildTransparentReportData(log, params());
+    assert.equal(result.engine, "transparent");
+    assert.equal(result.passed.length, 1);
+    assert.equal(result.passed[0].host, "good.com");
+    assert.equal(result.blocked.length, 1);
+    assert.equal(result.blocked[0].host, "bad.com");
+    assert.equal(result.blockedCount, 1);
+  });
+
+  it("aggregates audited traffic in audit mode instead of allowed", () => {
+    const log = '[2024-01-01T00:00:00] buildcage [AUDIT] (HTTPS) "any.com:443"';
+    const result = buildTransparentReportData(log, params({ mode: "audit" }));
+    assert.equal(result.passed.length, 1);
+    assert.equal(result.passed[0].host, "any.com");
+  });
+
+  it("annotates blocked rows against knownBlockedRules", () => {
+    const log = '[2024-01-01T00:00:00] buildcage [BLOCKED] (HTTPS) "noisy.example.com:443" not-allowed';
+    const result = buildTransparentReportData(log, params({ knownBlockedRules: ["noisy.example.com:443"] }));
+    assert.equal(result.blocked[0].expected, true);
+  });
+
+  it("returns empty passed/blocked and blockedCount 0 for empty log text", () => {
+    const result = buildTransparentReportData("", params());
+    assert.deepEqual(result.passed, []);
+    assert.deepEqual(result.blocked, []);
+    assert.equal(result.blockedCount, 0);
+  });
+
+  it("blockedCount counts raw events, not aggregated rows", () => {
+    const log = [
+      '[2024-01-01T00:00:00] buildcage [BLOCKED] (HTTPS) "bad.com:443" not-allowed',
+      '[2024-01-01T00:00:01] buildcage [BLOCKED] (HTTPS) "bad.com:443" not-allowed',
+    ].join("\n");
+    const result = buildTransparentReportData(log, params());
+    assert.equal(result.blockedCount, 2);
+    assert.equal(result.blocked.length, 1);
+    assert.equal(result.blocked[0].count, 2);
+  });
+});
+
+reportResults();
