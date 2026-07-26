@@ -10,8 +10,14 @@ export function parseContainerIds(psOutput: string): string[] {
 
 export type RunCommand = (args: string[]) => string;
 
+// 64MB, up from Node's 1MB default — `buildctl debug logs --progress=rawjson`
+// output for a verbose build can exceed the default easily.
 function defaultRunCommand(args: string[]): string {
-  return execFileSync("docker", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return execFileSync("docker", args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 64 * 1024 * 1024,
+  });
 }
 
 export interface Docker {
