@@ -33,7 +33,7 @@ RUN apk add --no-cache curl && \
     echo "${EXPECTED_SHA256}  /opt/buildcage/bin/runc" | sha256sum -c && \
     chmod +x /opt/buildcage/bin/runc
 
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine@sha256:56961d79ea8129efddcc0b8643fd8a5416b4e6228cfd477e3fd61deb2672c587 AS gen-seccomp-profile-build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS gen-seccomp-profile-build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src

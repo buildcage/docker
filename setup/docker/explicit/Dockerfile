@@ -13,7 +13,7 @@
 # the Go toolchain always runs natively instead of under QEMU emulation.
 # GOOS/GOARCH below then cross-compile the actual output binary for the
 # target platform — CGO_ENABLED=0 makes this a plain, fast cross-compile.
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine@sha256:56961d79ea8129efddcc0b8643fd8a5416b4e6228cfd477e3fd61deb2672c587 AS buildkit-proxy-build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS buildkit-proxy-build
 ARG BUILDKIT_PROXY_BUILD_TAGS=""
 ARG TARGETOS
 ARG TARGETARCH
