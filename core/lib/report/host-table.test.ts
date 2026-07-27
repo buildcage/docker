@@ -1,5 +1,4 @@
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
 import { renderHostTable } from "./host-table.ts";
 
 describe("renderHostTable", () => {
@@ -48,3 +47,5 @@ describe("renderHostTable", () => {
     assert.equal(table, "| Host | Rule | Count |\n| --- | --- | ---: |");
   });
 });
+
+reportResults();

@@ -16,7 +16,8 @@ import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import { SandboxError } from "./lib/errors.ts";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
-import { generateContainerName, getContainerPid, deriveProjectName } from "./lib/container.ts";
+import { generateContainerName, getContainerPid } from "./lib/container.ts";
+import { deriveProjectName } from "../../core/lib/docker/container.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.ts";
 import {
   writeRunScript,
@@ -248,14 +249,19 @@ async function main(): Promise<void> {
     }, containerName);
   } finally {
     try {
-      const report = fetchReport(containerName);
+      const report = fetchReport(containerName, {
+        mode: env.INPUT_PROXY_MODE || "restrict",
+        allowedHttpsRules: rules.httpsRules,
+        allowedHttpRules: rules.httpRules,
+        allowedIpRules: rules.ipRules,
+        knownBlockedRules,
+      });
       writeReport(report, {
         actionRepo,
         actionRef,
         runCommand: runInput,
         stepLabel: env.INPUT_LABEL || undefined,
         failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
-        knownBlockedRules,
       });
     } catch (e) {
       annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);

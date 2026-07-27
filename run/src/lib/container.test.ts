@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { generateContainerName, getContainerPid, deriveProjectName, buildDockerCpArgs, isContainerNotFoundError } from "./container.ts";
+import { generateContainerName, getContainerPid, isContainerNotFoundError } from "./container.ts";
+import { deriveProjectName } from "../../../core/lib/docker/container.ts";
 import { SandboxError } from "./errors.ts";
 
 describe("generateContainerName", () => {
@@ -65,20 +66,9 @@ describe("isContainerNotFoundError", () => {
   });
 });
 
-describe("buildDockerCpArgs", () => {
-  it("builds a `docker cp <container>:<containerPath> <hostPath>` argv", () => {
-    assert.deepEqual(
-      buildDockerCpArgs({ containerName: "buildcage-proxy-abcd1234", containerPath: "/opt/buildcage/bin/runc", hostPath: "/tmp/x/runc" }),
-      ["cp", "buildcage-proxy-abcd1234:/opt/buildcage/bin/runc", "/tmp/x/runc"],
-    );
-  });
-});
-
+// General deriveProjectName tests live in core/lib/docker/container.test.ts;
+// this one is specific to run's own container-name format.
 describe("deriveProjectName", () => {
-  it("returns the container name unchanged", () => {
-    assert.equal(deriveProjectName("buildcage-proxy-abcd1234"), "buildcage-proxy-abcd1234");
-  });
-
   it("matches docker compose's project-name character constraints for any generated container name", () => {
     for (let i = 0; i < 20; i++) {
       const projectName = deriveProjectName(generateContainerName());

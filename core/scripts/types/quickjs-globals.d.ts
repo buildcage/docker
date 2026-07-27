@@ -39,6 +39,28 @@ declare module "qjs:std" {
 declare module "qjs:os" {
   // Second element is an errno-style number, 0 on success.
   export function readdir(path: string): [string[], number];
+
+  // Subprocess execution (explicit engine's report.js shells out to
+  // buildctl itself) — verified against the same quickjs-ng 0.11.0 Alpine
+  // package: os.exec() with block:false and a pipe fd as stdout, drained
+  // via os.read() in a loop, then os.waitpid() to reap the child.
+  export function pipe(): [number, number];
+
+  export interface ExecOptions {
+    stdout?: number;
+    stderr?: number;
+    stdin?: number;
+    block?: boolean;
+    cwd?: string;
+  }
+
+  export function exec(args: string[], options?: ExecOptions): number;
+
+  export function close(fd: number): number;
+
+  export function read(fd: number, buffer: ArrayBuffer, offset: number, length: number): number;
+
+  export function waitpid(pid: number, options: number): [number, number];
 }
 
 /** qjs's argv equivalent: [scriptPath, ...args]. */

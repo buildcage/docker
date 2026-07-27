@@ -1,195 +1,86 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRestrictExample } from "../../core/lib/report/build-example.ts";
-import { renderCommunicationDetails } from "./lib/command-log.ts";
-import {
-  selectAllRefs,
-  parseVertexAllowedLog,
-  aggregateAllowedHosts,
-  type VertexAllowedEntry,
-} from "./lib/vertex-log.ts";
-import { createAnnotation } from "../../core/lib/actions/annotation.ts";
-import { evaluateBlockedReport } from "../../core/lib/report/known-blocked.ts";
-import { renderHostTable } from "../../core/lib/report/host-table.ts";
-import { parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
+
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
+import { deriveProjectName } from "../../core/lib/docker/container.ts";
+import { createDocker } from "../../core/lib/docker/client.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { ReportError } from "./lib/errors.ts";
-import type { ReportData } from "../../core/lib/report/report-data.ts";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// CI-only override gate, mirrors setup/src/main.ts's LOCAL_IMAGE_OVERRIDE_ENABLED.
+const PROJECT_NAME_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1";
+
+// Same derivation setup uses for its `-p`.
+export function resolveProjectName(builderName: string, env: NodeJS.ProcessEnv): string {
+  if (PROJECT_NAME_OVERRIDE_ENABLED && env.COMPOSE_PROJECT_NAME) {
+    return env.COMPOSE_PROJECT_NAME;
+  }
+  return deriveProjectName(builderName);
+}
 
 async function main(): Promise<void> {
-  // 1. Get structured report from container via QuickJS
-  const composeFile = process.argv[2] || join(__dirname, "../..", "setup", "compose.yaml");
-  // "buildcage" here is a fallback for running outside the Actions runtime
-  // (action.yml's own `default: 'buildcage'` covers the normal case) — keep
-  // both, and setup/src/main.ts's copy, in sync.
-  const composeEnv = {
-    ...process.env,
-    BUILDER_NAME: process.env.INPUT_BUILDER_NAME || "buildcage",
-  };
+  const builderName = process.env.INPUT_BUILDER_NAME || "buildcage";
+  const projectName = resolveProjectName(builderName, process.env);
+  const docker = createDocker();
 
-  // GITHUB_STEP_SUMMARY is unset when this script isn't running as the real
-  // report action (e.g. local debugging) — annotation suppresses ::error::/
-  // ::notice:: output in that case, same as the outcome annotation below.
-  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-  const annotation = createAnnotation(Boolean(summaryFile));
-
-  const knownBlockedRules = parseRulesOrThrow(process.env.INPUT_KNOWN_BLOCKED_RULES);
-
-  let jsonOutput;
+  // 1. Locate the report-source container purely via Docker metadata.
+  let containerId: string;
   try {
-    jsonOutput = execFileSync(
-      "docker",
-      [
-        "compose", "-f", composeFile, "exec", "builder", "sh", "-c",
-        "qjs --std -m /opt/buildcage/scripts/report.js",
-      ],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
-    );
-  } catch (e) {
-    throw new ReportError(
-      describeDockerFailure(e, { operation: "fetching the sandbox report from the container" }),
-      "DOCKER_UNAVAILABLE",
-    );
-  }
-
-  const report = JSON.parse(jsonOutput) as ReportData;
-
-  // 2. Console output — raw log lines (read directly from container log file)
-  console.log("::group::HTTP Proxy communication logs");
-  try {
-    // Explicit proxy engine writes its log to /var/log/buildkitd/current instead
-    // of HAProxy's /var/log/haproxy/current; try that first and fall back so
-    // this works unmodified against either engine without needing to know
-    // which one is running.
-    const rawLog = execFileSync(
-      "docker",
-      [
-        "compose", "-f", composeFile, "exec", "builder", "sh", "-c",
-        "cat /var/log/buildkitd/current 2>/dev/null || cat /var/log/haproxy/current 2>/dev/null",
-      ],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
-    );
-    process.stdout.write(rawLog);
-  } catch {
-    console.log("(failed to read raw log)");
-  }
-  console.log("::endgroup::");
-  console.log();
-
-  // 3. Build summary
-  if (report.mode === null) {
-    if (summaryFile) {
-      appendFileSync(summaryFile, "No proxy logs found.\n");
-    }
-    console.log("No proxy logs found.");
-    process.exit(0);
-  }
-
-  const actionRepo = process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
-  const actionRef = process.env.GITHUB_ACTION_REF || "v2";
-  const isAudit = report.mode === "audit";
-
-  // report.deniedTimeline is only present in explicit engine's report.js output
-  // (see setup/docker/explicit/scripts/report.js) — transparent mode has neither this
-  // nor a per-command breakdown to offer at all (its ACL log has no per-command
-  // boundary), so `isExplicit` gates both the allowed/audited table's source
-  // below and the Communication details section further down.
-  const isExplicit = report.deniedTimeline !== undefined;
-
-  // Fetched once, up front, since it feeds both the allowed/audited table
-  // (via aggregateAllowedHosts) and the per-command Communication details
-  // section (via renderCommunicationDetails) below. Explicit mode's own
-  // report.js has no "allowed"/"audited" section — that data comes from
-  // buildctl's build-history vertex log instead, which needs no special
-  // buildkitd configuration and tags each entry with the RUN step (vertex)
-  // that produced it (see report/src/lib/vertex-log.ts).
-  let builds: VertexAllowedEntry[][] = [];
-  if (isExplicit) {
-    try {
-      const historiesOutput = execFileSync(
-        "docker",
-        ["compose", "-f", composeFile, "exec", "builder", "buildctl", "debug", "histories", "--format", "{{json .}}"],
-        { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv }
+    const ids = docker.findContainers([
+      `label=com.docker.compose.project=${projectName}`,
+      "label=io.github.dash14.buildcage.report-source=true",
+    ]);
+    if (ids.length !== 1) {
+      throw new ReportError(
+        `Expected exactly one buildcage container for builder_name ${JSON.stringify(builderName)}, found ${ids.length}. ` +
+          "Did the setup step run first, with the same builder_name?",
+        "CONTAINER_NOT_FOUND",
       );
-      // Every build since the container started, not just the latest one — a
-      // workflow may run several builds against the same buildcage container
-      // before calling this action once, and each is its own independent
-      // buildctl history record (see vertex-log.ts's selectAllRefs()).
-      const refs = selectAllRefs(historiesOutput);
-      builds = refs.map((ref) => {
-        const rawJsonOutput = execFileSync(
-          "docker",
-          ["compose", "-f", composeFile, "exec", "builder", "buildctl", "debug", "logs", "--progress=rawjson", ref],
-          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: composeEnv, maxBuffer: 64 * 1024 * 1024 }
-        );
-        return parseVertexAllowedLog(rawJsonOutput);
-      });
+    }
+    containerId = ids[0];
+  } catch (e) {
+    if (e instanceof ReportError) throw e;
+    throw new ReportError(describeDockerFailure(e, { operation: "docker ps" }), "DOCKER_UNAVAILABLE");
+  }
+
+  // 2. Pull report-action.js out of the (Sigstore-verified) image and run
+  // it with node, inheriting stdio. It owns everything downstream —
+  // fetching the container's env/logs, rendering the Job Summary, the
+  // fail_on_blocked exit decision — so this step just reproduces its exit
+  // code as its own.
+  const scratchDir = mkdtempSync(join(tmpdir(), "buildcage-report-"));
+  try {
+    const reportActionPath = join(scratchDir, "report-action.js");
+
+    try {
+      docker.copyFromContainer(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath);
     } catch (e) {
-      console.log("(failed to fetch allowed/audited traffic detail via buildctl:", errorMessage(e), ")");
+      throw new ReportError(
+        describeDockerFailure(e, { operation: "docker cp (fetching report-action.js from the container)" }),
+        "DOCKER_UNAVAILABLE",
+      );
     }
-  }
 
-  const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
-  const { blockedRows: annotatedBlocked, showExpected, outcome, message } = evaluateBlockedReport(report, {
-    knownBlockedRules, failOnBlocked, engineLabel: "proxy",
-  });
-
-  let markdown = `## Outbound Traffic Report during Docker Build (${report.mode} mode)\n\n`;
-
-  if (isAudit) {
-    const audited = isExplicit ? aggregateAllowedHosts(builds, "AUDIT") : report.sections?.audited || [];
-    if (audited.length > 0) {
-      markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n";
+    // A separate catch from the docker cp above, so the error the user
+    // sees names the actual failure instead of a misleading Docker message.
+    try {
+      execFileSync("node", [reportActionPath, containerId], { stdio: "inherit" });
+    } catch (e) {
+      // A numeric exit status means report-action.js ran and already
+      // explained itself via its own inherited stdio — just reproduce it.
+      const status = (e as { status?: number | null }).status;
+      if (typeof status === "number") {
+        process.exitCode = status;
+        return;
+      }
+      throw new ReportError(`Failed to run report-action.js: ${errorMessage(e)}`, "REPORT_SCRIPT_FAILED");
     }
-    markdown += buildRestrictExample(audited, actionRepo, actionRef);
-    if (annotatedBlocked.length > 0) {
-      if (audited.length > 0) markdown += "\n";
-      markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
-    }
-  } else {
-    const allowed = isExplicit ? aggregateAllowedHosts(builds, "ALLOWED") : report.sections?.allowed || [];
-    if (allowed.length > 0) {
-      markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n";
-    }
-    if (allowed.length > 0 && annotatedBlocked.length > 0) {
-      markdown += "\n";
-    }
-    if (annotatedBlocked.length > 0) {
-      markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(annotatedBlocked, { showReason: true, showExpected }) + "\n";
-    }
-  }
-
-  if (isExplicit) {
-    markdown += renderCommunicationDetails(builds, report.deniedTimeline);
-  }
-
-  // SNI-based sniffing only applies to the transparent engine — the explicit
-  // engine terminates TLS itself, so this caveat doesn't apply to it.
-  if (!isExplicit) {
-    markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
-  }
-
-  markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
-
-  // Write Job Summary
-  if (summaryFile) {
-    appendFileSync(summaryFile, markdown);
-  } else {
-    console.log(markdown);
-  }
-
-  // 4. Error control for blocked connections
-  if (outcome.level === "error") {
-    annotation.error(message);
-    process.exitCode = 1;
-  } else if (outcome.level === "notice") {
-    annotation.notice(message);
+  } finally {
+    rmSync(scratchDir, { recursive: true, force: true });
   }
 }
 

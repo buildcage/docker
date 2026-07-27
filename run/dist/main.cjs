@@ -7168,25 +7168,6 @@ function generateContainerName() {
 	return `buildcage-proxy-${(0, node_crypto.randomBytes)(4).toString("hex")}`;
 }
 /**
-* Reused as the Compose project name (separate Docker namespace from
-* container names, so no collision). Passing an explicit, per-container
-* project name matters when `run` steps in the same job run truly
-* concurrently (GitHub Actions' `background`/`wait`/`parallel` keywords):
-* without it, Compose falls back to one shared, directory-derived project
-* name, and a concurrent `up`/`down` from a different step can recreate or
-* tear down another step's still-running proxy container.
-*/
-function deriveProjectName(containerName) {
-	return containerName;
-}
-function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
-	return [
-		"cp",
-		`${containerName}:${containerPath}`,
-		hostPath
-	];
-}
-/**
 * Distinguishes "this container doesn't exist" (docker's own wording, e.g.
 * `no such object`) from "docker itself is unusable on this runner" — both
 * phrasings are matched for resilience across docker CLI versions.
@@ -7221,6 +7202,28 @@ function getContainerPid(containerName, { exec = node_child_process.execFileSync
 	}
 	let pid = Number(out);
 	return Number.isInteger(pid) && pid > 0 ? pid : null;
+}
+//#endregion
+//#region core/lib/docker/container.ts
+/**
+* An explicit, deterministic Compose project name, so concurrent
+* `up`/`down`/`ps` from different steps in the same job never collide on
+* Compose's shared, directory-derived default.
+*
+* Hashed rather than used verbatim: Compose project names are constrained
+* to `^[a-z0-9][a-z0-9_-]*$`, but the input can be a wider-charset
+* user-supplied `builder_name` — a hex digest is always in-charset
+* regardless, so this never needs to validate its input.
+*/
+function deriveProjectName(containerName) {
+	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
+}
+function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
+	return [
+		"cp",
+		`${containerName}:${containerPath}`,
+		hostPath
+	];
 }
 //#endregion
 //#region run/src/lib/compose-args.ts
@@ -7608,6 +7611,81 @@ function withScratchDir(fn, containerName) {
 	}
 }
 //#endregion
+//#region core/lib/docker/container-env.ts
+/**
+* Parses `docker inspect <id> --format '{{json .Config.Env}}'`'s output — a
+* JSON array of "KEY=VALUE" strings — into a lookup map. Used to read a
+* running container's own env from the runner side (report-action.node.ts
+* doesn't run inside the container, so it can't read process.env directly).
+*/
+function parseDockerInspectEnv(inspectOutput) {
+	let entries = JSON.parse(inspectOutput), env = {};
+	for (let entry of entries) {
+		let i = entry.indexOf("=");
+		i !== -1 && (env[entry.slice(0, i)] = entry.slice(i + 1));
+	}
+	return env;
+}
+//#endregion
+//#region core/lib/docker/client.ts
+/** `docker ps --format '{{.ID}}'` prints one ID per line, possibly with
+*  trailing blank lines. */
+function parseContainerIds(psOutput) {
+	return psOutput.split("\n").map((s) => s.trim()).filter(Boolean);
+}
+function defaultRunCommand(args) {
+	return (0, node_child_process.execFileSync)("docker", args, {
+		encoding: "utf8",
+		stdio: [
+			"ignore",
+			"pipe",
+			"pipe"
+		],
+		maxBuffer: 64 * 1024 * 1024
+	});
+}
+/** `run` is injectable so tests can assert on argv instead of mocking
+*  node:child_process directly. */
+function createDocker(run = defaultRunCommand) {
+	return {
+		findContainers(filters) {
+			let args = ["ps"];
+			for (let filter of filters) args.push("--filter", filter);
+			return args.push("--format", "{{.ID}}"), parseContainerIds(run(args));
+		},
+		copyFromContainer(containerId, containerPath, hostPath) {
+			run(buildDockerCpArgs({
+				containerName: containerId,
+				containerPath,
+				hostPath
+			}));
+		},
+		readFile(containerId, path) {
+			return run([
+				"exec",
+				containerId,
+				"cat",
+				path
+			]);
+		},
+		readEnv(containerId) {
+			return parseDockerInspectEnv(run([
+				"inspect",
+				containerId,
+				"--format",
+				"{{json .Config.Env}}"
+			]));
+		},
+		exec(containerId, args) {
+			return run([
+				"exec",
+				containerId,
+				...args
+			]);
+		}
+	};
+}
+//#endregion
 //#region core/lib/report/build-example.ts
 const ruleTypeToParam = {
 	HTTPS: "allowed_https_rules",
@@ -7686,25 +7764,6 @@ function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }
 	let unexpected = blockedRows.filter((row) => !row.expected).length;
 	return unexpected === blockedRows.length ? base : unexpected === 0 ? `${base}, all matched known_blocked_rules (expected)` : `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
 }
-function evaluateBlockedReport(report, { knownBlockedRules, failOnBlocked, engineLabel }) {
-	let isAudit = report.mode === "audit", blockedRows = annotateKnownBlocked(report.sections?.blocked ?? [], knownBlockedRules), outcome = determineBlockedOutcome({
-		isAudit,
-		failOnBlocked,
-		blockedCount: report.blockedCount ?? 0,
-		blockedRows
-	}), message = buildBlockedMessage({
-		blockedCount: report.blockedCount ?? 0,
-		blockedRows,
-		engineLabel,
-		isAudit
-	});
-	return {
-		blockedRows,
-		showExpected: knownBlockedRules.length > 0,
-		outcome,
-		message
-	};
-}
 //#endregion
 //#region core/lib/actions/markdown-table.ts
 const ALIGN_MARKERS = {
@@ -7756,65 +7815,105 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	})));
 }
 //#endregion
-//#region run/src/lib/report.ts
+//#region core/lib/log/haproxy-log-parser.ts
+const logPattern = /^\[.*?\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+\((\w+)\)\s+"([^"]+)"\s*(\S*)/;
 /**
-* Fetch the structured HAProxy-log report from the (still-running) proxy
-* container. Unlike report/src/main.ts (which supports both engines), the
-* run action always runs the transparent-engine proxy stack, so this
-* only ever needs core/scripts/report.js.
+* Parse log text into structured entries.
 */
-function fetchReport(containerName) {
-	let jsonOutput = (0, node_child_process.execFileSync)("docker", [
-		"exec",
-		containerName,
-		"qjs",
-		"--std",
-		"-m",
-		"/opt/buildcage/scripts/report.js"
-	], {
-		encoding: "utf8",
-		stdio: [
-			"ignore",
-			"pipe",
-			"pipe"
-		]
-	});
-	return JSON.parse(jsonOutput);
-}
-function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand, blockedRows = [], showExpected = !1 } = {}) {
-	let heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
-	if (report.mode === null) return `## ${heading}\n\nNo proxy logs found.\n`;
-	let isAudit = report.mode === "audit", markdown = `## ${heading} (${report.mode} mode)\n\n`;
-	if (isAudit) {
-		let audited = report.sections?.audited || [];
-		audited.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(audited) + "\n\n"), actionRepo && (markdown += buildRestrictExample(audited, actionRepo, actionRef, {
-			actionName: "run",
-			runCommand
-		})), blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, {
-			showReason: !0,
-			showExpected
-		}) + "\n\n");
-	} else {
-		let allowed = report.sections?.allowed || [];
-		allowed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(allowed) + "\n\n"), blockedRows.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(blockedRows, {
-			showReason: !0,
-			showExpected
-		}) + "\n\n");
+function parseEntries(logText) {
+	let entries = [];
+	for (let line of logText.split("\n")) {
+		let m = line.match(logPattern);
+		if (m) {
+			let [, decision, ruleType, hostPort, reason] = m, colonIdx = hostPort.lastIndexOf(":"), host, port;
+			colonIdx > 0 ? (host = hostPort.substring(0, colonIdx), port = hostPort.substring(colonIdx + 1)) : (host = hostPort, port = "0"), entries.push({
+				decision,
+				ruleType,
+				host,
+				port,
+				reason: reason || "-"
+			});
+		}
 	}
-	return markdown;
+	return entries;
 }
-function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand, knownBlockedRules = [] } = {}) {
-	let { blockedRows, showExpected, outcome, message } = evaluateBlockedReport(report, {
-		knownBlockedRules,
+//#endregion
+//#region core/lib/log/aggregate.ts
+/**
+* Aggregate log entries by (host, port, ruleType, reason) with counts, sorted
+* descending.
+*/
+function aggregate(filtered) {
+	let map = {};
+	for (let e of filtered) {
+		let key = `${e.host}\t${e.port}\t${e.ruleType}\t${e.reason}`;
+		map[key] = (map[key] || 0) + 1;
+	}
+	return Object.keys(map).map((key) => {
+		let [host, portStr, ruleType, reason] = key.split("	");
+		return {
+			host,
+			port: portStr,
+			ruleType,
+			reason,
+			count: map[key]
+		};
+	}).sort((a, b) => b.count - a.count || (a.host < b.host ? -1 : +(a.host > b.host)) || Number(a.port) - Number(b.port));
+}
+//#endregion
+//#region core/lib/report/build-transparent-report-data.ts
+/**
+* Pure — no I/O; callers (report-action.node.ts, run/src/lib/report.ts)
+* fetch logText/parameters themselves. An empty logText naturally yields
+* passed:[]/blocked:[]/blockedCount:0, so no special-case branch is needed.
+*/
+function buildTransparentReportData(logText, parameters) {
+	let isAudit = parameters.mode === "audit", entries = parseEntries(logText), blockedCount = entries.filter((e) => e.decision === "BLOCKED").length, blocked = annotateKnownBlocked(aggregate(entries.filter((e) => e.decision === "BLOCKED")), parameters.knownBlockedRules);
+	return {
+		engine: "transparent",
+		parameters,
+		passed: aggregate(isAudit ? entries.filter((e) => e.decision === "AUDIT") : entries.filter((e) => e.decision === "ALLOWED")),
+		blocked,
+		blockedCount
+	};
+}
+/**
+* run always runs the transparent-engine stack and, unlike report/src/main.ts,
+* has no version-skew concern of its own (one pinned version end to end),
+* so it fetches the raw log and calls the shared builder in-process.
+*/
+function fetchReport(containerName, parameters) {
+	return buildTransparentReportData(createDocker().readFile(containerName, "/var/log/haproxy/current"), parameters);
+}
+function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand } = {}) {
+	let heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`, isAudit = report.parameters.mode === "audit", showExpected = report.parameters.knownBlockedRules.length > 0, markdown = `## ${heading} (${report.parameters.mode} mode)\n\n`;
+	return isAudit ? (report.passed.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(report.passed) + "\n\n"), actionRepo && (markdown += buildRestrictExample(report.passed, actionRepo, actionRef, {
+		actionName: "run",
+		runCommand
+	})), report.blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, {
+		showReason: !0,
+		showExpected
+	}) + "\n\n")) : (report.passed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(report.passed) + "\n\n"), report.blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, {
+		showReason: !0,
+		showExpected
+	}) + "\n\n")), markdown;
+}
+function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand } = {}) {
+	let isAudit = report.parameters.mode === "audit", outcome = determineBlockedOutcome({
+		isAudit,
 		failOnBlocked: failOnBlocked ?? !1,
-		engineLabel: "sandbox"
+		blockedCount: report.blockedCount,
+		blockedRows: report.blocked
+	}), message = buildBlockedMessage({
+		blockedCount: report.blockedCount,
+		blockedRows: report.blocked,
+		engineLabel: "sandbox",
+		isAudit
 	}), markdown = buildReportMarkdown(report, {
 		stepLabel,
 		actionRepo,
 		actionRef,
-		runCommand,
-		blockedRows,
-		showExpected
+		runCommand
 	}), summaryFile = process.env.GITHUB_STEP_SUMMARY;
 	summaryFile ? (0, node_fs.appendFileSync)(summaryFile, markdown) : console.log(markdown);
 	let debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
@@ -7950,13 +8049,18 @@ async function main() {
 		}, containerName);
 	} finally {
 		try {
-			writeReport(fetchReport(containerName), {
+			writeReport(fetchReport(containerName, {
+				mode: env.INPUT_PROXY_MODE || "restrict",
+				allowedHttpsRules: rules.httpsRules,
+				allowedHttpRules: rules.httpRules,
+				allowedIpRules: rules.ipRules,
+				knownBlockedRules
+			}), {
 				actionRepo,
 				actionRef,
 				runCommand: runInput,
 				stepLabel: env.INPUT_LABEL || void 0,
-				failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
-				knownBlockedRules
+				failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true"
 			});
 		} catch (e) {
 			annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);

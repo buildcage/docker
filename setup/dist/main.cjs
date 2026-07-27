@@ -15,6 +15,7 @@ let node_child_process = require("node:child_process"), node_path = require("nod
 node_path = __toESM(node_path, 1);
 let node_url = require("node:url"), node_fs = require("node:fs"), node_os = require("node:os");
 node_os = __toESM(node_os, 1);
+let node_crypto = require("node:crypto");
 //#region core/lib/general/action-error.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
@@ -7102,6 +7103,21 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
+//#region core/lib/docker/container.ts
+/**
+* An explicit, deterministic Compose project name, so concurrent
+* `up`/`down`/`ps` from different steps in the same job never collide on
+* Compose's shared, directory-derived default.
+*
+* Hashed rather than used verbatim: Compose project names are constrained
+* to `^[a-z0-9][a-z0-9_-]*$`, but the input can be a wider-charset
+* user-supplied `builder_name` — a hex digest is always in-charset
+* regardless, so this never needs to validate its input.
+*/
+function deriveProjectName(containerName) {
+	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
+}
+//#endregion
 //#region setup/src/main.ts
 const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
 /**
@@ -7136,21 +7152,24 @@ async function main() {
 		httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
 		httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
 		ipRulesInput: env.INPUT_ALLOWED_IP_RULES
-	});
-	console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), console.log("::endgroup::");
-	let composeEnv = {
+	}), knownBlockedRules = parseRulesOrThrow(env.INPUT_KNOWN_BLOCKED_RULES);
+	console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known blocked", knownBlockedRules), console.log("::endgroup::");
+	let builderName = env.INPUT_BUILDER_NAME || "buildcage", projectName = deriveProjectName(builderName), composeEnv = {
 		...env,
-		BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
+		BUILDER_NAME: builderName,
 		PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
 		PROXY_ENGINE: proxyEngine,
 		ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
 		ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
 		ALLOWED_IP_RULES: rules.ipRules.join("\n"),
+		KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
 		BUILDCAGE_IMAGE_REF: imageRef
 	};
 	try {
 		(0, node_child_process.execFileSync)("docker", [
 			"compose",
+			"-p",
+			projectName,
 			"-f",
 			composeFile,
 			"down"
@@ -7164,6 +7183,8 @@ async function main() {
 	try {
 		(0, node_child_process.execFileSync)("docker", [
 			"compose",
+			"-p",
+			projectName,
 			"-f",
 			composeFile,
 			"up",

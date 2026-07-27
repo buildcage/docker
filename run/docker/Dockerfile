@@ -52,7 +52,6 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 COPY rolldown.qjs.config.js tsconfig.qjs.json ./
 COPY core/scripts/ ./core/scripts/
 COPY core/lib/acl/ ./core/lib/acl/
-COPY core/lib/log/ ./core/lib/log/
 COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:qjs
@@ -86,11 +85,10 @@ RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
 COPY run/docker/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
 # Tools (QuickJS scripts, rolldown-bundled by qjs-build above) — convert-rule.js is used
-# by init-haproxy-cfg, report.js by the run action's report step. Each is a self-contained
-# bundle — no separate /opt/buildcage/shared/ copy is needed, unlike before TypeScript
-# migration.
+# by init-haproxy-cfg. Self-contained bundle — no separate /opt/buildcage/shared/ copy
+# is needed, unlike before TypeScript migration. No report-action.js here: run/src/lib/
+# report.ts builds its own report in-process instead of fetching one from the container.
 COPY --from=qjs-build /build/dist/qjs/core/scripts/convert-rule.js /opt/buildcage/scripts/convert-rule.js
-COPY --from=qjs-build /build/dist/qjs/core/scripts/report.js       /opt/buildcage/scripts/report.js
 
 # runc — extracted onto the runner host at `run` action startup and used by
 # run-isolated.sh to execute the isolated command (see docs/development.md)

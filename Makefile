@@ -3,6 +3,19 @@ COMPOSE_FILE ?= compose.yaml
 # containers/images instead of the default transparent-engine test overlay.
 TEST_COMPOSE_FILE ?= setup/compose.test-transparent.yaml
 
+# Must equal deriveProjectName("buildcage") (core/lib/docker/container.ts).
+# Exported so setup/test/helpers.sh and assert-explicit-*.sh's plain
+# `docker compose exec` calls pick it up without needing -p every time.
+#
+# Skipped for `help` (the default goal), so it doesn't pay for a Node
+# startup just to print the command list.
+ifeq ($(strip $(filter-out help,$(or $(MAKECMDGOALS),help))),)
+BUILDER_PROJECT_NAME :=
+else
+export COMPOSE_PROJECT_NAME := $(shell node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName('buildcage')))")
+BUILDER_PROJECT_NAME := $(COMPOSE_PROJECT_NAME)
+endif
+
 # Self-Documented Makefile
 .PHONY: help
 help:
@@ -12,7 +25,7 @@ help:
 clean: ## Clean up all resources
 	@echo "Stopping and removing all containers..."
 	@docker buildx rm buildcage 2>/dev/null || true
-	@docker compose -f compose.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi all
+	@docker compose -p $(BUILDER_PROJECT_NAME) -f compose.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi all
 	@docker rmi buildcage-test 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
@@ -25,7 +38,7 @@ run_transparent_audit_mode: ## Start transparent engine in audit mode
 	@echo "Starting buildcage (transparent engine) in AUDIT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=audit \
-	  docker compose up -d --wait --build
+	  docker compose -p $(BUILDER_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
@@ -39,7 +52,7 @@ run_transparent_restrict_mode: ## Start transparent engine in restrict mode
 	  PROXY_MODE=restrict \
 	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
 	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
-	  docker compose up -d --wait --build
+	  docker compose -p $(BUILDER_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
@@ -52,7 +65,7 @@ run_explicit_audit_mode: ## Start explicit proxy engine in audit mode
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_ENGINE=explicit \
 	  PROXY_MODE=audit \
-	  docker compose up -d --wait --build
+	  docker compose -p $(BUILDER_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
@@ -67,7 +80,7 @@ run_explicit_restrict_mode: ## Start explicit proxy engine in restrict mode
 	  PROXY_MODE=restrict \
 	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
 	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
-	  docker compose up -d --wait --build
+	  docker compose -p $(BUILDER_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm buildcage 2>/dev/null || true
 	@echo "Creating buildx builder..."
 	@docker buildx create --bootstrap \
@@ -122,8 +135,10 @@ test_transparent_audit_mode: ## Run transparent-engine audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.transparent-audit setup/test/ \
 	  --load -t buildcage-test
-	@node report/src/main.ts ./compose.yaml
+	@node report/src/main.ts
 	@./setup/test/assert-transparent-audit.sh
+	@node setup/src/post.ts
+	@./setup/test/assert-post.sh
 	@$(MAKE) clean
 
 .PHONY: test_transparent_restrict_mode
@@ -136,8 +151,10 @@ test_transparent_restrict_mode: ## Run transparent-engine restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.transparent-restrict setup/test/ \
 	  --load -t buildcage-test
-	@node report/src/main.ts ./compose.yaml || true
+	@node report/src/main.ts || true
 	@./setup/test/assert-transparent-restrict.sh
+	@node setup/src/post.ts
+	@./setup/test/assert-post.sh
 	@$(MAKE) clean
 
 .PHONY: test_explicit_audit_mode
@@ -150,8 +167,10 @@ test_explicit_audit_mode: ## Run explicit-engine audit mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.explicit-audit setup/test/ \
 	  --load -t buildcage-test
-	@PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml || true
+	@node report/src/main.ts || true
 	@./setup/test/assert-explicit-audit.sh
+	@node setup/src/post.ts
+	@./setup/test/assert-post.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
 .PHONY: test_explicit_restrict_mode
@@ -164,8 +183,10 @@ test_explicit_restrict_mode: ## Run explicit-engine restrict mode tests
 	  --platform linux/arm64 \
 	  --progress=plain -f setup/test/Dockerfile.explicit-restrict setup/test/ \
 	  --load -t buildcage-test
-	@PROXY_ENGINE=explicit node report/src/main.ts ./compose.yaml || true
+	@node report/src/main.ts || true
 	@./setup/test/assert-explicit-restrict.sh
+	@node setup/src/post.ts
+	@./setup/test/assert-post.sh
 	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean
 
 # Unlike test_{engine}_{mode}_mode above, this drives run/dist/main.cjs
@@ -216,8 +237,7 @@ test_sandbox_unit: ## Run the run action's unit tests
 QJS_MOUNTS := \
 	-v "$(CURDIR)/dist/test-qjs/core:/opt/buildcage/core:ro"
 QJS_TEST_DIRS := \
-	/opt/buildcage/core/lib/acl \
-	/opt/buildcage/core/lib/log
+	/opt/buildcage/core/lib/acl
 
 .PHONY: test_qjs
 test_qjs: ## Run unit tests in Docker
@@ -241,7 +261,7 @@ run_audit_example: ## Run audit mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.ts ./compose.yaml
+	@node report/src/main.ts
 	@$(MAKE) clean
 	rm -fr /tmp/build-context
 
@@ -262,6 +282,6 @@ run_restrict_example: ## Run restrict mode example tests
 	  --platform linux/arm64 \
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
-	@node report/src/main.ts ./compose.yaml || true
+	@node report/src/main.ts || true
 	@$(MAKE) clean
 	rm -fr /tmp/build-context

@@ -67,14 +67,14 @@ jobs:
       - name: Check dist is up to date
         run: git diff --exit-code
 
-      - name: Check dist is free of the local-image test hook
+      - name: Check dist is free of the BUILDCAGE_BUILD_TEST_HOOKS test hooks
         run: |
-          for f in setup/dist/main.cjs run/dist/main.cjs; do
+          for f in setup/dist/main.cjs run/dist/main.cjs report/dist/main.cjs; do
             if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
-              echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read after a normal build — rolldown's replacePlugin failed to substitute it (see rolldown.config.js). This means the local-image bypass could be reachable by anyone setting that env var on a published action step. Do not merge until this passes."
+              echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read — rolldown's replacePlugin failed to substitute it (see rolldown.config.js), leaving a test-only hook reachable in a published action. Do not merge until this passes."
               exit 1
             fi
-            echo "confirmed: $f has no live BUILDCAGE_BUILD_TEST_HOOKS read — the local-image bypass is unreachable in this build."
+            echo "confirmed: $f has no live BUILDCAGE_BUILD_TEST_HOOKS read — its test hooks are unreachable in this build."
           done
 
       - name: Run unit tests

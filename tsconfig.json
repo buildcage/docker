@@ -16,7 +16,8 @@
     "core/lib/**/*.ts",
     "setup/src/**/*.ts",
     "run/src/**/*.ts",
-    "report/src/**/*.ts"
+    "report/src/**/*.ts",
+    "setup/docker/*/scripts/*.node.ts"
   ],
-  "exclude": ["setup/docker", "**/dist/**"]
+  "exclude": ["**/dist/**"]
 }

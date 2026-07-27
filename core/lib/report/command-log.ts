@@ -1,5 +1,5 @@
-import type { AllowedRequest, VertexAllowedEntry } from "./vertex-log.ts";
-import type { DeniedEntry } from "../../../core/lib/report/report-data.ts";
+import type { AllowedRequest, VertexAllowedEntry } from "../log/vertex-log.ts";
+import type { DeniedEntry } from "./report-data.ts";
 
 /**
  * Render the explicit engine's communication detail as a collapsed markdown

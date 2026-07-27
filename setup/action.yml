@@ -26,6 +26,10 @@ inputs:
     description: "IP address allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
     required: false
     default: ''
+  known_blocked_rules:
+    description: "Domains expected to be blocked intentionally (wildcard or ~regex), separated by whitespace. Port required. Blocked connections matching these rules don't fail the report step even when fail_on_blocked is true — only unmatched (unexpected) blocked connections do. e.g., 'known-noisy.example.com:443'"
+    required: false
+    default: ''
 
 runs:
   using: node24

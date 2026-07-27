@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { SetupError } from "./lib/errors.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
-import { buildACLRules } from "../../core/lib/acl/rules.ts";
+import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import {
   verifyImageDigestOrThrow,
   type VerifyImageDigestOptions,
@@ -13,6 +13,7 @@ import {
 } from "../../core/lib/provenance/verify-image.ts";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
+import { deriveProjectName } from "../../core/lib/docker/container.ts";
 
 export { buildACLRules };
 
@@ -72,31 +73,39 @@ async function main(): Promise<void> {
     httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
     ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
   });
+  const knownBlockedRules = parseRulesOrThrow(env.INPUT_KNOWN_BLOCKED_RULES);
 
   console.log("::group::Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
   logRules("HTTP", rules.httpRules);
   logRules("IP", rules.ipRules);
+  logRules("Known blocked", knownBlockedRules);
   console.log("::endgroup::");
+
+  // "buildcage" here is a fallback for running outside the Actions runtime
+  // (action.yml's own `default: 'buildcage'` covers the normal case) — keep
+  // both, and report/src/main.ts's copy, in sync.
+  const builderName = env.INPUT_BUILDER_NAME || "buildcage";
+  // So report can independently derive the same project name from its own
+  // builder_name input and find this container via `docker ps --filter`.
+  const projectName = deriveProjectName(builderName);
 
   const composeEnv = {
     ...env,
-    // "buildcage" here is a fallback for running outside the Actions runtime
-    // (action.yml's own `default: 'buildcage'` covers the normal case) — keep
-    // both, and report/src/main.ts's copy, in sync.
-    BUILDER_NAME: env.INPUT_BUILDER_NAME || "buildcage",
+    BUILDER_NAME: builderName,
     PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
     PROXY_ENGINE: proxyEngine,
     ALLOWED_HTTPS_RULES: rules.httpsRules.join('\n'),
     ALLOWED_HTTP_RULES: rules.httpRules.join('\n'),
     ALLOWED_IP_RULES: rules.ipRules.join('\n'),
+    KNOWN_BLOCKED_RULES: knownBlockedRules.join('\n'),
     BUILDCAGE_IMAGE_REF: imageRef,
   };
 
   try {
     execFileSync(
       "docker",
-      ["compose", "-f", composeFile, "down"],
+      ["compose", "-p", projectName, "-f", composeFile, "down"],
       { stdio: "inherit", env: composeEnv }
     );
   } catch (e) {
@@ -111,6 +120,7 @@ async function main(): Promise<void> {
       "docker",
       [
         "compose",
+        "-p", projectName,
         "-f", composeFile,
         "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull",
       ],

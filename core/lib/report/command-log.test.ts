@@ -1,5 +1,4 @@
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it, assert, reportResults } from "../test/test-shim.ts";
 import { renderCommunicationDetails } from "./command-log.ts";
 
 function wrap(body: string) {
@@ -177,3 +176,5 @@ describe("renderCommunicationDetails", () => {
     });
   });
 });
+
+reportResults();

@@ -11,7 +11,7 @@
  * `-p projectName` is required on both so that fully concurrent `run`
  * steps in the same job (see GitHub Actions' `background`/`wait`/`parallel`
  * step keywords) never share Compose's implicit, directory-derived project
- * name — see lib/container.ts's deriveProjectName for why that matters.
+ * name — see core/lib/docker/container.ts's deriveProjectName for why that matters.
  */
 export interface ComposeArgsOptions {
   composeFile: string;

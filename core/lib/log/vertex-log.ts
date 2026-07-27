@@ -1,5 +1,5 @@
-import { parseIdentifier } from "../../../core/lib/log/parse-identifier.ts";
-import { aggregate, type AggregatedEntry } from "../../../core/lib/log/aggregate.ts";
+import { parseIdentifier } from "./parse-identifier.ts";
+import { aggregate, type AggregatedEntry } from "./aggregate.ts";
 
 /**
  * Parse `buildctl debug histories --format '{{json .}}'`'s newline-delimited

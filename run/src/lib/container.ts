@@ -14,37 +14,6 @@ export function generateContainerName(): string {
 }
 
 /**
- * Reused as the Compose project name (separate Docker namespace from
- * container names, so no collision). Passing an explicit, per-container
- * project name matters when `run` steps in the same job run truly
- * concurrently (GitHub Actions' `background`/`wait`/`parallel` keywords):
- * without it, Compose falls back to one shared, directory-derived project
- * name, and a concurrent `up`/`down` from a different step can recreate or
- * tear down another step's still-running proxy container.
- */
-export function deriveProjectName(containerName: string): string {
-  return containerName;
-}
-
-/**
- * Used to pull runc and gen-seccomp-profile out of the proxy image before
- * the isolated command runs (see lib/isolated-exec.ts).
- */
-export interface BuildDockerCpArgsOptions {
-  containerName: string;
-  containerPath: string;
-  hostPath: string;
-}
-
-export function buildDockerCpArgs({
-  containerName,
-  containerPath,
-  hostPath,
-}: BuildDockerCpArgsOptions): string[] {
-  return ["cp", `${containerName}:${containerPath}`, hostPath];
-}
-
-/**
  * Distinguishes "this container doesn't exist" (docker's own wording, e.g.
  * `no such object`) from "docker itself is unusable on this runner" — both
  * phrasings are matched for resilience across docker CLI versions.
