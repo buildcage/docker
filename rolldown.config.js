@@ -2,7 +2,7 @@ import { defineConfig } from "rolldown";
 import { replacePlugin } from "rolldown/plugins";
 
 // Plugin required to substitute BUILDCAGE_BUILD_TEST_HOOKS at build time.
-// Applied to setup/src/main.js; other entries have no need for it.
+// Applied to setup/src/main.js and report/src/main.js only.
 //
 // replacePlugin() substitutes BUILDCAGE_BUILD_TEST_HOOKS with the value from
 // this build's own env, not the resulting action's runtime env — see
@@ -24,7 +24,11 @@ const configs = [
     codeSplitting: false,
   },
   { input: "setup/src/post.ts", file: "setup/dist/post.cjs" },
-  { input: "report/src/main.ts", file: "report/dist/main.cjs" },
+  {
+    input: "report/src/main.ts",
+    file: "report/dist/main.cjs",
+    plugins: mainPlugins,
+  },
   {
     input: "run/src/main.ts",
     file: "run/dist/main.cjs",

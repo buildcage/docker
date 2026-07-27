@@ -11,11 +11,20 @@ import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { ReportError } from "./lib/errors.ts";
 
+// CI-only override gate, mirrors setup/src/main.ts's LOCAL_IMAGE_OVERRIDE_ENABLED.
+const PROJECT_NAME_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1";
+
+// Same derivation setup uses for its `-p`.
+export function resolveProjectName(builderName: string, env: NodeJS.ProcessEnv): string {
+  if (PROJECT_NAME_OVERRIDE_ENABLED && env.COMPOSE_PROJECT_NAME) {
+    return env.COMPOSE_PROJECT_NAME;
+  }
+  return deriveProjectName(builderName);
+}
+
 async function main(): Promise<void> {
   const builderName = process.env.INPUT_BUILDER_NAME || "buildcage";
-  // Same derivation setup uses for its own `-p` — lets this step find the
-  // right container without ever touching setup's compose file.
-  const projectName = deriveProjectName(builderName);
+  const projectName = resolveProjectName(builderName, process.env);
   const docker = createDocker();
 
   // 1. Locate the report-source container purely via Docker metadata.

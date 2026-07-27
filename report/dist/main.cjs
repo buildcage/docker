@@ -1,3 +1,4 @@
+Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_os = require("node:os"), node_path = require("node:path"), node_url = require("node:url"), node_crypto = require("node:crypto");
 /**
 * Turns a caught `docker` invocation error into an actionable message,
@@ -172,8 +173,11 @@ function errorMessage(e) {
 var ReportError = class extends ActionError {};
 //#endregion
 //#region report/src/main.ts
+function resolveProjectName(builderName, env) {
+	return deriveProjectName(builderName);
+}
 async function main() {
-	let builderName = process.env.INPUT_BUILDER_NAME || "buildcage", projectName = deriveProjectName(builderName), docker = createDocker(), containerId;
+	let builderName = process.env.INPUT_BUILDER_NAME || "buildcage", projectName = resolveProjectName(builderName, process.env), docker = createDocker(), containerId;
 	try {
 		let ids = docker.findContainers([`label=com.docker.compose.project=${projectName}`, "label=io.github.dash14.buildcage.report-source=true"]);
 		if (ids.length !== 1) throw new ReportError(`Expected exactly one buildcage container for builder_name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder_name?`, "CONTAINER_NOT_FOUND");
@@ -206,7 +210,7 @@ async function main() {
 		});
 	}
 }
+//#endregion
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
 	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in report: ${errorMessage(err)}`), process.exit(1);
-});
-//#endregion
+}), exports.resolveProjectName = resolveProjectName;

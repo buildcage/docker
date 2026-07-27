@@ -98,6 +98,10 @@ jobs:
 
     env:
       COMPOSE_FILE: ${{ matrix.compose_file }}
+      # Avoids replicating deriveProjectName's hashing in workflow YAML.
+      COMPOSE_PROJECT_NAME: buildcage-project
+      # Lets report trust COMPOSE_PROJECT_NAME above.
+      BUILDCAGE_BUILD_TEST_HOOKS: "1"
 
     steps:
       - name: Checkout
@@ -111,24 +115,14 @@ jobs:
           BUILDER_NAME: ${{ matrix.builder_name }}
         # Scoped to the services this job needs: builder, plus the
         # test-server/test-dns fixtures from matrix.compose_file's overlay.
-        #
-        # COMPOSE_PROJECT_NAME must match deriveProjectName(builder_name)
-        # (core/lib/docker/container.ts), or report can't find this job's
-        # container.
-        run: |
-          COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
-          export COMPOSE_PROJECT_NAME
-          docker compose build builder test-server test-dns
+        run: docker compose build builder test-server test-dns
 
       - name: Start containers
         env:
           PROXY_MODE: ${{ matrix.proxy_mode }}
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: |
-          COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
-          export COMPOSE_PROJECT_NAME
-          docker compose up -d --wait builder test-server test-dns
+        run: docker compose up -d --wait builder test-server test-dns
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -171,10 +165,7 @@ jobs:
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
           INPUT_BUILDER_NAME: ${{ matrix.builder_name }}
-        run: |
-          COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
-          export COMPOSE_PROJECT_NAME
-          ${{ matrix.assert_script }}
+        run: ${{ matrix.assert_script }}
 
       - name: Run source-policy conflict assertions
         if: matrix.mode == 'explicit-restrict'
@@ -186,10 +177,7 @@ jobs:
         if: always()
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: |
-          COMPOSE_PROJECT_NAME=$(node -e "import('./core/lib/docker/container.ts').then(m => process.stdout.write(m.deriveProjectName(process.env.BUILDER_NAME)))")
-          export COMPOSE_PROJECT_NAME
-          docker compose down -v --rmi all 2>/dev/null || true
+        run: docker compose down -v --rmi all 2>/dev/null || true
 
   test_multiarch:
     needs: changes
