@@ -1,7 +1,7 @@
 # Mac-friendly dev-loop overlay for the run action (see run/dev/Dockerfile
 # for why this exists and how it differs from production / CI's test_sandbox).
 #
-# Usage: make run_sandbox_mode / make test_sandbox_mode
+# Usage: make setup_sandbox_dev / make test_sandbox_dev
 services:
   sandbox-dev-runner:
     container_name: buildcage-sandbox-dev-runner

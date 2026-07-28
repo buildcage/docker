@@ -1,5 +1,5 @@
 #!/bin/sh
-# Sample isolated command for `make test_sandbox_mode` — exercises the same
+# Sample isolated command for `make test_sandbox_dev` — exercises the same
 # checks the CI test_sandbox job performs, run from the mac dev loop instead.
 set -e
 

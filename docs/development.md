@@ -10,20 +10,20 @@ You can run Buildcage locally without GitHub Actions using Docker Compose and Ma
 
 ### Starting the Builder
 
-There's one `run_{engine}_{mode}_mode` target per (`transparent`, `explicit`) x (`audit`, `restrict`)
+There's one `setup_buildkit_{engine}_{mode}` target per (`transparent`, `explicit`) x (`audit`, `restrict`)
 combination:
 
 ```bash
-make run_transparent_audit_mode
-make run_transparent_restrict_mode
-make run_explicit_audit_mode
-make run_explicit_restrict_mode
+make setup_buildkit_transparent_audit
+make setup_buildkit_transparent_restrict
+make setup_buildkit_explicit_audit
+make setup_buildkit_explicit_restrict
 ```
 
 **Start with custom domains** (restrict mode only):
 
 ```bash
-ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make run_transparent_restrict_mode
+ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make setup_buildkit_transparent_restrict
 ```
 
 The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/DNS-redirect/HAProxy
@@ -36,23 +36,28 @@ stack (see [Proxy Engines](./reference.md#proxy-engines)). `PROXY_ENGINE=explici
 
 ```bash
 # 1. Start Buildcage
-make run_transparent_audit_mode
+make setup_buildkit_transparent_audit
 
 # 2. Build
 docker buildx build --builder buildcage --progress=plain -f Dockerfile .
 
 # 3. View report
-docker compose logs builder
+make report_buildkit
 
 # 4. Clean up
-make clean
+make clean_integration_buildkit
 ```
+
+`make report_buildkit` runs `node report/src/main.ts` with the same `COMPOSE_PROJECT_NAME`/`BUILDCAGE_BUILD_TEST_HOOKS`
+override the `setup_buildkit_*`/`clean_integration_buildkit` targets use (see the pattern rule near the top of the
+Makefile) — running `node report/src/main.ts` directly, without going through `make`, won't find the running
+builder container. Raw builder logs are also available via `docker compose logs builder`.
 
 ### Sandbox Dev Loop (mac-friendly)
 
 The `run` action's own isolation mechanism (`run-isolated.sh`) uses Linux-only primitives
-(`ip netns`, `nsenter`, `runc`) that can't run natively on macOS. `make run_sandbox_mode` /
-`make test_sandbox_mode` instead drive it from inside a container with `pid: host` (see
+(`ip netns`, `nsenter`, `runc`) that can't run natively on macOS. `make setup_sandbox_dev` /
+`make test_sandbox_dev` instead drive it from inside a container with `pid: host` (see
 `run/dev/Dockerfile` and `run/compose.sandbox-dev.yaml`), which can see the proxy
 container's PID/netns via `/proc` — close enough to the real "runner host + separate proxy
 container" arrangement for day-to-day iteration, though it can't validate the container-boundary
@@ -66,25 +71,26 @@ production exactly — treat those as the final word on whether a change actuall
 dev loop.
 
 ```bash
-make run_sandbox_mode   # start the proxy + dev-loop runner container
-make test_sandbox_mode  # run a sample isolated command and verify allow/block + capability drop
+make setup_sandbox_dev  # start the proxy + dev-loop runner container
+make test_sandbox_dev   # run a sample isolated command and verify allow/block + capability drop
 ```
 
 ## Testing
 
-Each `run_{engine}_{mode}_mode` target has a matching `test_{engine}_{mode}_mode` target
-(start → build the matching `setup/test/Dockerfile.*` → verify → clean up):
+Each `setup_buildkit_{engine}_{mode}` target has a matching
+`test_integration_buildkit_{engine}_{mode}` target (start → build the matching
+`setup/test/Dockerfile.*` → verify → clean up):
 
 ```bash
-make test_transparent_audit_mode
-make test_transparent_restrict_mode
-make test_explicit_audit_mode
-make test_explicit_restrict_mode
+make test_integration_buildkit_transparent_audit
+make test_integration_buildkit_transparent_restrict
+make test_integration_buildkit_explicit_audit
+make test_integration_buildkit_explicit_restrict
 ```
 
-`make test_sandbox_unit` runs the run action's Node.js unit tests
-(`node --test 'run/src/**/*.test.ts'`); `make test_sandbox_mode` is the dev-loop end-to-end
-check described above; `make test_sandbox_integration` drives `run/dist/main.cjs` directly for
+`make test_unit_sandbox` runs the run action's Node.js unit tests
+(`node --test 'run/src/**/*.test.ts'`); `make test_sandbox_dev` is the dev-loop end-to-end
+check described above; `make test_integration_sandbox_linux` drives `run/dist/main.cjs` directly for
 checks that don't depend on the real action wrapper (see `run/test/integration-test-*.sh`) and
 is what CI's `test_sandbox` job in `test-integration.yml` runs. The CI-only `test_sandbox_*`
 end-to-end jobs (real runner host, no nested container) are described in
@@ -286,20 +292,22 @@ reports for the allowed side.
 | Command | Description |
 |---------|-------------|
 | `make help` | Show available commands |
-| `make run_transparent_audit_mode` | Start transparent engine in audit mode |
-| `make run_transparent_restrict_mode` | Start transparent engine in restrict mode (default domains) |
-| `make run_explicit_audit_mode` | Start explicit proxy engine in audit mode |
-| `make run_explicit_restrict_mode` | Start explicit proxy engine in restrict mode |
-| `make test_transparent_audit_mode` | Run transparent-engine audit mode tests (start → build → verify → clean up) |
-| `make test_transparent_restrict_mode` | Run transparent-engine restrict mode tests (start → build → verify → clean up) |
-| `make test_explicit_audit_mode` | Run explicit-engine audit mode tests (start → build → verify → clean up) |
-| `make test_explicit_restrict_mode` | Run explicit-engine restrict mode tests (start → build → verify → clean up) |
-| `make run_sandbox_mode` | Start the run action's proxy + mac-friendly dev-loop runner |
-| `make test_sandbox_mode` | Run a sample isolated command in the dev loop and verify isolation |
-| `make test_unit` | Run unit tests (includes `test_sandbox_unit`) |
-| `make test_sandbox_unit` | Run the run action's Node.js unit tests |
-| `make test_sandbox_integration` | Run the run action's integration tests (needs `BUILDCAGE_LOCAL_IMAGE_REF` and a test-hook build of `run/dist/main.cjs`) |
-| `make clean` | Remove all resources |
+| `make setup_buildkit_transparent_audit` | Start transparent engine in audit mode |
+| `make setup_buildkit_transparent_restrict` | Start transparent engine in restrict mode (default domains) |
+| `make setup_buildkit_explicit_audit` | Start explicit proxy engine in audit mode |
+| `make setup_buildkit_explicit_restrict` | Start explicit proxy engine in restrict mode |
+| `make report_buildkit` | Show the buildcage report for the currently running builder |
+| `make test_integration_buildkit` | Run all `test_integration_buildkit_*` tests |
+| `make test_integration_buildkit_transparent_audit` | Run transparent-engine audit mode tests (start → build → verify → clean up) |
+| `make test_integration_buildkit_transparent_restrict` | Run transparent-engine restrict mode tests (start → build → verify → clean up) |
+| `make test_integration_buildkit_explicit_audit` | Run explicit-engine audit mode tests (start → build → verify → clean up) |
+| `make test_integration_buildkit_explicit_restrict` | Run explicit-engine restrict mode tests (start → build → verify → clean up) |
+| `make setup_sandbox_dev` | Start the run action's proxy + mac-friendly dev-loop runner |
+| `make test_sandbox_dev` | Run a sample isolated command in the dev loop and verify isolation |
+| `make test_unit` | Run unit tests (includes `test_unit_sandbox`) |
+| `make test_unit_sandbox` | Run the run action's Node.js unit tests |
+| `make test_integration_sandbox_linux` | Run the run action's integration tests (needs `BUILDCAGE_LOCAL_IMAGE_REF` and a test-hook build of `run/dist/main.cjs`) |
+| `make clean_integration_buildkit` | Stop and remove the buildkit builder's containers/images and buildx builder |
 
 ## Directory Structure
 
@@ -374,8 +382,8 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 
 2. **Run in audit mode** to understand your build's network behavior:
    ```bash
-   make clean
-   make run_transparent_audit_mode
+   make clean_integration_buildkit
+   make setup_buildkit_transparent_audit
    docker buildx build --builder buildcage --no-cache -f Dockerfile .
    docker compose logs builder
    ```
