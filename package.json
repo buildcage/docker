@@ -21,9 +21,9 @@
   "type": "module",
   "scripts": {
     "build": "rolldown -c",
-    "build:qjs": "rolldown -c rolldown.qjs.config.js",
-    "build:qjs-test": "QJS_BUILD_TARGET=test rolldown -c rolldown.qjs.config.js",
-    "build:report-action": "rolldown -c rolldown.report-action.config.js",
+    "build:qjs": "BUILD_TARGET=qjs rolldown -c rolldown.scripts.config.js",
+    "build:qjs-test": "BUILD_TARGET=qjs-test rolldown -c rolldown.scripts.config.js",
+    "build:scripts": "rolldown -c rolldown.scripts.config.js",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.qjs.json"
   },
   "dependencies": {

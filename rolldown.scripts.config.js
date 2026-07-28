@@ -1,0 +1,57 @@
+import { globSync } from "node:fs";
+import { defineConfig } from "rolldown";
+
+// Small standalone scripts baked into the built Docker images, as opposed
+// to rolldown.config.js's Action entrypoints.
+const productionInputs = globSync(["**/scripts/*.ts"], {
+  exclude: ["node_modules/**", "dist/**", "**/*.test.ts"],
+});
+
+// core/lib/acl/*.test.ts is dual-consumed (also runs under node:test);
+// *.property.test.ts siblings are node:test/fast-check only, not qjs-compatible.
+const qjsTestInputs = [
+  "core/scripts/test/run-tests.qjs.ts",
+  ...globSync(["core/lib/acl/*.test.ts"], { exclude: ["**/*.property.test.ts"] }),
+];
+
+function settingsFor(input) {
+  return input.endsWith(".qjs.ts")
+    ? { outDir: "dist/qjs", stripSuffix: /\.qjs\.ts$/, external: ["qjs:std", "qjs:os"], platform: "neutral" }
+    : { outDir: "dist/report-action", stripSuffix: /\.node\.ts$/, external: [/^node:/], platform: "node" };
+}
+
+const baseOutput = {
+  // report-action's plain .js is still ESM: node auto-detects import/export syntax (Node 22.7+).
+  format: "esm",
+  codeSplitting: false,
+  minify: {
+    compress: true,
+    mangle: false,
+    codegen: { removeWhitespace: false, legalComments: "none" },
+  },
+};
+
+// Unset BUILD_TARGET builds everything but qjs-test (run/docker/Dockerfile,
+// which doesn't need report-action.node.ts, requests "qjs" explicitly).
+const target = process.env.BUILD_TARGET;
+const scriptInputs =
+  target === "qjs" ? productionInputs.filter((input) => input.endsWith(".qjs.ts")) : productionInputs;
+
+export default defineConfig(
+  target === "qjs-test"
+    ? qjsTestInputs.map((input) => ({
+        input,
+        external: ["qjs:std", "qjs:os"],
+        platform: "neutral",
+        output: { file: `dist/test-qjs/${input.replace(/\.ts$/, ".js")}`, ...baseOutput },
+      }))
+    : scriptInputs.map((input) => {
+        const { outDir, stripSuffix, external, platform } = settingsFor(input);
+        return {
+          input,
+          external,
+          platform,
+          output: { file: `${outDir}/${input.replace(stripSuffix, ".js")}`, ...baseOutput },
+        };
+      }),
+);
