@@ -355,7 +355,7 @@ reports for the allowed side.
 │   │                         # report-action.node.ts, never by the QuickJS scripts
 │   └── scripts/              # QuickJS entry point (convert-rule.ts), run inside the built images
 │                             # (rolldown-bundled into /opt/buildcage/scripts/ at image build time
-│                             # — see rolldown.qjs.config.js); test/ is a qjs test runner, types/ is
+│                             # — see rolldown.scripts.config.js); test/ is a qjs test runner, types/ is
 │                             # the qjs:std/qjs:os ambient type declaration
 ├── docs/                     # development.md, rules.md, security.md, self-hosting.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by

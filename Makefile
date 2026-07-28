@@ -233,7 +233,7 @@ test_sandbox_unit: ## Run the run action's unit tests
 # .ts directly, so compile fresh on the host (pnpm run build:qjs-test, output to
 # dist/test-qjs/) and bind-mount that compiled output in for qjs to exec. qjs itself is
 # identical across images, so one representative build (setup's transparent engine) is
-# enough — the qjs-build stage's own bundles are unused here (bind-mounted over).
+# enough — the scripts-build stage's own bundles are unused here (bind-mounted over).
 QJS_MOUNTS := \
 	-v "$(CURDIR)/dist/test-qjs/core:/opt/buildcage/core:ro"
 QJS_TEST_DIRS := \
