@@ -8,8 +8,8 @@ TEST_COMPOSE_FILE ?= setup/compose.test-transparent.yaml
 # Scoped to the targets that touch this Compose project; test_unit_*,
 # test_integration_sandbox_linux, and the sandbox dev-loop targets are
 # excluded on purpose (see their own sections below).
-setup_buildkit_% test_integration_buildkit_% example_% clean_integration_buildkit report_buildkit: export COMPOSE_PROJECT_NAME := buildcage-project
-setup_buildkit_% test_integration_buildkit_% example_% clean_integration_buildkit report_buildkit: export BUILDCAGE_BUILD_TEST_HOOKS := 1
+setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export COMPOSE_PROJECT_NAME := buildcage-project
+setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export BUILDCAGE_BUILD_TEST_HOOKS := 1
 
 .PHONY: help
 help:
@@ -115,6 +115,13 @@ setup_buildkit_explicit_restrict: ## Start explicit proxy engine in restrict mod
 		--name buildcage \
 		--driver remote docker-container://buildcage
 
+.PHONY: clean_buildkit
+clean_buildkit: ## Stop and remove the buildkit builder's containers/images and buildx builder
+	@echo "Stopping and removing all containers..."
+	@docker buildx rm buildcage 2>/dev/null || true
+	@docker compose -p $(COMPOSE_PROJECT_NAME) -f compose.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi all
+	@docker rmi buildcage-test 2>/dev/null || true
+
 .PHONY: report_buildkit
 report_buildkit: ## Show the buildcage report for the currently running builder
 	@node report/src/main.ts
@@ -140,7 +147,7 @@ test_integration_buildkit_transparent_audit: ## Run transparent-engine audit mod
 	@./setup/test/assert-transparent-audit.sh
 	@node setup/src/post.ts
 	@./setup/test/assert-post.sh
-	@$(MAKE) clean_integration_buildkit
+	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_transparent_restrict
 test_integration_buildkit_transparent_restrict: ## Run transparent-engine restrict mode tests
@@ -156,7 +163,7 @@ test_integration_buildkit_transparent_restrict: ## Run transparent-engine restri
 	@./setup/test/assert-transparent-restrict.sh
 	@node setup/src/post.ts
 	@./setup/test/assert-post.sh
-	@$(MAKE) clean_integration_buildkit
+	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_explicit_audit
 test_integration_buildkit_explicit_audit: ## Run explicit-engine audit mode tests
@@ -172,7 +179,7 @@ test_integration_buildkit_explicit_audit: ## Run explicit-engine audit mode test
 	@./setup/test/assert-explicit-audit.sh
 	@node setup/src/post.ts
 	@./setup/test/assert-post.sh
-	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean_integration_buildkit
+	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_explicit_restrict
 test_integration_buildkit_explicit_restrict: ## Run explicit-engine restrict mode tests
@@ -188,14 +195,7 @@ test_integration_buildkit_explicit_restrict: ## Run explicit-engine restrict mod
 	@./setup/test/assert-explicit-restrict.sh
 	@node setup/src/post.ts
 	@./setup/test/assert-post.sh
-	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean_integration_buildkit
-
-.PHONY: clean_integration_buildkit
-clean_integration_buildkit: ## Stop and remove the buildkit builder's containers/images and buildx builder
-	@echo "Stopping and removing all containers..."
-	@docker buildx rm buildcage 2>/dev/null || true
-	@docker compose -p $(COMPOSE_PROJECT_NAME) -f compose.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi all
-	@docker rmi buildcage-test 2>/dev/null || true
+	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean_buildkit
 
 # ---------------------------------------------------------------------------
 # setup_sandbox_dev / test_sandbox_dev — mac-friendly dev loop for the run
@@ -264,7 +264,7 @@ example_transparent_audit: ## Run audit mode example tests
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
 	@node report/src/main.ts
-	@$(MAKE) clean_integration_buildkit
+	@$(MAKE) clean_buildkit
 	rm -fr /tmp/build-context
 
 .PHONY: example_transparent_restrict
@@ -285,5 +285,5 @@ example_transparent_restrict: ## Run restrict mode example tests
 	  --progress=plain -f /tmp/build-context/Dockerfile /tmp/build-context \
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
-	@$(MAKE) clean_integration_buildkit
+	@$(MAKE) clean_buildkit
 	rm -fr /tmp/build-context

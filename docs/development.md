@@ -45,11 +45,11 @@ docker buildx build --builder buildcage --progress=plain -f Dockerfile .
 make report_buildkit
 
 # 4. Clean up
-make clean_integration_buildkit
+make clean_buildkit
 ```
 
 `make report_buildkit` runs `node report/src/main.ts` with the same `COMPOSE_PROJECT_NAME`/`BUILDCAGE_BUILD_TEST_HOOKS`
-override the `setup_buildkit_*`/`clean_integration_buildkit` targets use (see the pattern rule near the top of the
+override the `setup_buildkit_*`/`clean_buildkit` targets use (see the pattern rule near the top of the
 Makefile) — running `node report/src/main.ts` directly, without going through `make`, won't find the running
 builder container. Raw builder logs are also available via `docker compose logs builder`.
 
@@ -307,7 +307,7 @@ reports for the allowed side.
 | `make test_unit` | Run unit tests (includes `test_unit_sandbox`) |
 | `make test_unit_sandbox` | Run the run action's Node.js unit tests |
 | `make test_integration_sandbox_linux` | Run the run action's integration tests (needs `BUILDCAGE_LOCAL_IMAGE_REF` and a test-hook build of `run/dist/main.cjs`) |
-| `make clean_integration_buildkit` | Stop and remove the buildkit builder's containers/images and buildx builder |
+| `make clean_buildkit` | Stop and remove the buildkit builder's containers/images and buildx builder |
 
 ## Directory Structure
 
@@ -382,7 +382,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 
 2. **Run in audit mode** to understand your build's network behavior:
    ```bash
-   make clean_integration_buildkit
+   make clean_buildkit
    make setup_buildkit_transparent_audit
    docker buildx build --builder buildcage --no-cache -f Dockerfile .
    docker compose logs builder
