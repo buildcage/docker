@@ -23,7 +23,11 @@ const configs = [
     // sigstore uses dynamic imports; inline them so dist is a single file.
     codeSplitting: false,
   },
-  { input: "setup/src/post.ts", file: "setup/dist/post.cjs" },
+  {
+    input: "setup/src/post.ts",
+    file: "setup/dist/post.cjs",
+    plugins: mainPlugins,
+  },
   {
     input: "report/src/main.ts",
     file: "report/dist/main.cjs",

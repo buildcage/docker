@@ -69,7 +69,7 @@ jobs:
 
       - name: Check dist is free of the BUILDCAGE_BUILD_TEST_HOOKS test hooks
         run: |
-          for f in setup/dist/main.cjs run/dist/main.cjs report/dist/main.cjs; do
+          for f in setup/dist/main.cjs setup/dist/post.cjs run/dist/main.cjs report/dist/main.cjs; do
             if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
               echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read — rolldown's replacePlugin failed to substitute it (see rolldown.config.js), leaving a test-only hook reachable in a published action. Do not merge until this passes."
               exit 1
