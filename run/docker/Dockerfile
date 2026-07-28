@@ -34,24 +34,18 @@ RUN go mod download
 COPY run/docker/gen-seccomp-profile/main.go ./
 RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -o /out/gen-seccomp-profile .
 
-# Compile the QuickJS-targeted TypeScript sources to plain ESM JavaScript
-# that `qjs --std -m` can execute directly (QuickJS has no TypeScript
-# support). tsc only strips types; rolldown does the actual bundling — same
-# division of labor as the Actions entrypoints (see rolldown.config.js), just
-# targeting quickjs-ng's ESM runtime (format esm, "qjs:std"/"qjs:os" left
-# external) instead of Node's CJS. Output is architecture-independent, so —
-# same reasoning as gen-seccomp-profile-build above — this stage is pinned to
-# --platform=$BUILDPLATFORM to always run natively (no QEMU). Keep this stage
-# byte-identical across setup/docker/transparent/Dockerfile,
-# setup/docker/explicit/Dockerfile, and run/docker/Dockerfile.
+# Bundle the QuickJS scripts (rolldown; see rolldown.scripts.config.js) —
+# qjs has no TypeScript support. Architecture-independent output, so
+# pinned to --platform=$BUILDPLATFORM like gen-seccomp-profile-build above
+# (no QEMU). run only needs this qjs half — see scripts-build in
+# setup/docker/{explicit,transparent}/Dockerfile for the report-action half.
 FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS qjs-build
 WORKDIR /build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
-COPY rolldown.qjs.config.js tsconfig.qjs.json ./
-COPY core/scripts/ ./core/scripts/
-COPY core/lib/acl/ ./core/lib/acl/
+COPY rolldown.scripts.config.js ./
+COPY core/ ./core/
 COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:qjs
