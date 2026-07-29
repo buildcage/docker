@@ -254,7 +254,7 @@ example_transparent_audit: ## Run audit mode example tests
 	@$(MAKE) setup_buildkit_transparent_audit
 	@mkdir -p /tmp/build-context
 	@printf '%s\n' \
-	  "FROM node:24-alpine" \
+	  "FROM node:26-alpine" \
 	  "WORKDIR /app" \
 	  "RUN npm init -y && npm install --ignore-scripts express" \
 	  > /tmp/build-context/Dockerfile
@@ -274,7 +274,7 @@ example_transparent_restrict: ## Run restrict mode example tests
 	  $(MAKE) setup_buildkit_transparent_restrict
 	@mkdir -p /tmp/build-context
 	@printf '%s\n' \
-	  "FROM node:24-alpine" \
+	  "FROM node:26-alpine" \
 	  "WORKDIR /app" \
 	  "RUN npm init -y && npm install --ignore-scripts express" \
 	  "RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true" \

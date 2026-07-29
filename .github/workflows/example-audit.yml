@@ -38,7 +38,7 @@ jobs:
         run: |
           mkdir -p /tmp/build-context
           cat <<'EOF' > /tmp/build-context/Dockerfile
-          FROM node:24-alpine
+          FROM node:26-alpine
           WORKDIR /app
           RUN npm init -y && npm install --ignore-scripts express
           EOF

@@ -118,7 +118,7 @@ jobs:
         run: |
           mkdir -p /tmp/build-context
           cat <<'EOF' > /tmp/build-context/Dockerfile
-          FROM node:24-alpine
+          FROM node:26-alpine
           WORKDIR /app
           # NODE_USE_SYSTEM_CA=1: required for the explicit engine (always
           # MITMs TLS); harmless for transparent.

@@ -42,7 +42,7 @@ jobs:
         run: |
           mkdir -p /tmp/build-context
           cat <<'EOF' > /tmp/build-context/Dockerfile
-          FROM node:24-alpine
+          FROM node:26-alpine
           WORKDIR /app
           RUN npm init -y
           # npm bundles its own CA store, so it needs NODE_USE_SYSTEM_CA=1 to trust
