@@ -7,5 +7,10 @@ iptables -t nat -A PREROUTING -i buildkit0 -p tcp \
   -j REDIRECT --to-ports 10024
 
 iptables -A FORWARD -i buildkit0 -j DROP
-ip6tables -A FORWARD -i buildkit0 -j DROP
-echo "init-iptables: REDIRECT configured, FORWARD from buildkit0 blocked (IPv4/IPv6)"
+
+if [ -e /proc/net/if_inet6 ]; then
+  ip6tables -A FORWARD -i buildkit0 -j DROP
+  echo "init-iptables: REDIRECT configured, FORWARD from buildkit0 blocked (IPv4/IPv6)"
+else
+  echo "init-iptables: REDIRECT configured, FORWARD from buildkit0 blocked (IPv4); kernel has no IPv6 support, skipping ip6tables"
+fi

@@ -7,5 +7,14 @@ iptables -t nat -A PREROUTING -i sandbox0 -p tcp \
   -j REDIRECT --to-ports 10024
 
 iptables -A FORWARD -i sandbox0 -j DROP
-ip6tables -A FORWARD -i sandbox0 -j DROP
-echo "init-iptables: REDIRECT configured, FORWARD from sandbox0 blocked (IPv4/IPv6)"
+
+# /proc/net/if_inet6 only exists when the kernel has IPv6 support compiled in
+# and active. If it's absent, no IPv6 traffic can occur at all, so skipping
+# ip6tables is safe. If it's present, ip6tables must succeed -- set -e keeps
+# this fail-closed rather than silently leaving IPv6 unfiltered.
+if [ -e /proc/net/if_inet6 ]; then
+  ip6tables -A FORWARD -i sandbox0 -j DROP
+  echo "init-iptables: REDIRECT configured, FORWARD from sandbox0 blocked (IPv4/IPv6)"
+else
+  echo "init-iptables: REDIRECT configured, FORWARD from sandbox0 blocked (IPv4); kernel has no IPv6 support, skipping ip6tables"
+fi
