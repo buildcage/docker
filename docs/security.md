@@ -91,7 +91,7 @@ An attacker may attempt to tunnel data using non-TCP protocols such as ICMP echo
 
 An attacker may attempt to use IPv6 to circumvent IPv4-based iptables rules.
 
-**Why this is prevented:** Equivalent ip6tables rules drop all forwarded IPv6 traffic from the isolated network. Additionally, the internal DNS server returns the IPv6 unspecified address (::) for all queries, effectively disabling IPv6 name resolution within build containers.
+**Why this is prevented:** Equivalent ip6tables rules drop all forwarded IPv6 traffic from the isolated network. Additionally, the internal DNS server returns the IPv6 unspecified address (::) for all queries, effectively disabling IPv6 name resolution within build containers, and the proxy resolves allowed domains over IPv4 only — so even an allowed domain is never reached over IPv6. The ip6tables rule is skipped only when the kernel has no IPv6 support at all (no `/proc/net/if_inet6`), in which case no IPv6 traffic can occur regardless; if IPv6 support is present, applying the rule is mandatory and startup fails closed if it can't be applied, rather than silently leaving IPv6 unfiltered.
 
 #### Alternative DNS Transports (DoH / DoT)
 
@@ -231,8 +231,10 @@ an OCI `config.json` and enforced by runc natively.
 - **Network namespace**: the isolated command runs in its own network namespace, connected to the
   proxy container's netns by a dedicated veth pair (no bridge — it's always a 1:1 connection, one
   sandbox to one proxy) — the same enforcement `transparent` mode applies to Docker `RUN` steps
-  (iptables `REDIRECT`/`DROP`, DNS redirect, SNI/Host allowlist). runc joins this namespace itself,
-  driven by the OCI spec's `linux.namespaces` path — no wrapper needed.
+  (iptables `REDIRECT`/`DROP`, DNS redirect, SNI/Host allowlist), including the
+  [IPv6 Bypass](#ipv6-bypass) protections above — `ip6tables` `FORWARD` drop and DNS returning `::`
+  for all queries. runc joins this namespace itself, driven by the OCI spec's `linux.namespaces`
+  path — no wrapper needed.
 - **Seccomp filter**: derived from Docker's own default seccomp profile (allowlist-based;
   `moby/profiles`), resolved against an empty capability set to match the capability drop below —
   so any syscall Docker's default profile only conditionally allows for a *held* capability is
