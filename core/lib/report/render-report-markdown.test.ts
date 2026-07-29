@@ -64,6 +64,19 @@ describe("renderReportMarkdown — transparent", () => {
     const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
     assertNotMatch(md, /### ✅ Allowed Hosts/);
   });
+
+  it("shows a '(no communication)' note when nothing passed and nothing blocked", () => {
+    const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
+    assert.match(md, /_\(no communication\)_/);
+  });
+
+  it("omits the '(no communication)' note once anything passed or was blocked", () => {
+    const passedMd = renderReportMarkdown({ ...base, passed: [allowedRow] }, "dash14/buildcage", "v2");
+    assertNotMatch(passedMd, /_\(no communication\)_/);
+
+    const blockedMd = renderReportMarkdown({ ...base, blocked: [blockedRow], blockedCount: 1 }, "dash14/buildcage", "v2");
+    assertNotMatch(blockedMd, /_\(no communication\)_/);
+  });
 });
 
 describe("renderReportMarkdown — explicit", () => {
