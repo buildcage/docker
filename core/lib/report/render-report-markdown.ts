@@ -23,6 +23,11 @@ export function renderReportMarkdown(report: ReportData, actionRepo: string, act
     if (report.passed.length > 0) markdown += "\n";
     markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, { showReason: true, showExpected }) + "\n";
   }
+  if (report.passed.length === 0 && report.blocked.length === 0) {
+    // Otherwise a no-traffic build leaves nothing between the heading and the
+    // footer — indistinguishable from a report that failed to generate.
+    markdown += "_(no communication)_\n\n";
+  }
 
   if (report.engine === "explicit") {
     markdown += renderCommunicationDetails(report.proxyLogs.builds, report.proxyLogs.denied);
