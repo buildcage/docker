@@ -260,7 +260,7 @@ jobs:
           BUILDER_NAME: buildcage-multiarch
         run: docker compose down -v --rmi all 2>/dev/null || true
 
-  # Drives run/dist/main.cjs directly via `make test_sandbox_integration`
+  # Drives run/dist/main.cjs directly via `make test_integration_sandbox_linux`
   # (see run/test/integration-test-*.sh), not through the real run action —
   # mirrors how the `test` job above drives report/src/main.js directly.
   # test-e2e.yml's test_sandbox_* jobs keep one representative case each
@@ -296,7 +296,7 @@ jobs:
       - name: Run run-action integration tests
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
-        run: make test_sandbox_integration
+        run: make test_integration_sandbox_linux
 
   # Single, stably-named required status check for branch protection: the
   # `test` job's own name varies per matrix entry (test (transparent-audit),

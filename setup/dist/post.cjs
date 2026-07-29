@@ -1,3 +1,4 @@
+Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 let node_child_process = require("node:child_process"), node_path = require("node:path"), node_url = require("node:url"), node_crypto = require("node:crypto");
 //#region core/lib/docker/container.ts
 /**
@@ -15,19 +16,26 @@ function deriveProjectName(containerName) {
 }
 //#endregion
 //#region setup/src/post.ts
-const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), builderName = process.env.INPUT_BUILDER_NAME || "buildcage";
-(0, node_child_process.execFileSync)("docker", [
-	"compose",
-	"-p",
-	deriveProjectName(builderName),
-	"-f",
-	(0, node_path.join)(__dirname$1, "../compose.yaml"),
-	"down"
-], {
-	stdio: "inherit",
-	env: {
-		...process.env,
-		BUILDER_NAME: builderName
-	}
-});
+const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
+function resolveProjectName(builderName, env) {
+	return deriveProjectName(builderName);
+}
+function main() {
+	let builderName = process.env.INPUT_BUILDER_NAME || "buildcage";
+	(0, node_child_process.execFileSync)("docker", [
+		"compose",
+		"-p",
+		resolveProjectName(builderName, process.env),
+		"-f",
+		(0, node_path.join)(__dirname$1, "../compose.yaml"),
+		"down"
+	], {
+		stdio: "inherit",
+		env: {
+			...process.env,
+			BUILDER_NAME: builderName
+		}
+	});
+}
 //#endregion
+process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main(), exports.resolveProjectName = resolveProjectName;

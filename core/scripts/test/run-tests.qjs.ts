@@ -20,11 +20,7 @@ for (const dir of dirs) {
     std.err.puts(`cannot read directory ${dir}: errno ${err}\n`);
     std.exit(1);
   }
-  // *.property.test.js files are node:test-based (run via `node --test`,
-  // not qjs) and live alongside these — exclude them explicitly.
-  const testFiles = entries
-    .filter((f) => f.endsWith(".test.js") && !f.endsWith(".property.test.js"))
-    .sort();
+  const testFiles = entries.filter((f) => f.endsWith(".test.js")).sort();
   for (const f of testFiles) {
     await import(`${dir}/${f}`);
   }
