@@ -27,6 +27,13 @@ export interface ReportDataCommon {
   /** Raw blocked-event count — can differ from blocked.length for the
    *  transparent engine (pre-aggregation log line count). */
   blockedCount: number;
+
+  /** False iff the log looks structurally implausible for a real run (no
+   *  non-buildcage/non-denial content at all) — see haproxy-log-parser.ts's
+   *  hasNonBuildcageContent / buildkitd-log-parser.ts's hasNonDenialContent.
+   *  Used by known-blocked.ts to fail closed on a suspiciously empty log
+   *  instead of treating it as "nothing was blocked". */
+  logLooksPlausible: boolean;
 }
 
 export interface TransparentReportData extends ReportDataCommon {

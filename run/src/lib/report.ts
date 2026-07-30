@@ -66,6 +66,7 @@ export function writeReport(
     failOnBlocked: failOnBlocked ?? false,
     blockedCount: report.blockedCount,
     blockedRows: report.blocked,
+    logLooksPlausible: report.logLooksPlausible,
   });
   const message = buildBlockedMessage({
     blockedCount: report.blockedCount,

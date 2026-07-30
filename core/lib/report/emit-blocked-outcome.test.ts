@@ -33,6 +33,7 @@ function report(overrides: Partial<ReportDataCommon> = {}): ReportDataCommon {
     passed: [],
     blocked: [],
     blockedCount: 0,
+    logLooksPlausible: true,
     ...overrides,
   };
 }
@@ -65,6 +66,12 @@ describe("emitBlockedOutcome", () => {
     });
     emitBlockedOutcome(r, { failOnBlocked: false, summaryFile: undefined });
     assert.equal(process.exitCode, undefined);
+  });
+
+  it("sets exitCode=1 when blockedCount is 0 but the log looks implausible (tampering signal)", () => {
+    const r = report({ blockedCount: 0, logLooksPlausible: false });
+    emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: undefined });
+    assert.equal(process.exitCode, 1);
   });
 
   it("leaves exitCode untouched in audit mode even when failOnBlocked is true", () => {

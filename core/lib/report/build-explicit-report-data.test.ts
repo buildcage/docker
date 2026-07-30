@@ -71,6 +71,14 @@ describe("buildExplicitReportData", () => {
     assert.deepEqual(result.passed, []);
     assert.deepEqual(result.blocked, []);
     assert.equal(result.blockedCount, 0);
+    assert.equal(result.logLooksPlausible, false);
+  });
+
+  it("logLooksPlausible is true for a genuinely quiet run (buildkitd's own startup noise, zero denials)", () => {
+    const log = 'time="2026-01-01T00:00:00Z" level=info msg="found worker" builder=0';
+    const result = buildExplicitReportData(log, [], params());
+    assert.equal(result.blockedCount, 0);
+    assert.equal(result.logLooksPlausible, true);
   });
 });
 

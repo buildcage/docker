@@ -1,5 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { parseEntries, parseDenialTimeline } from "./buildkitd-log-parser.ts";
+import { parseEntries, parseDenialTimeline, hasNonDenialContent } from "./buildkitd-log-parser.ts";
 
 // Real line captured from a live moby/buildkit v0.31.1 explicit-mode container.
 const REAL_DENY_LINE =
@@ -71,6 +71,28 @@ describe("parseDenialTimeline", () => {
 
   it("ignores non-denial lines", () => {
     assert.deepEqual(parseDenialTimeline('time="2026-07-05T00:00:00Z" level=info msg="found worker"'), []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasNonDenialContent
+// ---------------------------------------------------------------------------
+describe("hasNonDenialContent", () => {
+  it("returns false for empty log text", () => {
+    assert.equal(hasNonDenialContent(""), false);
+  });
+
+  it("returns false when the log has only denial lines", () => {
+    assert.equal(hasNonDenialContent(REAL_DENY_LINE), false);
+  });
+
+  it("returns true when the log contains buildkitd's own non-denial debug output", () => {
+    const logText = [REAL_DENY_LINE, 'time="x" level=info msg="found worker"'].join("\n");
+    assert.equal(hasNonDenialContent(logText), true);
+  });
+
+  it("ignores blank lines when deciding", () => {
+    assert.equal(hasNonDenialContent("\n\n  \n"), false);
   });
 });
 

@@ -7740,9 +7740,18 @@ function annotateKnownBlocked(blockedRows, knownBlockedRules) {
 		expected: matchers.some((re) => re.test(`${row.host}:${row.port}`))
 	}));
 }
-function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedRows }) {
-	if (!blockedCount) return {
+function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedRows, logLooksPlausible }) {
+	if (!blockedCount) return logLooksPlausible ? {
 		level: "none",
+		shouldFail: !1
+	} : isAudit ? {
+		level: "notice",
+		shouldFail: !1
+	} : failOnBlocked ? {
+		level: "error",
+		shouldFail: !0
+	} : {
+		level: "notice",
 		shouldFail: !1
 	};
 	if (isAudit) return {
@@ -7837,6 +7846,19 @@ function parseEntries(logText) {
 	}
 	return entries;
 }
+/**
+* True iff logText contains at least one non-blank line that is not a
+* buildcage-decision line. A genuine HAProxy process always produces some
+* such content (its own startup/notice output, merged into this same log
+* via the s6 pipeline) before any traffic occurs, regardless of whether
+* any connection was ever blocked. A log consisting only of forged/replayed
+* decision lines — or nothing at all — lacks this, which is a signal (not
+* a guarantee) that the log may have been tampered with rather than
+* reflecting a real run.
+*/
+function hasNonBuildcageContent(logText) {
+	return logText.split("\n").some((line) => line.trim() !== "" && !logPattern.test(line));
+}
 //#endregion
 //#region core/lib/log/aggregate.ts
 /**
@@ -7874,7 +7896,8 @@ function buildTransparentReportData(logText, parameters) {
 		parameters,
 		passed: aggregate(isAudit ? entries.filter((e) => e.decision === "AUDIT") : entries.filter((e) => e.decision === "ALLOWED")),
 		blocked,
-		blockedCount
+		blockedCount,
+		logLooksPlausible: hasNonBuildcageContent(logText)
 	};
 }
 /**
@@ -7903,7 +7926,8 @@ function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, 
 		isAudit,
 		failOnBlocked: failOnBlocked ?? !1,
 		blockedCount: report.blockedCount,
-		blockedRows: report.blocked
+		blockedRows: report.blocked,
+		logLooksPlausible: report.logLooksPlausible
 	}), message = buildBlockedMessage({
 		blockedCount: report.blockedCount,
 		blockedRows: report.blocked,

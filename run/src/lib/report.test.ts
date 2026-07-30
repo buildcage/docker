@@ -55,6 +55,7 @@ function report(overrides: Partial<Report> = {}): Report {
     passed: [],
     blocked: [],
     blockedCount: 0,
+    logLooksPlausible: true,
     ...overrides,
   };
 }

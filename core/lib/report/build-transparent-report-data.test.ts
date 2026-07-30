@@ -46,6 +46,17 @@ describe("buildTransparentReportData", () => {
     assert.deepEqual(result.passed, []);
     assert.deepEqual(result.blocked, []);
     assert.equal(result.blockedCount, 0);
+    assert.equal(result.logLooksPlausible, false);
+  });
+
+  it("logLooksPlausible is true for a genuinely quiet run (HAProxy's own startup noise, zero blocked)", () => {
+    const log = [
+      "[NOTICE]   (1) : haproxy version is 2.9.0",
+      '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "good.com:443" -',
+    ].join("\n");
+    const result = buildTransparentReportData(log, params());
+    assert.equal(result.blockedCount, 0);
+    assert.equal(result.logLooksPlausible, true);
   });
 
   it("blockedCount counts raw events, not aggregated rows", () => {
