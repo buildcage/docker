@@ -1,5 +1,5 @@
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
-let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_os = require("node:os"), node_path = require("node:path"), node_url = require("node:url"), node_crypto = require("node:crypto");
+let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_os = require("node:os"), node_path = require("node:path"), node_url = require("node:url"), node_crypto = require("node:crypto"), node_events = require("node:events"), node_readline = require("node:readline");
 /**
 * Turns a caught `docker` invocation error into an actionable message,
 * pointing at the runner requirement instead of surfacing execFileSync's
@@ -90,9 +90,59 @@ function defaultRunCommand(args) {
 		maxBuffer: 64 * 1024 * 1024
 	});
 }
-/** `run` is injectable so tests can assert on argv instead of mocking
-*  node:child_process directly. */
-function createDocker(run = defaultRunCommand) {
+function defaultSpawnCommand(args) {
+	return (0, node_child_process.spawn)("docker", args, { stdio: [
+		"ignore",
+		"pipe",
+		"pipe"
+	] });
+}
+/**
+* Drives a `docker <args>` child process and yields its stdout line by
+* line, never buffering more than the current line. Lazy — nothing spawns
+* until the caller starts iterating.
+*
+* Throws `{status, stderr}` on a non-zero exit and Node's own
+* `{code: "ENOENT", ...}` on a spawn failure, matching the shape
+* describeDockerFailure() (core/lib/actions/docker-error.ts) expects from
+* execFileSync elsewhere in this module.
+*/
+async function* streamDockerLines(spawnDocker, args, operation) {
+	let child = spawnDocker(args), spawnError;
+	child.on("error", (err) => {
+		spawnError = err;
+	});
+	let closed = (0, node_events.once)(child, "close").then(([code, signal]) => ({
+		code,
+		signal
+	}), () => ({
+		code: null,
+		signal: null
+	})), stderr = "";
+	child.stderr?.setEncoding("utf8"), child.stderr?.on("data", (chunk) => {
+		stderr += chunk;
+	});
+	let rl = (0, node_readline.createInterface)({
+		input: child.stdout,
+		crlfDelay: Infinity
+	}), exhausted = !1;
+	try {
+		for await (let line of rl) yield line;
+		exhausted = !0;
+	} finally {
+		rl.close(), !exhausted && child.exitCode === null && child.signalCode === null && child.kill();
+	}
+	if (!exhausted) return;
+	let { code, signal } = await closed;
+	if (spawnError) throw spawnError;
+	if (code !== 0) throw Object.assign(/* @__PURE__ */ Error(`${operation} exited with code ${code}${signal ? ` (signal ${signal})` : ""}: ${stderr.trim()}`), {
+		status: code ?? void 0,
+		stderr
+	});
+}
+/** `run`/`spawnDocker` are injectable so tests can assert on argv instead of
+*  mocking node:child_process directly. */
+function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand) {
 	return {
 		findContainers(filters) {
 			let args = ["ps"];
@@ -106,13 +156,13 @@ function createDocker(run = defaultRunCommand) {
 				hostPath
 			}));
 		},
-		readFile(containerId, path) {
-			return run([
+		readFileLines(containerId, path) {
+			return streamDockerLines(spawnDocker, [
 				"exec",
 				containerId,
 				"cat",
 				path
-			]);
+			], `docker exec cat ${path}`);
 		},
 		readEnv(containerId) {
 			return parseDockerInspectEnv(run([

@@ -1,24 +1,20 @@
-import { parseEntries, parseDenialTimeline, hasNonDenialContent } from "../log/buildkitd-log-parser.ts";
-import { aggregate } from "../log/aggregate.ts";
+import { scanBuildkitdLog } from "../log/buildkitd-log-parser.ts";
 import { aggregateAllowedHosts, type VertexAllowedEntry } from "../log/vertex-log.ts";
 import { annotateKnownBlocked } from "./known-blocked.ts";
 import type { GenReportParameters, ExplicitReportData } from "./report-data.ts";
 
-/**
- * Pure — no I/O; `builds` is already fetched via buildctl by the caller.
- * blockedCount equals blocked.length here, unlike the transparent engine:
- * buildkitd's denial log has no finer per-event granularity to count.
- */
-export function buildExplicitReportData(
-  logText: string,
+/** Pure — no I/O; callers fetch lines/builds/parameters themselves. */
+export async function buildExplicitReportData(
+  lines: AsyncIterable<string> | Iterable<string>,
   builds: VertexAllowedEntry[][],
   parameters: GenReportParameters,
-): ExplicitReportData {
+): Promise<ExplicitReportData> {
   const isAudit = parameters.mode === "audit";
-
-  const blockedRawRows = aggregate(parseEntries(logText));
-  const blockedCount = blockedRawRows.length;
+  const { blocked: blockedRawRows, denied, hasNonDenialContent } = await scanBuildkitdLog(lines);
   const blocked = annotateKnownBlocked(blockedRawRows, parameters.knownBlockedRules);
+  // blockedCount equals blocked.length here, unlike the transparent engine:
+  // buildkitd's denial log has no finer per-event granularity to count.
+  const blockedCount = blocked.length;
 
   const passed = aggregateAllowedHosts(builds, isAudit ? "AUDIT" : "ALLOWED");
 
@@ -28,10 +24,10 @@ export function buildExplicitReportData(
     passed,
     blocked,
     blockedCount,
-    logLooksPlausible: hasNonDenialContent(logText),
+    logLooksPlausible: hasNonDenialContent,
     proxyLogs: {
       builds,
-      denied: parseDenialTimeline(logText),
+      denied,
     },
   };
 }

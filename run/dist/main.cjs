@@ -15,7 +15,7 @@ let node_child_process = require("node:child_process"), node_fs = require("node:
 node_path = __toESM(node_path, 1);
 let node_url = require("node:url"), node_os = require("node:os");
 node_os = __toESM(node_os, 1);
-let node_crypto = require("node:crypto");
+let node_crypto = require("node:crypto"), node_events = require("node:events"), node_readline = require("node:readline");
 //#region core/lib/provenance/image-ref.ts
 function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
@@ -7644,9 +7644,59 @@ function defaultRunCommand(args) {
 		maxBuffer: 64 * 1024 * 1024
 	});
 }
-/** `run` is injectable so tests can assert on argv instead of mocking
-*  node:child_process directly. */
-function createDocker(run = defaultRunCommand) {
+function defaultSpawnCommand(args) {
+	return (0, node_child_process.spawn)("docker", args, { stdio: [
+		"ignore",
+		"pipe",
+		"pipe"
+	] });
+}
+/**
+* Drives a `docker <args>` child process and yields its stdout line by
+* line, never buffering more than the current line. Lazy — nothing spawns
+* until the caller starts iterating.
+*
+* Throws `{status, stderr}` on a non-zero exit and Node's own
+* `{code: "ENOENT", ...}` on a spawn failure, matching the shape
+* describeDockerFailure() (core/lib/actions/docker-error.ts) expects from
+* execFileSync elsewhere in this module.
+*/
+async function* streamDockerLines(spawnDocker, args, operation) {
+	let child = spawnDocker(args), spawnError;
+	child.on("error", (err) => {
+		spawnError = err;
+	});
+	let closed = (0, node_events.once)(child, "close").then(([code, signal]) => ({
+		code,
+		signal
+	}), () => ({
+		code: null,
+		signal: null
+	})), stderr = "";
+	child.stderr?.setEncoding("utf8"), child.stderr?.on("data", (chunk) => {
+		stderr += chunk;
+	});
+	let rl = (0, node_readline.createInterface)({
+		input: child.stdout,
+		crlfDelay: Infinity
+	}), exhausted = !1;
+	try {
+		for await (let line of rl) yield line;
+		exhausted = !0;
+	} finally {
+		rl.close(), !exhausted && child.exitCode === null && child.signalCode === null && child.kill();
+	}
+	if (!exhausted) return;
+	let { code, signal } = await closed;
+	if (spawnError) throw spawnError;
+	if (code !== 0) throw Object.assign(/* @__PURE__ */ Error(`${operation} exited with code ${code}${signal ? ` (signal ${signal})` : ""}: ${stderr.trim()}`), {
+		status: code ?? void 0,
+		stderr
+	});
+}
+/** `run`/`spawnDocker` are injectable so tests can assert on argv instead of
+*  mocking node:child_process directly. */
+function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand) {
 	return {
 		findContainers(filters) {
 			let args = ["ps"];
@@ -7660,13 +7710,13 @@ function createDocker(run = defaultRunCommand) {
 				hostPath
 			}));
 		},
-		readFile(containerId, path) {
-			return run([
+		readFileLines(containerId, path) {
+			return streamDockerLines(spawnDocker, [
 				"exec",
 				containerId,
 				"cat",
 				path
-			]);
+			], `docker exec cat ${path}`);
 		},
 		readEnv(containerId) {
 			return parseDockerInspectEnv(run([
@@ -7824,80 +7874,89 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	})));
 }
 //#endregion
-//#region core/lib/log/haproxy-log-parser.ts
-const logPattern = /^\[.*?\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+\((\w+)\)\s+"([^"]+)"\s*(\S*)/;
-/**
-* Parse log text into structured entries.
-*/
-function parseEntries(logText) {
-	let entries = [];
-	for (let line of logText.split("\n")) {
-		let m = line.match(logPattern);
-		if (m) {
-			let [, decision, ruleType, hostPort, reason] = m, colonIdx = hostPort.lastIndexOf(":"), host, port;
-			colonIdx > 0 ? (host = hostPort.substring(0, colonIdx), port = hostPort.substring(colonIdx + 1)) : (host = hostPort, port = "0"), entries.push({
-				decision,
-				ruleType,
-				host,
-				port,
-				reason: reason || "-"
-			});
-		}
-	}
-	return entries;
+//#region core/lib/log/aggregate.ts
+function compareAggregated(a, b) {
+	return b.count - a.count || (a.host < b.host ? -1 : +(a.host > b.host)) || Number(a.port) - Number(b.port);
 }
-/**
-* True iff logText contains at least one non-blank line that is not a
-* buildcage-decision line. A genuine HAProxy process always produces some
-* such content (its own startup/notice output, merged into this same log
-* via the s6 pipeline) before any traffic occurs, regardless of whether
-* any connection was ever blocked. A log consisting only of forged/replayed
-* decision lines — or nothing at all — lacks this, which is a signal (not
-* a guarantee) that the log may have been tampered with rather than
-* reflecting a real run.
-*/
-function hasNonBuildcageContent(logText) {
-	return logText.split("\n").some((line) => line.trim() !== "" && !logPattern.test(line));
+/** Streaming counterpart to aggregate(): folds one entry at a time into a
+*  running Map, bounding memory by the number of unique combinations seen
+*  rather than by input length. */
+function createIncrementalAggregator() {
+	let map = /* @__PURE__ */ new Map();
+	return {
+		add(entry) {
+			let key = `${entry.host}\t${entry.port}\t${entry.ruleType}\t${entry.reason}`, existing = map.get(key);
+			existing ? existing.count++ : map.set(key, {
+				...entry,
+				count: 1
+			});
+		},
+		toSortedArray() {
+			return [...map.values()].sort(compareAggregated);
+		}
+	};
 }
 //#endregion
-//#region core/lib/log/aggregate.ts
+//#region core/lib/log/haproxy-log-parser.ts
 /**
-* Aggregate log entries by (host, port, ruleType, reason) with counts, sorted
-* descending.
+* Log parsing library for HAProxy buildcage logs. aggregate() lives
+* separately in core/lib/log/aggregate.js and is not re-exported here.
 */
-function aggregate(filtered) {
-	let map = {};
-	for (let e of filtered) {
-		let key = `${e.host}\t${e.port}\t${e.ruleType}\t${e.reason}`;
-		map[key] = (map[key] || 0) + 1;
-	}
-	return Object.keys(map).map((key) => {
-		let [host, portStr, ruleType, reason] = key.split("	");
-		return {
+const logPattern = /^\[.*?\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+\((\w+)\)\s+"([^"]+)"\s*(\S*)/;
+/**
+* Single forward pass over the log: matching lines fold directly into
+* incremental aggregators (never collected into a flat array first), and
+* non-matching, non-blank lines flip hasNonBuildcageContent.
+*
+* A genuine HAProxy process always emits some non-buildcage-format output
+* of its own before any traffic occurs. A log with nothing but
+* forged/replayed decision lines — or nothing at all — lacks that, which is
+* a signal (not a guarantee) of tampering.
+*
+* `isAudit` picks which decision counts as "passed" (AUDIT vs ALLOWED); the
+* other one, if it somehow appears, is dropped rather than aggregated.
+*/
+async function scanHaproxyLog(lines, isAudit) {
+	let passed = createIncrementalAggregator(), blocked = createIncrementalAggregator(), passedDecision = isAudit ? "AUDIT" : "ALLOWED", blockedCount = 0, hasNonBuildcageContent = !1;
+	for await (let line of lines) {
+		let m = line.match(logPattern);
+		if (!m) {
+			line.trim() !== "" && (hasNonBuildcageContent = !0);
+			continue;
+		}
+		let [, decision, ruleType, hostPort, reason] = m, colonIdx = hostPort.lastIndexOf(":"), host, port;
+		colonIdx > 0 ? (host = hostPort.substring(0, colonIdx), port = hostPort.substring(colonIdx + 1)) : (host = hostPort, port = "0");
+		let entry = {
 			host,
-			port: portStr,
+			port,
 			ruleType,
-			reason,
-			count: map[key]
+			reason: reason || "-"
 		};
-	}).sort((a, b) => b.count - a.count || (a.host < b.host ? -1 : +(a.host > b.host)) || Number(a.port) - Number(b.port));
+		decision === passedDecision ? passed.add(entry) : decision === "BLOCKED" && (blocked.add(entry), blockedCount++);
+	}
+	return {
+		passed: passed.toSortedArray(),
+		blocked: blocked.toSortedArray(),
+		blockedCount,
+		hasNonBuildcageContent
+	};
 }
 //#endregion
 //#region core/lib/report/build-transparent-report-data.ts
 /**
 * Pure — no I/O; callers (report-action.node.ts, run/src/lib/report.ts)
-* fetch logText/parameters themselves. An empty logText naturally yields
+* fetch lines/parameters themselves. An empty input naturally yields
 * passed:[]/blocked:[]/blockedCount:0, so no special-case branch is needed.
 */
-function buildTransparentReportData(logText, parameters) {
-	let isAudit = parameters.mode === "audit", entries = parseEntries(logText), blockedCount = entries.filter((e) => e.decision === "BLOCKED").length, blocked = annotateKnownBlocked(aggregate(entries.filter((e) => e.decision === "BLOCKED")), parameters.knownBlockedRules);
+async function buildTransparentReportData(lines, parameters) {
+	let { passed, blocked: blockedRawRows, blockedCount, hasNonBuildcageContent } = await scanHaproxyLog(lines, parameters.mode === "audit");
 	return {
 		engine: "transparent",
 		parameters,
-		passed: aggregate(isAudit ? entries.filter((e) => e.decision === "AUDIT") : entries.filter((e) => e.decision === "ALLOWED")),
-		blocked,
+		passed,
+		blocked: annotateKnownBlocked(blockedRawRows, parameters.knownBlockedRules),
 		blockedCount,
-		logLooksPlausible: hasNonBuildcageContent(logText)
+		logLooksPlausible: hasNonBuildcageContent
 	};
 }
 /**
@@ -7906,7 +7965,7 @@ function buildTransparentReportData(logText, parameters) {
 * so it fetches the raw log and calls the shared builder in-process.
 */
 function fetchReport(containerName, parameters) {
-	return buildTransparentReportData(createDocker().readFile(containerName, "/var/log/haproxy/current"), parameters);
+	return buildTransparentReportData(createDocker().readFileLines(containerName, "/var/log/haproxy/current"), parameters);
 }
 function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand } = {}) {
 	let heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`, isAudit = report.parameters.mode === "audit", showExpected = report.parameters.knownBlockedRules.length > 0, markdown = `## ${heading} (${report.parameters.mode} mode)\n\n`;
@@ -8073,7 +8132,7 @@ async function main() {
 		}, containerName);
 	} finally {
 		try {
-			writeReport(fetchReport(containerName, {
+			writeReport(await fetchReport(containerName, {
 				mode: env.INPUT_PROXY_MODE || "restrict",
 				allowedHttpsRules: rules.httpsRules,
 				allowedHttpRules: rules.httpRules,

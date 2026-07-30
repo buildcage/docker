@@ -18,6 +18,8 @@ interface Assert {
   ok(value: unknown): void;
   throws(fn: () => void, pattern?: RegExp): void;
   match(value: string, pattern: RegExp): void;
+  /** Node-only in practice; the QuickJS shim implements it just to satisfy this type. */
+  rejects(promise: Promise<unknown>, matcher?: (e: unknown) => boolean): Promise<void>;
 }
 
 interface Shim {
@@ -93,6 +95,17 @@ async function createQjsShim(): Promise<Shim> {
       if (!pattern.test(value)) {
         throw new Error(`Expected "${value}" to match ${pattern}`);
       }
+    },
+    async rejects(promise, matcher) {
+      try {
+        await promise;
+      } catch (e) {
+        if (matcher && !matcher(e)) {
+          throw new Error("Rejection did not match the expected condition");
+        }
+        return;
+      }
+      throw new Error("Expected promise to reject");
     },
   };
 

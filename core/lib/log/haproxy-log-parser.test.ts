@@ -1,101 +1,118 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { parseEntries, hasNonBuildcageContent } from "./haproxy-log-parser.ts";
+import { scanHaproxyLog } from "./haproxy-log-parser.ts";
 
 // ---------------------------------------------------------------------------
-// parseEntries
+// scanHaproxyLog
 // ---------------------------------------------------------------------------
-describe("parseEntries", () => {
-  it("parses ALLOWED log line", () => {
+describe("scanHaproxyLog", () => {
+  it("aggregates an ALLOWED log line as passed when isAudit is false", async () => {
     const log = '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "example.com:443" rule1';
-    const entries = parseEntries(log);
-    assert.equal(entries.length, 1);
-    assert.equal(entries[0].decision, "ALLOWED");
-    assert.equal(entries[0].ruleType, "HTTPS");
-    assert.equal(entries[0].host, "example.com");
-    assert.equal(entries[0].port, "443");
-    assert.equal(entries[0].reason, "rule1");
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    assert.equal(result.passed.length, 1);
+    assert.equal(result.passed[0].ruleType, "HTTPS");
+    assert.equal(result.passed[0].host, "example.com");
+    assert.equal(result.passed[0].port, "443");
+    assert.equal(result.passed[0].reason, "rule1");
+    assert.equal(result.blocked.length, 0);
   });
 
-  it("parses BLOCKED log line", () => {
+  it("aggregates a BLOCKED log line regardless of isAudit", async () => {
     const log = '[2024-01-01T00:00:00] buildcage [BLOCKED] (HTTP) "bad.com:80" not-allowed';
-    const entries = parseEntries(log);
-    assert.equal(entries.length, 1);
-    assert.equal(entries[0].decision, "BLOCKED");
-    assert.equal(entries[0].reason, "not-allowed");
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    assert.equal(result.blocked.length, 1);
+    assert.equal(result.blocked[0].reason, "not-allowed");
+    assert.equal(result.blockedCount, 1);
   });
 
-  it("parses AUDIT log line", () => {
+  it("aggregates an AUDIT log line as passed when isAudit is true", async () => {
     const log = '[2024-01-01T00:00:00] buildcage [AUDIT] (HTTPS) "any.com:443"';
-    const entries = parseEntries(log);
-    assert.equal(entries.length, 1);
-    assert.equal(entries[0].decision, "AUDIT");
-    assert.equal(entries[0].reason, "-");
+    const result = await scanHaproxyLog(log.split("\n"), true);
+    assert.equal(result.passed.length, 1);
+    assert.equal(result.passed[0].reason, "-");
   });
 
-  it("ignores non-matching lines", () => {
+  it("drops an ALLOWED line when isAudit is true (not the decision this mode aggregates)", async () => {
+    const log = '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "example.com:443" rule1';
+    const result = await scanHaproxyLog(log.split("\n"), true);
+    assert.equal(result.passed.length, 0);
+  });
+
+  it("drops an AUDIT line when isAudit is false (not the decision this mode aggregates)", async () => {
+    const log = '[2024-01-01T00:00:00] buildcage [AUDIT] (HTTPS) "any.com:443"';
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    assert.equal(result.passed.length, 0);
+  });
+
+  it("ignores non-matching lines without counting them anywhere", async () => {
     const log = "some random log line\n[2024-01-01] other stuff";
-    const entries = parseEntries(log);
-    assert.equal(entries.length, 0);
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    assert.equal(result.passed.length, 0);
+    assert.equal(result.blocked.length, 0);
   });
 
-  it("parses multiple lines", () => {
+  it("aggregates repeated BLOCKED lines into one row, but keeps blockedCount raw", async () => {
+    const log = [
+      '[2024-01-01T00:00:00] buildcage [BLOCKED] (HTTPS) "bad.com:443" not-allowed',
+      '[2024-01-01T00:00:01] buildcage [BLOCKED] (HTTPS) "bad.com:443" not-allowed',
+    ].join("\n");
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    assert.equal(result.blocked.length, 1);
+    assert.equal(result.blocked[0].count, 2);
+    assert.equal(result.blockedCount, 2);
+  });
+
+  it("keeps passed/blocked buckets independent across mixed lines", async () => {
     const log = [
       '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "a.com:443" r1',
       '[2024-01-01T00:00:01] buildcage [BLOCKED] (HTTP) "b.com:80" not-allowed',
-      'not a log line',
+      "not a log line",
       '[2024-01-01T00:00:02] buildcage [ALLOWED] (HTTPS) "a.com:443" r1',
     ].join("\n");
-    const entries = parseEntries(log);
-    assert.equal(entries.length, 3);
-  });
-});
-
-// aggregate() is tested in core/lib/log/aggregate.test.ts.
-
-// ---------------------------------------------------------------------------
-// mode detection
-// ---------------------------------------------------------------------------
-describe("mode detection", () => {
-  it("detects audit mode", () => {
-    const entries = parseEntries('[2024-01-01T00:00:00] buildcage [AUDIT] (HTTPS) "a.com:443"');
-    const isAudit = entries.some(e => e.decision === "AUDIT");
-    assert.ok(isAudit);
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    assert.equal(result.passed.length, 1);
+    assert.equal(result.passed[0].count, 2);
+    assert.equal(result.blocked.length, 1);
+    assert.equal(result.blockedCount, 1);
   });
 
-  it("detects restrict mode", () => {
-    const entries = parseEntries('[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "a.com:443" r1');
-    const isAudit = entries.some(e => e.decision === "AUDIT");
-    assert.ok(!isAudit);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// hasNonBuildcageContent
-// ---------------------------------------------------------------------------
-describe("hasNonBuildcageContent", () => {
-  it("returns false for empty log text", () => {
-    assert.equal(hasNonBuildcageContent(""), false);
+  it("accepts a real AsyncIterable, not just an array", async () => {
+    async function* lines(): AsyncGenerator<string> {
+      yield '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "async.com:443" r1';
+    }
+    const result = await scanHaproxyLog(lines(), false);
+    assert.equal(result.passed.length, 1);
+    assert.equal(result.passed[0].host, "async.com");
   });
 
-  it("returns false when the log has only buildcage-decision lines", () => {
+  // ---------------------------------------------------------------------
+  // hasNonBuildcageContent
+  // ---------------------------------------------------------------------
+  it("hasNonBuildcageContent is false for empty log text", async () => {
+    const result = await scanHaproxyLog("".split("\n"), false);
+    assert.equal(result.hasNonBuildcageContent, false);
+  });
+
+  it("hasNonBuildcageContent is false when the log has only buildcage-decision lines", async () => {
     const log = [
       '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "a.com:443" r1',
       '[2024-01-01T00:00:01] buildcage [BLOCKED] (HTTP) "b.com:80" not-allowed',
     ].join("\n");
-    assert.equal(hasNonBuildcageContent(log), false);
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    assert.equal(result.hasNonBuildcageContent, false);
   });
 
-  it("returns true when the log contains HAProxy's own non-decision output", () => {
+  it("hasNonBuildcageContent is true when the log contains HAProxy's own non-decision output", async () => {
     const log = [
       "[NOTICE]   (1) : haproxy version is 2.9.0",
       '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "a.com:443" r1',
     ].join("\n");
-    assert.equal(hasNonBuildcageContent(log), true);
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    assert.equal(result.hasNonBuildcageContent, true);
   });
 
-  it("ignores blank lines when deciding", () => {
-    const log = "\n\n  \n";
-    assert.equal(hasNonBuildcageContent(log), false);
+  it("hasNonBuildcageContent ignores blank lines when deciding", async () => {
+    const result = await scanHaproxyLog("\n\n  \n".split("\n"), false);
+    assert.equal(result.hasNonBuildcageContent, false);
   });
 });
 
