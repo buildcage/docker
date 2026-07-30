@@ -7,17 +7,20 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { parseEntries } from "./haproxy-log-parser.ts";
+import { scanHaproxyLog } from "./haproxy-log-parser.ts";
 import { aggregate } from "./aggregate.ts";
 
 // ---------------------------------------------------------------------------
-// parseEntries
+// scanHaproxyLog
 // ---------------------------------------------------------------------------
 
-describe("parseEntries – properties", () => {
-  // A well-formed log line always round-trips: parseEntries recovers all five fields.
-  it("valid log line always parses to exactly one entry with matching fields", () => {
+describe("scanHaproxyLog – properties", () => {
+  // A well-formed log line always round-trips into the right bucket:
+  // BLOCKED always lands in `blocked`; ALLOWED/AUDIT lands in `passed` only
+  // if it matches the decision `isAudit` selects, otherwise it's dropped.
+  it("valid log line always aggregates to exactly one entry in the right bucket", async () => {
     const decision = fc.constantFrom("ALLOWED", "BLOCKED", "AUDIT");
+    const isAudit = fc.boolean();
     // ruleType must match \w+ in the log pattern
     const ruleType = fc.stringMatching(/^\w{1,10}$/);
     // host: no '"' or ':' to keep the lastIndexOf split unambiguous
@@ -26,31 +29,46 @@ describe("parseEntries – properties", () => {
     // reason: \S+ so the log pattern captures it in full
     const reason = fc.oneof(fc.constant("-"), fc.stringMatching(/^\S{1,15}$/));
 
-    fc.assert(
-      fc.property(decision, ruleType, host, port, reason, (d, rt, h, p, r) => {
+    await fc.assert(
+      fc.asyncProperty(decision, isAudit, ruleType, host, port, reason, async (d, audit, rt, h, p, r) => {
         const line = `[2024-01-01] buildcage [${d}] (${rt}) "${h}:${p}" ${r}`;
-        const entries = parseEntries(line);
-        assert.equal(entries.length, 1);
-        assert.equal(entries[0].decision, d);
-        assert.equal(entries[0].ruleType, rt);
-        assert.equal(entries[0].host, h);
-        assert.equal(entries[0].port, p);
-        assert.equal(entries[0].reason, r);
+        const result = await scanHaproxyLog([line], audit);
+        const passedDecision = audit ? "AUDIT" : "ALLOWED";
+
+        if (d === "BLOCKED") {
+          assert.equal(result.passed.length, 0);
+          assert.equal(result.blocked.length, 1);
+          assert.equal(result.blocked[0].ruleType, rt);
+          assert.equal(result.blocked[0].host, h);
+          assert.equal(result.blocked[0].port, p);
+          assert.equal(result.blocked[0].reason, r);
+        } else if (d === passedDecision) {
+          assert.equal(result.blocked.length, 0);
+          assert.equal(result.passed.length, 1);
+          assert.equal(result.passed[0].ruleType, rt);
+          assert.equal(result.passed[0].host, h);
+          assert.equal(result.passed[0].port, p);
+          assert.equal(result.passed[0].reason, r);
+        } else {
+          // The "other" of ALLOWED/AUDIT for this mode — dropped entirely.
+          assert.equal(result.passed.length, 0);
+          assert.equal(result.blocked.length, 0);
+        }
       }),
     );
   });
 
   // The log pattern captures reason as \S* (no whitespace). A reason string
   // containing an internal space is silently truncated to its first word.
-  it("reason with internal space is truncated to the first word", () => {
+  it("reason with internal space is truncated to the first word", async () => {
     const word = fc.stringMatching(/^\S{1,10}$/);
 
-    fc.assert(
-      fc.property(word, word, (w1, w2) => {
+    await fc.assert(
+      fc.asyncProperty(word, word, async (w1, w2) => {
         const line = `[ts] buildcage [ALLOWED] (HTTPS) "example.com:443" ${w1} ${w2}`;
-        const entries = parseEntries(line);
-        assert.equal(entries.length, 1);
-        assert.equal(entries[0].reason, w1);
+        const result = await scanHaproxyLog([line], false);
+        assert.equal(result.passed.length, 1);
+        assert.equal(result.passed[0].reason, w1);
       }),
     );
   });

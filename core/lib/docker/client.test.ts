@@ -1,5 +1,7 @@
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { createDocker, parseContainerIds } from "./client.ts";
+import { createDocker, parseContainerIds, type SpawnCommand } from "./client.ts";
 
 describe("parseContainerIds", () => {
   it("splits one ID per line", () => {
@@ -43,13 +45,6 @@ describe("createDocker", () => {
     assert.deepEqual(calls, [["cp", "abc123:/opt/buildcage/scripts/report-action.js", "/tmp/report-action.js"]]);
   });
 
-  it("readFile runs docker exec cat and returns its stdout", () => {
-    const { run, calls } = fakeRun(["log contents\n"]);
-    const text = createDocker(run).readFile("abc123", "/var/log/haproxy/current");
-    assert.equal(text, "log contents\n");
-    assert.deepEqual(calls, [["exec", "abc123", "cat", "/var/log/haproxy/current"]]);
-  });
-
   it("readEnv runs docker inspect and parses the Env JSON array", () => {
     const { run, calls } = fakeRun(['["PROXY_MODE=restrict","FOO=bar"]']);
     const env = createDocker(run).readEnv("abc123");
@@ -62,6 +57,111 @@ describe("createDocker", () => {
     const out = createDocker(run).exec("abc123", ["buildctl", "debug", "histories", "--format", "{{json .}}"]);
     assert.equal(out, "histories output");
     assert.deepEqual(calls, [["exec", "abc123", "buildctl", "debug", "histories", "--format", "{{json .}}"]]);
+  });
+});
+
+/** Minimal stand-in for node:child_process's ChildProcess, just enough
+ *  surface for streamDockerLines: stdout/stderr streams, 'error'/'close'
+ *  events, exitCode/signalCode, and a kill() the test can observe. */
+class FakeChild extends EventEmitter {
+  stdout = new PassThrough();
+  stderr = new PassThrough();
+  exitCode: number | null = null;
+  signalCode: NodeJS.Signals | null = null;
+  killed = false;
+  kill() {
+    this.killed = true;
+    this.signalCode = "SIGTERM";
+    this.stdout.end();
+    this.emit("close", null, "SIGTERM");
+  }
+  finish(code: number) {
+    this.exitCode = code;
+    this.stdout.end();
+    this.stderr.end();
+    this.emit("close", code, null);
+  }
+  failToSpawn(err: NodeJS.ErrnoException) {
+    this.emit("error", err);
+    this.stdout.end();
+    this.stderr.end();
+    this.emit("close", null, null);
+  }
+}
+
+// Same shape as fakeRun, but for the spawn-based second constructor param.
+function fakeSpawn(): { spawnDocker: SpawnCommand; calls: string[][]; children: FakeChild[] } {
+  const calls: string[][] = [];
+  const children: FakeChild[] = [];
+  return {
+    calls,
+    children,
+    spawnDocker(args: string[]) {
+      calls.push(args);
+      const child = new FakeChild();
+      children.push(child);
+      return child as unknown as ReturnType<SpawnCommand>;
+    },
+  };
+}
+
+async function drain(iterable: AsyncIterable<string>): Promise<string[]> {
+  const lines: string[] = [];
+  for await (const line of iterable) lines.push(line);
+  return lines;
+}
+
+describe("createDocker readFileLines", () => {
+  it("is lazy — nothing spawns until iteration actually starts", () => {
+    const { spawnDocker, calls } = fakeSpawn();
+    createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current");
+    assert.deepEqual(calls, []);
+  });
+
+  it("streams docker exec cat's stdout as lines, in argv order", async () => {
+    const { spawnDocker, calls, children } = fakeSpawn();
+    const iterablePromise = drain(createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current"));
+    // drain()'s first pull has already triggered the spawn synchronously.
+    assert.deepEqual(calls, [["exec", "abc123", "cat", "/var/log/haproxy/current"]]);
+    children[0].stdout.write("line one\nline two\n");
+    children[0].finish(0);
+    assert.deepEqual(await iterablePromise, ["line one", "line two"]);
+  });
+
+  it("throws {status, stderr} on a non-zero exit", async () => {
+    const { spawnDocker, children } = fakeSpawn();
+    const drained = drain(createDocker(undefined, spawnDocker).readFileLines("abc123", "/missing"));
+    // Ensure the child has been created before driving it.
+    await Promise.resolve();
+    children[0].stderr.write("cat: /missing: No such file or directory\n");
+    children[0].finish(1);
+    await assert.rejects(
+      drained,
+      (e) =>
+        (e as { status?: number; stderr?: string }).status === 1 &&
+        Boolean((e as { stderr?: string }).stderr?.includes("No such file or directory")),
+    );
+  });
+
+  it("surfaces a spawn-level ENOENT as-is", async () => {
+    const { spawnDocker, children } = fakeSpawn();
+    const drained = drain(createDocker(undefined, spawnDocker).readFileLines("abc123", "/path"));
+    await Promise.resolve();
+    children[0].failToSpawn(Object.assign(new Error("spawn docker ENOENT"), { code: "ENOENT" }));
+    await assert.rejects(drained, (e) => (e as NodeJS.ErrnoException).code === "ENOENT");
+  });
+
+  it("kills the child if the consumer stops iterating early", async () => {
+    const { spawnDocker, children } = fakeSpawn();
+    const iterable = createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current");
+    const iterator = iterable[Symbol.asyncIterator]();
+    // .next() runs synchronously through spawnDocker(args), so the child
+    // already exists once this returns.
+    const firstLine = iterator.next();
+    children[0].stdout.write("line one\nline two\n"); // never finish()'d — simulates a still-running process
+    assert.equal((await firstLine).value, "line one");
+    await iterator.return?.(undefined); // what `for await...of` does on an early break
+    assert.ok(children[0].killed);
   });
 });
 

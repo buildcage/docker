@@ -37,7 +37,7 @@ function collectBuilds(docker: Docker, containerId: string): VertexAllowedEntry[
   }
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const containerId = process.argv[2];
   if (!containerId) {
     throw new Error("Usage: report-action.js <container-id>");
@@ -45,10 +45,8 @@ function main(): void {
 
   const docker = createDocker();
   const parameters = buildReportParameters(docker.readEnv(containerId));
-  const logText = docker.readFile(containerId, LOG_FILE);
   const builds = collectBuilds(docker, containerId);
-
-  const report = buildExplicitReportData(logText, builds, parameters);
+  const report = await buildExplicitReportData(docker.readFileLines(containerId, LOG_FILE), builds, parameters);
 
   for (const line of wrapLogGroup("HTTP Proxy communication logs", renderCommunicationDetails(report.proxyLogs.builds, report.proxyLogs.denied))) {
     console.log(line);
@@ -71,9 +69,7 @@ function main(): void {
   emitBlockedOutcome(report, { failOnBlocked, summaryFile });
 }
 
-try {
-  main();
-} catch (e) {
+main().catch((e) => {
   console.log(`::error::Unexpected error in report-action: ${errorMessage(e)}`);
   process.exit(1);
-}
+});

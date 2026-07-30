@@ -16,9 +16,8 @@ const LOG_FILE = "/var/log/haproxy/current";
  * has no version-skew concern of its own (one pinned version end to end),
  * so it fetches the raw log and calls the shared builder in-process.
  */
-export function fetchReport(containerName: string, parameters: GenReportParameters): Report {
-  const logText = createDocker().readFile(containerName, LOG_FILE);
-  return buildTransparentReportData(logText, parameters);
+export function fetchReport(containerName: string, parameters: GenReportParameters): Promise<Report> {
+  return buildTransparentReportData(createDocker().readFileLines(containerName, LOG_FILE), parameters);
 }
 
 export interface ReportRenderContext {

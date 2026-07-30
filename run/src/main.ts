@@ -249,7 +249,7 @@ async function main(): Promise<void> {
     }, containerName);
   } finally {
     try {
-      const report = fetchReport(containerName, {
+      const report = await fetchReport(containerName, {
         mode: env.INPUT_PROXY_MODE || "restrict",
         allowedHttpsRules: rules.httpsRules,
         allowedHttpRules: rules.httpRules,

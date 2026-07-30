@@ -17,7 +17,7 @@ import { errorMessage } from "../../../../core/lib/general/error-message.ts";
 
 const LOG_FILE = "/var/log/haproxy/current";
 
-function main(): void {
+async function main(): Promise<void> {
   const containerId = process.argv[2];
   if (!containerId) {
     throw new Error("Usage: report-action.js <container-id>");
@@ -25,9 +25,7 @@ function main(): void {
 
   const docker = createDocker();
   const parameters = buildReportParameters(docker.readEnv(containerId));
-  const logText = docker.readFile(containerId, LOG_FILE);
-
-  const report = buildTransparentReportData(logText, parameters);
+  const report = await buildTransparentReportData(docker.readFileLines(containerId, LOG_FILE), parameters);
 
   const markdown = renderReportMarkdown(
     report,
@@ -46,9 +44,7 @@ function main(): void {
   emitBlockedOutcome(report, { failOnBlocked, summaryFile });
 }
 
-try {
-  main();
-} catch (e) {
+main().catch((e) => {
   console.log(`::error::Unexpected error in report-action: ${errorMessage(e)}`);
   process.exit(1);
-}
+});
