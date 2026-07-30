@@ -47,7 +47,6 @@ tool works the same way, including `docker/bake-action`: just point its `driver:
 
 ```yaml
 - name: Start Buildcage in audit mode
-  id: buildcage
   uses: dash14/buildcage/setup@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
   with:
     proxy_mode: audit  # Log every destination, block nothing
@@ -85,7 +84,6 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 
 ```yaml
 - name: Start Buildcage in restrict mode
-  id: buildcage
   uses: dash14/buildcage/setup@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
   with:
     proxy_mode: restrict  # Block every destination except the ones you allow

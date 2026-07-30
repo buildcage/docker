@@ -6,7 +6,6 @@ Starts the Buildcage builder container.
 
 ```yaml
 - name: Start Buildcage builder
-  id: buildcage
   uses: dash14/buildcage/setup@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
   with:
     proxy_mode: restrict
