@@ -10,20 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # packages: read # Uncomment together with the login step below when self-hosting under a private GHCR package.
 
     steps:
-      # Uncomment when self-hosting under a private GHCR package; the public
-      # dash14/buildcage image is pulled anonymously and needs no login.
-      # - name: Login to GHCR
-      #   uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
-      #   with:
-      #     registry: ghcr.io
-      #     username: ${{ github.actor }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Start Buildcage builder
-        # For self-hosting, replace with: <your-org>/buildcage/setup@<SHA>
         uses: dash14/buildcage/setup@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
         with:
           proxy_mode: audit
@@ -55,5 +44,4 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        # For self-hosting, replace with: <your-org>/buildcage/report@<SHA>
         uses: dash14/buildcage/report@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
