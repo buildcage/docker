@@ -20,6 +20,7 @@ export function emitBlockedOutcome(
     failOnBlocked,
     blockedCount: report.blockedCount,
     blockedRows: report.blocked,
+    logLooksPlausible: report.logLooksPlausible,
   });
 
   if (outcome.level !== "none") {

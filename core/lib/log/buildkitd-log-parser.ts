@@ -89,3 +89,16 @@ export function parseEntries(logText: string): DenialEntry[] {
 export function parseDenialTimeline(logText: string): DenialTimelineEntry[] {
   return parseDenialEntries(logText);
 }
+
+/**
+ * True iff logText contains at least one non-blank line that is not a
+ * denial line. buildkitd emits copious startup/worker/gRPC debug output
+ * (level = "debug" is set unconditionally) from the moment the process
+ * starts, regardless of whether any build ever ran or any denial ever
+ * occurred. A log consisting only of forged denial lines — or nothing at
+ * all — lacks this, which is a signal (not a guarantee) that the log may
+ * have been tampered with rather than reflecting a real run.
+ */
+export function hasNonDenialContent(logText: string): boolean {
+  return logText.split("\n").some((line) => line.trim() !== "" && !deniedLinePattern.test(line));
+}

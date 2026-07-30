@@ -1,4 +1,4 @@
-import { parseEntries } from "../log/haproxy-log-parser.ts";
+import { parseEntries, hasNonBuildcageContent } from "../log/haproxy-log-parser.ts";
 import { aggregate } from "../log/aggregate.ts";
 import { annotateKnownBlocked } from "./known-blocked.ts";
 import type { GenReportParameters, TransparentReportData } from "./report-data.ts";
@@ -26,5 +26,6 @@ export function buildTransparentReportData(logText: string, parameters: GenRepor
     passed,
     blocked,
     blockedCount,
+    logLooksPlausible: hasNonBuildcageContent(logText),
   };
 }

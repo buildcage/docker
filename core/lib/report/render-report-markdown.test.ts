@@ -28,6 +28,7 @@ describe("renderReportMarkdown — transparent", () => {
     passed: [],
     blocked: [],
     blockedCount: 0,
+    logLooksPlausible: true,
   };
 
   it("renders the restrict-mode heading and Allowed Hosts table", () => {
@@ -86,6 +87,7 @@ describe("renderReportMarkdown — explicit", () => {
     passed: [allowedRow],
     blocked: [blockedRow],
     blockedCount: 1,
+    logLooksPlausible: true,
     proxyLogs: {
       builds: [
         [

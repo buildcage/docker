@@ -62,7 +62,10 @@ describe("annotateKnownBlocked", () => {
 describe("determineBlockedOutcome", () => {
   it("returns none when there are no blocked connections", () => {
     assert.deepEqual(
-      determineBlockedOutcome({ isAudit: false, failOnBlocked: true, blockedCount: 0, blockedRows: [] }),
+      determineBlockedOutcome({
+        isAudit: false, failOnBlocked: true, blockedCount: 0, blockedRows: [],
+        logLooksPlausible: true,
+      }),
       { level: "none", shouldFail: false },
     );
   });
@@ -71,7 +74,7 @@ describe("determineBlockedOutcome", () => {
     assert.deepEqual(
       determineBlockedOutcome({
         isAudit: true, failOnBlocked: true, blockedCount: 2,
-        blockedRows: [{ expected: false }],
+        blockedRows: [{ expected: false }], logLooksPlausible: true,
       }),
       { level: "notice", shouldFail: false },
     );
@@ -81,7 +84,7 @@ describe("determineBlockedOutcome", () => {
     assert.deepEqual(
       determineBlockedOutcome({
         isAudit: false, failOnBlocked: true, blockedCount: 3,
-        blockedRows: [{ expected: true }, { expected: true }],
+        blockedRows: [{ expected: true }, { expected: true }], logLooksPlausible: true,
       }),
       { level: "notice", shouldFail: false },
     );
@@ -91,7 +94,7 @@ describe("determineBlockedOutcome", () => {
     assert.deepEqual(
       determineBlockedOutcome({
         isAudit: false, failOnBlocked: true, blockedCount: 3,
-        blockedRows: [{ expected: true }, { expected: false }],
+        blockedRows: [{ expected: true }, { expected: false }], logLooksPlausible: true,
       }),
       { level: "error", shouldFail: true },
     );
@@ -101,7 +104,7 @@ describe("determineBlockedOutcome", () => {
     assert.deepEqual(
       determineBlockedOutcome({
         isAudit: false, failOnBlocked: false, blockedCount: 2,
-        blockedRows: [{ expected: false }],
+        blockedRows: [{ expected: false }], logLooksPlausible: true,
       }),
       { level: "notice", shouldFail: false },
     );
@@ -109,9 +112,54 @@ describe("determineBlockedOutcome", () => {
 
   it("fails closed when blockedRows is empty but blockedCount is nonzero", () => {
     assert.deepEqual(
-      determineBlockedOutcome({ isAudit: false, failOnBlocked: true, blockedCount: 2, blockedRows: [] }),
+      determineBlockedOutcome({
+        isAudit: false, failOnBlocked: true, blockedCount: 2, blockedRows: [],
+        logLooksPlausible: true,
+      }),
       { level: "error", shouldFail: true },
     );
+  });
+
+  describe("logLooksPlausible: false (log has no trace of a real proxy run)", () => {
+    it("fails closed when blockedCount is 0 and failOnBlocked is true", () => {
+      assert.deepEqual(
+        determineBlockedOutcome({
+          isAudit: false, failOnBlocked: true, blockedCount: 0, blockedRows: [],
+          logLooksPlausible: false,
+        }),
+        { level: "error", shouldFail: true },
+      );
+    });
+
+    it("returns notice (not error) when blockedCount is 0 and failOnBlocked is false", () => {
+      assert.deepEqual(
+        determineBlockedOutcome({
+          isAudit: false, failOnBlocked: false, blockedCount: 0, blockedRows: [],
+          logLooksPlausible: false,
+        }),
+        { level: "notice", shouldFail: false },
+      );
+    });
+
+    it("never fails in audit mode, even with an implausible log", () => {
+      assert.deepEqual(
+        determineBlockedOutcome({
+          isAudit: true, failOnBlocked: true, blockedCount: 0, blockedRows: [],
+          logLooksPlausible: false,
+        }),
+        { level: "notice", shouldFail: false },
+      );
+    });
+
+    it("has no additional effect when blockedCount is already nonzero", () => {
+      assert.deepEqual(
+        determineBlockedOutcome({
+          isAudit: false, failOnBlocked: true, blockedCount: 3,
+          blockedRows: [{ expected: true }, { expected: true }], logLooksPlausible: false,
+        }),
+        { level: "notice", shouldFail: false },
+      );
+    });
   });
 });
 

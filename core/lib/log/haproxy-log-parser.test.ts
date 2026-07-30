@@ -1,5 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { parseEntries } from "./haproxy-log-parser.ts";
+import { parseEntries, hasNonBuildcageContent } from "./haproxy-log-parser.ts";
 
 // ---------------------------------------------------------------------------
 // parseEntries
@@ -66,6 +66,36 @@ describe("mode detection", () => {
     const entries = parseEntries('[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "a.com:443" r1');
     const isAudit = entries.some(e => e.decision === "AUDIT");
     assert.ok(!isAudit);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasNonBuildcageContent
+// ---------------------------------------------------------------------------
+describe("hasNonBuildcageContent", () => {
+  it("returns false for empty log text", () => {
+    assert.equal(hasNonBuildcageContent(""), false);
+  });
+
+  it("returns false when the log has only buildcage-decision lines", () => {
+    const log = [
+      '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "a.com:443" r1',
+      '[2024-01-01T00:00:01] buildcage [BLOCKED] (HTTP) "b.com:80" not-allowed',
+    ].join("\n");
+    assert.equal(hasNonBuildcageContent(log), false);
+  });
+
+  it("returns true when the log contains HAProxy's own non-decision output", () => {
+    const log = [
+      "[NOTICE]   (1) : haproxy version is 2.9.0",
+      '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "a.com:443" r1',
+    ].join("\n");
+    assert.equal(hasNonBuildcageContent(log), true);
+  });
+
+  it("ignores blank lines when deciding", () => {
+    const log = "\n\n  \n";
+    assert.equal(hasNonBuildcageContent(log), false);
   });
 });
 

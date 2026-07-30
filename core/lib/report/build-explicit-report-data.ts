@@ -1,4 +1,4 @@
-import { parseEntries, parseDenialTimeline } from "../log/buildkitd-log-parser.ts";
+import { parseEntries, parseDenialTimeline, hasNonDenialContent } from "../log/buildkitd-log-parser.ts";
 import { aggregate } from "../log/aggregate.ts";
 import { aggregateAllowedHosts, type VertexAllowedEntry } from "../log/vertex-log.ts";
 import { annotateKnownBlocked } from "./known-blocked.ts";
@@ -28,6 +28,7 @@ export function buildExplicitReportData(
     passed,
     blocked,
     blockedCount,
+    logLooksPlausible: hasNonDenialContent(logText),
     proxyLogs: {
       builds,
       denied: parseDenialTimeline(logText),

@@ -53,6 +53,8 @@ export interface DetermineBlockedOutcomeOptions {
   failOnBlocked: boolean;
   blockedCount: number;
   blockedRows: ExpectedFlag[];
+  /** See report-data.ts's ReportDataCommon.logLooksPlausible. */
+  logLooksPlausible: boolean;
 }
 
 export function determineBlockedOutcome({
@@ -60,8 +62,17 @@ export function determineBlockedOutcome({
   failOnBlocked,
   blockedCount,
   blockedRows,
+  logLooksPlausible,
 }: DetermineBlockedOutcomeOptions): BlockedOutcome {
-  if (!blockedCount) return { level: "none", shouldFail: false };
+  if (!blockedCount) {
+    // A log with no recognizable trace of a real proxy run is treated as
+    // suspicious rather than as "nothing was blocked" — this is a
+    // heuristic against a naive wholesale-erasure tamper, not a guarantee
+    // against a deliberate, format-aware forgery.
+    if (logLooksPlausible) return { level: "none", shouldFail: false };
+    if (isAudit) return { level: "notice", shouldFail: false };
+    return failOnBlocked ? { level: "error", shouldFail: true } : { level: "notice", shouldFail: false };
+  }
   if (isAudit) return { level: "notice", shouldFail: false };
   const hasUnexpected = blockedRows.length === 0 || blockedRows.some((row) => !row.expected);
   if (failOnBlocked && hasUnexpected) return { level: "error", shouldFail: true };
