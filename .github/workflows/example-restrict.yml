@@ -42,9 +42,6 @@ jobs:
           context: /tmp/build-context
           push: false
           no-cache: true
-        env:
-          DOCKER_BUILD_SUMMARY: false
-          DOCKER_BUILD_RECORD_UPLOAD: false
 
       - name: Show proxy report
         if: always()
