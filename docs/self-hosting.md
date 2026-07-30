@@ -85,7 +85,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start Buildcage
-        id: buildcage
         uses: <your_org>/buildcage/setup@<40-char-sha> # vX.Y.Z
         with:
           proxy_mode: audit
