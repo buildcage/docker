@@ -7426,6 +7426,26 @@ function startEcapture(ecapturePath, logPath, cgroupPath) {
 	});
 	return (0, node_fs.closeSync)(logFd), proc;
 }
+const ECAPTURE_READY_PATTERN = /started successfully/;
+/**
+* Block (synchronously — see withScratchDir) until ecapture's own log shows
+* it has finished loading and attaching its eBPF probes, or `timeoutMs`
+* elapses, whichever comes first. Loading/verifying the eBPF bytecode and
+* attaching probes isn't instant, and its exact duration varies with the
+* kernel; without this, a short-lived isolated command (a handful of quick
+* `wget`/`curl` calls, done in well under a second) can run to completion
+* before ecapture is actually capturing anything, silently yielding an empty
+* (rather than merely absent) httpLogs. Best-effort: on timeout this simply
+* gives up and lets the caller proceed anyway — missing the capture window
+* is preferable to hanging the whole step indefinitely.
+*/
+function waitForEcaptureReady(logPath, timeoutMs = 5e3) {
+	let deadline = Date.now() + timeoutMs;
+	for (; Date.now() < deadline;) {
+		if ((0, node_fs.existsSync)(logPath) && ECAPTURE_READY_PATTERN.test((0, node_fs.readFileSync)(logPath, "utf8"))) return;
+		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+	}
+}
 /**
 * Stop a process started by startEcapture, giving it a brief, fixed grace
 * period (blocking — see withScratchDir, whose callback must stay
@@ -8310,7 +8330,7 @@ async function main() {
 				ecaptureProc = startEcapture(extractEcapture({
 					containerName,
 					destDir: dir
-				}), ecaptureLogPath);
+				}), ecaptureLogPath), waitForEcaptureReady(ecaptureLogPath);
 			} catch (e) {
 				annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
 			}
