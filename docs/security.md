@@ -317,6 +317,13 @@ that's the only point standing between decrypted traffic and a GitHub Job Summar
 
 **Coverage is deliberately narrow, and known to have gaps:**
 
+- **Blocked HTTPS connections never appear here, only allowed ones.** The allow/block decision above
+  is made from the SNI in the TLS `ClientHello`, before the handshake completes — a blocked
+  connection is torn down right there, so the encrypted session `SSL_write`/`SSL_read` operate on
+  never actually gets established, and there's no application-layer request for ecapture to capture
+  in the first place. This is expected, not a coverage gap to fix: the "🚫 Blocked Hosts" table above
+  is (and stays) the authoritative record of what was blocked; this section only ever supplements the
+  "✅ Allowed Hosts" side with method/path detail.
 - **OpenSSL/BoringSSL/GnuTLS/NSS-linked tools only.** A tool statically using its own TLS stack —
   Rust's `rustls`, the JVM's default `SunJSSE` provider, .NET's own implementation — isn't hooked by
   this mechanism at all and simply won't appear in this section, same as if it made no HTTPS calls.
