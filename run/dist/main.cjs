@@ -7255,6 +7255,74 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 	];
 }
 //#endregion
+//#region core/lib/log/ecapture-log-parser.ts
+const ansiEscapePattern = /\x1b\[[0-9;]*m/g, blockHeaderPattern = /PID:(\d+)\s+TID:(\d+)\s+Comm:\S+\s+FD:(\d+)\s+(WRITE|READ)\s+\(\d+\s+bytes\):/, blockTerminatorPattern = /^\s*probe=/i, requestLinePattern = /^(\S+)\s+(\S+)\s+HTTP\/1\.[01]/, hostHeaderPattern = /^Host:\s*([^\s\\]+)/i, responseLinePattern = /^HTTP\/1\.[01]\s+(\d{3})/;
+/**
+* Single forward pass over ecapture's text-mode output. Returns every
+* request/response pair it could reconstruct, in the order captured. A WRITE
+* block with no matching READ (connection reset, blocked before a response,
+* end of log) is still emitted, with `status` left undefined — mirroring how
+* the explicit engine's own AllowedRequest already treats a missing status.
+*
+* Synchronous (unlike haproxy-log-parser.ts's scanHaproxyLog): ecapture's log
+* is always read directly off the runner host's own filesystem (see
+* run/src/lib/isolated-exec.ts's readEcaptureLog), never streamed from a
+* `docker exec`, so there's no AsyncIterable source to support here.
+*/
+function scanEcaptureLog(lines) {
+	let pending = /* @__PURE__ */ new Map(), entries = [], current = null, finalizeCurrent = () => {
+		if (!current) return;
+		let block = current;
+		if (current = null, block.direction === "WRITE") {
+			let reqMatch = block.lines[0]?.match(requestLinePattern);
+			if (!reqMatch) return;
+			let host = block.lines.slice(1).map((l) => l.match(hostHeaderPattern)?.[1]).find(Boolean);
+			if (!host) return;
+			pending.set(block.key, {
+				method: reqMatch[1],
+				path: reqMatch[2],
+				host
+			});
+		} else {
+			let resMatch = block.lines[0]?.match(responseLinePattern);
+			if (!resMatch) return;
+			let req = pending.get(block.key);
+			if (!req) return;
+			pending.delete(block.key), entries.push({
+				method: req.method,
+				url: `https://${req.host}${req.path}`,
+				status: Number(resMatch[1])
+			});
+		}
+	};
+	for (let rawLine of lines) {
+		let line = rawLine.replace(ansiEscapePattern, ""), headerMatch = line.match(blockHeaderPattern);
+		if (headerMatch) {
+			finalizeCurrent();
+			let [, pid, tid, fd, direction] = headerMatch;
+			current = {
+				key: `${pid}:${tid}:${fd}`,
+				direction,
+				lines: []
+			};
+			continue;
+		}
+		if (current) {
+			if (blockTerminatorPattern.test(line)) {
+				finalizeCurrent();
+				continue;
+			}
+			current.lines.push(line);
+		}
+	}
+	finalizeCurrent();
+	for (let { method, host, path } of pending.values()) entries.push({
+		method,
+		url: `https://${host}${path}`
+	});
+	return entries;
+}
+//#endregion
 //#region run/scripts/extra-masked-proc-paths.json
 var extra_masked_proc_paths_default = [
 	"/proc/kallsyms",
@@ -7302,6 +7370,101 @@ function extractRuncBootstrap({ containerName, destDir }) {
 		seccompProfile,
 		baseSpec
 	};
+}
+/**
+* Extract ecapture (eBPF-based TLS plaintext capture, no CA certificate
+* needed) from the proxy image onto the runner host, alongside runc/
+* gen-seccomp-profile above. Run natively on the host (not `docker exec`)
+* for the same reason those are: it needs to observe the isolated command
+* directly, and the sandbox's rootfs is a bind-mount of the host's own `/`
+* (see run-isolated.sh), so a host-native ecapture process resolves the
+* exact same libssl.so the sandboxed command loads — no cross-mount-
+* namespace path resolution needed. See docs/security.md's Run Action HTTPS
+* communication logs section for what this does and doesn't capture.
+*/
+function extractEcapture({ containerName, destDir }) {
+	let ecapturePath = (0, node_path.join)(destDir, "ecapture");
+	return (0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
+		containerName,
+		containerPath: "/opt/buildcage/bin/ecapture",
+		hostPath: ecapturePath
+	})), (0, node_fs.chmodSync)(ecapturePath, 493), ecapturePath;
+}
+/**
+* Start ecapture in the background, writing its captured events to `logPath`
+* (inside this run's own scratch dir). Meant to be started just before
+* runIsolated() and stopped (stopEcapture) right after it returns, so its
+* capture window covers exactly one `run:` step.
+*
+* No `--pid`/`--cgroup_path` scoping is applied by default: as of now,
+* ecapture observes every OpenSSL-linked process on the runner host for the
+* duration of this step, not just the isolated command's own (see
+* docs/security.md's known limitations). `cgroupPath`, when a caller
+* eventually has one to pass, would narrow that — see the TODO on this
+* repo's own dev-loop investigation notes; every attempt to resolve a
+* runc-nested sandbox's own auto-generated cgroup failed in local testing
+* for a reason not yet root-caused, so this parameter is unused for now,
+* pending re-verification on a real Linux CI host.
+*/
+function startEcapture(ecapturePath, logPath, cgroupPath) {
+	let args = [
+		"-n",
+		"--",
+		ecapturePath,
+		"tls",
+		"-m",
+		"text"
+	];
+	cgroupPath && args.push(`--cgroup_path=${cgroupPath}`);
+	let logFd = (0, node_fs.openSync)(logPath, "w"), proc = (0, node_child_process.spawn)("sudo", args, {
+		stdio: [
+			"ignore",
+			logFd,
+			logFd
+		],
+		detached: !0
+	});
+	return (0, node_fs.closeSync)(logFd), proc;
+}
+/**
+* Stop a process started by startEcapture, giving it a brief, fixed grace
+* period (blocking — see withScratchDir, whose callback must stay
+* synchronous) to flush and exit before the caller reads its log file.
+*
+* Not a wait-until-actually-exited poll: the `Atomics.wait`-based blocking
+* sleep below (same pattern as removeScratchDir's retry loop) starves the
+* event loop, so Node can never process this child's own exit notification
+* while we're in it — `proc.exitCode` would never update. A raw
+* `process.kill(pid, 0)` liveness probe doesn't work as a substitute either:
+* it still succeeds against a zombie (exited but not yet reaped) process,
+* which is exactly the state this child sits in for as long as we keep
+* starving the event loop, so a loop built on that check would always run
+* to its full timeout. Distinguishing zombie from running requires an
+* OS-specific mechanism (e.g. /proc/<pid>/stat's state field on Linux) this
+* function deliberately avoids needing. ecapture's own writes are
+* unbuffered per captured event, so anything already written to the log by
+* the time SIGTERM lands is already on disk regardless of exactly when the
+* process finishes exiting.
+*/
+function stopEcapture(proc) {
+	if (proc.pid) {
+		try {
+			process.kill(-proc.pid, "SIGTERM");
+		} catch {
+			return;
+		}
+		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+	}
+}
+/**
+* Read and parse ecapture's captured log (see startEcapture), returning the
+* HTTPS communication logs to attach to this step's report. Returns
+* undefined (not an empty array) if the log doesn't exist at all — e.g.
+* ecapture failed to start — distinguishing "not captured" from "captured,
+* saw nothing".
+*/
+function readEcaptureLog(logPath) {
+	if ((0, node_fs.existsSync)(logPath)) return scanEcaptureLog((0, node_fs.readFileSync)(logPath, "utf8").split("\n"));
 }
 /**
 * Pure: extract {mountPoint, fsType} for every line of raw
@@ -7874,6 +8037,29 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	})));
 }
 //#endregion
+//#region core/lib/report/command-log.ts
+function renderRequestLine({ method, url, status }) {
+	let line = `- ${escapeMarkdown(method)} ${escapeMarkdown(url)}`;
+	return status === void 0 ? line : `${line} -> ${status}`;
+}
+/**
+* Render the `run` action's ecapture-derived HTTPS communication logs as a
+* collapsed markdown section, or "" if there's nothing to show. Unlike
+* renderCommunicationDetails above, entries aren't grouped per RUN
+* step/vertex — ecapture's log carries no such attribution, so this is a
+* flat, time-ordered list of every request it could reconstruct.
+*/
+function renderHttpLogList(entries) {
+	if (!entries || entries.length === 0) return "";
+	let md = "\n<details>\n<summary>💬 HTTPS communication logs</summary>\n\n";
+	md += "```\n";
+	for (let entry of entries) md += `${renderRequestLine(entry)}\n`;
+	return md += "```\n", md += "</details>\n", md;
+}
+function escapeMarkdown(text) {
+	return text.replace(/([\\`*_[\]<>])/g, "\\$1");
+}
+//#endregion
 //#region core/lib/log/aggregate.ts
 function compareAggregated(a, b) {
 	return b.count - a.count || (a.host < b.host ? -1 : +(a.host > b.host)) || Number(a.port) - Number(b.port);
@@ -7978,7 +8164,7 @@ function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runComm
 	}) + "\n\n")) : (report.passed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(report.passed) + "\n\n"), report.blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, {
 		showReason: !0,
 		showExpected
-	}) + "\n\n")), markdown;
+	}) + "\n\n")), markdown += renderHttpLogList(report.httpLogs), markdown;
 }
 function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand } = {}) {
 	let isAudit = report.parameters.mode === "audit", outcome = determineBlockedOutcome({
@@ -8082,7 +8268,7 @@ async function main() {
 	} catch (e) {
 		throw new SandboxError(describeDockerFailure(e, { operation: "docker compose up" }), "DOCKER_UNAVAILABLE");
 	}
-	let exitCode = 1;
+	let exitCode = 1, httpLogs;
 	try {
 		let proxyPid = getContainerPid(containerName);
 		if (proxyPid === null) throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
@@ -8118,7 +8304,17 @@ async function main() {
 			} catch (e) {
 				throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
 			}
-			return writeOciConfig(config, dir), runIsolated({
+			writeOciConfig(config, dir);
+			let ecaptureProc, ecaptureLogPath = (0, node_path.join)(dir, "ecapture.log");
+			try {
+				ecaptureProc = startEcapture(extractEcapture({
+					containerName,
+					destDir: dir
+				}), ecaptureLogPath);
+			} catch (e) {
+				annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
+			}
+			let isolatedExitCode = runIsolated({
 				runcPath,
 				proxyPid,
 				bundleDir: dir,
@@ -8129,16 +8325,23 @@ async function main() {
 				dns,
 				targetIp: "172.20.0.101"
 			});
+			if (ecaptureProc) try {
+				stopEcapture(ecaptureProc), httpLogs = readEcaptureLog(ecaptureLogPath);
+			} catch (e) {
+				annotation.warning(`Failed to read ecapture's HTTPS communication logs: ${errorMessage(e)}`);
+			}
+			return isolatedExitCode;
 		}, containerName);
 	} finally {
 		try {
-			writeReport(await fetchReport(containerName, {
+			let report = await fetchReport(containerName, {
 				mode: env.INPUT_PROXY_MODE || "restrict",
 				allowedHttpsRules: rules.httpsRules,
 				allowedHttpRules: rules.httpRules,
 				allowedIpRules: rules.ipRules,
 				knownBlockedRules
-			}), {
+			});
+			report.httpLogs = httpLogs, writeReport(report, {
 				actionRepo,
 				actionRef,
 				runCommand: runInput,
