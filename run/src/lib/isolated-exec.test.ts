@@ -2,7 +2,6 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { spawn } from "node:child_process";
 
 import {
   writeRunScript,
@@ -497,30 +496,11 @@ describe("waitForEcaptureReady", () => {
 });
 
 describe("stopEcapture", () => {
-  it("delivers SIGTERM to the whole process group, not just the immediate child", () => {
-    withScratchDir((dir) => {
-      // A trap-and-touch script, rather than checking kill(pid, 0) after
-      // the fact: that check would succeed against a zombie (exited but not
-      // yet reaped) process regardless of whether the signal was actually
-      // delivered, since stopEcapture's own blocking sleep prevents Node
-      // from reaping it during the call — see stopEcapture's own comment.
-      const markerPath = join(dir, "signaled");
-      const proc = spawn("sh", ["-c", `trap 'touch ${markerPath}; exit 0' TERM; sleep 30`], {
-        detached: true,
-        stdio: "ignore",
-      });
-      // Give the shell a moment to actually start and register its trap
-      // handler before signaling it -- sending SIGTERM in the same instant
-      // as spawn() would hit it before the trap exists, falling back to the
-      // signal's default (silent) termination instead of running it. Real
-      // usage never races this: ecapture runs for the isolated command's
-      // whole duration, not a few milliseconds.
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
-      stopEcapture(proc);
-      assert.equal(statSync(markerPath).isFile(), true);
-    });
-  });
-
+  // stopEcapture kills via `sudo` (ecapture itself runs as root), so a
+  // meaningful "does it actually terminate the process" test needs a real
+  // passwordless-sudo host, not a unit test -- see
+  // run/test/integration-test-ecapture-terminates.sh, which drives the real
+  // run/dist/main.cjs and checks with `pgrep` afterward.
   it("does nothing (doesn't throw) when the process has no pid", () => {
     assert.doesNotThrow(() => stopEcapture({ pid: undefined } as never));
   });

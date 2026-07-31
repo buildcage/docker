@@ -204,17 +204,17 @@ export function waitForEcaptureReady(logPath: string, timeoutMs = 5000): void {
 
 /**
  * Stop a process started by startEcapture, with a brief grace period to
- * flush and exit before the caller reads its log file. Not a wait-until-
- * exited poll: the blocking sleep here starves the event loop, so
- * `proc.exitCode` never updates, and `process.kill(pid, 0)` would still
- * succeed against a zombie either way.
+ * flush and exit before the caller reads its log file. Killed via `sudo`
+ * since ecapture runs as root -- an unprivileged `process.kill()` would just
+ * fail with EPERM. Not a wait-until-exited poll: the blocking sleep here
+ * starves the event loop, so `proc.exitCode`/`kill(pid, 0)` can't be trusted.
  */
 export function stopEcapture(proc: ChildProcess): void {
   if (!proc.pid) return;
   try {
-    process.kill(-proc.pid, "SIGTERM");
+    execFileSync("sudo", ["-n", "--", "kill", "-TERM", `-${proc.pid}`]);
   } catch {
-    return; // already exited
+    return; // already exited, or sudo itself failed
   }
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
 }
