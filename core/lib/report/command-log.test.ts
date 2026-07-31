@@ -192,12 +192,21 @@ describe("renderHttpLogList", () => {
     assert.equal(
       renderHttpLogList(entries),
       "\n<details>\n<summary>💬 HTTPS communication logs</summary>\n\n" +
+        "<sub>*Note: captured only for HTTPS traffic that was allowed, from processes linked against " +
+        "OpenSSL/BoringSSL/GnuTLS/NSS — other TLS stacks (e.g. Rust's rustls, Go's crypto/tls) and " +
+        "blocked connections never appear here.*</sub>\n\n" +
         "```\n" +
         "- GET https://example.com/a -> 200\n" +
         "- POST https://example.com/b -> 404\n" +
         "```\n" +
         "</details>\n"
     );
+  });
+
+  it("includes a caveat note about OpenSSL-only coverage and allowed-only traffic", () => {
+    const md = renderHttpLogList([{ method: "GET", url: "https://example.com/", status: 200 }]);
+    assert.match(md, /OpenSSL\/BoringSSL\/GnuTLS\/NSS/);
+    assert.match(md, /blocked connections\s+never appear here/);
   });
 
   it("an entry with no status omits the arrow", () => {
