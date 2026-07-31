@@ -125,7 +125,25 @@ function scratchDirFor(containerName) {
 }
 //#endregion
 //#region run/src/post.ts
-const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), containerName = process.env.STATE_container_name, projectName = process.env.STATE_project_name;
+const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), containerName = process.env.STATE_container_name, projectName = process.env.STATE_project_name, ecapturePid = process.env.STATE_ecapture_pid;
+if (ecapturePid) try {
+	(0, node_fs.readFileSync)(`/proc/${ecapturePid}/comm`, "utf8").trim() === "ecapture" && (0, node_child_process.execFileSync)("sudo", [
+		"-n",
+		"--",
+		"kill",
+		"-TERM",
+		`-${ecapturePid}`
+	]);
+} catch {}
+const ecaptureCgroupPath = process.env.STATE_ecapture_cgroup_path;
+if (ecaptureCgroupPath) try {
+	(0, node_child_process.execFileSync)("sudo", [
+		"-n",
+		"--",
+		"rmdir",
+		ecaptureCgroupPath
+	]);
+} catch {}
 if (containerName?.startsWith("buildcage-proxy-")) try {
 	let scratchDir = scratchDirFor(containerName);
 	(0, node_fs.existsSync)(scratchDir) && cleanupScratchDir(scratchDir);

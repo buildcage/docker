@@ -7270,7 +7270,11 @@ function scanEcaptureLog(lines) {
 			if (!reqMatch) return;
 			let host = block.lines.slice(1).map((l) => l.match(hostHeaderPattern)?.[1]).find(Boolean);
 			if (!host) return;
-			pending.set(block.key, {
+			let superseded = pending.get(block.key);
+			superseded && entries.push({
+				method: superseded.method,
+				url: `https://${superseded.host}${superseded.path}`
+			}), pending.set(block.key, {
 				method: reqMatch[1],
 				path: reqMatch[2],
 				host
@@ -7278,12 +7282,14 @@ function scanEcaptureLog(lines) {
 		} else {
 			let resMatch = block.lines[0]?.match(responseLinePattern);
 			if (!resMatch) return;
+			let status = Number(resMatch[1]);
+			if (status >= 100 && status < 200) return;
 			let req = pending.get(block.key);
 			if (!req) return;
 			pending.delete(block.key), entries.push({
 				method: req.method,
 				url: `https://${req.host}${req.path}`,
-				status: Number(resMatch[1])
+				status
 			});
 		}
 	};
@@ -7345,18 +7351,19 @@ function writeRunScript(runInput, dir) {
 function generateBaseOciSpec(runcPath, bundleDir) {
 	return (0, node_child_process.execFileSync)(runcPath, ["spec"], { cwd: bundleDir }), JSON.parse((0, node_fs.readFileSync)((0, node_path.join)(bundleDir, "config.json"), "utf8"));
 }
+/** Extract one binary from the proxy image's `/opt/buildcage/bin/` into `destDir`
+*  via `docker cp` (not `docker exec` -- some callers run natively on the host,
+*  see gen-seccomp-profile/main.go). Torn down with the scratch dir. */
+function extractBinaryFromProxyImage(containerName, destDir, name) {
+	let path = (0, node_path.join)(destDir, name);
+	return (0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
+		containerName,
+		containerPath: `/opt/buildcage/bin/${name}`,
+		hostPath: path
+	})), (0, node_fs.chmodSync)(path, 493), path;
+}
 function extractRuncBootstrap({ containerName, destDir }) {
-	let runcPath = (0, node_path.join)(destDir, "runc"), genSeccompProfilePath = (0, node_path.join)(destDir, "gen-seccomp-profile");
-	(0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
-		containerName,
-		containerPath: "/opt/buildcage/bin/runc",
-		hostPath: runcPath
-	})), (0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
-		containerName,
-		containerPath: "/opt/buildcage/bin/gen-seccomp-profile",
-		hostPath: genSeccompProfilePath
-	})), (0, node_fs.chmodSync)(runcPath, 493), (0, node_fs.chmodSync)(genSeccompProfilePath, 493);
-	let seccompProfile = JSON.parse((0, node_child_process.execFileSync)(genSeccompProfilePath, { encoding: "utf8" })), baseSpec = generateBaseOciSpec(runcPath, destDir);
+	let runcPath = extractBinaryFromProxyImage(containerName, destDir, "runc"), genSeccompProfilePath = extractBinaryFromProxyImage(containerName, destDir, "gen-seccomp-profile"), seccompProfile = JSON.parse((0, node_child_process.execFileSync)(genSeccompProfilePath, { encoding: "utf8" })), baseSpec = generateBaseOciSpec(runcPath, destDir);
 	return (0, node_fs.rmSync)(genSeccompProfilePath), {
 		runcPath,
 		seccompProfile,
@@ -7366,17 +7373,12 @@ function extractRuncBootstrap({ containerName, destDir }) {
 /** Extract ecapture onto the runner host, same as extractRuncBootstrap above.
 *  See docs/security.md's Run Action HTTPS communication logs section. */
 function extractEcapture({ containerName, destDir }) {
-	let ecapturePath = (0, node_path.join)(destDir, "ecapture");
-	return (0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
-		containerName,
-		containerPath: "/opt/buildcage/bin/ecapture",
-		hostPath: ecapturePath
-	})), (0, node_fs.chmodSync)(ecapturePath, 493), ecapturePath;
+	return extractBinaryFromProxyImage(containerName, destDir, "ecapture");
 }
 /**
 * Start ecapture in the background. Meant to run for exactly one `run:`
 * step: start before runIsolated(), stop (stopEcapture) right after.
-* `cgroupPath` (see predictCgroupPath), when given, scopes capture to the
+* `cgroupPath` (see cgroupFsPath), when given, scopes capture to the
 * isolated command's own cgroup instead of the whole runner host.
 */
 function startEcapture(ecapturePath, logPath, cgroupPath) {
@@ -7397,7 +7399,7 @@ function startEcapture(ecapturePath, logPath, cgroupPath) {
 		],
 		detached: !0
 	});
-	return (0, node_fs.closeSync)(logFd), proc;
+	return (0, node_fs.closeSync)(logFd), proc.on("error", () => {}), proc;
 }
 const ECAPTURE_READY_PATTERN = /started successfully/;
 /**
@@ -7414,15 +7416,21 @@ function waitForEcaptureReady(logPath, timeoutMs = 5e3) {
 }
 /**
 * Stop a process started by startEcapture, with a brief grace period to
-* flush and exit before the caller reads its log file. Not a wait-until-
-* exited poll: the blocking sleep here starves the event loop, so
-* `proc.exitCode` never updates, and `process.kill(pid, 0)` would still
-* succeed against a zombie either way.
+* flush and exit before the caller reads its log file. Killed via `sudo`
+* since ecapture runs as root -- an unprivileged `process.kill()` would just
+* fail with EPERM. Not a wait-until-exited poll: the blocking sleep here
+* starves the event loop, so `proc.exitCode`/`kill(pid, 0)` can't be trusted.
 */
 function stopEcapture(proc) {
 	if (proc.pid) {
 		try {
-			process.kill(-proc.pid, "SIGTERM");
+			(0, node_child_process.execFileSync)("sudo", [
+				"-n",
+				"--",
+				"kill",
+				"-TERM",
+				`-${proc.pid}`
+			]);
 		} catch {
 			return;
 		}
@@ -7434,25 +7442,15 @@ function stopEcapture(proc) {
 function readEcaptureLog(logPath) {
 	if ((0, node_fs.existsSync)(logPath)) return scanEcaptureLog((0, node_fs.readFileSync)(logPath, "utf8").split("\n"));
 }
-/**
-* Predict the cgroup v2 path runc will create for `containerName` (no
-* explicit `linux.cgroupsPath` is set in the OCI config). Per runc's own
-* source (opencontainers/cgroups' fs2.defaultDirPath), that's
-* `/sys/fs/cgroup/<parent of the caller's own cgroup>/<containerName>` — not
-* a fixed prefix like `/docker/<id>`, which was only ever an artifact of the
-* Mac dev-loop's own container living under `/docker/...`.
-*
-* The path doesn't exist yet here (runc creates it once the container
-* starts) — see ensureCgroupDir.
-*/
-function predictCgroupPath(containerName) {
-	return computeCgroupPath((0, node_fs.readFileSync)("/proc/self/cgroup", "utf8"), containerName);
+/** The `linux.cgroupsPath` value for `containerName`'s OCI config, relative
+*  to the cgroup v2 mount root. */
+function cgroupInnerPath(containerName) {
+	return `/buildcage-run/${containerName}`;
 }
-/** Pure half of predictCgroupPath (no real /proc/self/cgroup on macOS, where these tests also run). */
-function computeCgroupPath(selfCgroupContent, containerName) {
-	let line = selfCgroupContent.split("\n").find((l) => l.startsWith("0::"));
-	if (!line) throw Error(`could not find a cgroup v2 (unified) entry in /proc/self/cgroup: ${selfCgroupContent}`);
-	return (0, node_path.join)("/sys/fs/cgroup", (0, node_path.dirname)(line.slice(3).trim()), containerName);
+/** The real filesystem path of `cgroupInnerPath`'s cgroup, for
+*  ensureCgroupDir/removeCgroupDirIfEmpty and ecapture's own `--cgroup_path`. */
+function cgroupFsPath(containerName) {
+	return (0, node_path.join)("/sys/fs/cgroup", cgroupInnerPath(containerName));
 }
 /** Pre-create the cgroup so ecapture's own `--cgroup_path` validation (a
 *  stat check) succeeds before the container exists. runc's cgroup setup
@@ -7567,7 +7565,7 @@ function assertScratchBaseNotWritable(writableDirs) {
 	let overlapping = writableDirs.find((p) => pathsOverlap(p, SANDBOX_SCRATCH_BASE));
 	if (overlapping) throw Error(`writable path ${JSON.stringify(overlapping)} overlaps the sandbox's own scratch directory (${SANDBOX_SCRATCH_BASE}); this would re-expose the sandboxed host filesystem read-write inside the sandbox itself. Choose a writable path outside ${SANDBOX_SCRATCH_BASE}.`);
 }
-function buildOciConfig(baseSpec, { uid, gid, workdir, home, runnerTemp, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] }) {
+function buildOciConfig(baseSpec, { uid, gid, workdir, home, runnerTemp, writablePaths = [], env, netnsPath, rootfsBindDir, cgroupsPath, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] }) {
 	let disableReadonly = writablePaths.includes("/"), mounts = [...baseSpec.mounts, {
 		destination: "/etc/resolv.conf",
 		type: "none",
@@ -7629,7 +7627,8 @@ function buildOciConfig(baseSpec, { uid, gid, workdir, home, runnerTemp, writabl
 			namespaces,
 			seccomp: seccompProfile,
 			maskedPaths,
-			readonlyPaths
+			readonlyPaths,
+			...cgroupsPath ? { cgroupsPath } : {}
 		}
 	};
 }
@@ -8061,7 +8060,7 @@ function renderRequestLine({ method, url, status }) {
 function renderHttpLogList(entries) {
 	if (!entries || entries.length === 0) return "";
 	let md = "\n<details>\n<summary>💬 HTTPS communication logs</summary>\n\n";
-	md += "```\n";
+	md += "<sub>*Note: captured only for HTTPS traffic that was allowed, from processes linked against OpenSSL/BoringSSL/GnuTLS/NSS — other TLS stacks (e.g. Rust's rustls, Go's crypto/tls) and blocked connections never appear here.*</sub>\n\n", md += "```\n";
 	for (let entry of entries) md += `${renderRequestLine(entry)}\n`;
 	return md += "```\n", md += "</details>\n", md;
 }
@@ -8292,7 +8291,14 @@ async function main() {
 			} catch (e) {
 				throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${errorMessage(e)}`, "RUNC_EXTRACT_FAILED");
 			}
-			let workdir = env.GITHUB_WORKSPACE || "", home = env.HOME || "", netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-"), rootfsBindDir = (0, node_path.join)(dir, "rootfs"), config;
+			let workdir = env.GITHUB_WORKSPACE || "", home = env.HOME || "", netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-"), rootfsBindDir = (0, node_path.join)(dir, "rootfs"), cgroupFs = cgroupFsPath(containerName), cgroupReady = !1;
+			try {
+				ensureCgroupDir(cgroupFs), cgroupReady = !0;
+			} catch (e) {
+				annotation.warning(`Failed to prepare a scoped cgroup for ecapture (falling back to unscoped capture): ${errorMessage(e)}`);
+			}
+			cgroupReady && stateFile && (0, node_fs.appendFileSync)(stateFile, `ecapture_cgroup_path=${cgroupFs}\n`);
+			let config;
 			try {
 				let resolvConfPath = writeResolvConf(dns, dir), scriptPath = writeRunScript(runInput, dir), hostMounts = listHostMounts();
 				config = buildOciConfig(baseSpec, {
@@ -8308,23 +8314,19 @@ async function main() {
 					resolvConfPath,
 					seccompProfile,
 					scriptPath,
-					hostMounts
+					hostMounts,
+					cgroupsPath: cgroupReady ? cgroupInnerPath(containerName) : void 0
 				});
 			} catch (e) {
 				throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
 			}
 			writeOciConfig(config, dir);
-			let ecaptureProc, ecaptureLogPath = (0, node_path.join)(dir, "ecapture.log"), cgroupPath;
-			try {
-				cgroupPath = predictCgroupPath(containerName), ensureCgroupDir(cgroupPath);
-			} catch (e) {
-				annotation.warning(`Failed to prepare a scoped cgroup for ecapture (falling back to unscoped capture): ${errorMessage(e)}`), cgroupPath = void 0;
-			}
+			let ecaptureProc, ecaptureLogPath = (0, node_path.join)(dir, "ecapture.log");
 			try {
 				ecaptureProc = startEcapture(extractEcapture({
 					containerName,
 					destDir: dir
-				}), ecaptureLogPath, cgroupPath), waitForEcaptureReady(ecaptureLogPath);
+				}), ecaptureLogPath, cgroupReady ? cgroupFs : void 0), waitForEcaptureReady(ecaptureLogPath), ecaptureProc.pid && stateFile && (0, node_fs.appendFileSync)(stateFile, `ecapture_pid=${ecaptureProc.pid}\n`);
 			} catch (e) {
 				annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
 			}
@@ -8344,7 +8346,7 @@ async function main() {
 			} catch (e) {
 				annotation.warning(`Failed to read ecapture's HTTPS communication logs: ${errorMessage(e)}`);
 			}
-			return cgroupPath && removeCgroupDirIfEmpty(cgroupPath), isolatedExitCode;
+			return cgroupReady && removeCgroupDirIfEmpty(cgroupFs), isolatedExitCode;
 		}, containerName);
 	} finally {
 		try {
