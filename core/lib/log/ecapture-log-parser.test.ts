@@ -98,6 +98,32 @@ describe("scanEcaptureLog", () => {
     assert.equal(result[0].status, 200);
   });
 
+  it("flushes an earlier unresolved WRITE as unmatched when a second WRITE supersedes it (pipelining)", async () => {
+    const lines = [
+      ...block(100, 100, 4, "WRITE", ["GET /a HTTP/1.1\\r", "Host: example.com\\r", "\\r"]),
+      ...block(100, 100, 4, "WRITE", ["GET /b HTTP/1.1\\r", "Host: example.com\\r", "\\r"]),
+      ...block(100, 100, 4, "READ", ["HTTP/1.1 200 OK\\r", "\\r"]),
+    ];
+    const result = await scanEcaptureLog(lines);
+    assert.equal(result.length, 2);
+    assert.equal(result[0].url, "https://example.com/a");
+    assert.equal(result[0].status, undefined);
+    assert.equal(result[1].url, "https://example.com/b");
+    assert.equal(result[1].status, 200);
+  });
+
+  it("does not resolve the pending request on a 100 Continue, waiting for the real status instead", async () => {
+    const lines = [
+      ...block(100, 100, 4, "WRITE", ["PUT /upload HTTP/1.1\\r", "Host: example.com\\r", "\\r"]),
+      ...block(100, 100, 4, "READ", ["HTTP/1.1 100 Continue\\r", "\\r"]),
+      ...block(100, 100, 4, "READ", ["HTTP/1.1 200 OK\\r", "\\r"]),
+    ];
+    const result = await scanEcaptureLog(lines);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].url, "https://example.com/upload");
+    assert.equal(result[0].status, 200);
+  });
+
   it("ignores non-matching lines outside any block", async () => {
     const result = await scanEcaptureLog(["some unrelated log line", ""]);
     assert.equal(result.length, 0);

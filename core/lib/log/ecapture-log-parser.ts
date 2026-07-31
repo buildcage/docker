@@ -48,14 +48,19 @@ export function scanEcaptureLog(lines: Iterable<string>): AllowedRequest[] {
       if (!reqMatch) return;
       const host = block.lines.slice(1).map((l) => l.match(hostHeaderPattern)?.[1]).find(Boolean);
       if (!host) return;
+      // Flush a pipelined, still-pending request as unmatched before it's superseded.
+      const superseded = pending.get(block.key);
+      if (superseded) entries.push({ method: superseded.method, url: `https://${superseded.host}${superseded.path}` });
       pending.set(block.key, { method: reqMatch[1], path: reqMatch[2], host });
     } else {
       const resMatch = block.lines[0]?.match(responseLinePattern);
       if (!resMatch) return;
+      const status = Number(resMatch[1]);
+      if (status >= 100 && status < 200) return; // interim (e.g. 100 Continue) — the real response is still to come
       const req = pending.get(block.key);
       if (!req) return;
       pending.delete(block.key);
-      entries.push({ method: req.method, url: `https://${req.host}${req.path}`, status: Number(resMatch[1]) });
+      entries.push({ method: req.method, url: `https://${req.host}${req.path}`, status });
     }
   };
 
