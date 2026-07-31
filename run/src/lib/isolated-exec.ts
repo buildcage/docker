@@ -208,6 +208,30 @@ export function startEcapture(ecapturePath: string, logPath: string, cgroupPath?
   return proc;
 }
 
+const ECAPTURE_READY_PATTERN = /started successfully/;
+
+/**
+ * Block (synchronously — see withScratchDir) until ecapture's own log shows
+ * it has finished loading and attaching its eBPF probes, or `timeoutMs`
+ * elapses, whichever comes first. Loading/verifying the eBPF bytecode and
+ * attaching probes isn't instant, and its exact duration varies with the
+ * kernel; without this, a short-lived isolated command (a handful of quick
+ * `wget`/`curl` calls, done in well under a second) can run to completion
+ * before ecapture is actually capturing anything, silently yielding an empty
+ * (rather than merely absent) httpLogs. Best-effort: on timeout this simply
+ * gives up and lets the caller proceed anyway — missing the capture window
+ * is preferable to hanging the whole step indefinitely.
+ */
+export function waitForEcaptureReady(logPath: string, timeoutMs = 5000): void {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (existsSync(logPath) && ECAPTURE_READY_PATTERN.test(readFileSync(logPath, "utf8"))) {
+      return;
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+  }
+}
+
 /**
  * Stop a process started by startEcapture, giving it a brief, fixed grace
  * period (blocking — see withScratchDir, whose callback must stay

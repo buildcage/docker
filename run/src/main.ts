@@ -25,6 +25,7 @@ import {
   extractRuncBootstrap,
   extractEcapture,
   startEcapture,
+  waitForEcaptureReady,
   stopEcapture,
   readEcaptureLog,
   buildOciConfig,
@@ -251,6 +252,10 @@ async function main(): Promise<void> {
       try {
         const ecapturePath = extractEcapture({ containerName, destDir: dir });
         ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath);
+        // Loading/attaching its eBPF probes isn't instant -- without this, a
+        // short-lived isolated command can finish before ecapture is
+        // actually capturing anything (see waitForEcaptureReady's own doc).
+        waitForEcaptureReady(ecaptureLogPath);
       } catch (e) {
         annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
       }

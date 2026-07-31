@@ -17,6 +17,7 @@ import {
   parseMountsUnder,
   stopEcapture,
   readEcaptureLog,
+  waitForEcaptureReady,
 } from "./isolated-exec.ts";
 
 describe("writeRunScript", () => {
@@ -430,6 +431,39 @@ describe("readEcaptureLog", () => {
       writeFileSync(logPath, content);
       const result = readEcaptureLog(logPath);
       assert.deepEqual(result, [{ method: "GET", url: "https://example.com/", status: 200 }]);
+    });
+  });
+});
+
+describe("waitForEcaptureReady", () => {
+  it("returns as soon as the log already contains the readiness marker", () => {
+    withScratchDir((dir) => {
+      const logPath = join(dir, "ecapture.log");
+      writeFileSync(logPath, "INF OpenSSL probe started successfully probe=OpenSSL\n");
+      const start = Date.now();
+      waitForEcaptureReady(logPath, 5000);
+      assert.ok(Date.now() - start < 200, "should not wait once the marker is already present");
+    });
+  });
+
+  it("gives up after timeoutMs when the log never shows the marker", () => {
+    withScratchDir((dir) => {
+      const logPath = join(dir, "ecapture.log");
+      writeFileSync(logPath, "INF some unrelated startup line\n");
+      const start = Date.now();
+      waitForEcaptureReady(logPath, 300);
+      const elapsed = Date.now() - start;
+      assert.ok(elapsed >= 300, "should wait out the full timeout");
+      assert.ok(elapsed < 2000, "should not wait meaningfully longer than the timeout");
+    });
+  });
+
+  it("gives up after timeoutMs when the log file never appears at all", () => {
+    withScratchDir((dir) => {
+      const logPath = join(dir, "does-not-exist.log");
+      const start = Date.now();
+      waitForEcaptureReady(logPath, 300);
+      assert.ok(Date.now() - start >= 300);
     });
   });
 });
