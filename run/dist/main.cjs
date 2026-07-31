@@ -7258,16 +7258,8 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 //#region core/lib/log/ecapture-log-parser.ts
 const ansiEscapePattern = /\x1b\[[0-9;]*m/g, blockHeaderPattern = /PID:(\d+)\s+TID:(\d+)\s+Comm:\S+\s+FD:(\d+)\s+(WRITE|READ)\s+\(\d+\s+bytes\):/, blockTerminatorPattern = /^\s*probe=/i, requestLinePattern = /^(\S+)\s+(\S+)\s+HTTP\/1\.[01]/, hostHeaderPattern = /^Host:\s*([^\s\\]+)/i, responseLinePattern = /^HTTP\/1\.[01]\s+(\d{3})/;
 /**
-* Single forward pass over ecapture's text-mode output. Returns every
-* request/response pair it could reconstruct, in the order captured. A WRITE
-* block with no matching READ (connection reset, blocked before a response,
-* end of log) is still emitted, with `status` left undefined — mirroring how
-* the explicit engine's own AllowedRequest already treats a missing status.
-*
-* Synchronous (unlike haproxy-log-parser.ts's scanHaproxyLog): ecapture's log
-* is always read directly off the runner host's own filesystem (see
-* run/src/lib/isolated-exec.ts's readEcaptureLog), never streamed from a
-* `docker exec`, so there's no AsyncIterable source to support here.
+* One forward pass over ecapture's text-mode output, in capture order. A
+* WRITE with no matching READ is still emitted, with `status` undefined.
 */
 function scanEcaptureLog(lines) {
 	let pending = /* @__PURE__ */ new Map(), entries = [], current = null, finalizeCurrent = () => {
@@ -7371,17 +7363,8 @@ function extractRuncBootstrap({ containerName, destDir }) {
 		baseSpec
 	};
 }
-/**
-* Extract ecapture (eBPF-based TLS plaintext capture, no CA certificate
-* needed) from the proxy image onto the runner host, alongside runc/
-* gen-seccomp-profile above. Run natively on the host (not `docker exec`)
-* for the same reason those are: it needs to observe the isolated command
-* directly, and the sandbox's rootfs is a bind-mount of the host's own `/`
-* (see run-isolated.sh), so a host-native ecapture process resolves the
-* exact same libssl.so the sandboxed command loads — no cross-mount-
-* namespace path resolution needed. See docs/security.md's Run Action HTTPS
-* communication logs section for what this does and doesn't capture.
-*/
+/** Extract ecapture onto the runner host, same as extractRuncBootstrap above.
+*  See docs/security.md's Run Action HTTPS communication logs section. */
 function extractEcapture({ containerName, destDir }) {
 	let ecapturePath = (0, node_path.join)(destDir, "ecapture");
 	return (0, node_child_process.execFileSync)("docker", buildDockerCpArgs({
@@ -7391,21 +7374,10 @@ function extractEcapture({ containerName, destDir }) {
 	})), (0, node_fs.chmodSync)(ecapturePath, 493), ecapturePath;
 }
 /**
-* Start ecapture in the background, writing its captured events to `logPath`
-* (inside this run's own scratch dir). Meant to be started just before
-* runIsolated() and stopped (stopEcapture) right after it returns, so its
-* capture window covers exactly one `run:` step.
-*
-* `cgroupPath` (see predictCgroupPath/ensureCgroupDir), when given, scopes
-* ecapture to just the isolated command's own cgroup rather than every
-* OpenSSL-linked process on the runner host for the step's duration — see
-* docs/security.md's known limitations for why this matters (cross-talk
-* between concurrent `run:` steps, or with an unrelated process, on a
-* shared/self-hosted runner). Earlier attempts to resolve a runc-nested
-* sandbox's own cgroup failed in Mac dev-loop testing for a reason
-* eventually traced to that testing environment specifically (see
-* predictCgroupPath's own doc) — real Linux CI is what determines whether
-* this actually narrows capture as intended.
+* Start ecapture in the background. Meant to run for exactly one `run:`
+* step: start before runIsolated(), stop (stopEcapture) right after.
+* `cgroupPath` (see predictCgroupPath), when given, scopes capture to the
+* isolated command's own cgroup instead of the whole runner host.
 */
 function startEcapture(ecapturePath, logPath, cgroupPath) {
 	let args = [
@@ -7429,16 +7401,9 @@ function startEcapture(ecapturePath, logPath, cgroupPath) {
 }
 const ECAPTURE_READY_PATTERN = /started successfully/;
 /**
-* Block (synchronously — see withScratchDir) until ecapture's own log shows
-* it has finished loading and attaching its eBPF probes, or `timeoutMs`
-* elapses, whichever comes first. Loading/verifying the eBPF bytecode and
-* attaching probes isn't instant, and its exact duration varies with the
-* kernel; without this, a short-lived isolated command (a handful of quick
-* `wget`/`curl` calls, done in well under a second) can run to completion
-* before ecapture is actually capturing anything, silently yielding an empty
-* (rather than merely absent) httpLogs. Best-effort: on timeout this simply
-* gives up and lets the caller proceed anyway — missing the capture window
-* is preferable to hanging the whole step indefinitely.
+* Block until ecapture's log shows its eBPF probes are attached, or
+* `timeoutMs` elapses. Needed because a short isolated command can finish
+* before ecapture is actually capturing anything.
 */
 function waitForEcaptureReady(logPath, timeoutMs = 5e3) {
 	let deadline = Date.now() + timeoutMs;
@@ -7448,24 +7413,11 @@ function waitForEcaptureReady(logPath, timeoutMs = 5e3) {
 	}
 }
 /**
-* Stop a process started by startEcapture, giving it a brief, fixed grace
-* period (blocking — see withScratchDir, whose callback must stay
-* synchronous) to flush and exit before the caller reads its log file.
-*
-* Not a wait-until-actually-exited poll: the `Atomics.wait`-based blocking
-* sleep below (same pattern as removeScratchDir's retry loop) starves the
-* event loop, so Node can never process this child's own exit notification
-* while we're in it — `proc.exitCode` would never update. A raw
-* `process.kill(pid, 0)` liveness probe doesn't work as a substitute either:
-* it still succeeds against a zombie (exited but not yet reaped) process,
-* which is exactly the state this child sits in for as long as we keep
-* starving the event loop, so a loop built on that check would always run
-* to its full timeout. Distinguishing zombie from running requires an
-* OS-specific mechanism (e.g. /proc/<pid>/stat's state field on Linux) this
-* function deliberately avoids needing. ecapture's own writes are
-* unbuffered per captured event, so anything already written to the log by
-* the time SIGTERM lands is already on disk regardless of exactly when the
-* process finishes exiting.
+* Stop a process started by startEcapture, with a brief grace period to
+* flush and exit before the caller reads its log file. Not a wait-until-
+* exited poll: the blocking sleep here starves the event loop, so
+* `proc.exitCode` never updates, and `process.kill(pid, 0)` would still
+* succeed against a zombie either way.
 */
 function stopEcapture(proc) {
 	if (proc.pid) {
@@ -7477,56 +7429,35 @@ function stopEcapture(proc) {
 		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
 	}
 }
-/**
-* Read and parse ecapture's captured log (see startEcapture), returning the
-* HTTPS communication logs to attach to this step's report. Returns
-* undefined (not an empty array) if the log doesn't exist at all — e.g.
-* ecapture failed to start — distinguishing "not captured" from "captured,
-* saw nothing".
-*/
+/** Parse ecapture's captured log into this step's HTTPS communication logs.
+*  Undefined (not empty) if the log doesn't exist at all. */
 function readEcaptureLog(logPath) {
 	if ((0, node_fs.existsSync)(logPath)) return scanEcaptureLog((0, node_fs.readFileSync)(logPath, "utf8").split("\n"));
 }
 /**
-* Predict the cgroup v2 path runc will create for a container named
-* `containerName`, given no explicit `linux.cgroupsPath` in the OCI config
-* (buildOciConfig doesn't set one). Confirmed against runc's own source
-* (opencontainers/cgroups' fs2.defaultDirPath): with no cgroupsPath and no
-* systemd cgroup driver, the path is `/sys/fs/cgroup/<parent-of-runc's-own-
-* current-cgroup>/<containerName>` — i.e. a sibling of whatever cgroup the
-* process invoking `runc run` (this Node process, via `sudo`, which doesn't
-* itself move cgroups) is currently in. This is NOT a fixed prefix like
-* `/docker/<id>` — that was only ever true in Mac dev-loop testing because
-* the dev-loop container's own cgroup happened to be under `/docker/...`,
-* confirmed by reading runc's actual path-computation logic instead of
-* assuming the earlier observation generalized.
+* Predict the cgroup v2 path runc will create for `containerName` (no
+* explicit `linux.cgroupsPath` is set in the OCI config). Per runc's own
+* source (opencontainers/cgroups' fs2.defaultDirPath), that's
+* `/sys/fs/cgroup/<parent of the caller's own cgroup>/<containerName>` — not
+* a fixed prefix like `/docker/<id>`, which was only ever an artifact of the
+* Mac dev-loop's own container living under `/docker/...`.
 *
-* The predicted path doesn't exist yet at this point (runc only creates it
-* once the container actually starts) — see ensureCgroupDir, which must run
-* before ecapture's own `--cgroup_path` validation (a plain stat check) can
-* succeed.
+* The path doesn't exist yet here (runc creates it once the container
+* starts) — see ensureCgroupDir.
 */
 function predictCgroupPath(containerName) {
 	return computeCgroupPath((0, node_fs.readFileSync)("/proc/self/cgroup", "utf8"), containerName);
 }
-/** Pure half of predictCgroupPath, split out so it's testable without a real
-*  /proc/self/cgroup (not present on macOS, where these tests also run). */
+/** Pure half of predictCgroupPath (no real /proc/self/cgroup on macOS, where these tests also run). */
 function computeCgroupPath(selfCgroupContent, containerName) {
 	let line = selfCgroupContent.split("\n").find((l) => l.startsWith("0::"));
 	if (!line) throw Error(`could not find a cgroup v2 (unified) entry in /proc/self/cgroup: ${selfCgroupContent}`);
 	return (0, node_path.join)("/sys/fs/cgroup", (0, node_path.dirname)(line.slice(3).trim()), containerName);
 }
-/**
-* Create the cgroup v2 directory runc will later reuse for the isolated
-* command (see predictCgroupPath), so ecapture's `--cgroup_path` validation
-* has something real to stat before the container itself exists. Run via
-* `sudo` since `/sys/fs/cgroup` isn't writable by the runner's own
-* unprivileged user. Safe to pre-create: runc's own cgroup setup
-* (opencontainers/cgroups' fs2.CreateCgroupPath) already tolerates the
-* directory existing (os.Mkdir + os.IsExist check), and its normal container
-* teardown (`runc delete -f` in run-isolated.sh's cleanup trap) removes it
-* regardless of who created it.
-*/
+/** Pre-create the cgroup so ecapture's own `--cgroup_path` validation (a
+*  stat check) succeeds before the container exists. runc's cgroup setup
+*  tolerates the directory already existing, and removes it on teardown
+*  regardless of who created it. */
 function ensureCgroupDir(cgroupPath) {
 	(0, node_child_process.execFileSync)("sudo", [
 		"-n",
@@ -7536,16 +7467,8 @@ function ensureCgroupDir(cgroupPath) {
 		cgroupPath
 	]);
 }
-/**
-* Best-effort cleanup for the directory ensureCgroupDir created. Normally
-* already removed by runc's own container teardown (`runc delete -f` in
-* run-isolated.sh's cleanup trap, which removes the cgroup it manages
-* regardless of who created the directory) — this is a safety net for the
-* case where that didn't happen (e.g. runIsolated itself failed before ever
-* creating a container). `rmdir` only removes an *empty* directory, so this
-* silently no-ops rather than forcing anything if the cgroup is still in use
-* or already gone.
-*/
+/** Best-effort cleanup in case runc's own teardown didn't run. `rmdir`
+*  no-ops if the cgroup is still in use or already gone. */
 function removeCgroupDirIfEmpty(cgroupPath) {
 	try {
 		(0, node_child_process.execFileSync)("sudo", [
@@ -8132,13 +8055,9 @@ function renderRequestLine({ method, url, status }) {
 	let line = `- ${escapeMarkdown(method)} ${escapeMarkdown(url)}`;
 	return status === void 0 ? line : `${line} -> ${status}`;
 }
-/**
-* Render the `run` action's ecapture-derived HTTPS communication logs as a
-* collapsed markdown section, or "" if there's nothing to show. Unlike
-* renderCommunicationDetails above, entries aren't grouped per RUN
-* step/vertex — ecapture's log carries no such attribution, so this is a
-* flat, time-ordered list of every request it could reconstruct.
-*/
+/** Renders the `run` action's ecapture-derived HTTPS communication logs as a
+*  collapsed section, or "" if empty. Flat, time-ordered — unlike
+*  renderCommunicationDetails, there's no per-vertex attribution here. */
 function renderHttpLogList(entries) {
 	if (!entries || entries.length === 0) return "";
 	let md = "\n<details>\n<summary>💬 HTTPS communication logs</summary>\n\n";
