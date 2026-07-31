@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // https://docs.github.com/en/actions/creating-actions/dockerfile-support-for-github-actions#saving-state.
 const containerName = process.env.STATE_container_name;
 const projectName = process.env.STATE_project_name;
+
+// Fallback-only: main.ts's own stopEcapture already runs on the normal exit
+// path. Checks /proc/<pid>/comm first to guard against PID reuse.
+const ecapturePid = process.env.STATE_ecapture_pid;
+if (ecapturePid) {
+  try {
+    if (readFileSync(`/proc/${ecapturePid}/comm`, "utf8").trim() === "ecapture") {
+      execFileSync("sudo", ["-n", "--", "kill", "-TERM", `-${ecapturePid}`]);
+    }
+  } catch {
+    // Already exited, /proc/<pid> is gone, or sudo itself failed.
+  }
+}
+const ecaptureCgroupPath = process.env.STATE_ecapture_cgroup_path;
+if (ecaptureCgroupPath) {
+  try {
+    execFileSync("sudo", ["-n", "--", "rmdir", ecaptureCgroupPath]);
+  } catch {
+    // Already removed by runc's own teardown, or still in use.
+  }
+}
 
 // Reclaim this step's sandbox scratch dir if a hard kill bypassed main.ts's
 // own withScratchDir finally. Its path is derived deterministically from

@@ -225,6 +225,9 @@ async function main(): Promise<void> {
       } catch (e) {
         annotation.warning(`Failed to prepare a scoped cgroup for ecapture (falling back to unscoped capture): ${errorMessage(e)}`);
       }
+      if (cgroupReady && stateFile) {
+        appendFileSync(stateFile, `ecapture_cgroup_path=${cgroupFs}\n`);
+      }
 
       let config;
       try {
@@ -267,6 +270,9 @@ async function main(): Promise<void> {
         const ecapturePath = extractEcapture({ containerName, destDir: dir });
         ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath, cgroupReady ? cgroupFs : undefined);
         waitForEcaptureReady(ecaptureLogPath);
+        if (ecaptureProc.pid && stateFile) {
+          appendFileSync(stateFile, `ecapture_pid=${ecaptureProc.pid}\n`);
+        }
       } catch (e) {
         annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
       }
