@@ -156,17 +156,8 @@ export function extractRuncBootstrap({
   return { runcPath, seccompProfile, baseSpec };
 }
 
-/**
- * Extract ecapture (eBPF-based TLS plaintext capture, no CA certificate
- * needed) from the proxy image onto the runner host, alongside runc/
- * gen-seccomp-profile above. Run natively on the host (not `docker exec`)
- * for the same reason those are: it needs to observe the isolated command
- * directly, and the sandbox's rootfs is a bind-mount of the host's own `/`
- * (see run-isolated.sh), so a host-native ecapture process resolves the
- * exact same libssl.so the sandboxed command loads — no cross-mount-
- * namespace path resolution needed. See docs/security.md's Run Action HTTPS
- * communication logs section for what this does and doesn't capture.
- */
+/** Extract ecapture onto the runner host, same as extractRuncBootstrap above.
+ *  See docs/security.md's Run Action HTTPS communication logs section. */
 export function extractEcapture({ containerName, destDir }: ExtractRuncBootstrapOptions): string {
   const ecapturePath = join(destDir, "ecapture");
   execFileSync(
@@ -178,32 +169,17 @@ export function extractEcapture({ containerName, destDir }: ExtractRuncBootstrap
 }
 
 /**
- * Start ecapture in the background, writing its captured events to `logPath`
- * (inside this run's own scratch dir). Meant to be started just before
- * runIsolated() and stopped (stopEcapture) right after it returns, so its
- * capture window covers exactly one `run:` step.
- *
- * `cgroupPath` (see predictCgroupPath/ensureCgroupDir), when given, scopes
- * ecapture to just the isolated command's own cgroup rather than every
- * OpenSSL-linked process on the runner host for the step's duration — see
- * docs/security.md's known limitations for why this matters (cross-talk
- * between concurrent `run:` steps, or with an unrelated process, on a
- * shared/self-hosted runner). Earlier attempts to resolve a runc-nested
- * sandbox's own cgroup failed in Mac dev-loop testing for a reason
- * eventually traced to that testing environment specifically (see
- * predictCgroupPath's own doc) — real Linux CI is what determines whether
- * this actually narrows capture as intended.
+ * Start ecapture in the background. Meant to run for exactly one `run:`
+ * step: start before runIsolated(), stop (stopEcapture) right after.
+ * `cgroupPath` (see predictCgroupPath), when given, scopes capture to the
+ * isolated command's own cgroup instead of the whole runner host.
  */
 export function startEcapture(ecapturePath: string, logPath: string, cgroupPath?: string): ChildProcess {
   const args = ["-n", "--", ecapturePath, "tls", "-m", "text"];
   if (cgroupPath) args.push(`--cgroup_path=${cgroupPath}`);
   const logFd = openSync(logPath, "w");
-  // detached: true puts ecapture in its own process group, so stopEcapture
-  // can SIGTERM the whole group (-pid) rather than just `sudo`'s own PID —
-  // some sudoers configurations (Defaults use_pty) fork a monitor process
-  // between `sudo` and the actual command, which a plain, non-group kill
-  // would leave running (the same residual gap run-isolated.sh's own
-  // setpriv --pdeathsig comment already documents for a similar reason).
+  // detached so stopEcapture can SIGTERM the whole process group (-pid),
+  // not just sudo's own PID (some sudoers configs fork a monitor process).
   const proc = spawn("sudo", args, { stdio: ["ignore", logFd, logFd], detached: true });
   closeSync(logFd);
   return proc;
@@ -212,16 +188,9 @@ export function startEcapture(ecapturePath: string, logPath: string, cgroupPath?
 const ECAPTURE_READY_PATTERN = /started successfully/;
 
 /**
- * Block (synchronously — see withScratchDir) until ecapture's own log shows
- * it has finished loading and attaching its eBPF probes, or `timeoutMs`
- * elapses, whichever comes first. Loading/verifying the eBPF bytecode and
- * attaching probes isn't instant, and its exact duration varies with the
- * kernel; without this, a short-lived isolated command (a handful of quick
- * `wget`/`curl` calls, done in well under a second) can run to completion
- * before ecapture is actually capturing anything, silently yielding an empty
- * (rather than merely absent) httpLogs. Best-effort: on timeout this simply
- * gives up and lets the caller proceed anyway — missing the capture window
- * is preferable to hanging the whole step indefinitely.
+ * Block until ecapture's log shows its eBPF probes are attached, or
+ * `timeoutMs` elapses. Needed because a short isolated command can finish
+ * before ecapture is actually capturing anything.
  */
 export function waitForEcaptureReady(logPath: string, timeoutMs = 5000): void {
   const deadline = Date.now() + timeoutMs;
@@ -234,24 +203,11 @@ export function waitForEcaptureReady(logPath: string, timeoutMs = 5000): void {
 }
 
 /**
- * Stop a process started by startEcapture, giving it a brief, fixed grace
- * period (blocking — see withScratchDir, whose callback must stay
- * synchronous) to flush and exit before the caller reads its log file.
- *
- * Not a wait-until-actually-exited poll: the `Atomics.wait`-based blocking
- * sleep below (same pattern as removeScratchDir's retry loop) starves the
- * event loop, so Node can never process this child's own exit notification
- * while we're in it — `proc.exitCode` would never update. A raw
- * `process.kill(pid, 0)` liveness probe doesn't work as a substitute either:
- * it still succeeds against a zombie (exited but not yet reaped) process,
- * which is exactly the state this child sits in for as long as we keep
- * starving the event loop, so a loop built on that check would always run
- * to its full timeout. Distinguishing zombie from running requires an
- * OS-specific mechanism (e.g. /proc/<pid>/stat's state field on Linux) this
- * function deliberately avoids needing. ecapture's own writes are
- * unbuffered per captured event, so anything already written to the log by
- * the time SIGTERM lands is already on disk regardless of exactly when the
- * process finishes exiting.
+ * Stop a process started by startEcapture, with a brief grace period to
+ * flush and exit before the caller reads its log file. Not a wait-until-
+ * exited poll: the blocking sleep here starves the event loop, so
+ * `proc.exitCode` never updates, and `process.kill(pid, 0)` would still
+ * succeed against a zombie either way.
  */
 export function stopEcapture(proc: ChildProcess): void {
   if (!proc.pid) return;
@@ -263,13 +219,8 @@ export function stopEcapture(proc: ChildProcess): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
 }
 
-/**
- * Read and parse ecapture's captured log (see startEcapture), returning the
- * HTTPS communication logs to attach to this step's report. Returns
- * undefined (not an empty array) if the log doesn't exist at all — e.g.
- * ecapture failed to start — distinguishing "not captured" from "captured,
- * saw nothing".
- */
+/** Parse ecapture's captured log into this step's HTTPS communication logs.
+ *  Undefined (not empty) if the log doesn't exist at all. */
 export function readEcaptureLog(logPath: string): AllowedRequest[] | undefined {
   if (!existsSync(logPath)) return undefined;
   const content = readFileSync(logPath, "utf8");
@@ -277,30 +228,21 @@ export function readEcaptureLog(logPath: string): AllowedRequest[] | undefined {
 }
 
 /**
- * Predict the cgroup v2 path runc will create for a container named
- * `containerName`, given no explicit `linux.cgroupsPath` in the OCI config
- * (buildOciConfig doesn't set one). Confirmed against runc's own source
- * (opencontainers/cgroups' fs2.defaultDirPath): with no cgroupsPath and no
- * systemd cgroup driver, the path is `/sys/fs/cgroup/<parent-of-runc's-own-
- * current-cgroup>/<containerName>` — i.e. a sibling of whatever cgroup the
- * process invoking `runc run` (this Node process, via `sudo`, which doesn't
- * itself move cgroups) is currently in. This is NOT a fixed prefix like
- * `/docker/<id>` — that was only ever true in Mac dev-loop testing because
- * the dev-loop container's own cgroup happened to be under `/docker/...`,
- * confirmed by reading runc's actual path-computation logic instead of
- * assuming the earlier observation generalized.
+ * Predict the cgroup v2 path runc will create for `containerName` (no
+ * explicit `linux.cgroupsPath` is set in the OCI config). Per runc's own
+ * source (opencontainers/cgroups' fs2.defaultDirPath), that's
+ * `/sys/fs/cgroup/<parent of the caller's own cgroup>/<containerName>` — not
+ * a fixed prefix like `/docker/<id>`, which was only ever an artifact of the
+ * Mac dev-loop's own container living under `/docker/...`.
  *
- * The predicted path doesn't exist yet at this point (runc only creates it
- * once the container actually starts) — see ensureCgroupDir, which must run
- * before ecapture's own `--cgroup_path` validation (a plain stat check) can
- * succeed.
+ * The path doesn't exist yet here (runc creates it once the container
+ * starts) — see ensureCgroupDir.
  */
 export function predictCgroupPath(containerName: string): string {
   return computeCgroupPath(readFileSync("/proc/self/cgroup", "utf8"), containerName);
 }
 
-/** Pure half of predictCgroupPath, split out so it's testable without a real
- *  /proc/self/cgroup (not present on macOS, where these tests also run). */
+/** Pure half of predictCgroupPath (no real /proc/self/cgroup on macOS, where these tests also run). */
 export function computeCgroupPath(selfCgroupContent: string, containerName: string): string {
   const line = selfCgroupContent.split("\n").find((l) => l.startsWith("0::"));
   if (!line) {
@@ -311,31 +253,16 @@ export function computeCgroupPath(selfCgroupContent: string, containerName: stri
   return join("/sys/fs/cgroup", parent, containerName);
 }
 
-/**
- * Create the cgroup v2 directory runc will later reuse for the isolated
- * command (see predictCgroupPath), so ecapture's `--cgroup_path` validation
- * has something real to stat before the container itself exists. Run via
- * `sudo` since `/sys/fs/cgroup` isn't writable by the runner's own
- * unprivileged user. Safe to pre-create: runc's own cgroup setup
- * (opencontainers/cgroups' fs2.CreateCgroupPath) already tolerates the
- * directory existing (os.Mkdir + os.IsExist check), and its normal container
- * teardown (`runc delete -f` in run-isolated.sh's cleanup trap) removes it
- * regardless of who created it.
- */
+/** Pre-create the cgroup so ecapture's own `--cgroup_path` validation (a
+ *  stat check) succeeds before the container exists. runc's cgroup setup
+ *  tolerates the directory already existing, and removes it on teardown
+ *  regardless of who created it. */
 export function ensureCgroupDir(cgroupPath: string): void {
   execFileSync("sudo", ["-n", "--", "mkdir", "-p", cgroupPath]);
 }
 
-/**
- * Best-effort cleanup for the directory ensureCgroupDir created. Normally
- * already removed by runc's own container teardown (`runc delete -f` in
- * run-isolated.sh's cleanup trap, which removes the cgroup it manages
- * regardless of who created the directory) — this is a safety net for the
- * case where that didn't happen (e.g. runIsolated itself failed before ever
- * creating a container). `rmdir` only removes an *empty* directory, so this
- * silently no-ops rather than forcing anything if the cgroup is still in use
- * or already gone.
- */
+/** Best-effort cleanup in case runc's own teardown didn't run. `rmdir`
+ *  no-ops if the cgroup is still in use or already gone. */
 export function removeCgroupDirIfEmpty(cgroupPath: string): void {
   try {
     execFileSync("sudo", ["-n", "--", "rmdir", cgroupPath]);

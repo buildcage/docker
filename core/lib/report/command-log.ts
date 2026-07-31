@@ -69,13 +69,9 @@ function renderRequestLine({ method, url, status }: AllowedRequest): string {
   return status === undefined ? line : `${line} -> ${status}`;
 }
 
-/**
- * Render the `run` action's ecapture-derived HTTPS communication logs as a
- * collapsed markdown section, or "" if there's nothing to show. Unlike
- * renderCommunicationDetails above, entries aren't grouped per RUN
- * step/vertex — ecapture's log carries no such attribution, so this is a
- * flat, time-ordered list of every request it could reconstruct.
- */
+/** Renders the `run` action's ecapture-derived HTTPS communication logs as a
+ *  collapsed section, or "" if empty. Flat, time-ordered — unlike
+ *  renderCommunicationDetails, there's no per-vertex attribution here. */
 export function renderHttpLogList(entries: AllowedRequest[] | null | undefined): string {
   if (!entries || entries.length === 0) return "";
 

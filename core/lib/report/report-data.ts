@@ -38,12 +38,8 @@ export interface ReportDataCommon {
 
 export interface TransparentReportData extends ReportDataCommon {
   engine: "transparent";
-  /** Best-effort HTTPS communication logs from ecapture (`run` action only,
-   *  as of now — see docs/security.md's Run Action section). A flat,
-   *  chronological list rather than per-RUN-step-grouped like explicit's
-   *  proxyLogs.builds: there's no vertex/span identifier to attribute
-   *  entries with here. Undefined (not just empty) when ecapture wasn't run
-   *  at all, distinguishing "no HTTPS traffic observed" from "not captured". */
+  /** Best-effort HTTPS communication logs from ecapture (`run` action only —
+   *  see docs/security.md). Undefined when ecapture wasn't run at all. */
   httpLogs?: AllowedRequest[];
 }
 

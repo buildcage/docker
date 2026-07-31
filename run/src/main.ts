@@ -245,18 +245,10 @@ async function main(): Promise<void> {
       }
       writeOciConfig(config, dir);
 
-      // Best-effort HTTPS communication logs (see docs/security.md's Run
-      // Action section): captured alongside the isolated command, not
-      // required for it to run at all. A failure here (e.g. no BTF, no
-      // sudo access to load eBPF programs) only ever surfaces as a warning
-      // annotation, never as a SandboxError that would abort the step itself.
+      // Best-effort HTTPS communication logs (docs/security.md's Run Action
+      // section); a failure here is only ever a warning, never a SandboxError.
       let ecaptureProc;
       const ecaptureLogPath = join(dir, "ecapture.log");
-      // Scope ecapture to just this step's own cgroup rather than the whole
-      // runner host, when possible. Best-effort and independent of whether
-      // ecapture itself starts below: a failure here (e.g. this host isn't
-      // cgroup v2, or sudo can't create the directory) just falls back to
-      // unscoped, system-wide capture rather than skipping ecapture entirely.
       let cgroupPath: string | undefined;
       try {
         cgroupPath = predictCgroupPath(containerName);
@@ -268,9 +260,6 @@ async function main(): Promise<void> {
       try {
         const ecapturePath = extractEcapture({ containerName, destDir: dir });
         ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath, cgroupPath);
-        // Loading/attaching its eBPF probes isn't instant -- without this, a
-        // short-lived isolated command can finish before ecapture is
-        // actually capturing anything (see waitForEcaptureReady's own doc).
         waitForEcaptureReady(ecaptureLogPath);
       } catch (e) {
         annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);

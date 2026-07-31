@@ -1,21 +1,13 @@
 /**
- * Log parsing library for ecapture's `tls -m text` output (see
- * docs/security.md's Run Action HTTPS communication logs section). Unlike
- * haproxy-log-parser.ts's single-line-per-decision format, each captured
- * event spans multiple lines: a "PID:.. TID:.. Comm:.. FD:.. WRITE|READ (N
- * bytes):" header followed by the raw bytes ecapture observed, terminated by
- * a "probe=..." annotation line. A WRITE block holds the request (an HTTP/1.x
- * request line plus a Host header); the following READ block on the same
- * PID+TID+FD holds the response (an HTTP/1.x status line). HTTP/2 traffic's
- * HPACK-compressed headers don't match either pattern and are silently
- * skipped — never emitted as (mis-)parsed data.
+ * Parses ecapture's `tls -m text` output (see docs/security.md's Run Action
+ * HTTPS communication logs section). Each event spans multiple lines: a
+ * "PID:.. TID:.. Comm:.. FD:.. WRITE|READ (N bytes):" header, the raw bytes,
+ * then a "probe=..." terminator. A WRITE block holds the request line + Host
+ * header; the matching READ (same PID+TID+FD) holds the response status
+ * line. Non-matching blocks (HTTP/2, etc.) are silently skipped.
  *
- * Only method/host/path/status are ever extracted into AllowedRequest — the
- * raw block content (which can include Authorization headers or response
- * bodies) is discarded once matched against, never retained or exposed. This
- * is the only point standing between ecapture's captured plaintext and
- * anything this data is later rendered into (a GitHub Job Summary), so it
- * must stay narrow.
+ * Only method/host/path/status ever leave the parser — the only point
+ * between ecapture's captured plaintext and the Job Summary.
  */
 import type { AllowedRequest } from "./vertex-log.ts";
 
@@ -39,16 +31,8 @@ interface Block {
 }
 
 /**
- * Single forward pass over ecapture's text-mode output. Returns every
- * request/response pair it could reconstruct, in the order captured. A WRITE
- * block with no matching READ (connection reset, blocked before a response,
- * end of log) is still emitted, with `status` left undefined — mirroring how
- * the explicit engine's own AllowedRequest already treats a missing status.
- *
- * Synchronous (unlike haproxy-log-parser.ts's scanHaproxyLog): ecapture's log
- * is always read directly off the runner host's own filesystem (see
- * run/src/lib/isolated-exec.ts's readEcaptureLog), never streamed from a
- * `docker exec`, so there's no AsyncIterable source to support here.
+ * One forward pass over ecapture's text-mode output, in capture order. A
+ * WRITE with no matching READ is still emitted, with `status` undefined.
  */
 export function scanEcaptureLog(lines: Iterable<string>): AllowedRequest[] {
   const pending = new Map<string, PendingRequest>();
@@ -93,9 +77,7 @@ export function scanEcaptureLog(lines: Iterable<string>): AllowedRequest[] {
   }
   finalizeCurrent();
 
-  // Requests that never saw a matching response (still in `pending`) are
-  // surfaced too, rather than silently dropped, with no status — appended
-  // after every matched pair since insertion order (a Map) is chronological.
+  // Unmatched requests still surface, with no status.
   for (const { method, host, path } of pending.values()) {
     entries.push({ method, url: `https://${host}${path}` });
   }
