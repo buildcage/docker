@@ -14,6 +14,7 @@ import {
   computeReadonlyHostMounts,
   freshMountDestinationsFrom,
   parseMountsUnder,
+  startEcapture,
   stopEcapture,
   readEcaptureLog,
   waitForEcaptureReady,
@@ -491,6 +492,16 @@ describe("waitForEcaptureReady", () => {
       const start = Date.now();
       waitForEcaptureReady(logPath, 300);
       assert.ok(Date.now() - start >= 300);
+    });
+  });
+});
+
+describe("startEcapture", () => {
+  it("attaches an 'error' listener so an async spawn failure can't crash the process", () => {
+    withScratchDir((dir) => {
+      const proc = startEcapture(join(dir, "nonexistent-ecapture-binary"), join(dir, "ecapture.log"));
+      assert.ok(proc.listenerCount("error") > 0);
+      stopEcapture(proc);
     });
   });
 });

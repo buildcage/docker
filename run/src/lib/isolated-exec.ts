@@ -182,6 +182,9 @@ export function startEcapture(ecapturePath: string, logPath: string, cgroupPath?
   // not just sudo's own PID (some sudoers configs fork a monitor process).
   const proc = spawn("sudo", args, { stdio: ["ignore", logFd, logFd], detached: true });
   closeSync(logFd);
+  // Swallow spawn failures (async 'error' event) so they can't crash the
+  // process -- waitForEcaptureReady's own timeout already covers this as a no-op.
+  proc.on("error", () => {});
   return proc;
 }
 
