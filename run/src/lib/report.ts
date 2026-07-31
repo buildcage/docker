@@ -4,6 +4,7 @@ import { createAnnotation } from "../../../core/lib/actions/annotation.ts";
 import { buildRestrictExample } from "../../../core/lib/report/build-example.ts";
 import { determineBlockedOutcome, buildBlockedMessage } from "../../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../../core/lib/report/host-table.ts";
+import { renderHttpLogList } from "../../../core/lib/report/command-log.ts";
 import { buildTransparentReportData } from "../../../core/lib/report/build-transparent-report-data.ts";
 import type { GenReportParameters, TransparentReportData } from "../../../core/lib/report/report-data.ts";
 
@@ -47,6 +48,8 @@ export function buildReportMarkdown(
     if (report.passed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
     if (report.blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, { showReason: true, showExpected }) + "\n\n";
   }
+
+  markdown += renderHttpLogList(report.httpLogs);
 
   return markdown;
 }

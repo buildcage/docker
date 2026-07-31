@@ -69,6 +69,24 @@ function renderRequestLine({ method, url, status }: AllowedRequest): string {
   return status === undefined ? line : `${line} -> ${status}`;
 }
 
+/**
+ * Render the `run` action's ecapture-derived HTTPS communication logs as a
+ * collapsed markdown section, or "" if there's nothing to show. Unlike
+ * renderCommunicationDetails above, entries aren't grouped per RUN
+ * step/vertex — ecapture's log carries no such attribution, so this is a
+ * flat, time-ordered list of every request it could reconstruct.
+ */
+export function renderHttpLogList(entries: AllowedRequest[] | null | undefined): string {
+  if (!entries || entries.length === 0) return "";
+
+  let md = "\n<details>\n<summary>💬 HTTPS communication logs</summary>\n\n";
+  md += "```\n";
+  for (const entry of entries) md += `${renderRequestLine(entry)}\n`;
+  md += "```\n";
+  md += "</details>\n";
+  return md;
+}
+
 // Escapes the markdown syntax characters that could actually alter rendering
 // in the contexts this module embeds text into (bold headers, list items,
 // italic captions): backslash (escaped first, so it can't double-escape the

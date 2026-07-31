@@ -1,9 +1,21 @@
-import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync, existsSync } from "node:fs";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import {
+  writeFileSync,
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  mkdirSync,
+  chmodSync,
+  existsSync,
+  openSync,
+  closeSync,
+} from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDockerCpArgs } from "../../../core/lib/docker/container.ts";
 import { errorMessage } from "../../../core/lib/general/error-message.ts";
+import { scanEcaptureLog } from "../../../core/lib/log/ecapture-log-parser.ts";
+import type { AllowedRequest } from "../../../core/lib/log/vertex-log.ts";
 // Sensitive /proc paths masked with /dev/null. runc's own `runc spec`
 // default already masks /proc/kcore, /proc/keys, and /proc/timer_list
 // (among others) and leaves /proc/sysrq-trigger merely read-only —
@@ -142,6 +154,101 @@ export function extractRuncBootstrap({
   rmSync(genSeccompProfilePath); // only needed to resolve seccompProfile above
 
   return { runcPath, seccompProfile, baseSpec };
+}
+
+/**
+ * Extract ecapture (eBPF-based TLS plaintext capture, no CA certificate
+ * needed) from the proxy image onto the runner host, alongside runc/
+ * gen-seccomp-profile above. Run natively on the host (not `docker exec`)
+ * for the same reason those are: it needs to observe the isolated command
+ * directly, and the sandbox's rootfs is a bind-mount of the host's own `/`
+ * (see run-isolated.sh), so a host-native ecapture process resolves the
+ * exact same libssl.so the sandboxed command loads — no cross-mount-
+ * namespace path resolution needed. See docs/security.md's Run Action HTTPS
+ * communication logs section for what this does and doesn't capture.
+ */
+export function extractEcapture({ containerName, destDir }: ExtractRuncBootstrapOptions): string {
+  const ecapturePath = join(destDir, "ecapture");
+  execFileSync(
+    "docker",
+    buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/ecapture", hostPath: ecapturePath }),
+  );
+  chmodSync(ecapturePath, 0o755);
+  return ecapturePath;
+}
+
+/**
+ * Start ecapture in the background, writing its captured events to `logPath`
+ * (inside this run's own scratch dir). Meant to be started just before
+ * runIsolated() and stopped (stopEcapture) right after it returns, so its
+ * capture window covers exactly one `run:` step.
+ *
+ * No `--pid`/`--cgroup_path` scoping is applied by default: as of now,
+ * ecapture observes every OpenSSL-linked process on the runner host for the
+ * duration of this step, not just the isolated command's own (see
+ * docs/security.md's known limitations). `cgroupPath`, when a caller
+ * eventually has one to pass, would narrow that — see the TODO on this
+ * repo's own dev-loop investigation notes; every attempt to resolve a
+ * runc-nested sandbox's own auto-generated cgroup failed in local testing
+ * for a reason not yet root-caused, so this parameter is unused for now,
+ * pending re-verification on a real Linux CI host.
+ */
+export function startEcapture(ecapturePath: string, logPath: string, cgroupPath?: string): ChildProcess {
+  const args = ["-n", "--", ecapturePath, "tls", "-m", "text"];
+  if (cgroupPath) args.push(`--cgroup_path=${cgroupPath}`);
+  const logFd = openSync(logPath, "w");
+  // detached: true puts ecapture in its own process group, so stopEcapture
+  // can SIGTERM the whole group (-pid) rather than just `sudo`'s own PID —
+  // some sudoers configurations (Defaults use_pty) fork a monitor process
+  // between `sudo` and the actual command, which a plain, non-group kill
+  // would leave running (the same residual gap run-isolated.sh's own
+  // setpriv --pdeathsig comment already documents for a similar reason).
+  const proc = spawn("sudo", args, { stdio: ["ignore", logFd, logFd], detached: true });
+  closeSync(logFd);
+  return proc;
+}
+
+/**
+ * Stop a process started by startEcapture, giving it a brief, fixed grace
+ * period (blocking — see withScratchDir, whose callback must stay
+ * synchronous) to flush and exit before the caller reads its log file.
+ *
+ * Not a wait-until-actually-exited poll: the `Atomics.wait`-based blocking
+ * sleep below (same pattern as removeScratchDir's retry loop) starves the
+ * event loop, so Node can never process this child's own exit notification
+ * while we're in it — `proc.exitCode` would never update. A raw
+ * `process.kill(pid, 0)` liveness probe doesn't work as a substitute either:
+ * it still succeeds against a zombie (exited but not yet reaped) process,
+ * which is exactly the state this child sits in for as long as we keep
+ * starving the event loop, so a loop built on that check would always run
+ * to its full timeout. Distinguishing zombie from running requires an
+ * OS-specific mechanism (e.g. /proc/<pid>/stat's state field on Linux) this
+ * function deliberately avoids needing. ecapture's own writes are
+ * unbuffered per captured event, so anything already written to the log by
+ * the time SIGTERM lands is already on disk regardless of exactly when the
+ * process finishes exiting.
+ */
+export function stopEcapture(proc: ChildProcess): void {
+  if (!proc.pid) return;
+  try {
+    process.kill(-proc.pid, "SIGTERM");
+  } catch {
+    return; // already exited
+  }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+}
+
+/**
+ * Read and parse ecapture's captured log (see startEcapture), returning the
+ * HTTPS communication logs to attach to this step's report. Returns
+ * undefined (not an empty array) if the log doesn't exist at all — e.g.
+ * ecapture failed to start — distinguishing "not captured" from "captured,
+ * saw nothing".
+ */
+export function readEcaptureLog(logPath: string): AllowedRequest[] | undefined {
+  if (!existsSync(logPath)) return undefined;
+  const content = readFileSync(logPath, "utf8");
+  return scanEcaptureLog(content.split("\n"));
 }
 
 /**

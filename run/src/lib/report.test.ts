@@ -247,4 +247,25 @@ describe("buildReportMarkdown", () => {
     const markdown = buildReportMarkdown(r, { actionRepo: "dash14/buildcage", actionRef: "v2" });
     assert.doesNotMatch(markdown, /Expected/);
   });
+
+  it("appends the ecapture HTTPS communication logs section when httpLogs is set", () => {
+    const r = report({ httpLogs: [{ method: "GET", url: "https://example.com/", status: 200 }] });
+    const markdown = buildReportMarkdown(r, { actionRepo: "dash14/buildcage", actionRef: "v2" });
+    assert.match(markdown, /💬 HTTPS communication logs/);
+    assert.match(markdown, /- GET https:\/\/example\.com\/ -> 200/);
+  });
+
+  it("omits the ecapture HTTPS communication logs section when httpLogs is unset", () => {
+    const markdown = buildReportMarkdown(report(), { actionRepo: "dash14/buildcage", actionRef: "v2" });
+    assert.doesNotMatch(markdown, /HTTPS communication logs/);
+  });
+
+  it("shows the ecapture section in audit mode too, not just restrict", () => {
+    const r = report({
+      parameters: parameters({ mode: "audit" }),
+      httpLogs: [{ method: "GET", url: "https://example.com/", status: 200 }],
+    });
+    const markdown = buildReportMarkdown(r, { actionRepo: "dash14/buildcage", actionRef: "v2" });
+    assert.match(markdown, /💬 HTTPS communication logs/);
+  });
 });

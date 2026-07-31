@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { spawn } from "node:child_process";
 
 import {
   writeRunScript,
@@ -14,6 +15,8 @@ import {
   computeReadonlyHostMounts,
   freshMountDestinationsFrom,
   parseMountsUnder,
+  stopEcapture,
+  readEcaptureLog,
 } from "./isolated-exec.ts";
 
 describe("writeRunScript", () => {
@@ -392,5 +395,71 @@ describe("withScratchDir", () => {
       });
     });
     assert.throws(() => readFileSync(join(capturedDir, "run-script.sh")));
+  });
+});
+
+describe("readEcaptureLog", () => {
+  it("returns undefined when the log file doesn't exist at all", () => {
+    withScratchDir((dir) => {
+      assert.equal(readEcaptureLog(join(dir, "does-not-exist.log")), undefined);
+    });
+  });
+
+  it("returns an empty array when the log exists but has no matching content", () => {
+    withScratchDir((dir) => {
+      const logPath = join(dir, "ecapture.log");
+      writeFileSync(logPath, "some unrelated startup log line\n");
+      assert.deepEqual(readEcaptureLog(logPath), []);
+    });
+  });
+
+  it("parses a real WRITE/READ pair from the log file", () => {
+    withScratchDir((dir) => {
+      const logPath = join(dir, "ecapture.log");
+      const content = [
+        "PID:100 TID:100 Comm:curl FD:4 WRITE (0 bytes):",
+        "GET / HTTP/1.1\\r",
+        "Host: example.com\\r",
+        "\\r",
+        " probe=OpenSSL",
+        "PID:100 TID:100 Comm:curl FD:4 READ (0 bytes):",
+        "HTTP/1.1 200 OK\\r",
+        "\\r",
+        " probe=OpenSSL",
+      ].join("\n");
+      writeFileSync(logPath, content);
+      const result = readEcaptureLog(logPath);
+      assert.deepEqual(result, [{ method: "GET", url: "https://example.com/", status: 200 }]);
+    });
+  });
+});
+
+describe("stopEcapture", () => {
+  it("delivers SIGTERM to the whole process group, not just the immediate child", () => {
+    withScratchDir((dir) => {
+      // A trap-and-touch script, rather than checking kill(pid, 0) after
+      // the fact: that check would succeed against a zombie (exited but not
+      // yet reaped) process regardless of whether the signal was actually
+      // delivered, since stopEcapture's own blocking sleep prevents Node
+      // from reaping it during the call — see stopEcapture's own comment.
+      const markerPath = join(dir, "signaled");
+      const proc = spawn("sh", ["-c", `trap 'touch ${markerPath}; exit 0' TERM; sleep 30`], {
+        detached: true,
+        stdio: "ignore",
+      });
+      // Give the shell a moment to actually start and register its trap
+      // handler before signaling it -- sending SIGTERM in the same instant
+      // as spawn() would hit it before the trap exists, falling back to the
+      // signal's default (silent) termination instead of running it. Real
+      // usage never races this: ecapture runs for the isolated command's
+      // whole duration, not a few milliseconds.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+      stopEcapture(proc);
+      assert.equal(statSync(markerPath).isFile(), true);
+    });
+  });
+
+  it("does nothing (doesn't throw) when the process has no pid", () => {
+    assert.doesNotThrow(() => stopEcapture({ pid: undefined } as never));
   });
 });

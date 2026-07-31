@@ -1,5 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { renderCommunicationDetails } from "./command-log.ts";
+import { renderCommunicationDetails, renderHttpLogList } from "./command-log.ts";
 
 function wrap(body: string) {
   return "\n<details>\n<summary>💬 Communication details</summary>\n\n" + body + "</details>\n";
@@ -174,6 +174,40 @@ describe("renderCommunicationDetails", () => {
       const md = renderCommunicationDetails([[vertex]], []);
       assert.match(md, /\* RUN echo hello-world\.txt\n/);
     });
+  });
+});
+
+describe("renderHttpLogList", () => {
+  it("null/undefined/empty → empty string", () => {
+    assert.equal(renderHttpLogList(null), "");
+    assert.equal(renderHttpLogList(undefined), "");
+    assert.equal(renderHttpLogList([]), "");
+  });
+
+  it("renders a flat, time-ordered list with no per-vertex grouping", () => {
+    const entries = [
+      { method: "GET", url: "https://example.com/a", status: 200 },
+      { method: "POST", url: "https://example.com/b", status: 404 },
+    ];
+    assert.equal(
+      renderHttpLogList(entries),
+      "\n<details>\n<summary>💬 HTTPS communication logs</summary>\n\n" +
+        "```\n" +
+        "- GET https://example.com/a -> 200\n" +
+        "- POST https://example.com/b -> 404\n" +
+        "```\n" +
+        "</details>\n"
+    );
+  });
+
+  it("an entry with no status omits the arrow", () => {
+    const md = renderHttpLogList([{ method: "GET", url: "https://example.com/" }]);
+    assert.match(md, /- GET https:\/\/example\.com\/\n/);
+  });
+
+  it("escapes markdown-significant characters in the URL", () => {
+    const md = renderHttpLogList([{ method: "GET", url: "https://example.com/[id]", status: 200 }]);
+    assert.match(md, /- GET https:\/\/example\.com\/\\\[id\\\] -> 200/);
   });
 });
 

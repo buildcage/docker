@@ -1,6 +1,6 @@
 import type { HostTableRow } from "./host-table.ts";
 import type { AnnotatedBlockedRow } from "./known-blocked.ts";
-import type { VertexAllowedEntry } from "../log/vertex-log.ts";
+import type { AllowedRequest, VertexAllowedEntry } from "../log/vertex-log.ts";
 
 /** Echoed back verbatim rather than re-derived — only the container's own
  *  env (or, for run, its own action input) reflects what was configured. */
@@ -38,6 +38,13 @@ export interface ReportDataCommon {
 
 export interface TransparentReportData extends ReportDataCommon {
   engine: "transparent";
+  /** Best-effort HTTPS communication logs from ecapture (`run` action only,
+   *  as of now — see docs/security.md's Run Action section). A flat,
+   *  chronological list rather than per-RUN-step-grouped like explicit's
+   *  proxyLogs.builds: there's no vertex/span identifier to attribute
+   *  entries with here. Undefined (not just empty) when ecapture wasn't run
+   *  at all, distinguishing "no HTTPS traffic observed" from "not captured". */
+  httpLogs?: AllowedRequest[];
 }
 
 /** Discriminated union (keyed on `engine`) rather than an optional field,

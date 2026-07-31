@@ -23,6 +23,10 @@ import {
   writeRunScript,
   writeResolvConf,
   extractRuncBootstrap,
+  extractEcapture,
+  startEcapture,
+  stopEcapture,
+  readEcaptureLog,
   buildOciConfig,
   writeOciConfig,
   runIsolated,
@@ -30,6 +34,7 @@ import {
   listHostMounts,
 } from "./lib/isolated-exec.ts";
 import { fetchReport, writeReport } from "./lib/report.ts";
+import type { AllowedRequest } from "../../core/lib/log/vertex-log.ts";
 
 export { buildComposeUpArgs, buildComposeDownArgs, buildACLRules };
 
@@ -171,6 +176,7 @@ async function main(): Promise<void> {
   }
 
   let exitCode = 1;
+  let httpLogs: AllowedRequest[] | undefined;
   try {
     const proxyPid = getContainerPid(containerName);
     if (proxyPid === null) {
@@ -235,7 +241,21 @@ async function main(): Promise<void> {
       }
       writeOciConfig(config, dir);
 
-      return runIsolated({
+      // Best-effort HTTPS communication logs (see docs/security.md's Run
+      // Action section): captured alongside the isolated command, not
+      // required for it to run at all. A failure here (e.g. no BTF, no
+      // sudo access to load eBPF programs) only ever surfaces as a warning
+      // annotation, never as a SandboxError that would abort the step itself.
+      let ecaptureProc;
+      const ecaptureLogPath = join(dir, "ecapture.log");
+      try {
+        const ecapturePath = extractEcapture({ containerName, destDir: dir });
+        ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath);
+      } catch (e) {
+        annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
+      }
+
+      const isolatedExitCode = runIsolated({
         runcPath,
         proxyPid,
         bundleDir: dir,
@@ -246,6 +266,17 @@ async function main(): Promise<void> {
         dns,
         targetIp,
       });
+
+      if (ecaptureProc) {
+        try {
+          stopEcapture(ecaptureProc);
+          httpLogs = readEcaptureLog(ecaptureLogPath);
+        } catch (e) {
+          annotation.warning(`Failed to read ecapture's HTTPS communication logs: ${errorMessage(e)}`);
+        }
+      }
+
+      return isolatedExitCode;
     }, containerName);
   } finally {
     try {
@@ -256,6 +287,7 @@ async function main(): Promise<void> {
         allowedIpRules: rules.ipRules,
         knownBlockedRules,
       });
+      report.httpLogs = httpLogs;
       writeReport(report, {
         actionRepo,
         actionRef,
