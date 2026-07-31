@@ -152,7 +152,16 @@ order it actually happens. For the user-facing behavior and threat model, see
    - Extracted fresh into this step's own scratch directory on every invocation (no shared,
      cross-step/cross-job cache), so each `run:` step is fully independent and everything extracted
      is torn down with the scratch directory afterward.
-4. Build an OCI runtime bundle (`config.json`) describing the sandbox (`isolated-exec.ts`).
+4. Pre-create the cgroup runc will use for the isolated command (`isolated-exec.ts`).
+   - The path (`cgroupInnerPath`/`cgroupFsPath`) is derived purely from the container name, not
+     runc's own default cgroup placement (which depends on whatever cgroup the invoking process
+     happens to be in at the time, and isn't reliably knowable in advance). Created via `sudo mkdir
+     -p` since ecapture's own `--cgroup_path` validation (step 7) needs it to already exist.
+   - Recorded to GITHUB_STATE (`ecapture_cgroup_path`) so `post.ts` can remove it if the step is
+     killed outright before reaching its own cleanup (step 10).
+   - Best-effort: a failure here is a warning, and both the OCI config below and ecapture (step 7)
+     fall back to runc's own default cgroup placement / unscoped capture instead.
+5. Build an OCI runtime bundle (`config.json`) describing the sandbox (`isolated-exec.ts`).
    - Starts from `runc`'s own default spec, then patches in: a root filesystem pointing at a
      not-yet-created bind-mount directory, made read-only (every real host mount point is forced
      individually read-only outside workdir/home/tmp/RUNNER_TEMP/writable, since the top-level
@@ -167,7 +176,9 @@ order it actually happens. For the user-facing behavior and threat model, see
      that directory (or an ancestor of it) is rejected outright rather than silently accepted. The
      sandbox's real host view (its own `/` and every nested mount) is untouched and stays read-only
      outside the writable set.
-5. Stage the sandbox's network and filesystem as root, via `sudo -n` (`run-isolated.sh`).
+   - `linux.cgroupsPath` is set to step 4's cgroup path when that step succeeded, telling runc
+     exactly where to place the container's cgroup instead of leaving it to runc's own default.
+6. Stage the sandbox's network and filesystem as root, via `sudo -n` (`run-isolated.sh`).
    - Re-execs itself into a fresh, private mount namespace before touching anything else, so the
      mount work below is invisible to every other `run:` step running concurrently on the same
      host.
@@ -181,39 +192,45 @@ order it actually happens. For the user-facing behavior and threat model, see
      proxy's fixed gateway address directly — no bridge, since this is always a 1:1 connection
      (one sandbox, one proxy) and a plain named interface is enough for `init-iptables`'s
      `-i sandbox0` rule (added at container startup) to match once this device appears later.
-6. Start ecapture in the background, just before running the sandboxed command (`isolated-exec.ts`).
+7. Start ecapture in the background, just before running the sandboxed command (`isolated-exec.ts`).
    - Extracted onto the runner host the same way as `runc`/`gen-seccomp-profile` in step 3 (`docker
-     cp` from the proxy image, run natively there). Its capture window is exactly the isolated
-     command's lifetime: started here, stopped right after step 7 below returns.
+     cp` from the proxy image, run natively there). Scoped to step 4's cgroup (`--cgroup_path`) when
+     that step succeeded. Its capture window is exactly the isolated command's lifetime: started
+     here, stopped right after step 8 below returns.
+   - Its pid is recorded to GITHUB_STATE (`ecapture_pid`) so `post.ts` can find and stop it if the
+     step is killed outright before reaching its own cleanup (step 10).
    - Best-effort only — a failure to extract or start it is reported as a warning annotation, never
      a `SandboxError` that would abort the step itself. See [HTTPS Communication Logs
      (ecapture)](./security.md#https-communication-logs-ecapture) in Security Details for what this
      does and doesn't capture.
-7. Run the sandboxed command via `runc`.
+8. Run the sandboxed command via `runc`.
    - runc creates its own further-nested namespaces per `config.json` and enforces every
      isolation guarantee declared there — capability drop, seccomp filter, read-only filesystem,
-     network namespace.
+     network namespace — including placing it in step 4's cgroup when `linux.cgroupsPath` was set.
    - A two-hop process-supervision chain ties the sandboxed process's life to the staging step
      above: the process that starts `runc` and, separately, the sandboxed command itself both
      die if their immediate parent does, so killing the staging step tears down the whole chain
      instead of leaving the sandboxed command running as an orphan.
-   - Once this returns, ecapture (step 6) is stopped and its log parsed
-     (`core/lib/log/ecapture-log-parser.ts`) into the step's HTTPS communication logs, before the
-     scratch directory holding that log is torn down in the next step.
-8. Clean up once the command exits (`run-isolated.sh`).
+   - Once this returns, ecapture (step 7) is stopped — via `sudo`, since it runs as root — and its
+     log parsed (`core/lib/log/ecapture-log-parser.ts`) into the step's HTTPS communication logs,
+     before the scratch directory holding that log is torn down in the next step. Step 4's cgroup
+     directory is then removed too (best-effort; normally already gone via runc's own teardown).
+9. Clean up once the command exits (`run-isolated.sh`).
    - An exit trap tears the container down, unmounts the rootfs bind-mount, removes the veth, and
      deletes the network namespace.
    - As a second layer of defense, anything still mounted under the run's own scratch directory
      is force-detached before that directory is deleted, in case the trap above didn't run to
      completion.
-9. Append this step's report to the Job Summary and stop the proxy container (`main.ts`).
-   - The report is built in-process on the runner: `report.ts` reads the container's own
-     communication log via `docker exec ... cat`, then the container is stopped. The HTTPS
-     communication logs parsed in step 7 are merged into this same report object before rendering.
-   - If the whole process is killed before reaching this point, a fallback step reads the
-     container's identity back from job state and stops it anyway, and reclaims the step's scratch
-     directory — whose path it reconstructs deterministically from that same identity, then
-     force-detaches any surviving mount before deleting (`post.ts`).
+10. Append this step's report to the Job Summary and stop the proxy container (`main.ts`).
+    - The report is built in-process on the runner: `report.ts` reads the container's own
+      communication log via `docker exec ... cat`, then the container is stopped. The HTTPS
+      communication logs parsed in step 8 are merged into this same report object before rendering.
+    - If the whole process is killed before reaching this point, a fallback step reads the
+      container's identity back from job state and stops it anyway, and reclaims the step's scratch
+      directory — whose path it reconstructs deterministically from that same identity, then
+      force-detaches any surviving mount before deleting. It applies the same recovery to ecapture
+      (`STATE_ecapture_pid`, checked against `/proc/<pid>/comm` before signaling in case the pid was
+      recycled) and step 4's cgroup directory (`STATE_ecapture_cgroup_path`) (`post.ts`).
 
 ## Local Development
 

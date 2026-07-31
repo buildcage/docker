@@ -325,8 +325,9 @@ that's the only point standing between decrypted traffic and a GitHub Job Summar
   is (and stays) the authoritative record of what was blocked; this section only ever supplements the
   "✅ Allowed Hosts" side with method/path detail.
 - **OpenSSL/BoringSSL/GnuTLS/NSS-linked tools only.** A tool statically using its own TLS stack —
-  Rust's `rustls`, the JVM's default `SunJSSE` provider, .NET's own implementation — isn't hooked by
-  this mechanism at all and simply won't appear in this section, same as if it made no HTTPS calls.
+  Rust's `rustls`, Go's `crypto/tls`, the JVM's default `SunJSSE` provider, .NET's own implementation
+  — isn't hooked by this mechanism at all and simply won't appear in this section, same as if it made
+  no HTTPS calls.
   This is narrower than the "works with any language or package manager" guarantee the domain-level
   allow/block decision itself carries (see the [README](../README.md)) — that guarantee is untouched;
   it's specifically this supplementary detail that doesn't extend to every stack.
@@ -334,12 +335,15 @@ that's the only point standing between decrypted traffic and a GitHub Job Summar
   HPACK-compressed headers, so a client that negotiates `h2` (many modern HTTP libraries do, when the
   server supports it) won't have its method/path recovered — the request simply doesn't appear here,
   rather than showing up malformed.
-- **Scoped to this step's own cgroup.** ecapture is started with `--cgroup_path` pointed at the
-  cgroup runc will create for the isolated command — predicted from the invoking process's own
-  `/proc/self/cgroup` (see `predictCgroupPath` in `run/src/lib/isolated-exec.ts`) and pre-created
-  with `sudo mkdir -p` before ecapture starts (its own `--cgroup_path` validation needs the directory
-  to already exist; runc's cgroup setup already tolerates reusing a directory it didn't create
-  itself, and its normal container teardown removes it afterward). Confirmed on GitHub-hosted
+- **Scoped to this step's own cgroup.** ecapture is started with `--cgroup_path` pointed at a cgroup
+  path (`cgroupFsPath` in `run/src/lib/isolated-exec.ts`) derived deterministically from the
+  container name, with no dependence on runc's own implicit defaults or on parsing
+  `/proc/self/cgroup`. The same path is passed to runc explicitly as `linux.cgroupsPath` in the OCI
+  config, so runc places the isolated command's own cgroup exactly there rather than somewhere
+  ecapture would have to guess. The directory is pre-created with `sudo mkdir -p` before ecapture
+  starts (its own `--cgroup_path` validation needs the directory to already exist; runc's cgroup
+  setup tolerates reusing a directory it didn't create itself) and removed again after the step
+  finishes. Confirmed on GitHub-hosted
   runners: two concurrent `run:` steps with different allowlists each show only their own step's
   HTTPS requests, never each other's. If this preparation fails for any reason (not a cgroup v2 host,
   `sudo` can't create the directory, etc.), it falls back to unscoped capture rather than skipping
