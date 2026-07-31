@@ -113,18 +113,21 @@ export function generateBaseOciSpec(runcPath: string, bundleDir: string): OciSpe
   return JSON.parse(readFileSync(join(bundleDir, "config.json"), "utf8"));
 }
 
+/** Extract one binary from the proxy image's `/opt/buildcage/bin/` into `destDir`
+ *  via `docker cp` (not `docker exec` -- some callers run natively on the host,
+ *  see gen-seccomp-profile/main.go). Torn down with the scratch dir. */
+function extractBinaryFromProxyImage(containerName: string, destDir: string, name: string): string {
+  const path = join(destDir, name);
+  execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: `/opt/buildcage/bin/${name}`, hostPath: path }));
+  chmodSync(path, 0o755);
+  return path;
+}
+
 /**
- * Extract runc and gen-seccomp-profile from the proxy image into this run's
- * own `destDir` (its per-step scratch dir), then resolve the base OCI spec
- * and the seccomp profile from them. Run once per `run:` step; each
- * invocation is independent, and everything written here is torn down with
- * the scratch dir (see withScratchDir / cleanupScratchDir).
- *
- * Both binaries ship inside the proxy image and are pulled onto the host via
- * `docker cp`, then run natively there (not `docker exec`) since the seccomp
- * profile's content depends on the real host kernel/arch -- see
- * gen-seccomp-profile/main.go. gen-seccomp-profile is only needed transiently
- * to resolve the profile, so it's removed once read; runc stays for `runc run`.
+ * Extract runc and gen-seccomp-profile, then resolve the base OCI spec and
+ * the seccomp profile from them. Run once per `run:` step; each invocation
+ * is independent. gen-seccomp-profile is only needed transiently to resolve
+ * the profile, so it's removed once read; runc stays for `runc run`.
  */
 export interface ExtractRuncBootstrapOptions {
   containerName: string;
@@ -141,15 +144,8 @@ export function extractRuncBootstrap({
   containerName,
   destDir,
 }: ExtractRuncBootstrapOptions): RuncBootstrap {
-  const runcPath = join(destDir, "runc");
-  const genSeccompProfilePath = join(destDir, "gen-seccomp-profile");
-  execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/runc", hostPath: runcPath }));
-  execFileSync(
-    "docker",
-    buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/gen-seccomp-profile", hostPath: genSeccompProfilePath }),
-  );
-  chmodSync(runcPath, 0o755);
-  chmodSync(genSeccompProfilePath, 0o755);
+  const runcPath = extractBinaryFromProxyImage(containerName, destDir, "runc");
+  const genSeccompProfilePath = extractBinaryFromProxyImage(containerName, destDir, "gen-seccomp-profile");
   const seccompProfile = JSON.parse(execFileSync(genSeccompProfilePath, { encoding: "utf8" }));
   const baseSpec = generateBaseOciSpec(runcPath, destDir); // writes config.json into destDir (overwritten later by writeOciConfig)
   rmSync(genSeccompProfilePath); // only needed to resolve seccompProfile above
@@ -160,19 +156,13 @@ export function extractRuncBootstrap({
 /** Extract ecapture onto the runner host, same as extractRuncBootstrap above.
  *  See docs/security.md's Run Action HTTPS communication logs section. */
 export function extractEcapture({ containerName, destDir }: ExtractRuncBootstrapOptions): string {
-  const ecapturePath = join(destDir, "ecapture");
-  execFileSync(
-    "docker",
-    buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/ecapture", hostPath: ecapturePath }),
-  );
-  chmodSync(ecapturePath, 0o755);
-  return ecapturePath;
+  return extractBinaryFromProxyImage(containerName, destDir, "ecapture");
 }
 
 /**
  * Start ecapture in the background. Meant to run for exactly one `run:`
  * step: start before runIsolated(), stop (stopEcapture) right after.
- * `cgroupPath` (see predictCgroupPath), when given, scopes capture to the
+ * `cgroupPath` (see cgroupFsPath), when given, scopes capture to the
  * isolated command's own cgroup instead of the whole runner host.
  */
 export function startEcapture(ecapturePath: string, logPath: string, cgroupPath?: string): ChildProcess {
