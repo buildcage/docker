@@ -63,6 +63,25 @@ for label_dir in "A:$TMP_A" "B:$TMP_B"; do
   fi
 done
 
+# Beyond reachability, confirm ecapture's cgroup scoping isolates capture too:
+# each summary should show only its own host, never the other (blocked) one.
+for label_dir in "A:$TMP_A:example.com:example.net" "B:$TMP_B:example.net:example.com"; do
+  label="${label_dir%%:*}"
+  rest="${label_dir#*:}"
+  dir="${rest%%:*}"
+  rest="${rest#*:}"
+  own_host="${rest%%:*}"
+  other_host="${rest#*:}"
+  summary="$dir/summary.md"
+  if grep -q "https://$own_host/" "$summary" 2>/dev/null && ! grep -q "https://$other_host/" "$summary" 2>/dev/null; then
+    echo "  PASS  instance $label's HTTPS communication logs show only its own host"
+  else
+    echo "  FAIL  instance $label's HTTPS communication logs are missing its own host or leaked the other's; see summary below"
+    cat "$summary" 2>/dev/null
+    FAILURES=$((FAILURES + 1))
+  fi
+done
+
 LEFTOVER_CONTAINERS=$(docker ps -a --filter "name=buildcage-proxy-" -q)
 if [ -z "$LEFTOVER_CONTAINERS" ]; then
   echo "  PASS  no leftover buildcage-proxy-* containers"

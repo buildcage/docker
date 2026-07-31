@@ -243,6 +243,8 @@ test_integration_sandbox_linux: ## Run the run action's integration tests (needs
 	@./run/test/integration-test-non-runc-default-pseudofs-readonly.sh
 	@./run/test/integration-test-concurrent.sh
 	@./run/test/integration-test-known-blocked-rules.sh
+	@./run/test/integration-test-ecapture-terminates.sh
+	@./run/test/integration-test-ecapture-hard-kill-recovery.sh
 
 # ---------------------------------------------------------------------------
 # example_{engine}_{mode} — smoke test against a plain Dockerfile
