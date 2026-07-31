@@ -24,6 +24,9 @@ import {
   writeResolvConf,
   extractRuncBootstrap,
   extractEcapture,
+  predictCgroupPath,
+  ensureCgroupDir,
+  removeCgroupDirIfEmpty,
   startEcapture,
   waitForEcaptureReady,
   stopEcapture,
@@ -249,9 +252,22 @@ async function main(): Promise<void> {
       // annotation, never as a SandboxError that would abort the step itself.
       let ecaptureProc;
       const ecaptureLogPath = join(dir, "ecapture.log");
+      // Scope ecapture to just this step's own cgroup rather than the whole
+      // runner host, when possible. Best-effort and independent of whether
+      // ecapture itself starts below: a failure here (e.g. this host isn't
+      // cgroup v2, or sudo can't create the directory) just falls back to
+      // unscoped, system-wide capture rather than skipping ecapture entirely.
+      let cgroupPath: string | undefined;
+      try {
+        cgroupPath = predictCgroupPath(containerName);
+        ensureCgroupDir(cgroupPath);
+      } catch (e) {
+        annotation.warning(`Failed to prepare a scoped cgroup for ecapture (falling back to unscoped capture): ${errorMessage(e)}`);
+        cgroupPath = undefined;
+      }
       try {
         const ecapturePath = extractEcapture({ containerName, destDir: dir });
-        ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath);
+        ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath, cgroupPath);
         // Loading/attaching its eBPF probes isn't instant -- without this, a
         // short-lived isolated command can finish before ecapture is
         // actually capturing anything (see waitForEcaptureReady's own doc).
@@ -280,6 +296,7 @@ async function main(): Promise<void> {
           annotation.warning(`Failed to read ecapture's HTTPS communication logs: ${errorMessage(e)}`);
         }
       }
+      if (cgroupPath) removeCgroupDirIfEmpty(cgroupPath);
 
       return isolatedExitCode;
     }, containerName);

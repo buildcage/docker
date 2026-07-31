@@ -334,16 +334,22 @@ that's the only point standing between decrypted traffic and a GitHub Job Summar
   HPACK-compressed headers, so a client that negotiates `h2` (many modern HTTP libraries do, when the
   server supports it) won't have its method/path recovered — the request simply doesn't appear here,
   rather than showing up malformed.
-- **Sees the whole runner host, not just this step.** ecapture is started without `--pid`/`--cgroup_path`
-  scoping, so — for the duration of one `run:` step — it observes every OpenSSL-linked process on the
+- **Scoped to this step's own cgroup, on a best-effort basis.** ecapture is normally started with
+  `--cgroup_path` pointed at the cgroup runc will create for the isolated command — predicted from
+  the invoking process's own `/proc/self/cgroup` (see `predictCgroupPath` in
+  `run/src/lib/isolated-exec.ts`) and pre-created with `sudo mkdir -p` before ecapture starts (its
+  own `--cgroup_path` validation needs the directory to already exist; runc's cgroup setup already
+  tolerates reusing a directory it didn't create itself, and its normal container teardown removes it
+  afterward). If this preparation fails for any reason (not a cgroup v2 host, `sudo` can't create the
+  directory, etc.), it falls back to unscoped capture rather than skipping ecapture entirely — in that
+  fallback case, for the duration of one `run:` step, it observes every OpenSSL-linked process on the
   runner host, not only the isolated command's own. On a GitHub-hosted runner (a dedicated, ephemeral
-  VM for one job) this has no practical effect. On a shared, concurrently-used self-hosted runner, it
-  means this step's report could in principle pick up HTTPS traffic from an unrelated process running
-  on the same host at the same time. Both PID-based and cgroup-based scoping were evaluated and
-  rejected for now: a single `--pid` match doesn't cover the child processes a `run:` script's own
-  commands spawn under different PIDs, and `--cgroup_path` — despite working correctly against a
-  plain container's own cgroup in testing — failed to capture anything at all when pointed at the
-  cgroup runc creates for the isolated command specifically, for a reason not yet root-caused.
+  VM for one job) an unscoped fallback has no practical effect either way. On a shared,
+  concurrently-used self-hosted runner, an unscoped fallback means this step's report could in
+  principle pick up HTTPS traffic from an unrelated process running on the same host at the same time.
+  PID-based scoping was evaluated and rejected as an alternative: a single `--pid` match doesn't cover
+  the child processes a `run:` script's own commands spawn under different PIDs, unlike cgroup
+  membership, which they inherit.
 
 ### Known Limitations
 

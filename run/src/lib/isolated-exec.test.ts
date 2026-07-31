@@ -18,6 +18,7 @@ import {
   stopEcapture,
   readEcaptureLog,
   waitForEcaptureReady,
+  computeCgroupPath,
 } from "./isolated-exec.ts";
 
 describe("writeRunScript", () => {
@@ -432,6 +433,33 @@ describe("readEcaptureLog", () => {
       const result = readEcaptureLog(logPath);
       assert.deepEqual(result, [{ method: "GET", url: "https://example.com/", status: 200 }]);
     });
+  });
+});
+
+describe("computeCgroupPath", () => {
+  it("joins the parent of the caller's own cgroup with the container name", () => {
+    const result = computeCgroupPath("0::/actions_job/1234\n", "buildcage-proxy-abc");
+    assert.equal(result, "/sys/fs/cgroup/actions_job/buildcage-proxy-abc");
+  });
+
+  it("handles the caller already being at the cgroup v2 root", () => {
+    const result = computeCgroupPath("0::/\n", "buildcage-proxy-abc");
+    assert.equal(result, "/sys/fs/cgroup/buildcage-proxy-abc");
+  });
+
+  it("matches the Mac dev-loop's own observed /docker/<id> shape, as one possible case", () => {
+    const result = computeCgroupPath("0::/docker/65385640f4b2bac1f5c422ab29e3bba9d0be8d4d9c3a161530dc59a9d05a6bfe\n", "buildcage-proxy-abc");
+    assert.equal(result, "/sys/fs/cgroup/docker/buildcage-proxy-abc");
+  });
+
+  it("finds the 0:: line among other (cgroup v1 hybrid) lines", () => {
+    const content = "12:pids:/user.slice\n1:name=systemd:/user.slice\n0::/user.slice/session-1.scope\n";
+    const result = computeCgroupPath(content, "buildcage-proxy-abc");
+    assert.equal(result, "/sys/fs/cgroup/user.slice/buildcage-proxy-abc");
+  });
+
+  it("throws when there is no 0:: (cgroup v2 unified) entry at all", () => {
+    assert.throws(() => computeCgroupPath("12:pids:/user.slice\n1:name=systemd:/user.slice\n", "x"), /cgroup v2/);
   });
 });
 
