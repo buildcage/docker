@@ -46,6 +46,17 @@ runc
 
 ------------------------------------------------------------------------------
 
+ecapture
+  Website : https://ecapture.cc/
+  License : Apache License 2.0 (Apache-2.0)
+  Source  : https://github.com/gojue/ecapture
+  Note    : Official pre-built release binary, checksum-pinned in
+            run/docker/Dockerfile. Extracted onto the runner host at `run`
+            action startup and run natively there alongside the isolated
+            command, to capture HTTPS communication logs (see docs/security.md).
+
+------------------------------------------------------------------------------
+
 Note on GPL components (HAProxy, dnsmasq):
 
 These components are installed from the Alpine Linux official package
