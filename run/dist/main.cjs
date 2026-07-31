@@ -7396,15 +7396,16 @@ function extractEcapture({ containerName, destDir }) {
 * runIsolated() and stopped (stopEcapture) right after it returns, so its
 * capture window covers exactly one `run:` step.
 *
-* No `--pid`/`--cgroup_path` scoping is applied by default: as of now,
-* ecapture observes every OpenSSL-linked process on the runner host for the
-* duration of this step, not just the isolated command's own (see
-* docs/security.md's known limitations). `cgroupPath`, when a caller
-* eventually has one to pass, would narrow that — see the TODO on this
-* repo's own dev-loop investigation notes; every attempt to resolve a
-* runc-nested sandbox's own auto-generated cgroup failed in local testing
-* for a reason not yet root-caused, so this parameter is unused for now,
-* pending re-verification on a real Linux CI host.
+* `cgroupPath` (see predictCgroupPath/ensureCgroupDir), when given, scopes
+* ecapture to just the isolated command's own cgroup rather than every
+* OpenSSL-linked process on the runner host for the step's duration — see
+* docs/security.md's known limitations for why this matters (cross-talk
+* between concurrent `run:` steps, or with an unrelated process, on a
+* shared/self-hosted runner). Earlier attempts to resolve a runc-nested
+* sandbox's own cgroup failed in Mac dev-loop testing for a reason
+* eventually traced to that testing environment specifically (see
+* predictCgroupPath's own doc) — real Linux CI is what determines whether
+* this actually narrows capture as intended.
 */
 function startEcapture(ecapturePath, logPath, cgroupPath) {
 	let args = [
@@ -7485,6 +7486,75 @@ function stopEcapture(proc) {
 */
 function readEcaptureLog(logPath) {
 	if ((0, node_fs.existsSync)(logPath)) return scanEcaptureLog((0, node_fs.readFileSync)(logPath, "utf8").split("\n"));
+}
+/**
+* Predict the cgroup v2 path runc will create for a container named
+* `containerName`, given no explicit `linux.cgroupsPath` in the OCI config
+* (buildOciConfig doesn't set one). Confirmed against runc's own source
+* (opencontainers/cgroups' fs2.defaultDirPath): with no cgroupsPath and no
+* systemd cgroup driver, the path is `/sys/fs/cgroup/<parent-of-runc's-own-
+* current-cgroup>/<containerName>` — i.e. a sibling of whatever cgroup the
+* process invoking `runc run` (this Node process, via `sudo`, which doesn't
+* itself move cgroups) is currently in. This is NOT a fixed prefix like
+* `/docker/<id>` — that was only ever true in Mac dev-loop testing because
+* the dev-loop container's own cgroup happened to be under `/docker/...`,
+* confirmed by reading runc's actual path-computation logic instead of
+* assuming the earlier observation generalized.
+*
+* The predicted path doesn't exist yet at this point (runc only creates it
+* once the container actually starts) — see ensureCgroupDir, which must run
+* before ecapture's own `--cgroup_path` validation (a plain stat check) can
+* succeed.
+*/
+function predictCgroupPath(containerName) {
+	return computeCgroupPath((0, node_fs.readFileSync)("/proc/self/cgroup", "utf8"), containerName);
+}
+/** Pure half of predictCgroupPath, split out so it's testable without a real
+*  /proc/self/cgroup (not present on macOS, where these tests also run). */
+function computeCgroupPath(selfCgroupContent, containerName) {
+	let line = selfCgroupContent.split("\n").find((l) => l.startsWith("0::"));
+	if (!line) throw Error(`could not find a cgroup v2 (unified) entry in /proc/self/cgroup: ${selfCgroupContent}`);
+	return (0, node_path.join)("/sys/fs/cgroup", (0, node_path.dirname)(line.slice(3).trim()), containerName);
+}
+/**
+* Create the cgroup v2 directory runc will later reuse for the isolated
+* command (see predictCgroupPath), so ecapture's `--cgroup_path` validation
+* has something real to stat before the container itself exists. Run via
+* `sudo` since `/sys/fs/cgroup` isn't writable by the runner's own
+* unprivileged user. Safe to pre-create: runc's own cgroup setup
+* (opencontainers/cgroups' fs2.CreateCgroupPath) already tolerates the
+* directory existing (os.Mkdir + os.IsExist check), and its normal container
+* teardown (`runc delete -f` in run-isolated.sh's cleanup trap) removes it
+* regardless of who created it.
+*/
+function ensureCgroupDir(cgroupPath) {
+	(0, node_child_process.execFileSync)("sudo", [
+		"-n",
+		"--",
+		"mkdir",
+		"-p",
+		cgroupPath
+	]);
+}
+/**
+* Best-effort cleanup for the directory ensureCgroupDir created. Normally
+* already removed by runc's own container teardown (`runc delete -f` in
+* run-isolated.sh's cleanup trap, which removes the cgroup it manages
+* regardless of who created the directory) — this is a safety net for the
+* case where that didn't happen (e.g. runIsolated itself failed before ever
+* creating a container). `rmdir` only removes an *empty* directory, so this
+* silently no-ops rather than forcing anything if the cgroup is still in use
+* or already gone.
+*/
+function removeCgroupDirIfEmpty(cgroupPath) {
+	try {
+		(0, node_child_process.execFileSync)("sudo", [
+			"-n",
+			"--",
+			"rmdir",
+			cgroupPath
+		]);
+	} catch {}
 }
 /**
 * Pure: extract {mountPoint, fsType} for every line of raw
@@ -8325,12 +8395,17 @@ async function main() {
 				throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
 			}
 			writeOciConfig(config, dir);
-			let ecaptureProc, ecaptureLogPath = (0, node_path.join)(dir, "ecapture.log");
+			let ecaptureProc, ecaptureLogPath = (0, node_path.join)(dir, "ecapture.log"), cgroupPath;
+			try {
+				cgroupPath = predictCgroupPath(containerName), ensureCgroupDir(cgroupPath);
+			} catch (e) {
+				annotation.warning(`Failed to prepare a scoped cgroup for ecapture (falling back to unscoped capture): ${errorMessage(e)}`), cgroupPath = void 0;
+			}
 			try {
 				ecaptureProc = startEcapture(extractEcapture({
 					containerName,
 					destDir: dir
-				}), ecaptureLogPath), waitForEcaptureReady(ecaptureLogPath);
+				}), ecaptureLogPath, cgroupPath), waitForEcaptureReady(ecaptureLogPath);
 			} catch (e) {
 				annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
 			}
@@ -8350,7 +8425,7 @@ async function main() {
 			} catch (e) {
 				annotation.warning(`Failed to read ecapture's HTTPS communication logs: ${errorMessage(e)}`);
 			}
-			return isolatedExitCode;
+			return cgroupPath && removeCgroupDirIfEmpty(cgroupPath), isolatedExitCode;
 		}, containerName);
 	} finally {
 		try {
