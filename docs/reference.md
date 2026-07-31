@@ -239,6 +239,13 @@ In `audit` mode, the Job Summary also includes a ready-to-paste `restrict` mode 
 during the audited run — mirroring the same example the `report` action generates for
 `setup`/`report` workflows.
 
+When the isolated command makes HTTPS requests through an OpenSSL-family library, the Job Summary
+also includes a "💬 HTTPS communication logs" section showing method/path detail, not just the
+domain-level allow/block decision — this is best-effort observability with real coverage gaps (no
+effect on enforcement); see [HTTPS Communication Logs
+(ecapture)](./security.md#https-communication-logs-ecapture) in Security Details for exactly what
+it does and doesn't capture.
+
 See the [restrict mode](../.github/workflows/example-run-restrict.yml) and
 [audit mode](../.github/workflows/example-run-audit.yml) example workflows for each in full.
 

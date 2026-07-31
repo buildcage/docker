@@ -181,7 +181,15 @@ order it actually happens. For the user-facing behavior and threat model, see
      proxy's fixed gateway address directly — no bridge, since this is always a 1:1 connection
      (one sandbox, one proxy) and a plain named interface is enough for `init-iptables`'s
      `-i sandbox0` rule (added at container startup) to match once this device appears later.
-6. Run the sandboxed command via `runc`.
+6. Start ecapture in the background, just before running the sandboxed command (`isolated-exec.ts`).
+   - Extracted onto the runner host the same way as `runc`/`gen-seccomp-profile` in step 3 (`docker
+     cp` from the proxy image, run natively there). Its capture window is exactly the isolated
+     command's lifetime: started here, stopped right after step 7 below returns.
+   - Best-effort only — a failure to extract or start it is reported as a warning annotation, never
+     a `SandboxError` that would abort the step itself. See [HTTPS Communication Logs
+     (ecapture)](./security.md#https-communication-logs-ecapture) in Security Details for what this
+     does and doesn't capture.
+7. Run the sandboxed command via `runc`.
    - runc creates its own further-nested namespaces per `config.json` and enforces every
      isolation guarantee declared there — capability drop, seccomp filter, read-only filesystem,
      network namespace.
@@ -189,15 +197,19 @@ order it actually happens. For the user-facing behavior and threat model, see
      above: the process that starts `runc` and, separately, the sandboxed command itself both
      die if their immediate parent does, so killing the staging step tears down the whole chain
      instead of leaving the sandboxed command running as an orphan.
-7. Clean up once the command exits (`run-isolated.sh`).
+   - Once this returns, ecapture (step 6) is stopped and its log parsed
+     (`core/lib/log/ecapture-log-parser.ts`) into the step's HTTPS communication logs, before the
+     scratch directory holding that log is torn down in the next step.
+8. Clean up once the command exits (`run-isolated.sh`).
    - An exit trap tears the container down, unmounts the rootfs bind-mount, removes the veth, and
      deletes the network namespace.
    - As a second layer of defense, anything still mounted under the run's own scratch directory
      is force-detached before that directory is deleted, in case the trap above didn't run to
      completion.
-8. Append this step's report to the Job Summary and stop the proxy container (`main.ts`).
+9. Append this step's report to the Job Summary and stop the proxy container (`main.ts`).
    - The report is built in-process on the runner: `report.ts` reads the container's own
-     communication log via `docker exec ... cat`, then the container is stopped.
+     communication log via `docker exec ... cat`, then the container is stopped. The HTTPS
+     communication logs parsed in step 7 are merged into this same report object before rendering.
    - If the whole process is killed before reaching this point, a fallback step reads the
      container's identity back from job state and stops it anyway, and reclaims the step's scratch
      directory — whose path it reconstructs deterministically from that same identity, then

@@ -294,6 +294,50 @@ an OCI `config.json` and enforced by runc natively.
   `run-isolated.sh` is killed outright (e.g. an out-of-memory kill lands on it specifically), the
   whole sandboxed process tree is killed with it rather than surviving as an orphan.
 
+### HTTPS Communication Logs (ecapture)
+
+`run` optionally shows *method and path* detail for the isolated command's HTTPS traffic, not just
+the domain-level allow/block decision the tables above already show — a "💬 HTTPS communication
+logs" section in the report, when there's anything to show. This is purely observability layered on
+top of the network isolation above; it has no effect on what's allowed or blocked.
+
+It's implemented with [ecapture](https://github.com/gojue/ecapture), an eBPF-based tool that hooks
+OpenSSL's own read/write functions (`uprobe`s on `libssl.so`) to read the plaintext on either side of
+encryption, directly in the traced process's memory — no CA certificate or MITM proxying involved,
+unlike `explicit`'s own path-level visibility (see [Coverage and
+Visibility](#coverage-and-visibility)). ecapture is extracted onto the runner host alongside
+`runc`/`gen-seccomp-profile` (see [Isolation Mechanisms](#isolation-mechanisms) above) and started
+just before, stopped just after, the isolated command runs — its capture window covers exactly one
+`run:` step. It works here specifically because the sandbox's rootfs is a bind-mount of the host's
+own `/` (see above): the isolated command's `libssl.so` is the exact same file ecapture itself
+resolves, with no cross-mount-namespace path resolution needed. Only `method`, `host`, `path`, and
+`status` are ever extracted from what ecapture captures — every other byte (headers, including
+`Authorization`, and request/response bodies) is discarded before this data reaches the report, since
+that's the only point standing between decrypted traffic and a GitHub Job Summary.
+
+**Coverage is deliberately narrow, and known to have gaps:**
+
+- **OpenSSL/BoringSSL/GnuTLS/NSS-linked tools only.** A tool statically using its own TLS stack —
+  Rust's `rustls`, the JVM's default `SunJSSE` provider, .NET's own implementation — isn't hooked by
+  this mechanism at all and simply won't appear in this section, same as if it made no HTTPS calls.
+  This is narrower than the "works with any language or package manager" guarantee the domain-level
+  allow/block decision itself carries (see the [README](../README.md)) — that guarantee is untouched;
+  it's specifically this supplementary detail that doesn't extend to every stack.
+- **HTTP/1.x request lines only.** ecapture's text-mode output doesn't decompress HTTP/2's
+  HPACK-compressed headers, so a client that negotiates `h2` (many modern HTTP libraries do, when the
+  server supports it) won't have its method/path recovered — the request simply doesn't appear here,
+  rather than showing up malformed.
+- **Sees the whole runner host, not just this step.** ecapture is started without `--pid`/`--cgroup_path`
+  scoping, so — for the duration of one `run:` step — it observes every OpenSSL-linked process on the
+  runner host, not only the isolated command's own. On a GitHub-hosted runner (a dedicated, ephemeral
+  VM for one job) this has no practical effect. On a shared, concurrently-used self-hosted runner, it
+  means this step's report could in principle pick up HTTPS traffic from an unrelated process running
+  on the same host at the same time. Both PID-based and cgroup-based scoping were evaluated and
+  rejected for now: a single `--pid` match doesn't cover the child processes a `run:` script's own
+  commands spawn under different PIDs, and `--cgroup_path` — despite working correctly against a
+  plain container's own cgroup in testing — failed to capture anything at all when pointed at the
+  cgroup runc creates for the isolated command specifically, for a reason not yet root-caused.
+
 ### Known Limitations
 
 - **No AppArmor/SELinux/Landlock policy**: these would add path-level MAC restrictions on top of
