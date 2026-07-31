@@ -60,6 +60,7 @@ interface OciSpec {
     readonlyPaths?: string[];
     namespaces: { type: string; path?: string }[];
     seccomp?: unknown;
+    cgroupsPath?: string;
   };
   root?: unknown;
   process: Record<string, unknown>;
@@ -230,30 +231,21 @@ export function readEcaptureLog(logPath: string): AllowedRequest[] | undefined {
   return scanEcaptureLog(content.split("\n"));
 }
 
-/**
- * Predict the cgroup v2 path runc will create for `containerName` (no
- * explicit `linux.cgroupsPath` is set in the OCI config). Per runc's own
- * source (opencontainers/cgroups' fs2.defaultDirPath), that's
- * `/sys/fs/cgroup/<parent of the caller's own cgroup>/<containerName>` — not
- * a fixed prefix like `/docker/<id>`, which was only ever an artifact of the
- * Mac dev-loop's own container living under `/docker/...`.
- *
- * The path doesn't exist yet here (runc creates it once the container
- * starts) — see ensureCgroupDir.
- */
-export function predictCgroupPath(containerName: string): string {
-  return computeCgroupPath(readFileSync("/proc/self/cgroup", "utf8"), containerName);
+// Passed to buildOciConfig as linux.cgroupsPath, so runc creates the
+// container's cgroup exactly here instead of us predicting its own default.
+// Arbitrary and fixed -- only needs to be unique per container.
+const CGROUP_INNER_PREFIX = "/buildcage-run";
+
+/** The `linux.cgroupsPath` value for `containerName`'s OCI config, relative
+ *  to the cgroup v2 mount root. */
+export function cgroupInnerPath(containerName: string): string {
+  return `${CGROUP_INNER_PREFIX}/${containerName}`;
 }
 
-/** Pure half of predictCgroupPath (no real /proc/self/cgroup on macOS, where these tests also run). */
-export function computeCgroupPath(selfCgroupContent: string, containerName: string): string {
-  const line = selfCgroupContent.split("\n").find((l) => l.startsWith("0::"));
-  if (!line) {
-    throw new Error(`could not find a cgroup v2 (unified) entry in /proc/self/cgroup: ${selfCgroupContent}`);
-  }
-  const ownCgroupPath = line.slice("0::".length).trim();
-  const parent = dirname(ownCgroupPath);
-  return join("/sys/fs/cgroup", parent, containerName);
+/** The real filesystem path of `cgroupInnerPath`'s cgroup, for
+ *  ensureCgroupDir/removeCgroupDirIfEmpty and ecapture's own `--cgroup_path`. */
+export function cgroupFsPath(containerName: string): string {
+  return join("/sys/fs/cgroup", cgroupInnerPath(containerName));
 }
 
 /** Pre-create the cgroup so ecapture's own `--cgroup_path` validation (a
@@ -426,6 +418,8 @@ function assertScratchBaseNotWritable(writableDirs: string[]): void {
  * - linux.seccomp: the Docker-default-profile-derived filter (see
  *   gen-seccomp-profile), resolved against this same empty capability
  *   set.
+ * - linux.cgroupsPath: set when given so runc creates the container's cgroup
+ *   exactly where ensureCgroupDir already prepared it (see cgroupInnerPath).
  *
  * `writablePaths` containing "/" is a sentinel meaning "disable the
  * read-only restriction entirely" (see docs/reference.md's `writable`
@@ -445,6 +439,7 @@ export interface BuildOciConfigOptions {
   seccompProfile: unknown;
   scriptPath: string;
   hostMounts?: HostMount[];
+  cgroupsPath?: string;
 }
 
 export function buildOciConfig(
@@ -459,6 +454,7 @@ export function buildOciConfig(
     env,
     netnsPath,
     rootfsBindDir,
+    cgroupsPath,
     resolvConfPath,
     seccompProfile,
     scriptPath,
@@ -528,6 +524,7 @@ export function buildOciConfig(
       seccomp: seccompProfile,
       maskedPaths,
       readonlyPaths,
+      ...(cgroupsPath ? { cgroupsPath } : {}),
     },
   };
 }

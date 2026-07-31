@@ -24,7 +24,8 @@ import {
   writeResolvConf,
   extractRuncBootstrap,
   extractEcapture,
-  predictCgroupPath,
+  cgroupInnerPath,
+  cgroupFsPath,
   ensureCgroupDir,
   removeCgroupDirIfEmpty,
   startEcapture,
@@ -213,6 +214,18 @@ async function main(): Promise<void> {
       const netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-");
       const rootfsBindDir = join(dir, "rootfs");
 
+      // Pre-create the cgroup for ecapture's scoped capture (docs/security.md).
+      // Only pass it to buildOciConfig below if this succeeded -- otherwise
+      // fall back to runc's default placement / unscoped capture.
+      const cgroupFs = cgroupFsPath(containerName);
+      let cgroupReady = false;
+      try {
+        ensureCgroupDir(cgroupFs);
+        cgroupReady = true;
+      } catch (e) {
+        annotation.warning(`Failed to prepare a scoped cgroup for ecapture (falling back to unscoped capture): ${errorMessage(e)}`);
+      }
+
       let config;
       try {
         const resolvConfPath = writeResolvConf(dns, dir);
@@ -239,6 +252,7 @@ async function main(): Promise<void> {
           seccompProfile,
           scriptPath,
           hostMounts,
+          cgroupsPath: cgroupReady ? cgroupInnerPath(containerName) : undefined,
         });
       } catch (e) {
         throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
@@ -249,17 +263,9 @@ async function main(): Promise<void> {
       // section); a failure here is only ever a warning, never a SandboxError.
       let ecaptureProc;
       const ecaptureLogPath = join(dir, "ecapture.log");
-      let cgroupPath: string | undefined;
-      try {
-        cgroupPath = predictCgroupPath(containerName);
-        ensureCgroupDir(cgroupPath);
-      } catch (e) {
-        annotation.warning(`Failed to prepare a scoped cgroup for ecapture (falling back to unscoped capture): ${errorMessage(e)}`);
-        cgroupPath = undefined;
-      }
       try {
         const ecapturePath = extractEcapture({ containerName, destDir: dir });
-        ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath, cgroupPath);
+        ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath, cgroupReady ? cgroupFs : undefined);
         waitForEcaptureReady(ecaptureLogPath);
       } catch (e) {
         annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
@@ -285,7 +291,7 @@ async function main(): Promise<void> {
           annotation.warning(`Failed to read ecapture's HTTPS communication logs: ${errorMessage(e)}`);
         }
       }
-      if (cgroupPath) removeCgroupDirIfEmpty(cgroupPath);
+      if (cgroupReady) removeCgroupDirIfEmpty(cgroupFs);
 
       return isolatedExitCode;
     }, containerName);

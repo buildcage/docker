@@ -18,7 +18,8 @@ import {
   stopEcapture,
   readEcaptureLog,
   waitForEcaptureReady,
-  computeCgroupPath,
+  cgroupInnerPath,
+  cgroupFsPath,
 } from "./isolated-exec.ts";
 
 describe("writeRunScript", () => {
@@ -242,6 +243,16 @@ describe("buildOciConfig", () => {
     assert.equal(config.linux.namespaces.length, 6);
   });
 
+  it("sets linux.cgroupsPath when given", () => {
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], cgroupsPath: "/buildcage-run/buildcage-proxy-abc" });
+    assert.equal(config.linux.cgroupsPath, "/buildcage-run/buildcage-proxy-abc");
+  });
+
+  it("omits linux.cgroupsPath when not given, leaving runc's own default in effect", () => {
+    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    assert.equal("cgroupsPath" in config.linux, false);
+  });
+
   it("extends maskedPaths with kallsyms/kmsg/sysrq-trigger and moves sysrq-trigger out of readonlyPaths", () => {
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
     for (const p of ["/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-trigger", "/proc/kcore", "/proc/keys", "/proc/timer_list"]) {
@@ -436,30 +447,15 @@ describe("readEcaptureLog", () => {
   });
 });
 
-describe("computeCgroupPath", () => {
-  it("joins the parent of the caller's own cgroup with the container name", () => {
-    const result = computeCgroupPath("0::/actions_job/1234\n", "buildcage-proxy-abc");
-    assert.equal(result, "/sys/fs/cgroup/actions_job/buildcage-proxy-abc");
+describe("cgroupInnerPath / cgroupFsPath", () => {
+  it("derives a path from the container name alone, with no host-specific input", () => {
+    assert.equal(cgroupInnerPath("buildcage-proxy-abc"), "/buildcage-run/buildcage-proxy-abc");
+    assert.equal(cgroupFsPath("buildcage-proxy-abc"), "/sys/fs/cgroup/buildcage-run/buildcage-proxy-abc");
   });
 
-  it("handles the caller already being at the cgroup v2 root", () => {
-    const result = computeCgroupPath("0::/\n", "buildcage-proxy-abc");
-    assert.equal(result, "/sys/fs/cgroup/buildcage-proxy-abc");
-  });
-
-  it("matches the Mac dev-loop's own observed /docker/<id> shape, as one possible case", () => {
-    const result = computeCgroupPath("0::/docker/65385640f4b2bac1f5c422ab29e3bba9d0be8d4d9c3a161530dc59a9d05a6bfe\n", "buildcage-proxy-abc");
-    assert.equal(result, "/sys/fs/cgroup/docker/buildcage-proxy-abc");
-  });
-
-  it("finds the 0:: line among other (cgroup v1 hybrid) lines", () => {
-    const content = "12:pids:/user.slice\n1:name=systemd:/user.slice\n0::/user.slice/session-1.scope\n";
-    const result = computeCgroupPath(content, "buildcage-proxy-abc");
-    assert.equal(result, "/sys/fs/cgroup/user.slice/buildcage-proxy-abc");
-  });
-
-  it("throws when there is no 0:: (cgroup v2 unified) entry at all", () => {
-    assert.throws(() => computeCgroupPath("12:pids:/user.slice\n1:name=systemd:/user.slice\n", "x"), /cgroup v2/);
+  it("keeps cgroupFsPath consistent with cgroupInnerPath (the same value passed to both runc and ecapture)", () => {
+    const name = "buildcage-proxy-xyz";
+    assert.equal(cgroupFsPath(name), `/sys/fs/cgroup${cgroupInnerPath(name)}`);
   });
 });
 
@@ -509,7 +505,7 @@ describe("startEcapture", () => {
 describe("stopEcapture", () => {
   // stopEcapture kills via `sudo` (ecapture itself runs as root), so a
   // meaningful "does it actually terminate the process" test needs a real
-  // passwordless-sudo host, not a unit test -- see
+  // passwordless-sudo host, not a unit test — see
   // run/test/integration-test-ecapture-terminates.sh, which drives the real
   // run/dist/main.cjs and checks with `pgrep` afterward.
   it("does nothing (doesn't throw) when the process has no pid", () => {
