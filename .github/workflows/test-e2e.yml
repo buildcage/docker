@@ -401,8 +401,12 @@ jobs:
               fail_on_blocked: false
               run: |
                 sleep 5
-                wget -q -T 5 -O /dev/null http://example.com/
-                if wget -q -T 5 -O /dev/null http://example.net/ 2>&1; then
+                # HTTPS (not HTTP): exercises ecapture's HTTPS communication logs
+                # for a parallel step, so its report can be checked for
+                # cross-talk from step B's own traffic just as much as the
+                # network-level check below.
+                wget -q -T 5 -O /dev/null https://example.com/
+                if wget -q -T 5 -O /dev/null https://example.net/ 2>&1; then
                   echo "::error::cross-talk: example.net (step B's allowlist) was reachable from step A"; exit 1
                 fi
 
@@ -418,8 +422,8 @@ jobs:
               label: parallel-b
               fail_on_blocked: false
               run: |
-                wget -q -T 5 -O /dev/null http://example.net/
-                if wget -q -T 5 -O /dev/null http://example.com/ 2>&1; then
+                wget -q -T 5 -O /dev/null https://example.net/
+                if wget -q -T 5 -O /dev/null https://example.com/ 2>&1; then
                   echo "::error::cross-talk: example.com (step A's allowlist) was reachable from step B"; exit 1
                 fi
 
