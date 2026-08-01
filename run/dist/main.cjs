@@ -8351,7 +8351,7 @@ async function main() {
 				ecaptureProc = startEcapture(extractEcapture({
 					containerName,
 					destDir: dir
-				}), ecaptureLogPath, void 0), waitForEcaptureReady(ecaptureLogPath), ecaptureProc.pid && stateFile && (0, node_fs.appendFileSync)(stateFile, `ecapture_pid=${ecaptureProc.pid}\n`);
+				}), ecaptureLogPath, cgroupReady ? cgroupFs : void 0), waitForEcaptureReady(ecaptureLogPath), ecaptureProc.pid && stateFile && (0, node_fs.appendFileSync)(stateFile, `ecapture_pid=${ecaptureProc.pid}\n`);
 			} catch (e) {
 				annotation.warning(`Failed to start ecapture (HTTPS communication logs will be unavailable): ${errorMessage(e)}`);
 			}

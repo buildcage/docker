@@ -268,8 +268,7 @@ async function main(): Promise<void> {
       const ecaptureLogPath = join(dir, "ecapture.log");
       try {
         const ecapturePath = extractEcapture({ containerName, destDir: dir });
-        // TEMPORARY: testing whether --cgroup_path itself is what's causing ecapture to hang on shutdown.
-        ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath, undefined);
+        ecaptureProc = startEcapture(ecapturePath, ecaptureLogPath, cgroupReady ? cgroupFs : undefined);
         waitForEcaptureReady(ecaptureLogPath);
         if (ecaptureProc.pid && stateFile) {
           appendFileSync(stateFile, `ecapture_pid=${ecaptureProc.pid}\n`);

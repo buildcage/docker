@@ -244,8 +244,12 @@ test_integration_sandbox_linux: ## Run the run action's integration tests (needs
 	# TEMPORARY: diagnosing a CI-only cancellation right at this transition.
 	@echo "--- diagnostic: PID/process state before integration-test-concurrent.sh ---"
 	@cat /proc/sys/kernel/pid_max 2>&1 || true
-	@ps -eo pid,ppid,pgid,comm --sort=-pid 2>&1 | head -15 || true
+	@ps -eo pid,ppid,pgid,stat,wchan:32,comm --sort=-pid 2>&1 | head -15 || true
 	@ps -eo pid,ppid,pgid,comm 2>&1 | wc -l || true
+	@echo "--- ecapture process stacks (if accessible) ---"
+	@for p in $$(pgrep -x ecapture 2>/dev/null); do echo "== pid $$p =="; sudo -n cat /proc/$$p/stack 2>&1 || true; done
+	@echo "--- recent kernel log (dmesg, bpf/rcu/oom related) ---"
+	@sudo -n dmesg --time-format iso 2>&1 | tail -100 || true
 	@echo "--- end diagnostic ---"
 	@./run/test/integration-test-concurrent.sh
 	@./run/test/integration-test-known-blocked-rules.sh
