@@ -8073,7 +8073,7 @@ async function main() {
 		httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
 		ipRulesInput: env.INPUT_ALLOWED_IP_RULES
 	}), knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
-	console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules), console.log("::endgroup::");
+	console.log("::group::buildcage: Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules), console.log("::endgroup::");
 	let writablePaths = parseWritablePaths(env.INPUT_WRITABLE), containerName = generateContainerName(), projectName = deriveProjectName(containerName), stateFile = env.GITHUB_STATE;
 	stateFile && ((0, node_fs.appendFileSync)(stateFile, `container_name=${containerName}\n`), (0, node_fs.appendFileSync)(stateFile, `project_name=${projectName}\n`));
 	let composeEnv = {

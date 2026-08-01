@@ -7153,7 +7153,7 @@ async function main() {
 		httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
 		ipRulesInput: env.INPUT_ALLOWED_IP_RULES
 	}), knownBlockedRules = parseRulesOrThrow(env.INPUT_KNOWN_BLOCKED_RULES);
-	console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known blocked", knownBlockedRules), console.log("::endgroup::");
+	console.log("::group::buildcage: Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known blocked", knownBlockedRules), console.log("::endgroup::");
 	let builderName = env.INPUT_BUILDER_NAME || "buildcage", projectName = deriveProjectName(builderName), composeEnv = {
 		...env,
 		BUILDER_NAME: builderName,

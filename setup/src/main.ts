@@ -79,7 +79,7 @@ async function main(): Promise<void> {
   });
   const knownBlockedRules = parseRulesOrThrow(env.INPUT_KNOWN_BLOCKED_RULES);
 
-  console.log("::group::Configured ACL Rules");
+  console.log("::group::buildcage: Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
   logRules("HTTP", rules.httpRules);
   logRules("IP", rules.ipRules);
