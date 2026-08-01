@@ -12,14 +12,26 @@ describe("scanBuildkitdLog — blocked", () => {
   it("aggregates a real denial line (no explicit port in URL)", async () => {
     const result = await scanBuildkitdLog(REAL_DENY_LINE.split("\n"));
     assert.deepEqual(result.blocked, [
-      { ruleType: "HTTPS", host: "blocked.example.com", port: "443", reason: "not-allowed", count: 1 },
+      {
+        ruleType: "HTTPS",
+        host: "blocked.example.com",
+        port: "443",
+        reason: "not-allowed",
+        count: 1,
+      },
     ]);
   });
 
   it("aggregates a real denial line with an explicit port and path", async () => {
     const result = await scanBuildkitdLog(REAL_DENY_LINE_WITH_PATH.split("\n"));
     assert.deepEqual(result.blocked, [
-      { ruleType: "HTTPS", host: "dl-cdn.alpinelinux.org", port: "443", reason: "not-allowed", count: 1 },
+      {
+        ruleType: "HTTPS",
+        host: "dl-cdn.alpinelinux.org",
+        port: "443",
+        reason: "not-allowed",
+        count: 1,
+      },
     ]);
   });
 
@@ -28,12 +40,19 @@ describe("scanBuildkitdLog — blocked", () => {
       'time="2026-07-05T00:00:00Z" level=debug msg="Evaluated source policy" error="source \\"http://blocked.example.com:80/\\" denied by policy: source denied by policy" mutated=false ref="http://blocked.example.com:80/" updated="http://blocked.example.com:80/"';
     const result = await scanBuildkitdLog(line.split("\n"));
     assert.deepEqual(result.blocked, [
-      { ruleType: "HTTP", host: "blocked.example.com", port: "80", reason: "not-allowed", count: 1 },
+      {
+        ruleType: "HTTP",
+        host: "blocked.example.com",
+        port: "80",
+        reason: "not-allowed",
+        count: 1,
+      },
     ]);
   });
 
   it("ignores unrelated debug lines", async () => {
-    const line = 'time="2026-07-05T00:00:00Z" level=debug msg="finished setting up network namespace abc"';
+    const line =
+      'time="2026-07-05T00:00:00Z" level=debug msg="finished setting up network namespace abc"';
     const result = await scanBuildkitdLog(line.split("\n"));
     assert.deepEqual(result.blocked, []);
   });
@@ -60,7 +79,11 @@ describe("scanBuildkitdLog — blocked", () => {
   });
 
   it("parses multiple lines and skips non-matching ones", async () => {
-    const logText = [REAL_DENY_LINE, 'time="x" level=info msg="found worker"', REAL_DENY_LINE_WITH_PATH].join("\n");
+    const logText = [
+      REAL_DENY_LINE,
+      'time="x" level=info msg="found worker"',
+      REAL_DENY_LINE_WITH_PATH,
+    ].join("\n");
     const result = await scanBuildkitdLog(logText.split("\n"));
     assert.equal(result.blocked.length, 2);
   });
@@ -72,7 +95,10 @@ describe("scanBuildkitdLog — denied (chronological, unaggregated)", () => {
     const result = await scanBuildkitdLog(logText.split("\n"));
     assert.deepEqual(result.denied, [
       { url: "https://blocked.example.com/", timestamp: "2026-07-05T02:26:34Z" },
-      { url: "https://dl-cdn.alpinelinux.org:443/alpine/v3.20/main/aarch64/APKINDEX.tar.gz", timestamp: "2026-07-05T02:26:21Z" },
+      {
+        url: "https://dl-cdn.alpinelinux.org:443/alpine/v3.20/main/aarch64/APKINDEX.tar.gz",
+        timestamp: "2026-07-05T02:26:21Z",
+      },
     ]);
   });
 
@@ -83,7 +109,9 @@ describe("scanBuildkitdLog — denied (chronological, unaggregated)", () => {
   });
 
   it("ignores non-denial lines", async () => {
-    const result = await scanBuildkitdLog('time="2026-07-05T00:00:00Z" level=info msg="found worker"'.split("\n"));
+    const result = await scanBuildkitdLog(
+      'time="2026-07-05T00:00:00Z" level=info msg="found worker"'.split("\n"),
+    );
     assert.deepEqual(result.denied, []);
   });
 });

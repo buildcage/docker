@@ -20,30 +20,30 @@ Wildcard rules use glob-like patterns to match domain names.
 
 ### Patterns
 
-| Pattern | Matches | Example |
-|---------|---------|---------|
-| `*` | One or more characters **excluding** dots (single label) | `*.example.com` matches `sub.example.com` but not `deep.sub.example.com` |
-| `**` | One or more characters **including** dots (multiple labels) | `**.example.com` matches `sub.example.com` and `deep.sub.example.com` |
-| `?` | A single character excluding dots | `exampl?.com` matches `example.com`, `examplx.com` |
+| Pattern | Matches                                                     | Example                                                                  |
+| ------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `*`     | One or more characters **excluding** dots (single label)    | `*.example.com` matches `sub.example.com` but not `deep.sub.example.com` |
+| `**`    | One or more characters **including** dots (multiple labels) | `**.example.com` matches `sub.example.com` and `deep.sub.example.com`    |
+| `?`     | A single character excluding dots                           | `exampl?.com` matches `example.com`, `examplx.com`                       |
 
 ### Port Specification
 
 Port is required. Append `:port` to every rule.
 
-| Rule | Matches |
-|------|---------|
-| `example.com:443` | `example.com` on port 443 only |
+| Rule                 | Matches                                                       |
+| -------------------- | ------------------------------------------------------------- |
+| `example.com:443`    | `example.com` on port 443 only                                |
 | `*.example.com:8443` | Any single-level subdomain of `example.com` on port 8443 only |
-| `example.com:*` | `example.com` on any port |
+| `example.com:*`      | `example.com` on any port                                     |
 
 ## IP Address Rules
 
 Use `allowed_ip_rules` for direct IP address access. The IP address must include a port.
 
-| Rule | Matches |
-|------|---------|
+| Rule              | Matches                        |
+| ----------------- | ------------------------------ |
 | `192.168.1.1:443` | `192.168.1.1` on port 443 only |
-| `10.0.0.1:8080` | `10.0.0.1` on port 8080 only |
+| `10.0.0.1:8080`   | `10.0.0.1` on port 8080 only   |
 
 IP rules are handled separately from domain rules because direct IP access bypasses DNS resolution. CIDR notation is not supported.
 
@@ -57,10 +57,10 @@ allowed_https_rules: "~^api\\.example\\.com:443$"
 
 Since the regex is tested against the `domain:port` string, include a port pattern if you want to restrict by port:
 
-| Rule | Effect |
-|------|--------|
-| `~^example\.com:443$` | Matches `example.com` on port 443 only |
-| `~^example\.com:\d+$` | Matches `example.com` on any port |
+| Rule                             | Effect                                                     |
+| -------------------------------- | ---------------------------------------------------------- |
+| `~^example\.com:443$`            | Matches `example.com` on port 443 only                     |
+| `~^example\.com:\d+$`            | Matches `example.com` on any port                          |
 | `~^.*\.example\.com:{443,8443}$` | Matches any subdomain of `example.com` on port 443 or 8443 |
 
 ## Examples

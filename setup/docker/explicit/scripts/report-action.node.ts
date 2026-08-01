@@ -16,7 +16,11 @@ import { renderCommunicationDetails } from "../../../../core/lib/report/command-
 import { emitBlockedOutcome } from "../../../../core/lib/report/emit-blocked-outcome.ts";
 import { errorMessage } from "../../../../core/lib/general/error-message.ts";
 import { wrapLogGroup } from "../../../../core/lib/log/log-entries.ts";
-import { selectAllRefs, parseVertexAllowedLog, type VertexAllowedEntry } from "../../../../core/lib/log/vertex-log.ts";
+import {
+  selectAllRefs,
+  parseVertexAllowedLog,
+  type VertexAllowedEntry,
+} from "../../../../core/lib/log/vertex-log.ts";
 
 const LOG_FILE = "/var/log/buildkitd/current";
 
@@ -25,14 +29,28 @@ const LOG_FILE = "/var/log/buildkitd/current";
  *  buildctl failure here leaves the per-command breakdown empty. */
 function collectBuilds(docker: Docker, containerId: string): VertexAllowedEntry[][] {
   try {
-    const historiesOutput = docker.exec(containerId, ["buildctl", "debug", "histories", "--format", "{{json .}}"]);
+    const historiesOutput = docker.exec(containerId, [
+      "buildctl",
+      "debug",
+      "histories",
+      "--format",
+      "{{json .}}",
+    ]);
     const refs = selectAllRefs(historiesOutput);
     return refs.map((ref) => {
-      const rawJsonOutput = docker.exec(containerId, ["buildctl", "debug", "logs", "--progress=rawjson", ref]);
+      const rawJsonOutput = docker.exec(containerId, [
+        "buildctl",
+        "debug",
+        "logs",
+        "--progress=rawjson",
+        ref,
+      ]);
       return parseVertexAllowedLog(rawJsonOutput);
     });
   } catch (e) {
-    console.error(`(failed to fetch allowed/audited traffic detail via buildctl: ${errorMessage(e)})`);
+    console.error(
+      `(failed to fetch allowed/audited traffic detail via buildctl: ${errorMessage(e)})`,
+    );
     return [];
   }
 }
@@ -46,9 +64,16 @@ async function main(): Promise<void> {
   const docker = createDocker();
   const parameters = buildReportParameters(docker.readEnv(containerId));
   const builds = collectBuilds(docker, containerId);
-  const report = await buildExplicitReportData(docker.readFileLines(containerId, LOG_FILE), builds, parameters);
+  const report = await buildExplicitReportData(
+    docker.readFileLines(containerId, LOG_FILE),
+    builds,
+    parameters,
+  );
 
-  for (const line of wrapLogGroup("HTTP Proxy communication logs", renderCommunicationDetails(report.proxyLogs.builds, report.proxyLogs.denied))) {
+  for (const line of wrapLogGroup(
+    "HTTP Proxy communication logs",
+    renderCommunicationDetails(report.proxyLogs.builds, report.proxyLogs.denied),
+  )) {
     console.log(line);
   }
 

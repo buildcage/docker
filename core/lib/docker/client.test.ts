@@ -36,13 +36,21 @@ describe("createDocker", () => {
     const { run, calls } = fakeRun(["abc123\ndef456\n"]);
     const ids = createDocker(run).findContainers(["label=a=1", "label=b=2"]);
     assert.deepEqual(ids, ["abc123", "def456"]);
-    assert.deepEqual(calls, [["ps", "--filter", "label=a=1", "--filter", "label=b=2", "--format", "{{.ID}}"]]);
+    assert.deepEqual(calls, [
+      ["ps", "--filter", "label=a=1", "--filter", "label=b=2", "--format", "{{.ID}}"],
+    ]);
   });
 
   it("copyFromContainer runs a docker cp with containerId:containerPath -> hostPath", () => {
     const { run, calls } = fakeRun([""]);
-    createDocker(run).copyFromContainer("abc123", "/opt/buildcage/scripts/report-action.js", "/tmp/report-action.js");
-    assert.deepEqual(calls, [["cp", "abc123:/opt/buildcage/scripts/report-action.js", "/tmp/report-action.js"]]);
+    createDocker(run).copyFromContainer(
+      "abc123",
+      "/opt/buildcage/scripts/report-action.js",
+      "/tmp/report-action.js",
+    );
+    assert.deepEqual(calls, [
+      ["cp", "abc123:/opt/buildcage/scripts/report-action.js", "/tmp/report-action.js"],
+    ]);
   });
 
   it("readEnv runs docker inspect and parses the Env JSON array", () => {
@@ -54,9 +62,17 @@ describe("createDocker", () => {
 
   it("exec runs docker exec with the given argv and returns its stdout", () => {
     const { run, calls } = fakeRun(["histories output"]);
-    const out = createDocker(run).exec("abc123", ["buildctl", "debug", "histories", "--format", "{{json .}}"]);
+    const out = createDocker(run).exec("abc123", [
+      "buildctl",
+      "debug",
+      "histories",
+      "--format",
+      "{{json .}}",
+    ]);
     assert.equal(out, "histories output");
-    assert.deepEqual(calls, [["exec", "abc123", "buildctl", "debug", "histories", "--format", "{{json .}}"]]);
+    assert.deepEqual(calls, [
+      ["exec", "abc123", "buildctl", "debug", "histories", "--format", "{{json .}}"],
+    ]);
   });
 });
 
@@ -120,7 +136,9 @@ describe("createDocker readFileLines", () => {
 
   it("streams docker exec cat's stdout as lines, in argv order", async () => {
     const { spawnDocker, calls, children } = fakeSpawn();
-    const iterablePromise = drain(createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current"));
+    const iterablePromise = drain(
+      createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current"),
+    );
     // drain()'s first pull has already triggered the spawn synchronously.
     assert.deepEqual(calls, [["exec", "abc123", "cat", "/var/log/haproxy/current"]]);
     children[0].stdout.write("line one\nline two\n");
@@ -153,7 +171,10 @@ describe("createDocker readFileLines", () => {
 
   it("kills the child if the consumer stops iterating early", async () => {
     const { spawnDocker, children } = fakeSpawn();
-    const iterable = createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current");
+    const iterable = createDocker(undefined, spawnDocker).readFileLines(
+      "abc123",
+      "/var/log/haproxy/current",
+    );
     const iterator = iterable[Symbol.asyncIterator]();
     // .next() runs synchronously through spawnDocker(args), so the child
     // already exists once this returns.

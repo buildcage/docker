@@ -12,8 +12,12 @@ export async function buildTransparentReportData(
   parameters: GenReportParameters,
 ): Promise<TransparentReportData> {
   const isAudit = parameters.mode === "audit";
-  const { passed, blocked: blockedRawRows, blockedCount, hasNonBuildcageContent } =
-    await scanHaproxyLog(lines, isAudit);
+  const {
+    passed,
+    blocked: blockedRawRows,
+    blockedCount,
+    hasNonBuildcageContent,
+  } = await scanHaproxyLog(lines, isAudit);
   const blocked = annotateKnownBlocked(blockedRawRows, parameters.knownBlockedRules);
 
   return {

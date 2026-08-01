@@ -37,7 +37,10 @@ describe("renderHostTable", () => {
   });
 
   it("renders all 5 columns when both showReason and showExpected are true", () => {
-    const table = renderHostTable([row({ expected: true })], { showReason: true, showExpected: true });
+    const table = renderHostTable([row({ expected: true })], {
+      showReason: true,
+      showExpected: true,
+    });
     assert.match(table, /^\| Host \| Rule \| Reason \| Count \| Expected \|/);
     assert.match(table, /\| example\.com:443 \| HTTPS \| not in allowlist \| 2 \| ✅ \|/);
   });

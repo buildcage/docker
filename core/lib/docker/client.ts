@@ -7,7 +7,10 @@ import { parseDockerInspectEnv } from "./container-env.ts";
 /** `docker ps --format '{{.ID}}'` prints one ID per line, possibly with
  *  trailing blank lines. */
 export function parseContainerIds(psOutput: string): string[] {
-  return psOutput.split("\n").map((s) => s.trim()).filter(Boolean);
+  return psOutput
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export type RunCommand = (args: string[]) => string;
@@ -53,7 +56,10 @@ async function* streamDockerLines(
 
   // Registered up front too, so a 'close' firing while suspended at `yield`
   // can't be missed.
-  const closed: Promise<{ code: number | null; signal: NodeJS.Signals | null }> = once(child, "close").then(
+  const closed: Promise<{ code: number | null; signal: NodeJS.Signals | null }> = once(
+    child,
+    "close",
+  ).then(
     ([code, signal]) => ({ code, signal }),
     () => ({ code: null, signal: null }),
   );
@@ -88,7 +94,9 @@ async function* streamDockerLines(
   if (spawnError) throw spawnError;
   if (code !== 0) {
     throw Object.assign(
-      new Error(`${operation} exited with code ${code}${signal ? ` (signal ${signal})` : ""}: ${stderr.trim()}`),
+      new Error(
+        `${operation} exited with code ${code}${signal ? ` (signal ${signal})` : ""}: ${stderr.trim()}`,
+      ),
       { status: code ?? undefined, stderr },
     );
   }
@@ -126,10 +134,16 @@ export function createDocker(
       run(buildDockerCpArgs({ containerName: containerId, containerPath, hostPath }));
     },
     readFileLines(containerId, path) {
-      return streamDockerLines(spawnDocker, ["exec", containerId, "cat", path], `docker exec cat ${path}`);
+      return streamDockerLines(
+        spawnDocker,
+        ["exec", containerId, "cat", path],
+        `docker exec cat ${path}`,
+      );
     },
     readEnv(containerId) {
-      return parseDockerInspectEnv(run(["inspect", containerId, "--format", "{{json .Config.Env}}"]));
+      return parseDockerInspectEnv(
+        run(["inspect", containerId, "--format", "{{json .Config.Env}}"]),
+      );
     },
     exec(containerId, args) {
       return run(["exec", containerId, ...args]);

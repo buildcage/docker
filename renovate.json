@@ -1,27 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "helpers:pinGitHubActionDigests"
-  ],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
   "schedule": ["* * * * 6"],
   "minimumReleaseAge": "14 days",
   "internalChecksFilter": "strict",
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^setup/docker/transparent/Dockerfile$/"
-      ],
-      "matchStrings": ["# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG CNI_VERSION=(?<currentValue>v[\\d.]+)"]
+      "managerFilePatterns": ["/^setup/docker/transparent/Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG CNI_VERSION=(?<currentValue>v[\\d.]+)"
+      ]
     },
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^run/docker/Dockerfile$/",
-        "/^run/dev/Dockerfile$/"
-      ],
-      "matchStrings": ["# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG RUNC_VERSION=(?<currentValue>v[\\d.]+)"]
+      "managerFilePatterns": ["/^run/docker/Dockerfile$/", "/^run/dev/Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG RUNC_VERSION=(?<currentValue>v[\\d.]+)"
+      ]
     },
     {
       "customType": "regex",

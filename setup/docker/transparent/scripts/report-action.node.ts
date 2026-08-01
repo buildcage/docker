@@ -25,7 +25,10 @@ async function main(): Promise<void> {
 
   const docker = createDocker();
   const parameters = buildReportParameters(docker.readEnv(containerId));
-  const report = await buildTransparentReportData(docker.readFileLines(containerId, LOG_FILE), parameters);
+  const report = await buildTransparentReportData(
+    docker.readFileLines(containerId, LOG_FILE),
+    parameters,
+  );
 
   const markdown = renderReportMarkdown(
     report,

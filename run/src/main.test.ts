@@ -6,7 +6,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildACLRules, buildComposeUpArgs, buildComposeDownArgs, parseWritablePaths, readKnownBlockedRules } from "./main.ts";
+import {
+  buildACLRules,
+  buildComposeUpArgs,
+  buildComposeDownArgs,
+  parseWritablePaths,
+  readKnownBlockedRules,
+} from "./main.ts";
 import { InvalidRulesError } from "../../core/lib/acl/rules.ts";
 
 describe("buildACLRules", () => {
@@ -58,10 +64,10 @@ describe("buildACLRules", () => {
 
 describe("readKnownBlockedRules", () => {
   it("parses whitespace-separated rules", () => {
-    assert.deepEqual(
-      readKnownBlockedRules("known-bad.example.com:443 *.noisy.example.com:80"),
-      ["known-bad.example.com:443", "*.noisy.example.com:80"],
-    );
+    assert.deepEqual(readKnownBlockedRules("known-bad.example.com:443 *.noisy.example.com:80"), [
+      "known-bad.example.com:443",
+      "*.noisy.example.com:80",
+    ]);
   });
 
   it("returns an empty array for empty/undefined input", () => {
@@ -99,9 +105,18 @@ describe("buildComposeUpArgs", () => {
       pullPolicy: "always",
     });
     assert.deepEqual(args, [
-      "compose", "-f", "/path/to/compose.yaml",
-      "-p", "buildcage-proxy-abcd1234",
-      "up", "-d", "--pull", "always", "--no-build", "--wait", "--quiet-pull",
+      "compose",
+      "-f",
+      "/path/to/compose.yaml",
+      "-p",
+      "buildcage-proxy-abcd1234",
+      "up",
+      "-d",
+      "--pull",
+      "always",
+      "--no-build",
+      "--wait",
+      "--quiet-pull",
     ]);
   });
 });
@@ -113,8 +128,11 @@ describe("buildComposeDownArgs", () => {
       projectName: "buildcage-proxy-abcd1234",
     });
     assert.deepEqual(args, [
-      "compose", "-f", "/path/to/compose.yaml",
-      "-p", "buildcage-proxy-abcd1234",
+      "compose",
+      "-f",
+      "/path/to/compose.yaml",
+      "-p",
+      "buildcage-proxy-abcd1234",
       "down",
     ]);
   });
@@ -122,11 +140,17 @@ describe("buildComposeDownArgs", () => {
 
 describe("parseWritablePaths", () => {
   it("splits on newlines, trimming each entry", () => {
-    assert.deepEqual(parseWritablePaths("/opt/extra\n /var/cache \n"), ["/opt/extra", "/var/cache"]);
+    assert.deepEqual(parseWritablePaths("/opt/extra\n /var/cache \n"), [
+      "/opt/extra",
+      "/var/cache",
+    ]);
   });
 
   it("does not split on internal spaces (paths may contain them)", () => {
-    assert.deepEqual(parseWritablePaths("/path with spaces\n/other"), ["/path with spaces", "/other"]);
+    assert.deepEqual(parseWritablePaths("/path with spaces\n/other"), [
+      "/path with spaces",
+      "/other",
+    ]);
   });
 
   it("returns an empty array for empty/undefined input", () => {

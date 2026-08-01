@@ -16,7 +16,8 @@ const VERTEX_A = {
 };
 
 const VERTEX_B = {
-  command: "RUN echo step-A && wget -q -O /dev/null --timeout=5 https://allowed.example.com/ && echo A-done",
+  command:
+    "RUN echo step-A && wget -q -O /dev/null --timeout=5 https://allowed.example.com/ && echo A-done",
   started: "2026-07-05T22:08:41.670Z",
   completed: "2026-07-05T22:08:41.751Z",
   entries: [{ method: "GET", url: "https://allowed.example.com/", status: 200 }],
@@ -61,8 +62,14 @@ describe("renderCommunicationDetails", () => {
   });
 
   it("an entry with no status omits the arrow", () => {
-    const vertex = { ...VERTEX_B, entries: [{ method: "GET", url: "https://allowed.example.com/" }] };
-    assert.match(renderCommunicationDetails([[vertex]], []), /- GET https:\/\/allowed\.example\.com\/\n/);
+    const vertex = {
+      ...VERTEX_B,
+      entries: [{ method: "GET", url: "https://allowed.example.com/" }],
+    };
+    assert.match(
+      renderCommunicationDetails([[vertex]], []),
+      /- GET https:\/\/allowed\.example\.com\/\n/,
+    );
   });
 
   it("renders multiple vertices within one build under one 'Allowed Urls' item, no build item", () => {
@@ -81,8 +88,8 @@ describe("renderCommunicationDetails", () => {
           "      (22:08:41Z · duration 0.081s)\n\n" +
           "      ```\n" +
           "      - GET https://allowed.example.com/ -> 200\n" +
-          "      ```\n\n"
-      )
+          "      ```\n\n",
+      ),
     );
   });
 
@@ -98,10 +105,12 @@ describe("renderCommunicationDetails", () => {
   });
 
   it("renders the Blocked Urls section with whole-second timestamps, no vertex attribution", () => {
-    const deniedTimeline = [{ url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" }];
+    const deniedTimeline = [
+      { url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" },
+    ];
     assert.equal(
       renderCommunicationDetails([], deniedTimeline),
-      wrap("* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n")
+      wrap("* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n"),
     );
   });
 
@@ -113,24 +122,30 @@ describe("renderCommunicationDetails", () => {
     assert.equal(
       renderCommunicationDetails([], deniedTimeline),
       wrap(
-        "* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/a\n   - (22:08:42Z) https://blocked.example.com/b\n\n"
-      )
+        "* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/a\n   - (22:08:42Z) https://blocked.example.com/b\n\n",
+      ),
     );
   });
 
   it("renders Allowed Urls before Blocked Urls", () => {
-    const deniedTimeline = [{ url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" }];
+    const deniedTimeline = [
+      { url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" },
+    ];
     assert.equal(
       renderCommunicationDetails([[VERTEX_B]], deniedTimeline),
-      wrap(ALLOWED_B + "* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n")
+      wrap(
+        ALLOWED_B + "* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n",
+      ),
     );
   });
 
   it("renders only Blocked Urls when builds is empty but deniedTimeline is not", () => {
-    const deniedTimeline = [{ url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" }];
+    const deniedTimeline = [
+      { url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" },
+    ];
     assert.equal(
       renderCommunicationDetails([], deniedTimeline),
-      wrap("* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n")
+      wrap("* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n"),
     );
   });
 
@@ -140,7 +155,11 @@ describe("renderCommunicationDetails", () => {
 
   describe("markdown escaping", () => {
     it("escapes '[' ']' in a command, including a '[N/M]' step-counter prefix, so it can't be misread as link syntax", () => {
-      const vertex = { ...VERTEX_A, command: '[2/2] RUN echo "=== [HTTPS - allowed] ==="', entries: [] };
+      const vertex = {
+        ...VERTEX_A,
+        command: '[2/2] RUN echo "=== [HTTPS - allowed] ==="',
+        entries: [],
+      };
       const md = renderCommunicationDetails([[vertex]], []);
       assert.match(md, /\* \\\[2\/2\\\] RUN echo "=== \\\[HTTPS - allowed\\\] ==="\n/);
     });
@@ -158,13 +177,18 @@ describe("renderCommunicationDetails", () => {
     });
 
     it("escapes special characters in an allowed request's URL inside the code block", () => {
-      const vertex = { ...VERTEX_A, entries: [{ method: "GET", url: "https://allowed.example.com/[id]", status: 200 }] };
+      const vertex = {
+        ...VERTEX_A,
+        entries: [{ method: "GET", url: "https://allowed.example.com/[id]", status: 200 }],
+      };
       const md = renderCommunicationDetails([[vertex]], []);
       assert.match(md, /- GET https:\/\/allowed\.example\.com\/\\\[id\\\] -> 200/);
     });
 
     it("escapes special characters in a denied URL", () => {
-      const deniedTimeline = [{ url: "https://blocked.example.com/[id]", timestamp: "2026-07-05T22:08:41Z" }];
+      const deniedTimeline = [
+        { url: "https://blocked.example.com/[id]", timestamp: "2026-07-05T22:08:41Z" },
+      ];
       const md = renderCommunicationDetails([], deniedTimeline);
       assert.match(md, /- \(22:08:41Z\) https:\/\/blocked\.example\.com\/\\\[id\\\]/);
     });

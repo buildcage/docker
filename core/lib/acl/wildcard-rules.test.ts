@@ -27,10 +27,7 @@ describe("wildcardToRegex", () => {
   });
 
   it("multiple wildcards", () => {
-    assert.equal(
-      wildcardToRegex("*.*.example.com:443"),
-      "[^.]+\\.[^.]+\\.example\\.com:443",
-    );
+    assert.equal(wildcardToRegex("*.*.example.com:443"), "[^.]+\\.[^.]+\\.example\\.com:443");
   });
 
   it("rejects mixed * in part", () => {
@@ -71,24 +68,15 @@ describe("convertRule", () => {
   });
 
   it("wildcard with explicit port", () => {
-    assert.equal(
-      convertRule("*.example.com:8443"),
-      "^[^.]+\\.example\\.com:8443$",
-    );
+    assert.equal(convertRule("*.example.com:8443"), "^[^.]+\\.example\\.com:8443$");
   });
 
   it("** wildcard with explicit port", () => {
-    assert.equal(
-      convertRule("**.example.com:443"),
-      "^.+\\.example\\.com:443$",
-    );
+    assert.equal(convertRule("**.example.com:443"), "^.+\\.example\\.com:443$");
   });
 
   it("regex rule (~ prefix) — returned as-is without ~", () => {
-    assert.equal(
-      convertRule("~^custom\\.regex:443$"),
-      "^custom\\.regex:443$",
-    );
+    assert.equal(convertRule("~^custom\\.regex:443$"), "^custom\\.regex:443$");
   });
 
   it("rejects invalid regex (~ prefix)", () => {
@@ -145,10 +133,10 @@ describe("convertRule — regex behavior", () => {
 // ---------------------------------------------------------------------------
 describe("buildRules", () => {
   it("converts multiple rules", () => {
-    assert.deepEqual(
-      buildRules("example.com:443 *.foo.com:8443"),
-      ["^example\\.com:443$", "^[^.]+\\.foo\\.com:8443$"],
-    );
+    assert.deepEqual(buildRules("example.com:443 *.foo.com:8443"), [
+      "^example\\.com:443$",
+      "^[^.]+\\.foo\\.com:8443$",
+    ]);
   });
 
   it("empty input → empty array", () => {
@@ -156,10 +144,10 @@ describe("buildRules", () => {
   });
 
   it("regex rules (~ prefix)", () => {
-    assert.deepEqual(
-      buildRules("~^custom\\.regex:(443|8080)$ example.com:443"),
-      ["^custom\\.regex:(443|8080)$", "^example\\.com:443$"],
-    );
+    assert.deepEqual(buildRules("~^custom\\.regex:(443|8080)$ example.com:443"), [
+      "^custom\\.regex:(443|8080)$",
+      "^example\\.com:443$",
+    ]);
   });
 });
 
@@ -168,10 +156,10 @@ describe("buildRules", () => {
 // ---------------------------------------------------------------------------
 describe("parseAndValidateRules", () => {
   it("returns raw (unconverted) rule tokens", () => {
-    assert.deepEqual(
-      parseAndValidateRules("example.com:443 *.foo.com:8443"),
-      ["example.com:443", "*.foo.com:8443"],
-    );
+    assert.deepEqual(parseAndValidateRules("example.com:443 *.foo.com:8443"), [
+      "example.com:443",
+      "*.foo.com:8443",
+    ]);
   });
 
   it("empty input → empty array", () => {

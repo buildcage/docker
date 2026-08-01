@@ -29,7 +29,10 @@ describe("convertRule – properties", () => {
       fc.property(simplePattern, (pattern) => {
         const regex = new RegExp(convertRule(pattern));
         assert.ok(regex.test(pattern), "regex must match original pattern");
-        assert.ok(!regex.test(`sub.${pattern}`), "regex must not match with extra subdomain prefix");
+        assert.ok(
+          !regex.test(`sub.${pattern}`),
+          "regex must not match with extra subdomain prefix",
+        );
       }),
     );
   });
@@ -60,13 +63,18 @@ describe("convertRule – properties", () => {
   it("label with * mixed with other characters always throws", () => {
     const mixedWildcardLabel = fc
       .string({ minLength: 1, maxLength: 8 })
-      .filter((s) => s.includes("*") && s !== "*" && s !== "**" && !s.startsWith("~") && !s.includes("."));
+      .filter(
+        (s) => s.includes("*") && s !== "*" && s !== "**" && !s.startsWith("~") && !s.includes("."),
+      );
 
     fc.assert(
       fc.property(mixedWildcardLabel, (label) => {
         assert.throws(
           () => convertRule(`${label}.com:443`),
-          (err) => { assert.ok(err instanceof Error); return true; },
+          (err) => {
+            assert.ok(err instanceof Error);
+            return true;
+          },
         );
       }),
     );
@@ -90,14 +98,10 @@ describe("buildRules – properties", () => {
     const whitespace = fc.constantFrom(" ", "\t", "\n", "  ", " \t ");
 
     fc.assert(
-      fc.property(
-        fc.array(validRule, { minLength: 0, maxLength: 5 }),
-        whitespace,
-        (rules, sep) => {
-          const result = buildRules(rules.join(sep));
-          assert.equal(result.length, rules.length);
-        },
-      ),
+      fc.property(fc.array(validRule, { minLength: 0, maxLength: 5 }), whitespace, (rules, sep) => {
+        const result = buildRules(rules.join(sep));
+        assert.equal(result.length, rules.length);
+      }),
     );
   });
 });

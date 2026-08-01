@@ -20,7 +20,11 @@ export function parseIdentifier(identifier: string): ParsedIdentifier | null {
   const [, scheme, hostPort] = m;
   const colonIdx = hostPort.lastIndexOf(":");
   if (colonIdx > 0) {
-    return { scheme, host: hostPort.substring(0, colonIdx), port: hostPort.substring(colonIdx + 1) };
+    return {
+      scheme,
+      host: hostPort.substring(0, colonIdx),
+      port: hostPort.substring(colonIdx + 1),
+    };
   }
   return { scheme, host: hostPort, port: DEFAULT_PORT[scheme] };
 }

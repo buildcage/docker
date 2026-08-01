@@ -38,7 +38,9 @@ async function resolveVerifiedImage({
   proxyEngine,
 }: VerifyImageDigestOptions): Promise<ResolvedImage> {
   const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine });
-  console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
+  console.log(
+    `Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`,
+  );
   return {
     imageRef: resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo }),
     pullPolicy: "always",
@@ -54,7 +56,9 @@ async function main(): Promise<void> {
   console.log(`Proxy engine: ${proxyEngine}`);
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(env)
+    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(
+        env,
+      )
     : null;
   if (localOverride) {
     console.log(
@@ -95,19 +99,18 @@ async function main(): Promise<void> {
     BUILDER_NAME: builderName,
     PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
     PROXY_ENGINE: proxyEngine,
-    ALLOWED_HTTPS_RULES: rules.httpsRules.join('\n'),
-    ALLOWED_HTTP_RULES: rules.httpRules.join('\n'),
-    ALLOWED_IP_RULES: rules.ipRules.join('\n'),
-    KNOWN_BLOCKED_RULES: knownBlockedRules.join('\n'),
+    ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
+    ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
+    ALLOWED_IP_RULES: rules.ipRules.join("\n"),
+    KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
     BUILDCAGE_IMAGE_REF: imageRef,
   };
 
   try {
-    execFileSync(
-      "docker",
-      ["compose", "-p", projectName, "-f", composeFile, "down"],
-      { stdio: "inherit", env: composeEnv }
-    );
+    execFileSync("docker", ["compose", "-p", projectName, "-f", composeFile, "down"], {
+      stdio: "inherit",
+      env: composeEnv,
+    });
   } catch (e) {
     throw new SetupError(
       describeDockerFailure(e, { operation: "docker compose down" }),
@@ -120,11 +123,19 @@ async function main(): Promise<void> {
       "docker",
       [
         "compose",
-        "-p", projectName,
-        "-f", composeFile,
-        "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull",
+        "-p",
+        projectName,
+        "-f",
+        composeFile,
+        "up",
+        "-d",
+        "--pull",
+        pullPolicy,
+        "--no-build",
+        "--wait",
+        "--quiet-pull",
       ],
-      { stdio: "inherit", env: composeEnv }
+      { stdio: "inherit", env: composeEnv },
     );
   } catch (e) {
     throw new SetupError(

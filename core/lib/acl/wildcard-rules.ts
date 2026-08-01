@@ -61,7 +61,9 @@ function domainToRegex(domain: string): string {
     if (part === "**") return ".+";
     if (part === "*") return "[^.]+";
     if (part.includes("*")) {
-      throw new Error(`Invalid wildcard in "${domain}": part "${part}" mixes "*" with other characters`);
+      throw new Error(
+        `Invalid wildcard in "${domain}": part "${part}" mixes "*" with other characters`,
+      );
     }
     // Escape regex meta characters (`?` excluded — it is a wildcard, handled below)
     return part

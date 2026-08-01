@@ -7,7 +7,7 @@ I welcome reports about both proxy engines (`transparent` and `explicit`):
 - **Proxy bypass (`transparent`)** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#known-limitations))
 - **Network isolation escape (`transparent`)** — bypassing CNI isolation or iptables rules to reach the internet directly
 - **DNS filtering bypass (`transparent`)** — bypassing the DNS redirect mechanism
-- **Source policy bypass (`explicit`)** — ways to make network connections from `RUN` steps that evade the BuildKit source policy *compiled by buildcage* from your allowlist (e.g., a flaw in how buildcage translates rules into policy, or in how it injects/merges that policy via the gRPC `Solve` intercept)
+- **Source policy bypass (`explicit`)** — ways to make network connections from `RUN` steps that evade the BuildKit source policy _compiled by buildcage_ from your allowlist (e.g., a flaw in how buildcage translates rules into policy, or in how it injects/merges that policy via the gRPC `Solve` intercept)
 - **GitHub Actions setup** — vulnerabilities in the `setup` or `report` actions (e.g., injection, credential leak)
 
 The following are **out of scope** (please report to the respective projects instead):
@@ -18,9 +18,9 @@ The following are **out of scope** (please report to the respective projects ins
 
 ## Supported Versions
 
-| Version | Supported |
-| ------- | --------- |
-| 1.x     | :x: |
+| Version | Supported          |
+| ------- | ------------------ |
+| 1.x     | :x:                |
 | 2.x     | :white_check_mark: |
 
 ## Verifying Releases

@@ -31,7 +31,7 @@ function main(): void {
         ...process.env,
         BUILDER_NAME: builderName,
       },
-    }
+    },
   );
 }
 

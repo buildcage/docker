@@ -16,8 +16,18 @@ const qjsTestInputs = [
 
 function settingsFor(input) {
   return input.endsWith(".qjs.ts")
-    ? { outDir: "dist/qjs", stripSuffix: /\.qjs\.ts$/, external: ["qjs:std", "qjs:os"], platform: "neutral" }
-    : { outDir: "dist/report-action", stripSuffix: /\.node\.ts$/, external: [/^node:/], platform: "node" };
+    ? {
+        outDir: "dist/qjs",
+        stripSuffix: /\.qjs\.ts$/,
+        external: ["qjs:std", "qjs:os"],
+        platform: "neutral",
+      }
+    : {
+        outDir: "dist/report-action",
+        stripSuffix: /\.node\.ts$/,
+        external: [/^node:/],
+        platform: "node",
+      };
 }
 
 const baseOutput = {
@@ -35,7 +45,9 @@ const baseOutput = {
 // which doesn't need report-action.node.ts, requests "qjs" explicitly).
 const target = process.env.BUILD_TARGET;
 const scriptInputs =
-  target === "qjs" ? productionInputs.filter((input) => input.endsWith(".qjs.ts")) : productionInputs;
+  target === "qjs"
+    ? productionInputs.filter((input) => input.endsWith(".qjs.ts"))
+    : productionInputs;
 
 export default defineConfig(
   target === "qjs-test"

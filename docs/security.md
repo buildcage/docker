@@ -27,6 +27,7 @@ All containers spawned by BuildKit `RUN` steps are placed on an isolated network
 **Note:** Base image pulls (`FROM` instructions) are performed by buildkitd itself, which runs outside the isolated network. Only commands in `RUN` steps are subject to network filtering.
 
 **Why this approach?**
+
 - No MITM certificate injection needed
 - TLS certificate validation works normally
 - Zero modification to your Dockerfile required
@@ -174,12 +175,12 @@ For how the supervisor binary, gRPC interception, and policy compilation work in
 
 ### Coverage and Visibility
 
-| Traffic | Allowed | Denied |
-|---|---|---|
-| `RUN` step, proxy-aware tool | Logged per-step in the report's "Communication details" | Logged in a flat `DENIED` list (no per-step attribution; whole-second timestamps) |
-| `RUN` step, non-cooperative tool or raw socket | — (immediate "network unreachable"; **no trace anywhere** — not in the build log, the report, or provenance) | same as above |
-| `ADD <url>` | Not tracked by the report — the URL is developer-specified in the Dockerfile, already an intentional, reviewable part of the build | Aborts the entire build immediately at LLB load time; logged the same way as a denied `RUN` |
-| `FROM` / git contexts | Unaffected — buildcage's policy only ever matches `http(s)://` sources | Unaffected |
+| Traffic                                        | Allowed                                                                                                                            | Denied                                                                                      |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `RUN` step, proxy-aware tool                   | Logged per-step in the report's "Communication details"                                                                            | Logged in a flat `DENIED` list (no per-step attribution; whole-second timestamps)           |
+| `RUN` step, non-cooperative tool or raw socket | — (immediate "network unreachable"; **no trace anywhere** — not in the build log, the report, or provenance)                       | same as above                                                                               |
+| `ADD <url>`                                    | Not tracked by the report — the URL is developer-specified in the Dockerfile, already an intentional, reviewable part of the build | Aborts the entire build immediately at LLB load time; logged the same way as a denied `RUN` |
+| `FROM` / git contexts                          | Unaffected — buildcage's policy only ever matches `http(s)://` sources                                                             | Unaffected                                                                                  |
 
 The key structural difference from `transparent` mode: there, a non-cooperative process still reaches
 the CNI bridge and is observed, blocked, and logged. Under `explicit`, each `RUN` step's network
@@ -203,7 +204,7 @@ allowlist proxy — to an arbitrary `run:` command instead of a BuildKit `RUN` s
 Its threat model differs from the two build engines above in one important way: the process being
 isolated is a full shell command chosen by the workflow author, running with the same privileges as
 the Actions runner itself (rather than inside a BuildKit-managed OCI container), so isolating its
-*network* access is not sufficient on its own — the isolated command must also be structurally
+_network_ access is not sufficient on its own — the isolated command must also be structurally
 unable to reach outside its sandbox by other means (escalating privileges, reaching the Docker
 socket, or reading another process's memory).
 
@@ -237,7 +238,7 @@ an OCI `config.json` and enforced by runc natively.
   path — no wrapper needed.
 - **Seccomp filter**: derived from Docker's own default seccomp profile (allowlist-based;
   `moby/profiles`), resolved against an empty capability set to match the capability drop below —
-  so any syscall Docker's default profile only conditionally allows for a *held* capability is
+  so any syscall Docker's default profile only conditionally allows for a _held_ capability is
   excluded outright. This directly closes the gap historical `io_uring` and unprivileged
   user-namespace-creation CVEs relied on: `unshare(2)`/`clone(2)` with `CLONE_NEWUSER` and the
   `io_uring_*` syscall family are not in the resulting allowlist at all. Generated at `run` action
@@ -279,7 +280,7 @@ an OCI `config.json` and enforced by runc natively.
   in `config.json`, applied by runc itself). This closes off tampering with anything outside those
   paths — e.g. rewriting a binary earlier on `$PATH` to plant a payload for a later, non-sandboxed
   step in the same job. The rest of the host filesystem, including nested mounts, stays fully
-  *visible* (read-only) so existing tools keep working; only writes are restricted. The writable
+  _visible_ (read-only) so existing tools keep working; only writes are restricted. The writable
   exceptions are recursive bind-mounts (preserving any legitimately nested mounts under them); the
   sandbox's own `mount --rbind /` rootfs is staged under `/var/tmp/buildcage`, which is never one of
   those writable exceptions, so that recursion doesn't re-expose it as a second, writable copy of
@@ -290,7 +291,7 @@ an OCI `config.json` and enforced by runc natively.
   [Filesystem Access](./reference.md#filesystem-access) in Reference.
 - **Die-with-parent**: the isolated command's life is tied to `run-isolated.sh`'s own via a two-hop
   `setpriv --pdeathsig=KILL` chain (`run-isolated.sh` → `runc run` → the isolated command — `runc
-  run`'s own process sits between the two, so a single-hop guard wouldn't be enough). If
+run`'s own process sits between the two, so a single-hop guard wouldn't be enough). If
   `run-isolated.sh` is killed outright (e.g. an out-of-memory kill lands on it specifically), the
   whole sandboxed process tree is killed with it rather than surviving as an orphan.
 
@@ -312,9 +313,9 @@ an OCI `config.json` and enforced by runc natively.
   read-only host filesystem, the isolated command has no permission to use it. A `run:` step that
   itself needs to invoke `docker` (build an image, run a container, etc.) cannot be wrapped by
   `run`.
-- **Credential retrieval is intentionally not blocked**: `run` restricts *where* the isolated
+- **Credential retrieval is intentionally not blocked**: `run` restricts _where_ the isolated
   command can send network traffic and, since the filesystem is read-only outside
-  `$GITHUB_WORKSPACE`/`$HOME`/`/tmp`, *where* it can persist a payload — but not what it reads. A
+  `$GITHUB_WORKSPACE`/`$HOME`/`/tmp`, _where_ it can persist a payload — but not what it reads. A
   compromised dependency can still read `~/.aws/credentials`, `~/.docker/config.json`, or similar
   local credential files anywhere on the filesystem; it just cannot exfiltrate them anywhere outside
   the allowlist. This mirrors the same design principle as the Docker build engines above (see the
@@ -336,7 +337,7 @@ an OCI `config.json` and enforced by runc natively.
 
 ## Trusting the Buildcage Image
 
-Buildcage is a security tool — so it's fair to ask: *how do you trust Buildcage itself?*
+Buildcage is a security tool — so it's fair to ask: _how do you trust Buildcage itself?_
 
 The upstream image is verified at action startup via Sigstore: the signature cryptographically binds
 the published image to the exact source commit SHA, so a tampered or substituted image fails

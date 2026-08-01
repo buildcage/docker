@@ -93,7 +93,9 @@ export function parseAllowedRequestsFromText(text: string): AllowedRequest[] {
       const m = lines[j].match(requestLineDetailPattern);
       if (!m) break;
       const [, method, url, status] = m;
-      entries.push(status === undefined ? { method, url } : { method, url, status: Number(status) });
+      entries.push(
+        status === undefined ? { method, url } : { method, url, status: Number(status) },
+      );
     }
   }
   return entries;
@@ -169,7 +171,7 @@ export function parseVertexAllowedLog(rawJsonText: string): VertexAllowedEntry[]
     list.sort((a, b) => Date.parse(a.started!) - Date.parse(b.started!));
   }
   const orderedGroups = [...groups.values()].sort(
-    (a, b) => Date.parse(a[0].started!) - Date.parse(b[0].started!)
+    (a, b) => Date.parse(a[0].started!) - Date.parse(b[0].started!),
   );
 
   const logsByDigest = new Map<string, LogLine[]>();
@@ -181,7 +183,7 @@ export function parseVertexAllowedLog(rawJsonText: string): VertexAllowedEntry[]
 
   return orderedGroups.flat().map((v) => {
     const stderrLogs = (logsByDigest.get(v.digest) || []).sort(
-      (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)
+      (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp),
     );
     const text = stderrLogs.map((l) => Buffer.from(l.data, "base64").toString("utf8")).join("");
     return {
@@ -203,10 +205,7 @@ export interface HasEntries {
   entries: AllowedRequest[];
 }
 
-export function aggregateAllowedHosts(
-  builds: HasEntries[][],
-  decision: string,
-): AggregatedEntry[] {
+export function aggregateAllowedHosts(builds: HasEntries[][], decision: string): AggregatedEntry[] {
   const entries = [];
   for (const vertices of builds) {
     for (const { entries: vertexEntries } of vertices) {

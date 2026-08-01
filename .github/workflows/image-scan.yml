@@ -4,7 +4,7 @@ run-name: Image Security Scan (${{ github.ref_name }})
 on:
   schedule:
     # Monthly on the 1st at 00:00 UTC
-    - cron: '0 0 1 * *'
+    - cron: "0 0 1 * *"
   workflow_dispatch:
 
 permissions: {}

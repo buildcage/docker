@@ -47,16 +47,24 @@ describe("getContainerPid", () => {
 
 describe("isContainerNotFoundError", () => {
   it("recognizes docker's 'no such object' wording", () => {
-    assert.equal(isContainerNotFoundError({ stderr: "error: no such object: buildcage-proxy-xyz" }), true);
+    assert.equal(
+      isContainerNotFoundError({ stderr: "error: no such object: buildcage-proxy-xyz" }),
+      true,
+    );
   });
 
   it("recognizes docker's 'no such container' wording", () => {
-    assert.equal(isContainerNotFoundError({ stderr: "Error: No such container: buildcage-proxy-xyz" }), true);
+    assert.equal(
+      isContainerNotFoundError({ stderr: "Error: No such container: buildcage-proxy-xyz" }),
+      true,
+    );
   });
 
   it("does not misclassify a daemon-unreachable failure", () => {
     assert.equal(
-      isContainerNotFoundError({ stderr: "Cannot connect to the Docker daemon at unix:///var/run/docker.sock" }),
+      isContainerNotFoundError({
+        stderr: "Cannot connect to the Docker daemon at unix:///var/run/docker.sock",
+      }),
       false,
     );
   });

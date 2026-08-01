@@ -331,7 +331,9 @@ export async function fetchBundle(
         if (!subResp.ok) continue;
         const sub = await subResp.json!();
         if (sub.artifactType !== BUNDLE_MEDIA_TYPE) continue;
-        const layer = (sub.layers ?? []).find((l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE);
+        const layer = (sub.layers ?? []).find(
+          (l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE,
+        );
         if (!layer) continue;
         return fetchBundleBlob(api, layer.digest, headers, _fetch);
       }
@@ -394,12 +396,11 @@ async function fetchBundleFromManifestDigest(
       );
     }
     const manifest = await resp.json!();
-    const layer = (manifest.layers ?? []).find((l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE);
+    const layer = (manifest.layers ?? []).find(
+      (l: OciDescriptor) => l.mediaType === BUNDLE_MEDIA_TYPE,
+    );
     if (!layer) {
-      throw new VerifyImageError(
-        "No Sigstore bundle layer found in bundle manifest",
-        "NOT_FOUND",
-      );
+      throw new VerifyImageError("No Sigstore bundle layer found in bundle manifest", "NOT_FOUND");
     }
     return fetchBundleBlob(api, layer.digest, headers, _fetch);
   } catch (err) {
@@ -433,10 +434,7 @@ async function fetchBundleBlob(
       );
     }
     if (!resp.ok) {
-      throw new VerifyImageError(
-        `Failed to fetch bundle blob: HTTP ${resp.status}`,
-        "NOT_FOUND",
-      );
+      throw new VerifyImageError(`Failed to fetch bundle blob: HTTP ${resp.status}`, "NOT_FOUND");
     }
     return resp.json!();
   } catch (err) {

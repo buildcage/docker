@@ -4,7 +4,11 @@ import { deriveProjectName, buildDockerCpArgs } from "./container.ts";
 describe("buildDockerCpArgs", () => {
   it("builds a `docker cp <container>:<containerPath> <hostPath>` argv", () => {
     assert.deepEqual(
-      buildDockerCpArgs({ containerName: "buildcage-proxy-abcd1234", containerPath: "/opt/buildcage/bin/runc", hostPath: "/tmp/x/runc" }),
+      buildDockerCpArgs({
+        containerName: "buildcage-proxy-abcd1234",
+        containerPath: "/opt/buildcage/bin/runc",
+        hostPath: "/tmp/x/runc",
+      }),
       ["cp", "buildcage-proxy-abcd1234:/opt/buildcage/bin/runc", "/tmp/x/runc"],
     );
   });
@@ -12,7 +16,10 @@ describe("buildDockerCpArgs", () => {
 
 describe("deriveProjectName", () => {
   it("is deterministic — same input always derives the same project name", () => {
-    assert.equal(deriveProjectName("buildcage-proxy-abcd1234"), deriveProjectName("buildcage-proxy-abcd1234"));
+    assert.equal(
+      deriveProjectName("buildcage-proxy-abcd1234"),
+      deriveProjectName("buildcage-proxy-abcd1234"),
+    );
   });
 
   it("matches docker compose's project-name character constraints, even for input Compose would reject", () => {

@@ -48,7 +48,15 @@ describe("emitBlockedOutcome", () => {
     const r = report({
       blockedCount: 1,
       blocked: annotateKnownBlocked(
-        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 }],
+        [
+          {
+            host: "bad.example.com",
+            port: "443",
+            ruleType: "HTTPS",
+            reason: "not in allowlist",
+            count: 1,
+          },
+        ],
         [],
       ),
     });
@@ -60,7 +68,15 @@ describe("emitBlockedOutcome", () => {
     const r = report({
       blockedCount: 1,
       blocked: annotateKnownBlocked(
-        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 }],
+        [
+          {
+            host: "bad.example.com",
+            port: "443",
+            ruleType: "HTTPS",
+            reason: "not in allowlist",
+            count: 1,
+          },
+        ],
         [],
       ),
     });
@@ -79,7 +95,15 @@ describe("emitBlockedOutcome", () => {
       parameters: parameters({ mode: "audit" }),
       blockedCount: 1,
       blocked: annotateKnownBlocked(
-        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 }],
+        [
+          {
+            host: "bad.example.com",
+            port: "443",
+            ruleType: "HTTPS",
+            reason: "not in allowlist",
+            count: 1,
+          },
+        ],
         [],
       ),
     });
@@ -93,7 +117,15 @@ describe("emitBlockedOutcome", () => {
       parameters: parameters({ knownBlockedRules }),
       blockedCount: 1,
       blocked: annotateKnownBlocked(
-        [{ host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 }],
+        [
+          {
+            host: "known-bad.example.com",
+            port: "443",
+            ruleType: "HTTPS",
+            reason: "not in allowlist",
+            count: 1,
+          },
+        ],
         knownBlockedRules,
       ),
     });
@@ -107,13 +139,25 @@ describe("emitBlockedOutcome", () => {
       parameters: parameters({ mode: "audit" }),
       blockedCount: 1,
       blocked: annotateKnownBlocked(
-        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 }],
+        [
+          {
+            host: "bad.example.com",
+            port: "443",
+            ruleType: "HTTPS",
+            reason: "not in allowlist",
+            count: 1,
+          },
+        ],
         [],
       ),
     });
     emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: "/tmp/summary.md" });
-    const notices = log.mock.calls.map((c) => c.arguments[0] as string).filter((s) => s.startsWith("::notice::"));
-    const errors = log.mock.calls.map((c) => c.arguments[0] as string).filter((s) => s.startsWith("::error::"));
+    const notices = log.mock.calls
+      .map((c) => c.arguments[0] as string)
+      .filter((s) => s.startsWith("::notice::"));
+    const errors = log.mock.calls
+      .map((c) => c.arguments[0] as string)
+      .filter((s) => s.startsWith("::error::"));
     assert.equal(notices.length, 1);
     assert.equal(errors.length, 0);
   });
@@ -123,12 +167,22 @@ describe("emitBlockedOutcome", () => {
     const r = report({
       blockedCount: 1,
       blocked: annotateKnownBlocked(
-        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 }],
+        [
+          {
+            host: "bad.example.com",
+            port: "443",
+            ruleType: "HTTPS",
+            reason: "not in allowlist",
+            count: 1,
+          },
+        ],
         [],
       ),
     });
     emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: "/tmp/summary.md" });
-    const errors = log.mock.calls.map((c) => c.arguments[0] as string).filter((s) => s.startsWith("::error::"));
+    const errors = log.mock.calls
+      .map((c) => c.arguments[0] as string)
+      .filter((s) => s.startsWith("::error::"));
     assert.equal(errors.length, 1);
   });
 
@@ -137,7 +191,15 @@ describe("emitBlockedOutcome", () => {
     const r = report({
       blockedCount: 1,
       blocked: annotateKnownBlocked(
-        [{ host: "bad.example.com", port: "443", ruleType: "HTTPS", reason: "not in allowlist", count: 1 }],
+        [
+          {
+            host: "bad.example.com",
+            port: "443",
+            ruleType: "HTTPS",
+            reason: "not in allowlist",
+            count: 1,
+          },
+        ],
         [],
       ),
     });

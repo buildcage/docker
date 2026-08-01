@@ -16,7 +16,9 @@ describe("resolveProjectName", () => {
 
   it("ignores COMPOSE_PROJECT_NAME when the test-hooks gate isn't on for this build", () => {
     assert.equal(
-      resolveProjectName("buildcage-transparent-audit", { COMPOSE_PROJECT_NAME: "buildcage-project" }),
+      resolveProjectName("buildcage-transparent-audit", {
+        COMPOSE_PROJECT_NAME: "buildcage-project",
+      }),
       deriveProjectName("buildcage-transparent-audit"),
     );
   });

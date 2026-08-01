@@ -2,10 +2,16 @@ import { appendFileSync } from "node:fs";
 import { createDocker } from "../../../core/lib/docker/client.ts";
 import { createAnnotation } from "../../../core/lib/actions/annotation.ts";
 import { buildRestrictExample } from "../../../core/lib/report/build-example.ts";
-import { determineBlockedOutcome, buildBlockedMessage } from "../../../core/lib/report/known-blocked.ts";
+import {
+  determineBlockedOutcome,
+  buildBlockedMessage,
+} from "../../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../../core/lib/report/host-table.ts";
 import { buildTransparentReportData } from "../../../core/lib/report/build-transparent-report-data.ts";
-import type { GenReportParameters, TransparentReportData } from "../../../core/lib/report/report-data.ts";
+import type {
+  GenReportParameters,
+  TransparentReportData,
+} from "../../../core/lib/report/report-data.ts";
 
 export type Report = TransparentReportData;
 
@@ -16,8 +22,14 @@ const LOG_FILE = "/var/log/haproxy/current";
  * has no version-skew concern of its own (one pinned version end to end),
  * so it fetches the raw log and calls the shared builder in-process.
  */
-export function fetchReport(containerName: string, parameters: GenReportParameters): Promise<Report> {
-  return buildTransparentReportData(createDocker().readFileLines(containerName, LOG_FILE), parameters);
+export function fetchReport(
+  containerName: string,
+  parameters: GenReportParameters,
+): Promise<Report> {
+  return buildTransparentReportData(
+    createDocker().readFileLines(containerName, LOG_FILE),
+    parameters,
+  );
 }
 
 export interface ReportRenderContext {
@@ -38,14 +50,27 @@ export function buildReportMarkdown(
   let markdown = `## ${heading} (${report.parameters.mode} mode)\n\n`;
 
   if (isAudit) {
-    if (report.passed.length > 0) markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
+    if (report.passed.length > 0)
+      markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
     if (actionRepo) {
-      markdown += buildRestrictExample(report.passed, actionRepo, actionRef, { actionName: "run", runCommand });
+      markdown += buildRestrictExample(report.passed, actionRepo, actionRef, {
+        actionName: "run",
+        runCommand,
+      });
     }
-    if (report.blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, { showReason: true, showExpected }) + "\n\n";
+    if (report.blocked.length > 0)
+      markdown +=
+        "### 🚫 Blocked Hosts\n\n" +
+        renderHostTable(report.blocked, { showReason: true, showExpected }) +
+        "\n\n";
   } else {
-    if (report.passed.length > 0) markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
-    if (report.blocked.length > 0) markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, { showReason: true, showExpected }) + "\n\n";
+    if (report.passed.length > 0)
+      markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
+    if (report.blocked.length > 0)
+      markdown +=
+        "### 🚫 Blocked Hosts\n\n" +
+        renderHostTable(report.blocked, { showReason: true, showExpected }) +
+        "\n\n";
   }
 
   return markdown;

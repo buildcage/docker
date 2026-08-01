@@ -30,7 +30,9 @@ if (containerName?.startsWith("buildcage-proxy-")) {
     const scratchDir = scratchDirFor(containerName);
     if (existsSync(scratchDir)) cleanupScratchDir(scratchDir);
   } catch (e) {
-    console.log(`::warning::run post-cleanup: failed to remove sandbox scratch dir: ${errorMessage(e)}`);
+    console.log(
+      `::warning::run post-cleanup: failed to remove sandbox scratch dir: ${errorMessage(e)}`,
+    );
   }
 }
 

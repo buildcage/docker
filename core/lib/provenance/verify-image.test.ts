@@ -13,20 +13,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  imageTagFromRef,
-  buildVerifyOptions,
-  verifyImageDigestOrThrow,
-} from "./verify-image.ts";
+import { imageTagFromRef, buildVerifyOptions, verifyImageDigestOrThrow } from "./verify-image.ts";
 import { ProvenanceError, VerifyImageError } from "./errors.ts";
 import type { VerifyBundleOptions } from "./sigstore.ts";
 
 // ── Constants mirrored from verify-image.ts (for assertion readability) ──────
 
-const EXPECTED_ISSUER        = "https://token.actions.githubusercontent.com";
-const RELEASE_WORKFLOW       = ".github/workflows/docker-publish.yml";
+const EXPECTED_ISSUER = "https://token.actions.githubusercontent.com";
+const RELEASE_WORKFLOW = ".github/workflows/docker-publish.yml";
 const OID_SOURCE_REPO_DIGEST = "1.3.6.1.4.1.57264.1.13";
-const REPO                   = "dash14/buildcage";
+const REPO = "dash14/buildcage";
 
 /** Build a sample SAN URI as Fulcio would embed it. */
 function makeSAN(ref: string) {
@@ -120,7 +116,10 @@ describe("buildVerifyOptions — version tag", () => {
 
   it("does NOT match @v2.1.0 against cert SAN v2.1.1", () => {
     const opts = getOpts("v2.1.0");
-    assert.ok(!matchesSAN(opts, makeSAN("refs/tags/v2.1.1")), "exact pin must not match different patch");
+    assert.ok(
+      !matchesSAN(opts, makeSAN("refs/tags/v2.1.1")),
+      "exact pin must not match different patch",
+    );
   });
 
   it("does NOT match @v2.1 against cert SAN v2.2.0", () => {
@@ -207,7 +206,10 @@ describe("verifyImageDigestOrThrow", () => {
             throw new VerifyImageError("registry token request failed", "TOKEN_ERROR");
           },
         }),
-      (err: unknown) => err instanceof ProvenanceError && err.code === "TOKEN_ERROR" && err.message === "registry token request failed",
+      (err: unknown) =>
+        err instanceof ProvenanceError &&
+        err.code === "TOKEN_ERROR" &&
+        err.message === "registry token request failed",
     );
   });
 

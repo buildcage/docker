@@ -6,7 +6,11 @@ import type { ReportData } from "./report-data.ts";
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
  *  duplicated per engine. actionRepo/actionRef are real values, not
  *  placeholders — this runs on the runner, with process.env available. */
-export function renderReportMarkdown(report: ReportData, actionRepo: string, actionRef: string): string {
+export function renderReportMarkdown(
+  report: ReportData,
+  actionRepo: string,
+  actionRef: string,
+): string {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
   const heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts";
@@ -21,7 +25,10 @@ export function renderReportMarkdown(report: ReportData, actionRepo: string, act
   }
   if (report.blocked.length > 0) {
     if (report.passed.length > 0) markdown += "\n";
-    markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, { showReason: true, showExpected }) + "\n";
+    markdown +=
+      "### 🚫 Blocked Hosts\n\n" +
+      renderHostTable(report.blocked, { showReason: true, showExpected }) +
+      "\n";
   }
   if (report.passed.length === 0 && report.blocked.length === 0) {
     // Otherwise a no-traffic build leaves nothing between the heading and the
@@ -35,7 +42,8 @@ export function renderReportMarkdown(report: ReportData, actionRepo: string, act
     // SNI-based sniffing only applies to the transparent engine — the
     // explicit engine terminates TLS itself, so this caveat doesn't apply
     // there (renderCommunicationDetails above covers explicit instead).
-    markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
+    markdown +=
+      "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
   }
 
   markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;

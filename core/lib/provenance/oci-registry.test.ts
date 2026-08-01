@@ -25,13 +25,16 @@ describe("fetchManifestDigest", () => {
     return {
       ok: status >= 200 && status < 300,
       status,
-      headers: { get: (name: string) => name === "Docker-Content-Digest" ? digestValue : null },
+      headers: { get: (name: string) => (name === "Docker-Content-Digest" ? digestValue : null) },
     };
   }
 
   it("returns digest from Docker-Content-Digest header on success", async () => {
     let capturedOpts: { method?: string } | undefined;
-    const mockFetch = async (url: string, opts?: { method?: string }) => { capturedOpts = opts; return makeResp(200, digest); };
+    const mockFetch = async (url: string, opts?: { method?: string }) => {
+      capturedOpts = opts;
+      return makeResp(200, digest);
+    };
     const result = await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
     assert.equal(result, digest);
     assert.equal(capturedOpts?.method, "HEAD");
@@ -67,7 +70,10 @@ describe("fetchManifestDigest", () => {
     } catch (err) {
       assert.ok(err instanceof VerifyImageError);
       assert.equal(err.code, "TRANSIENT");
-      assert.ok(err.message.includes("authenticated"), "error message should hint at authentication");
+      assert.ok(
+        err.message.includes("authenticated"),
+        "error message should hint at authentication",
+      );
     }
   });
 
@@ -79,7 +85,10 @@ describe("fetchManifestDigest", () => {
     } catch (err) {
       assert.ok(err instanceof VerifyImageError);
       assert.equal(err.code, "TRANSIENT");
-      assert.ok(err.message.includes("authenticated"), "error message should hint at authentication");
+      assert.ok(
+        err.message.includes("authenticated"),
+        "error message should hint at authentication",
+      );
     }
   });
 
@@ -95,7 +104,9 @@ describe("fetchManifestDigest", () => {
   });
 
   it("throws TRANSIENT on network error", async () => {
-    const mockFetch = async () => { throw new Error("ECONNREFUSED"); };
+    const mockFetch = async () => {
+      throw new Error("ECONNREFUSED");
+    };
     try {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
@@ -158,7 +169,9 @@ describe("fetchRegistryToken", () => {
   });
 
   it("throws TRANSIENT on network error when no Docker credentials", async () => {
-    const mockFetch = async () => { throw new Error("ECONNREFUSED"); };
+    const mockFetch = async () => {
+      throw new Error("ECONNREFUSED");
+    };
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
@@ -188,7 +201,10 @@ describe("fetchRegistryToken", () => {
   it("throws TOKEN_ERROR immediately on 401 when Docker credentials are present (no fallback)", async () => {
     const basicAuth = Buffer.from("actor:expired_token").toString("base64");
     let callCount = 0;
-    const mockFetch = async () => { callCount++; return { ok: false, status: 401 }; };
+    const mockFetch = async () => {
+      callCount++;
+      return { ok: false, status: 401 };
+    };
     try {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
       assert.fail("should have thrown");
@@ -258,7 +274,9 @@ describe("readGhcrBasicAuth", () => {
   });
 
   it("returns null on file read error (not logged in at all)", () => {
-    const throwingRead = () => { throw new Error("ENOENT"); };
+    const throwingRead = () => {
+      throw new Error("ENOENT");
+    };
     assert.equal(readGhcrBasicAuth({}, throwingRead), null);
   });
 
@@ -268,9 +286,15 @@ describe("readGhcrBasicAuth", () => {
 
   it("uses DOCKER_CONFIG env var to resolve config path", () => {
     let capturedPath: string | undefined;
-    const readSpy = (p: string) => { capturedPath = p; return JSON.stringify({ auths: {} }); };
+    const readSpy = (p: string) => {
+      capturedPath = p;
+      return JSON.stringify({ auths: {} });
+    };
     readGhcrBasicAuth({ DOCKER_CONFIG: "/custom/docker" }, readSpy);
-    assert.ok(capturedPath?.startsWith("/custom/docker"), `expected path under DOCKER_CONFIG, got: ${capturedPath}`);
+    assert.ok(
+      capturedPath?.startsWith("/custom/docker"),
+      `expected path under DOCKER_CONFIG, got: ${capturedPath}`,
+    );
   });
 });
 
@@ -287,23 +311,31 @@ function makeFetchReturning(responses: any[]) {
 }
 
 describe("fetchBundle — Referrers API path", () => {
-  const digest      = "sha256:" + "a".repeat(64);
+  const digest = "sha256:" + "a".repeat(64);
   const manifestDig = "sha256:" + "b".repeat(64);
-  const blobDig     = "sha256:" + "d".repeat(64);
-  const bundleObj   = { mediaType: BUNDLE_TYPE, verificationMaterial: {} };
+  const blobDig = "sha256:" + "d".repeat(64);
+  const bundleObj = { mediaType: BUNDLE_TYPE, verificationMaterial: {} };
 
   it("returns bundle when found via Referrers API (3-request flow: referrers → manifest → blob)", async () => {
     const mockFetch = makeFetchReturning([
       // GET /referrers/<digest>
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
-          manifests: [{ artifactType: BUNDLE_TYPE, mediaType: "application/vnd.oci.image.manifest.v1+json", digest: manifestDig }],
+          manifests: [
+            {
+              artifactType: BUNDLE_TYPE,
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              digest: manifestDig,
+            },
+          ],
         }),
       },
       // GET /manifests/<manifestDig>
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
           artifactType: BUNDLE_TYPE,
           layers: [{ mediaType: BUNDLE_TYPE, digest: blobDig }],
@@ -320,8 +352,11 @@ describe("fetchBundle — Referrers API path", () => {
     const mockFetch = makeFetchReturning([
       // Referrers API → no bundle
       {
-        ok: true, status: 200,
-        json: async () => ({ manifests: [{ artifactType: "application/other", digest: "sha256:c" }] }),
+        ok: true,
+        status: 200,
+        json: async () => ({
+          manifests: [{ artifactType: "application/other", digest: "sha256:c" }],
+        }),
       },
       // Fallback tag → 404
       { ok: false, status: 404, json: async () => ({}) },
@@ -337,10 +372,10 @@ describe("fetchBundle — Referrers API path", () => {
 });
 
 describe("fetchBundle — fallback tag path", () => {
-  const digest      = "sha256:" + "a".repeat(64);
+  const digest = "sha256:" + "a".repeat(64);
   const manifestDig = "sha256:" + "b".repeat(64);
-  const blobDig     = "sha256:" + "c".repeat(64);
-  const bundleObj   = { mediaType: BUNDLE_TYPE };
+  const blobDig = "sha256:" + "c".repeat(64);
+  const bundleObj = { mediaType: BUNDLE_TYPE };
 
   it("falls back to sha256-<hex> tag (legacy direct-layers format) and returns bundle", async () => {
     const mockFetch = makeFetchReturning([
@@ -348,7 +383,8 @@ describe("fetchBundle — fallback tag path", () => {
       { ok: false, status: 404, json: async () => ({}) },
       // Fallback tag: direct manifest with layers
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
           layers: [{ mediaType: BUNDLE_TYPE, digest: blobDig }],
         }),
@@ -366,18 +402,22 @@ describe("fetchBundle — fallback tag path", () => {
       { ok: false, status: 404, json: async () => ({}) },
       // Fallback tag: image index with correct artifactType
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
-          manifests: [{
-            mediaType: "application/vnd.oci.image.manifest.v1+json",
-            artifactType: BUNDLE_TYPE,
-            digest: manifestDig,
-          }],
+          manifests: [
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              artifactType: BUNDLE_TYPE,
+              digest: manifestDig,
+            },
+          ],
         }),
       },
       // Sub-manifest
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
           artifactType: BUNDLE_TYPE,
           layers: [{ mediaType: BUNDLE_TYPE, digest: blobDig }],
@@ -396,29 +436,36 @@ describe("fetchBundle — fallback tag path", () => {
     const mockFetch = makeFetchReturning([
       // Referrers API → 303 redirect → image index (GHCR behaviour)
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
-          manifests: [{
-            mediaType: "application/vnd.oci.image.manifest.v1+json",
-            artifactType: "application/vnd.oci.empty.v1+json",  // ← GHCR: config.mediaType
-            digest: manifestDig,
-          }],
+          manifests: [
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              artifactType: "application/vnd.oci.empty.v1+json", // ← GHCR: config.mediaType
+              digest: manifestDig,
+            },
+          ],
         }),
       },
       // Fallback tag: same image index (fetched again)
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
-          manifests: [{
-            mediaType: "application/vnd.oci.image.manifest.v1+json",
-            artifactType: "application/vnd.oci.empty.v1+json",  // ← GHCR: config.mediaType
-            digest: manifestDig,
-          }],
+          manifests: [
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              artifactType: "application/vnd.oci.empty.v1+json", // ← GHCR: config.mediaType
+              digest: manifestDig,
+            },
+          ],
         }),
       },
       // Sub-manifest inspection: real artifactType is correct
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
           artifactType: BUNDLE_TYPE,
           layers: [{ mediaType: BUNDLE_TYPE, digest: blobDig }],
@@ -432,9 +479,7 @@ describe("fetchBundle — fallback tag path", () => {
   });
 
   it("throws TRANSIENT on 5xx from Referrers API", async () => {
-    const mockFetch = makeFetchReturning([
-      { ok: false, status: 503 },
-    ]);
+    const mockFetch = makeFetchReturning([{ ok: false, status: 503 }]);
     try {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
@@ -445,7 +490,9 @@ describe("fetchBundle — fallback tag path", () => {
   });
 
   it("throws TRANSIENT on network error from Referrers API", async () => {
-    const mockFetch = async () => { throw new Error("ECONNRESET"); };
+    const mockFetch = async () => {
+      throw new Error("ECONNRESET");
+    };
     try {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
@@ -461,7 +508,8 @@ describe("fetchBundle — fallback tag path", () => {
       { ok: false, status: 404, json: async () => ({}) },
       // Fallback tag manifest found (legacy format)
       {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => ({
           layers: [{ mediaType: BUNDLE_TYPE, digest: blobDig }],
         }),
@@ -474,8 +522,11 @@ describe("fetchBundle — fallback tag path", () => {
       assert.fail("should have thrown");
     } catch (err) {
       assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT",
-        "auth error must not be reported as NOT_FOUND (unsigned image)");
+      assert.equal(
+        err.code,
+        "TRANSIENT",
+        "auth error must not be reported as NOT_FOUND (unsigned image)",
+      );
     }
   });
 });

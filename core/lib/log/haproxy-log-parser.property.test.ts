@@ -30,31 +30,39 @@ describe("scanHaproxyLog – properties", () => {
     const reason = fc.oneof(fc.constant("-"), fc.stringMatching(/^\S{1,15}$/));
 
     await fc.assert(
-      fc.asyncProperty(decision, isAudit, ruleType, host, port, reason, async (d, audit, rt, h, p, r) => {
-        const line = `[2024-01-01] buildcage [${d}] (${rt}) "${h}:${p}" ${r}`;
-        const result = await scanHaproxyLog([line], audit);
-        const passedDecision = audit ? "AUDIT" : "ALLOWED";
+      fc.asyncProperty(
+        decision,
+        isAudit,
+        ruleType,
+        host,
+        port,
+        reason,
+        async (d, audit, rt, h, p, r) => {
+          const line = `[2024-01-01] buildcage [${d}] (${rt}) "${h}:${p}" ${r}`;
+          const result = await scanHaproxyLog([line], audit);
+          const passedDecision = audit ? "AUDIT" : "ALLOWED";
 
-        if (d === "BLOCKED") {
-          assert.equal(result.passed.length, 0);
-          assert.equal(result.blocked.length, 1);
-          assert.equal(result.blocked[0].ruleType, rt);
-          assert.equal(result.blocked[0].host, h);
-          assert.equal(result.blocked[0].port, p);
-          assert.equal(result.blocked[0].reason, r);
-        } else if (d === passedDecision) {
-          assert.equal(result.blocked.length, 0);
-          assert.equal(result.passed.length, 1);
-          assert.equal(result.passed[0].ruleType, rt);
-          assert.equal(result.passed[0].host, h);
-          assert.equal(result.passed[0].port, p);
-          assert.equal(result.passed[0].reason, r);
-        } else {
-          // The "other" of ALLOWED/AUDIT for this mode — dropped entirely.
-          assert.equal(result.passed.length, 0);
-          assert.equal(result.blocked.length, 0);
-        }
-      }),
+          if (d === "BLOCKED") {
+            assert.equal(result.passed.length, 0);
+            assert.equal(result.blocked.length, 1);
+            assert.equal(result.blocked[0].ruleType, rt);
+            assert.equal(result.blocked[0].host, h);
+            assert.equal(result.blocked[0].port, p);
+            assert.equal(result.blocked[0].reason, r);
+          } else if (d === passedDecision) {
+            assert.equal(result.blocked.length, 0);
+            assert.equal(result.passed.length, 1);
+            assert.equal(result.passed[0].ruleType, rt);
+            assert.equal(result.passed[0].host, h);
+            assert.equal(result.passed[0].port, p);
+            assert.equal(result.passed[0].reason, r);
+          } else {
+            // The "other" of ALLOWED/AUDIT for this mode — dropped entirely.
+            assert.equal(result.passed.length, 0);
+            assert.equal(result.blocked.length, 0);
+          }
+        },
+      ),
     );
   });
 

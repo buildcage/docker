@@ -26,7 +26,10 @@ describe("imageTagFromRef – properties", () => {
         fc.stringMatching(/^[0-9a-fA-F]{40}$/),
         fc.constantFrom("transparent", "explicit"),
         (sha, engine) => {
-          assert.equal(imageTagFromRef(sha, engine), `sha-${sha.toLowerCase()}${suffixFor(engine)}`);
+          assert.equal(
+            imageTagFromRef(sha, engine),
+            `sha-${sha.toLowerCase()}${suffixFor(engine)}`,
+          );
         },
       ),
     );
@@ -146,23 +149,20 @@ describe("buildACLRules – properties", () => {
   // '~'-prefixed tokens are treated as raw regexes and bypass host:port validation.
   it("any token without a colon and without ~ prefix always throws", () => {
     fc.assert(
-      fc.property(
-        fc.stringMatching(/^[^\s:~]{1,30}$/),
-        (token) => {
-          assert.throws(
-            () =>
-              buildACLRules({
-                httpsRulesInput: token,
-                httpRulesInput: "",
-                ipRulesInput: "",
-              }),
-            (err) => {
-              assert.ok(err instanceof Error);
-              return true;
-            },
-          );
-        },
-      ),
+      fc.property(fc.stringMatching(/^[^\s:~]{1,30}$/), (token) => {
+        assert.throws(
+          () =>
+            buildACLRules({
+              httpsRulesInput: token,
+              httpRulesInput: "",
+              ipRulesInput: "",
+            }),
+          (err) => {
+            assert.ok(err instanceof Error);
+            return true;
+          },
+        );
+      }),
     );
   });
 });
@@ -175,10 +175,7 @@ describe("resolveBuildcageImageRef – properties", () => {
   it("with digest: repository part is always lowercased regardless of actionRepository casing", () => {
     const digest = fc.stringMatching(/^sha256:[0-9a-f]{64}$/);
     const repoName = fc
-      .tuple(
-        fc.stringMatching(/^[A-Za-z0-9-]{1,20}$/),
-        fc.stringMatching(/^[A-Za-z0-9-]{1,20}$/),
-      )
+      .tuple(fc.stringMatching(/^[A-Za-z0-9-]{1,20}$/), fc.stringMatching(/^[A-Za-z0-9-]{1,20}$/))
       .map(([owner, repo]) => `${owner}/${repo}`);
 
     fc.assert(

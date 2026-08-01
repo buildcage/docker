@@ -14,8 +14,7 @@ const REQUIREMENT =
   'but NOT on lightweight images such as "ubuntu-slim" or many self-hosted/minimal runners. See ' +
   "docs/reference.md and docs/security.md for details.";
 
-const SLIM_RUNNER_NOTE =
-  `${SLIM_RUNNER_DETECTED_PREFIX} — these typically don't have passwordless sudo configured for this kind of privileged setup.`;
+const SLIM_RUNNER_NOTE = `${SLIM_RUNNER_DETECTED_PREFIX} — these typically don't have passwordless sudo configured for this kind of privileged setup.`;
 
 /**
  * Kept pure (takes the error, not execFileSync's raw output) so it's
