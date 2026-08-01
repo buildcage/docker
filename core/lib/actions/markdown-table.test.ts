@@ -5,7 +5,10 @@ import { markdownTable } from "./markdown-table.ts";
 describe("markdownTable", () => {
   it("renders headers, a left-aligned divider row, and cells pulled by key", () => {
     const table = markdownTable(
-      [{ key: "a", title: "A" }, { key: "b", title: "B" }],
+      [
+        { key: "a", title: "A" },
+        { key: "b", title: "B" },
+      ],
       [{ a: "1", b: "2" }],
     );
     assert.equal(table, "| A | B |\n| --- | --- |\n| 1 | 2 |");

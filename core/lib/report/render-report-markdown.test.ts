@@ -1,6 +1,10 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
 import { renderReportMarkdown } from "./render-report-markdown.ts";
-import type { GenReportParameters, TransparentReportData, ExplicitReportData } from "./report-data.ts";
+import type {
+  GenReportParameters,
+  TransparentReportData,
+  ExplicitReportData,
+} from "./report-data.ts";
 
 function params(overrides: Partial<GenReportParameters> = {}): GenReportParameters {
   return {
@@ -14,7 +18,14 @@ function params(overrides: Partial<GenReportParameters> = {}): GenReportParamete
 }
 
 const allowedRow = { host: "good.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 };
-const blockedRow = { host: "bad.com", port: "80", ruleType: "HTTP", reason: "not-allowed", count: 1, expected: false };
+const blockedRow = {
+  host: "bad.com",
+  port: "80",
+  ruleType: "HTTP",
+  reason: "not-allowed",
+  count: 1,
+  expected: false,
+};
 
 // test-shim's Assert interface has no doesNotMatch.
 function assertNotMatch(value: string, pattern: RegExp): void {
@@ -49,7 +60,11 @@ describe("renderReportMarkdown — transparent", () => {
   });
 
   it("renders Blocked Hosts and shows the SNI footnote, not Communication details", () => {
-    const md = renderReportMarkdown({ ...base, blocked: [blockedRow], blockedCount: 1 }, "dash14/buildcage", "v2");
+    const md = renderReportMarkdown(
+      { ...base, blocked: [blockedRow], blockedCount: 1 },
+      "dash14/buildcage",
+      "v2",
+    );
     assert.match(md, /### 🚫 Blocked Hosts/);
     assert.match(md, /based on the Host header/);
     assertNotMatch(md, /Communication details/);
@@ -72,10 +87,18 @@ describe("renderReportMarkdown — transparent", () => {
   });
 
   it("omits the '(no communication)' note once anything passed or was blocked", () => {
-    const passedMd = renderReportMarkdown({ ...base, passed: [allowedRow] }, "dash14/buildcage", "v2");
+    const passedMd = renderReportMarkdown(
+      { ...base, passed: [allowedRow] },
+      "dash14/buildcage",
+      "v2",
+    );
     assertNotMatch(passedMd, /_\(no communication\)_/);
 
-    const blockedMd = renderReportMarkdown({ ...base, blocked: [blockedRow], blockedCount: 1 }, "dash14/buildcage", "v2");
+    const blockedMd = renderReportMarkdown(
+      { ...base, blocked: [blockedRow], blockedCount: 1 },
+      "dash14/buildcage",
+      "v2",
+    );
     assertNotMatch(blockedMd, /_\(no communication\)_/);
   });
 });

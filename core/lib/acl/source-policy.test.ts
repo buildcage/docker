@@ -7,7 +7,10 @@ import { buildSourcePolicy } from "./source-policy.ts";
 // rule wins. This is the real, load-bearing semantics our rule ORDER must
 // produce correct results under — verified against a live buildkitd
 // container (see docs/security.md).
-function evaluate(policy: { rules: { action: string; selector: { identifier: string } }[] }, identifier: string) {
+function evaluate(
+  policy: { rules: { action: string; selector: { identifier: string } }[] },
+  identifier: string,
+) {
   let deny = false;
   for (const rule of policy.rules) {
     if (!new RegExp(rule.selector.identifier).test(identifier)) continue;
@@ -77,7 +80,10 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
     assert.equal(policy.version, 1);
     assert.deepEqual(policy.rules, [
       { action: "DENY", selector: { identifier: "^https?://.*", matchType: "REGEX" } },
-      { action: "ALLOW", selector: { identifier: "^https://example\\.com(:443)?(/.*)?$", matchType: "REGEX" } },
+      {
+        action: "ALLOW",
+        selector: { identifier: "^https://example\\.com(:443)?(/.*)?$", matchType: "REGEX" },
+      },
     ]);
   });
 
@@ -125,9 +131,15 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       ipRulesInput: "192.168.1.1:443",
     });
     assert.deepEqual(policy.rules.slice(1, 3), [
-      { action: "ALLOW", selector: { identifier: "^https://192\\.168\\.1\\.1(:443)?(/.*)?$", matchType: "REGEX" } },
+      {
+        action: "ALLOW",
+        selector: { identifier: "^https://192\\.168\\.1\\.1(:443)?(/.*)?$", matchType: "REGEX" },
+      },
       // :443 is not the default port for http, so it stays required
-      { action: "ALLOW", selector: { identifier: "^http://192\\.168\\.1\\.1:443(/.*)?$", matchType: "REGEX" } },
+      {
+        action: "ALLOW",
+        selector: { identifier: "^http://192\\.168\\.1\\.1:443(/.*)?$", matchType: "REGEX" },
+      },
     ]);
   });
 
@@ -138,7 +150,10 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(policy.rules[1].selector.identifier, "^https://[^.]+\\.example\\.com(:443)?(/.*)?$");
+    assert.equal(
+      policy.rules[1].selector.identifier,
+      "^https://[^.]+\\.example\\.com(:443)?(/.*)?$",
+    );
   });
 
   it("the DENY catch-all never matches non-http(s) source schemes", () => {

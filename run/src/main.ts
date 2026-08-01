@@ -51,7 +51,9 @@ async function resolveVerifiedImage({
   actionRepo,
 }: VerifyImageIdentity): Promise<ResolvedImage> {
   const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine: "proxy" });
-  console.log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
+  console.log(
+    `Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`,
+  );
   return {
     imageRef: resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo }),
     pullPolicy: "always",
@@ -105,7 +107,9 @@ async function main(): Promise<void> {
   const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(env)
+    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(
+        env,
+      )
     : null;
   if (localOverride) {
     console.log(
@@ -114,7 +118,8 @@ async function main(): Promise<void> {
         `buildcage's own CI self-tests and local development.`,
     );
   }
-  const { imageRef, pullPolicy } = localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo }));
+  const { imageRef, pullPolicy } =
+    localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo }));
   console.log(`buildcage-proxy image: ${imageRef}`);
 
   const rules = buildACLRules({
@@ -158,11 +163,10 @@ async function main(): Promise<void> {
   };
 
   try {
-    execFileSync(
-      "docker",
-      buildComposeUpArgs({ composeFile, projectName, pullPolicy }),
-      { stdio: "inherit", env: composeEnv },
-    );
+    execFileSync("docker", buildComposeUpArgs({ composeFile, projectName, pullPolicy }), {
+      stdio: "inherit",
+      env: composeEnv,
+    });
   } catch (e) {
     throw new SandboxError(
       describeDockerFailure(e, { operation: "docker compose up" }),
@@ -174,7 +178,10 @@ async function main(): Promise<void> {
   try {
     const proxyPid = getContainerPid(containerName);
     if (proxyPid === null) {
-      throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
+      throw new SandboxError(
+        `Sandbox proxy container ${containerName} is not running.`,
+        "PROXY_NOT_RUNNING",
+      );
     }
 
     // Fixed addressing for the direct veth link to the proxy's sandbox0 interface.
@@ -189,9 +196,15 @@ async function main(): Promise<void> {
         // Run natively on the runner host (not `docker exec`, which would
         // resolve against the container's kernel/arch instead of the real
         // one) — see gen-seccomp-profile/main.go.
-        ({ runcPath, seccompProfile, baseSpec } = extractRuncBootstrap({ containerName, destDir: dir }));
+        ({ runcPath, seccompProfile, baseSpec } = extractRuncBootstrap({
+          containerName,
+          destDir: dir,
+        }));
       } catch (e) {
-        throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${errorMessage(e)}`, "RUNC_EXTRACT_FAILED");
+        throw new SandboxError(
+          `Failed to extract runc/gen-seccomp-profile from the proxy image: ${errorMessage(e)}`,
+          "RUNC_EXTRACT_FAILED",
+        );
       }
 
       const workdir = env.GITHUB_WORKSPACE || "";
@@ -231,7 +244,10 @@ async function main(): Promise<void> {
           hostMounts,
         });
       } catch (e) {
-        throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
+        throw new SandboxError(
+          `Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`,
+          "OCI_CONFIG_BUILD_FAILED",
+        );
       }
       writeOciConfig(config, dir);
 
@@ -267,7 +283,10 @@ async function main(): Promise<void> {
       annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
     }
     try {
-      execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), { stdio: "inherit", env: composeEnv });
+      execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), {
+        stdio: "inherit",
+        env: composeEnv,
+      });
     } catch (e) {
       annotation.warning(
         `Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`,

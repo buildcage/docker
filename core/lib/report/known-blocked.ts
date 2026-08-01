@@ -71,7 +71,9 @@ export function determineBlockedOutcome({
     // against a deliberate, format-aware forgery.
     if (logLooksPlausible) return { level: "none", shouldFail: false };
     if (isAudit) return { level: "notice", shouldFail: false };
-    return failOnBlocked ? { level: "error", shouldFail: true } : { level: "notice", shouldFail: false };
+    return failOnBlocked
+      ? { level: "error", shouldFail: true }
+      : { level: "notice", shouldFail: false };
   }
   if (isAudit) return { level: "notice", shouldFail: false };
   const hasUnexpected = blockedRows.length === 0 || blockedRows.some((row) => !row.expected);

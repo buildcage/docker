@@ -55,7 +55,10 @@ export function buildSourcePolicy({
     },
     ...splitInput(httpsRulesInput).map((rule) => allowRule(rule, "https")),
     ...splitInput(httpRulesInput).map((rule) => allowRule(rule, "http")),
-    ...splitInput(ipRulesInput).flatMap((rule) => [allowRule(rule, "https"), allowRule(rule, "http")]),
+    ...splitInput(ipRulesInput).flatMap((rule) => [
+      allowRule(rule, "https"),
+      allowRule(rule, "http"),
+    ]),
   ];
   return { version: 1, rules };
 }
@@ -102,7 +105,7 @@ function isEscapedAt(s: string, i: number): boolean {
 // isEscapedAt above, inline as part of the replace.
 function confineDotStarToDomain(s: string): string {
   return s.replace(/(\\*)\.\*/g, (match, backslashes) =>
-    backslashes.length % 2 === 1 ? match : `${backslashes}[^/]*`
+    backslashes.length % 2 === 1 ? match : `${backslashes}[^/]*`,
   );
 }
 

@@ -95,10 +95,7 @@ export function assertSignedDigest(bundleJson: DsseBundle, expectedDigest: strin
     }
   } catch (err) {
     if (err instanceof VerifyImageError) throw err;
-    throw new VerifyImageError(
-      "Failed to parse signed payload from bundle",
-      "VERIFY_FAILED",
-    );
+    throw new VerifyImageError("Failed to parse signed payload from bundle", "VERIFY_FAILED");
   }
 }
 

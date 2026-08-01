@@ -7,7 +7,9 @@ import type { GenReportParameters } from "./report-data.ts";
  * an equivalent env-shaped record it already holds in memory. Same env var
  * names for both engines.
  */
-export function buildReportParameters(env: Record<string, string | undefined>): GenReportParameters {
+export function buildReportParameters(
+  env: Record<string, string | undefined>,
+): GenReportParameters {
   return {
     mode: env.PROXY_MODE || "restrict",
     allowedHttpsRules: splitRuleTokens(env.ALLOWED_HTTPS_RULES),

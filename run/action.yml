@@ -8,35 +8,35 @@ inputs:
   proxy_mode:
     description: "audit or restrict"
     required: false
-    default: 'restrict'
+    default: "restrict"
   allowed_https_rules:
     description: "HTTPS allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '*.example.com:443 ~^custom\\.pattern:443$'"
     required: false
-    default: ''
+    default: ""
   allowed_http_rules:
     description: "HTTP allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., 'example.com:80'"
     required: false
-    default: ''
+    default: ""
   allowed_ip_rules:
     description: "IP address allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
     required: false
-    default: ''
+    default: ""
   fail_on_blocked:
     description: "Fail the step if any connection was blocked (restrict mode only)"
     required: false
-    default: 'true'
+    default: "true"
   known_blocked_rules:
     description: "Domains expected to be blocked intentionally (wildcard or ~regex), separated by whitespace. Port required. Blocked connections matching these rules don't fail the step even when fail_on_blocked is true — only unmatched (unexpected) blocked connections do. e.g., 'known-noisy.example.com:443'"
     required: false
-    default: ''
+    default: ""
   writable:
     description: "Additional writable directories (newline-separated), on top of $GITHUB_WORKSPACE, $HOME, and /tmp which are always writable — everything else is read-only. Use '/' to disable the read-only restriction entirely."
     required: false
-    default: ''
+    default: ""
   label:
     description: "Label appended to this step's Job Summary heading, e.g. 'npm install' — useful to tell steps apart when `run` is used more than once in the same job"
     required: false
-    default: ''
+    default: ""
 
 runs:
   using: node24

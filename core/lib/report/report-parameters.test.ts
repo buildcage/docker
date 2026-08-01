@@ -21,7 +21,7 @@ describe("buildReportParameters", () => {
     );
   });
 
-  it("defaults mode to \"restrict\" when unset", () => {
+  it('defaults mode to "restrict" when unset', () => {
     assert.equal(buildReportParameters({}).mode, "restrict");
   });
 

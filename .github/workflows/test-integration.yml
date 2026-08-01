@@ -279,7 +279,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vp
 
       - name: Build local sandbox proxy image
         run: docker compose build proxy
@@ -291,7 +291,7 @@ jobs:
       - name: Rebuild run action with the local-image test hook enabled
         env:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: pnpm build
+        run: vp run build
 
       - name: Run run-action integration tests
         env:

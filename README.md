@@ -20,7 +20,7 @@ This is not a hypothetical risk: the [Shai-Hulud npm worm](https://unit42.paloal
 
 <img src="assets/report-restrict-mode.png" alt="Buildcage report showing allowed and blocked connections" width="556">
 
-*A build tries to reach an unexpected domain. Buildcage blocks it and records it in the report. This is what your report looks like after completing the audit → restrict flow below.*
+_A build tries to reach an unexpected domain. Buildcage blocks it and records it in the report. This is what your report looks like after completing the audit → restrict flow below._
 
 ## Features
 
@@ -49,7 +49,7 @@ tool works the same way, including `docker/bake-action`: just point its `driver:
 - name: Start Buildcage in audit mode
   uses: dash14/buildcage/setup@f40c162979dc9f095993ad26049b08b2eca77911 # v2.2.5
   with:
-    proxy_mode: audit  # Log every destination, block nothing
+    proxy_mode: audit # Log every destination, block nothing
 
 - name: Set up Docker Buildx
   uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -61,7 +61,7 @@ tool works the same way, including `docker/bake-action`: just point its `driver:
   uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
   with:
     context: .
-    push: false  # Set to true to push the built image
+    push: false # Set to true to push the built image
 
 - name: Show Buildcage report
   if: always()
@@ -76,7 +76,7 @@ The report action outputs a Job Summary showing every destination your build con
 
 <img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="556">
 
-*Same workflow, run first in audit mode: every destination is logged, nothing is blocked yet.*
+_Same workflow, run first in audit mode: every destination is logged, nothing is blocked yet._
 
 Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for Step 3.
 
@@ -86,7 +86,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 - name: Start Buildcage in restrict mode
   uses: dash14/buildcage/setup@f40c162979dc9f095993ad26049b08b2eca77911 # v2.2.5
   with:
-    proxy_mode: restrict  # Block every destination except the ones you allow
+    proxy_mode: restrict # Block every destination except the ones you allow
     allowed_https_rules: |
       registry.npmjs.org:443
       fonts.googleapis.com:443
@@ -101,7 +101,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
   uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
   with:
     context: .
-    push: false  # Set to true to push the built image
+    push: false # Set to true to push the built image
 
 - name: Show Buildcage report
   if: always()
@@ -155,7 +155,7 @@ See [Reference](./docs/reference.md) for the full mechanism, including Docker bu
 proxy engine switch.
 
 > [!IMPORTANT]
-> Buildcage controls *where* your builds can connect, not *what code* they run. If a malicious
+> Buildcage controls _where_ your builds can connect, not _what code_ they run. If a malicious
 > package is delivered through a legitimate repository (e.g., a compromised npm package hosted on
 > `registry.npmjs.org`), Buildcage cannot detect or prevent it: the connection goes to an allowed
 > domain.
@@ -229,13 +229,13 @@ isolates each `RUN` step or `run:` command individually.
 
 ## Documentation
 
-| Doc | What's in it |
-|---|---|
-| [Reference](./docs/reference.md) | Full parameter reference, operation modes, and how each proxy engine and the `run` action work under the hood |
-| [Rule Syntax](./docs/rules.md) | Wildcard, regex, and IP rule syntax in detail |
-| [Security Details](./docs/security.md) | Architecture, attack resistance, and known limitations for Docker builds and the `run` action |
-| [Self-Hosting Guide](./docs/self-hosting.md) | Hosting your own Buildcage image in a private repository |
-| [Development Guide](./docs/development.md) | Local usage, testing, logs, and implementation internals |
+| Doc                                          | What's in it                                                                                                  |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [Reference](./docs/reference.md)             | Full parameter reference, operation modes, and how each proxy engine and the `run` action work under the hood |
+| [Rule Syntax](./docs/rules.md)               | Wildcard, regex, and IP rule syntax in detail                                                                 |
+| [Security Details](./docs/security.md)       | Architecture, attack resistance, and known limitations for Docker builds and the `run` action                 |
+| [Self-Hosting Guide](./docs/self-hosting.md) | Hosting your own Buildcage image in a private repository                                                      |
+| [Development Guide](./docs/development.md)   | Local usage, testing, logs, and implementation internals                                                      |
 
 ## Why I Built This
 
@@ -267,6 +267,7 @@ If you find Buildcage helpful, please consider giving it a star ⭐ on GitHub!
 This software is provided "as is", without warranty of any kind, express or implied. The authors and contributors are not liable for any damages, losses, or security incidents arising from the use of this software. Use at your own risk.
 
 ## License
+
 The Buildcage source code is licensed under the MIT License. See [LICENSE](./LICENSE) file for details.
 
 The Docker image includes third-party components under their own licenses (GPL, Apache 2.0, ISC, etc.). See [THIRD_PARTY_LICENSES](./THIRD_PARTY_LICENSES) for the full list.

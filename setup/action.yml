@@ -5,31 +5,31 @@ inputs:
   builder_name:
     description: "Name of the builder container"
     required: false
-    default: 'buildcage'
+    default: "buildcage"
   proxy_mode:
     description: "audit or restrict"
     required: false
-    default: 'restrict'
+    default: "restrict"
   proxy_engine:
     description: "Network enforcement engine: transparent (transparent proxy, default) or explicit (BuildKit's native --proxy-network; experimental, see docs/security.md)"
     required: false
-    default: 'transparent'
+    default: "transparent"
   allowed_https_rules:
     description: "HTTPS allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '*.example.com:443 ~^custom\\.pattern:443$'"
     required: false
-    default: ''
+    default: ""
   allowed_http_rules:
     description: "HTTP allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., 'example.com:80'"
     required: false
-    default: ''
+    default: ""
   allowed_ip_rules:
     description: "IP address allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
     required: false
-    default: ''
+    default: ""
   known_blocked_rules:
     description: "Domains expected to be blocked intentionally (wildcard or ~regex), separated by whitespace. Port required. Blocked connections matching these rules don't fail the report step even when fail_on_blocked is true — only unmatched (unexpected) blocked connections do. e.g., 'known-noisy.example.com:443'"
     required: false
-    default: ''
+    default: ""
 
 runs:
   using: node24

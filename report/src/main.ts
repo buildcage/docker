@@ -44,7 +44,10 @@ async function main(): Promise<void> {
     containerId = ids[0];
   } catch (e) {
     if (e instanceof ReportError) throw e;
-    throw new ReportError(describeDockerFailure(e, { operation: "docker ps" }), "DOCKER_UNAVAILABLE");
+    throw new ReportError(
+      describeDockerFailure(e, { operation: "docker ps" }),
+      "DOCKER_UNAVAILABLE",
+    );
   }
 
   // 2. Pull report-action.js out of the (Sigstore-verified) image and run
@@ -57,10 +60,16 @@ async function main(): Promise<void> {
     const reportActionPath = join(scratchDir, "report-action.js");
 
     try {
-      docker.copyFromContainer(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath);
+      docker.copyFromContainer(
+        containerId,
+        "/opt/buildcage/scripts/report-action.js",
+        reportActionPath,
+      );
     } catch (e) {
       throw new ReportError(
-        describeDockerFailure(e, { operation: "docker cp (fetching report-action.js from the container)" }),
+        describeDockerFailure(e, {
+          operation: "docker cp (fetching report-action.js from the container)",
+        }),
         "DOCKER_UNAVAILABLE",
       );
     }
@@ -77,7 +86,10 @@ async function main(): Promise<void> {
         process.exitCode = status;
         return;
       }
-      throw new ReportError(`Failed to run report-action.js: ${errorMessage(e)}`, "REPORT_SCRIPT_FAILED");
+      throw new ReportError(
+        `Failed to run report-action.js: ${errorMessage(e)}`,
+        "REPORT_SCRIPT_FAILED",
+      );
     }
   } finally {
     rmSync(scratchDir, { recursive: true, force: true });

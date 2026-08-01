@@ -36,10 +36,7 @@ interface MakeBundleOptions {
   subjects?: Subject[];
 }
 
-function makeBundle(
-  signedDigest: string,
-  { payloadType, subjects }: MakeBundleOptions = {},
-) {
+function makeBundle(signedDigest: string, { payloadType, subjects }: MakeBundleOptions = {}) {
   let payloadObj;
   if (payloadType === "application/vnd.in-toto+json") {
     const subjectList = subjects ?? [
@@ -152,11 +149,7 @@ describe("assertSignedDigest — in-toto Statement v1 (cosign --new-bundle-forma
 
   it("throws VERIFY_FAILED when subject digest does not match", () => {
     assert.throws(
-      () =>
-        assertSignedDigest(
-          makeBundle("sha256:different", { payloadType: IN_TOTO }),
-          DIGEST,
-        ),
+      () => assertSignedDigest(makeBundle("sha256:different", { payloadType: IN_TOTO }), DIGEST),
       (err: unknown) => {
         assert.ok(err instanceof VerifyImageError);
         assert.equal(err.code, "VERIFY_FAILED");

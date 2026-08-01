@@ -13,4 +13,6 @@ import { ActionError } from "../../../core/lib/general/action-error.ts";
  *                          report-action.js that ran and exited nonzero is
  *                          reproduced via this action's exit code instead)
  */
-export class ReportError extends ActionError<"DOCKER_UNAVAILABLE" | "CONTAINER_NOT_FOUND" | "REPORT_SCRIPT_FAILED"> {}
+export class ReportError extends ActionError<
+  "DOCKER_UNAVAILABLE" | "CONTAINER_NOT_FOUND" | "REPORT_SCRIPT_FAILED"
+> {}

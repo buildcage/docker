@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (leave empty to use latest)'
+        description: "Tag to build (leave empty to use latest)"
         required: false
         type: string
 

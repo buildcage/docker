@@ -16,26 +16,26 @@ Starts the Buildcage builder container.
 
 ### Parameters
 
-| Parameter | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `builder_name` | No | `buildcage` | Name of the builder container |
-| `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
-| `proxy_engine` | No | `transparent` | Network enforcement engine (`transparent` / `explicit`, see [Proxy Engines](#proxy-engines)) |
-| `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
-| `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
-| `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
-| `known_blocked_rules` | No | empty | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the `report` step even when `fail_on_blocked` is `true` — see [Report Action](#report-action-dash14buildcagereport) below |
+| Parameter             | Required | Default       | Description                                                                                                                                                                                                                                              |
+| --------------------- | -------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `builder_name`        | No       | `buildcage`   | Name of the builder container                                                                                                                                                                                                                            |
+| `proxy_mode`          | No       | `restrict`    | Operation mode (`audit` / `restrict`)                                                                                                                                                                                                                    |
+| `proxy_engine`        | No       | `transparent` | Network enforcement engine (`transparent` / `explicit`, see [Proxy Engines](#proxy-engines))                                                                                                                                                             |
+| `allowed_https_rules` | No       | empty         | HTTPS allow rules (wildcard or regex, port required)                                                                                                                                                                                                     |
+| `allowed_http_rules`  | No       | empty         | HTTP allow rules (wildcard or regex, port required)                                                                                                                                                                                                      |
+| `allowed_ip_rules`    | No       | empty         | IP address allow rules (wildcard or regex, port required)                                                                                                                                                                                                |
+| `known_blocked_rules` | No       | empty         | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the `report` step even when `fail_on_blocked` is `true` — see [Report Action](#report-action-dash14buildcagereport) below |
 
 ### Rule Syntax
 
-| Pattern | Example | Matches |
-|---------|---------|---------|
-| Exact domain | `example.com:443` | `example.com` on port 443 only |
-| Single-level wildcard | `*.example.com:443` | `sub.example.com` on port 443 (not `deep.sub.example.com`) |
-| Multi-level wildcard | `**.example.com:443` | `sub.example.com` and `deep.sub.example.com` on port 443 |
-| Single-char wildcard | `exampl?.com:443` | `example.com`, `examplx.com` on port 443 |
-| Wildcard port | `example.com:*` | `example.com` on any port |
-| Regex | `~^custom\.pattern:\d+$` | Matched against `domain:port` |
+| Pattern               | Example                  | Matches                                                    |
+| --------------------- | ------------------------ | ---------------------------------------------------------- |
+| Exact domain          | `example.com:443`        | `example.com` on port 443 only                             |
+| Single-level wildcard | `*.example.com:443`      | `sub.example.com` on port 443 (not `deep.sub.example.com`) |
+| Multi-level wildcard  | `**.example.com:443`     | `sub.example.com` and `deep.sub.example.com` on port 443   |
+| Single-char wildcard  | `exampl?.com:443`        | `example.com`, `examplx.com` on port 443                   |
+| Wildcard port         | `example.com:*`          | `example.com` on any port                                  |
+| Regex                 | `~^custom\.pattern:\d+$` | Matched against `domain:port`                              |
 
 IP address rules (e.g., `192.168.1.1:443`) use the same syntax but go in `allowed_ip_rules`.
 
@@ -88,17 +88,17 @@ See the [audit mode](../.github/workflows/example-audit.yml) and
 It's independent of `proxy_mode` (audit/restrict): either engine works with either mode, and both
 use identical `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` syntax.
 
-| | `transparent` (default) | `explicit` |
-|---|---|---|
-| Isolation mechanism | CNI network + DNS redirection | BuildKit native `--proxy-network` (point-to-point network namespace) |
-| TLS handling | Not terminated — SNI (HTTPS) / Host header (HTTP) inspected only | Terminated (MITM) via an injected CA — full host **and path** visible |
-| Dockerfile / tool changes | None required | None for tools that already respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store (most OpenSSL-based tools); a tool that bundles its own CA store (e.g. npm) needs an env var or flag pointing it at the system CA store — see [CA Trust for Tools with Their Own CA Store](#ca-trust-for-tools-with-their-own-ca-store) below |
-| Enforcement granularity | Domain (and port) | Domain (and port) — same as `transparent`; the decrypted path is visible for logging but isn't matched by `allowed_*_rules` |
-| `allowed_ip_rules` enforcement | Raw TCP passthrough — no protocol inspection once `ip:port` matches | Same as domain rules — matched and MITM'd via the BuildKit source policy, not a special-cased passthrough |
-| Non-cooperative tools (ignore proxy env vars, or open raw sockets) | Still observed, blocked, and logged — network-level enforcement, no opt-out | Blocked with "network unreachable" — invisible, no trace anywhere in the report |
-| Report detail | Allowed / blocked hosts | Allowed / blocked hosts (with full path), plus a per-step "Communication details" breakdown |
-| BuildKit provenance / SLSA integration | Not integrated | Integrated into BuildKit's own build output and SLSA provenance |
-| Best for | Default choice — works with any tool regardless of proxy-awareness | Cooperative tools, when path-level visibility or provenance integration matters more than catching non-cooperative traffic |
+|                                                                    | `transparent` (default)                                                     | `explicit`                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Isolation mechanism                                                | CNI network + DNS redirection                                               | BuildKit native `--proxy-network` (point-to-point network namespace)                                                                                                                                                                                                                                                                       |
+| TLS handling                                                       | Not terminated — SNI (HTTPS) / Host header (HTTP) inspected only            | Terminated (MITM) via an injected CA — full host **and path** visible                                                                                                                                                                                                                                                                      |
+| Dockerfile / tool changes                                          | None required                                                               | None for tools that already respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store (most OpenSSL-based tools); a tool that bundles its own CA store (e.g. npm) needs an env var or flag pointing it at the system CA store — see [CA Trust for Tools with Their Own CA Store](#ca-trust-for-tools-with-their-own-ca-store) below |
+| Enforcement granularity                                            | Domain (and port)                                                           | Domain (and port) — same as `transparent`; the decrypted path is visible for logging but isn't matched by `allowed_*_rules`                                                                                                                                                                                                                |
+| `allowed_ip_rules` enforcement                                     | Raw TCP passthrough — no protocol inspection once `ip:port` matches         | Same as domain rules — matched and MITM'd via the BuildKit source policy, not a special-cased passthrough                                                                                                                                                                                                                                  |
+| Non-cooperative tools (ignore proxy env vars, or open raw sockets) | Still observed, blocked, and logged — network-level enforcement, no opt-out | Blocked with "network unreachable" — invisible, no trace anywhere in the report                                                                                                                                                                                                                                                            |
+| Report detail                                                      | Allowed / blocked hosts                                                     | Allowed / blocked hosts (with full path), plus a per-step "Communication details" breakdown                                                                                                                                                                                                                                                |
+| BuildKit provenance / SLSA integration                             | Not integrated                                                              | Integrated into BuildKit's own build output and SLSA provenance                                                                                                                                                                                                                                                                            |
+| Best for                                                           | Default choice — works with any tool regardless of proxy-awareness          | Cooperative tools, when path-level visibility or provenance integration matters more than catching non-cooperative traffic                                                                                                                                                                                                                 |
 
 `transparent` enforces at the network layer regardless of whether a tool cooperates, so every
 connection attempt is observed and recorded — this is why it's the default. Use `explicit` if you
@@ -196,10 +196,10 @@ gains an extra **Expected** column (✅) marking the matched rows.
 
 ### Parameters
 
-| Parameter | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `builder_name` | No | `buildcage` | Name of the builder container |
-| `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
+| Parameter         | Required | Default     | Description                                                                                   |
+| ----------------- | -------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `builder_name`    | No       | `buildcage` | Name of the builder container                                                                 |
+| `fail_on_blocked` | No       | `true`      | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
 
 ---
 
@@ -244,17 +244,17 @@ See the [restrict mode](../.github/workflows/example-run-restrict.yml) and
 
 ### Parameters
 
-| Parameter | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `run` | Yes | — | Command(s) to run inside the isolated sandbox (multi-line supported, like a workflow `run:` step) |
-| `proxy_mode` | No | `restrict` | Operation mode (`audit` / `restrict`) |
-| `allowed_https_rules` | No | empty | HTTPS allow rules (wildcard or regex, port required) |
-| `allowed_http_rules` | No | empty | HTTP allow rules (wildcard or regex, port required) |
-| `allowed_ip_rules` | No | empty | IP address allow rules (wildcard or regex, port required) |
-| `fail_on_blocked` | No | `true` | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode) |
-| `known_blocked_rules` | No | empty | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the step even when `fail_on_blocked` is `true` |
-| `writable` | No | empty | Additional writable directories (newline-separated), on top of `$GITHUB_WORKSPACE`, `$HOME`, `/tmp`, and `$RUNNER_TEMP` — see [Filesystem Access](#filesystem-access) below |
-| `label` | No | empty | Label appended to this step's Job Summary heading, e.g. `npm install` — useful to tell steps apart when `run` is used more than once in the same job |
+| Parameter             | Required | Default    | Description                                                                                                                                                                   |
+| --------------------- | -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run`                 | Yes      | —          | Command(s) to run inside the isolated sandbox (multi-line supported, like a workflow `run:` step)                                                                             |
+| `proxy_mode`          | No       | `restrict` | Operation mode (`audit` / `restrict`)                                                                                                                                         |
+| `allowed_https_rules` | No       | empty      | HTTPS allow rules (wildcard or regex, port required)                                                                                                                          |
+| `allowed_http_rules`  | No       | empty      | HTTP allow rules (wildcard or regex, port required)                                                                                                                           |
+| `allowed_ip_rules`    | No       | empty      | IP address allow rules (wildcard or regex, port required)                                                                                                                     |
+| `fail_on_blocked`     | No       | `true`     | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode)                                                                                 |
+| `known_blocked_rules` | No       | empty      | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the step even when `fail_on_blocked` is `true` |
+| `writable`            | No       | empty      | Additional writable directories (newline-separated), on top of `$GITHUB_WORKSPACE`, `$HOME`, `/tmp`, and `$RUNNER_TEMP` — see [Filesystem Access](#filesystem-access) below   |
+| `label`               | No       | empty      | Label appended to this step's Job Summary heading, e.g. `npm install` — useful to tell steps apart when `run` is used more than once in the same job                          |
 
 Rule syntax is identical to `setup`'s — see [Rule Syntax](#rule-syntax) above. `known_blocked_rules`
 uses this same syntax; see the [Report Action](#report-action-dash14buildcagereport) section above
@@ -311,7 +311,7 @@ BuildKit `RUN` step:
 Only `$GITHUB_WORKSPACE`, `$HOME`, `/tmp`, and `$RUNNER_TEMP` are writable by default — every other
 path is remounted read-only for the duration of the `run` command. This closes off using the
 filesystem to plant a payload for a later, non-sandboxed step in the same job (e.g. rewriting a
-binary earlier on `$PATH`); it doesn't restrict what the command can *read* (see
+binary earlier on `$PATH`); it doesn't restrict what the command can _read_ (see
 [Known Limitations](./security.md#run-action) in Security Details).
 
 If `run` needs to write somewhere else — a tool-specific cache directory, for example — list it
@@ -328,7 +328,7 @@ under `writable`:
 To disable the read-only restriction entirely, set `writable` to `/`:
 
 ```yaml
-    writable: /
+writable: /
 ```
 
 > [!NOTE]

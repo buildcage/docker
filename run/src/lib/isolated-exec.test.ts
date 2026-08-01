@@ -106,7 +106,10 @@ describe("computeReadonlyHostMounts", () => {
   it("excludes explicitly protected (writable) paths", () => {
     const result = computeReadonlyHostMounts(hostMounts, new Set(["/run"]), freshMountDestinations);
     assert.ok(!result.includes("/run"));
-    assert.ok(result.includes("/run/user/1000"), "a nested mount under a protected path is still its own separate mount point");
+    assert.ok(
+      result.includes("/run/user/1000"),
+      "a nested mount under a protected path is still its own separate mount point",
+    );
   });
 
   it("includes real, non-pseudo, non-protected host mounts (e.g. a separate disk at /mnt)", () => {
@@ -121,7 +124,10 @@ describe("computeReadonlyHostMounts", () => {
     // "kernel pseudo-fs" class as /proc, but runc's default spec never
     // declares a mount for it, so the host-swept copy must be forced
     // read-only just like any other real mount point.
-    const withSecurityfs = [...hostMounts, { mountPoint: "/sys/kernel/security", fsType: "securityfs" }];
+    const withSecurityfs = [
+      ...hostMounts,
+      { mountPoint: "/sys/kernel/security", fsType: "securityfs" },
+    ];
     const result = computeReadonlyHostMounts(withSecurityfs, new Set(), freshMountDestinations);
     assert.ok(result.includes("/sys/kernel/security"));
   });
@@ -129,7 +135,9 @@ describe("computeReadonlyHostMounts", () => {
 
 describe("freshMountDestinationsFrom", () => {
   it("collects every mounts[].destination from the base spec", () => {
-    const baseSpec = { mounts: [{ destination: "/proc" }, { destination: "/sys" }, { destination: "/dev/pts" }] };
+    const baseSpec = {
+      mounts: [{ destination: "/proc" }, { destination: "/sys" }, { destination: "/dev/pts" }],
+    };
     assert.deepEqual(freshMountDestinationsFrom(baseSpec), new Set(["/proc", "/sys", "/dev/pts"]));
   });
 });
@@ -144,7 +152,10 @@ describe("parseMountsUnder", () => {
 
   it("finds only mount points nested under the given directory", () => {
     const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-abc");
-    assert.deepEqual(result.sort(), ["/tmp/buildcage-sandbox-abc", "/tmp/buildcage-sandbox-abc/rootfs"].sort());
+    assert.deepEqual(
+      result.sort(),
+      ["/tmp/buildcage-sandbox-abc", "/tmp/buildcage-sandbox-abc/rootfs"].sort(),
+    );
   });
 
   it("orders deepest paths first, so children are unmounted before their parents", () => {
@@ -184,7 +195,14 @@ function fakeBaseSpec() {
       },
     },
     linux: {
-      namespaces: [{ type: "pid" }, { type: "network" }, { type: "ipc" }, { type: "uts" }, { type: "mount" }, { type: "cgroup" }],
+      namespaces: [
+        { type: "pid" },
+        { type: "network" },
+        { type: "ipc" },
+        { type: "uts" },
+        { type: "mount" },
+        { type: "cgroup" },
+      ],
       maskedPaths: ["/proc/acpi", "/proc/kcore", "/proc/keys", "/proc/timer_list"],
       readonlyPaths: ["/proc/bus", "/proc/sysrq-trigger"],
     },
@@ -207,7 +225,13 @@ describe("buildOciConfig", () => {
 
   it("clears all five capability sets and sets noNewPrivileges", () => {
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
-    assert.deepEqual(config.process.capabilities, { bounding: [], effective: [], permitted: [], inheritable: [], ambient: [] });
+    assert.deepEqual(config.process.capabilities, {
+      bounding: [],
+      effective: [],
+      permitted: [],
+      inheritable: [],
+      ambient: [],
+    });
     assert.equal(config.process.noNewPrivileges, true);
   });
 
@@ -239,7 +263,14 @@ describe("buildOciConfig", () => {
 
   it("extends maskedPaths with kallsyms/kmsg/sysrq-trigger and moves sysrq-trigger out of readonlyPaths", () => {
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
-    for (const p of ["/proc/kallsyms", "/proc/kmsg", "/proc/sysrq-trigger", "/proc/kcore", "/proc/keys", "/proc/timer_list"]) {
+    for (const p of [
+      "/proc/kallsyms",
+      "/proc/kmsg",
+      "/proc/sysrq-trigger",
+      "/proc/kcore",
+      "/proc/keys",
+      "/proc/timer_list",
+    ]) {
       assert.ok(config.linux.maskedPaths.includes(p), `expected maskedPaths to include ${p}`);
     }
     assert.ok(!config.linux.readonlyPaths.includes("/proc/sysrq-trigger"));
@@ -272,23 +303,45 @@ describe("buildOciConfig", () => {
   });
 
   it("fails closed when writable: lists an ancestor of the scratch base", () => {
-    assert.throws(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp"] }), /overlaps/);
+    assert.throws(
+      () => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp"] }),
+      /overlaps/,
+    );
   });
 
   it("fails closed when writable: lists a descendant of the scratch base", () => {
-    assert.throws(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp/buildcage/some-other-run"] }), /overlaps/);
+    assert.throws(
+      () =>
+        buildOciConfig(fakeBaseSpec(), {
+          ...baseArgs,
+          writablePaths: ["/var/tmp/buildcage/some-other-run"],
+        }),
+      /overlaps/,
+    );
   });
 
   it("fails closed when $HOME or RUNNER_TEMP itself overlaps the scratch base", () => {
-    assert.throws(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, home: "/var/tmp/buildcage", writablePaths: [] }), /overlaps/);
+    assert.throws(
+      () =>
+        buildOciConfig(fakeBaseSpec(), {
+          ...baseArgs,
+          home: "/var/tmp/buildcage",
+          writablePaths: [],
+        }),
+      /overlaps/,
+    );
   });
 
   it("does not fail closed for an unrelated sibling under /var/tmp", () => {
-    assert.doesNotThrow(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp/some-other-tool"] }));
+    assert.doesNotThrow(() =>
+      buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp/some-other-tool"] }),
+    );
   });
 
   it("`writable: /` is exempt from the scratch-base guard (documented full opt-out)", () => {
-    assert.doesNotThrow(() => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/"] }));
+    assert.doesNotThrow(() =>
+      buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/"] }),
+    );
   });
 
   it("keeps RUNNER_TEMP writable (rw bind) and out of readonlyPaths", () => {
@@ -297,22 +350,41 @@ describe("buildOciConfig", () => {
       { mountPoint: "/", fsType: "ext4" },
       { mountPoint: runnerTemp, fsType: "ext4" },
     ];
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], runnerTemp, hostMounts });
+    const config = buildOciConfig(fakeBaseSpec(), {
+      ...baseArgs,
+      writablePaths: [],
+      runnerTemp,
+      hostMounts,
+    });
     const rw = config.mounts.filter((m) => m.options?.includes("rw")).map((m) => m.destination);
     assert.ok(rw.includes(runnerTemp), "RUNNER_TEMP must be bind-mounted writable");
-    assert.ok(!config.linux.readonlyPaths.includes(runnerTemp), "RUNNER_TEMP must not be forced read-only");
+    assert.ok(
+      !config.linux.readonlyPaths.includes(runnerTemp),
+      "RUNNER_TEMP must not be forced read-only",
+    );
   });
 
   it("does not double-mount RUNNER_TEMP when it duplicates another writable path", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], runnerTemp: "/tmp" });
-    const tmpMounts = config.mounts.filter((m) => m.destination === "/tmp" && m.options?.includes("rw"));
+    const config = buildOciConfig(fakeBaseSpec(), {
+      ...baseArgs,
+      writablePaths: [],
+      runnerTemp: "/tmp",
+    });
+    const tmpMounts = config.mounts.filter(
+      (m) => m.destination === "/tmp" && m.options?.includes("rw"),
+    );
     assert.equal(tmpMounts.length, 1);
   });
 
   it("adds a read-only resolv.conf bind mount", () => {
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
     const resolv = config.mounts.find((m) => m.destination === "/etc/resolv.conf");
-    assert.deepEqual(resolv, { destination: "/etc/resolv.conf", type: "none", source: baseArgs.resolvConfPath, options: ["rbind", "ro"] });
+    assert.deepEqual(resolv, {
+      destination: "/etc/resolv.conf",
+      type: "none",
+      source: baseArgs.resolvConfPath,
+      options: ["rbind", "ro"],
+    });
   });
 
   it("`writable: /` disables the read-only root and skips the individual writable-path mounts", () => {
@@ -330,15 +402,31 @@ describe("buildOciConfig", () => {
       { mountPoint: baseArgs.workdir, fsType: "ext4" },
     ];
     const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], hostMounts });
-    assert.ok(config.linux.readonlyPaths.includes("/mnt"), "a real, separate host mount not covered by root.readonly must be listed explicitly");
-    assert.ok(!config.linux.readonlyPaths.includes("/"), "'/' itself is already covered by root.readonly");
-    assert.ok(!config.linux.readonlyPaths.includes("/proc"), "pseudo-filesystems get their own fresh mount, not a readonly remount of the host copy");
-    assert.ok(!config.linux.readonlyPaths.includes(baseArgs.workdir), "workdir must stay writable, not be added to readonlyPaths");
+    assert.ok(
+      config.linux.readonlyPaths.includes("/mnt"),
+      "a real, separate host mount not covered by root.readonly must be listed explicitly",
+    );
+    assert.ok(
+      !config.linux.readonlyPaths.includes("/"),
+      "'/' itself is already covered by root.readonly",
+    );
+    assert.ok(
+      !config.linux.readonlyPaths.includes("/proc"),
+      "pseudo-filesystems get their own fresh mount, not a readonly remount of the host copy",
+    );
+    assert.ok(
+      !config.linux.readonlyPaths.includes(baseArgs.workdir),
+      "workdir must stay writable, not be added to readonlyPaths",
+    );
   });
 
   it("`writable: /` skips the host-mount readonly pass entirely", () => {
     const hostMounts = [{ mountPoint: "/mnt", fsType: "ext4" }];
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/"], hostMounts });
+    const config = buildOciConfig(fakeBaseSpec(), {
+      ...baseArgs,
+      writablePaths: ["/"],
+      hostMounts,
+    });
     assert.ok(!config.linux.readonlyPaths.includes("/mnt"));
   });
 

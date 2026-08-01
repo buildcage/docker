@@ -63,7 +63,10 @@ describe("determineBlockedOutcome", () => {
   it("returns none when there are no blocked connections", () => {
     assert.deepEqual(
       determineBlockedOutcome({
-        isAudit: false, failOnBlocked: true, blockedCount: 0, blockedRows: [],
+        isAudit: false,
+        failOnBlocked: true,
+        blockedCount: 0,
+        blockedRows: [],
         logLooksPlausible: true,
       }),
       { level: "none", shouldFail: false },
@@ -73,8 +76,11 @@ describe("determineBlockedOutcome", () => {
   it("always returns notice in audit mode, even with unmatched rows", () => {
     assert.deepEqual(
       determineBlockedOutcome({
-        isAudit: true, failOnBlocked: true, blockedCount: 2,
-        blockedRows: [{ expected: false }], logLooksPlausible: true,
+        isAudit: true,
+        failOnBlocked: true,
+        blockedCount: 2,
+        blockedRows: [{ expected: false }],
+        logLooksPlausible: true,
       }),
       { level: "notice", shouldFail: false },
     );
@@ -83,8 +89,11 @@ describe("determineBlockedOutcome", () => {
   it("returns notice (not error) when every blocked row matched known_blocked_rules", () => {
     assert.deepEqual(
       determineBlockedOutcome({
-        isAudit: false, failOnBlocked: true, blockedCount: 3,
-        blockedRows: [{ expected: true }, { expected: true }], logLooksPlausible: true,
+        isAudit: false,
+        failOnBlocked: true,
+        blockedCount: 3,
+        blockedRows: [{ expected: true }, { expected: true }],
+        logLooksPlausible: true,
       }),
       { level: "notice", shouldFail: false },
     );
@@ -93,8 +102,11 @@ describe("determineBlockedOutcome", () => {
   it("returns error when at least one blocked row is unexpected", () => {
     assert.deepEqual(
       determineBlockedOutcome({
-        isAudit: false, failOnBlocked: true, blockedCount: 3,
-        blockedRows: [{ expected: true }, { expected: false }], logLooksPlausible: true,
+        isAudit: false,
+        failOnBlocked: true,
+        blockedCount: 3,
+        blockedRows: [{ expected: true }, { expected: false }],
+        logLooksPlausible: true,
       }),
       { level: "error", shouldFail: true },
     );
@@ -103,8 +115,11 @@ describe("determineBlockedOutcome", () => {
   it("returns notice when failOnBlocked is false, even with unexpected rows", () => {
     assert.deepEqual(
       determineBlockedOutcome({
-        isAudit: false, failOnBlocked: false, blockedCount: 2,
-        blockedRows: [{ expected: false }], logLooksPlausible: true,
+        isAudit: false,
+        failOnBlocked: false,
+        blockedCount: 2,
+        blockedRows: [{ expected: false }],
+        logLooksPlausible: true,
       }),
       { level: "notice", shouldFail: false },
     );
@@ -113,7 +128,10 @@ describe("determineBlockedOutcome", () => {
   it("fails closed when blockedRows is empty but blockedCount is nonzero", () => {
     assert.deepEqual(
       determineBlockedOutcome({
-        isAudit: false, failOnBlocked: true, blockedCount: 2, blockedRows: [],
+        isAudit: false,
+        failOnBlocked: true,
+        blockedCount: 2,
+        blockedRows: [],
         logLooksPlausible: true,
       }),
       { level: "error", shouldFail: true },
@@ -124,7 +142,10 @@ describe("determineBlockedOutcome", () => {
     it("fails closed when blockedCount is 0 and failOnBlocked is true", () => {
       assert.deepEqual(
         determineBlockedOutcome({
-          isAudit: false, failOnBlocked: true, blockedCount: 0, blockedRows: [],
+          isAudit: false,
+          failOnBlocked: true,
+          blockedCount: 0,
+          blockedRows: [],
           logLooksPlausible: false,
         }),
         { level: "error", shouldFail: true },
@@ -134,7 +155,10 @@ describe("determineBlockedOutcome", () => {
     it("returns notice (not error) when blockedCount is 0 and failOnBlocked is false", () => {
       assert.deepEqual(
         determineBlockedOutcome({
-          isAudit: false, failOnBlocked: false, blockedCount: 0, blockedRows: [],
+          isAudit: false,
+          failOnBlocked: false,
+          blockedCount: 0,
+          blockedRows: [],
           logLooksPlausible: false,
         }),
         { level: "notice", shouldFail: false },
@@ -144,7 +168,10 @@ describe("determineBlockedOutcome", () => {
     it("never fails in audit mode, even with an implausible log", () => {
       assert.deepEqual(
         determineBlockedOutcome({
-          isAudit: true, failOnBlocked: true, blockedCount: 0, blockedRows: [],
+          isAudit: true,
+          failOnBlocked: true,
+          blockedCount: 0,
+          blockedRows: [],
           logLooksPlausible: false,
         }),
         { level: "notice", shouldFail: false },
@@ -154,8 +181,11 @@ describe("determineBlockedOutcome", () => {
     it("has no additional effect when blockedCount is already nonzero", () => {
       assert.deepEqual(
         determineBlockedOutcome({
-          isAudit: false, failOnBlocked: true, blockedCount: 3,
-          blockedRows: [{ expected: true }, { expected: true }], logLooksPlausible: false,
+          isAudit: false,
+          failOnBlocked: true,
+          blockedCount: 3,
+          blockedRows: [{ expected: true }, { expected: true }],
+          logLooksPlausible: false,
         }),
         { level: "notice", shouldFail: false },
       );
@@ -166,24 +196,30 @@ describe("determineBlockedOutcome", () => {
 describe("buildBlockedMessage", () => {
   it("matches the legacy wording when no rows matched known_blocked_rules", () => {
     const message = buildBlockedMessage({
-      blockedCount: 2, blockedRows: [{ expected: false }, { expected: false }],
-      engineLabel: "sandbox", isAudit: false,
+      blockedCount: 2,
+      blockedRows: [{ expected: false }, { expected: false }],
+      engineLabel: "sandbox",
+      isAudit: false,
     });
     assert.equal(message, "2 blocked connection(s) detected by buildcage sandbox");
   });
 
   it("notes that all rows matched when every row is expected", () => {
     const message = buildBlockedMessage({
-      blockedCount: 3, blockedRows: [{ expected: true }, { expected: true }],
-      engineLabel: "proxy", isAudit: false,
+      blockedCount: 3,
+      blockedRows: [{ expected: true }, { expected: true }],
+      engineLabel: "proxy",
+      isAudit: false,
     });
     assert.match(message, /all matched known_blocked_rules \(expected\)/);
   });
 
   it("reports the unmatched count when some rows are unexpected", () => {
     const message = buildBlockedMessage({
-      blockedCount: 3, blockedRows: [{ expected: true }, { expected: false }],
-      engineLabel: "sandbox", isAudit: false,
+      blockedCount: 3,
+      blockedRows: [{ expected: true }, { expected: false }],
+      engineLabel: "sandbox",
+      isAudit: false,
     });
     assert.match(message, /1 of 2 distinct blocked host\(s\) unmatched by known_blocked_rules/);
   });
@@ -195,24 +231,30 @@ describe("buildBlockedMessage", () => {
 
     it("stays fixed when every row matched", () => {
       const message = buildBlockedMessage({
-        blockedCount: 5, blockedRows: [{ expected: true }, { expected: true }],
-        engineLabel: "sandbox", isAudit: true,
+        blockedCount: 5,
+        blockedRows: [{ expected: true }, { expected: true }],
+        engineLabel: "sandbox",
+        isAudit: true,
       });
       assert.equal(message, fixedText);
     });
 
     it("stays fixed when some rows are unmatched", () => {
       const message = buildBlockedMessage({
-        blockedCount: 5, blockedRows: [{ expected: true }, { expected: false }],
-        engineLabel: "sandbox", isAudit: true,
+        blockedCount: 5,
+        blockedRows: [{ expected: true }, { expected: false }],
+        engineLabel: "sandbox",
+        isAudit: true,
       });
       assert.equal(message, fixedText);
     });
 
     it("stays fixed when no rows matched", () => {
       const message = buildBlockedMessage({
-        blockedCount: 5, blockedRows: [{ expected: false }, { expected: false }],
-        engineLabel: "sandbox", isAudit: true,
+        blockedCount: 5,
+        blockedRows: [{ expected: false }, { expected: false }],
+        engineLabel: "sandbox",
+        isAudit: true,
       });
       assert.equal(message, fixedText);
     });

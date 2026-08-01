@@ -38,7 +38,7 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'rolldown.config.js'
               - 'tsconfig.json'
-              - '.github/actions/setup-pnpm/**'
+              - '.github/actions/setup-vp/**'
             workflow: &workflow
               - '.github/workflows/test-e2e.yml'
 
@@ -77,7 +77,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vp
 
       - name: Build local buildcage image
         env:
@@ -95,7 +95,7 @@ jobs:
       - name: Rebuild setup action with the local-image test hook enabled
         env:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: pnpm build
+        run: vp run build
 
       # Default builder_name is fine: each matrix entry runs on its own VM.
       - name: Start Buildcage builder via the real setup action
@@ -171,7 +171,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vp
 
       - name: Build local sandbox proxy image
         run: docker compose build proxy
@@ -183,7 +183,7 @@ jobs:
       - name: Rebuild run action with the local-image test hook enabled
         env:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: pnpm build
+        run: vp run build
 
       - name: Run an isolated command in audit mode
         uses: ./run
@@ -217,7 +217,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vp
 
       - name: Build local sandbox proxy image
         run: docker compose build proxy
@@ -229,7 +229,7 @@ jobs:
       - name: Rebuild run action with the local-image test hook enabled
         env:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: pnpm build
+        run: vp run build
 
       - name: Run an isolated command via the real run action
         uses: ./run
@@ -298,7 +298,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vp
 
       - name: Build local sandbox proxy image
         run: docker compose build proxy
@@ -310,7 +310,7 @@ jobs:
       - name: Rebuild run action with the local-image test hook enabled
         env:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: pnpm build
+        run: vp run build
 
       - name: Run an isolated command that triggers a blocked connection
         id: blocked_connection
@@ -373,7 +373,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vp
 
       - name: Build local sandbox proxy image
         run: docker compose build proxy
@@ -385,7 +385,7 @@ jobs:
       - name: Rebuild run action with the local-image test hook enabled
         env:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: pnpm build
+        run: vp run build
 
       - parallel:
           - name: sandbox-parallel-a

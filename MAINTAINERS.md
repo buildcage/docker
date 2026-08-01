@@ -9,6 +9,7 @@
 ## Responsibilities
 
 The maintainer is responsible for:
+
 - Reviewing and merging pull requests
 - Triaging and responding to issues
 - Cutting releases and publishing the Docker image to GHCR

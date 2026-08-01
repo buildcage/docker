@@ -14,7 +14,7 @@ interface DescribeDockerFailureOptions {
 }
 
 const REQUIREMENT =
-  'Buildcage requires a working Docker installation (client and daemon) on the runner. ' +
+  "Buildcage requires a working Docker installation (client and daemon) on the runner. " +
   'Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no ' +
   'daemon and are not supported for this action — use "ubuntu-latest" (or another runner with a ' +
   "full Docker install) instead. See docs/reference.md and docs/security.md for details.";
@@ -22,8 +22,7 @@ const REQUIREMENT =
 export const SLIM_RUNNER_DETECTED_PREFIX =
   ' Detected a container-based GitHub-hosted runner image (e.g. "ubuntu-slim")';
 
-const SLIM_RUNNER_NOTE =
-  `${SLIM_RUNNER_DETECTED_PREFIX} — these ship a Docker client with no daemon and are not supported for this action.`;
+const SLIM_RUNNER_NOTE = `${SLIM_RUNNER_DETECTED_PREFIX} — these ship a Docker client with no daemon and are not supported for this action.`;
 
 /**
  * Turns a caught `docker` invocation error into an actionable message,
@@ -35,7 +34,11 @@ const SLIM_RUNNER_NOTE =
  */
 export function describeDockerFailure(
   e: unknown,
-  { operation = "docker", env = process.env, exists = existsSync }: DescribeDockerFailureOptions = {},
+  {
+    operation = "docker",
+    env = process.env,
+    exists = existsSync,
+  }: DescribeDockerFailureOptions = {},
 ): string {
   const err = (e && typeof e === "object" ? e : {}) as DockerErrorLike;
   const slimNote = isLikelySlimRunner(env, exists) ? SLIM_RUNNER_NOTE : "";
@@ -45,7 +48,9 @@ export function describeDockerFailure(
     whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
   } else {
     const captured = typeof err.stderr === "string" ? err.stderr.trim() : "";
-    const detail = captured ? `: ${captured}` : " (see the Docker output above for the underlying error)";
+    const detail = captured
+      ? `: ${captured}`
+      : " (see the Docker output above for the underlying error)";
     whatHappened = `${operation} failed${detail}.`;
   }
 

@@ -42,7 +42,7 @@ describe("buildRestrictExample", () => {
           "      registry.npmjs.org:443",
           "      github.com:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
@@ -64,14 +64,12 @@ describe("buildRestrictExample", () => {
           "    allowed_http_rules: >-",
           "      deb.debian.org:80",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
   it("IP entries", () => {
-    const rows = [
-      { host: "192.168.1.1", port: "443", ruleType: "IP", count: 1 },
-    ];
+    const rows = [{ host: "192.168.1.1", port: "443", ruleType: "IP", count: 1 }];
     assert.equal(
       buildRestrictExample(rows, REPO, REF),
       wrap(
@@ -83,7 +81,7 @@ describe("buildRestrictExample", () => {
           "    allowed_ip_rules: >-",
           "      192.168.1.1:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
@@ -108,14 +106,12 @@ describe("buildRestrictExample", () => {
           "    allowed_ip_rules: >-",
           "      10.0.0.1:8080",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
   it("uses custom actionRepo", () => {
-    const rows = [
-      { host: "example.com", port: "443", ruleType: "HTTPS", count: 1 },
-    ];
+    const rows = [{ host: "example.com", port: "443", ruleType: "HTTPS", count: 1 }];
     assert.equal(
       buildRestrictExample(rows, "myorg/myrepo", REF),
       wrap(
@@ -127,14 +123,12 @@ describe("buildRestrictExample", () => {
           "    allowed_https_rules: >-",
           "      example.com:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
   it("renders a tag actionRef as-is", () => {
-    const rows = [
-      { host: "example.com", port: "443", ruleType: "HTTPS", count: 1 },
-    ];
+    const rows = [{ host: "example.com", port: "443", ruleType: "HTTPS", count: 1 }];
     assert.equal(
       buildRestrictExample(rows, REPO, "v2.1.0"),
       wrap(
@@ -146,14 +140,12 @@ describe("buildRestrictExample", () => {
           "    allowed_https_rules: >-",
           "      example.com:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
   it("renders a commit SHA actionRef as a <sha> placeholder", () => {
-    const rows = [
-      { host: "example.com", port: "443", ruleType: "HTTPS", count: 1 },
-    ];
+    const rows = [{ host: "example.com", port: "443", ruleType: "HTTPS", count: 1 }];
     const sha = "abc1234567890def1234567890abcdef12345678";
     assert.equal(
       buildRestrictExample(rows, REPO, sha),
@@ -166,14 +158,12 @@ describe("buildRestrictExample", () => {
           "    allowed_https_rules: >-",
           "      example.com:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
   it("uses the run action and includes the run command when actionName is 'run'", () => {
-    const rows = [
-      { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 5 },
-    ];
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 5 }];
     assert.equal(
       buildRestrictExample(rows, REPO, REF, { actionName: "run", runCommand: "npm install" }),
       wrap(
@@ -187,14 +177,12 @@ describe("buildRestrictExample", () => {
           "    allowed_https_rules: >-",
           "      registry.npmjs.org:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
   it("preserves multi-line run commands, indented under run: |", () => {
-    const rows = [
-      { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 },
-    ];
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
     assert.equal(
       buildRestrictExample(rows, REPO, REF, { actionName: "run", runCommand: "npm ci\nnpm test" }),
       wrap(
@@ -209,16 +197,17 @@ describe("buildRestrictExample", () => {
           "    allowed_https_rules: >-",
           "      registry.npmjs.org:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
   it("strips the trailing newline GitHub Actions adds to `run: |` block scalars", () => {
-    const rows = [
-      { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 },
-    ];
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
     assert.equal(
-      buildRestrictExample(rows, REPO, REF, { actionName: "run", runCommand: "npm ci\nnpm test\n" }),
+      buildRestrictExample(rows, REPO, REF, {
+        actionName: "run",
+        runCommand: "npm ci\nnpm test\n",
+      }),
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -231,14 +220,12 @@ describe("buildRestrictExample", () => {
           "    allowed_https_rules: >-",
           "      registry.npmjs.org:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 
   it("actionName 'run' without a runCommand omits the run: block", () => {
-    const rows = [
-      { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 },
-    ];
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
     assert.equal(
       buildRestrictExample(rows, REPO, REF, { actionName: "run" }),
       wrap(
@@ -250,7 +237,7 @@ describe("buildRestrictExample", () => {
           "    allowed_https_rules: >-",
           "      registry.npmjs.org:443",
         ].join("\n") + "\n",
-      )
+      ),
     );
   });
 });

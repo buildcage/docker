@@ -38,7 +38,7 @@ test_unit_report: ## Run report unit tests
 test_unit_sandbox: ## Run the run action's unit tests
 	@node --test 'run/src/**/*.test.ts'
 
-# qjs can't execute .ts directly, so compile fresh (pnpm run build:qjs-test)
+# qjs can't execute .ts directly, so compile fresh (vp run build:qjs-test)
 # and bind-mount the output in. qjs itself is identical across images, so one
 # representative build is enough.
 QJS_MOUNTS := \
@@ -48,7 +48,7 @@ QJS_TEST_DIRS := \
 
 .PHONY: test_unit_qjs
 test_unit_qjs: ## Run unit tests in Docker
-	@pnpm run build:qjs-test
+	@vp run build:qjs-test
 	@docker build -f setup/docker/transparent/Dockerfile -t buildcage-qjs-test .
 	@docker run --rm --entrypoint qjs $(QJS_MOUNTS) buildcage-qjs-test \
 		--std -m /opt/buildcage/core/scripts/test/run-tests.qjs.js $(QJS_TEST_DIRS)

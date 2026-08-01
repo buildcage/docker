@@ -36,7 +36,8 @@ describe("buildTransparentReportData", () => {
   });
 
   it("annotates blocked rows against knownBlockedRules", async () => {
-    const log = '[2024-01-01T00:00:00] buildcage [BLOCKED] (HTTPS) "noisy.example.com:443" not-allowed';
+    const log =
+      '[2024-01-01T00:00:00] buildcage [BLOCKED] (HTTPS) "noisy.example.com:443" not-allowed';
     const result = await buildTransparentReportData(
       log.split("\n"),
       params({ knownBlockedRules: ["noisy.example.com:443"] }),

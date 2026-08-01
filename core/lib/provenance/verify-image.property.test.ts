@@ -41,7 +41,11 @@ describe("buildVerifyOptions – properties", () => {
         (actionRef, actionRepo) => {
           const result = buildVerifyOptions({ actionRef, actionRepo });
           assert.ok(result !== null);
-          assert.equal(result.certificateOIDs, undefined, "version tag must not set certificateOIDs");
+          assert.equal(
+            result.certificateOIDs,
+            undefined,
+            "version tag must not set certificateOIDs",
+          );
           assert.doesNotThrow(() => new RegExp(result.certificateIdentityURI!));
         },
       ),

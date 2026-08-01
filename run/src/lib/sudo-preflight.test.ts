@@ -19,7 +19,10 @@ describe("describeSudoFailure", () => {
   });
 
   it("adds a detection note when the runner looks like a container-based image", () => {
-    const withNote = describeSudoFailure({ status: 1 }, { env: { ImageOS: "Linux" }, exists: () => true });
+    const withNote = describeSudoFailure(
+      { status: 1 },
+      { env: { ImageOS: "Linux" }, exists: () => true },
+    );
     const withoutNote = describeSudoFailure({ status: 1 }, noSlimRunner);
     assert.match(withNote, /Detected a container-based GitHub-hosted runner image/);
     assert.doesNotMatch(withoutNote, /Detected a container-based GitHub-hosted runner image/);

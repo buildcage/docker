@@ -9,7 +9,12 @@
  *   - Unverifiable ref (branch / local ./setup) → returns null.
  */
 
-import { fetchManifestDigest, fetchRegistryToken, fetchBundle, readGhcrBasicAuth } from "./oci-registry.ts";
+import {
+  fetchManifestDigest,
+  fetchRegistryToken,
+  fetchBundle,
+  readGhcrBasicAuth,
+} from "./oci-registry.ts";
 import { derUtf8, verifyBundle, type VerifyBundleOptions, type DsseBundle } from "./sigstore.ts";
 import { ProvenanceError, VerifyImageError } from "./errors.ts";
 import { errorMessage } from "../general/error-message.ts";

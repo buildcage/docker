@@ -5,11 +5,11 @@ inputs:
   builder_name:
     description: "Name of the builder container"
     required: false
-    default: 'buildcage'
+    default: "buildcage"
   fail_on_blocked:
     description: "Fail the step if blocked connections are detected"
     required: false
-    default: 'true'
+    default: "true"
 
 runs:
   using: node24

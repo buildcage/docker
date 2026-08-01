@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Semver tag (e.g. v1.2.3)'
+        description: "Semver tag (e.g. v1.2.3)"
         required: true
         type: string
 

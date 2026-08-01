@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, chmodSync, existsSync } from "node:fs";
+import {
+  writeFileSync,
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  mkdirSync,
+  chmodSync,
+  existsSync,
+} from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDockerCpArgs } from "../../../core/lib/docker/container.ts";
@@ -130,10 +138,21 @@ export function extractRuncBootstrap({
 }: ExtractRuncBootstrapOptions): RuncBootstrap {
   const runcPath = join(destDir, "runc");
   const genSeccompProfilePath = join(destDir, "gen-seccomp-profile");
-  execFileSync("docker", buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/runc", hostPath: runcPath }));
   execFileSync(
     "docker",
-    buildDockerCpArgs({ containerName, containerPath: "/opt/buildcage/bin/gen-seccomp-profile", hostPath: genSeccompProfilePath }),
+    buildDockerCpArgs({
+      containerName,
+      containerPath: "/opt/buildcage/bin/runc",
+      hostPath: runcPath,
+    }),
+  );
+  execFileSync(
+    "docker",
+    buildDockerCpArgs({
+      containerName,
+      containerPath: "/opt/buildcage/bin/gen-seccomp-profile",
+      hostPath: genSeccompProfilePath,
+    }),
   );
   chmodSync(runcPath, 0o755);
   chmodSync(genSeccompProfilePath, 0o755);
@@ -199,7 +218,12 @@ export function computeReadonlyHostMounts(
   freshMountDestinations: Set<string>,
 ): string[] {
   return hostMounts
-    .filter(({ mountPoint }) => mountPoint !== "/" && !freshMountDestinations.has(mountPoint) && !protectedPaths.has(mountPoint))
+    .filter(
+      ({ mountPoint }) =>
+        mountPoint !== "/" &&
+        !freshMountDestinations.has(mountPoint) &&
+        !protectedPaths.has(mountPoint),
+    )
     .map(({ mountPoint }) => mountPoint);
 }
 
@@ -229,7 +253,12 @@ export function freshMountDestinationsFrom(baseSpec: HasMounts): Set<string> {
 // resolves to the same binary inside. Falls back to bare "setpriv" (PATH
 // lookup) only if none of the usual locations exist -- run-isolated.sh has
 // already verified setpriv is on root's PATH before we get here.
-const SETPRIV_CANDIDATE_PATHS = ["/usr/bin/setpriv", "/bin/setpriv", "/usr/sbin/setpriv", "/sbin/setpriv"];
+const SETPRIV_CANDIDATE_PATHS = [
+  "/usr/bin/setpriv",
+  "/bin/setpriv",
+  "/usr/sbin/setpriv",
+  "/sbin/setpriv",
+];
 function resolveSetprivPath(): string {
   return SETPRIV_CANDIDATE_PATHS.find((p) => existsSync(p)) ?? "setpriv";
 }
@@ -337,32 +366,54 @@ export function buildOciConfig(
 ): BuiltOciSpec {
   const disableReadonly = writablePaths.includes("/");
 
-  const mounts = [...baseSpec.mounts, { destination: "/etc/resolv.conf", type: "none", source: resolvConfPath, options: ["rbind", "ro"] }];
+  const mounts = [
+    ...baseSpec.mounts,
+    {
+      destination: "/etc/resolv.conf",
+      type: "none",
+      source: resolvConfPath,
+      options: ["rbind", "ro"],
+    },
+  ];
   // Paths kept writable on top of the read-only root. RUNNER_TEMP is included
   // because many actions/tools write there and it isn't always under $HOME
   // (self-hosted runners can place it elsewhere), so the $HOME exception
   // wouldn't otherwise cover it. Deduped so an overlapping entry (RUNNER_TEMP
   // nested under $HOME, or a writablePaths duplicate) isn't bind-mounted twice.
   const writableDirs = [
-    ...new Set([workdir, home, "/tmp", runnerTemp, ...writablePaths].filter((p): p is string => Boolean(p))),
+    ...new Set(
+      [workdir, home, "/tmp", runnerTemp, ...writablePaths].filter((p): p is string => Boolean(p)),
+    ),
   ];
   const protectedPaths = new Set(writableDirs);
   if (!disableReadonly) {
     // `writable: /` (disableReadonly) is an intentional, documented full
     // opt-out of the read-only restriction, so it's exempt from this guard.
     assertScratchBaseNotWritable(writableDirs);
-    for (const p of writableDirs) mounts.push({ destination: p, type: "none", source: p, options: ["rbind", "rw"] });
+    for (const p of writableDirs)
+      mounts.push({ destination: p, type: "none", source: p, options: ["rbind", "rw"] });
   }
 
   const maskedPaths = [...(baseSpec.linux.maskedPaths ?? []), ...EXTRA_MASKED_PROC_PATHS];
-  const baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter((p) => !EXTRA_MASKED_PROC_PATHS.includes(p));
+  const baseReadonlyPaths = (baseSpec.linux.readonlyPaths ?? []).filter(
+    (p) => !EXTRA_MASKED_PROC_PATHS.includes(p),
+  );
   const readonlyPaths = disableReadonly
     ? baseReadonlyPaths
     : Array.from(
-        new Set([...baseReadonlyPaths, ...computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinationsFrom(baseSpec))]),
+        new Set([
+          ...baseReadonlyPaths,
+          ...computeReadonlyHostMounts(
+            hostMounts,
+            protectedPaths,
+            freshMountDestinationsFrom(baseSpec),
+          ),
+        ]),
       );
 
-  const namespaces = baseSpec.linux.namespaces.map((ns) => (ns.type === "network" ? { ...ns, path: netnsPath } : ns));
+  const namespaces = baseSpec.linux.namespaces.map((ns) =>
+    ns.type === "network" ? { ...ns, path: netnsPath } : ns,
+  );
 
   return {
     ...baseSpec,
@@ -529,7 +580,9 @@ function unmountAllUnder(dir: string): void {
   }
   for (const mountPoint of mountPoints) {
     try {
-      execFileSync("sudo", ["umount", "-R", "-l", mountPoint], { stdio: ["ignore", "ignore", "pipe"] });
+      execFileSync("sudo", ["umount", "-R", "-l", mountPoint], {
+        stdio: ["ignore", "ignore", "pipe"],
+      });
     } catch (e) {
       console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${errorMessage(e)}`);
     }

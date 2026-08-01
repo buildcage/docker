@@ -16,19 +16,28 @@ import { buildACLRules, resolveProxyEngine } from "./main.ts";
 describe("resolveBuildcageImageRef", () => {
   it("uses IMAGE@DIGEST", () => {
     const digest = "sha256:" + "a".repeat(64);
-    const result = resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "Owner/Repo" });
+    const result = resolveBuildcageImageRef({
+      imageDigest: digest,
+      actionRepository: "Owner/Repo",
+    });
     assert.equal(result, `ghcr.io/owner/repo@${digest}`);
   });
 
   it("lowercases the repository", () => {
     const digest = "sha256:" + "b".repeat(64);
-    const result = resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "MyOrg/MyRepo" });
+    const result = resolveBuildcageImageRef({
+      imageDigest: digest,
+      actionRepository: "MyOrg/MyRepo",
+    });
     assert.ok(result.startsWith("ghcr.io/myorg/myrepo@"));
   });
 
   it("always derives repository from actionRepository (no external override)", () => {
     const digest = "sha256:" + "c".repeat(64);
-    const result = resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "dash14/buildcage" });
+    const result = resolveBuildcageImageRef({
+      imageDigest: digest,
+      actionRepository: "dash14/buildcage",
+    });
     assert.ok(result.startsWith("ghcr.io/dash14/buildcage@"));
   });
 });
@@ -57,14 +66,20 @@ describe("resolveProxyEngine", () => {
   it("throws SetupError for an invalid value", () => {
     assert.throws(
       () => resolveProxyEngine("restrict"),
-      (err) => { assert.ok(err instanceof Error); return true; }
+      (err) => {
+        assert.ok(err instanceof Error);
+        return true;
+      },
     );
   });
 
   it("throws SetupError for a value with different casing (case-sensitive)", () => {
     assert.throws(
       () => resolveProxyEngine("Explicit"),
-      (err) => { assert.ok(err instanceof Error); return true; }
+      (err) => {
+        assert.ok(err instanceof Error);
+        return true;
+      },
     );
   });
 });
@@ -114,7 +129,7 @@ describe("buildACLRules", () => {
       (err) => {
         assert.ok(err instanceof Error, "expected Error");
         return true;
-      }
+      },
     );
   });
 });

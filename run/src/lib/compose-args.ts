@@ -27,13 +27,23 @@ export function buildComposeUpArgs({
   projectName,
   pullPolicy,
 }: BuildComposeUpArgsOptions): string[] {
-  return ["compose", "-f", composeFile, "-p", projectName, "up", "-d", "--pull", pullPolicy, "--no-build", "--wait", "--quiet-pull"];
+  return [
+    "compose",
+    "-f",
+    composeFile,
+    "-p",
+    projectName,
+    "up",
+    "-d",
+    "--pull",
+    pullPolicy,
+    "--no-build",
+    "--wait",
+    "--quiet-pull",
+  ];
 }
 
 /** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
-export function buildComposeDownArgs({
-  composeFile,
-  projectName,
-}: ComposeArgsOptions): string[] {
+export function buildComposeDownArgs({ composeFile, projectName }: ComposeArgsOptions): string[] {
   return ["compose", "-f", composeFile, "-p", projectName, "down"];
 }
