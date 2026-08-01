@@ -207,20 +207,34 @@ export function waitForEcaptureReady(logPath: string, timeoutMs = 5000): void {
  * Stop a process started by startEcapture, with a brief grace period to
  * flush and exit before the caller reads its log file. Killed via `sudo`
  * since ecapture runs as root -- an unprivileged `process.kill()` would just
- * fail with EPERM. Not a wait-until-exited poll: the blocking sleep here
- * starves the event loop, so `proc.exitCode`/`kill(pid, 0)` can't be trusted.
+ * fail with EPERM. Escalates to SIGKILL if it's still alive after the grace
+ * period: ecapture doesn't always honor SIGTERM promptly (detaching its eBPF
+ * uprobes can be slow, or get stuck), and a stopEcapture that only ever sends
+ * SIGTERM leaves it running as a leaked root process indefinitely -- these
+ * accumulate silently across many `run:` steps until enough are alive at
+ * once to destabilize the runner. Liveness is checked via a fresh `sudo kill
+ * -0`, not Node's own `proc.exitCode`/`kill(pid, 0)`: the blocking sleep here
+ * starves the event loop, so Node can't have reaped this child by now either
+ * way, making its own view of the process unreliable.
  */
 export function stopEcapture(proc: ChildProcess): void {
   if (!proc.pid) return;
+  const pgid = `-${proc.pid}`;
   try {
     // stdio: "ignore" -- execFileSync passes a failing child's stderr straight
     // through even when the thrown error is caught, and "already exited" is
     // an expected, not a warning-worthy, outcome here.
-    execFileSync("sudo", ["-n", "--", "kill", "-TERM", `-${proc.pid}`], { stdio: "ignore" });
+    execFileSync("sudo", ["-n", "--", "kill", "-TERM", pgid], { stdio: "ignore" });
   } catch {
     return; // already exited, or sudo itself failed
   }
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+  try {
+    execFileSync("sudo", ["-n", "--", "kill", "-0", pgid], { stdio: "ignore" }); // throws (ESRCH) if already gone
+    execFileSync("sudo", ["-n", "--", "kill", "-KILL", pgid], { stdio: "ignore" });
+  } catch {
+    // Already gone (kill -0 failed), or sudo itself failed.
+  }
 }
 
 /** Parse ecapture's captured log into this step's HTTPS communication logs.

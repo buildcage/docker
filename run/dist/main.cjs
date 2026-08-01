@@ -7418,24 +7418,46 @@ function waitForEcaptureReady(logPath, timeoutMs = 5e3) {
 * Stop a process started by startEcapture, with a brief grace period to
 * flush and exit before the caller reads its log file. Killed via `sudo`
 * since ecapture runs as root -- an unprivileged `process.kill()` would just
-* fail with EPERM. Not a wait-until-exited poll: the blocking sleep here
-* starves the event loop, so `proc.exitCode`/`kill(pid, 0)` can't be trusted.
+* fail with EPERM. Escalates to SIGKILL if it's still alive after the grace
+* period: ecapture doesn't always honor SIGTERM promptly (detaching its eBPF
+* uprobes can be slow, or get stuck), and a stopEcapture that only ever sends
+* SIGTERM leaves it running as a leaked root process indefinitely -- these
+* accumulate silently across many `run:` steps until enough are alive at
+* once to destabilize the runner. Liveness is checked via a fresh `sudo kill
+* -0`, not Node's own `proc.exitCode`/`kill(pid, 0)`: the blocking sleep here
+* starves the event loop, so Node can't have reaped this child by now either
+* way, making its own view of the process unreliable.
 */
 function stopEcapture(proc) {
-	if (proc.pid) {
-		try {
-			(0, node_child_process.execFileSync)("sudo", [
-				"-n",
-				"--",
-				"kill",
-				"-TERM",
-				`-${proc.pid}`
-			], { stdio: "ignore" });
-		} catch {
-			return;
-		}
-		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+	if (!proc.pid) return;
+	let pgid = `-${proc.pid}`;
+	try {
+		(0, node_child_process.execFileSync)("sudo", [
+			"-n",
+			"--",
+			"kill",
+			"-TERM",
+			pgid
+		], { stdio: "ignore" });
+	} catch {
+		return;
 	}
+	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+	try {
+		(0, node_child_process.execFileSync)("sudo", [
+			"-n",
+			"--",
+			"kill",
+			"-0",
+			pgid
+		], { stdio: "ignore" }), (0, node_child_process.execFileSync)("sudo", [
+			"-n",
+			"--",
+			"kill",
+			"-KILL",
+			pgid
+		], { stdio: "ignore" });
+	} catch {}
 }
 /** Parse ecapture's captured log into this step's HTTPS communication logs.
 *  Undefined (not empty) if the log doesn't exist at all. */
