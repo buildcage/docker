@@ -7147,7 +7147,7 @@ async function main() {
 		actionRepo,
 		proxyEngine
 	});
-	console.log(`buildcage image: ${imageRef}`);
+	console.log(`buildcage: image: ${imageRef}`);
 	let rules = buildACLRules({
 		httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
 		httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
