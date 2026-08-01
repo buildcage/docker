@@ -232,24 +232,8 @@ clean_sandbox_dev: ## Stop and remove the sandbox dev-loop containers
 # Drives run/dist/main.cjs directly (a host command, not a Docker build).
 .PHONY: test_integration_sandbox_linux
 test_integration_sandbox_linux: ## Run the run action's integration tests (needs BUILDCAGE_LOCAL_IMAGE_REF and a test-hook build of run/dist/main.cjs)
-	@./run/test/integration-test-writable-dir.sh
-	@./run/test/integration-test-writable-disabled.sh
-	@./run/test/integration-test-defaults.sh
-	@./run/test/integration-test-seccomp.sh
-	@./run/test/integration-test-die-with-parent.sh
-	@./run/test/integration-test-fs-escape.sh
-	@./run/test/integration-test-runner-temp.sh
-	@./run/test/integration-test-nested-mount-readonly.sh
-	@./run/test/integration-test-non-runc-default-pseudofs-readonly.sh
-	@echo "--- diagnostic: resource usage before integration-test-concurrent.sh ---"
-	@df -h / /var/tmp 2>&1 || true
-	@free -h 2>&1 || true
-	@docker system df 2>&1 || true
-	@echo "--- end diagnostic ---"
+	# TEMPORARY: isolated to just this one script to bisect a CI-only hang/cancellation -- restore the full list once resolved.
 	@./run/test/integration-test-concurrent.sh
-	@./run/test/integration-test-known-blocked-rules.sh
-	@./run/test/integration-test-ecapture-terminates.sh
-	@./run/test/integration-test-ecapture-hard-kill-recovery.sh
 
 # ---------------------------------------------------------------------------
 # example_{engine}_{mode} — smoke test against a plain Dockerfile
