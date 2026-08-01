@@ -1,6 +1,6 @@
 /**
- * Test shim, portable between Node (delegates to node:test/node:assert) and
- * QuickJS (its own minimal implementation — node:test and fast-check aren't
+ * Test shim, portable between Node (delegates to vitest/node:assert) and
+ * QuickJS (its own minimal implementation — vitest and fast-check aren't
  * available there). The same *.test.ts source runs unmodified under both.
  *
  * Module specifiers below are routed through non-literal string variables:
@@ -30,11 +30,11 @@ interface Shim {
 }
 
 async function createNodeShim(): Promise<Shim> {
-  const nodeTestSpecifier = "node:test";
+  const testRunnerSpecifier = "vitest";
   const nodeAssertSpecifier = "node:assert/strict";
-  const { describe, it } = await import(nodeTestSpecifier);
+  const { describe, it } = await import(testRunnerSpecifier);
   const { default: assert } = await import(nodeAssertSpecifier);
-  // node:test tracks pass/fail and sets the process exit code itself.
+  // vitest tracks pass/fail and sets the process exit code itself.
   return { describe, it, assert, reportResults() {} };
 }
 

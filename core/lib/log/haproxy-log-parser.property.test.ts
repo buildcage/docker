@@ -1,9 +1,9 @@
 /**
  * Property-based tests for core/lib/log/haproxy-log-parser.ts.
  *
- * Run with: node --test core/lib/log/haproxy-log-parser.property.test.ts
+ * Run with: vp test run core/lib/log/haproxy-log-parser.property.test.ts
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 

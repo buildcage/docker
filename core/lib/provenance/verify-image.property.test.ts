@@ -1,9 +1,9 @@
 /**
  * Property-based tests for verify-image.ts helpers.
  *
- * Run with: node --test core/lib/provenance/verify-image.property.test.ts
+ * Run with: vp test run core/lib/provenance/verify-image.property.test.ts
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 

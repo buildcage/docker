@@ -1,9 +1,9 @@
 /**
  * Property-based tests for run/main.ts and its helpers.
  *
- * Run with: node --test run/src/main.property.test.ts
+ * Run with: vp test run run/src/main.property.test.ts
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 

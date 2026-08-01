@@ -8,9 +8,9 @@
  * verifyBundle and verifyImageDigest require a live TUF network call; those
  * paths are covered by end-to-end / integration tests.
  *
- * Run with: node --test core/lib/provenance/verify-image.test.ts
+ * Run with: vp test run core/lib/provenance/verify-image.test.ts
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import { imageTagFromRef, buildVerifyOptions, verifyImageDigestOrThrow } from "./verify-image.ts";

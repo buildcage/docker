@@ -1,9 +1,9 @@
 /**
  * Unit tests for run/main.ts
  *
- * Run with: node --test run/src/main.test.ts
+ * Run with: vp test run run/src/main.test.ts
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import {

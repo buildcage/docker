@@ -4,7 +4,7 @@
  * the isolated command's own exit code (see main.ts), never resetting it
  * back to success.
  */
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach } from "vitest";
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
