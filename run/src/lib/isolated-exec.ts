@@ -225,15 +225,18 @@ export function stopEcapture(proc: ChildProcess): void {
     // through even when the thrown error is caught, and "already exited" is
     // an expected, not a warning-worthy, outcome here.
     execFileSync("sudo", ["-n", "--", "kill", "-TERM", pgid], { stdio: "ignore" });
-  } catch {
+  } catch (e) {
+    console.error(`DEBUG stopEcapture: initial TERM to ${pgid} threw: ${errorMessage(e)}`); // TEMPORARY
     return; // already exited, or sudo itself failed
   }
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
   try {
     execFileSync("sudo", ["-n", "--", "kill", "-0", pgid], { stdio: "ignore" }); // throws (ESRCH) if already gone
+    console.error(`DEBUG stopEcapture: ${pgid} still alive after TERM+500ms, escalating to KILL`); // TEMPORARY
     execFileSync("sudo", ["-n", "--", "kill", "-KILL", pgid], { stdio: "ignore" });
-  } catch {
-    // Already gone (kill -0 failed), or sudo itself failed.
+    console.error(`DEBUG stopEcapture: KILL sent to ${pgid}`); // TEMPORARY
+  } catch (e) {
+    console.error(`DEBUG stopEcapture: ${pgid} liveness check/escalation ended: ${errorMessage(e)}`); // TEMPORARY
   }
 }
 

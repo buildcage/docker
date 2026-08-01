@@ -7439,7 +7439,8 @@ function stopEcapture(proc) {
 			"-TERM",
 			pgid
 		], { stdio: "ignore" });
-	} catch {
+	} catch (e) {
+		console.error(`DEBUG stopEcapture: initial TERM to ${pgid} threw: ${errorMessage(e)}`);
 		return;
 	}
 	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
@@ -7450,14 +7451,16 @@ function stopEcapture(proc) {
 			"kill",
 			"-0",
 			pgid
-		], { stdio: "ignore" }), (0, node_child_process.execFileSync)("sudo", [
+		], { stdio: "ignore" }), console.error(`DEBUG stopEcapture: ${pgid} still alive after TERM+500ms, escalating to KILL`), (0, node_child_process.execFileSync)("sudo", [
 			"-n",
 			"--",
 			"kill",
 			"-KILL",
 			pgid
-		], { stdio: "ignore" });
-	} catch {}
+		], { stdio: "ignore" }), console.error(`DEBUG stopEcapture: KILL sent to ${pgid}`);
+	} catch (e) {
+		console.error(`DEBUG stopEcapture: ${pgid} liveness check/escalation ended: ${errorMessage(e)}`);
+	}
 }
 /** Parse ecapture's captured log into this step's HTTPS communication logs.
 *  Undefined (not empty) if the log doesn't exist at all. */
