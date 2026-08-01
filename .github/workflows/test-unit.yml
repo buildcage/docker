@@ -34,8 +34,9 @@ jobs:
               - 'rolldown.scripts.config.js'
               - 'tsconfig.json'
               - 'tsconfig.qjs.json'
+              - 'vite.config.ts'
               - '.dockerignore'
-              - '.github/actions/setup-pnpm/**'
+              - '.github/actions/setup-vp/**'
               - '.github/workflows/test-unit.yml'
               - 'core/**'
               - 'setup/**'
@@ -56,10 +57,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vp
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Check (lint/format)
+        run: vp check
 
       - name: Build
         run: pnpm build

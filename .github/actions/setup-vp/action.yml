@@ -1,0 +1,15 @@
+name: Set up vp toolchain
+description: Install vp (Vite+), set up Node, and install dependencies
+# Callers must run actions/checkout before this — a local-path action can't
+# be located at all until the calling job has checked out the repo.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up vp
+      uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
+      with:
+        node-version-file: package.json
+        cache: true
+        run-install: |
+          args: ['--frozen-lockfile']

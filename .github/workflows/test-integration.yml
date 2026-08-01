@@ -279,7 +279,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vp
 
       - name: Build local sandbox proxy image
         run: docker compose build proxy

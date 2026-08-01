@@ -96,6 +96,41 @@ is what CI's `test_sandbox` job in `test-integration.yml` runs. The CI-only `tes
 end-to-end jobs (real runner host, no nested container) are described in
 [Run Action Internals](#run-action-internals) below.
 
+## Formatting & Linting
+
+Formatting, linting, and type-aware linting are handled by [vp (Vite+)](https://viteplus.dev/),
+installed globally on your machine like `pnpm`/`corepack` rather than through `pnpm exec`:
+
+```bash
+curl -fsSL https://vite.plus | bash   # macOS/Linux
+# Windows: irm https://viteplus.dev/install.ps1 | iex
+```
+
+The project pins its own toolchain version via the `vite-plus` devDependency in `package.json`
+(the same way `packageManager` pins `pnpm`) — the globally installed `vp` binary detects and
+delegates to that pinned version automatically, so plain `vp ...` commands are reproducible
+without going through `pnpm exec`. This was verified against `vp v0.2.7` / local `vite-plus
+v0.2.5`; if a much newer `vp` behaves differently, that's the version to compare against.
+
+```bash
+vp check       # format + lint + type-aware lint (read-only; what CI runs)
+vp check --fix # same, but auto-fixes format/lint issues in place
+vp lint --fix
+vp fmt --write
+```
+
+`pnpm typecheck` (`tsc`) remains the authoritative full type check; `vp check`'s type-aware
+linting (via `oxlint-tsgolint`) catches a subset of type-driven issues fast but doesn't replace it.
+
+Running `vp install` (in place of `pnpm install`) automatically sets up a pre-commit hook — via
+the `prepare` script — that formats and lints your staged files (`vite.config.ts`'s `staged`
+config) before each commit, auto-fixing and re-staging what it can. To skip it in an emergency
+(not recommended — CI runs the same check and will fail if you rely on this):
+
+```bash
+git commit --no-verify
+```
+
 ## Explicit Engine Internals
 
 This section covers how `proxy_engine: explicit` is implemented internally. For the user-facing
@@ -163,7 +198,7 @@ order it actually happens. For the user-facing behavior and threat model, see
    - The writable exceptions are recursive bind-mounts (so legitimately nested mounts under them
      stay visible). The `mount --rbind /` rootfs is therefore staged under `/var/tmp/buildcage` —
      never one of the writable exceptions — so those recursive rbinds don't re-expose it as a
-     second, *writable* copy of the whole host `/` inside the sandbox. A `writable:` input naming
+     second, _writable_ copy of the whole host `/` inside the sandbox. A `writable:` input naming
      that directory (or an ancestor of it) is rejected outright rather than silently accepted. The
      sandbox's real host view (its own `/` and every nested mount) is untouched and stays read-only
      outside the writable set.
@@ -223,7 +258,7 @@ guarding against a future refactor silently breaking that guarantee.
 To exercise it locally:
 
 1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine, or `docker
-   compose build proxy` for the proxy image).
+compose build proxy` for the proxy image).
 2. `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build`
 3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set (e.g. via `act`, or by
    invoking `node setup/dist/main.cjs` / `node run/dist/main.cjs` directly with the relevant
@@ -255,7 +290,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 
 **In `proxy_engine: explicit`**, there is no HAProxy log — instead, denied requests end up in
 buildkitd's own debug log at `/var/log/buildkitd/current` inside the container, logged by BuildKit's
-source-policy engine. Allowed/audited requests are *not* read from this log file: BuildKit's own
+source-policy engine. Allowed/audited requests are _not_ read from this log file: BuildKit's own
 "proxy network requests:" build output only ends up there if buildkitd runs with
 `BUILDKIT_DEBUG_EXEC_OUTPUT=1`, which also mirrors every RUN step's own console output into the same
 log. That data is instead fetched via `buildctl debug logs --progress=rawjson`, described below,
@@ -268,7 +303,7 @@ unmodified against either engine.
 The `explicit` engine's job summary builds its "Allowed"/"Audited Hosts" table, and a collapsed
 **Communication details** section (a per-command breakdown `transparent` mode has no equivalent for),
 from the same source: `core/lib/log/vertex-log.ts` calls `buildctl debug histories` (to enumerate
-*every* build recorded since the container started — a workflow may run several builds against the
+_every_ build recorded since the container started — a workflow may run several builds against the
 same buildcage container before calling the report action once, and each is independently tracked)
 and `buildctl debug logs --progress=rawjson <ref>` for each one, whose log entries are each tagged
 with the exact vertex (RUN step) that produced them — reliable even under concurrent execution, since
@@ -289,25 +324,25 @@ reports for the allowed side.
 
 ## Makefile Commands
 
-| Command | Description |
-|---------|-------------|
-| `make help` | Show available commands |
-| `make setup_buildkit_transparent_audit` | Start transparent engine in audit mode |
-| `make setup_buildkit_transparent_restrict` | Start transparent engine in restrict mode (default domains) |
-| `make setup_buildkit_explicit_audit` | Start explicit proxy engine in audit mode |
-| `make setup_buildkit_explicit_restrict` | Start explicit proxy engine in restrict mode |
-| `make report_buildkit` | Show the buildcage report for the currently running builder |
-| `make test_integration_buildkit` | Run all `test_integration_buildkit_*` tests |
-| `make test_integration_buildkit_transparent_audit` | Run transparent-engine audit mode tests (start → build → verify → clean up) |
-| `make test_integration_buildkit_transparent_restrict` | Run transparent-engine restrict mode tests (start → build → verify → clean up) |
-| `make test_integration_buildkit_explicit_audit` | Run explicit-engine audit mode tests (start → build → verify → clean up) |
-| `make test_integration_buildkit_explicit_restrict` | Run explicit-engine restrict mode tests (start → build → verify → clean up) |
-| `make setup_sandbox_dev` | Start the run action's proxy + mac-friendly dev-loop runner |
-| `make test_sandbox_dev` | Run a sample isolated command in the dev loop and verify isolation |
-| `make test_unit` | Run unit tests (includes `test_unit_sandbox`) |
-| `make test_unit_sandbox` | Run the run action's Node.js unit tests |
-| `make test_integration_sandbox_linux` | Run the run action's integration tests (needs `BUILDCAGE_LOCAL_IMAGE_REF` and a test-hook build of `run/dist/main.cjs`) |
-| `make clean_buildkit` | Stop and remove the buildkit builder's containers/images and buildx builder |
+| Command                                               | Description                                                                                                             |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `make help`                                           | Show available commands                                                                                                 |
+| `make setup_buildkit_transparent_audit`               | Start transparent engine in audit mode                                                                                  |
+| `make setup_buildkit_transparent_restrict`            | Start transparent engine in restrict mode (default domains)                                                             |
+| `make setup_buildkit_explicit_audit`                  | Start explicit proxy engine in audit mode                                                                               |
+| `make setup_buildkit_explicit_restrict`               | Start explicit proxy engine in restrict mode                                                                            |
+| `make report_buildkit`                                | Show the buildcage report for the currently running builder                                                             |
+| `make test_integration_buildkit`                      | Run all `test_integration_buildkit_*` tests                                                                             |
+| `make test_integration_buildkit_transparent_audit`    | Run transparent-engine audit mode tests (start → build → verify → clean up)                                             |
+| `make test_integration_buildkit_transparent_restrict` | Run transparent-engine restrict mode tests (start → build → verify → clean up)                                          |
+| `make test_integration_buildkit_explicit_audit`       | Run explicit-engine audit mode tests (start → build → verify → clean up)                                                |
+| `make test_integration_buildkit_explicit_restrict`    | Run explicit-engine restrict mode tests (start → build → verify → clean up)                                             |
+| `make setup_sandbox_dev`                              | Start the run action's proxy + mac-friendly dev-loop runner                                                             |
+| `make test_sandbox_dev`                               | Run a sample isolated command in the dev loop and verify isolation                                                      |
+| `make test_unit`                                      | Run unit tests (includes `test_unit_sandbox`)                                                                           |
+| `make test_unit_sandbox`                              | Run the run action's Node.js unit tests                                                                                 |
+| `make test_integration_sandbox_linux`                 | Run the run action's integration tests (needs `BUILDCAGE_LOCAL_IMAGE_REF` and a test-hook build of `run/dist/main.cjs`) |
+| `make clean_buildkit`                                 | Stop and remove the buildkit builder's containers/images and buildx builder                                             |
 
 ## Directory Structure
 
@@ -376,11 +411,13 @@ reports for the allowed side.
 If you encounter issues, try reproducing the problem locally to get detailed logs:
 
 1. **Check logs:**
+
    ```bash
    docker compose logs builder
    ```
 
 2. **Run in audit mode** to understand your build's network behavior:
+
    ```bash
    make clean_buildkit
    make setup_buildkit_transparent_audit
