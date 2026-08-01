@@ -291,7 +291,7 @@ jobs:
       - name: Rebuild run action with the local-image test hook enabled
         env:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: pnpm build
+        run: vp run build
 
       - name: Run run-action integration tests
         env:

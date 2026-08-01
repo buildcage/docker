@@ -60,13 +60,13 @@ jobs:
       - uses: ./.github/actions/setup-vp
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: vp run typecheck
 
       - name: Check (lint/format)
         run: vp check
 
       - name: Build
-        run: pnpm build
+        run: vp run build
 
       - name: Check dist is up to date
         run: git diff --exit-code
