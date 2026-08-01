@@ -122,40 +122,35 @@ async function main(): Promise<void> {
   // when this script isn't running as the real action.
   const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
 
-  const { imageRef, pullPolicy, rules, knownBlockedRules } = await withGroup(
-    "buildcage: image & ACL configuration",
-    async () => {
-      const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-        ? (
-            await import("../../core/lib/provenance/local-image-override.ts")
-          ).readLocalImageOverride(env)
-        : null;
-      if (localOverride) {
-        console.log(
-          `BUILDCAGE_LOCAL_IMAGE_REF is set (${JSON.stringify(localOverride.imageRef)}) — ` +
-            `skipping image provenance verification entirely. This bypass exists only for ` +
-            `buildcage's own CI self-tests and local development.`,
-        );
-      }
-      const { imageRef, pullPolicy } =
-        localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo }));
-      console.log(`buildcage-proxy image: ${imageRef}`);
+  const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
+    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(
+        env,
+      )
+    : null;
+  if (localOverride) {
+    console.log(
+      `BUILDCAGE_LOCAL_IMAGE_REF is set (${JSON.stringify(localOverride.imageRef)}) — ` +
+        `skipping image provenance verification entirely. This bypass exists only for ` +
+        `buildcage's own CI self-tests and local development.`,
+    );
+  }
+  const { imageRef, pullPolicy } =
+    localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo }));
+  console.log(`buildcage: proxy image: ${imageRef}`);
 
-      const rules = buildACLRules({
-        httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
-        httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
-        ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
-      });
-      const knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
+  const rules = buildACLRules({
+    httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
+    httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
+    ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
+  });
+  const knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
 
-      logRules("HTTPS", rules.httpsRules);
-      logRules("HTTP", rules.httpRules);
-      logRules("IP", rules.ipRules);
-      logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules);
-
-      return { imageRef, pullPolicy, rules, knownBlockedRules };
-    },
-  );
+  console.log("::group::Configured ACL Rules");
+  logRules("HTTPS", rules.httpsRules);
+  logRules("HTTP", rules.httpRules);
+  logRules("IP", rules.ipRules);
+  logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules);
+  console.log("::endgroup::");
 
   const writablePaths = parseWritablePaths(env.INPUT_WRITABLE);
 
