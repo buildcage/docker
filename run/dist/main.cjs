@@ -1452,7 +1452,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 		constructor(options) {
 			this.specVersion = options.specVersion || SPECIFICATION_VERSION.join(".");
 			let specList = this.specVersion.split(".");
-			if (!(specList.length === 2 || specList.length === 3) || !specList.every((item) => isNumeric(item))) throw new error_1.ValueError("Failed to parse specVersion");
+			if (specList.length !== 2 && specList.length !== 3 || !specList.every((item) => isNumeric(item))) throw new error_1.ValueError("Failed to parse specVersion");
 			if (specList[0] != SPECIFICATION_VERSION[0]) throw new error_1.ValueError("Unsupported specVersion");
 			this.expires = options.expires, this.version = options.version, this.unrecognizedFields = options.unrecognizedFields || {};
 		}
@@ -2498,7 +2498,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 				if (didSomething = !1, !this.preserveMultipleSlashes) {
 					for (let i = 1; i < parts.length - 1; i++) {
 						let p = parts[i];
-						i === 1 && p === "" && parts[0] === "" || (p === "." || p === "") && (didSomething = !0, parts.splice(i, 1), i--);
+						(i !== 1 || p !== "" || parts[0] !== "") && (p === "." || p === "") && (didSomething = !0, parts.splice(i, 1), i--);
 					}
 					parts[0] === "." && parts.length === 2 && (parts[1] === "." || parts[1] === "") && (didSomething = !0, parts.pop());
 				}
@@ -2529,7 +2529,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 					if (!this.preserveMultipleSlashes) {
 						for (let i = 1; i < parts.length - 1; i++) {
 							let p = parts[i];
-							i === 1 && p === "" && parts[0] === "" || (p === "." || p === "") && (didSomething = !0, parts.splice(i, 1), i--);
+							(i !== 1 || p !== "" || parts[0] !== "") && (p === "." || p === "") && (didSomething = !0, parts.splice(i, 1), i--);
 						}
 						parts[0] === "." && parts.length === 2 && (parts[1] === "." || parts[1] === "") && (didSomething = !0, parts.pop());
 					}
@@ -2690,7 +2690,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 				});
 				pp.forEach((p, i) => {
 					let next = pp[i + 1], prev = pp[i - 1];
-					p !== exports.GLOBSTAR || prev === exports.GLOBSTAR || (prev === void 0 ? next !== void 0 && next !== exports.GLOBSTAR ? pp[i + 1] = "(?:\\/|" + twoStar + "\\/)?" + next : pp[i] = twoStar : next === void 0 ? pp[i - 1] = prev + "(?:\\/|\\/" + twoStar + ")?" : next !== exports.GLOBSTAR && (pp[i - 1] = prev + "(?:\\/|\\/" + twoStar + "\\/)" + next, pp[i + 1] = exports.GLOBSTAR));
+					p === exports.GLOBSTAR && prev !== exports.GLOBSTAR && (prev === void 0 ? next !== void 0 && next !== exports.GLOBSTAR ? pp[i + 1] = "(?:\\/|" + twoStar + "\\/)?" + next : pp[i] = twoStar : next === void 0 ? pp[i - 1] = prev + "(?:\\/|\\/" + twoStar + ")?" : next !== exports.GLOBSTAR && (pp[i - 1] = prev + "(?:\\/|\\/" + twoStar + "\\/)" + next, pp[i + 1] = exports.GLOBSTAR));
 				});
 				let filtered = pp.filter((p) => p !== exports.GLOBSTAR);
 				if (this.partial && filtered.length >= 1) {
