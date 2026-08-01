@@ -8044,6 +8044,21 @@ function logRules(label, rules) {
 	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
 	for (let r of rules) console.log(`  ${r}`);
 }
+/**
+* Wraps buildcage's own (non-user) log output in a collapsed
+* `::group::`/`::endgroup::` block, so a step's default (collapsed) view
+* shows only the user's own `run:` output — matching a plain `run:` step's
+* look. Always closes the group, even if `fn` throws, so a failure mid-group
+* can't leave it open for the rest of the step's output.
+*/
+async function withGroup(label, fn) {
+	console.log(`::group::${label}`);
+	try {
+		return await fn();
+	} finally {
+		console.log("::endgroup::");
+	}
+}
 async function main() {
 	let env = process.env, actionRef = env.GITHUB_ACTION_REF || "v2", actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", runInput = env.INPUT_RUN ?? "";
 	if (!runInput.trim()) throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
@@ -8052,13 +8067,13 @@ async function main() {
 		actionRef,
 		actionRepo
 	});
-	console.log(`buildcage-proxy image: ${imageRef}`);
+	console.log(`buildcage: proxy image: ${imageRef}`);
 	let rules = buildACLRules({
 		httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
 		httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
 		ipRulesInput: env.INPUT_ALLOWED_IP_RULES
 	}), knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
-	console.log("::group::Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules), console.log("::endgroup::");
+	console.log("::group::buildcage: Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules), console.log("::endgroup::");
 	let writablePaths = parseWritablePaths(env.INPUT_WRITABLE), containerName = generateContainerName(), projectName = deriveProjectName(containerName), stateFile = env.GITHUB_STATE;
 	stateFile && ((0, node_fs.appendFileSync)(stateFile, `container_name=${containerName}\n`), (0, node_fs.appendFileSync)(stateFile, `project_name=${projectName}\n`));
 	let composeEnv = {
@@ -8070,18 +8085,20 @@ async function main() {
 		ALLOWED_IP_RULES: rules.ipRules.join("\n"),
 		BUILDCAGE_PROXY_IMAGE_REF: imageRef
 	};
-	try {
-		(0, node_child_process.execFileSync)("docker", buildComposeUpArgs({
-			composeFile,
-			projectName,
-			pullPolicy
-		}), {
-			stdio: "inherit",
-			env: composeEnv
-		});
-	} catch (e) {
-		throw new SandboxError(describeDockerFailure(e, { operation: "docker compose up" }), "DOCKER_UNAVAILABLE");
-	}
+	await withGroup("buildcage: starting sandbox proxy", () => {
+		try {
+			(0, node_child_process.execFileSync)("docker", buildComposeUpArgs({
+				composeFile,
+				projectName,
+				pullPolicy
+			}), {
+				stdio: "inherit",
+				env: composeEnv
+			});
+		} catch (e) {
+			throw new SandboxError(describeDockerFailure(e, { operation: "docker compose up" }), "DOCKER_UNAVAILABLE");
+		}
+	});
 	let exitCode = 1;
 	try {
 		let proxyPid = getContainerPid(containerName);
@@ -8148,17 +8165,19 @@ async function main() {
 		} catch (e) {
 			annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
 		}
-		try {
-			(0, node_child_process.execFileSync)("docker", buildComposeDownArgs({
-				composeFile,
-				projectName
-			}), {
-				stdio: "inherit",
-				env: composeEnv
-			});
-		} catch (e) {
-			annotation.warning(`Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`);
-		}
+		await withGroup("buildcage: stopping sandbox proxy", () => {
+			try {
+				(0, node_child_process.execFileSync)("docker", buildComposeDownArgs({
+					composeFile,
+					projectName
+				}), {
+					stdio: "inherit",
+					env: composeEnv
+				});
+			} catch (e) {
+				annotation.warning(`Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`);
+			}
+		});
 	}
 	exitCode !== 0 && (process.exitCode = exitCode);
 }
