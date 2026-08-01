@@ -232,8 +232,25 @@ clean_sandbox_dev: ## Stop and remove the sandbox dev-loop containers
 # Drives run/dist/main.cjs directly (a host command, not a Docker build).
 .PHONY: test_integration_sandbox_linux
 test_integration_sandbox_linux: ## Run the run action's integration tests (needs BUILDCAGE_LOCAL_IMAGE_REF and a test-hook build of run/dist/main.cjs)
-	# TEMPORARY: isolated to just this one script to bisect a CI-only hang/cancellation -- restore the full list once resolved.
+	@./run/test/integration-test-writable-dir.sh
+	@./run/test/integration-test-writable-disabled.sh
+	@./run/test/integration-test-defaults.sh
+	@./run/test/integration-test-seccomp.sh
+	@./run/test/integration-test-die-with-parent.sh
+	@./run/test/integration-test-fs-escape.sh
+	@./run/test/integration-test-runner-temp.sh
+	@./run/test/integration-test-nested-mount-readonly.sh
+	@./run/test/integration-test-non-runc-default-pseudofs-readonly.sh
+	# TEMPORARY: diagnosing a CI-only cancellation right at this transition.
+	@echo "--- diagnostic: PID/process state before integration-test-concurrent.sh ---"
+	@cat /proc/sys/kernel/pid_max 2>&1 || true
+	@ps -eo pid,ppid,pgid,comm --sort=-pid 2>&1 | head -15 || true
+	@ps -eo pid,ppid,pgid,comm 2>&1 | wc -l || true
+	@echo "--- end diagnostic ---"
 	@./run/test/integration-test-concurrent.sh
+	@./run/test/integration-test-known-blocked-rules.sh
+	@./run/test/integration-test-ecapture-terminates.sh
+	@./run/test/integration-test-ecapture-hard-kill-recovery.sh
 
 # ---------------------------------------------------------------------------
 # example_{engine}_{mode} — smoke test against a plain Dockerfile
