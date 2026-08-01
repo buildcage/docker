@@ -12,10 +12,6 @@ touch "$WORKDIR/state.env"
 
 cleanup() {
   [ -n "${NODE_PID:-}" ] && kill -9 "$NODE_PID" >/dev/null 2>&1
-  # Matches only the real bash instance running run-isolated.sh, not sudo's
-  # own `use_pty` monitor process (which also has "run-isolated.sh" in its
-  # argv) -- see the kill below for the same distinction.
-  sudo -n pkill -9 -f "/bin/bash .*/run/scripts/run-isolated.sh" >/dev/null 2>&1
   sudo -n pkill -9 -x ecapture >/dev/null 2>&1
   docker ps -aq --filter "name=buildcage-proxy-" | xargs -r docker rm -f >/dev/null 2>&1
   docker network ls --filter "name=buildcage-proxy-" -q | xargs -r docker network rm >/dev/null 2>&1
@@ -29,7 +25,7 @@ GITHUB_STEP_SUMMARY="$WORKDIR/summary.md" \
 BUILDCAGE_BUILD_TEST_HOOKS=1 \
 BUILDCAGE_LOCAL_IMAGE_REF="$BUILDCAGE_LOCAL_IMAGE_REF" \
 INPUT_ALLOWED_HTTPS_RULES="example.com:443" \
-INPUT_RUN='sleep 60' \
+INPUT_RUN='sleep 300' \
   node "$REPO_ROOT/run/dist/main.cjs" > "$WORKDIR/out.log" 2>&1 &
 NODE_PID=$!
 
@@ -50,16 +46,9 @@ fi
 
 ECAPTURE_CGROUP=$(grep "^ecapture_cgroup_path=" "$WORKDIR/state.env" | cut -d= -f2-)
 
-# Bypasses main.ts's own finally block, simulating the runner cancelling the
-# step (or an OOM kill) mid-run. Killing Node alone leaves run-isolated.sh
-# (and runc/the sandboxed command under it) running as an orphan -- killing
-# it too exercises the same pdeathsig-based die-with-parent chain that
-# already covers it dying for any other reason (see docs/security.md and
-# integration-test-die-with-parent.sh, whose pgrep pattern this mirrors: sudo's
-# `use_pty` setting forks a monitor process that also matches a naive
-# `-f run-isolated.sh`, so this must target the real bash instance specifically).
+# Bypasses main.ts's own finally block entirely, simulating the runner
+# cancelling the step (or an OOM kill) mid-run.
 kill -9 "$NODE_PID" >/dev/null 2>&1
-sudo -n pkill -9 -f "/bin/bash .*/run/scripts/run-isolated.sh" >/dev/null 2>&1
 wait "$NODE_PID" 2>/dev/null
 
 if ! pgrep -x ecapture >/dev/null 2>&1; then
@@ -67,33 +56,18 @@ if ! pgrep -x ecapture >/dev/null 2>&1; then
   exit 1
 fi
 
-# Simulate GitHub Actions exposing this step's own GITHUB_STATE entries to its
-# post action as STATE_<name> environment variables -- except container_name/
-# project_name: this test is only about ecapture_pid/ecapture_cgroup_path
-# recovery, and including them would also exercise post.ts's docker-compose-down
-# path, which has hung in this environment when the sandbox network wasn't
-# fully torn down. That path is already exercised by every other passing
-# integration test's normal (non-hard-killed) exit, so it isn't retested here.
+# Simulate GitHub Actions exposing this step's own GITHUB_STATE entries to
+# its post action as STATE_<name> environment variables.
 STATE_ENV_ARGS=()
 while IFS='=' read -r k v; do
-  case "$k" in
-    container_name | project_name) continue ;;
-  esac
   [ -n "$k" ] && STATE_ENV_ARGS+=("STATE_$k=$v")
 done < "$WORKDIR/state.env"
-timeout 60 env "${STATE_ENV_ARGS[@]}" node "$REPO_ROOT/run/dist/post.cjs" > "$WORKDIR/post-out.log" 2>&1
-POST_CODE=$?
+env "${STATE_ENV_ARGS[@]}" node "$REPO_ROOT/run/dist/post.cjs" > "$WORKDIR/post-out.log" 2>&1
 
 echo ""
 echo "=== Ecapture Hard-Kill Recovery Assertions ==="
 echo ""
 FAILURES=0
-
-if [ "$POST_CODE" = "124" ]; then
-  echo "  FAIL  post.ts (run/dist/post.cjs) timed out after 60s; see log below"
-  cat "$WORKDIR/post-out.log"
-  FAILURES=$((FAILURES + 1))
-fi
 
 if pgrep -x ecapture >/dev/null 2>&1; then
   echo "  FAIL  ecapture process still running after post.ts ran; see log below"
