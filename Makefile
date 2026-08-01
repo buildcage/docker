@@ -241,6 +241,11 @@ test_integration_sandbox_linux: ## Run the run action's integration tests (needs
 	@./run/test/integration-test-runner-temp.sh
 	@./run/test/integration-test-nested-mount-readonly.sh
 	@./run/test/integration-test-non-runc-default-pseudofs-readonly.sh
+	@echo "--- diagnostic: resource usage before integration-test-concurrent.sh ---"
+	@df -h / /var/tmp 2>&1 || true
+	@free -h 2>&1 || true
+	@docker system df 2>&1 || true
+	@echo "--- end diagnostic ---"
 	@./run/test/integration-test-concurrent.sh
 	@./run/test/integration-test-known-blocked-rules.sh
 	@./run/test/integration-test-ecapture-terminates.sh
