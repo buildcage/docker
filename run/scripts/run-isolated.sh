@@ -99,8 +99,26 @@ VETH_P="sbxp${RAND_ID}"
 
 CODE=1
 
+# Tracks whether a ::group:: block is currently open (see group_start/
+# group_end below), so cleanup() can force it closed if this script exits
+# mid-group (e.g. a failed `ip netns add`) -- otherwise every line printed
+# afterwards (including the WARNING messages below) would stay nested inside
+# an unclosed, collapsed group in the Actions UI.
+IN_GROUP=0
+
+group_start() {
+  echo "::group::$1" >&2
+  IN_GROUP=1
+}
+
+group_end() {
+  echo "::endgroup::" >&2
+  IN_GROUP=0
+}
+
 cleanup() {
   set +e
+  [ "$IN_GROUP" = "1" ] && group_end
   # -f/--force also kills the container's process tree if it's still
   # running (e.g. this trap fired from INT/TERM mid-run), so it must run
   # before the network/mount resources below are torn out from under it.
@@ -131,6 +149,7 @@ trap cleanup EXIT INT TERM
 # minimizes the gap between isolated-exec.ts's listHostMounts() snapshot
 # (which config.json's readonlyPaths was computed from) and this rbind
 # actually capturing the host's mount table.
+group_start "Buildcage: preparing sandbox"
 echo "run-isolated: bind-mounting host root for runc's rootfs..." >&2
 mkdir -p "$ROOTFS_BIND_DIR"
 mount --rbind / "$ROOTFS_BIND_DIR"
@@ -170,6 +189,7 @@ nsenter --net="/proc/${PROXY_PID}/ns/net" -- sh -c "
 "
 
 echo "run-isolated: executing isolated command via runc..." >&2
+group_end
 set +e
 # No nsenter wrapper needed here: config.json's linux.namespaces network
 # entry already points at /var/run/netns/${NETNS_NAME}, so runc joins it
@@ -194,4 +214,4 @@ setpriv --pdeathsig=KILL -- "$RUNC_PATH" run --bundle "$BUNDLE_DIR" "$CONTAINER_
 CODE=$?
 set -e
 
-echo "run-isolated: command exited with code ${CODE}" >&2
+echo "Buildcage: command exited with code ${CODE}" >&2

@@ -86,6 +86,22 @@ function logRules(label: string, rules: string[]): void {
   for (const r of rules) console.log(`  ${r}`);
 }
 
+/**
+ * Wraps buildcage's own (non-user) log output in a collapsed
+ * `::group::`/`::endgroup::` block, so a step's default (collapsed) view
+ * shows only the user's own `run:` output — matching a plain `run:` step's
+ * look. Always closes the group, even if `fn` throws, so a failure mid-group
+ * can't leave it open for the rest of the step's output.
+ */
+async function withGroup<T>(label: string, fn: () => T | Promise<T>): Promise<T> {
+  console.log(`::group::${label}`);
+  try {
+    return await fn();
+  } finally {
+    console.log("::endgroup::");
+  }
+}
+
 async function main(): Promise<void> {
   const env = process.env;
   // Empty (not `??`-catchable) for local-path `uses: ./run` invocations —
@@ -106,36 +122,40 @@ async function main(): Promise<void> {
   // when this script isn't running as the real action.
   const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
 
-  const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(
-        env,
-      )
-    : null;
-  if (localOverride) {
-    console.log(
-      `BUILDCAGE_LOCAL_IMAGE_REF is set (${JSON.stringify(localOverride.imageRef)}) — ` +
-        `skipping image provenance verification entirely. This bypass exists only for ` +
-        `buildcage's own CI self-tests and local development.`,
-    );
-  }
-  const { imageRef, pullPolicy } =
-    localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo }));
-  console.log(`buildcage-proxy image: ${imageRef}`);
+  const { imageRef, pullPolicy, rules, knownBlockedRules } = await withGroup(
+    "Buildcage: image & ACL configuration",
+    async () => {
+      const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
+        ? (
+            await import("../../core/lib/provenance/local-image-override.ts")
+          ).readLocalImageOverride(env)
+        : null;
+      if (localOverride) {
+        console.log(
+          `BUILDCAGE_LOCAL_IMAGE_REF is set (${JSON.stringify(localOverride.imageRef)}) — ` +
+            `skipping image provenance verification entirely. This bypass exists only for ` +
+            `buildcage's own CI self-tests and local development.`,
+        );
+      }
+      const { imageRef, pullPolicy } =
+        localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo }));
+      console.log(`buildcage-proxy image: ${imageRef}`);
 
-  const rules = buildACLRules({
-    httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
-    httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
-    ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
-  });
+      const rules = buildACLRules({
+        httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
+        httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
+        ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
+      });
+      const knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
 
-  const knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
+      logRules("HTTPS", rules.httpsRules);
+      logRules("HTTP", rules.httpRules);
+      logRules("IP", rules.ipRules);
+      logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules);
 
-  console.log("::group::Configured ACL Rules");
-  logRules("HTTPS", rules.httpsRules);
-  logRules("HTTP", rules.httpRules);
-  logRules("IP", rules.ipRules);
-  logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules);
-  console.log("::endgroup::");
+      return { imageRef, pullPolicy, rules, knownBlockedRules };
+    },
+  );
 
   const writablePaths = parseWritablePaths(env.INPUT_WRITABLE);
 
@@ -162,17 +182,19 @@ async function main(): Promise<void> {
     BUILDCAGE_PROXY_IMAGE_REF: imageRef,
   };
 
-  try {
-    execFileSync("docker", buildComposeUpArgs({ composeFile, projectName, pullPolicy }), {
-      stdio: "inherit",
-      env: composeEnv,
-    });
-  } catch (e) {
-    throw new SandboxError(
-      describeDockerFailure(e, { operation: "docker compose up" }),
-      "DOCKER_UNAVAILABLE",
-    );
-  }
+  await withGroup("Buildcage: starting sandbox proxy", () => {
+    try {
+      execFileSync("docker", buildComposeUpArgs({ composeFile, projectName, pullPolicy }), {
+        stdio: "inherit",
+        env: composeEnv,
+      });
+    } catch (e) {
+      throw new SandboxError(
+        describeDockerFailure(e, { operation: "docker compose up" }),
+        "DOCKER_UNAVAILABLE",
+      );
+    }
+  });
 
   let exitCode = 1;
   try {
@@ -282,16 +304,18 @@ async function main(): Promise<void> {
     } catch (e) {
       annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
     }
-    try {
-      execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), {
-        stdio: "inherit",
-        env: composeEnv,
-      });
-    } catch (e) {
-      annotation.warning(
-        `Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`,
-      );
-    }
+    await withGroup("Buildcage: stopping sandbox proxy", () => {
+      try {
+        execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), {
+          stdio: "inherit",
+          env: composeEnv,
+        });
+      } catch (e) {
+        annotation.warning(
+          `Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`,
+        );
+      }
+    });
   }
 
   if (exitCode !== 0) {
