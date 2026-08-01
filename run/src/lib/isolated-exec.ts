@@ -206,7 +206,10 @@ export function waitForEcaptureReady(logPath: string, timeoutMs = 5000): void {
 export function stopEcapture(proc: ChildProcess): void {
   if (!proc.pid) return;
   try {
-    execFileSync("sudo", ["-n", "--", "kill", "-TERM", `-${proc.pid}`]);
+    // stdio: "ignore" -- execFileSync passes a failing child's stderr straight
+    // through even when the thrown error is caught, and "already exited" is
+    // an expected, not a warning-worthy, outcome here.
+    execFileSync("sudo", ["-n", "--", "kill", "-TERM", `-${proc.pid}`], { stdio: "ignore" });
   } catch {
     return; // already exited, or sudo itself failed
   }
@@ -250,7 +253,10 @@ export function ensureCgroupDir(cgroupPath: string): void {
  *  no-ops if the cgroup is still in use or already gone. */
 export function removeCgroupDirIfEmpty(cgroupPath: string): void {
   try {
-    execFileSync("sudo", ["-n", "--", "rmdir", cgroupPath]);
+    // stdio: "ignore" -- suppresses the expected "No such file or directory"/
+    // "Device or busy" stderr that execFileSync would otherwise print even
+    // though the error below is caught and intentionally not surfaced.
+    execFileSync("sudo", ["-n", "--", "rmdir", cgroupPath], { stdio: "ignore" });
   } catch {
     // Already removed by runc, or still non-empty -- not our job to force it.
   }

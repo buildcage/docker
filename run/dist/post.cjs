@@ -133,7 +133,7 @@ if (ecapturePid) try {
 		"kill",
 		"-TERM",
 		`-${ecapturePid}`
-	]);
+	], { stdio: "ignore" });
 } catch {}
 const ecaptureCgroupPath = process.env.STATE_ecapture_cgroup_path;
 if (ecaptureCgroupPath) try {
@@ -142,7 +142,7 @@ if (ecaptureCgroupPath) try {
 		"--",
 		"rmdir",
 		ecaptureCgroupPath
-	]);
+	], { stdio: "ignore" });
 } catch {}
 if (containerName?.startsWith("buildcage-proxy-")) try {
 	let scratchDir = scratchDirFor(containerName);

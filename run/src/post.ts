@@ -25,7 +25,9 @@ const ecapturePid = process.env.STATE_ecapture_pid;
 if (ecapturePid) {
   try {
     if (readFileSync(`/proc/${ecapturePid}/comm`, "utf8").trim() === "ecapture") {
-      execFileSync("sudo", ["-n", "--", "kill", "-TERM", `-${ecapturePid}`]);
+      // stdio: "ignore" -- execFileSync leaks a failing child's stderr even
+      // when the error is caught, and "already exited" isn't warning-worthy.
+      execFileSync("sudo", ["-n", "--", "kill", "-TERM", `-${ecapturePid}`], { stdio: "ignore" });
     }
   } catch {
     // Already exited, /proc/<pid> is gone, or sudo itself failed.
@@ -34,7 +36,7 @@ if (ecapturePid) {
 const ecaptureCgroupPath = process.env.STATE_ecapture_cgroup_path;
 if (ecaptureCgroupPath) {
   try {
-    execFileSync("sudo", ["-n", "--", "rmdir", ecaptureCgroupPath]);
+    execFileSync("sudo", ["-n", "--", "rmdir", ecaptureCgroupPath], { stdio: "ignore" });
   } catch {
     // Already removed by runc's own teardown, or still in use.
   }

@@ -7430,7 +7430,7 @@ function stopEcapture(proc) {
 				"kill",
 				"-TERM",
 				`-${proc.pid}`
-			]);
+			], { stdio: "ignore" });
 		} catch {
 			return;
 		}
@@ -7474,7 +7474,7 @@ function removeCgroupDirIfEmpty(cgroupPath) {
 			"--",
 			"rmdir",
 			cgroupPath
-		]);
+		], { stdio: "ignore" });
 	} catch {}
 }
 /**
