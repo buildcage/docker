@@ -1,3 +1,5 @@
 engineStrict: true
 trustPolicy: no-downgrade
 minimumReleaseAge: 20160 # 2 weeks
+minimumReleaseAgeExclude:
+  - brace-expansion@5.0.7 || 5.0.8

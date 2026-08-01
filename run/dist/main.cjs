@@ -1781,9 +1781,9 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 		return result;
 	};
 })), require_commonjs$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.EXPANSION_MAX = void 0, exports.expand = expand;
+	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.EXPANSION_MAX_LENGTH = exports.EXPANSION_MAX = void 0, exports.expand = expand;
 	let balanced_match_1 = require_commonjs$2(), escSlash = "\0SLASH" + Math.random() + "\0", escOpen = "\0OPEN" + Math.random() + "\0", escClose = "\0CLOSE" + Math.random() + "\0", escComma = "\0COMMA" + Math.random() + "\0", escPeriod = "\0PERIOD" + Math.random() + "\0", escSlashPattern = new RegExp(escSlash, "g"), escOpenPattern = new RegExp(escOpen, "g"), escClosePattern = new RegExp(escClose, "g"), escCommaPattern = new RegExp(escComma, "g"), escPeriodPattern = new RegExp(escPeriod, "g"), slashPattern = /\\\\/g, openPattern = /\\{/g, closePattern = /\\}/g, commaPattern = /\\,/g, periodPattern = /\\\./g;
-	exports.EXPANSION_MAX = 1e5;
+	exports.EXPANSION_MAX = 1e5, exports.EXPANSION_MAX_LENGTH = 4e6;
 	function numeric(str) {
 		return isNaN(str) ? str.charCodeAt(0) : parseInt(str, 10);
 	}
@@ -1809,8 +1809,8 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	}
 	function expand(str, options = {}) {
 		if (!str) return [];
-		let { max = exports.EXPANSION_MAX } = options;
-		return str.slice(0, 2) === "{}" && (str = "\\{\\}" + str.slice(2)), expand_(escapeBraces(str), max, !0).map(unescapeBraces);
+		let { max = exports.EXPANSION_MAX, maxLength = exports.EXPANSION_MAX_LENGTH } = options;
+		return str.slice(0, 2) === "{}" && (str = "\\{\\}" + str.slice(2)), expand_(escapeBraces(str), max, maxLength, !0).map(unescapeBraces);
 	}
 	function embrace(str) {
 		return "{" + str + "}";
@@ -1824,49 +1824,76 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function gte(i, y) {
 		return i >= y;
 	}
-	function expand_(str, max, isTop) {
-		/** @type {string[]} */
-		let expansions = [], m = (0, balanced_match_1.balanced)("{", "}", str);
-		if (!m) return [str];
-		let pre = m.pre, post = m.post.length ? expand_(m.post, max, !1) : [""];
-		if (/\$$/.test(m.pre)) for (let k = 0; k < post.length && k < max; k++) {
-			let expansion = pre + "{" + m.body + "}" + post[k];
-			expansions.push(expansion);
+	function combine(acc, pre, values, max, maxLength, dropEmpties) {
+		let out = [], length = 0;
+		for (let a = 0; a < acc.length; a++) for (let v = 0; v < values.length; v++) {
+			if (out.length >= max) return out;
+			let expansion = acc[a] + pre + values[v];
+			if (!(dropEmpties && !expansion)) {
+				if (length + expansion.length > maxLength) return out;
+				out.push(expansion), length += expansion.length;
+			}
 		}
-		else {
-			let isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body), isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body), isSequence = isNumericSequence || isAlphaSequence, isOptions = m.body.indexOf(",") >= 0;
-			if (!isSequence && !isOptions) return m.post.match(/,(?!,).*\}/) ? (str = m.pre + "{" + m.body + escClose + m.post, expand_(str, max, !0)) : [str];
-			let n;
-			if (isSequence) n = m.body.split(/\.\./);
-			else if (n = parseCommaParts(m.body), n.length === 1 && n[0] !== void 0 && (n = expand_(n[0], max, !1).map(embrace), n.length === 1)) return post.map((p) => m.pre + n[0] + p);
-			let N;
-			if (isSequence && n[0] !== void 0 && n[1] !== void 0) {
-				let x = numeric(n[0]), y = numeric(n[1]), width = Math.max(n[0].length, n[1].length), incr = n.length === 3 && n[2] !== void 0 ? Math.max(Math.abs(numeric(n[2])), 1) : 1, test = lte;
-				y < x && (incr *= -1, test = gte);
-				let pad = n.some(isPadded);
-				N = [];
-				for (let i = x; test(i, y) && N.length < max; i += incr) {
-					let c;
-					if (isAlphaSequence) c = String.fromCharCode(i), c === "\\" && (c = "");
-					else if (c = String(i), pad) {
-						let need = width - c.length;
-						if (need > 0) {
-							let z = Array(need + 1).join("0");
-							c = i < 0 ? "-" + z + c.slice(1) : z + c;
-						}
-					}
-					N.push(c);
+		return out;
+	}
+	function expandSequence(body, isAlphaSequence, max) {
+		let n = body.split(/\.\./), N = [];
+		/* c8 ignore start */
+		if (n[0] === void 0 || n[1] === void 0) return N;
+		/* c8 ignore stop */
+		let x = numeric(n[0]), y = numeric(n[1]), width = Math.max(n[0].length, n[1].length), incr = n.length === 3 && n[2] !== void 0 ? Math.max(Math.abs(numeric(n[2])), 1) : 1, test = lte;
+		y < x && (incr *= -1, test = gte);
+		let pad = n.some(isPadded);
+		for (let i = x; test(i, y) && N.length < max; i += incr) {
+			let c;
+			if (isAlphaSequence) c = String.fromCharCode(i), c === "\\" && (c = "");
+			else if (c = String(i), pad) {
+				let need = width - c.length;
+				if (need > 0) {
+					let z = Array(need + 1).join("0");
+					c = i < 0 ? "-" + z + c.slice(1) : z + c;
 				}
-			} else {
-				N = [];
-				for (let j = 0; j < n.length; j++) N.push.apply(N, expand_(n[j], max, !1));
 			}
-			for (let j = 0; j < N.length; j++) for (let k = 0; k < post.length && expansions.length < max; k++) {
-				let expansion = pre + N[j] + post[k];
-				(!isTop || isSequence || expansion) && expansions.push(expansion);
-			}
+			N.push(c);
 		}
-		return expansions;
+		return N;
+	}
+	function expand_(str, max, maxLength, isTop) {
+		let acc = [""], dropEmpties = !1, firstGroup = !0;
+		for (;;) {
+			let m = (0, balanced_match_1.balanced)("{", "}", str);
+			if (!m) return combine(acc, str, [""], max, maxLength, dropEmpties);
+			let pre = m.pre;
+			if (/\$$/.test(pre)) {
+				if (acc = combine(acc, pre + "{" + m.body + "}", [""], max, maxLength, dropEmpties && !m.post.length), firstGroup = !1, !m.post.length) break;
+				str = m.post;
+				continue;
+			}
+			let isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body), isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body), isSequence = isNumericSequence || isAlphaSequence, isOptions = m.body.indexOf(",") >= 0;
+			if (!isSequence && !isOptions) {
+				if (m.post.match(/,(?!,).*\}/)) {
+					str = m.pre + "{" + m.body + escClose + m.post, isTop = !0;
+					continue;
+				}
+				return combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties);
+			}
+			firstGroup &&= (dropEmpties = isTop && !isSequence, !1);
+			let values;
+			if (isSequence) values = expandSequence(m.body, isAlphaSequence, max);
+			else {
+				let n = parseCommaParts(m.body);
+				if (n.length === 1 && n[0] !== void 0 && (n = expand_(n[0], max, maxLength, !1).map(embrace), n.length === 1)) {
+					if (acc = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
+					str = m.post;
+					continue;
+				}
+				values = [];
+				for (let j = 0; j < n.length; j++) values.push.apply(values, expand_(n[j], max, maxLength, !1));
+			}
+			if (acc = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
+			str = m.post;
+		}
+		return acc;
 	}
 })), require_assert_valid_pattern = /* @__PURE__ */ __commonJSMin(((exports) => {
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.assertValidPattern = void 0, exports.assertValidPattern = (pattern) => {
