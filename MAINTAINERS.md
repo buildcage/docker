@@ -2,8 +2,8 @@
 
 ## Current Maintainer
 
-| Name   | GitHub                               | Role       | Access                                                                                                           |
-| ------ | ------------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| Name | GitHub | Role | Access |
+|------|--------|------|--------|
 | dash14 | [@dash14](https://github.com/dash14) | Maintainer | Repository admin (write access, branch protection, secrets), GHCR package publishing, GitHub Security Advisories |
 
 ## Responsibilities

@@ -22,7 +22,7 @@ export default defineConfig({
     },
   },
   fmt: {
-    ignorePatterns: [...generatedOutputs, ...fixtures],
+    ignorePatterns: [...generatedOutputs, ...fixtures, "MAINTAINERS.md"],
   },
   staged: {
     "*.{ts,tsx,js,jsx,json,jsonc,yaml,yml,md}": "vp check --fix",
