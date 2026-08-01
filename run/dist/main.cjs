@@ -7414,6 +7414,24 @@ function waitForEcaptureReady(logPath, timeoutMs = 5e3) {
 		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
 	}
 }
+function waitUntilGone(pgid, timeoutMs) {
+	let deadline = Date.now() + timeoutMs;
+	for (; Date.now() < deadline;) {
+		try {
+			(0, node_child_process.execFileSync)("sudo", [
+				"-n",
+				"--",
+				"kill",
+				"-0",
+				pgid
+			], { stdio: "ignore" });
+		} catch {
+			return !0;
+		}
+		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+	}
+	return !1;
+}
 /**
 * Stop a process started by startEcapture, with a brief grace period to
 * flush and exit before the caller reads its log file. Killed via `sudo`
@@ -7443,24 +7461,24 @@ function stopEcapture(proc) {
 		console.error(`DEBUG stopEcapture: initial TERM to ${pgid} threw: ${errorMessage(e)}`);
 		return;
 	}
-	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+	if (waitUntilGone(pgid, 8e3)) {
+		console.error(`DEBUG stopEcapture: ${pgid} exited on its own within 8s of TERM`);
+		return;
+	}
+	console.error(`DEBUG stopEcapture: ${pgid} still alive after TERM+8s, escalating to KILL`);
 	try {
 		(0, node_child_process.execFileSync)("sudo", [
 			"-n",
 			"--",
 			"kill",
-			"-0",
-			pgid
-		], { stdio: "ignore" }), console.error(`DEBUG stopEcapture: ${pgid} still alive after TERM+500ms, escalating to KILL`), (0, node_child_process.execFileSync)("sudo", [
-			"-n",
-			"--",
-			"kill",
 			"-KILL",
 			pgid
-		], { stdio: "ignore" }), console.error(`DEBUG stopEcapture: KILL sent to ${pgid}`);
+		], { stdio: "ignore" });
 	} catch (e) {
-		console.error(`DEBUG stopEcapture: ${pgid} liveness check/escalation ended: ${errorMessage(e)}`);
+		console.error(`DEBUG stopEcapture: KILL to ${pgid} threw: ${errorMessage(e)}`);
+		return;
 	}
+	waitUntilGone(pgid, 5e3) ? console.error(`DEBUG stopEcapture: ${pgid} gone within 5s of KILL`) : console.error(`DEBUG stopEcapture: ${pgid} STILL ALIVE 5s after KILL`);
 }
 /** Parse ecapture's captured log into this step's HTTPS communication logs.
 *  Undefined (not empty) if the log doesn't exist at all. */
