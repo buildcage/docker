@@ -7399,7 +7399,7 @@ function startEcapture(ecapturePath, logPath, cgroupPath) {
 		],
 		detached: !0
 	});
-	return (0, node_fs.closeSync)(logFd), proc.on("error", () => {}), proc;
+	return (0, node_fs.closeSync)(logFd), proc.on("error", () => {}), proc.unref(), proc;
 }
 const ECAPTURE_READY_PATTERN = /started successfully/;
 /**

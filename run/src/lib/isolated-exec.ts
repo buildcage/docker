@@ -176,6 +176,13 @@ export function startEcapture(ecapturePath: string, logPath: string, cgroupPath?
   // Swallow spawn failures (async 'error' event) so they can't crash the
   // process -- waitForEcaptureReady's own timeout already covers this as a no-op.
   proc.on("error", () => {});
+  // Without this, Node keeps the event loop alive until this child actually
+  // exits -- by default true even for a detached child (see Node's own
+  // child_process docs). stopEcapture only sends SIGTERM and waits a fixed
+  // 500ms with no confirmation, so if ecapture is slow to tear down its eBPF
+  // probes, the whole run action step would otherwise hang well past the
+  // point where its own work (report, docker compose down) is already done.
+  proc.unref();
   return proc;
 }
 
