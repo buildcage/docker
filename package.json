@@ -1,29 +1,18 @@
 {
   "name": "buildcage",
   "private": true,
-  "engines": {
-    "node": ">=24",
-    "pnpm": ">=11"
-  },
-  "packageManager": "pnpm@11.11.0",
-  "devEngines": {
-    "runtime": {
-      "name": "node",
-      "version": "24.16.0",
-      "onFail": "download"
-    },
-    "packageManager": {
-      "name": "pnpm",
-      "version": "11.11.0",
-      "onFail": "download"
-    }
-  },
   "type": "module",
   "scripts": {
     "build": "rolldown -c",
     "build:qjs": "BUILD_TARGET=qjs rolldown -c rolldown.scripts.config.js",
     "build:qjs-test": "BUILD_TARGET=qjs-test rolldown -c rolldown.scripts.config.js",
     "build:scripts": "rolldown -c rolldown.scripts.config.js",
+    "check": "vp check",
+    "format": "vp fmt --write",
+    "format:check": "vp fmt --check",
+    "lint": "vp lint",
+    "lint:fix": "vp lint --fix",
+    "prepare": "vp config",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.qjs.json"
   },
   "dependencies": {
@@ -35,6 +24,24 @@
     "@types/node": "^24.9.2",
     "fast-check": "^4.8.0",
     "rolldown": "^1.1.5",
-    "typescript": "^7.0.2"
-  }
+    "typescript": "^7.0.2",
+    "vite-plus": "^0.2.5"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.11.0",
+      "onFail": "download"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "24.16.0",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=11"
+  },
+  "packageManager": "pnpm@11.11.0"
 }
