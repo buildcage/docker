@@ -18,12 +18,12 @@
   "dependencies": {
     "@sigstore/bundle": "^5.0.0",
     "@sigstore/tuf": "^5.0.0",
-    "@sigstore/verify": "^4.0.0"
+    "@sigstore/verify": "^4.1.0"
   },
   "devDependencies": {
-    "@types/node": "^24.9.2",
-    "fast-check": "^4.8.0",
-    "rolldown": "^1.1.5",
+    "@types/node": "^24.13.3",
+    "fast-check": "^4.9.0",
+    "rolldown": "^1.2.0",
     "typescript": "^7.0.2",
     "vite-plus": "^0.2.5"
   },

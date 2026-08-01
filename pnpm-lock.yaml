@@ -214,20 +214,20 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0
       '@sigstore/verify':
-        specifier: ^4.0.0
+        specifier: ^4.1.0
         version: 4.1.0
     devDependencies:
       '@types/node':
-        specifier: ^24.9.2
+        specifier: ^24.13.3
         version: 24.13.3
       fast-check:
-        specifier: ^4.8.0
+        specifier: ^4.9.0
         version: 4.9.0
       node:
         specifier: runtime:24.16.0
         version: runtime:24.16.0
       rolldown:
-        specifier: ^1.1.5
+        specifier: ^1.2.0
         version: 1.2.0
       typescript:
         specifier: ^7.0.2
@@ -1236,9 +1236,9 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
-  brace-expansion@5.0.6:
-    resolution: {integrity: sha512-kLpxurY4Z4r9sgMsyG0Z9uzsBlgiU/EFKhj/h91/8yHu0edo7XuixOIH3VcJ8kkxs6/jPzoI6U9Vj3WqbMQ94g==}
-    engines: {node: 18 || 20 || >=22}
+  brace-expansion@5.0.8:
+    resolution: {integrity: sha512-JZyDyq3D4AUifKTPOB7DELf6XsB3WdPuNxCtob1vFXPsSXhdAiHBWJ/tJ8HAc9aH84BK+5JFZLNkJKx3G9kzQg==}
+    engines: {node: 20 || >=22}
 
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
@@ -2376,7 +2376,7 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  brace-expansion@5.0.6:
+  brace-expansion@5.0.8:
     dependencies:
       balanced-match: 4.0.4
 
@@ -2472,7 +2472,7 @@ snapshots:
 
   minimatch@10.2.5:
     dependencies:
-      brace-expansion: 5.0.6
+      brace-expansion: 5.0.8
 
   mrmime@2.0.1: {}
 
