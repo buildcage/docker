@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Run tests with outbound network isolation
-        uses: dash14/buildcage/run@bdf40b4677db602b923c622f26ef09a210d2ebd7 # v2.2.4
+        uses: dash14/buildcage/run@f40c162979dc9f095993ad26049b08b2eca77911 # v2.2.5
         with:
           proxy_mode: restrict
           allowed_https_rules: |
