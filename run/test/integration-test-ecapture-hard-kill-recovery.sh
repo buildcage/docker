@@ -12,6 +12,7 @@ touch "$WORKDIR/state.env"
 
 cleanup() {
   [ -n "${NODE_PID:-}" ] && kill -9 "$NODE_PID" >/dev/null 2>&1
+  sudo -n pkill -9 -f run-isolated.sh >/dev/null 2>&1
   sudo -n pkill -9 -x ecapture >/dev/null 2>&1
   docker ps -aq --filter "name=buildcage-proxy-" | xargs -r docker rm -f >/dev/null 2>&1
   docker network ls --filter "name=buildcage-proxy-" -q | xargs -r docker network rm >/dev/null 2>&1
@@ -25,7 +26,7 @@ GITHUB_STEP_SUMMARY="$WORKDIR/summary.md" \
 BUILDCAGE_BUILD_TEST_HOOKS=1 \
 BUILDCAGE_LOCAL_IMAGE_REF="$BUILDCAGE_LOCAL_IMAGE_REF" \
 INPUT_ALLOWED_HTTPS_RULES="example.com:443" \
-INPUT_RUN='sleep 300' \
+INPUT_RUN='sleep 60' \
   node "$REPO_ROOT/run/dist/main.cjs" > "$WORKDIR/out.log" 2>&1 &
 NODE_PID=$!
 
@@ -46,9 +47,13 @@ fi
 
 ECAPTURE_CGROUP=$(grep "^ecapture_cgroup_path=" "$WORKDIR/state.env" | cut -d= -f2-)
 
-# Bypasses main.ts's own finally block entirely, simulating the runner
-# cancelling the step (or an OOM kill) mid-run.
+# Bypasses main.ts's own finally block, simulating the runner cancelling the
+# step (or an OOM kill) mid-run. Killing Node alone leaves run-isolated.sh
+# (and runc/the sandboxed command under it) running as an orphan -- killing
+# it too triggers the same pdeathsig-based die-with-parent chain that covers
+# it dying for any other reason (see docs/security.md).
 kill -9 "$NODE_PID" >/dev/null 2>&1
+sudo -n pkill -9 -f run-isolated.sh >/dev/null 2>&1
 wait "$NODE_PID" 2>/dev/null
 
 if ! pgrep -x ecapture >/dev/null 2>&1; then
@@ -57,17 +62,26 @@ if ! pgrep -x ecapture >/dev/null 2>&1; then
 fi
 
 # Simulate GitHub Actions exposing this step's own GITHUB_STATE entries to
-# its post action as STATE_<name> environment variables.
+# its post action as STATE_<name> environment variables. `timeout`-bounded:
+# post.ts's docker-compose-down call has none of its own, and an incompletely
+# killed sandbox tree previously left it hanging on a busy proxy network.
 STATE_ENV_ARGS=()
 while IFS='=' read -r k v; do
   [ -n "$k" ] && STATE_ENV_ARGS+=("STATE_$k=$v")
 done < "$WORKDIR/state.env"
-env "${STATE_ENV_ARGS[@]}" node "$REPO_ROOT/run/dist/post.cjs" > "$WORKDIR/post-out.log" 2>&1
+timeout 60 env "${STATE_ENV_ARGS[@]}" node "$REPO_ROOT/run/dist/post.cjs" > "$WORKDIR/post-out.log" 2>&1
+POST_CODE=$?
 
 echo ""
 echo "=== Ecapture Hard-Kill Recovery Assertions ==="
 echo ""
 FAILURES=0
+
+if [ "$POST_CODE" = "124" ]; then
+  echo "  FAIL  post.ts (run/dist/post.cjs) timed out after 60s; see log below"
+  cat "$WORKDIR/post-out.log"
+  FAILURES=$((FAILURES + 1))
+fi
 
 if pgrep -x ecapture >/dev/null 2>&1; then
   echo "  FAIL  ecapture process still running after post.ts ran; see log below"
