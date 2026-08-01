@@ -70,7 +70,7 @@ async function main(): Promise<void> {
   }
   const { imageRef, pullPolicy } =
     localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }));
-  console.log(`buildcage image: ${imageRef}`);
+  console.log(`buildcage: image: ${imageRef}`);
 
   const rules = buildACLRules({
     httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
