@@ -123,7 +123,7 @@ async function main(): Promise<void> {
   const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
 
   const { imageRef, pullPolicy, rules, knownBlockedRules } = await withGroup(
-    "Buildcage: image & ACL configuration",
+    "buildcage: image & ACL configuration",
     async () => {
       const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
         ? (
@@ -182,7 +182,7 @@ async function main(): Promise<void> {
     BUILDCAGE_PROXY_IMAGE_REF: imageRef,
   };
 
-  await withGroup("Buildcage: starting sandbox proxy", () => {
+  await withGroup("buildcage: starting sandbox proxy", () => {
     try {
       execFileSync("docker", buildComposeUpArgs({ composeFile, projectName, pullPolicy }), {
         stdio: "inherit",
@@ -304,7 +304,7 @@ async function main(): Promise<void> {
     } catch (e) {
       annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
     }
-    await withGroup("Buildcage: stopping sandbox proxy", () => {
+    await withGroup("buildcage: stopping sandbox proxy", () => {
       try {
         execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), {
           stdio: "inherit",
