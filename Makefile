@@ -22,11 +22,7 @@ help:
 .PHONY: test_unit
 test_unit: test_unit_core test_unit_setup test_unit_report test_unit_sandbox test_unit_qjs ## Run unit tests
 
-# vitest's CLI positional args are substring filters against each resolved
-# test file's path (not glob expansion like `node --test` used), matched
-# against vite.config.ts's `test.include`. "report/src" (not bare "report")
-# avoids matching core/lib/report/*.test.ts; adding new test files under
-# paths that share one of these substrings could misroute them.
+# vitest matches these by path substring, not glob, so keep them package-specific.
 .PHONY: test_unit_core
 test_unit_core: ## Run core unit tests
 	@vp test run core/

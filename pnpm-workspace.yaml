@@ -4,8 +4,6 @@ minimumReleaseAge: 20160 # 2 weeks
 minimumReleaseAgeExclude:
   - brace-expansion@5.0.7 || 5.0.8
 
-# vitest is only a transitive dependency (bundled inside vite-plus, which
-# `vp test` execs directly regardless of root node_modules), but *.test.ts
-# files import it by name, so tsc needs it resolvable from the project root.
+# Lets tsc resolve vitest's types, even though it's only vite-plus's transitive dependency.
 publicHoistPattern:
   - vitest
