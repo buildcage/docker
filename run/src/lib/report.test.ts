@@ -4,7 +4,7 @@
  * the isolated command's own exit code (see main.ts), never resetting it
  * back to success.
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -204,8 +204,8 @@ describe("writeReport", () => {
 
   // Audit's outcome never depends on known_blocked_rules matching, so the
   // notice text shouldn't either.
-  it("audit-mode notice text stays fixed even when known_blocked_rules matches every blocked connection", (t) => {
-    const log = t.mock.method(console, "log", () => {});
+  it("audit-mode notice text stays fixed even when known_blocked_rules matches every blocked connection", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const knownBlockedRules = ["known-bad.example.com:443"];
     const r = report({
       parameters: parameters({ mode: "audit", knownBlockedRules }),
@@ -218,7 +218,7 @@ describe("writeReport", () => {
     writeReportWithSummary(r, { failOnBlocked: true });
     assert.equal(log.mock.calls.length, 1);
     assert.equal(
-      log.mock.calls[0].arguments[0],
+      log.mock.calls[0][0],
       "::notice::2 blocked connection(s) detected by buildcage sandbox",
     );
   });

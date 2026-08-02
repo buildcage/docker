@@ -22,21 +22,26 @@ help:
 .PHONY: test_unit
 test_unit: test_unit_core test_unit_setup test_unit_report test_unit_sandbox test_unit_qjs ## Run unit tests
 
+# vitest's CLI positional args are substring filters against each resolved
+# test file's path (not glob expansion like `node --test` used), matched
+# against vite.config.ts's `test.include`. "report/src" (not bare "report")
+# avoids matching core/lib/report/*.test.ts; adding new test files under
+# paths that share one of these substrings could misroute them.
 .PHONY: test_unit_core
 test_unit_core: ## Run core unit tests
-	@node --test 'core/**/*.test.ts'
+	@vp test run core/
 
 .PHONY: test_unit_setup
 test_unit_setup: ## Run setup action unit tests
-	@node --test 'setup/src/**/*.test.ts'
+	@vp test run setup/src
 
 .PHONY: test_unit_report
 test_unit_report: ## Run report unit tests
-	@node --test 'report/src/**/*.test.ts'
+	@vp test run report/src
 
 .PHONY: test_unit_sandbox
 test_unit_sandbox: ## Run the run action's unit tests
-	@node --test 'run/src/**/*.test.ts'
+	@vp test run run/src
 
 # qjs can't execute .ts directly, so compile fresh (vp run build:qjs-test)
 # and bind-mount the output in. qjs itself is identical across images, so one

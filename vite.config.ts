@@ -29,4 +29,13 @@ export default defineConfig({
     "run/docker/gen-seccomp-profile/**/*.go": "gofmt -w",
     "setup/docker/explicit/buildkit-proxy/**/*.go": "gofmt -w",
   },
+  test: {
+    include: [
+      "core/**/*.test.ts",
+      "setup/src/**/*.test.ts",
+      "report/src/**/*.test.ts",
+      "run/src/**/*.test.ts",
+    ],
+    restoreMocks: true,
+  },
 });
