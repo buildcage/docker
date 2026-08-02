@@ -3,3 +3,7 @@ trustPolicy: no-downgrade
 minimumReleaseAge: 20160 # 2 weeks
 minimumReleaseAgeExclude:
   - brace-expansion@5.0.7 || 5.0.8
+
+# Lets tsc resolve vitest's types, even though it's only vite-plus's transitive dependency.
+publicHoistPattern:
+  - vitest

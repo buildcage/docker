@@ -1,9 +1,9 @@
 /**
  * Unit tests for setup/main.ts
  *
- * Run with: node --test setup/src/main.test.ts
+ * Run with: vp test run setup/src/main.test.ts
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";

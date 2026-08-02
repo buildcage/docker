@@ -3,9 +3,9 @@
  *
  * Tests use injectable _exec / _fetch arguments to avoid real network/docker calls.
  *
- * Run with: node --test core/lib/provenance/oci-registry.test.ts
+ * Run with: vp test run core/lib/provenance/oci-registry.test.ts
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import {

@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
 
 import { emitBlockedOutcome } from "./emit-blocked-outcome.ts";
@@ -133,8 +133,8 @@ describe("emitBlockedOutcome", () => {
     assert.equal(process.exitCode, undefined);
   });
 
-  it("emits ::notice:: (not ::error::) when console output is enabled and outcome level is notice", (t) => {
-    const log = t.mock.method(console, "log", () => {});
+  it("emits ::notice:: (not ::error::) when console output is enabled and outcome level is notice", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const r = report({
       parameters: parameters({ mode: "audit" }),
       blockedCount: 1,
@@ -153,17 +153,17 @@ describe("emitBlockedOutcome", () => {
     });
     emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: "/tmp/summary.md" });
     const notices = log.mock.calls
-      .map((c) => c.arguments[0] as string)
+      .map((c) => c[0] as string)
       .filter((s) => s.startsWith("::notice::"));
     const errors = log.mock.calls
-      .map((c) => c.arguments[0] as string)
+      .map((c) => c[0] as string)
       .filter((s) => s.startsWith("::error::"));
     assert.equal(notices.length, 1);
     assert.equal(errors.length, 0);
   });
 
-  it("emits ::error:: when console output is enabled and outcome level is error", (t) => {
-    const log = t.mock.method(console, "log", () => {});
+  it("emits ::error:: when console output is enabled and outcome level is error", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const r = report({
       blockedCount: 1,
       blocked: annotateKnownBlocked(
@@ -181,13 +181,13 @@ describe("emitBlockedOutcome", () => {
     });
     emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: "/tmp/summary.md" });
     const errors = log.mock.calls
-      .map((c) => c.arguments[0] as string)
+      .map((c) => c[0] as string)
       .filter((s) => s.startsWith("::error::"));
     assert.equal(errors.length, 1);
   });
 
-  it("suppresses annotation output when summaryFile is undefined (not running as the real action)", (t) => {
-    const log = t.mock.method(console, "log", () => {});
+  it("suppresses annotation output when summaryFile is undefined (not running as the real action)", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const r = report({
       blockedCount: 1,
       blocked: annotateKnownBlocked(
@@ -205,7 +205,7 @@ describe("emitBlockedOutcome", () => {
     });
     emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: undefined });
     const annotations = log.mock.calls
-      .map((c) => c.arguments[0] as string)
+      .map((c) => c[0] as string)
       .filter((s) => s.startsWith("::notice::") || s.startsWith("::error::"));
     assert.equal(annotations.length, 0);
   });

@@ -7,8 +7,8 @@ const productionInputs = globSync(["**/scripts/*.ts"], {
   exclude: ["node_modules/**", "dist/**", "**/*.test.ts"],
 });
 
-// core/lib/acl/*.test.ts is dual-consumed (also runs under node:test);
-// *.property.test.ts siblings are node:test/fast-check only, not qjs-compatible.
+// core/lib/acl/*.test.ts is dual-consumed (also runs under vitest);
+// *.property.test.ts siblings are vitest/fast-check only, not qjs-compatible.
 const qjsTestInputs = [
   "core/scripts/test/run-tests.qjs.ts",
   ...globSync(["core/lib/acl/*.test.ts"], { exclude: ["**/*.property.test.ts"] }),

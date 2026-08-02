@@ -6,10 +6,10 @@
  *
  * assertSignedDigest() is pure synchronous logic and is fully unit-tested here.
  *
- * Run with: node --test core/lib/provenance/sigstore.test.ts
+ * Run with: vp test run core/lib/provenance/sigstore.test.ts
  */
 
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { assertSignedDigest } from "./sigstore.ts";
 import { VerifyImageError } from "./errors.ts";
