@@ -48,7 +48,7 @@ LABEL org.opencontainers.image.title="buildcage (explicit proxy engine)" \
       org.opencontainers.image.licenses="MIT AND Apache-2.0" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage" \
       io.github.buildcage.report-source="true"
-# Keep in sync with core/lib/docker/report-source.ts's REPORT_SOURCE_LABEL.
+# report finds this container by this label — must match core/lib/docker/report-source.ts.
 
 # quickjs-ng is the only extra package needed, for source-policy generation.
 RUN apk add --no-cache quickjs-ng

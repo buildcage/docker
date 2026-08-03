@@ -45,7 +45,7 @@ LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage" \
       io.github.buildcage.report-source="true"
-# Keep in sync with core/lib/docker/report-source.ts's REPORT_SOURCE_LABEL.
+# report finds this container by this label — must match core/lib/docker/report-source.ts.
 
 RUN apk add --no-cache \
       s6-overlay \
