@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { deriveProjectName } from "../../core/lib/docker/container.ts";
 import { createDocker } from "../../core/lib/docker/client.ts";
+import {
+  REPORT_ACTION_SCRIPT_PATH,
+  REPORT_SOURCE_LABEL,
+} from "../../core/lib/docker/report-source.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { ReportError } from "./lib/errors.ts";
@@ -32,7 +36,7 @@ async function main(): Promise<void> {
   try {
     const ids = docker.findContainers([
       `label=com.docker.compose.project=${projectName}`,
-      "label=io.github.dash14.buildcage.report-source=true",
+      `label=${REPORT_SOURCE_LABEL}=true`,
     ]);
     if (ids.length !== 1) {
       throw new ReportError(
@@ -60,11 +64,7 @@ async function main(): Promise<void> {
     const reportActionPath = join(scratchDir, "report-action.js");
 
     try {
-      docker.copyFromContainer(
-        containerId,
-        "/opt/buildcage/scripts/report-action.js",
-        reportActionPath,
-      );
+      docker.copyFromContainer(containerId, REPORT_ACTION_SCRIPT_PATH, reportActionPath);
     } catch (e) {
       throw new ReportError(
         describeDockerFailure(e, {
