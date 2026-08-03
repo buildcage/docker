@@ -9,5 +9,5 @@
  * static text — so their values must be kept in sync with these constants
  * by hand. report/src imports them directly.
  */
-export const REPORT_SOURCE_LABEL = "io.github.dash14.buildcage.report-source";
+export const REPORT_SOURCE_LABEL = "io.github.buildcage.report-source";
 export const REPORT_ACTION_SCRIPT_PATH = "/opt/buildcage/scripts/report-action.js";

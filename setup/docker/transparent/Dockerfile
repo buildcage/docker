@@ -44,7 +44,8 @@ LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
       org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage" \
-      io.github.dash14.buildcage.report-source="true"
+      io.github.buildcage.report-source="true"
+# Keep in sync with core/lib/docker/report-source.ts's REPORT_SOURCE_LABEL.
 
 RUN apk add --no-cache \
       s6-overlay \
