@@ -229,7 +229,7 @@ function resolveProjectName(builderName, env) {
 async function main() {
 	let builderName = process.env.INPUT_BUILDER_NAME || "buildcage", projectName = resolveProjectName(builderName, process.env), docker = createDocker(), containerId;
 	try {
-		let ids = docker.findContainers([`label=com.docker.compose.project=${projectName}`, "label=io.github.dash14.buildcage.report-source=true"]);
+		let ids = docker.findContainers([`label=com.docker.compose.project=${projectName}`, "label=io.github.buildcage.report-source=true"]);
 		if (ids.length !== 1) throw new ReportError(`Expected exactly one buildcage container for builder_name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder_name?`, "CONTAINER_NOT_FOUND");
 		containerId = ids[0];
 	} catch (e) {
