@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
 import { createDocker, parseContainerIds, type SpawnCommand } from "./client.ts";
+import { REPORT_ACTION_SCRIPT_PATH } from "./report-source.ts";
 
 describe("parseContainerIds", () => {
   it("splits one ID per line", () => {
@@ -45,11 +46,11 @@ describe("createDocker", () => {
     const { run, calls } = fakeRun([""]);
     createDocker(run).copyFromContainer(
       "abc123",
-      "/opt/buildcage/scripts/report-action.js",
+      REPORT_ACTION_SCRIPT_PATH,
       "/tmp/report-action.js",
     );
     assert.deepEqual(calls, [
-      ["cp", "abc123:/opt/buildcage/scripts/report-action.js", "/tmp/report-action.js"],
+      ["cp", `abc123:${REPORT_ACTION_SCRIPT_PATH}`, "/tmp/report-action.js"],
     ]);
   });
 
