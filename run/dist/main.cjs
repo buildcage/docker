@@ -7884,24 +7884,7 @@ function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	];
 }
 //#endregion
-//#region run/scripts/extra-masked-proc-paths.json
-var extra_masked_proc_paths_default = [
-	"/proc/kallsyms",
-	"/proc/kmsg",
-	"/proc/sysrq-trigger"
-];
-//#endregion
-//#region run/src/lib/isolated-exec.ts
-const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), SANDBOX_SCRATCH_BASE = "/var/tmp/buildcage";
-/**
-* Write the user-supplied `run:` input to an executable script file.
-* Routing through a file (rather than passing the command inline to a
-* shell) avoids any shell-injection surface from the input string.
-*/
-function writeRunScript(runInput, dir) {
-	let scriptPath = (0, node_path.join)(dir, "run-script.sh");
-	return (0, node_fs.writeFileSync)(scriptPath, runInput.startsWith("#!") ? runInput : `#!/bin/sh\nset -e\n${runInput}\n`, { mode: 448 }), scriptPath;
-}
+//#region run/src/lib/sandbox/runc-bootstrap.ts
 /**
 * Generate runc's own default OCI bundle config via `runc spec` (run in
 * `bundleDir`, which is where it writes `config.json`). Used as the
@@ -7932,6 +7915,8 @@ function extractRuncBootstrap({ containerName, destDir }) {
 		baseSpec
 	};
 }
+//#endregion
+//#region run/src/lib/sandbox/mountinfo.ts
 /**
 * Pure: extract {mountPoint, fsType} for every line of raw
 * /proc/self/mountinfo content. Format (space-separated fields):
@@ -7959,6 +7944,134 @@ function parseMountinfo(mountinfoContent) {
 function listHostMounts() {
 	return parseMountinfo((0, node_fs.readFileSync)("/proc/self/mountinfo", "utf8"));
 }
+//#endregion
+//#region run/src/lib/sandbox/scratch-dir.ts
+const SANDBOX_SCRATCH_BASE = "/var/tmp/buildcage";
+/**
+* Pure: mount points from raw /proc/self/mountinfo content that are
+* nested under `dir` (including `dir` itself), deepest-path-first so a
+* caller can safely unmount children before their parents.
+*/
+function parseMountsUnder(mountinfoContent, dir) {
+	let prefix = dir.endsWith("/") ? dir : `${dir}/`;
+	return parseMountinfo(mountinfoContent).map(({ mountPoint }) => mountPoint).filter((mountPoint) => mountPoint === dir || mountPoint.startsWith(prefix)).sort((a, b) => b.length - a.length);
+}
+/**
+* Force-detaches any mount points still nested under `dir` before it's
+* recursively deleted. This is the safety net for rootfsBindDir (a
+* `mount --rbind /` of the entire host filesystem — see main.ts) surviving
+* past run-isolated.sh's own cleanup trap: if that trap never runs (e.g.
+* run-isolated.sh itself is SIGKILL'd, which bypasses traps entirely) or
+* its `umount -R` fails (EBUSY), a plain recursive delete of `dir` would
+* otherwise walk straight through the still-live bind-mount and delete
+* the real files on the host it points at, not a sandboxed copy. `-l`
+* (lazy) detaches each mount from the namespace immediately regardless of
+* busy references, so this step itself can't hang or fail the way a
+* normal (non-lazy) unmount could.
+*/
+function unmountAllUnder(dir) {
+	let mountPoints;
+	try {
+		mountPoints = parseMountsUnder((0, node_fs.readFileSync)("/proc/self/mountinfo", "utf8"), dir);
+	} catch {
+		return;
+	}
+	for (let mountPoint of mountPoints) try {
+		(0, node_child_process.execFileSync)("sudo", [
+			"umount",
+			"-R",
+			"-l",
+			mountPoint
+		], { stdio: [
+			"ignore",
+			"ignore",
+			"pipe"
+		] });
+	} catch (e) {
+		console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${errorMessage(e)}`);
+	}
+}
+/**
+* Removes the scratch dir, retrying on EBUSY. A lazy unmount (see
+* unmountAllUnder) detaches a mount from the path-resolution tree
+* immediately -- it stops appearing in /proc/self/mountinfo right away --
+* but the kernel's underlying teardown of that now-orphaned mount can
+* still lag behind by a short, bounded window, which can make a
+* directory rmSync is about to delete spuriously report EBUSY even
+* though it's no longer listed as a mountpoint at all. Resolves on the
+* very next attempt after a brief wait.
+*/
+function removeScratchDir(dir) {
+	for (let attempt = 1; attempt <= 5; attempt++) try {
+		(0, node_fs.rmSync)(dir, {
+			recursive: !0,
+			force: !0
+		});
+		return;
+	} catch (e) {
+		if (e.code !== "EBUSY" || attempt === 5) throw e;
+		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+	}
+}
+/**
+* Force-detach anything still mounted under `dir` (the rootfs bind-mount
+* safety net — see unmountAllUnder) and then recursively remove it. Exported
+* so post.ts can reclaim a scratch dir orphaned by a hard kill that bypassed
+* withScratchDir's own finally. No-ops safely when `dir` doesn't exist.
+*/
+function cleanupScratchDir(dir) {
+	unmountAllUnder(dir), removeScratchDir(dir);
+}
+/**
+* Absolute path of the scratch dir for a given proxy container, derived
+* deterministically from `containerName` (the `buildcage-proxy-` prefix
+* swapped for `sandbox-`, under SANDBOX_SCRATCH_BASE). Lets the post step
+* reconstruct and reclaim the exact same directory from `STATE_container_name`
+* alone.
+*/
+function scratchDirFor(containerName) {
+	return (0, node_path.join)(SANDBOX_SCRATCH_BASE, containerName.replace(/^buildcage-proxy-/, "sandbox-"));
+}
+/**
+* Create/remove a scratch directory for this step's OCI bundle + run-script.
+* With `containerName` the dir is named deterministically (scratchDirFor) so
+* post.ts can reclaim it after a hard kill; without it a random mkdtemp name
+* is used (unit tests). Cleaned up on every exit path that unwinds — a
+* SIGKILL bypasses this finally, which is exactly what post.ts covers.
+*/
+function withScratchDir(fn, containerName) {
+	let dir;
+	(0, node_fs.mkdirSync)(SANDBOX_SCRATCH_BASE, {
+		recursive: !0,
+		mode: 493
+	}), containerName ? (dir = scratchDirFor(containerName), cleanupScratchDir(dir), (0, node_fs.mkdirSync)(dir, {
+		recursive: !0,
+		mode: 448
+	})) : dir = (0, node_fs.mkdtempSync)((0, node_path.join)(SANDBOX_SCRATCH_BASE, "sandbox-"));
+	try {
+		return fn(dir);
+	} finally {
+		cleanupScratchDir(dir);
+	}
+}
+//#endregion
+//#region run/scripts/extra-masked-proc-paths.json
+var extra_masked_proc_paths_default = [
+	"/proc/kallsyms",
+	"/proc/kmsg",
+	"/proc/sysrq-trigger"
+];
+//#endregion
+//#region run/src/lib/sandbox/oci-config.ts
+/**
+* Write the user-supplied `run:` input to an executable script file.
+* Routing through a file (rather than passing the command inline to a
+* shell) avoids any shell-injection surface from the input string.
+*/
+function writeRunScript(runInput, dir) {
+	let scriptPath = (0, node_path.join)(dir, "run-script.sh");
+	return (0, node_fs.writeFileSync)(scriptPath, runInput.startsWith("#!") ? runInput : `#!/bin/sh\nset -e\n${runInput}\n`, { mode: 448 }), scriptPath;
+}
 /**
 * Pure: given the host's real mount table, the set of paths that must stay
 * writable, and the destinations runc's own base spec already declares a
@@ -7981,6 +8094,17 @@ function listHostMounts() {
 function computeReadonlyHostMounts(hostMounts, protectedPaths, freshMountDestinations) {
 	return hostMounts.filter(({ mountPoint }) => mountPoint !== "/" && !freshMountDestinations.has(mountPoint) && !protectedPaths.has(mountPoint)).map(({ mountPoint }) => mountPoint);
 }
+/**
+* Pure: the set of destination paths `baseSpec.mounts` already declares a
+* mount for. Derived directly from the actual `runc spec` output already
+* being used to build config.json (see generateBaseOciSpec), rather than a
+* hardcoded list of filesystem types -- this stays correct automatically
+* if a future runc version changes its own default mounts, and sidesteps
+* fstype ambiguity (e.g. runc's default spec declares a `cgroup`-type
+* mount at /sys/fs/cgroup that transparently resolves to the host's real
+* cgroup v1 or v2 hierarchy, so matching by destination path covers both
+* without needing to special-case a literal "cgroup2" fstype name).
+*/
 function freshMountDestinationsFrom(baseSpec) {
 	return new Set(baseSpec.mounts.map((m) => m.destination));
 }
@@ -8101,6 +8225,9 @@ function writeResolvConf(dns, dir) {
 	let resolvConfPath = (0, node_path.join)(dir, "resolv.conf");
 	return (0, node_fs.writeFileSync)(resolvConfPath, `nameserver ${dns}\n`, { mode: 420 }), resolvConfPath;
 }
+//#endregion
+//#region run/src/lib/sandbox/run.ts
+const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
 function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsName, rootfsBindDir, gateway, dns, targetIp }) {
 	let args = [
 		"-n",
@@ -8130,113 +8257,6 @@ function runIsolated({ runcPath, proxyPid, bundleDir, containerId, netnsName, ro
 	} catch (e) {
 		let status = e.status;
 		return typeof status == "number" ? status : 1;
-	}
-}
-/**
-* Pure: mount points from raw /proc/self/mountinfo content that are
-* nested under `dir` (including `dir` itself), deepest-path-first so a
-* caller can safely unmount children before their parents.
-*/
-function parseMountsUnder(mountinfoContent, dir) {
-	let prefix = dir.endsWith("/") ? dir : `${dir}/`;
-	return parseMountinfo(mountinfoContent).map(({ mountPoint }) => mountPoint).filter((mountPoint) => mountPoint === dir || mountPoint.startsWith(prefix)).sort((a, b) => b.length - a.length);
-}
-/**
-* Force-detaches any mount points still nested under `dir` before it's
-* recursively deleted. This is the safety net for rootfsBindDir (a
-* `mount --rbind /` of the entire host filesystem — see main.ts) surviving
-* past run-isolated.sh's own cleanup trap: if that trap never runs (e.g.
-* run-isolated.sh itself is SIGKILL'd, which bypasses traps entirely) or
-* its `umount -R` fails (EBUSY), a plain recursive delete of `dir` would
-* otherwise walk straight through the still-live bind-mount and delete
-* the real files on the host it points at, not a sandboxed copy. `-l`
-* (lazy) detaches each mount from the namespace immediately regardless of
-* busy references, so this step itself can't hang or fail the way a
-* normal (non-lazy) unmount could.
-*/
-function unmountAllUnder(dir) {
-	let mountPoints;
-	try {
-		mountPoints = parseMountsUnder((0, node_fs.readFileSync)("/proc/self/mountinfo", "utf8"), dir);
-	} catch {
-		return;
-	}
-	for (let mountPoint of mountPoints) try {
-		(0, node_child_process.execFileSync)("sudo", [
-			"umount",
-			"-R",
-			"-l",
-			mountPoint
-		], { stdio: [
-			"ignore",
-			"ignore",
-			"pipe"
-		] });
-	} catch (e) {
-		console.log(`::warning::Failed to unmount ${mountPoint} before cleanup: ${errorMessage(e)}`);
-	}
-}
-/**
-* Removes the scratch dir, retrying on EBUSY. A lazy unmount (see
-* unmountAllUnder) detaches a mount from the path-resolution tree
-* immediately -- it stops appearing in /proc/self/mountinfo right away --
-* but the kernel's underlying teardown of that now-orphaned mount can
-* still lag behind by a short, bounded window, which can make a
-* directory rmSync is about to delete spuriously report EBUSY even
-* though it's no longer listed as a mountpoint at all. Resolves on the
-* very next attempt after a brief wait.
-*/
-function removeScratchDir(dir) {
-	for (let attempt = 1; attempt <= 5; attempt++) try {
-		(0, node_fs.rmSync)(dir, {
-			recursive: !0,
-			force: !0
-		});
-		return;
-	} catch (e) {
-		if (e.code !== "EBUSY" || attempt === 5) throw e;
-		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
-	}
-}
-/**
-* Force-detach anything still mounted under `dir` (the rootfs bind-mount
-* safety net — see unmountAllUnder) and then recursively remove it. Exported
-* so post.ts can reclaim a scratch dir orphaned by a hard kill that bypassed
-* withScratchDir's own finally. No-ops safely when `dir` doesn't exist.
-*/
-function cleanupScratchDir(dir) {
-	unmountAllUnder(dir), removeScratchDir(dir);
-}
-/**
-* Absolute path of the scratch dir for a given proxy container, derived
-* deterministically from `containerName` (the `buildcage-proxy-` prefix
-* swapped for `sandbox-`, under SANDBOX_SCRATCH_BASE). Lets the post step
-* reconstruct and reclaim the exact same directory from `STATE_container_name`
-* alone.
-*/
-function scratchDirFor(containerName) {
-	return (0, node_path.join)(SANDBOX_SCRATCH_BASE, containerName.replace(/^buildcage-proxy-/, "sandbox-"));
-}
-/**
-* Create/remove a scratch directory for this step's OCI bundle + run-script.
-* With `containerName` the dir is named deterministically (scratchDirFor) so
-* post.ts can reclaim it after a hard kill; without it a random mkdtemp name
-* is used (unit tests). Cleaned up on every exit path that unwinds — a
-* SIGKILL bypasses this finally, which is exactly what post.ts covers.
-*/
-function withScratchDir(fn, containerName) {
-	let dir;
-	(0, node_fs.mkdirSync)(SANDBOX_SCRATCH_BASE, {
-		recursive: !0,
-		mode: 493
-	}), containerName ? (dir = scratchDirFor(containerName), cleanupScratchDir(dir), (0, node_fs.mkdirSync)(dir, {
-		recursive: !0,
-		mode: 448
-	})) : dir = (0, node_fs.mkdtempSync)((0, node_path.join)(SANDBOX_SCRATCH_BASE, "sandbox-"));
-	try {
-		return fn(dir);
-	} finally {
-		cleanupScratchDir(dir);
 	}
 }
 //#endregion

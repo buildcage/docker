@@ -46,7 +46,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Machine-readable only (isolated-exec.ts's getOrPopulateBootstrapCache
+	// Machine-readable only (sandbox/runc-bootstrap.ts's extractRuncBootstrap
 	// JSON.parses this straight off stdout) -- no pretty-printing needed.
 	if err := json.NewEncoder(os.Stdout).Encode(linuxSeccomp); err != nil {
 		fmt.Fprintln(os.Stderr, "gen-seccomp-profile:", err)

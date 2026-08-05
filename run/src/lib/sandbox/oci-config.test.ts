@@ -1,20 +1,17 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
 
 import {
   writeRunScript,
   writeResolvConf,
-  buildOciConfig,
-  writeOciConfig,
-  withScratchDir,
-  scratchDirFor,
-  parseMountinfo,
   computeReadonlyHostMounts,
   freshMountDestinationsFrom,
-  parseMountsUnder,
-} from "./isolated-exec.ts";
+  buildOciConfig,
+  writeOciConfig,
+} from "./oci-config.ts";
+import { parseMountinfo } from "./mountinfo.ts";
+import { withScratchDir } from "./scratch-dir.ts";
 
 describe("writeRunScript", () => {
   it("wraps plain commands in a #!/bin/sh + set -e preamble", () => {
@@ -42,17 +39,6 @@ describe("writeRunScript", () => {
   });
 });
 
-describe("scratchDirFor", () => {
-  it("derives a path under /var/tmp/buildcage from the container name (not under a writable exception)", () => {
-    const dir = scratchDirFor("buildcage-proxy-abcd1234");
-    assert.equal(dir, "/var/tmp/buildcage/sandbox-abcd1234");
-  });
-
-  it("is deterministic for the same container name (so post.ts can reconstruct it)", () => {
-    assert.equal(scratchDirFor("buildcage-proxy-xyz"), scratchDirFor("buildcage-proxy-xyz"));
-  });
-});
-
 describe("writeResolvConf", () => {
   it("writes a single nameserver line", () => {
     withScratchDir((dir) => {
@@ -72,22 +58,6 @@ const SAMPLE_MOUNTINFO = [
   "4 3 0:4 / /run/user/1000 rw,nosuid,relatime shared:4 - tmpfs tmpfs rw",
   "5 1 0:5 / /mnt rw,relatime shared:5 - ext4 /dev/sdb1 rw",
 ].join("\n");
-
-describe("parseMountinfo", () => {
-  it("extracts the mount point and filesystem type of every line", () => {
-    assert.deepEqual(parseMountinfo(SAMPLE_MOUNTINFO), [
-      { mountPoint: "/", fsType: "ext4" },
-      { mountPoint: "/proc", fsType: "proc" },
-      { mountPoint: "/run", fsType: "tmpfs" },
-      { mountPoint: "/run/user/1000", fsType: "tmpfs" },
-      { mountPoint: "/mnt", fsType: "ext4" },
-    ]);
-  });
-
-  it("ignores trailing/blank lines", () => {
-    assert.deepEqual(parseMountinfo(`${SAMPLE_MOUNTINFO}\n\n`).length, 5);
-  });
-});
 
 describe("computeReadonlyHostMounts", () => {
   const hostMounts = parseMountinfo(SAMPLE_MOUNTINFO);
@@ -142,35 +112,8 @@ describe("freshMountDestinationsFrom", () => {
   });
 });
 
-describe("parseMountsUnder", () => {
-  const mountinfo = [
-    "1 0 0:1 / / rw,relatime shared:1 - ext4 /dev/root rw",
-    "2 1 0:2 / /tmp/buildcage-sandbox-abc rw,relatime shared:2 - tmpfs tmpfs rw",
-    "3 2 0:3 / /tmp/buildcage-sandbox-abc/rootfs rw,relatime shared:3 - ext4 /dev/root rw",
-    "4 1 0:4 / /tmp/other-dir rw,relatime shared:4 - tmpfs tmpfs rw",
-  ].join("\n");
-
-  it("finds only mount points nested under the given directory", () => {
-    const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-abc");
-    assert.deepEqual(
-      result.sort(),
-      ["/tmp/buildcage-sandbox-abc", "/tmp/buildcage-sandbox-abc/rootfs"].sort(),
-    );
-  });
-
-  it("orders deepest paths first, so children are unmounted before their parents", () => {
-    const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-abc");
-    assert.deepEqual(result, ["/tmp/buildcage-sandbox-abc/rootfs", "/tmp/buildcage-sandbox-abc"]);
-  });
-
-  it("does not match a sibling directory with a similar prefix", () => {
-    const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-ab");
-    assert.deepEqual(result, []);
-  });
-});
-
 // A minimal stand-in for what `runc spec` actually produces (see
-// isolated-exec.ts's generateBaseOciSpec) — only the fields buildOciConfig
+// runc-bootstrap.ts's generateBaseOciSpec) — only the fields buildOciConfig
 // reads/overrides are included.
 function fakeBaseSpec() {
   return {
@@ -500,27 +443,5 @@ describe("writeOciConfig", () => {
       const mode = statSync(path).mode & 0o777;
       assert.equal(mode, 0o600);
     });
-  });
-});
-
-describe("withScratchDir", () => {
-  it("removes the directory after the callback returns", () => {
-    let capturedDir: string;
-    withScratchDir((dir) => {
-      capturedDir = dir;
-      writeRunScript("echo hi", dir);
-    });
-    assert.throws(() => readFileSync(join(capturedDir, "run-script.sh")));
-  });
-
-  it("removes the directory even if the callback throws", () => {
-    let capturedDir: string;
-    assert.throws(() => {
-      withScratchDir((dir) => {
-        capturedDir = dir;
-        throw new Error("boom");
-      });
-    });
-    assert.throws(() => readFileSync(join(capturedDir, "run-script.sh")));
   });
 });

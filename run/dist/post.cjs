@@ -491,7 +491,8 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 function errorMessage(e) {
 	return e instanceof Error ? e.message : String(e);
 }
-(0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
+//#endregion
+//#region run/src/lib/sandbox/mountinfo.ts
 /**
 * Pure: extract {mountPoint, fsType} for every line of raw
 * /proc/self/mountinfo content. Format (space-separated fields):

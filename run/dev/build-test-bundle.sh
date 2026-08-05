@@ -1,5 +1,5 @@
 #!/bin/bash
-# build-test-bundle.sh — dev-only stand-in for isolated-exec.ts's
+# build-test-bundle.sh — dev-only stand-in for sandbox/oci-config.ts's
 # buildOciConfig, used by `make test_sandbox_dev` to build just enough of
 # an OCI bundle to exercise run-isolated.sh directly (see
 # ../compose.sandbox-dev.yaml and ../dev/Dockerfile for why this dev loop

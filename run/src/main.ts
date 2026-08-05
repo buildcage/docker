@@ -21,16 +21,16 @@ import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
 import { generateContainerName, getContainerPid } from "./lib/container.ts";
 import { deriveProjectName } from "../../core/lib/docker/compose-project-name.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
+import { extractRuncBootstrap } from "./lib/sandbox/runc-bootstrap.ts";
 import {
   writeRunScript,
   writeResolvConf,
-  extractRuncBootstrap,
   buildOciConfig,
   writeOciConfig,
-  runIsolated,
-  withScratchDir,
-  listHostMounts,
-} from "./lib/isolated-exec.ts";
+} from "./lib/sandbox/oci-config.ts";
+import { listHostMounts } from "./lib/sandbox/mountinfo.ts";
+import { runIsolated } from "./lib/sandbox/run.ts";
+import { withScratchDir } from "./lib/sandbox/scratch-dir.ts";
 import {
   fetchReport,
   computeReportOutcome,
