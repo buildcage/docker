@@ -13,9 +13,593 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 //#endregion
 let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_path = require("node:path");
 node_path = __toESM(node_path, 1);
-let node_url = require("node:url"), node_os = require("node:os");
+let node_url = require("node:url"), os = require("os");
+os = __toESM(os, 1);
+let crypto = require("crypto");
+crypto = __toESM(crypto, 1);
+let fs = require("fs");
+fs = __toESM(fs, 1);
+let path = require("path");
+path = __toESM(path, 1);
+let events = require("events");
+events = __toESM(events, 1);
+let node_events = require("node:events"), node_crypto = require("node:crypto"), child_process = require("child_process");
+child_process = __toESM(child_process, 1), require("timers");
+let node_os = require("node:os");
 node_os = __toESM(node_os, 1);
-let node_crypto = require("node:crypto"), node_events = require("node:events"), node_readline = require("node:readline");
+let node_readline = require("node:readline");
+//#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/utils.js
+/**
+* Sanitizes an input into a string so it can be passed into issueCommand safely
+* @param input input to sanitize into a string
+*/
+function toCommandValue(input) {
+	return input == null ? "" : typeof input == "string" || input instanceof String ? input : JSON.stringify(input);
+}
+//#endregion
+//#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/command.js
+/**
+* Issues a command to the GitHub Actions runner
+*
+* @param command - The command name to issue
+* @param properties - Additional properties for the command (key-value pairs)
+* @param message - The message to include with the command
+* @remarks
+* This function outputs a specially formatted string to stdout that the Actions
+* runner interprets as a command. These commands can control workflow behavior,
+* set outputs, create annotations, mask values, and more.
+*
+* Command Format:
+*   ::name key=value,key=value::message
+*
+* @example
+* ```typescript
+* // Issue a warning annotation
+* issueCommand('warning', {}, 'This is a warning message');
+* // Output: ::warning::This is a warning message
+*
+* // Set an environment variable
+* issueCommand('set-env', { name: 'MY_VAR' }, 'some value');
+* // Output: ::set-env name=MY_VAR::some value
+*
+* // Add a secret mask
+* issueCommand('add-mask', {}, 'secretValue123');
+* // Output: ::add-mask::secretValue123
+* ```
+*
+* @internal
+* This is an internal utility function that powers the public API functions
+* such as setSecret, warning, error, and exportVariable.
+*/
+function issueCommand(command, properties, message) {
+	let cmd = new Command(command, properties, message);
+	process.stdout.write(cmd.toString() + os.EOL);
+}
+var Command = class {
+	constructor(command, properties, message) {
+		command ||= "missing.command", this.command = command, this.properties = properties, this.message = message;
+	}
+	toString() {
+		let cmdStr = "::" + this.command;
+		if (this.properties && Object.keys(this.properties).length > 0) {
+			cmdStr += " ";
+			let first = !0;
+			for (let key in this.properties) if (this.properties.hasOwnProperty(key)) {
+				let val = this.properties[key];
+				val && (first ? first = !1 : cmdStr += ",", cmdStr += `${key}=${escapeProperty(val)}`);
+			}
+		}
+		return cmdStr += `::${escapeData(this.message)}`, cmdStr;
+	}
+};
+function escapeData(s) {
+	return toCommandValue(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+}
+function escapeProperty(s) {
+	return toCommandValue(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A").replace(/:/g, "%3A").replace(/,/g, "%2C");
+}
+//#endregion
+//#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/file-command.js
+function issueFileCommand(command, message) {
+	let filePath = process.env[`GITHUB_${command}`];
+	if (!filePath) throw Error(`Unable to find environment variable for file command ${command}`);
+	if (!fs.existsSync(filePath)) throw Error(`Missing file at path: ${filePath}`);
+	fs.appendFileSync(filePath, `${toCommandValue(message)}${os.EOL}`, { encoding: "utf8" });
+}
+function prepareKeyValueMessage(key, value) {
+	let delimiter = `ghadelimiter_${crypto.randomUUID()}`, convertedValue = toCommandValue(value);
+	if (key.includes(delimiter)) throw Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
+	if (convertedValue.includes(delimiter)) throw Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
+	return `${key}<<${delimiter}${os.EOL}${convertedValue}${os.EOL}${delimiter}`;
+}
+//#endregion
+//#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/summary.js
+var __awaiter$6 = function(thisArg, _arguments, P, generator) {
+	function adopt(value) {
+		return value instanceof P ? value : new P(function(resolve) {
+			resolve(value);
+		});
+	}
+	return new (P ||= Promise)(function(resolve, reject) {
+		function fulfilled(value) {
+			try {
+				step(generator.next(value));
+			} catch (e) {
+				reject(e);
+			}
+		}
+		function rejected(value) {
+			try {
+				step(generator.throw(value));
+			} catch (e) {
+				reject(e);
+			}
+		}
+		function step(result) {
+			result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+		}
+		step((generator = generator.apply(thisArg, _arguments || [])).next());
+	});
+};
+const { access, appendFile, writeFile } = fs.promises, SUMMARY_ENV_VAR = "GITHUB_STEP_SUMMARY", summary = new class {
+	constructor() {
+		this._buffer = "";
+	}
+	/**
+	* Finds the summary file path from the environment, rejects if env var is not found or file does not exist
+	* Also checks r/w permissions.
+	*
+	* @returns step summary file path
+	*/
+	filePath() {
+		return __awaiter$6(this, void 0, void 0, function* () {
+			if (this._filePath) return this._filePath;
+			let pathFromEnv = process.env[SUMMARY_ENV_VAR];
+			if (!pathFromEnv) throw Error(`Unable to find environment variable for $${SUMMARY_ENV_VAR}. Check if your runtime environment supports job summaries.`);
+			try {
+				yield access(pathFromEnv, fs.constants.R_OK | fs.constants.W_OK);
+			} catch {
+				throw Error(`Unable to access summary file: '${pathFromEnv}'. Check if the file has correct read/write permissions.`);
+			}
+			return this._filePath = pathFromEnv, this._filePath;
+		});
+	}
+	/**
+	* Wraps content in an HTML tag, adding any HTML attributes
+	*
+	* @param {string} tag HTML tag to wrap
+	* @param {string | null} content content within the tag
+	* @param {[attribute: string]: string} attrs key-value list of HTML attributes to add
+	*
+	* @returns {string} content wrapped in HTML element
+	*/
+	wrap(tag, content, attrs = {}) {
+		let htmlAttrs = Object.entries(attrs).map(([key, value]) => ` ${key}="${value}"`).join("");
+		return content ? `<${tag}${htmlAttrs}>${content}</${tag}>` : `<${tag}${htmlAttrs}>`;
+	}
+	/**
+	* Writes text in the buffer to the summary buffer file and empties buffer. Will append by default.
+	*
+	* @param {SummaryWriteOptions} [options] (optional) options for write operation
+	*
+	* @returns {Promise<Summary>} summary instance
+	*/
+	write(options) {
+		return __awaiter$6(this, void 0, void 0, function* () {
+			let overwrite = !!options?.overwrite, filePath = yield this.filePath();
+			return yield (overwrite ? writeFile : appendFile)(filePath, this._buffer, { encoding: "utf8" }), this.emptyBuffer();
+		});
+	}
+	/**
+	* Clears the summary buffer and wipes the summary file
+	*
+	* @returns {Summary} summary instance
+	*/
+	clear() {
+		return __awaiter$6(this, void 0, void 0, function* () {
+			return this.emptyBuffer().write({ overwrite: !0 });
+		});
+	}
+	/**
+	* Returns the current summary buffer as a string
+	*
+	* @returns {string} string of summary buffer
+	*/
+	stringify() {
+		return this._buffer;
+	}
+	/**
+	* If the summary buffer is empty
+	*
+	* @returns {boolen} true if the buffer is empty
+	*/
+	isEmptyBuffer() {
+		return this._buffer.length === 0;
+	}
+	/**
+	* Resets the summary buffer without writing to summary file
+	*
+	* @returns {Summary} summary instance
+	*/
+	emptyBuffer() {
+		return this._buffer = "", this;
+	}
+	/**
+	* Adds raw text to the summary buffer
+	*
+	* @param {string} text content to add
+	* @param {boolean} [addEOL=false] (optional) append an EOL to the raw text (default: false)
+	*
+	* @returns {Summary} summary instance
+	*/
+	addRaw(text, addEOL = !1) {
+		return this._buffer += text, addEOL ? this.addEOL() : this;
+	}
+	/**
+	* Adds the operating system-specific end-of-line marker to the buffer
+	*
+	* @returns {Summary} summary instance
+	*/
+	addEOL() {
+		return this.addRaw(os.EOL);
+	}
+	/**
+	* Adds an HTML codeblock to the summary buffer
+	*
+	* @param {string} code content to render within fenced code block
+	* @param {string} lang (optional) language to syntax highlight code
+	*
+	* @returns {Summary} summary instance
+	*/
+	addCodeBlock(code, lang) {
+		let attrs = Object.assign({}, lang && { lang }), element = this.wrap("pre", this.wrap("code", code), attrs);
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds an HTML list to the summary buffer
+	*
+	* @param {string[]} items list of items to render
+	* @param {boolean} [ordered=false] (optional) if the rendered list should be ordered or not (default: false)
+	*
+	* @returns {Summary} summary instance
+	*/
+	addList(items, ordered = !1) {
+		let tag = ordered ? "ol" : "ul", listItems = items.map((item) => this.wrap("li", item)).join(""), element = this.wrap(tag, listItems);
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds an HTML table to the summary buffer
+	*
+	* @param {SummaryTableCell[]} rows table rows
+	*
+	* @returns {Summary} summary instance
+	*/
+	addTable(rows) {
+		let tableBody = rows.map((row) => {
+			let cells = row.map((cell) => {
+				if (typeof cell == "string") return this.wrap("td", cell);
+				let { header, data, colspan, rowspan } = cell, tag = header ? "th" : "td", attrs = Object.assign(Object.assign({}, colspan && { colspan }), rowspan && { rowspan });
+				return this.wrap(tag, data, attrs);
+			}).join("");
+			return this.wrap("tr", cells);
+		}).join(""), element = this.wrap("table", tableBody);
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds a collapsable HTML details element to the summary buffer
+	*
+	* @param {string} label text for the closed state
+	* @param {string} content collapsable content
+	*
+	* @returns {Summary} summary instance
+	*/
+	addDetails(label, content) {
+		let element = this.wrap("details", this.wrap("summary", label) + content);
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds an HTML image tag to the summary buffer
+	*
+	* @param {string} src path to the image you to embed
+	* @param {string} alt text description of the image
+	* @param {SummaryImageOptions} options (optional) addition image attributes
+	*
+	* @returns {Summary} summary instance
+	*/
+	addImage(src, alt, options) {
+		let { width, height } = options || {}, attrs = Object.assign(Object.assign({}, width && { width }), height && { height }), element = this.wrap("img", null, Object.assign({
+			src,
+			alt
+		}, attrs));
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds an HTML section heading element
+	*
+	* @param {string} text heading text
+	* @param {number | string} [level=1] (optional) the heading level, default: 1
+	*
+	* @returns {Summary} summary instance
+	*/
+	addHeading(text, level) {
+		let tag = `h${level}`, allowedTag = [
+			"h1",
+			"h2",
+			"h3",
+			"h4",
+			"h5",
+			"h6"
+		].includes(tag) ? tag : "h1", element = this.wrap(allowedTag, text);
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds an HTML thematic break (<hr>) to the summary buffer
+	*
+	* @returns {Summary} summary instance
+	*/
+	addSeparator() {
+		let element = this.wrap("hr", null);
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds an HTML line break (<br>) to the summary buffer
+	*
+	* @returns {Summary} summary instance
+	*/
+	addBreak() {
+		let element = this.wrap("br", null);
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds an HTML blockquote to the summary buffer
+	*
+	* @param {string} text quote text
+	* @param {string} cite (optional) citation url
+	*
+	* @returns {Summary} summary instance
+	*/
+	addQuote(text, cite) {
+		let attrs = Object.assign({}, cite && { cite }), element = this.wrap("blockquote", text, attrs);
+		return this.addRaw(element).addEOL();
+	}
+	/**
+	* Adds an HTML anchor tag to the summary buffer
+	*
+	* @param {string} text link text/content
+	* @param {string} href hyperlink
+	*
+	* @returns {Summary} summary instance
+	*/
+	addLink(text, href) {
+		let element = this.wrap("a", text, { href });
+		return this.addRaw(element).addEOL();
+	}
+}();
+//#endregion
+//#region node_modules/.pnpm/@actions+io@3.0.2/node_modules/@actions/io/lib/io-util.js
+var __awaiter$5 = function(thisArg, _arguments, P, generator) {
+	function adopt(value) {
+		return value instanceof P ? value : new P(function(resolve) {
+			resolve(value);
+		});
+	}
+	return new (P ||= Promise)(function(resolve, reject) {
+		function fulfilled(value) {
+			try {
+				step(generator.next(value));
+			} catch (e) {
+				reject(e);
+			}
+		}
+		function rejected(value) {
+			try {
+				step(generator.throw(value));
+			} catch (e) {
+				reject(e);
+			}
+		}
+		function step(result) {
+			result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+		}
+		step((generator = generator.apply(thisArg, _arguments || [])).next());
+	});
+};
+const { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs.promises, IS_WINDOWS$1 = process.platform === "win32";
+fs.constants.O_RDONLY;
+/**
+* On OSX/Linux, true if path starts with '/'. On Windows, true for paths like:
+* \, \hello, \\hello\share, C:, and C:\hello (and corresponding alternate separator cases).
+*/
+function isRooted(p) {
+	if (p = normalizeSeparators(p), !p) throw Error("isRooted() parameter \"p\" cannot be empty");
+	return IS_WINDOWS$1 ? p.startsWith("\\") || /^[A-Z]:/i.test(p) : p.startsWith("/");
+}
+/**
+* Best effort attempt to determine whether a file exists and is executable.
+* @param filePath    file path to check
+* @param extensions  additional file extensions to try
+* @return if file exists and is executable, returns the file path. otherwise empty string.
+*/
+function tryGetExecutablePath(filePath, extensions) {
+	return __awaiter$5(this, void 0, void 0, function* () {
+		let stats;
+		try {
+			stats = yield stat(filePath);
+		} catch (err) {
+			err.code !== "ENOENT" && console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
+		}
+		if (stats && stats.isFile()) {
+			if (IS_WINDOWS$1) {
+				let upperExt = path.extname(filePath).toUpperCase();
+				if (extensions.some((validExt) => validExt.toUpperCase() === upperExt)) return filePath;
+			} else if (isUnixExecutable(stats)) return filePath;
+		}
+		let originalFilePath = filePath;
+		for (let extension of extensions) {
+			filePath = originalFilePath + extension, stats = void 0;
+			try {
+				stats = yield stat(filePath);
+			} catch (err) {
+				err.code !== "ENOENT" && console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
+			}
+			if (stats && stats.isFile()) {
+				if (IS_WINDOWS$1) {
+					try {
+						let directory = path.dirname(filePath), upperName = path.basename(filePath).toUpperCase();
+						for (let actualName of yield readdir(directory)) if (upperName === actualName.toUpperCase()) {
+							filePath = path.join(directory, actualName);
+							break;
+						}
+					} catch (err) {
+						console.log(`Unexpected error attempting to determine the actual case of the file '${filePath}': ${err}`);
+					}
+					return filePath;
+				} else if (isUnixExecutable(stats)) return filePath;
+			}
+		}
+		return "";
+	});
+}
+function normalizeSeparators(p) {
+	return p ||= "", IS_WINDOWS$1 ? (p = p.replace(/\//g, "\\"), p.replace(/\\\\+/g, "\\")) : p.replace(/\/\/+/g, "/");
+}
+function isUnixExecutable(stats) {
+	return (stats.mode & 1) > 0 || (stats.mode & 8) > 0 && process.getgid !== void 0 && stats.gid === process.getgid() || (stats.mode & 64) > 0 && process.getuid !== void 0 && stats.uid === process.getuid();
+}
+//#endregion
+//#region node_modules/.pnpm/@actions+io@3.0.2/node_modules/@actions/io/lib/io.js
+var __awaiter$4 = function(thisArg, _arguments, P, generator) {
+	function adopt(value) {
+		return value instanceof P ? value : new P(function(resolve) {
+			resolve(value);
+		});
+	}
+	return new (P ||= Promise)(function(resolve, reject) {
+		function fulfilled(value) {
+			try {
+				step(generator.next(value));
+			} catch (e) {
+				reject(e);
+			}
+		}
+		function rejected(value) {
+			try {
+				step(generator.throw(value));
+			} catch (e) {
+				reject(e);
+			}
+		}
+		function step(result) {
+			result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+		}
+		step((generator = generator.apply(thisArg, _arguments || [])).next());
+	});
+};
+/**
+* Returns path of a tool had the tool actually been invoked.  Resolves via paths.
+* If you check and the tool does not exist, it will throw.
+*
+* @param     tool              name of the tool
+* @param     check             whether to check if tool exists
+* @returns   Promise<string>   path to tool
+*/
+function which(tool, check) {
+	return __awaiter$4(this, void 0, void 0, function* () {
+		if (!tool) throw Error("parameter 'tool' is required");
+		if (check) {
+			let result = yield which(tool, !1);
+			if (!result) throw Error(IS_WINDOWS$1 ? `Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also verify the file has a valid extension for an executable file.` : `Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also check the file mode to verify the file is executable.`);
+			return result;
+		}
+		let matches = yield findInPath(tool);
+		return matches && matches.length > 0 ? matches[0] : "";
+	});
+}
+/**
+* Returns a list of all occurrences of the given tool on the system path.
+*
+* @returns   Promise<string[]>  the paths of the tool
+*/
+function findInPath(tool) {
+	return __awaiter$4(this, void 0, void 0, function* () {
+		if (!tool) throw Error("parameter 'tool' is required");
+		let extensions = [];
+		if (IS_WINDOWS$1 && process.env.PATHEXT) for (let extension of process.env.PATHEXT.split(path.delimiter)) extension && extensions.push(extension);
+		if (isRooted(tool)) {
+			let filePath = yield tryGetExecutablePath(tool, extensions);
+			return filePath ? [filePath] : [];
+		}
+		if (tool.includes(path.sep)) return [];
+		let directories = [];
+		if (process.env.PATH) for (let p of process.env.PATH.split(path.delimiter)) p && directories.push(p);
+		let matches = [];
+		for (let directory of directories) {
+			let filePath = yield tryGetExecutablePath(path.join(directory, tool), extensions);
+			filePath && matches.push(filePath);
+		}
+		return matches;
+	});
+}
+process.platform, events.EventEmitter, events.EventEmitter, os.default.platform(), os.default.arch();
+/**
+* The code to exit an action
+*/
+var ExitCode;
+(function(ExitCode) {
+	/**
+	* A code indicating that the action was a failure
+	*/
+	ExitCode[ExitCode.Success = 0] = "Success", ExitCode[ExitCode.Failure = 1] = "Failure";
+})(ExitCode ||= {});
+/**
+* Gets the value of an input.
+* Unless trimWhitespace is set to false in InputOptions, the value is also trimmed.
+* Returns an empty string if the value is not defined.
+*
+* @param     name     name of the input to get
+* @param     options  optional. See InputOptions.
+* @returns   string
+*/
+function getInput(name, options) {
+	let val = process.env[`INPUT_${name.replace(/ /g, "_").toUpperCase()}`] || "";
+	if (options && options.required && !val) throw Error(`Input required and not supplied: ${name}`);
+	return options && options.trimWhitespace === !1 ? val : val.trim();
+}
+/**
+* Gets the input value of the boolean type in the YAML 1.2 "core schema" specification.
+* Support boolean input list: `true | True | TRUE | false | False | FALSE` .
+* The return value is also in boolean type.
+* ref: https://yaml.org/spec/1.2/spec.html#id2804923
+*
+* @param     name     name of the input to get
+* @param     options  optional. See InputOptions.
+* @returns   boolean
+*/
+function getBooleanInput(name, options) {
+	let trueValue = [
+		"true",
+		"True",
+		"TRUE"
+	], falseValue = [
+		"false",
+		"False",
+		"FALSE"
+	], val = getInput(name, options);
+	if (trueValue.includes(val)) return !0;
+	if (falseValue.includes(val)) return !1;
+	throw TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}\nSupport boolean input list: \`true | True | TRUE | false | False | FALSE\``);
+}
+/**
+* Saves state for current action, the state can only be retrieved by this action's post job execution.
+*
+* @param     name     name of the state to store
+* @param     value    value to store. Non-string values will be converted to a string via JSON.stringify
+*/
+function saveState(name, value) {
+	if (process.env.GITHUB_STATE) return issueFileCommand("STATE", prepareKeyValueMessage(name, value));
+	issueCommand("save-state", { name }, toCommandValue(value));
+}
+//#endregion
 //#region core/lib/provenance/image-ref.ts
 function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
@@ -4360,7 +4944,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Updater = void 0;
-	let models_1 = require_dist$4(), debug_1 = __importDefault(require_src()), fs = __importStar(require("fs")), path = __importStar(require("path")), package_json_1 = require_package$1(), config_1 = require_config(), error_1 = require_error$4(), fetcher_1 = require_fetcher(), store_1 = require_store(), url = __importStar(require_url()), log = (0, debug_1.default)("tuf:cache");
+	let models_1 = require_dist$4(), debug_1 = __importDefault(require_src()), fs$1 = __importStar(require("fs")), path$1 = __importStar(require("path")), package_json_1 = require_package$1(), config_1 = require_config(), error_1 = require_error$4(), fetcher_1 = require_fetcher(), store_1 = require_store(), url = __importStar(require_url()), log = (0, debug_1.default)("tuf:cache");
 	exports.Updater = class {
 		dir;
 		metadataBaseUrl;
@@ -4405,25 +4989,25 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 			}
 			let targetFilePath = targetInfo.path;
 			if (this.trustedSet.root.signed.consistentSnapshot && this.config.prefixTargetsWithHash) {
-				let hashes = Object.values(targetInfo.hashes), { dir, base } = path.parse(targetFilePath), filename = `${hashes[0]}.${base}`;
+				let hashes = Object.values(targetInfo.hashes), { dir, base } = path$1.parse(targetFilePath), filename = `${hashes[0]}.${base}`;
 				targetFilePath = dir ? `${dir}/${filename}` : filename;
 			}
 			let targetUrl = url.join(targetBaseUrl, targetFilePath);
 			return await this.fetcher.downloadFile(targetUrl, targetInfo.length, async (fileName) => {
-				await targetInfo.verify(fs.createReadStream(fileName)), log("WRITE %s", targetPath), fs.copyFileSync(fileName, targetPath);
+				await targetInfo.verify(fs$1.createReadStream(fileName)), log("WRITE %s", targetPath), fs$1.copyFileSync(fileName, targetPath);
 			}), targetPath;
 		}
 		async findCachedTarget(targetInfo, filePath) {
 			filePath ||= this.generateTargetPath(targetInfo);
 			try {
-				if (fs.existsSync(filePath)) return await targetInfo.verify(fs.createReadStream(filePath)), filePath;
+				if (fs$1.existsSync(filePath)) return await targetInfo.verify(fs$1.createReadStream(filePath)), filePath;
 			} catch {
 				return;
 			}
 		}
 		loadLocalMetadata(fileName) {
-			let filePath = path.join(this.dir, `${fileName}.json`);
-			return log("READ %s", filePath), fs.readFileSync(filePath);
+			let filePath = path$1.join(this.dir, `${fileName}.json`);
+			return log("READ %s", filePath), fs$1.readFileSync(filePath);
 		}
 		async loadRoot() {
 			let lowerBound = this.trustedSet.root.signed.version + 1, upperBound = lowerBound + this.config.maxRootRotations;
@@ -4512,13 +5096,13 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 		generateTargetPath(targetInfo) {
 			if (!this.targetDir) throw new error_1.ValueError("Target directory not set");
 			let filePath = encodeURIComponent(targetInfo.path);
-			return path.join(this.targetDir, filePath);
+			return path$1.join(this.targetDir, filePath);
 		}
 		persistMetadata(metaDataName, bytesData) {
 			let encodedName = encodeURIComponent(metaDataName);
 			try {
-				let filePath = path.join(this.dir, `${encodedName}.json`);
-				log("WRITE %s", filePath), fs.writeFileSync(filePath, bytesData.toString("utf8"));
+				let filePath = path$1.join(this.dir, `${encodedName}.json`);
+				log("WRITE %s", filePath), fs$1.writeFileSync(filePath, bytesData.toString("utf8"));
 			} catch (error) {
 				throw new error_1.PersistError(`Failed to persist metadata ${encodedName} error: ${error}`);
 			}
@@ -8007,7 +8591,12 @@ function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runComm
 		showExpected
 	}) + "\n\n")), markdown;
 }
-function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand } = {}) {
+/**
+* Pure decision + rendering step, kept free of process.env/file I/O so it's
+* testable without touching the filesystem — see main.ts's writeReportSummary
+* for the side-effecting half (actual summary/annotation output).
+*/
+function computeReportOutcome(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand } = {}) {
 	let isAudit = report.parameters.mode === "audit", outcome = determineBlockedOutcome({
 		isAudit,
 		failOnBlocked: failOnBlocked ?? !1,
@@ -8019,17 +8608,18 @@ function writeReport(report, { stepLabel, failOnBlocked, actionRepo, actionRef, 
 		blockedRows: report.blocked,
 		engineLabel: "sandbox",
 		isAudit
-	}), markdown = buildReportMarkdown(report, {
-		stepLabel,
-		actionRepo,
-		actionRef,
-		runCommand
-	}), summaryFile = process.env.GITHUB_STEP_SUMMARY;
-	summaryFile ? (0, node_fs.appendFileSync)(summaryFile, markdown) : console.log(markdown);
-	let debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
-	debugSummaryFile && (0, node_fs.appendFileSync)(debugSummaryFile, markdown);
-	let annotation = createAnnotation(!!summaryFile);
-	outcome.level === "error" ? (annotation.error(message), process.exitCode = 1) : outcome.level === "notice" && annotation.notice(message);
+	});
+	return {
+		markdown: buildReportMarkdown(report, {
+			stepLabel,
+			actionRepo,
+			actionRef,
+			runCommand
+		}),
+		message,
+		level: outcome.level,
+		shouldFail: outcome.shouldFail
+	};
 }
 //#endregion
 //#region run/src/main.ts
@@ -8086,8 +8676,18 @@ async function withGroup(label, fn) {
 		console.log("::endgroup::");
 	}
 }
+/**
+* Side-effecting half of the report step: computeReportOutcome() decides
+* what to say, this writes it to the Job Summary/annotations/exit code.
+*/
+async function writeReportSummary(report, annotation, options) {
+	let outcome = computeReportOutcome(report, options);
+	process.env.GITHUB_STEP_SUMMARY ? await summary.addRaw(outcome.markdown).write() : console.log(outcome.markdown);
+	let debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
+	debugSummaryFile && (0, node_fs.appendFileSync)(debugSummaryFile, outcome.markdown), outcome.level === "error" ? (annotation.error(outcome.message), process.exitCode = 1) : outcome.level === "notice" && annotation.notice(outcome.message);
+}
 async function main() {
-	let env = process.env, actionRef = env.GITHUB_ACTION_REF || "v2", actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", runInput = env.INPUT_RUN ?? "";
+	let env = process.env, actionRef = env.GITHUB_ACTION_REF || "v2", actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", runInput = getInput("run", { trimWhitespace: !1 });
 	if (!runInput.trim()) throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
 	checkPasswordlessSudo();
 	let annotation = createAnnotation(!!env.GITHUB_STEP_SUMMARY), { imageRef, pullPolicy } = await resolveVerifiedImage({
@@ -8096,17 +8696,17 @@ async function main() {
 	});
 	console.log(`buildcage: proxy image: ${imageRef}`);
 	let rules = buildACLRules({
-		httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
-		httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
-		ipRulesInput: env.INPUT_ALLOWED_IP_RULES
-	}), knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
+		httpsRulesInput: getInput("allowed_https_rules"),
+		httpRulesInput: getInput("allowed_http_rules"),
+		ipRulesInput: getInput("allowed_ip_rules")
+	}), knownBlockedRules = readKnownBlockedRules(getInput("known_blocked_rules"));
 	console.log("::group::buildcage: Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules), console.log("::endgroup::");
-	let writablePaths = parseWritablePaths(env.INPUT_WRITABLE), containerName = generateContainerName(), projectName = deriveProjectName(containerName), stateFile = env.GITHUB_STATE;
-	stateFile && ((0, node_fs.appendFileSync)(stateFile, `container_name=${containerName}\n`), (0, node_fs.appendFileSync)(stateFile, `project_name=${projectName}\n`));
+	let writablePaths = parseWritablePaths(getInput("writable")), containerName = generateContainerName(), projectName = deriveProjectName(containerName);
+	env.GITHUB_STATE && (saveState("container_name", containerName), saveState("project_name", projectName));
 	let composeEnv = {
 		...env,
 		PROXY_CONTAINER_NAME: containerName,
-		PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
+		PROXY_MODE: getInput("proxy_mode") || "restrict",
 		ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
 		ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
 		ALLOWED_IP_RULES: rules.ipRules.join("\n"),
@@ -8176,18 +8776,24 @@ async function main() {
 		}, containerName);
 	} finally {
 		try {
-			writeReport(await fetchReport(containerName, {
-				mode: env.INPUT_PROXY_MODE || "restrict",
+			let report = await fetchReport(containerName, {
+				mode: getInput("proxy_mode") || "restrict",
 				allowedHttpsRules: rules.httpsRules,
 				allowedHttpRules: rules.httpRules,
 				allowedIpRules: rules.ipRules,
 				knownBlockedRules
-			}), {
+			}), failOnBlocked;
+			try {
+				failOnBlocked = getBooleanInput("fail_on_blocked");
+			} catch {
+				failOnBlocked = !0;
+			}
+			await writeReportSummary(report, annotation, {
 				actionRepo,
 				actionRef,
 				runCommand: runInput,
-				stepLabel: env.INPUT_LABEL || void 0,
-				failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true"
+				stepLabel: getInput("label") || void 0,
+				failOnBlocked
 			});
 		} catch (e) {
 			annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
