@@ -7,9 +7,9 @@ import * as core from "@actions/core";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import {
   verifyImageDigestOrThrow,
-  type VerifyImageIdentity,
   type ResolvedImage,
 } from "../../core/lib/provenance/verify-image.ts";
+import type { VerifyImageIdentity } from "../../core/lib/provenance/verify-policy.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation, type Annotation } from "../../core/lib/actions/annotation.ts";
 import { logRules } from "../../core/lib/actions/log-rules.ts";
@@ -53,7 +53,7 @@ const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === 
 /**
  * Verifies image provenance and resolves the digest-pinned image ref for
  * the run action's (buildkitd-less) proxy image, published under the `-proxy`
- * tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.ts).
+ * tag suffix (see image-tag.ts's imageTagFromRef).
  */
 async function resolveVerifiedImage({
   actionRef,

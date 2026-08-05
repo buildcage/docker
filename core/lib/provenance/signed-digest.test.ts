@@ -1,17 +1,16 @@
 /**
- * Unit tests for core/lib/sigstore.ts
- *
- * verifyBundle() requires a live TUF network call; that path is covered by
- * end-to-end / integration tests.
+ * Unit tests for core/lib/provenance/signed-digest.ts
  *
  * assertSignedDigest() is pure synchronous logic and is fully unit-tested here.
+ * sigstore.ts's verifyBundle() requires a live TUF network call; that path
+ * is covered by end-to-end / integration tests instead.
  *
- * Run with: vp test run core/lib/provenance/sigstore.test.ts
+ * Run with: vp test run core/lib/provenance/signed-digest.test.ts
  */
 
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
-import { assertSignedDigest } from "./sigstore.ts";
+import { assertSignedDigest } from "./signed-digest.ts";
 import { VerifyImageError } from "./errors.ts";
 
 const DIGEST = "sha256:abc123";

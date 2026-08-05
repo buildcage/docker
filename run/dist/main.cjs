@@ -7437,7 +7437,8 @@ const derUtf8 = (s) => String.fromCharCode(12, s.length) + s;
 * with package-write access could re-attach a valid bundle to a different
 * image; this assertion prevents accepting such a re-attached bundle.
 *
-* Exported for unit testing; callers should use verifyBundle() instead.
+* Exported for unit testing; callers should use sigstore.ts's verifyBundle()
+* instead.
 */
 function assertSignedDigest(bundleJson, expectedDigest) {
 	let dsse = bundleJson?.dsseEnvelope, payload = dsse?.payload;
@@ -7455,6 +7456,8 @@ function assertSignedDigest(bundleJson, expectedDigest) {
 		throw err instanceof VerifyImageError ? err : new VerifyImageError("Failed to parse signed payload from bundle", "VERIFY_FAILED");
 	}
 }
+//#endregion
+//#region core/lib/provenance/sigstore.ts
 /**
 * Cryptographically verify a Sigstore Bundle (DSSE format) against a policy,
 * then assert that the bundle's signed manifest digest matches the fetched digest.
@@ -7490,18 +7493,7 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 	assertSignedDigest(bundleJson, expectedDigest);
 }
 //#endregion
-//#region core/lib/provenance/verify-image.ts
-/**
-* verify-image.ts — Image provenance verification helpers
-*
-* Verifies the Docker image's Sigstore provenance bundle.
-*
-* Fail-closed policy:
-*   - Any failure for a verifiable ref (version tag / 40-char SHA) → throws
-*     VerifyImageError; the caller (main) is responsible for printing ::error::.
-*   - Unverifiable ref (branch / local ./setup) → returns null.
-*/
-const REGISTRY = "ghcr.io", escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+//#region core/lib/provenance/image-tag.ts
 /**
 * Convert an action ref into the base Docker image tag, then append the
 * proxy engine suffix for non-default engines. The `transparent` engine
@@ -7511,13 +7503,16 @@ const REGISTRY = "ghcr.io", escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g
 * each publish under their own suffix (e.g. `2.1.0-explicit`,
 * `2.1.0-proxy`). All three share the same Sigstore verification identity
 * (same workflow, same git ref) — only the published Docker tag differs, so
-* this does not affect buildVerifyOptions below.
+* this does not affect verify-policy.ts's buildVerifyOptions.
 */
 function imageTagFromRef(actionRef, proxyEngine = "transparent") {
 	if (!actionRef) return "";
 	let base;
 	return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, proxyEngine === "explicit" || proxyEngine === "proxy" ? `${base}-${proxyEngine}` : base;
 }
+//#endregion
+//#region core/lib/provenance/verify-policy.ts
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /**
 * Build verify options encoding the expected certificate identity.
 *
@@ -7544,6 +7539,19 @@ function buildVerifyOptions({ actionRef, actionRepo }) {
 		certificateIdentityURI: `${sanPrefix}${escapeRegex(actionRef)}(\\.|$)`
 	} : null;
 }
+//#endregion
+//#region core/lib/provenance/verify-image.ts
+/**
+* verify-image.ts — Image provenance verification helpers
+*
+* Verifies the Docker image's Sigstore provenance bundle.
+*
+* Fail-closed policy:
+*   - Any failure for a verifiable ref (version tag / 40-char SHA) → throws
+*     VerifyImageError; the caller (main) is responsible for printing ::error::.
+*   - Unverifiable ref (branch / local ./setup) → returns null.
+*/
+const REGISTRY = "ghcr.io";
 /**
 * Verify image provenance and return the verified manifest digest.
 *
@@ -8748,7 +8756,7 @@ const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.file
 /**
 * Verifies image provenance and resolves the digest-pinned image ref for
 * the run action's (buildkitd-less) proxy image, published under the `-proxy`
-* tag suffix (see imageTagFromRef in core/lib/provenance/verify-image.ts).
+* tag suffix (see image-tag.ts's imageTagFromRef).
 */
 async function resolveVerifiedImage({ actionRef, actionRepo }) {
 	let digest = await verifyImageDigestOrThrow({
