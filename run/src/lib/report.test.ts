@@ -2,8 +2,8 @@ import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import { computeReportOutcome, type Report, type ComputeReportOutcomeOptions } from "./report.ts";
-import { annotateKnownBlocked } from "../../../core/lib/report/build/aggregate.ts";
-import type { GenReportParameters } from "../../../core/lib/report/types.ts";
+import { annotateKnownBlocked } from "#core/lib/report/build/aggregate.ts";
+import type { GenReportParameters } from "#core/lib/report/types.ts";
 
 function parameters(overrides: Partial<GenReportParameters> = {}): GenReportParameters {
   return {

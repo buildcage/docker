@@ -1,4 +1,4 @@
-import { ActionError } from "../../../core/lib/errors.ts";
+import { ActionError } from "#core/lib/errors.ts";
 
 /**
  * ReportError — intentional error in the report action's own logic. Invalid

@@ -1,4 +1,4 @@
-import { ActionError } from "../../../core/lib/errors.ts";
+import { ActionError } from "#core/lib/errors.ts";
 
 /**
  * SetupError — intentional error in the setup action's own logic. Image

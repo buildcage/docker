@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "../../test/test-shim.ts";
+import { describe, it, assert, reportResults } from "#core/lib/test/test-shim.ts";
 import { renderCommunicationDetails } from "./communication-details.ts";
 
 function wrap(body: string) {

@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import { generateContainerName, getContainerPid, isContainerNotFoundError } from "./container.ts";
-import { deriveProjectName } from "../../../core/lib/docker/compose-project-name.ts";
+import { deriveProjectName } from "#core/lib/docker/compose-project-name.ts";
 import { SandboxError } from "./errors.ts";
 
 describe("generateContainerName", () => {

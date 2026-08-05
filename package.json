@@ -2,6 +2,9 @@
   "name": "buildcage",
   "private": true,
   "type": "module",
+  "imports": {
+    "#core/*": "./core/*"
+  },
   "scripts": {
     "build": "rolldown -c",
     "build:qjs": "BUILD_TARGET=qjs rolldown -c rolldown.scripts.config.js",

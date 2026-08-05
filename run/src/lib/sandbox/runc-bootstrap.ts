@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, chmodSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { buildDockerCpArgs } from "../../../../core/lib/docker/args.ts";
+import { buildDockerCpArgs } from "#core/lib/docker/args.ts";
 import type { OciSpec } from "./types.ts";
 
 /**

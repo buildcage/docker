@@ -7,8 +7,8 @@ import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { imageTagFromRef } from "../../core/lib/provenance/image-tag.ts";
-import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
+import { imageTagFromRef } from "#core/lib/provenance/image-tag.ts";
+import { resolveBuildcageImageRef } from "#core/lib/provenance/image-ref.ts";
 import { buildACLRules, resolveProxyEngine } from "./main.ts";
 
 // ---------------------------------------------------------------------------
