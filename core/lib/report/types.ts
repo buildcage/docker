@@ -1,5 +1,5 @@
 import type { HostTableRow } from "./render/host-table.ts";
-import type { AnnotatedBlockedRow } from "./outcome/annotate-known-blocked.ts";
+import type { AnnotatedBlockedRow } from "./build/annotate-known-blocked.ts";
 import type { VertexAllowedEntry } from "../log/vertex-log-parser.ts";
 
 /** Echoed back verbatim rather than re-derived — only the container's own

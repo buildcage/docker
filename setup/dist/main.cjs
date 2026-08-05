@@ -480,7 +480,7 @@ function getInput(name, options) {
 	return options && options.trimWhitespace === !1 ? val : val.trim();
 }
 //#endregion
-//#region core/lib/general/action-error.ts
+//#region core/lib/errors/action-error.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -495,7 +495,7 @@ var ActionError = class extends Error {
 	}
 }, SetupError = class extends ActionError {};
 //#endregion
-//#region core/lib/general/error-message.ts
+//#region core/lib/errors/error-message.ts
 /**
 * Safely extract a message from a caught value of unknown shape — a plain
 * `Error` most of the time, but `catch` doesn't guarantee that.

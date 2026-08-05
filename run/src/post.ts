@@ -6,7 +6,7 @@ import * as core from "@actions/core";
 
 import { buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
 import { cleanupScratchDir, scratchDirFor } from "./lib/sandbox/scratch-dir.ts";
-import { errorMessage } from "../../core/lib/general/error-message.ts";
+import { errorMessage } from "../../core/lib/errors/error-message.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

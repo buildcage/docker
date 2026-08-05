@@ -17,7 +17,7 @@ import {
 } from "./oci-registry.ts";
 import { derUtf8, verifyBundle, type VerifyBundleOptions, type DsseBundle } from "./sigstore.ts";
 import { ProvenanceError, VerifyImageError } from "./errors.ts";
-import { errorMessage } from "../general/error-message.ts";
+import { errorMessage } from "../errors/error-message.ts";
 
 const REGISTRY = "ghcr.io";
 const EXPECTED_ISSUER = "https://token.actions.githubusercontent.com";

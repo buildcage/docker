@@ -1,5 +1,5 @@
-import { ActionError } from "../general/action-error.ts";
-import { errorMessage } from "../general/error-message.ts";
+import { ActionError } from "../errors/action-error.ts";
+import { errorMessage } from "../errors/error-message.ts";
 import { parseAndValidateRules } from "./wildcard-rules.ts";
 
 /**

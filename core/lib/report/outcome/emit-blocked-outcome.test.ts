@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
 
 import { emitBlockedOutcome } from "./emit-blocked-outcome.ts";
-import { annotateKnownBlocked } from "./annotate-known-blocked.ts";
+import { annotateKnownBlocked } from "../build/annotate-known-blocked.ts";
 import type { ReportDataCommon, GenReportParameters } from "../types.ts";
 
 let prevExitCode: number | string | null | undefined;

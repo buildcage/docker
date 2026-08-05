@@ -8,7 +8,7 @@ import {
   type VerificationPolicy,
 } from "@sigstore/verify";
 import { VerifyImageError } from "./errors.ts";
-import { errorMessage } from "../general/error-message.ts";
+import { errorMessage } from "../errors/error-message.ts";
 
 // Encode a string as DER UTF8String for Fulcio OID extension values.
 // sigstore-js compares the raw OCTET STRING bytes, so we must include

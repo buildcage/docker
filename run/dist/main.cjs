@@ -605,7 +605,7 @@ function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 //#endregion
-//#region core/lib/general/action-error.ts
+//#region core/lib/errors/action-error.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -625,7 +625,7 @@ var ActionError = class extends Error {
 	}
 }, ProvenanceError = class extends ActionError {};
 //#endregion
-//#region core/lib/general/error-message.ts
+//#region core/lib/errors/error-message.ts
 /**
 * Safely extract a message from a caught value of unknown shape — a plain
 * `Error` most of the time, but `catch` doesn't guarantee that.
@@ -8439,7 +8439,7 @@ function describeBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedR
 	};
 }
 //#endregion
-//#region core/lib/general/markdown-table.ts
+//#region core/lib/report/render/markdown-table.ts
 const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
@@ -8660,7 +8660,7 @@ async function scanHaproxyLog(lines, isAudit) {
 	};
 }
 //#endregion
-//#region core/lib/report/outcome/annotate-known-blocked.ts
+//#region core/lib/report/build/annotate-known-blocked.ts
 /**
 * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
 * its `host:port` matches at least one known_blocked_rules pattern.
@@ -8733,6 +8733,14 @@ function computeReportOutcome(report, { stepLabel, failOnBlocked, actionRepo, ac
 */
 async function writeStepSummary(markdown) {
 	process.env.GITHUB_STEP_SUMMARY ? await summary.addRaw(markdown).write() : console.log(markdown);
+}
+//#endregion
+//#region core/lib/report/outcome/apply-outcome-annotation.ts
+/** Emits the annotation for a computed report outcome and sets the process
+*  exit code if it calls for failing the step. Shared by emit-blocked-outcome.ts
+*  (setup/report's proxy engines) and run/src/main.ts's writeReportSummary. */
+function applyOutcomeAnnotation(annotation, { level, message, shouldFail }) {
+	level === "error" ? annotation.error(message) : level === "notice" && annotation.notice(message), shouldFail && (process.exitCode = 1);
 }
 //#endregion
 //#region run/src/main.ts
@@ -8886,7 +8894,7 @@ async function writeReportSummary(report, annotation, options) {
 	let outcome = computeReportOutcome(report, options);
 	await writeStepSummary(outcome.markdown);
 	let debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
-	debugSummaryFile && (0, node_fs.appendFileSync)(debugSummaryFile, outcome.markdown), outcome.level === "error" ? (annotation.error(outcome.message), process.exitCode = 1) : outcome.level === "notice" && annotation.notice(outcome.message);
+	debugSummaryFile && (0, node_fs.appendFileSync)(debugSummaryFile, outcome.markdown), applyOutcomeAnnotation(annotation, outcome);
 }
 async function main() {
 	let env = process.env, actionRef = env.GITHUB_ACTION_REF || "v2", actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage", runInput = getInput("run", { trimWhitespace: !1 });

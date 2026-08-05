@@ -1,5 +1,5 @@
 import { scanHaproxyLog } from "../../log/haproxy-log-parser.ts";
-import { annotateKnownBlocked } from "../outcome/annotate-known-blocked.ts";
+import { annotateKnownBlocked } from "./annotate-known-blocked.ts";
 import type { GenReportParameters, TransparentReportData } from "../types.ts";
 
 /**

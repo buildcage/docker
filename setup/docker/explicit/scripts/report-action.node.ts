@@ -14,7 +14,7 @@ import { buildExplicitReportData } from "../../../../core/lib/report/build/expli
 import { renderReportMarkdown } from "../../../../core/lib/report/render/render-report-markdown.ts";
 import { renderCommunicationDetails } from "../../../../core/lib/report/render/communication-details.ts";
 import { emitBlockedOutcome } from "../../../../core/lib/report/outcome/emit-blocked-outcome.ts";
-import { errorMessage } from "../../../../core/lib/general/error-message.ts";
+import { errorMessage } from "../../../../core/lib/errors/error-message.ts";
 import { wrapLogGroup } from "../../../../core/lib/actions/log-group.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
 import { selectAllRefs } from "../../../../core/lib/log/build-histories-parser.ts";
