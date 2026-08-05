@@ -9,7 +9,7 @@
  * FROM/git sources remain unfiltered by buildcage, matching transparent
  * mode's documented behavior that only RUN-step network is controlled.
  */
-import { convertRule, wildcardToRegex } from "./wildcard-rules.ts";
+import { convertRule, splitRuleTokens, wildcardToRegex } from "./wildcard-rules.ts";
 
 const DEFAULT_PORT: Record<string, string> = { https: "443", http: "80" };
 
@@ -53,9 +53,9 @@ export function buildSourcePolicy({
       action: "DENY",
       selector: { identifier: "^https?://.*", matchType: "REGEX" },
     },
-    ...splitInput(httpsRulesInput).map((rule) => allowRule(rule, "https")),
-    ...splitInput(httpRulesInput).map((rule) => allowRule(rule, "http")),
-    ...splitInput(ipRulesInput).flatMap((rule) => [
+    ...splitRuleTokens(httpsRulesInput).map((rule) => allowRule(rule, "https")),
+    ...splitRuleTokens(httpRulesInput).map((rule) => allowRule(rule, "http")),
+    ...splitRuleTokens(ipRulesInput).flatMap((rule) => [
       allowRule(rule, "https"),
       allowRule(rule, "http"),
     ]),
@@ -128,8 +128,4 @@ function toUrlIdentifierFromRegex(core: string, scheme: string): string {
   if (!hasTrailingAnchor) body = `${body}[^/]*`;
 
   return `^${scheme}://${body}(/.*)?$`;
-}
-
-function splitInput(input: string | undefined): string[] {
-  return input?.trim().split(/\s+/).filter(Boolean) ?? [];
 }
