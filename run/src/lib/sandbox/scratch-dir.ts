@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { errorMessage } from "../../../../core/lib/general/error-message.ts";
+import { errorMessage } from "../../../../core/lib/errors/error-message.ts";
 import { parseMountinfo } from "./mountinfo.ts";
 
 // Base directory for each run's scratch dir (OCI bundle + the host-`/`

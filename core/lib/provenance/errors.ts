@@ -1,4 +1,4 @@
-import { ActionError } from "../general/action-error.ts";
+import { ActionError } from "../errors/action-error.ts";
 
 /**
  * VerifyImageError — intentional error in the image provenance verification

@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
 
 import { SetupError } from "./lib/errors.ts";
-import { ActionError } from "../../core/lib/general/action-error.ts";
-import { errorMessage } from "../../core/lib/general/error-message.ts";
+import { ActionError } from "../../core/lib/errors/action-error.ts";
+import { errorMessage } from "../../core/lib/errors/error-message.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import {
   verifyImageDigestOrThrow,

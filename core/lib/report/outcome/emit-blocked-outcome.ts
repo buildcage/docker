@@ -1,6 +1,7 @@
 /** Emits an annotation and sets the exit code for a blocked-connection outcome. */
 import { createAnnotation } from "../../actions/annotation.ts";
 import { describeBlockedOutcome } from "./blocked-outcome.ts";
+import { applyOutcomeAnnotation } from "./apply-outcome-annotation.ts";
 import type { ReportDataCommon } from "../types.ts";
 
 export interface EmitBlockedOutcomeOptions {
@@ -12,7 +13,7 @@ export function emitBlockedOutcome(
   report: ReportDataCommon,
   { failOnBlocked, summaryFile }: EmitBlockedOutcomeOptions,
 ): void {
-  const { level, message, shouldFail } = describeBlockedOutcome({
+  const outcome = describeBlockedOutcome({
     isAudit: report.parameters.mode === "audit",
     failOnBlocked,
     blockedCount: report.blockedCount,
@@ -21,11 +22,5 @@ export function emitBlockedOutcome(
     engineLabel: "proxy",
   });
 
-  if (level !== "none") {
-    const annotation = createAnnotation(Boolean(summaryFile));
-    if (level === "error") annotation.error(message);
-    else annotation.notice(message);
-  }
-
-  if (shouldFail) process.exitCode = 1;
+  applyOutcomeAnnotation(createAnnotation(Boolean(summaryFile)), outcome);
 }

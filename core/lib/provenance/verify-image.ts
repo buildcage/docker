@@ -20,7 +20,7 @@ import type { DsseBundle } from "./signed-digest.ts";
 import { imageTagFromRef } from "./image-tag.ts";
 import { buildVerifyOptions, type VerifyImageIdentity } from "./verify-policy.ts";
 import { ProvenanceError, VerifyImageError } from "./errors.ts";
-import { errorMessage } from "../general/error-message.ts";
+import { errorMessage } from "../errors/error-message.ts";
 
 const REGISTRY = "ghcr.io";
 

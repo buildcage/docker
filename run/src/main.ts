@@ -13,8 +13,8 @@ import type { VerifyImageIdentity } from "../../core/lib/provenance/verify-polic
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation, type Annotation } from "../../core/lib/actions/annotation.ts";
 import { logRules } from "../../core/lib/actions/log-rules.ts";
-import { ActionError } from "../../core/lib/general/action-error.ts";
-import { errorMessage } from "../../core/lib/general/error-message.ts";
+import { ActionError } from "../../core/lib/errors/action-error.ts";
+import { errorMessage } from "../../core/lib/errors/error-message.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import { SandboxError } from "./lib/errors.ts";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
@@ -38,6 +38,7 @@ import {
   type ComputeReportOutcomeOptions,
 } from "./lib/report.ts";
 import { writeStepSummary } from "../../setup/docker/lib/write-step-summary.ts";
+import { applyOutcomeAnnotation } from "../../core/lib/report/outcome/apply-outcome-annotation.ts";
 
 export { buildACLRules };
 
@@ -289,12 +290,7 @@ async function writeReportSummary(
     appendFileSync(debugSummaryFile, outcome.markdown);
   }
 
-  if (outcome.level === "error") {
-    annotation.error(outcome.message);
-    process.exitCode = 1;
-  } else if (outcome.level === "notice") {
-    annotation.notice(outcome.message);
-  }
+  applyOutcomeAnnotation(annotation, outcome);
 }
 
 async function main(): Promise<void> {

@@ -483,7 +483,7 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 	];
 }
 //#endregion
-//#region core/lib/general/error-message.ts
+//#region core/lib/errors/error-message.ts
 /**
 * Safely extract a message from a caught value of unknown shape — a plain
 * `Error` most of the time, but `catch` doesn't guarantee that.

@@ -12,8 +12,8 @@ import {
   REPORT_ACTION_SCRIPT_PATH,
   REPORT_SOURCE_LABEL,
 } from "../../core/lib/docker/report-source.ts";
-import { ActionError } from "../../core/lib/general/action-error.ts";
-import { errorMessage } from "../../core/lib/general/error-message.ts";
+import { ActionError } from "../../core/lib/errors/action-error.ts";
+import { errorMessage } from "../../core/lib/errors/error-message.ts";
 import { ReportError } from "./lib/errors.ts";
 
 // Gates the COMPOSE_PROJECT_NAME override to this repo's own CI/dev testing.

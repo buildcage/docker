@@ -8,7 +8,7 @@ import {
   type VerificationPolicy,
 } from "@sigstore/verify";
 import { VerifyImageError } from "./errors.ts";
-import { errorMessage } from "../general/error-message.ts";
+import { errorMessage } from "../errors/error-message.ts";
 import { assertSignedDigest, type DsseBundle } from "./signed-digest.ts";
 
 export interface VerifyBundleOptions {
