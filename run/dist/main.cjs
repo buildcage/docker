@@ -8356,40 +8356,6 @@ function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand
 	};
 }
 //#endregion
-//#region core/lib/report/build-example.ts
-const ruleTypeToParam = {
-	HTTPS: "allowed_https_rules",
-	HTTP: "allowed_http_rules",
-	IP: "allowed_ip_rules"
-};
-/**
-* Build a restrict-mode YAML configuration example from audited rows.
-* Returns a markdown string wrapped in <details> tags, or "" if no rows.
-*
-* actionRef is the ref (tag or commit SHA) this action was invoked with.
-*/
-function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName = "setup", runCommand } = {}) {
-	if (!auditedRows || auditedRows.length === 0) return "";
-	let ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = /* @__PURE__ */ new Map();
-	for (let r of auditedRows) {
-		let param = ruleTypeToParam[r.ruleType];
-		param && (groups.has(param) || groups.set(param, []), groups.get(param).push(`${r.host}:${r.port}`));
-	}
-	if (groups.size === 0) return "";
-	let yaml = "";
-	if (yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`, yaml += "  with:\n", actionName === "run" && runCommand) {
-		yaml += "    run: |\n";
-		for (let line of runCommand.replace(/\r?\n$/, "").split(/\r?\n/)) yaml += `      ${line}\n`;
-	}
-	yaml += "    proxy_mode: restrict\n";
-	for (let [param, rules] of groups) {
-		yaml += `    ${param}: >-\n`;
-		for (let rule of rules) yaml += `      ${rule}\n`;
-	}
-	let md = "\n<details>\n";
-	return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", md += yaml, md += "```\n\n", md += "</details>\n", md;
-}
-//#endregion
 //#region core/lib/report/known-blocked.ts
 /**
 * Shared logic for `known_blocked_rules`: domains expected to be blocked,
@@ -8513,6 +8479,109 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	})));
 }
 //#endregion
+//#region core/lib/report/build-example.ts
+const ruleTypeToParam = {
+	HTTPS: "allowed_https_rules",
+	HTTP: "allowed_http_rules",
+	IP: "allowed_ip_rules"
+};
+/**
+* Build a restrict-mode YAML configuration example from audited rows.
+* Returns a markdown string wrapped in <details> tags, or "" if no rows.
+*
+* actionRef is the ref (tag or commit SHA) this action was invoked with.
+*/
+function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName = "setup", runCommand } = {}) {
+	if (!auditedRows || auditedRows.length === 0) return "";
+	let ref = /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef, groups = /* @__PURE__ */ new Map();
+	for (let r of auditedRows) {
+		let param = ruleTypeToParam[r.ruleType];
+		param && (groups.has(param) || groups.set(param, []), groups.get(param).push(`${r.host}:${r.port}`));
+	}
+	if (groups.size === 0) return "";
+	let yaml = "";
+	if (yaml += "- name: Start Buildcage in restrict mode\n", yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`, yaml += "  with:\n", actionName === "run" && runCommand) {
+		yaml += "    run: |\n";
+		for (let line of runCommand.replace(/\r?\n$/, "").split(/\r?\n/)) yaml += `      ${line}\n`;
+	}
+	yaml += "    proxy_mode: restrict\n";
+	for (let [param, rules] of groups) {
+		yaml += `    ${param}: >-\n`;
+		for (let rule of rules) yaml += `      ${rule}\n`;
+	}
+	let md = "\n<details>\n";
+	return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", md += yaml, md += "```\n\n", md += "</details>\n", md;
+}
+//#endregion
+//#region core/lib/report/command-log.ts
+/**
+* Render the explicit engine's communication detail as a collapsed markdown
+* section, or "" if there's nothing to show. Allowed Urls is listed before
+* Blocked Urls, matching the Allowed Hosts / Blocked Hosts tables above.
+*
+* Blocked entries aren't attributed to a specific RUN step — buildkitd's
+* denial log carries no vertex/span identifier to attribute it with. A
+* "Build N" item separates builds only when there's more than one, since
+* step labels like "[2/15] RUN ..." repeat across builds.
+*
+* Command text is escaped since it's embedded directly in markdown; request
+* lines go inside a fenced code block instead, where escaping isn't needed.
+*/
+function renderCommunicationDetails(builds, deniedTimeline) {
+	let nonEmptyBuilds = (builds || []).filter((b) => b && b.length > 0), hasVertexLog = nonEmptyBuilds.length > 0, hasDenied = deniedTimeline && deniedTimeline.length > 0;
+	if (!hasVertexLog && !hasDenied) return "";
+	let md = "\n<details>\n<summary>💬 Communication details</summary>\n\n";
+	if (hasVertexLog) {
+		md += "* **✅ Allowed Urls**\n\n";
+		let showBuildHeadings = nonEmptyBuilds.length > 1;
+		nonEmptyBuilds.forEach((vertices, i) => {
+			let indent = showBuildHeadings ? "      " : "   ";
+			showBuildHeadings && (md += `   * Build ${i + 1}\n\n`);
+			for (let vertex of vertices) md += renderVertexItem(vertex, indent);
+		});
+	}
+	if (hasDenied) {
+		md += "* **🚫 Blocked Urls**\n\n";
+		for (let { url, timestamp } of deniedTimeline) md += `   - (${formatSeconds(timestamp)}) ${escapeMarkdown(url)}\n`;
+		md += "\n";
+	}
+	return md += "</details>\n", md;
+}
+function renderVertexItem({ command, started, completed, entries }, indent) {
+	let inner = indent + "   ", s = `${indent}* ${escapeMarkdown(command)}\n\n`;
+	if (s += `${inner}(${formatSeconds(started)} · duration ${formatDuration(started, completed)})\n\n`, s += `${inner}\`\`\`\n`, entries.length === 0) s += `${inner}(no communication)\n`;
+	else for (let entry of entries) s += `${inner}${renderRequestLine(entry)}\n`;
+	return s += `${inner}\`\`\`\n\n`, s;
+}
+function renderRequestLine({ method, url, status }) {
+	let line = `- ${escapeMarkdown(method)} ${escapeMarkdown(url)}`;
+	return status === void 0 ? line : `${line} -> ${status}`;
+}
+function escapeMarkdown(text) {
+	return text.replace(/([\\`*_[\]<>])/g, "\\$1");
+}
+function formatSeconds(iso) {
+	return new Date(iso).toISOString().slice(11, 19) + "Z";
+}
+function formatDuration(started, completed) {
+	return `${((Date.parse(completed) - Date.parse(started)) / 1e3).toFixed(3)}s`;
+}
+//#endregion
+//#region core/lib/report/render-report-markdown.ts
+/** Branches on `report.engine`/`report.parameters.mode` rather than being
+*  duplicated per engine. actionRepo/actionRef are real values, not
+*  placeholders — this runs on the runner, with process.env available. */
+function renderReportMarkdown(report, actionRepo, actionRef, { heading: stepHeading, actionName, runCommand } = {}) {
+	let isAudit = report.parameters.mode === "audit", showExpected = report.parameters.knownBlockedRules.length > 0, heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts", markdown = `## ${`Outbound Traffic Report${stepHeading ? ` — ${stepHeading}` : ""}`} (${report.parameters.mode} mode)\n\n`;
+	return report.passed.length > 0 && (markdown += `### ${heading}\n\n` + renderHostTable(report.passed) + "\n"), isAudit && (markdown += buildRestrictExample(report.passed, actionRepo, actionRef, {
+		actionName,
+		runCommand
+	})), report.blocked.length > 0 && (report.passed.length > 0 && (markdown += "\n"), markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, {
+		showReason: !0,
+		showExpected
+	}) + "\n"), report.passed.length === 0 && report.blocked.length === 0 && (markdown += "_(no communication)_\n\n"), report.engine === "explicit" ? markdown += renderCommunicationDetails(report.proxyLogs.builds, report.proxyLogs.denied) : markdown += "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n", markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`, markdown;
+}
+//#endregion
 //#region core/lib/log/aggregate.ts
 function compareAggregated(a, b) {
 	return b.count - a.count || (a.host < b.host ? -1 : +(a.host > b.host)) || Number(a.port) - Number(b.port);
@@ -8606,25 +8675,12 @@ async function buildTransparentReportData(lines, parameters) {
 function fetchReport(containerName, parameters) {
 	return buildTransparentReportData(createDocker().readFileLines(containerName, "/var/log/haproxy/current"), parameters);
 }
-function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand } = {}) {
-	let heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`, isAudit = report.parameters.mode === "audit", showExpected = report.parameters.knownBlockedRules.length > 0, markdown = `## ${heading} (${report.parameters.mode} mode)\n\n`;
-	return isAudit ? (report.passed.length > 0 && (markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(report.passed) + "\n\n"), actionRepo && (markdown += buildRestrictExample(report.passed, actionRepo, actionRef, {
-		actionName: "run",
-		runCommand
-	})), report.blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, {
-		showReason: !0,
-		showExpected
-	}) + "\n\n")) : (report.passed.length > 0 && (markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(report.passed) + "\n\n"), report.blocked.length > 0 && (markdown += "### 🚫 Blocked Hosts\n\n" + renderHostTable(report.blocked, {
-		showReason: !0,
-		showExpected
-	}) + "\n\n")), markdown;
-}
 /**
 * Pure decision + rendering step, kept free of process.env/file I/O so it's
 * testable without touching the filesystem — see main.ts's writeReportSummary
 * for the side-effecting half (actual summary/annotation output).
 */
-function computeReportOutcome(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand } = {}) {
+function computeReportOutcome(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand }) {
 	let { level, message, shouldFail } = describeBlockedOutcome({
 		isAudit: report.parameters.mode === "audit",
 		failOnBlocked: failOnBlocked ?? !1,
@@ -8634,10 +8690,9 @@ function computeReportOutcome(report, { stepLabel, failOnBlocked, actionRepo, ac
 		engineLabel: "sandbox"
 	});
 	return {
-		markdown: buildReportMarkdown(report, {
-			stepLabel,
-			actionRepo,
-			actionRef,
+		markdown: renderReportMarkdown(report, actionRepo, actionRef, {
+			heading: stepLabel,
+			actionName: "run",
 			runCommand
 		}),
 		message,
