@@ -4,7 +4,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
 
-import { buildComposeDownArgs } from "./lib/compose-args.ts";
+import { buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
 import { cleanupScratchDir, scratchDirFor } from "./lib/isolated-exec.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 

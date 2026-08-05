@@ -7654,6 +7654,13 @@ function createAnnotation(enabled) {
 	};
 }
 //#endregion
+//#region core/lib/actions/log-rules.ts
+/** Logs a labeled ACL rule list, one rule per line, for a `::group::` block. */
+function logRules(label, rules) {
+	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
+	for (let r of rules) console.log(`  ${r}`);
+}
+//#endregion
 //#region core/lib/acl/wildcard-rules.ts
 /**
 * Rule conversion library for buildcage container.
@@ -7824,7 +7831,7 @@ function getContainerPid(containerName, { exec = node_child_process.execFileSync
 	return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 //#endregion
-//#region core/lib/docker/container.ts
+//#region core/lib/docker/compose-project-name.ts
 /**
 * An explicit, deterministic Compose project name, so concurrent
 * `up`/`down`/`ps` from different steps in the same job never collide on
@@ -7838,15 +7845,8 @@ function getContainerPid(containerName, { exec = node_child_process.execFileSync
 function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
 }
-function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
-	return [
-		"cp",
-		`${containerName}:${containerPath}`,
-		hostPath
-	];
-}
 //#endregion
-//#region run/src/lib/compose-args.ts
+//#region core/lib/docker/compose-args.ts
 function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
 	return [
 		"compose",
@@ -7872,6 +7872,15 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 		"-p",
 		projectName,
 		"down"
+	];
+}
+//#endregion
+//#region core/lib/docker/cp-args.ts
+function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
+	return [
+		"cp",
+		`${containerName}:${containerPath}`,
+		hostPath
 	];
 }
 //#endregion
@@ -8742,10 +8751,6 @@ function readKnownBlockedRules(input) {
 function parseWritablePaths(input) {
 	return input?.split(/\r?\n/).map((s) => s.trim()).filter(Boolean) ?? [];
 }
-function logRules(label, rules) {
-	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
-	for (let r of rules) console.log(`  ${r}`);
-}
 /**
 * Wraps buildcage's own (non-user) log output in a collapsed
 * `::group::`/`::endgroup::` block, so a step's default (collapsed) view
@@ -8907,4 +8912,4 @@ async function main() {
 }
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
 	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in sandbox: ${errorMessage(err)}`), process.exit(1);
-}), exports.buildACLRules = buildACLRules, exports.buildComposeDownArgs = buildComposeDownArgs, exports.buildComposeUpArgs = buildComposeUpArgs, exports.parseWritablePaths = parseWritablePaths, exports.readKnownBlockedRules = readKnownBlockedRules;
+}), exports.buildACLRules = buildACLRules, exports.parseWritablePaths = parseWritablePaths, exports.readKnownBlockedRules = readKnownBlockedRules;

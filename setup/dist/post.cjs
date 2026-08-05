@@ -475,7 +475,7 @@ function getInput(name, options) {
 	return options && options.trimWhitespace === !1 ? val : val.trim();
 }
 //#endregion
-//#region core/lib/docker/container.ts
+//#region core/lib/docker/compose-project-name.ts
 /**
 * An explicit, deterministic Compose project name, so concurrent
 * `up`/`down`/`ps` from different steps in the same job never collide on
@@ -495,18 +495,27 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 	return composeProjectNameOverride || deriveProjectName(builderName);
 }
 //#endregion
+//#region core/lib/docker/compose-args.ts
+/** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
+function buildComposeDownArgs({ composeFile, projectName }) {
+	return [
+		"compose",
+		"-f",
+		composeFile,
+		"-p",
+		projectName,
+		"down"
+	];
+}
+//#endregion
 //#region setup/src/post.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
 function main() {
-	let builderName = getInput("builder_name") || "buildcage";
-	(0, node_child_process.execFileSync)("docker", [
-		"compose",
-		"-p",
-		resolveProjectName(builderName, void 0),
-		"-f",
-		(0, node_path.join)(__dirname$1, "../compose.yaml"),
-		"down"
-	], {
+	let builderName = getInput("builder_name") || "buildcage", projectName = resolveProjectName(builderName, void 0);
+	(0, node_child_process.execFileSync)("docker", buildComposeDownArgs({
+		composeFile: (0, node_path.join)(__dirname$1, "../compose.yaml"),
+		projectName
+	}), {
 		stdio: "inherit",
 		env: {
 			...process.env,

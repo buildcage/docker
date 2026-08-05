@@ -1,18 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { deriveProjectName, buildDockerCpArgs, resolveProjectName } from "./container.ts";
-
-describe("buildDockerCpArgs", () => {
-  it("builds a `docker cp <container>:<containerPath> <hostPath>` argv", () => {
-    assert.deepEqual(
-      buildDockerCpArgs({
-        containerName: "buildcage-proxy-abcd1234",
-        containerPath: "/opt/buildcage/bin/runc",
-        hostPath: "/tmp/x/runc",
-      }),
-      ["cp", "buildcage-proxy-abcd1234:/opt/buildcage/bin/runc", "/tmp/x/runc"],
-    );
-  });
-});
+import { deriveProjectName, resolveProjectName } from "./compose-project-name.ts";
 
 describe("deriveProjectName", () => {
   it("is deterministic — same input always derives the same project name", () => {

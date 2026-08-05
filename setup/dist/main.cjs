@@ -7603,7 +7603,14 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region core/lib/docker/container.ts
+//#region core/lib/actions/log-rules.ts
+/** Logs a labeled ACL rule list, one rule per line, for a `::group::` block. */
+function logRules(label, rules) {
+	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
+	for (let r of rules) console.log(`  ${r}`);
+}
+//#endregion
+//#region core/lib/docker/compose-project-name.ts
 /**
 * An explicit, deterministic Compose project name, so concurrent
 * `up`/`down`/`ps` from different steps in the same job never collide on
@@ -7616,6 +7623,35 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 */
 function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
+}
+//#endregion
+//#region core/lib/docker/compose-args.ts
+function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
+	return [
+		"compose",
+		"-f",
+		composeFile,
+		"-p",
+		projectName,
+		"up",
+		"-d",
+		"--pull",
+		pullPolicy,
+		"--no-build",
+		"--wait",
+		"--quiet-pull"
+	];
+}
+/** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
+function buildComposeDownArgs({ composeFile, projectName }) {
+	return [
+		"compose",
+		"-f",
+		composeFile,
+		"-p",
+		projectName,
+		"down"
+	];
 }
 //#endregion
 //#region setup/src/main.ts
@@ -7666,14 +7702,10 @@ async function main() {
 		BUILDCAGE_IMAGE_REF: imageRef
 	};
 	try {
-		(0, node_child_process.execFileSync)("docker", [
-			"compose",
-			"-p",
-			projectName,
-			"-f",
+		(0, node_child_process.execFileSync)("docker", buildComposeDownArgs({
 			composeFile,
-			"down"
-		], {
+			projectName
+		}), {
 			stdio: "inherit",
 			env: composeEnv
 		});
@@ -7681,20 +7713,11 @@ async function main() {
 		throw new SetupError(describeDockerFailure(e, { operation: "docker compose down" }), "DOCKER_UNAVAILABLE");
 	}
 	try {
-		(0, node_child_process.execFileSync)("docker", [
-			"compose",
-			"-p",
-			projectName,
-			"-f",
+		(0, node_child_process.execFileSync)("docker", buildComposeUpArgs({
 			composeFile,
-			"up",
-			"-d",
-			"--pull",
-			pullPolicy,
-			"--no-build",
-			"--wait",
-			"--quiet-pull"
-		], {
+			projectName,
+			pullPolicy
+		}), {
 			stdio: "inherit",
 			env: composeEnv
 		});
@@ -7712,10 +7735,6 @@ function resolveProxyEngine(input) {
 	let engine = input?.trim() || "transparent";
 	if (engine !== "transparent" && engine !== "explicit") throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`, "INVALID_PROXY_ENGINE");
 	return engine;
-}
-function logRules(label, rules) {
-	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
-	for (let r of rules) console.log(`  ${r}`);
 }
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
 	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in setup: ${errorMessage(err)}`), process.exit(1);

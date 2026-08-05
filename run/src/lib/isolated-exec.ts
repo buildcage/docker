@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildDockerCpArgs } from "../../../core/lib/docker/container.ts";
+import { buildDockerCpArgs } from "../../../core/lib/docker/cp-args.ts";
 import { errorMessage } from "../../../core/lib/general/error-message.ts";
 // Sensitive /proc paths masked with /dev/null. runc's own `runc spec`
 // default already masks /proc/kcore, /proc/keys, and /proc/timer_list

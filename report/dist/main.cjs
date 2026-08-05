@@ -510,7 +510,7 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region core/lib/docker/container.ts
+//#region core/lib/docker/compose-project-name.ts
 /**
 * An explicit, deterministic Compose project name, so concurrent
 * `up`/`down`/`ps` from different steps in the same job never collide on
@@ -529,6 +529,8 @@ function deriveProjectName(containerName) {
 function resolveProjectName(builderName, composeProjectNameOverride) {
 	return composeProjectNameOverride || deriveProjectName(builderName);
 }
+//#endregion
+//#region core/lib/docker/cp-args.ts
 function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	return [
 		"cp",
