@@ -1,7 +1,7 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { buildExplicitReportData } from "./build-explicit-report-data.ts";
-import type { GenReportParameters } from "./report-data.ts";
-import type { VertexAllowedEntry } from "../log/vertex-log.ts";
+import { describe, it, assert, reportResults } from "../../test/test-shim.ts";
+import { buildExplicitReportData } from "./explicit.ts";
+import type { GenReportParameters } from "../types.ts";
+import type { VertexAllowedEntry } from "../../log/vertex-log.ts";
 
 function params(overrides: Partial<GenReportParameters> = {}): GenReportParameters {
   return {

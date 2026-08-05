@@ -68,7 +68,8 @@ async function resolveVerifiedImage({
 }
 
 /**
- * Never sent to the container's ACL — see core/lib/report/known-blocked.ts.
+ * Never sent to the container's ACL — used only for report-time annotation
+ * of expected vs. unexpected blocked connections.
  */
 export function readKnownBlockedRules(input: string | undefined): string[] {
   return parseRulesOrThrow(input);

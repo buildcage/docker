@@ -1,6 +1,6 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { buildTransparentReportData } from "./build-transparent-report-data.ts";
-import type { GenReportParameters } from "./report-data.ts";
+import { describe, it, assert, reportResults } from "../../test/test-shim.ts";
+import { buildTransparentReportData } from "./transparent.ts";
+import type { GenReportParameters } from "../types.ts";
 
 function params(overrides: Partial<GenReportParameters> = {}): GenReportParameters {
   return {

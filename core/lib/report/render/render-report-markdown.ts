@@ -1,7 +1,7 @@
 import { renderHostTable } from "./host-table.ts";
 import { buildRestrictExample } from "./build-example.ts";
-import { renderCommunicationDetails } from "./command-log.ts";
-import type { ReportData } from "./report-data.ts";
+import { renderCommunicationDetails } from "./communication-details.ts";
+import type { ReportData } from "../types.ts";
 
 export interface RenderReportMarkdownOptions {
   /** Full heading text, e.g. "Outbound Traffic Report during Docker Build"

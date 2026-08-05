@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { describe, it, assert, reportResults } from "../../test/test-shim.ts";
 import { buildRestrictExample } from "./build-example.ts";
 
 const REPO = "dash14/buildcage";

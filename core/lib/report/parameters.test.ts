@@ -1,5 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { buildReportParameters } from "./report-parameters.ts";
+import { buildReportParameters } from "./parameters.ts";
 
 describe("buildReportParameters", () => {
   it("tokenizes each rules field and passes mode through", () => {

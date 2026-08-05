@@ -1,7 +1,7 @@
-import { scanBuildkitdLog } from "../log/buildkitd-log-parser.ts";
-import { aggregateAllowedHosts, type VertexAllowedEntry } from "../log/vertex-log.ts";
-import { annotateKnownBlocked } from "./known-blocked.ts";
-import type { GenReportParameters, ExplicitReportData } from "./report-data.ts";
+import { scanBuildkitdLog } from "../../log/buildkitd-log-parser.ts";
+import { aggregateAllowedHosts, type VertexAllowedEntry } from "../../log/vertex-log.ts";
+import { annotateKnownBlocked } from "../outcome/annotate-known-blocked.ts";
+import type { GenReportParameters, ExplicitReportData } from "../types.ts";
 
 /** Pure — no I/O; callers fetch lines/builds/parameters themselves. */
 export async function buildExplicitReportData(

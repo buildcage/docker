@@ -1,6 +1,6 @@
-import { scanHaproxyLog } from "../log/haproxy-log-parser.ts";
-import { annotateKnownBlocked } from "./known-blocked.ts";
-import type { GenReportParameters, TransparentReportData } from "./report-data.ts";
+import { scanHaproxyLog } from "../../log/haproxy-log-parser.ts";
+import { annotateKnownBlocked } from "../outcome/annotate-known-blocked.ts";
+import type { GenReportParameters, TransparentReportData } from "../types.ts";
 
 /**
  * Pure — no I/O; callers (report-action.node.ts, run/src/lib/report.ts)
