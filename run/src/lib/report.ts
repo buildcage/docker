@@ -1,6 +1,4 @@
-import { appendFileSync } from "node:fs";
 import { createDocker } from "../../../core/lib/docker/client.ts";
-import { createAnnotation } from "../../../core/lib/actions/annotation.ts";
 import { buildRestrictExample } from "../../../core/lib/report/build-example.ts";
 import {
   determineBlockedOutcome,
@@ -76,14 +74,26 @@ export function buildReportMarkdown(
   return markdown;
 }
 
-export interface WriteReportOptions extends ReportRenderContext {
+export interface ComputeReportOutcomeOptions extends ReportRenderContext {
   failOnBlocked?: boolean;
 }
 
-export function writeReport(
+export interface ReportOutcome {
+  markdown: string;
+  message: string;
+  level: "none" | "notice" | "error";
+  shouldFail: boolean;
+}
+
+/**
+ * Pure decision + rendering step, kept free of process.env/file I/O so it's
+ * testable without touching the filesystem — see main.ts's writeReportSummary
+ * for the side-effecting half (actual summary/annotation output).
+ */
+export function computeReportOutcome(
   report: Report,
-  { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand }: WriteReportOptions = {},
-): void {
+  { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand }: ComputeReportOutcomeOptions = {},
+): ReportOutcome {
   const isAudit = report.parameters.mode === "audit";
   const outcome = determineBlockedOutcome({
     isAudit,
@@ -98,27 +108,7 @@ export function writeReport(
     engineLabel: "sandbox",
     isAudit,
   });
-
   const markdown = buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand });
-  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-  if (summaryFile) {
-    appendFileSync(summaryFile, markdown);
-  } else {
-    console.log(markdown);
-  }
 
-  // Debug-only mirror: GITHUB_STEP_SUMMARY is unique per step and can't be
-  // reassigned, so a later step has no way to read this step's copy back.
-  const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
-  if (debugSummaryFile) {
-    appendFileSync(debugSummaryFile, markdown);
-  }
-
-  const annotation = createAnnotation(Boolean(summaryFile));
-  if (outcome.level === "error") {
-    annotation.error(message);
-    process.exitCode = 1;
-  } else if (outcome.level === "notice") {
-    annotation.notice(message);
-  }
+  return { markdown, message, level: outcome.level, shouldFail: outcome.shouldFail };
 }

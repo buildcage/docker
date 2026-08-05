@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
@@ -10,7 +11,7 @@ import {
   type ResolvedImage,
 } from "../../core/lib/provenance/verify-image.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
-import { createAnnotation } from "../../core/lib/actions/annotation.ts";
+import { createAnnotation, type Annotation } from "../../core/lib/actions/annotation.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
@@ -29,7 +30,12 @@ import {
   withScratchDir,
   listHostMounts,
 } from "./lib/isolated-exec.ts";
-import { fetchReport, writeReport } from "./lib/report.ts";
+import {
+  fetchReport,
+  computeReportOutcome,
+  type Report,
+  type ComputeReportOutcomeOptions,
+} from "./lib/report.ts";
 
 export { buildComposeUpArgs, buildComposeDownArgs, buildACLRules };
 
@@ -102,6 +108,39 @@ async function withGroup<T>(label: string, fn: () => T | Promise<T>): Promise<T>
   }
 }
 
+/**
+ * Side-effecting half of the report step: computeReportOutcome() decides
+ * what to say, this writes it to the Job Summary/annotations/exit code.
+ */
+async function writeReportSummary(
+  report: Report,
+  annotation: Annotation,
+  options: ComputeReportOutcomeOptions,
+): Promise<void> {
+  const outcome = computeReportOutcome(report, options);
+
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryFile) {
+    await core.summary.addRaw(outcome.markdown).write();
+  } else {
+    console.log(outcome.markdown);
+  }
+
+  // Debug-only mirror: GITHUB_STEP_SUMMARY is unique per step and can't be
+  // reassigned, so a later step has no way to read this step's copy back.
+  const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
+  if (debugSummaryFile) {
+    appendFileSync(debugSummaryFile, outcome.markdown);
+  }
+
+  if (outcome.level === "error") {
+    annotation.error(outcome.message);
+    process.exitCode = 1;
+  } else if (outcome.level === "notice") {
+    annotation.notice(outcome.message);
+  }
+}
+
 async function main(): Promise<void> {
   const env = process.env;
   // Empty (not `??`-catchable) for local-path `uses: ./run` invocations —
@@ -118,8 +157,8 @@ async function main(): Promise<void> {
   // if the runner can't support the isolation setup at all.
   checkPasswordlessSudo();
 
-  // Same gate as writeReport() in lib/report.ts — suppresses annotations
-  // when this script isn't running as the real action.
+  // Same gate as writeReportSummary() below — suppresses annotations when
+  // this script isn't running as the real action.
   const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
@@ -297,7 +336,7 @@ async function main(): Promise<void> {
       } catch {
         failOnBlocked = true;
       }
-      writeReport(report, {
+      await writeReportSummary(report, annotation, {
         actionRepo,
         actionRef,
         runCommand: runInput,
