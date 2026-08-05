@@ -8571,8 +8571,8 @@ function formatDuration(started, completed) {
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
 *  duplicated per engine. actionRepo/actionRef are real values, not
 *  placeholders — this runs on the runner, with process.env available. */
-function renderReportMarkdown(report, actionRepo, actionRef, { headingSuffix, actionName, runCommand } = {}) {
-	let isAudit = report.parameters.mode === "audit", showExpected = report.parameters.knownBlockedRules.length > 0, heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts", markdown = `## ${`Outbound Traffic Report${headingSuffix ?? ""}`} (${report.parameters.mode} mode)\n\n`;
+function renderReportMarkdown(report, actionRepo, actionRef, { title = "Outbound Traffic Report", actionName, runCommand } = {}) {
+	let isAudit = report.parameters.mode === "audit", showExpected = report.parameters.knownBlockedRules.length > 0, heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts", markdown = `## ${title} (${report.parameters.mode} mode)\n\n`;
 	return report.passed.length > 0 && (markdown += `### ${heading}\n\n` + renderHostTable(report.passed) + "\n"), isAudit && (markdown += buildRestrictExample(report.passed, actionRepo, actionRef, {
 		actionName,
 		runCommand
@@ -8691,7 +8691,7 @@ function computeReportOutcome(report, { stepLabel, failOnBlocked, actionRepo, ac
 	});
 	return {
 		markdown: renderReportMarkdown(report, actionRepo, actionRef, {
-			headingSuffix: stepLabel ? ` — ${stepLabel}` : void 0,
+			title: stepLabel ? `Outbound Traffic Report — ${stepLabel}` : void 0,
 			actionName: "run",
 			runCommand
 		}),
