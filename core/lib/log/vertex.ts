@@ -1,4 +1,4 @@
-import { type AllowedRequest, parseAllowedRequestsFromText } from "./proxy-request-text-parser.ts";
+import { type AllowedRequest, parseAllowedRequestsFromText } from "./proxy-request-text.ts";
 
 // Matches vertex names for Dockerfile RUN instructions. The bracketed prefix
 // is either just the step counter ("[2/2] RUN ...", single-stage) or a
@@ -58,7 +58,7 @@ export interface VertexAllowedEntry {
 export function parseVertexAllowedLog(rawJsonText: string): VertexAllowedEntry[] {
   // Usually a single JSON object, but buildctl can flush a large build's
   // rawjson history as several newline-separated JSON documents instead —
-  // mirroring build-histories-parser.ts's selectAllRefs's line-by-line
+  // mirroring build-histories.ts's selectAllRefs's line-by-line
   // parsing, concatenate them into one vertexes/logs view rather than
   // assume a single blob (a lone JSON.parse on the whole text would throw
   // on the second document). Not deduplicated by digest: the existing

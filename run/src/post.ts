@@ -4,9 +4,9 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
 
-import { buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
+import { buildComposeDownArgs } from "../../core/lib/docker/args.ts";
 import { cleanupScratchDir, scratchDirFor } from "./lib/sandbox/scratch-dir.ts";
-import { errorMessage } from "../../core/lib/errors/error-message.ts";
+import { errorMessage } from "../../core/lib/errors.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

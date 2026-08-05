@@ -12,8 +12,8 @@ import { createDocker } from "../../../../core/lib/docker/client.ts";
 import { buildReportParameters } from "../../../../core/lib/report/parameters.ts";
 import { buildTransparentReportData } from "../../../../core/lib/report/build/transparent.ts";
 import { renderReportMarkdown } from "../../../../core/lib/report/render/render-report-markdown.ts";
-import { emitBlockedOutcome } from "../../../../core/lib/report/outcome/emit-blocked-outcome.ts";
-import { errorMessage } from "../../../../core/lib/errors/error-message.ts";
+import { emitBlockedOutcome } from "../../../../core/lib/report/outcome/emit.ts";
+import { errorMessage } from "../../../../core/lib/errors.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
 
 const LOG_FILE = "/var/log/haproxy/current";

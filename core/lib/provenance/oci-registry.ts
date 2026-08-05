@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { VerifyImageError } from "./errors.ts";
-import { errorMessage } from "../errors/error-message.ts";
+import { errorMessage } from "../errors.ts";
 
 const BUNDLE_MEDIA_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 

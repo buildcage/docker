@@ -1,4 +1,4 @@
-import type { ExpectedFlag } from "../build/annotate-known-blocked.ts";
+import type { ExpectedFlag } from "../build/aggregate.ts";
 
 /**
  * Decide whether blocked connections should fail the step.

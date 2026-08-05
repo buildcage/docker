@@ -1,5 +1,18 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { buildComposeUpArgs, buildComposeDownArgs } from "./compose-args.ts";
+import { buildDockerCpArgs, buildComposeUpArgs, buildComposeDownArgs } from "./args.ts";
+
+describe("buildDockerCpArgs", () => {
+  it("builds a `docker cp <container>:<containerPath> <hostPath>` argv", () => {
+    assert.deepEqual(
+      buildDockerCpArgs({
+        containerName: "buildcage-proxy-abcd1234",
+        containerPath: "/opt/buildcage/bin/runc",
+        hostPath: "/tmp/x/runc",
+      }),
+      ["cp", "buildcage-proxy-abcd1234:/opt/buildcage/bin/runc", "/tmp/x/runc"],
+    );
+  });
+});
 
 // Regression guard for the concurrent-step container/network collision:
 // both must always include "-p" + the project name, or Compose falls back

@@ -530,7 +530,7 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 	return composeProjectNameOverride || deriveProjectName(builderName);
 }
 //#endregion
-//#region core/lib/docker/cp-args.ts
+//#region core/lib/docker/args.ts
 function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	return [
 		"cp",
@@ -664,7 +664,7 @@ function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand
 	};
 }
 //#endregion
-//#region core/lib/errors/action-error.ts
+//#region core/lib/errors.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -678,8 +678,6 @@ var ActionError = class extends Error {
 		super(message), this.name = new.target.name, this.code = code;
 	}
 };
-//#endregion
-//#region core/lib/errors/error-message.ts
 /**
 * Safely extract a message from a caught value of unknown shape — a plain
 * `Error` most of the time, but `catch` doesn't guarantee that.

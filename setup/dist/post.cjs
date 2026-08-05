@@ -495,7 +495,7 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 	return composeProjectNameOverride || deriveProjectName(builderName);
 }
 //#endregion
-//#region core/lib/docker/compose-args.ts
+//#region core/lib/docker/args.ts
 /** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
 function buildComposeDownArgs({ composeFile, projectName }) {
 	return [

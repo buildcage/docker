@@ -470,7 +470,7 @@ function getState(name) {
 	return process.env[`STATE_${name}`] || "";
 }
 //#endregion
-//#region core/lib/docker/compose-args.ts
+//#region core/lib/docker/args.ts
 /** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
 function buildComposeDownArgs({ composeFile, projectName }) {
 	return [
@@ -483,7 +483,7 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 	];
 }
 //#endregion
-//#region core/lib/errors/error-message.ts
+//#region core/lib/errors.ts
 /**
 * Safely extract a message from a caught value of unknown shape — a plain
 * `Error` most of the time, but `catch` doesn't guarantee that.

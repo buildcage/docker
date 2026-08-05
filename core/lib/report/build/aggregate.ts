@@ -1,10 +1,38 @@
+import { convertRule } from "../../acl/wildcard-rules.ts";
 import { parseIdentifier } from "../../log/parse-identifier.ts";
 import { aggregate, type AggregatedEntry } from "../../log/aggregate.ts";
-import type { AllowedRequest } from "../../log/proxy-request-text-parser.ts";
+import type { AllowedRequest } from "../../log/proxy-request-text.ts";
+
+export type BlockedRow = AggregatedEntry;
+
+export interface AnnotatedBlockedRow extends BlockedRow {
+  expected: boolean;
+}
+
+export interface ExpectedFlag {
+  expected: boolean;
+}
+
+/**
+ * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
+ * its `host:port` matches at least one known_blocked_rules pattern.
+ *
+ * knownBlockedRules is as returned by parseAndValidateRules.
+ */
+export function annotateKnownBlocked(
+  blockedRows: BlockedRow[],
+  knownBlockedRules: string[],
+): AnnotatedBlockedRow[] {
+  const matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
+  return blockedRows.map((row) => ({
+    ...row,
+    expected: matchers.some((re) => re.test(`${row.host}:${row.port}`)),
+  }));
+}
 
 /**
  * Build the host-aggregated allowed/audited table from the same per-build
- * vertex data vertex-log-parser.ts's parseVertexAllowedLog() produces for
+ * vertex data vertex.ts's parseVertexAllowedLog() produces for
  * the per-command breakdown.
  *
  * decision is "ALLOWED" (restrict mode) or "AUDIT" (audit mode).

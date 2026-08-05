@@ -1,7 +1,7 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { createInterface } from "node:readline";
-import { buildDockerCpArgs } from "./cp-args.ts";
+import { buildDockerCpArgs } from "./args.ts";
 import { parseDockerInspectEnv } from "./container-env.ts";
 
 /** `docker ps --format '{{.ID}}'` prints one ID per line, possibly with
