@@ -7,7 +7,7 @@
 # involved, since this is always a 1:1 connection: one sandbox, one proxy),
 # bind-mounts the host's own "/" so it can be handed to runc as a read-only
 # rootfs, and execs `runc run` against an OCI bundle (config.json) that
-# isolated-exec.ts has already fully built -- namespaces, capabilities,
+# sandbox/oci-config.ts has already fully built -- namespaces, capabilities,
 # mounts, uid/gid, and the seccomp filter are all declared there. This
 # script only sets up what runc itself cannot: the network namespace's veth
 # wiring into the proxy, and the rootfs bind-mount runc needs as its
@@ -126,7 +126,7 @@ cleanup() {
   # Not silenced: a failed unmount here (e.g. EBUSY from a lingering
   # process) leaves ROOTFS_BIND_DIR -- a bind-mount of the entire host
   # filesystem -- still live, so it's worth surfacing even though
-  # isolated-exec.ts's withScratchDir has its own safety net before it
+  # sandbox/scratch-dir.ts's withScratchDir has its own safety net before it
   # recursively deletes this directory.
   UMOUNT_ERR_FILE="/tmp/.buildcage-umount-err.$$"
   umount -R "$ROOTFS_BIND_DIR" >/dev/null 2>"$UMOUNT_ERR_FILE" || {
@@ -146,7 +146,7 @@ trap cleanup EXIT INT TERM
 
 # Bind-mounted first, before any of the network setup below: it has no
 # dependency on the netns/veth work that follows, and doing it first
-# minimizes the gap between isolated-exec.ts's listHostMounts() snapshot
+# minimizes the gap between sandbox/mountinfo.ts's listHostMounts() snapshot
 # (which config.json's readonlyPaths was computed from) and this rbind
 # actually capturing the host's mount table.
 group_start "buildcage: preparing sandbox"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Verifies that a real pseudo-filesystem mount NOT among runc's own default
-# base-spec mounts (see freshMountDestinationsFrom in isolated-exec.ts) is
+# base-spec mounts (see freshMountDestinationsFrom in sandbox/oci-config.ts) is
 # still forced read-only inside the sandbox, rather than being silently
 # tolerated just because it superficially looks like a "kernel pseudo-fs".
 # securityfs is a concrete, realistic example: it's commonly mounted at

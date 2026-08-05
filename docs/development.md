@@ -65,7 +65,7 @@ parts of production (see [Run Action Internals](#run-action-internals) below). `
 `gen-seccomp-profile` are built directly into the dev-loop image (mirroring `run/docker/Dockerfile`)
 rather than `docker cp`-extracted from the proxy image at runtime, so the dev loop doesn't need the
 Docker socket mounted in just to reach a sibling container; `run/dev/build-test-bundle.sh` stands in
-for `isolated-exec.ts`'s `buildOciConfig` to build a minimal OCI bundle for the smoke test. CI's
+for `sandbox/oci-config.ts`'s `buildOciConfig` to build a minimal OCI bundle for the smoke test. CI's
 `test_sandbox_*` e2e jobs run `run-isolated.sh` directly on the runner host instead, matching
 production exactly — treat those as the final word on whether a change actually works, not this
 dev loop.
@@ -180,14 +180,14 @@ order it actually happens. For the user-facing behavior and threat model, see
      `run:` steps in the same job (GitHub Actions' `background`/`wait`/`parallel` keywords) never
      share an implicit, directory-derived Compose project — otherwise one step's `up`/`down` could
      recreate or tear down another step's still-running container.
-3. Extract `runc` and a seccomp-profile generator onto the runner host (`isolated-exec.ts`).
+3. Extract `runc` and a seccomp-profile generator onto the runner host (`sandbox/runc-bootstrap.ts`).
    - Both ship inside the proxy image and are pulled onto the host via `docker cp`, then run
      natively there — not `docker exec`'d — since the seccomp profile's content depends on the
      real host's kernel and architecture.
    - Extracted fresh into this step's own scratch directory on every invocation (no shared,
      cross-step/cross-job cache), so each `run:` step is fully independent and everything extracted
      is torn down with the scratch directory afterward.
-4. Build an OCI runtime bundle (`config.json`) describing the sandbox (`isolated-exec.ts`).
+4. Build an OCI runtime bundle (`config.json`) describing the sandbox (`sandbox/oci-config.ts`).
    - Starts from `runc`'s own default spec, then patches in: a root filesystem pointing at a
      not-yet-created bind-mount directory, made read-only (every real host mount point is forced
      individually read-only outside workdir/home/tmp/RUNNER_TEMP/writable, since the top-level
