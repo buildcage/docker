@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
@@ -160,12 +159,11 @@ async function main(): Promise<void> {
   // rather than sharing one across steps in the same job.
   const containerName = generateContainerName();
   const projectName = deriveProjectName(containerName);
-  const stateFile = env.GITHUB_STATE;
   // Recorded so post.ts can still clean up if this run is killed outright
   // before reaching its own finally block below.
-  if (stateFile) {
-    appendFileSync(stateFile, `container_name=${containerName}\n`);
-    appendFileSync(stateFile, `project_name=${projectName}\n`);
+  if (env.GITHUB_STATE) {
+    core.saveState("container_name", containerName);
+    core.saveState("project_name", projectName);
   }
 
   const composeEnv = {
