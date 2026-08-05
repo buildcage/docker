@@ -32,8 +32,9 @@ test_unit_setup: ## Run setup action unit tests
 	@vp test run setup/src
 
 .PHONY: test_unit_report
+# report/src has no package-local pure functions to unit-test.
 test_unit_report: ## Run report unit tests
-	@vp test run report/src
+	@vp test run report/src --passWithNoTests
 
 .PHONY: test_unit_sandbox
 test_unit_sandbox: ## Run the run action's unit tests

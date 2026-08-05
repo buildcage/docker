@@ -15,6 +15,15 @@ export function deriveProjectName(containerName: string): string {
   return `buildcage-${hash}`;
 }
 
+/** Compose project name for a builder_name, preferring an explicit override
+ *  over the deterministic hash-derived name. */
+export function resolveProjectName(
+  builderName: string,
+  composeProjectNameOverride: string | undefined,
+): string {
+  return composeProjectNameOverride || deriveProjectName(builderName);
+}
+
 export interface BuildDockerCpArgsOptions {
   containerName: string;
   containerPath: string;
