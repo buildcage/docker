@@ -43,8 +43,10 @@ describe("renderReportMarkdown — transparent", () => {
   };
 
   it("renders the restrict-mode heading and Allowed Hosts table", () => {
-    const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "dash14/buildcage", "v2");
-    assert.match(md, /## Outbound Traffic Report during Docker Build \(restrict mode\)/);
+    const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "dash14/buildcage", "v2", {
+      heading: "during Docker Build",
+    });
+    assert.match(md, /## Outbound Traffic Report — during Docker Build \(restrict mode\)/);
     assert.match(md, /### ✅ Allowed Hosts/);
     assert.match(md, /good\.com/);
   });
@@ -100,6 +102,36 @@ describe("renderReportMarkdown — transparent", () => {
       "v2",
     );
     assertNotMatch(blockedMd, /_\(no communication\)_/);
+  });
+
+  it("puts the heading option after an em dash instead of a bare heading", () => {
+    const md = renderReportMarkdown(base, "dash14/buildcage", "v2", { heading: "npm install" });
+    assert.match(md, /^## Outbound Traffic Report — npm install \(restrict mode\)/);
+  });
+
+  it("shows a run-flavored restrict-mode example including the run: command", () => {
+    const md = renderReportMarkdown(
+      { ...base, parameters: params({ mode: "audit" }), passed: [allowedRow] },
+      "dash14/buildcage",
+      "v2",
+      { actionName: "run", runCommand: "npm install" },
+    );
+    assert.match(md, /uses: dash14\/buildcage\/run@v2/);
+    assert.match(md, /run: \|\n\s+npm install/);
+  });
+
+  it("adds an Expected column marking known_blocked_rules matches when set", () => {
+    const md = renderReportMarkdown(
+      { ...base, parameters: params({ knownBlockedRules: ["bad.com:80"] }), blocked: [blockedRow] },
+      "dash14/buildcage",
+      "v2",
+    );
+    assert.match(md, /\| Host \| Rule \| Reason \| Count \| Expected \|/);
+  });
+
+  it("omits the Expected column when known_blocked_rules is not set", () => {
+    const md = renderReportMarkdown({ ...base, blocked: [blockedRow] }, "dash14/buildcage", "v2");
+    assertNotMatch(md, /Expected/);
   });
 });
 
