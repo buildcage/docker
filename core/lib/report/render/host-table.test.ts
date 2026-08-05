@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "../../test/test-shim.ts";
+import { describe, it, assert, reportResults } from "#core/lib/test/test-shim.ts";
 import { renderHostTable } from "./host-table.ts";
 
 describe("renderHostTable", () => {

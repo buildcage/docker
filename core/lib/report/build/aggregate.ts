@@ -1,7 +1,7 @@
-import { convertRule } from "../../acl/wildcard-rules.ts";
-import { parseIdentifier } from "../../log/parse-identifier.ts";
-import { aggregate, type AggregatedEntry } from "../../log/aggregate.ts";
-import type { AllowedRequest } from "../../log/proxy-request-text.ts";
+import { convertRule } from "#core/lib/acl/wildcard-rules.ts";
+import { parseIdentifier } from "#core/lib/log/parse-identifier.ts";
+import { aggregate, type AggregatedEntry } from "#core/lib/log/aggregate.ts";
+import type { AllowedRequest } from "#core/lib/log/proxy-request-text.ts";
 
 export type BlockedRow = AggregatedEntry;
 

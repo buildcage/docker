@@ -1,4 +1,4 @@
-import type { Annotation } from "../../actions/annotation.ts";
+import type { Annotation } from "#core/lib/actions/annotation.ts";
 
 export interface OutcomeEmission {
   level: "none" | "notice" | "error";

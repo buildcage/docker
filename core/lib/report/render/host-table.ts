@@ -1,5 +1,5 @@
 import { markdownTable, type ColumnFormat } from "./markdown-table.ts";
-import type { AggregatedEntry } from "../../log/aggregate.ts";
+import type { AggregatedEntry } from "#core/lib/log/aggregate.ts";
 
 export interface HostTableRow extends Omit<AggregatedEntry, "reason"> {
   reason?: string;

@@ -7,7 +7,7 @@ import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import { buildACLRules, parseWritablePaths, readKnownBlockedRules } from "./main.ts";
-import { InvalidRulesError } from "../../core/lib/acl/rules.ts";
+import { InvalidRulesError } from "#core/lib/acl/rules.ts";
 
 describe("buildACLRules", () => {
   it("parses whitespace-separated HTTPS rules", () => {

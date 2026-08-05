@@ -8,17 +8,17 @@
  * rather than needing buildctl reachable from the runner.
  */
 import * as core from "@actions/core";
-import { createDocker, type Docker } from "../../../../core/lib/docker/client.ts";
-import { buildReportParameters } from "../../../../core/lib/report/parameters.ts";
-import { buildExplicitReportData } from "../../../../core/lib/report/build/explicit.ts";
-import { renderReportMarkdown } from "../../../../core/lib/report/render/render-report-markdown.ts";
-import { renderCommunicationDetails } from "../../../../core/lib/report/render/communication-details.ts";
-import { emitBlockedOutcome } from "../../../../core/lib/report/outcome/emit.ts";
-import { errorMessage } from "../../../../core/lib/errors.ts";
-import { wrapLogGroup } from "../../../../core/lib/actions/log.ts";
+import { createDocker, type Docker } from "#core/lib/docker/client.ts";
+import { buildReportParameters } from "#core/lib/report/parameters.ts";
+import { buildExplicitReportData } from "#core/lib/report/build/explicit.ts";
+import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
+import { renderCommunicationDetails } from "#core/lib/report/render/communication-details.ts";
+import { emitBlockedOutcome } from "#core/lib/report/outcome/emit.ts";
+import { errorMessage } from "#core/lib/errors.ts";
+import { wrapLogGroup } from "#core/lib/actions/log.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
-import { selectAllRefs } from "../../../../core/lib/log/build-histories.ts";
-import { parseVertexAllowedLog, type VertexAllowedEntry } from "../../../../core/lib/log/vertex.ts";
+import { selectAllRefs } from "#core/lib/log/build-histories.ts";
+import { parseVertexAllowedLog, type VertexAllowedEntry } from "#core/lib/log/vertex.ts";
 
 const LOG_FILE = "/var/log/buildkitd/current";
 

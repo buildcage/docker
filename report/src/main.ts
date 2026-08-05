@@ -5,14 +5,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
 
-import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
-import { resolveProjectName } from "../../core/lib/docker/compose-project-name.ts";
-import { createDocker } from "../../core/lib/docker/client.ts";
-import {
-  REPORT_ACTION_SCRIPT_PATH,
-  REPORT_SOURCE_LABEL,
-} from "../../core/lib/docker/report-source.ts";
-import { ActionError, errorMessage } from "../../core/lib/errors.ts";
+import { describeDockerFailure } from "#core/lib/actions/docker-error.ts";
+import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
+import { createDocker } from "#core/lib/docker/client.ts";
+import { REPORT_ACTION_SCRIPT_PATH, REPORT_SOURCE_LABEL } from "#core/lib/docker/report-source.ts";
+import { ActionError, errorMessage } from "#core/lib/errors.ts";
 import { ReportError } from "./lib/errors.ts";
 
 // Gates the COMPOSE_PROJECT_NAME override to this repo's own CI/dev testing.

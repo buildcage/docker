@@ -1,4 +1,4 @@
-import { scanHaproxyLog } from "../../log/haproxy.ts";
+import { scanHaproxyLog } from "#core/lib/log/haproxy.ts";
 import { annotateKnownBlocked } from "./aggregate.ts";
 import type { GenReportParameters, TransparentReportData } from "../types.ts";
 

@@ -1,8 +1,8 @@
-import { createDocker } from "../../../core/lib/docker/client.ts";
-import { describeBlockedOutcome } from "../../../core/lib/report/outcome/blocked-outcome.ts";
-import { renderReportMarkdown } from "../../../core/lib/report/render/render-report-markdown.ts";
-import { buildTransparentReportData } from "../../../core/lib/report/build/transparent.ts";
-import type { GenReportParameters, TransparentReportData } from "../../../core/lib/report/types.ts";
+import { createDocker } from "#core/lib/docker/client.ts";
+import { describeBlockedOutcome } from "#core/lib/report/outcome/blocked-outcome.ts";
+import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
+import { buildTransparentReportData } from "#core/lib/report/build/transparent.ts";
+import type { GenReportParameters, TransparentReportData } from "#core/lib/report/types.ts";
 
 export type Report = TransparentReportData;
 

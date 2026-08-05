@@ -4,18 +4,18 @@ import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
 
 import { SetupError } from "./lib/errors.ts";
-import { ActionError, errorMessage } from "../../core/lib/errors.ts";
-import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
+import { ActionError, errorMessage } from "#core/lib/errors.ts";
+import { buildACLRules, parseRulesOrThrow } from "#core/lib/acl/rules.ts";
 import {
   verifyImageDigestOrThrow,
   type VerifyImageDigestOptions,
   type ResolvedImage,
-} from "../../core/lib/provenance/verify-image.ts";
-import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
-import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
-import { logRules } from "../../core/lib/actions/log.ts";
-import { deriveProjectName } from "../../core/lib/docker/compose-project-name.ts";
-import { buildComposeUpArgs, buildComposeDownArgs } from "../../core/lib/docker/args.ts";
+} from "#core/lib/provenance/verify-image.ts";
+import { resolveBuildcageImageRef } from "#core/lib/provenance/image-ref.ts";
+import { describeDockerFailure } from "#core/lib/actions/docker-error.ts";
+import { logRules } from "#core/lib/actions/log.ts";
+import { deriveProjectName } from "#core/lib/docker/compose-project-name.ts";
+import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
 
 export { buildACLRules };
 

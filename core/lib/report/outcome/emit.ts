@@ -1,5 +1,5 @@
 /** Emits an annotation and sets the exit code for a blocked-connection outcome. */
-import { createAnnotation } from "../../actions/annotation.ts";
+import { createAnnotation } from "#core/lib/actions/annotation.ts";
 import { describeBlockedOutcome } from "./blocked-outcome.ts";
 import { applyOutcomeAnnotation } from "./annotate.ts";
 import type { ReportDataCommon } from "../types.ts";
