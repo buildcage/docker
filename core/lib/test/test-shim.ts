@@ -23,10 +23,10 @@ interface Assert {
 }
 
 interface Shim {
-  describe(name: string, fn: () => void): void;
-  it(name: string, fn: () => void): void;
+  describe(this: void, name: string, fn: () => void): void;
+  it(this: void, name: string, fn: () => void): void;
   assert: Assert;
-  reportResults(): void;
+  reportResults(this: void): void;
 }
 
 async function createNodeShim(): Promise<Shim> {
@@ -58,7 +58,7 @@ async function createQjsShim(): Promise<Shim> {
       passed++;
     } catch (e) {
       failed++;
-      std.err.puts(`FAIL: ${label}\n  ${(e as Error).message || e}\n`);
+      std.err.puts(`FAIL: ${label}\n  ${e instanceof Error ? e.message : String(e)}\n`);
     }
   }
 
