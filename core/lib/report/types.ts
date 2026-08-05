@@ -1,6 +1,6 @@
 import type { HostTableRow } from "./render/host-table.ts";
-import type { AnnotatedBlockedRow } from "./build/annotate-known-blocked.ts";
-import type { VertexAllowedEntry } from "../log/vertex-log-parser.ts";
+import type { AnnotatedBlockedRow } from "./build/aggregate.ts";
+import type { VertexAllowedEntry } from "../log/vertex.ts";
 
 /** Echoed back verbatim rather than re-derived — only the container's own
  *  env (or, for run, its own action input) reflects what was configured. */
@@ -29,8 +29,8 @@ export interface ReportDataCommon {
   blockedCount: number;
 
   /** False iff the log looks structurally implausible for a real run (no
-   *  non-buildcage/non-denial content at all) — see haproxy-log-parser.ts's
-   *  hasNonBuildcageContent / buildkitd-log-parser.ts's hasNonDenialContent.
+   *  non-buildcage/non-denial content at all) — see haproxy.ts's
+   *  hasNonBuildcageContent / buildkitd.ts's hasNonDenialContent.
    *  Used to fail closed on a suspiciously empty log instead of treating it
    *  as "nothing was blocked". */
   logLooksPlausible: boolean;

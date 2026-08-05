@@ -1,13 +1,13 @@
 /**
- * Property-based tests for core/lib/log/haproxy-log-parser.ts.
+ * Property-based tests for core/lib/log/haproxy.ts.
  *
- * Run with: vp test run core/lib/log/haproxy-log-parser.property.test.ts
+ * Run with: vp test run core/lib/log/haproxy.property.test.ts
  */
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { scanHaproxyLog } from "./haproxy-log-parser.ts";
+import { scanHaproxyLog } from "./haproxy.ts";
 import { aggregate } from "./aggregate.ts";
 
 // ---------------------------------------------------------------------------

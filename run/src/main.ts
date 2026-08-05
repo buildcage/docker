@@ -12,15 +12,14 @@ import {
 import type { VerifyImageIdentity } from "../../core/lib/provenance/verify-policy.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation, type Annotation } from "../../core/lib/actions/annotation.ts";
-import { logRules } from "../../core/lib/actions/log-rules.ts";
-import { ActionError } from "../../core/lib/errors/action-error.ts";
-import { errorMessage } from "../../core/lib/errors/error-message.ts";
+import { logRules } from "../../core/lib/actions/log.ts";
+import { ActionError, errorMessage } from "../../core/lib/errors.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import { SandboxError } from "./lib/errors.ts";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
 import { generateContainerName, getContainerPid } from "./lib/container.ts";
 import { deriveProjectName } from "../../core/lib/docker/compose-project-name.ts";
-import { buildComposeUpArgs, buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
+import { buildComposeUpArgs, buildComposeDownArgs } from "../../core/lib/docker/args.ts";
 import { extractRuncBootstrap } from "./lib/sandbox/runc-bootstrap.ts";
 import {
   writeRunScript,
@@ -38,7 +37,7 @@ import {
   type ComputeReportOutcomeOptions,
 } from "./lib/report.ts";
 import { writeStepSummary } from "../../setup/docker/lib/write-step-summary.ts";
-import { applyOutcomeAnnotation } from "../../core/lib/report/outcome/apply-outcome-annotation.ts";
+import { applyOutcomeAnnotation } from "../../core/lib/report/outcome/annotate.ts";
 
 export { buildACLRules };
 

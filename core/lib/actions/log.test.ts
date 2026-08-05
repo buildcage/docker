@@ -1,5 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { wrapLogGroup } from "./log-group.ts";
+import { wrapLogGroup } from "./log.ts";
 
 describe("wrapLogGroup", () => {
   it("wraps non-empty log text in a group-open/content/group-close triple", () => {

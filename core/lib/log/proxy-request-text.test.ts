@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
-import { parseAllowedRequestsFromText } from "./proxy-request-text-parser.ts";
+import { parseAllowedRequestsFromText } from "./proxy-request-text.ts";
 
 describe("parseAllowedRequestsFromText", () => {
   it("parses a real 'proxy network requests:' block with a status code", () => {

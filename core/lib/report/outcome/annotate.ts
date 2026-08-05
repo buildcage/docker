@@ -7,8 +7,8 @@ export interface OutcomeEmission {
 }
 
 /** Emits the annotation for a computed report outcome and sets the process
- *  exit code if it calls for failing the step. Shared by emit-blocked-outcome.ts
- *  (setup/report's proxy engines) and run/src/main.ts's writeReportSummary. */
+ *  exit code if it calls for failing the step. Shared by outcome/emit.ts
+ *  (setup/report's proxy engines) and run's writeReportSummary. */
 export function applyOutcomeAnnotation(
   annotation: Annotation,
   { level, message, shouldFail }: OutcomeEmission,

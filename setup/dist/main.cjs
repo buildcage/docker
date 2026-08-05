@@ -480,7 +480,7 @@ function getInput(name, options) {
 	return options && options.trimWhitespace === !1 ? val : val.trim();
 }
 //#endregion
-//#region core/lib/errors/action-error.ts
+//#region core/lib/errors.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -493,9 +493,7 @@ var ActionError = class extends Error {
 	constructor(message, code) {
 		super(message), this.name = new.target.name, this.code = code;
 	}
-}, SetupError = class extends ActionError {};
-//#endregion
-//#region core/lib/errors/error-message.ts
+};
 /**
 * Safely extract a message from a caught value of unknown shape — a plain
 * `Error` most of the time, but `catch` doesn't guarantee that.
@@ -503,6 +501,9 @@ var ActionError = class extends Error {
 function errorMessage(e) {
 	return e instanceof Error ? e.message : String(e);
 }
+//#endregion
+//#region setup/src/lib/errors.ts
+var SetupError = class extends ActionError {};
 //#endregion
 //#region core/lib/acl/wildcard-rules.ts
 /**
@@ -7611,7 +7612,7 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region core/lib/actions/log-rules.ts
+//#region core/lib/actions/log.ts
 /** Logs a labeled ACL rule list, one rule per line, for a `::group::` block. */
 function logRules(label, rules) {
 	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
@@ -7633,7 +7634,7 @@ function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
 }
 //#endregion
-//#region core/lib/docker/compose-args.ts
+//#region core/lib/docker/args.ts
 function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
 	return [
 		"compose",

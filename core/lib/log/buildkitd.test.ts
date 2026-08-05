@@ -1,5 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { scanBuildkitdLog } from "./buildkitd-log-parser.ts";
+import { scanBuildkitdLog } from "./buildkitd.ts";
 
 // Real line captured from a live moby/buildkit v0.31.1 explicit-mode container.
 const REAL_DENY_LINE =

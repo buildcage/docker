@@ -605,7 +605,7 @@ function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 //#endregion
-//#region core/lib/errors/action-error.ts
+//#region core/lib/errors.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -618,14 +618,7 @@ var ActionError = class extends Error {
 	constructor(message, code) {
 		super(message), this.name = new.target.name, this.code = code;
 	}
-}, VerifyImageError = class extends Error {
-	code;
-	constructor(message, code) {
-		super(message), this.name = "VerifyImageError", this.code = code;
-	}
-}, ProvenanceError = class extends ActionError {};
-//#endregion
-//#region core/lib/errors/error-message.ts
+};
 /**
 * Safely extract a message from a caught value of unknown shape — a plain
 * `Error` most of the time, but `catch` doesn't guarantee that.
@@ -633,6 +626,14 @@ var ActionError = class extends Error {
 function errorMessage(e) {
 	return e instanceof Error ? e.message : String(e);
 }
+//#endregion
+//#region core/lib/provenance/errors.ts
+var VerifyImageError = class extends Error {
+	code;
+	constructor(message, code) {
+		super(message), this.name = "VerifyImageError", this.code = code;
+	}
+}, ProvenanceError = class extends ActionError {};
 //#endregion
 //#region core/lib/provenance/oci-registry.ts
 /**
@@ -7662,7 +7663,7 @@ function createAnnotation(enabled) {
 	};
 }
 //#endregion
-//#region core/lib/actions/log-rules.ts
+//#region core/lib/actions/log.ts
 /** Logs a labeled ACL rule list, one rule per line, for a `::group::` block. */
 function logRules(label, rules) {
 	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
@@ -7854,7 +7855,14 @@ function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
 }
 //#endregion
-//#region core/lib/docker/compose-args.ts
+//#region core/lib/docker/args.ts
+function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
+	return [
+		"cp",
+		`${containerName}:${containerPath}`,
+		hostPath
+	];
+}
 function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
 	return [
 		"compose",
@@ -7880,15 +7888,6 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 		"-p",
 		projectName,
 		"down"
-	];
-}
-//#endregion
-//#region core/lib/docker/cp-args.ts
-function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
-	return [
-		"cp",
-		`${containerName}:${containerPath}`,
-		hostPath
 	];
 }
 //#endregion
@@ -8623,7 +8622,7 @@ function createIncrementalAggregator() {
 	};
 }
 //#endregion
-//#region core/lib/log/haproxy-log-parser.ts
+//#region core/lib/log/haproxy.ts
 /**
 * Log parsing library for HAProxy buildcage logs. aggregate() lives
 * separately in core/lib/log/aggregate.js and is not re-exported here.
@@ -8668,7 +8667,7 @@ async function scanHaproxyLog(lines, isAudit) {
 	};
 }
 //#endregion
-//#region core/lib/report/build/annotate-known-blocked.ts
+//#region core/lib/report/build/aggregate.ts
 /**
 * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
 * its `host:port` matches at least one known_blocked_rules pattern.
@@ -8743,10 +8742,10 @@ async function writeStepSummary(markdown) {
 	process.env.GITHUB_STEP_SUMMARY ? await summary.addRaw(markdown).write() : console.log(markdown);
 }
 //#endregion
-//#region core/lib/report/outcome/apply-outcome-annotation.ts
+//#region core/lib/report/outcome/annotate.ts
 /** Emits the annotation for a computed report outcome and sets the process
-*  exit code if it calls for failing the step. Shared by emit-blocked-outcome.ts
-*  (setup/report's proxy engines) and run/src/main.ts's writeReportSummary. */
+*  exit code if it calls for failing the step. Shared by outcome/emit.ts
+*  (setup/report's proxy engines) and run's writeReportSummary. */
 function applyOutcomeAnnotation(annotation, { level, message, shouldFail }) {
 	level === "error" ? annotation.error(message) : level === "notice" && annotation.notice(message), shouldFail && (process.exitCode = 1);
 }

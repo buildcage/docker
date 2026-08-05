@@ -4,8 +4,7 @@ import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
 
 import { SetupError } from "./lib/errors.ts";
-import { ActionError } from "../../core/lib/errors/action-error.ts";
-import { errorMessage } from "../../core/lib/errors/error-message.ts";
+import { ActionError, errorMessage } from "../../core/lib/errors.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import {
   verifyImageDigestOrThrow,
@@ -14,9 +13,9 @@ import {
 } from "../../core/lib/provenance/verify-image.ts";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
-import { logRules } from "../../core/lib/actions/log-rules.ts";
+import { logRules } from "../../core/lib/actions/log.ts";
 import { deriveProjectName } from "../../core/lib/docker/compose-project-name.ts";
-import { buildComposeUpArgs, buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
+import { buildComposeUpArgs, buildComposeDownArgs } from "../../core/lib/docker/args.ts";
 
 export { buildACLRules };
 

@@ -1,5 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { scanHaproxyLog } from "./haproxy-log-parser.ts";
+import { scanHaproxyLog } from "./haproxy.ts";
 
 // ---------------------------------------------------------------------------
 // scanHaproxyLog
