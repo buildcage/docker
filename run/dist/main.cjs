@@ -8011,8 +8011,8 @@ function assertScratchBaseNotWritable(writableDirs) {
 	let overlapping = writableDirs.find((p) => pathsOverlap(p, SANDBOX_SCRATCH_BASE));
 	if (overlapping) throw Error(`writable path ${JSON.stringify(overlapping)} overlaps the sandbox's own scratch directory (${SANDBOX_SCRATCH_BASE}); this would re-expose the sandboxed host filesystem read-write inside the sandbox itself. Choose a writable path outside ${SANDBOX_SCRATCH_BASE}.`);
 }
-function buildOciConfig(baseSpec, { uid, gid, workdir, home, runnerTemp, writablePaths = [], env, netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] }) {
-	let disableReadonly = writablePaths.includes("/"), mounts = [...baseSpec.mounts, {
+function buildOciConfig(baseSpec, { identity, writable, runtime, env }) {
+	let { uid, gid } = identity, { workdir, home, runnerTemp, writablePaths = [] } = writable, { netnsPath, rootfsBindDir, resolvConfPath, seccompProfile, scriptPath, hostMounts = [] } = runtime, disableReadonly = writablePaths.includes("/"), mounts = [...baseSpec.mounts, {
 		destination: "/etc/resolv.conf",
 		type: "none",
 		source: resolvConfPath,
@@ -8833,19 +8833,25 @@ async function main() {
 			try {
 				let resolvConfPath = writeResolvConf(dns, dir), scriptPath = writeRunScript(runInput, dir), hostMounts = listHostMounts();
 				config = buildOciConfig(baseSpec, {
-					uid: process.getuid(),
-					gid: process.getgid(),
-					workdir,
-					home,
-					runnerTemp: env.RUNNER_TEMP || "",
-					writablePaths,
-					env,
-					netnsPath: `/var/run/netns/${netnsName}`,
-					rootfsBindDir,
-					resolvConfPath,
-					seccompProfile,
-					scriptPath,
-					hostMounts
+					identity: {
+						uid: process.getuid(),
+						gid: process.getgid()
+					},
+					writable: {
+						workdir,
+						home,
+						runnerTemp: env.RUNNER_TEMP || "",
+						writablePaths
+					},
+					runtime: {
+						netnsPath: `/var/run/netns/${netnsName}`,
+						rootfsBindDir,
+						resolvConfPath,
+						seccompProfile,
+						scriptPath,
+						hostMounts
+					},
+					env
 				});
 			} catch (e) {
 				throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
