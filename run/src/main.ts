@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as core from "@actions/core";
 
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import {
@@ -109,7 +110,7 @@ async function main(): Promise<void> {
   const actionRef = env.GITHUB_ACTION_REF || "v2";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 
-  const runInput = env.INPUT_RUN ?? "";
+  const runInput = core.getInput("run", { trimWhitespace: false });
   if (!runInput.trim()) {
     throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
   }
@@ -139,11 +140,11 @@ async function main(): Promise<void> {
   console.log(`buildcage: proxy image: ${imageRef}`);
 
   const rules = buildACLRules({
-    httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
-    httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
-    ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
+    httpsRulesInput: core.getInput("allowed_https_rules"),
+    httpRulesInput: core.getInput("allowed_http_rules"),
+    ipRulesInput: core.getInput("allowed_ip_rules"),
   });
-  const knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
+  const knownBlockedRules = readKnownBlockedRules(core.getInput("known_blocked_rules"));
 
   console.log("::group::buildcage: Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
@@ -152,7 +153,7 @@ async function main(): Promise<void> {
   logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules);
   console.log("::endgroup::");
 
-  const writablePaths = parseWritablePaths(env.INPUT_WRITABLE);
+  const writablePaths = parseWritablePaths(core.getInput("writable"));
 
   // Each `run` step gets its own throwaway proxy container — start, run
   // the isolated command, report, and stop, all within this one step —
@@ -170,7 +171,7 @@ async function main(): Promise<void> {
   const composeEnv = {
     ...env,
     PROXY_CONTAINER_NAME: containerName,
-    PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
+    PROXY_MODE: core.getInput("proxy_mode") || "restrict",
     ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
@@ -283,18 +284,27 @@ async function main(): Promise<void> {
   } finally {
     try {
       const report = await fetchReport(containerName, {
-        mode: env.INPUT_PROXY_MODE || "restrict",
+        mode: core.getInput("proxy_mode") || "restrict",
         allowedHttpsRules: rules.httpsRules,
         allowedHttpRules: rules.httpRules,
         allowedIpRules: rules.ipRules,
         knownBlockedRules,
       });
+      // Several integration scripts invoke this action directly without
+      // setting fail_on_blocked, unlike a real workflow where action.yml's
+      // own default always supplies it — fall back to that same default.
+      let failOnBlocked: boolean;
+      try {
+        failOnBlocked = core.getBooleanInput("fail_on_blocked");
+      } catch {
+        failOnBlocked = true;
+      }
       writeReport(report, {
         actionRepo,
         actionRef,
         runCommand: runInput,
-        stepLabel: env.INPUT_LABEL || undefined,
-        failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
+        stepLabel: core.getInput("label") || undefined,
+        failOnBlocked,
       });
     } catch (e) {
       annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
