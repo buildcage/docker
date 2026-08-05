@@ -82,7 +82,7 @@ async function main(): Promise<void> {
     report,
     process.env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage",
     process.env.GITHUB_ACTION_REF || "v2",
-    { heading: "during Docker Build" },
+    { headingSuffix: " during Docker Build" },
   );
 
   await writeStepSummary(markdown);

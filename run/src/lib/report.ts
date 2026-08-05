@@ -59,7 +59,7 @@ export function computeReportOutcome(
     engineLabel: "sandbox",
   });
   const markdown = renderReportMarkdown(report, actionRepo, actionRef, {
-    heading: stepLabel,
+    headingSuffix: stepLabel ? ` — ${stepLabel}` : undefined,
     actionName: "run",
     runCommand,
   });
