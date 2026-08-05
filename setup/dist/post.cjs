@@ -1,4 +1,3 @@
-Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 //#region \0rolldown/runtime.js
 var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDesc = Object.getOwnPropertyDescriptor, __getOwnPropNames = Object.getOwnPropertyNames, __getProtoOf = Object.getPrototypeOf, __hasOwnProp = Object.prototype.hasOwnProperty, __copyProps = (to, from, except, desc) => {
 	if (from && typeof from == "object" || typeof from == "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) key = keys[i], !__hasOwnProp.call(to, key) && key !== except && __defProp(to, key, {
@@ -490,18 +489,20 @@ function getInput(name, options) {
 function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
 }
+/** Compose project name for a builder_name, preferring an explicit override
+*  over the deterministic hash-derived name. */
+function resolveProjectName(builderName, composeProjectNameOverride) {
+	return composeProjectNameOverride || deriveProjectName(builderName);
+}
 //#endregion
 //#region setup/src/post.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
-function resolveProjectName(builderName, env) {
-	return deriveProjectName(builderName);
-}
 function main() {
 	let builderName = getInput("builder_name") || "buildcage";
 	(0, node_child_process.execFileSync)("docker", [
 		"compose",
 		"-p",
-		resolveProjectName(builderName, process.env),
+		resolveProjectName(builderName, void 0),
 		"-f",
 		(0, node_path.join)(__dirname$1, "../compose.yaml"),
 		"down"
@@ -513,5 +514,5 @@ function main() {
 		}
 	});
 }
+process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main();
 //#endregion
-process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main(), exports.resolveProjectName = resolveProjectName;

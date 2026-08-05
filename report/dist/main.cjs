@@ -1,4 +1,3 @@
-Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 //#region \0rolldown/runtime.js
 var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDesc = Object.getOwnPropertyDescriptor, __getOwnPropNames = Object.getOwnPropertyNames, __getProtoOf = Object.getPrototypeOf, __hasOwnProp = Object.prototype.hasOwnProperty, __copyProps = (to, from, except, desc) => {
 	if (from && typeof from == "object" || typeof from == "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) key = keys[i], !__hasOwnProp.call(to, key) && key !== except && __defProp(to, key, {
@@ -525,6 +524,11 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
 }
+/** Compose project name for a builder_name, preferring an explicit override
+*  over the deterministic hash-derived name. */
+function resolveProjectName(builderName, composeProjectNameOverride) {
+	return composeProjectNameOverride || deriveProjectName(builderName);
+}
 function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	return [
 		"cp",
@@ -699,11 +703,8 @@ function errorMessage(e) {
 var ReportError = class extends ActionError {};
 //#endregion
 //#region report/src/main.ts
-function resolveProjectName(builderName, env) {
-	return deriveProjectName(builderName);
-}
 async function main() {
-	let builderName = getInput("builder_name") || "buildcage", projectName = resolveProjectName(builderName, process.env), docker = createDocker(), containerId;
+	let builderName = getInput("builder_name") || "buildcage", projectName = resolveProjectName(builderName, void 0), docker = createDocker(), containerId;
 	try {
 		let ids = docker.findContainers([`label=com.docker.compose.project=${projectName}`, "label=io.github.buildcage.report-source=true"]);
 		if (ids.length !== 1) throw new ReportError(`Expected exactly one buildcage container for builder_name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder_name?`, "CONTAINER_NOT_FOUND");
@@ -736,7 +737,7 @@ async function main() {
 		});
 	}
 }
-//#endregion
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch((err) => {
 	err instanceof ActionError ? console.log(`::error::${err.message}`) : console.log(`::error::Unexpected error in report: ${errorMessage(err)}`), process.exit(1);
-}), exports.resolveProjectName = resolveProjectName;
+});
+//#endregion
