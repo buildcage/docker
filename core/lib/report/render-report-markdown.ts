@@ -4,10 +4,10 @@ import { renderCommunicationDetails } from "./command-log.ts";
 import type { ReportData } from "./report-data.ts";
 
 export interface RenderReportMarkdownOptions {
-  /** Appended to "Outbound Traffic Report" verbatim, including any leading
-   *  separator — e.g. " during Docker Build" or " — npm install". Omit for
-   *  a bare heading. */
-  headingSuffix?: string;
+  /** Full heading text, e.g. "Outbound Traffic Report during Docker Build"
+   *  or "Outbound Traffic Report — npm install". Defaults to a bare
+   *  "Outbound Traffic Report". */
+  title?: string;
   /** Which action's restrict-mode example to show in audit mode. */
   actionName?: "setup" | "run";
   /** The `run:` input, included in the example only when actionName is "run". */
@@ -21,13 +21,12 @@ export function renderReportMarkdown(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
-  { headingSuffix, actionName, runCommand }: RenderReportMarkdownOptions = {},
+  { title = "Outbound Traffic Report", actionName, runCommand }: RenderReportMarkdownOptions = {},
 ): string {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
   const heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts";
 
-  const title = `Outbound Traffic Report${headingSuffix ?? ""}`;
   let markdown = `## ${title} (${report.parameters.mode} mode)\n\n`;
 
   if (report.passed.length > 0) {

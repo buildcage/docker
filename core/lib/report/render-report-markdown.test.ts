@@ -44,7 +44,7 @@ describe("renderReportMarkdown — transparent", () => {
 
   it("renders the restrict-mode heading and Allowed Hosts table", () => {
     const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "dash14/buildcage", "v2", {
-      headingSuffix: " during Docker Build",
+      title: "Outbound Traffic Report during Docker Build",
     });
     assert.match(md, /## Outbound Traffic Report during Docker Build \(restrict mode\)/);
     assert.match(md, /### ✅ Allowed Hosts/);
@@ -104,9 +104,9 @@ describe("renderReportMarkdown — transparent", () => {
     assertNotMatch(blockedMd, /_\(no communication\)_/);
   });
 
-  it("appends headingSuffix verbatim, e.g. a run step's em-dash label", () => {
+  it("uses the title option verbatim, e.g. a run step's em-dash label", () => {
     const md = renderReportMarkdown(base, "dash14/buildcage", "v2", {
-      headingSuffix: " — npm install",
+      title: "Outbound Traffic Report — npm install",
     });
     assert.match(md, /^## Outbound Traffic Report — npm install \(restrict mode\)/);
   });
