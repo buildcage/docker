@@ -11,7 +11,7 @@ set -uo pipefail
 WORKDIR=$(mktemp -d)
 RUNNER_TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR" "$RUNNER_TEMP_DIR"' EXIT
-touch "$WORKDIR/state.env"
+touch "$WORKDIR/state.env" "$WORKDIR/summary.md"
 
 GITHUB_WORKSPACE="$WORKDIR" \
 GITHUB_STATE="$WORKDIR/state.env" \

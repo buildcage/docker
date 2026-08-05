@@ -10,7 +10,7 @@ set -uo pipefail
 
 WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT
-touch "$WORKDIR/state.env"
+touch "$WORKDIR/state.env" "$WORKDIR/summary.md"
 
 GITHUB_WORKSPACE="$WORKDIR" \
 GITHUB_STATE="$WORKDIR/state.env" \

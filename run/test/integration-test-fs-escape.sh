@@ -12,7 +12,7 @@ set -uo pipefail
 WORKDIR=$(mktemp -d)
 WORKDIR2=$(mktemp -d)
 trap 'rm -rf "$WORKDIR" "$WORKDIR2"' EXIT
-touch "$WORKDIR/state.env"
+touch "$WORKDIR/state.env" "$WORKDIR/summary.md"
 
 GITHUB_WORKSPACE="$WORKDIR" \
 GITHUB_STATE="$WORKDIR/state.env" \
@@ -68,7 +68,7 @@ echo ""
 # it) would recursively re-expose the sandbox's own rootfs read-write --
 # assertScratchBaseNotWritable in isolated-exec.ts must fail the step closed
 # rather than silently running with that hole open.
-touch "$WORKDIR2/state.env"
+touch "$WORKDIR2/state.env" "$WORKDIR2/summary.md"
 
 GITHUB_WORKSPACE="$WORKDIR2" \
 GITHUB_STATE="$WORKDIR2/state.env" \

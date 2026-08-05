@@ -35,7 +35,7 @@ echo ""
 # Case 1: the only blocked connection matches known_blocked_rules -> the
 # step must succeed despite fail_on_blocked defaulting to true.
 TMP_MATCH=$(mktemp -d)
-touch "$TMP_MATCH/state.env"
+touch "$TMP_MATCH/state.env" "$TMP_MATCH/summary.md"
 run_instance "$TMP_MATCH" "neverssl.com:80"
 CODE_MATCH=$(cat "$TMP_MATCH/exit_code")
 if [ "$CODE_MATCH" = "0" ]; then
@@ -51,7 +51,7 @@ rm -rf "$TMP_MATCH"
 # connection -> the step must still fail as normal (known_blocked_rules
 # isn't a backdoor allowlist).
 TMP_MISMATCH=$(mktemp -d)
-touch "$TMP_MISMATCH/state.env"
+touch "$TMP_MISMATCH/state.env" "$TMP_MISMATCH/summary.md"
 run_instance "$TMP_MISMATCH" "some-other-domain.example.com:443"
 CODE_MISMATCH=$(cat "$TMP_MISMATCH/exit_code")
 if [ "$CODE_MISMATCH" != "0" ]; then

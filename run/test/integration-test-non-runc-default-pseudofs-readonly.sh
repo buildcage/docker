@@ -27,7 +27,7 @@ cleanup() {
 trap cleanup EXIT
 
 sudo -n mount -t securityfs securityfs "$MOUNT_POINT"
-touch "$WORKDIR/state.env"
+touch "$WORKDIR/state.env" "$WORKDIR/summary.md"
 
 GITHUB_WORKSPACE="$WORKDIR" \
 GITHUB_STATE="$WORKDIR/state.env" \
