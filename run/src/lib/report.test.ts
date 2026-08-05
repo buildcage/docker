@@ -32,6 +32,8 @@ function report(overrides: Partial<Report> = {}): Report {
   };
 }
 
+// The decision matrix itself is tested elsewhere; these only verify
+// shouldFail and the rendered markdown combine correctly.
 describe("computeReportOutcome", () => {
   it("does not fail when there are no blocked connections", () => {
     const r = report({ blockedCount: 0 });
@@ -55,107 +57,6 @@ describe("computeReportOutcome", () => {
       ),
     });
     assert.equal(computeReportOutcome(r, { failOnBlocked: true }).shouldFail, true);
-  });
-
-  it("does not fail when failOnBlocked is false, even with blocked connections", () => {
-    const r = report({
-      blockedCount: 2,
-      blocked: annotateKnownBlocked(
-        [
-          {
-            host: "bad.example.com",
-            port: "443",
-            ruleType: "HTTPS",
-            reason: "not in allowlist",
-            count: 2,
-          },
-        ],
-        [],
-      ),
-    });
-    assert.equal(computeReportOutcome(r, { failOnBlocked: false }).shouldFail, false);
-  });
-
-  it("does not fail in audit mode even when failOnBlocked is true", () => {
-    const r = report({
-      parameters: parameters({ mode: "audit" }),
-      blockedCount: 2,
-      blocked: annotateKnownBlocked(
-        [
-          {
-            host: "bad.example.com",
-            port: "443",
-            ruleType: "HTTPS",
-            reason: "not in allowlist",
-            count: 2,
-          },
-        ],
-        [],
-      ),
-    });
-    assert.equal(computeReportOutcome(r, { failOnBlocked: true }).shouldFail, false);
-  });
-
-  it("does not fail when every blocked connection matches known_blocked_rules", () => {
-    const knownBlockedRules = ["known-bad.example.com:443"];
-    const r = report({
-      parameters: parameters({ knownBlockedRules }),
-      blockedCount: 3,
-      blocked: annotateKnownBlocked(
-        [
-          {
-            host: "known-bad.example.com",
-            port: "443",
-            ruleType: "HTTPS",
-            reason: "not in allowlist",
-            count: 3,
-          },
-        ],
-        knownBlockedRules,
-      ),
-    });
-    assert.equal(computeReportOutcome(r, { failOnBlocked: true }).shouldFail, false);
-  });
-
-  it("fails when some blocked rows don't match known_blocked_rules", () => {
-    const knownBlockedRules = ["known-bad.example.com:443"];
-    const r = report({
-      parameters: parameters({ knownBlockedRules }),
-      blockedCount: 4,
-      blocked: annotateKnownBlocked(
-        [
-          {
-            host: "known-bad.example.com",
-            port: "443",
-            ruleType: "HTTPS",
-            reason: "not in allowlist",
-            count: 3,
-          },
-          {
-            host: "unexpected.example.com",
-            port: "443",
-            ruleType: "HTTPS",
-            reason: "not in allowlist",
-            count: 1,
-          },
-        ],
-        knownBlockedRules,
-      ),
-    });
-    assert.equal(computeReportOutcome(r, { failOnBlocked: true }).shouldFail, true);
-  });
-
-  it("does not fail in audit mode even with known_blocked_rules set", () => {
-    const knownBlockedRules = ["known-bad.example.com:443"];
-    const r = report({
-      parameters: parameters({ mode: "audit", knownBlockedRules }),
-      blockedCount: 1,
-      blocked: annotateKnownBlocked(
-        [{ host: "known-bad.example.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 }],
-        knownBlockedRules,
-      ),
-    });
-    assert.equal(computeReportOutcome(r, { failOnBlocked: true }).shouldFail, false);
   });
 
   // Audit's outcome never depends on known_blocked_rules matching, so the

@@ -1,9 +1,6 @@
 import { createDocker } from "../../../core/lib/docker/client.ts";
 import { buildRestrictExample } from "../../../core/lib/report/build-example.ts";
-import {
-  determineBlockedOutcome,
-  buildBlockedMessage,
-} from "../../../core/lib/report/known-blocked.ts";
+import { describeBlockedOutcome } from "../../../core/lib/report/known-blocked.ts";
 import { renderHostTable } from "../../../core/lib/report/host-table.ts";
 import { buildTransparentReportData } from "../../../core/lib/report/build-transparent-report-data.ts";
 import type {
@@ -94,21 +91,15 @@ export function computeReportOutcome(
   report: Report,
   { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand }: ComputeReportOutcomeOptions = {},
 ): ReportOutcome {
-  const isAudit = report.parameters.mode === "audit";
-  const outcome = determineBlockedOutcome({
-    isAudit,
+  const { level, message, shouldFail } = describeBlockedOutcome({
+    isAudit: report.parameters.mode === "audit",
     failOnBlocked: failOnBlocked ?? false,
     blockedCount: report.blockedCount,
     blockedRows: report.blocked,
     logLooksPlausible: report.logLooksPlausible,
-  });
-  const message = buildBlockedMessage({
-    blockedCount: report.blockedCount,
-    blockedRows: report.blocked,
     engineLabel: "sandbox",
-    isAudit,
   });
   const markdown = buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand });
 
-  return { markdown, message, level: outcome.level, shouldFail: outcome.shouldFail };
+  return { markdown, message, level, shouldFail };
 }

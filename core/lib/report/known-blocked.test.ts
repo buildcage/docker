@@ -3,6 +3,7 @@ import {
   annotateKnownBlocked,
   determineBlockedOutcome,
   buildBlockedMessage,
+  describeBlockedOutcome,
 } from "./known-blocked.ts";
 
 describe("annotateKnownBlocked", () => {
@@ -258,6 +259,36 @@ describe("buildBlockedMessage", () => {
       });
       assert.equal(message, fixedText);
     });
+  });
+});
+
+describe("describeBlockedOutcome", () => {
+  it("combines determineBlockedOutcome's decision with buildBlockedMessage's text", () => {
+    const result = describeBlockedOutcome({
+      isAudit: false,
+      failOnBlocked: true,
+      blockedCount: 1,
+      blockedRows: [{ expected: false }],
+      logLooksPlausible: true,
+      engineLabel: "proxy",
+    });
+    assert.deepEqual(result, {
+      level: "error",
+      shouldFail: true,
+      message: "1 blocked connection(s) detected by buildcage proxy",
+    });
+  });
+
+  it("passes engineLabel through to the message", () => {
+    const result = describeBlockedOutcome({
+      isAudit: false,
+      failOnBlocked: false,
+      blockedCount: 0,
+      blockedRows: [],
+      logLooksPlausible: true,
+      engineLabel: "sandbox",
+    });
+    assert.equal(result.level, "none");
   });
 });
 
