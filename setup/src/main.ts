@@ -138,7 +138,7 @@ async function main(): Promise<void> {
  * Resolve and validate the proxy_engine input.
  * Only "transparent" (default) and "explicit" are accepted — each maps to a
  * separately published, separately tagged Docker image (see
- * lib/verify-image.ts's imageTagFromRef).
+ * provenance/image-tag.ts's imageTagFromRef).
  */
 export function resolveProxyEngine(input: string | undefined): "transparent" | "explicit" {
   const engine = input?.trim() || "transparent";
