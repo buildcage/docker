@@ -111,3 +111,36 @@ export function buildBlockedMessage({
   if (unexpected === 0) return `${base}, all matched known_blocked_rules (expected)`;
   return `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
 }
+
+export interface DescribedBlockedOutcome extends BlockedOutcome {
+  message: string;
+}
+
+export interface DescribeBlockedOutcomeOptions {
+  isAudit: boolean;
+  failOnBlocked: boolean;
+  blockedCount: number;
+  blockedRows: ExpectedFlag[];
+  logLooksPlausible: boolean;
+  engineLabel: "sandbox" | "proxy";
+}
+
+/** Combines the pass/fail decision with its annotation message. */
+export function describeBlockedOutcome({
+  isAudit,
+  failOnBlocked,
+  blockedCount,
+  blockedRows,
+  logLooksPlausible,
+  engineLabel,
+}: DescribeBlockedOutcomeOptions): DescribedBlockedOutcome {
+  const outcome = determineBlockedOutcome({
+    isAudit,
+    failOnBlocked,
+    blockedCount,
+    blockedRows,
+    logLooksPlausible,
+  });
+  const message = buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit });
+  return { ...outcome, message };
+}

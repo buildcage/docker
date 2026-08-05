@@ -13,7 +13,12 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
-import { imageTagFromRef, buildVerifyOptions, verifyImageDigestOrThrow } from "./verify-image.ts";
+import {
+  imageTagFromRef,
+  buildVerifyOptions,
+  toProvenanceError,
+  requireDigest,
+} from "./verify-image.ts";
 import { ProvenanceError, VerifyImageError } from "./errors.ts";
 import type { VerifyBundleOptions } from "./sigstore.ts";
 
@@ -184,59 +189,33 @@ describe("buildVerifyOptions — unverifiable refs", () => {
   });
 });
 
-describe("verifyImageDigestOrThrow", () => {
-  it("returns the digest on success", async () => {
-    const digest = await verifyImageDigestOrThrow({
-      actionRef: "v2.1.0",
-      actionRepo: REPO,
-      proxyEngine: "transparent",
-      verifyImageDigestFn: async () => "sha256:abc123",
-    });
-    assert.equal(digest, "sha256:abc123");
-  });
-
-  it("throws ProvenanceError carrying the original VerifyImageError's code on failure", async () => {
-    await assert.rejects(
-      () =>
-        verifyImageDigestOrThrow({
-          actionRef: "v2.1.0",
-          actionRepo: REPO,
-          proxyEngine: "transparent",
-          verifyImageDigestFn: async () => {
-            throw new VerifyImageError("registry token request failed", "TOKEN_ERROR");
-          },
-        }),
-      (err: unknown) =>
-        err instanceof ProvenanceError &&
-        err.code === "TOKEN_ERROR" &&
-        err.message === "registry token request failed",
+// The network/sigstore-calling success path is covered by end-to-end /
+// integration tests instead (see the file header).
+describe("toProvenanceError", () => {
+  it("carries the original VerifyImageError's code and message through", () => {
+    const err = toProvenanceError(
+      new VerifyImageError("registry token request failed", "TOKEN_ERROR"),
     );
+    assert.ok(err instanceof ProvenanceError);
+    assert.equal(err.code, "TOKEN_ERROR");
+    assert.equal(err.message, "registry token request failed");
   });
 
-  it("defaults to VERIFY_FAILED when the original error has no code", async () => {
-    await assert.rejects(
-      () =>
-        verifyImageDigestOrThrow({
-          actionRef: "v2.1.0",
-          actionRepo: REPO,
-          proxyEngine: "transparent",
-          verifyImageDigestFn: async () => {
-            throw new Error("boom");
-          },
-        }),
-      (err: unknown) => err instanceof ProvenanceError && err.code === "VERIFY_FAILED",
-    );
+  it("defaults to VERIFY_FAILED when the original error has no code", () => {
+    const err = toProvenanceError(new Error("boom"));
+    assert.ok(err instanceof ProvenanceError);
+    assert.equal(err.code, "VERIFY_FAILED");
+  });
+});
+
+describe("requireDigest", () => {
+  it("returns the digest when non-null", () => {
+    assert.equal(requireDigest("sha256:abc123", "v2.1.0"), "sha256:abc123");
   });
 
-  it("throws ProvenanceError with UNVERIFIABLE_REF when the digest is null", async () => {
-    await assert.rejects(
-      () =>
-        verifyImageDigestOrThrow({
-          actionRef: "main",
-          actionRepo: REPO,
-          proxyEngine: "transparent",
-          verifyImageDigestFn: async () => null,
-        }),
+  it("throws ProvenanceError with UNVERIFIABLE_REF when the digest is null", () => {
+    assert.throws(
+      () => requireDigest(null, "main"),
       (err: unknown) => err instanceof ProvenanceError && err.code === "UNVERIFIABLE_REF",
     );
   });

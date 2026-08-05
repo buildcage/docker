@@ -1,5 +1,5 @@
 import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { deriveProjectName, buildDockerCpArgs } from "./container.ts";
+import { deriveProjectName, buildDockerCpArgs, resolveProjectName } from "./container.ts";
 
 describe("buildDockerCpArgs", () => {
   it("builds a `docker cp <container>:<containerPath> <hostPath>` argv", () => {
@@ -35,6 +35,22 @@ describe("deriveProjectName", () => {
 
   it("derives different project names for different inputs", () => {
     assert.ok(deriveProjectName("buildcage") !== deriveProjectName("buildcage2"));
+  });
+});
+
+describe("resolveProjectName", () => {
+  it("falls back to deriveProjectName(builderName) when there's no override", () => {
+    assert.equal(
+      resolveProjectName("buildcage-transparent-audit", undefined),
+      deriveProjectName("buildcage-transparent-audit"),
+    );
+  });
+
+  it("prefers the override when given one", () => {
+    assert.equal(
+      resolveProjectName("buildcage-transparent-audit", "buildcage-project"),
+      "buildcage-project",
+    );
   });
 });
 

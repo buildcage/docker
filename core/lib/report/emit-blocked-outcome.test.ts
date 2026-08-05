@@ -38,6 +38,8 @@ function report(overrides: Partial<ReportDataCommon> = {}): ReportDataCommon {
   };
 }
 
+// The decision matrix itself is tested elsewhere; these only verify the
+// exit-code/annotation wiring.
 describe("emitBlockedOutcome", () => {
   it("leaves exitCode untouched when there are no blocked connections", () => {
     emitBlockedOutcome(report(), { failOnBlocked: true, summaryFile: undefined });
@@ -62,75 +64,6 @@ describe("emitBlockedOutcome", () => {
     });
     emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: undefined });
     assert.equal(process.exitCode, 1);
-  });
-
-  it("leaves exitCode untouched when failOnBlocked is false, even with blocked connections", () => {
-    const r = report({
-      blockedCount: 1,
-      blocked: annotateKnownBlocked(
-        [
-          {
-            host: "bad.example.com",
-            port: "443",
-            ruleType: "HTTPS",
-            reason: "not in allowlist",
-            count: 1,
-          },
-        ],
-        [],
-      ),
-    });
-    emitBlockedOutcome(r, { failOnBlocked: false, summaryFile: undefined });
-    assert.equal(process.exitCode, undefined);
-  });
-
-  it("sets exitCode=1 when blockedCount is 0 but the log looks implausible (tampering signal)", () => {
-    const r = report({ blockedCount: 0, logLooksPlausible: false });
-    emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: undefined });
-    assert.equal(process.exitCode, 1);
-  });
-
-  it("leaves exitCode untouched in audit mode even when failOnBlocked is true", () => {
-    const r = report({
-      parameters: parameters({ mode: "audit" }),
-      blockedCount: 1,
-      blocked: annotateKnownBlocked(
-        [
-          {
-            host: "bad.example.com",
-            port: "443",
-            ruleType: "HTTPS",
-            reason: "not in allowlist",
-            count: 1,
-          },
-        ],
-        [],
-      ),
-    });
-    emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: undefined });
-    assert.equal(process.exitCode, undefined);
-  });
-
-  it("leaves exitCode untouched when every blocked connection matches known_blocked_rules", () => {
-    const knownBlockedRules = ["known-bad.example.com:443"];
-    const r = report({
-      parameters: parameters({ knownBlockedRules }),
-      blockedCount: 1,
-      blocked: annotateKnownBlocked(
-        [
-          {
-            host: "known-bad.example.com",
-            port: "443",
-            ruleType: "HTTPS",
-            reason: "not in allowlist",
-            count: 1,
-          },
-        ],
-        knownBlockedRules,
-      ),
-    });
-    emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: undefined });
-    assert.equal(process.exitCode, undefined);
   });
 
   it("emits ::notice:: (not ::error::) when console output is enabled and outcome level is notice", () => {

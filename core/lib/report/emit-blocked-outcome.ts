@@ -1,8 +1,6 @@
-/** Shared by both report-action.node.ts entry points; run/src/lib/report.ts
- *  calls determineBlockedOutcome/buildBlockedMessage directly instead,
- *  since it uses a different engineLabel and its own summary-writing. */
+/** Emits an annotation and sets the exit code for a blocked-connection outcome. */
 import { createAnnotation } from "../actions/annotation.ts";
-import { determineBlockedOutcome, buildBlockedMessage } from "./known-blocked.ts";
+import { describeBlockedOutcome } from "./known-blocked.ts";
 import type { ReportDataCommon } from "./report-data.ts";
 
 export interface EmitBlockedOutcomeOptions {
@@ -14,26 +12,20 @@ export function emitBlockedOutcome(
   report: ReportDataCommon,
   { failOnBlocked, summaryFile }: EmitBlockedOutcomeOptions,
 ): void {
-  const isAudit = report.parameters.mode === "audit";
-  const outcome = determineBlockedOutcome({
-    isAudit,
+  const { level, message, shouldFail } = describeBlockedOutcome({
+    isAudit: report.parameters.mode === "audit",
     failOnBlocked,
     blockedCount: report.blockedCount,
     blockedRows: report.blocked,
     logLooksPlausible: report.logLooksPlausible,
+    engineLabel: "proxy",
   });
 
-  if (outcome.level !== "none") {
-    const message = buildBlockedMessage({
-      blockedCount: report.blockedCount,
-      blockedRows: report.blocked,
-      engineLabel: "proxy",
-      isAudit,
-    });
+  if (level !== "none") {
     const annotation = createAnnotation(Boolean(summaryFile));
-    if (outcome.level === "error") annotation.error(message);
+    if (level === "error") annotation.error(message);
     else annotation.notice(message);
   }
 
-  if (outcome.shouldFail) process.exitCode = 1;
+  if (shouldFail) process.exitCode = 1;
 }

@@ -7561,27 +7561,36 @@ async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transpa
 	let tag = imageTagFromRef(actionRef, proxyEngine), regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth()), digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
 	return await verifyBundle(await fetchBundle(REGISTRY, repoPath, digest, regToken), verifyOptions, digest), digest;
 }
+/** Maps a VerifyImageError (or any other thrown value) to the caller-facing ProvenanceError. */
+function toProvenanceError(e) {
+	return e instanceof VerifyImageError ? new ProvenanceError(e.message, e.code) : new ProvenanceError(errorMessage(e), "VERIFY_FAILED");
+}
+/**
+* verifyImageDigest returns null for an unverifiable ref (branch name,
+* local ./setup) rather than throwing — this turns that into the
+* caller-facing error.
+*/
+function requireDigest(digest, actionRef) {
+	if (digest === null) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
+	return digest;
+}
 /**
 * Like verifyImageDigest, but throws ProvenanceError (see errors.ts) instead
 * of the low-level VerifyImageError, so a caller gets one already-typed
 * error to catch rather than having to translate the result itself.
-*
-* `verifyImageDigestFn` is an injectable seam (defaults to the real
-* verifyImageDigest) for unit-testing without hitting the network/sigstore.
 */
-async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, verifyImageDigestFn = verifyImageDigest }) {
+async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine }) {
 	let digest;
 	try {
-		digest = await verifyImageDigestFn({
+		digest = await verifyImageDigest({
 			actionRef,
 			actionRepo,
 			proxyEngine
 		});
 	} catch (e) {
-		throw e instanceof VerifyImageError ? new ProvenanceError(e.message, e.code) : new ProvenanceError(errorMessage(e), "VERIFY_FAILED");
+		throw toProvenanceError(e);
 	}
-	if (digest === null) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
-	return digest;
+	return requireDigest(digest, actionRef);
 }
 //#endregion
 //#region core/lib/actions/docker-error.ts
@@ -8434,6 +8443,25 @@ function buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit }
 	let unexpected = blockedRows.filter((row) => !row.expected).length;
 	return unexpected === blockedRows.length ? base : unexpected === 0 ? `${base}, all matched known_blocked_rules (expected)` : `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
 }
+/** Combines the pass/fail decision with its annotation message. */
+function describeBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedRows, logLooksPlausible, engineLabel }) {
+	let outcome = determineBlockedOutcome({
+		isAudit,
+		failOnBlocked,
+		blockedCount,
+		blockedRows,
+		logLooksPlausible
+	}), message = buildBlockedMessage({
+		blockedCount,
+		blockedRows,
+		engineLabel,
+		isAudit
+	});
+	return {
+		...outcome,
+		message
+	};
+}
 //#endregion
 //#region core/lib/actions/markdown-table.ts
 const ALIGN_MARKERS = {
@@ -8597,17 +8625,13 @@ function buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runComm
 * for the side-effecting half (actual summary/annotation output).
 */
 function computeReportOutcome(report, { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand } = {}) {
-	let isAudit = report.parameters.mode === "audit", outcome = determineBlockedOutcome({
-		isAudit,
+	let { level, message, shouldFail } = describeBlockedOutcome({
+		isAudit: report.parameters.mode === "audit",
 		failOnBlocked: failOnBlocked ?? !1,
 		blockedCount: report.blockedCount,
 		blockedRows: report.blocked,
-		logLooksPlausible: report.logLooksPlausible
-	}), message = buildBlockedMessage({
-		blockedCount: report.blockedCount,
-		blockedRows: report.blocked,
-		engineLabel: "sandbox",
-		isAudit
+		logLooksPlausible: report.logLooksPlausible,
+		engineLabel: "sandbox"
 	});
 	return {
 		markdown: buildReportMarkdown(report, {
@@ -8617,9 +8641,18 @@ function computeReportOutcome(report, { stepLabel, failOnBlocked, actionRepo, ac
 			runCommand
 		}),
 		message,
-		level: outcome.level,
-		shouldFail: outcome.shouldFail
+		level,
+		shouldFail
 	};
+}
+//#endregion
+//#region setup/docker/lib/write-step-summary.ts
+/**
+* core.summary.write() throws if GITHUB_STEP_SUMMARY is unset, so this
+* checks first and falls back to stdout for local/manual invocations.
+*/
+async function writeStepSummary(markdown) {
+	process.env.GITHUB_STEP_SUMMARY ? await summary.addRaw(markdown).write() : console.log(markdown);
 }
 //#endregion
 //#region run/src/main.ts
@@ -8682,7 +8715,7 @@ async function withGroup(label, fn) {
 */
 async function writeReportSummary(report, annotation, options) {
 	let outcome = computeReportOutcome(report, options);
-	process.env.GITHUB_STEP_SUMMARY ? await summary.addRaw(outcome.markdown).write() : console.log(outcome.markdown);
+	await writeStepSummary(outcome.markdown);
 	let debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
 	debugSummaryFile && (0, node_fs.appendFileSync)(debugSummaryFile, outcome.markdown), outcome.level === "error" ? (annotation.error(outcome.message), process.exitCode = 1) : outcome.level === "notice" && annotation.notice(outcome.message);
 }

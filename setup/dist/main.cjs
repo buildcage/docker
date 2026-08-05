@@ -7532,27 +7532,36 @@ async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transpa
 	let tag = imageTagFromRef(actionRef, proxyEngine), regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth()), digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
 	return await verifyBundle(await fetchBundle(REGISTRY, repoPath, digest, regToken), verifyOptions, digest), digest;
 }
+/** Maps a VerifyImageError (or any other thrown value) to the caller-facing ProvenanceError. */
+function toProvenanceError(e) {
+	return e instanceof VerifyImageError ? new ProvenanceError(e.message, e.code) : new ProvenanceError(errorMessage(e), "VERIFY_FAILED");
+}
+/**
+* verifyImageDigest returns null for an unverifiable ref (branch name,
+* local ./setup) rather than throwing — this turns that into the
+* caller-facing error.
+*/
+function requireDigest(digest, actionRef) {
+	if (digest === null) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
+	return digest;
+}
 /**
 * Like verifyImageDigest, but throws ProvenanceError (see errors.ts) instead
 * of the low-level VerifyImageError, so a caller gets one already-typed
 * error to catch rather than having to translate the result itself.
-*
-* `verifyImageDigestFn` is an injectable seam (defaults to the real
-* verifyImageDigest) for unit-testing without hitting the network/sigstore.
 */
-async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, verifyImageDigestFn = verifyImageDigest }) {
+async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine }) {
 	let digest;
 	try {
-		digest = await verifyImageDigestFn({
+		digest = await verifyImageDigest({
 			actionRef,
 			actionRepo,
 			proxyEngine
 		});
 	} catch (e) {
-		throw e instanceof VerifyImageError ? new ProvenanceError(e.message, e.code) : new ProvenanceError(errorMessage(e), "VERIFY_FAILED");
+		throw toProvenanceError(e);
 	}
-	if (digest === null) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
-	return digest;
+	return requireDigest(digest, actionRef);
 }
 //#endregion
 //#region core/lib/provenance/image-ref.ts
