@@ -1,13 +1,13 @@
 /**
- * Property-based tests for verify-image.ts helpers.
+ * Property-based tests for verify-policy.ts helpers.
  *
- * Run with: vp test run core/lib/provenance/verify-image.property.test.ts
+ * Run with: vp test run core/lib/provenance/verify-policy.property.test.ts
  */
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 
-import { buildVerifyOptions } from "./verify-image.ts";
+import { buildVerifyOptions } from "./verify-policy.ts";
 
 // ---------------------------------------------------------------------------
 // buildVerifyOptions
