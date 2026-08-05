@@ -1,7 +1,6 @@
 import { createDocker } from "../../../core/lib/docker/client.ts";
-import { buildRestrictExample } from "../../../core/lib/report/build-example.ts";
 import { describeBlockedOutcome } from "../../../core/lib/report/known-blocked.ts";
-import { renderHostTable } from "../../../core/lib/report/host-table.ts";
+import { renderReportMarkdown } from "../../../core/lib/report/render-report-markdown.ts";
 import { buildTransparentReportData } from "../../../core/lib/report/build-transparent-report-data.ts";
 import type {
   GenReportParameters,
@@ -27,51 +26,11 @@ export function fetchReport(
   );
 }
 
-export interface ReportRenderContext {
+export interface ComputeReportOutcomeOptions {
   stepLabel?: string;
-  actionRepo?: string;
-  actionRef?: string;
+  actionRepo: string;
+  actionRef: string;
   runCommand?: string;
-}
-
-export function buildReportMarkdown(
-  report: Report,
-  { stepLabel, actionRepo, actionRef, runCommand }: ReportRenderContext = {},
-): string {
-  // Mirrors report/src/main.ts's heading, so both actions read alike.
-  const heading = `Outbound Traffic Report${stepLabel ? ` — ${stepLabel}` : ""}`;
-  const isAudit = report.parameters.mode === "audit";
-  const showExpected = report.parameters.knownBlockedRules.length > 0;
-  let markdown = `## ${heading} (${report.parameters.mode} mode)\n\n`;
-
-  if (isAudit) {
-    if (report.passed.length > 0)
-      markdown += "### 📋 Audited Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
-    if (actionRepo) {
-      markdown += buildRestrictExample(report.passed, actionRepo, actionRef, {
-        actionName: "run",
-        runCommand,
-      });
-    }
-    if (report.blocked.length > 0)
-      markdown +=
-        "### 🚫 Blocked Hosts\n\n" +
-        renderHostTable(report.blocked, { showReason: true, showExpected }) +
-        "\n\n";
-  } else {
-    if (report.passed.length > 0)
-      markdown += "### ✅ Allowed Hosts\n\n" + renderHostTable(report.passed) + "\n\n";
-    if (report.blocked.length > 0)
-      markdown +=
-        "### 🚫 Blocked Hosts\n\n" +
-        renderHostTable(report.blocked, { showReason: true, showExpected }) +
-        "\n\n";
-  }
-
-  return markdown;
-}
-
-export interface ComputeReportOutcomeOptions extends ReportRenderContext {
   failOnBlocked?: boolean;
 }
 
@@ -89,7 +48,7 @@ export interface ReportOutcome {
  */
 export function computeReportOutcome(
   report: Report,
-  { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand }: ComputeReportOutcomeOptions = {},
+  { stepLabel, failOnBlocked, actionRepo, actionRef, runCommand }: ComputeReportOutcomeOptions,
 ): ReportOutcome {
   const { level, message, shouldFail } = describeBlockedOutcome({
     isAudit: report.parameters.mode === "audit",
@@ -99,7 +58,11 @@ export function computeReportOutcome(
     logLooksPlausible: report.logLooksPlausible,
     engineLabel: "sandbox",
   });
-  const markdown = buildReportMarkdown(report, { stepLabel, actionRepo, actionRef, runCommand });
+  const markdown = renderReportMarkdown(report, actionRepo, actionRef, {
+    title: stepLabel ? `Outbound Traffic Report — ${stepLabel}` : undefined,
+    actionName: "run",
+    runCommand,
+  });
 
   return { markdown, message, level, shouldFail };
 }

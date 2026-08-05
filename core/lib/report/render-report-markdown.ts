@@ -3,6 +3,17 @@ import { buildRestrictExample } from "./build-example.ts";
 import { renderCommunicationDetails } from "./command-log.ts";
 import type { ReportData } from "./report-data.ts";
 
+export interface RenderReportMarkdownOptions {
+  /** Full heading text, e.g. "Outbound Traffic Report during Docker Build"
+   *  or "Outbound Traffic Report — npm install". Defaults to a bare
+   *  "Outbound Traffic Report". */
+  title?: string;
+  /** Which action's restrict-mode example to show in audit mode. */
+  actionName?: "setup" | "run";
+  /** The `run:` input, included in the example only when actionName is "run". */
+  runCommand?: string;
+}
+
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
  *  duplicated per engine. actionRepo/actionRef are real values, not
  *  placeholders — this runs on the runner, with process.env available. */
@@ -10,18 +21,22 @@ export function renderReportMarkdown(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
+  { title = "Outbound Traffic Report", actionName, runCommand }: RenderReportMarkdownOptions = {},
 ): string {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
   const heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts";
 
-  let markdown = `## Outbound Traffic Report during Docker Build (${report.parameters.mode} mode)\n\n`;
+  let markdown = `## ${title} (${report.parameters.mode} mode)\n\n`;
 
   if (report.passed.length > 0) {
     markdown += `### ${heading}\n\n` + renderHostTable(report.passed) + "\n";
   }
   if (isAudit) {
-    markdown += buildRestrictExample(report.passed, actionRepo, actionRef);
+    markdown += buildRestrictExample(report.passed, actionRepo, actionRef, {
+      actionName,
+      runCommand,
+    });
   }
   if (report.blocked.length > 0) {
     if (report.passed.length > 0) markdown += "\n";
