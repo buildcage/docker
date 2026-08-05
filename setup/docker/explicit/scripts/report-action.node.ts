@@ -15,7 +15,7 @@ import { renderReportMarkdown } from "../../../../core/lib/report/render-report-
 import { renderCommunicationDetails } from "../../../../core/lib/report/command-log.ts";
 import { emitBlockedOutcome } from "../../../../core/lib/report/emit-blocked-outcome.ts";
 import { errorMessage } from "../../../../core/lib/general/error-message.ts";
-import { wrapLogGroup } from "../../../../core/lib/log/log-entries.ts";
+import { wrapLogGroup } from "../../../../core/lib/actions/log-group.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
 import {
   selectAllRefs,

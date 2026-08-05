@@ -8429,7 +8429,7 @@ function describeBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedR
 	};
 }
 //#endregion
-//#region core/lib/actions/markdown-table.ts
+//#region core/lib/general/markdown-table.ts
 const ALIGN_MARKERS = {
 	left: "---",
 	right: "---:",
