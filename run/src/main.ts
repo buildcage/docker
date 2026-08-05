@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as core from "@actions/core";
 
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import {
@@ -10,7 +11,7 @@ import {
   type ResolvedImage,
 } from "../../core/lib/provenance/verify-image.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
-import { createAnnotation } from "../../core/lib/actions/annotation.ts";
+import { createAnnotation, type Annotation } from "../../core/lib/actions/annotation.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
@@ -29,7 +30,12 @@ import {
   withScratchDir,
   listHostMounts,
 } from "./lib/isolated-exec.ts";
-import { fetchReport, writeReport } from "./lib/report.ts";
+import {
+  fetchReport,
+  computeReportOutcome,
+  type Report,
+  type ComputeReportOutcomeOptions,
+} from "./lib/report.ts";
 
 export { buildComposeUpArgs, buildComposeDownArgs, buildACLRules };
 
@@ -102,6 +108,39 @@ async function withGroup<T>(label: string, fn: () => T | Promise<T>): Promise<T>
   }
 }
 
+/**
+ * Side-effecting half of the report step: computeReportOutcome() decides
+ * what to say, this writes it to the Job Summary/annotations/exit code.
+ */
+async function writeReportSummary(
+  report: Report,
+  annotation: Annotation,
+  options: ComputeReportOutcomeOptions,
+): Promise<void> {
+  const outcome = computeReportOutcome(report, options);
+
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryFile) {
+    await core.summary.addRaw(outcome.markdown).write();
+  } else {
+    console.log(outcome.markdown);
+  }
+
+  // Debug-only mirror: GITHUB_STEP_SUMMARY is unique per step and can't be
+  // reassigned, so a later step has no way to read this step's copy back.
+  const debugSummaryFile = process.env.BUILDCAGE_RUN_DEBUG_SUMMARY_FILE;
+  if (debugSummaryFile) {
+    appendFileSync(debugSummaryFile, outcome.markdown);
+  }
+
+  if (outcome.level === "error") {
+    annotation.error(outcome.message);
+    process.exitCode = 1;
+  } else if (outcome.level === "notice") {
+    annotation.notice(outcome.message);
+  }
+}
+
 async function main(): Promise<void> {
   const env = process.env;
   // Empty (not `??`-catchable) for local-path `uses: ./run` invocations —
@@ -109,7 +148,7 @@ async function main(): Promise<void> {
   const actionRef = env.GITHUB_ACTION_REF || "v2";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY || "dash14/buildcage";
 
-  const runInput = env.INPUT_RUN ?? "";
+  const runInput = core.getInput("run", { trimWhitespace: false });
   if (!runInput.trim()) {
     throw new SandboxError("Input 'run' is required.", "MISSING_RUN");
   }
@@ -118,8 +157,8 @@ async function main(): Promise<void> {
   // if the runner can't support the isolation setup at all.
   checkPasswordlessSudo();
 
-  // Same gate as writeReport() in lib/report.ts — suppresses annotations
-  // when this script isn't running as the real action.
+  // Same gate as writeReportSummary() below — suppresses annotations when
+  // this script isn't running as the real action.
   const annotation = createAnnotation(Boolean(env.GITHUB_STEP_SUMMARY));
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
@@ -139,11 +178,11 @@ async function main(): Promise<void> {
   console.log(`buildcage: proxy image: ${imageRef}`);
 
   const rules = buildACLRules({
-    httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
-    httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
-    ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
+    httpsRulesInput: core.getInput("allowed_https_rules"),
+    httpRulesInput: core.getInput("allowed_http_rules"),
+    ipRulesInput: core.getInput("allowed_ip_rules"),
   });
-  const knownBlockedRules = readKnownBlockedRules(env.INPUT_KNOWN_BLOCKED_RULES);
+  const knownBlockedRules = readKnownBlockedRules(core.getInput("known_blocked_rules"));
 
   console.log("::group::buildcage: Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
@@ -152,25 +191,24 @@ async function main(): Promise<void> {
   logRules("Known-blocked (informational only, not sent to proxy ACL)", knownBlockedRules);
   console.log("::endgroup::");
 
-  const writablePaths = parseWritablePaths(env.INPUT_WRITABLE);
+  const writablePaths = parseWritablePaths(core.getInput("writable"));
 
   // Each `run` step gets its own throwaway proxy container — start, run
   // the isolated command, report, and stop, all within this one step —
   // rather than sharing one across steps in the same job.
   const containerName = generateContainerName();
   const projectName = deriveProjectName(containerName);
-  const stateFile = env.GITHUB_STATE;
   // Recorded so post.ts can still clean up if this run is killed outright
   // before reaching its own finally block below.
-  if (stateFile) {
-    appendFileSync(stateFile, `container_name=${containerName}\n`);
-    appendFileSync(stateFile, `project_name=${projectName}\n`);
+  if (env.GITHUB_STATE) {
+    core.saveState("container_name", containerName);
+    core.saveState("project_name", projectName);
   }
 
   const composeEnv = {
     ...env,
     PROXY_CONTAINER_NAME: containerName,
-    PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
+    PROXY_MODE: core.getInput("proxy_mode") || "restrict",
     ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
@@ -283,18 +321,27 @@ async function main(): Promise<void> {
   } finally {
     try {
       const report = await fetchReport(containerName, {
-        mode: env.INPUT_PROXY_MODE || "restrict",
+        mode: core.getInput("proxy_mode") || "restrict",
         allowedHttpsRules: rules.httpsRules,
         allowedHttpRules: rules.httpRules,
         allowedIpRules: rules.ipRules,
         knownBlockedRules,
       });
-      writeReport(report, {
+      // Several integration scripts invoke this action directly without
+      // setting fail_on_blocked, unlike a real workflow where action.yml's
+      // own default always supplies it — fall back to that same default.
+      let failOnBlocked: boolean;
+      try {
+        failOnBlocked = core.getBooleanInput("fail_on_blocked");
+      } catch {
+        failOnBlocked = true;
+      }
+      await writeReportSummary(report, annotation, {
         actionRepo,
         actionRef,
         runCommand: runInput,
-        stepLabel: env.INPUT_LABEL || undefined,
-        failOnBlocked: (env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true",
+        stepLabel: core.getInput("label") || undefined,
+        failOnBlocked,
       });
     } catch (e) {
       annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);

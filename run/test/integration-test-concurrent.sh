@@ -36,7 +36,7 @@ fi" \
 }
 
 : "${BUILDCAGE_LOCAL_IMAGE_REF:?BUILDCAGE_LOCAL_IMAGE_REF must be set to the locally built proxy image}"
-touch "$TMP_A/state.env" "$TMP_B/state.env"
+touch "$TMP_A/state.env" "$TMP_A/summary.md" "$TMP_B/state.env" "$TMP_B/summary.md"
 
 run_instance "$TMP_A" "example.com:443" "https://example.com/" "https://example.net/" &
 PID_A=$!

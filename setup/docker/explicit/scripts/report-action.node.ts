@@ -7,7 +7,7 @@
  * including `buildctl` itself, run inside the container via `docker exec`
  * rather than needing buildctl reachable from the runner.
  */
-import { appendFileSync } from "node:fs";
+import * as core from "@actions/core";
 import { createDocker, type Docker } from "../../../../core/lib/docker/client.ts";
 import { buildReportParameters } from "../../../../core/lib/report/report-parameters.ts";
 import { buildExplicitReportData } from "../../../../core/lib/report/build-explicit-report-data.ts";
@@ -16,6 +16,7 @@ import { renderCommunicationDetails } from "../../../../core/lib/report/command-
 import { emitBlockedOutcome } from "../../../../core/lib/report/emit-blocked-outcome.ts";
 import { errorMessage } from "../../../../core/lib/general/error-message.ts";
 import { wrapLogGroup } from "../../../../core/lib/log/log-entries.ts";
+import { writeStepSummary } from "../../lib/write-step-summary.ts";
 import {
   selectAllRefs,
   parseVertexAllowedLog,
@@ -83,15 +84,18 @@ async function main(): Promise<void> {
     process.env.GITHUB_ACTION_REF || "v2",
   );
 
-  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-  if (summaryFile) {
-    appendFileSync(summaryFile, markdown);
-  } else {
-    console.log(markdown);
-  }
+  await writeStepSummary(markdown);
 
-  const failOnBlocked = (process.env.INPUT_FAIL_ON_BLOCKED || "true").toLowerCase() === "true";
-  emitBlockedOutcome(report, { failOnBlocked, summaryFile });
+  // Several test/dev invocations run this script directly without setting
+  // fail_on_blocked, unlike the real `report` action where action.yml's
+  // own default always supplies it — fall back to that same default.
+  let failOnBlocked: boolean;
+  try {
+    failOnBlocked = core.getBooleanInput("fail_on_blocked");
+  } catch {
+    failOnBlocked = true;
+  }
+  emitBlockedOutcome(report, { failOnBlocked, summaryFile: process.env.GITHUB_STEP_SUMMARY });
 }
 
 main().catch((e) => {

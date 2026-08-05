@@ -32,6 +32,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
 COPY rolldown.scripts.config.js ./
 COPY core/ ./core/
+COPY setup/docker/lib/ ./setup/docker/lib/
 COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
 COPY setup/docker/transparent/scripts/ ./setup/docker/transparent/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \

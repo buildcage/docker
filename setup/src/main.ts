@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as core from "@actions/core";
 
 import { SetupError } from "./lib/errors.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
@@ -52,7 +53,7 @@ async function main(): Promise<void> {
   const actionRef = env.GITHUB_ACTION_REF ?? "";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 
-  const proxyEngine = resolveProxyEngine(env.INPUT_PROXY_ENGINE);
+  const proxyEngine = resolveProxyEngine(core.getInput("proxy_engine"));
   console.log(`Proxy engine: ${proxyEngine}`);
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
@@ -73,11 +74,11 @@ async function main(): Promise<void> {
   console.log(`buildcage: image: ${imageRef}`);
 
   const rules = buildACLRules({
-    httpsRulesInput: env.INPUT_ALLOWED_HTTPS_RULES,
-    httpRulesInput: env.INPUT_ALLOWED_HTTP_RULES,
-    ipRulesInput: env.INPUT_ALLOWED_IP_RULES,
+    httpsRulesInput: core.getInput("allowed_https_rules"),
+    httpRulesInput: core.getInput("allowed_http_rules"),
+    ipRulesInput: core.getInput("allowed_ip_rules"),
   });
-  const knownBlockedRules = parseRulesOrThrow(env.INPUT_KNOWN_BLOCKED_RULES);
+  const knownBlockedRules = parseRulesOrThrow(core.getInput("known_blocked_rules"));
 
   console.log("::group::buildcage: Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
@@ -89,7 +90,7 @@ async function main(): Promise<void> {
   // "buildcage" here is a fallback for running outside the Actions runtime
   // (action.yml's own `default: 'buildcage'` covers the normal case) — keep
   // both, and report/src/main.ts's copy, in sync.
-  const builderName = env.INPUT_BUILDER_NAME || "buildcage";
+  const builderName = core.getInput("builder_name") || "buildcage";
   // So report can independently derive the same project name from its own
   // builder_name input and find this container via `docker ps --filter`.
   const projectName = deriveProjectName(builderName);
@@ -97,7 +98,7 @@ async function main(): Promise<void> {
   const composeEnv = {
     ...env,
     BUILDER_NAME: builderName,
-    PROXY_MODE: env.INPUT_PROXY_MODE || "restrict",
+    PROXY_MODE: core.getInput("proxy_mode") || "restrict",
     PROXY_ENGINE: proxyEngine,
     ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),

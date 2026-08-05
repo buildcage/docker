@@ -49,6 +49,9 @@ export default defineConfig(
     input,
     external: [/^node:/],
     platform: "node",
+    treeshake: {
+      moduleSideEffects: [{ test: /\/(@actions\/http-client|undici)\//, sideEffects: false }],
+    },
     plugins,
     output: {
       file,

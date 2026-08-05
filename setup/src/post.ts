@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as core from "@actions/core";
 import { deriveProjectName } from "../../core/lib/docker/container.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -19,7 +20,7 @@ export function resolveProjectName(builderName: string, env: NodeJS.ProcessEnv):
 function main(): void {
   // builder_name is a real input, so post.ts can recompute the same project
   // name main.ts used directly, without round-tripping it through GITHUB_STATE.
-  const builderName = process.env.INPUT_BUILDER_NAME || "buildcage";
+  const builderName = core.getInput("builder_name") || "buildcage";
   const projectName = resolveProjectName(builderName, process.env);
 
   execFileSync(

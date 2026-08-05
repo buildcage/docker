@@ -10,7 +10,7 @@ set -uo pipefail
 : "${BUILDCAGE_LOCAL_IMAGE_REF:?BUILDCAGE_LOCAL_IMAGE_REF must be set to the locally built proxy image}"
 
 WORKDIR=$(mktemp -d)
-touch "$WORKDIR/state.env"
+touch "$WORKDIR/state.env" "$WORKDIR/summary.md"
 FAILURES=0
 
 cleanup() {

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as core from "@actions/core";
 
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { deriveProjectName } from "../../core/lib/docker/container.ts";
@@ -27,7 +28,7 @@ export function resolveProjectName(builderName: string, env: NodeJS.ProcessEnv):
 }
 
 async function main(): Promise<void> {
-  const builderName = process.env.INPUT_BUILDER_NAME || "buildcage";
+  const builderName = core.getInput("builder_name") || "buildcage";
   const projectName = resolveProjectName(builderName, process.env);
   const docker = createDocker();
 

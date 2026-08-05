@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as core from "@actions/core";
 
 import { buildComposeDownArgs } from "./lib/compose-args.ts";
 import { cleanupScratchDir, scratchDirFor } from "./lib/isolated-exec.ts";
@@ -12,12 +13,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Fallback-only cleanup: main.ts already stops the proxy container in its
 // own finally block on every normal exit path. This only matters if the
 // process was killed outright before reaching that finally (e.g. the
-// runner cancels the step). GITHUB_STATE's container_name=.../project_name=...
-// (written by main.ts) surface here as STATE_container_name/STATE_project_name
-// — see
+// runner cancels the step). State saved by main.ts's core.saveState surfaces
+// here via core.getState — see
 // https://docs.github.com/en/actions/creating-actions/dockerfile-support-for-github-actions#saving-state.
-const containerName = process.env.STATE_container_name;
-const projectName = process.env.STATE_project_name;
+const containerName = core.getState("container_name");
+const projectName = core.getState("project_name");
 
 // Reclaim this step's sandbox scratch dir if a hard kill bypassed main.ts's
 // own withScratchDir finally. Its path is derived deterministically from
@@ -25,7 +25,7 @@ const projectName = process.env.STATE_project_name;
 // cleanupScratchDir force-detaches the rootfs bind-mount before deleting, so
 // this can't walk into the host filesystem even if a mount somehow survived.
 // Independent of the container teardown below, so it runs regardless.
-if (containerName?.startsWith("buildcage-proxy-")) {
+if (containerName.startsWith("buildcage-proxy-")) {
   try {
     const scratchDir = scratchDirFor(containerName);
     if (existsSync(scratchDir)) cleanupScratchDir(scratchDir);
