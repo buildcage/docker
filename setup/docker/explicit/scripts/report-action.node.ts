@@ -9,11 +9,11 @@
  */
 import * as core from "@actions/core";
 import { createDocker, type Docker } from "../../../../core/lib/docker/client.ts";
-import { buildReportParameters } from "../../../../core/lib/report/report-parameters.ts";
-import { buildExplicitReportData } from "../../../../core/lib/report/build-explicit-report-data.ts";
-import { renderReportMarkdown } from "../../../../core/lib/report/render-report-markdown.ts";
-import { renderCommunicationDetails } from "../../../../core/lib/report/command-log.ts";
-import { emitBlockedOutcome } from "../../../../core/lib/report/emit-blocked-outcome.ts";
+import { buildReportParameters } from "../../../../core/lib/report/parameters.ts";
+import { buildExplicitReportData } from "../../../../core/lib/report/build/explicit.ts";
+import { renderReportMarkdown } from "../../../../core/lib/report/render/render-report-markdown.ts";
+import { renderCommunicationDetails } from "../../../../core/lib/report/render/communication-details.ts";
+import { emitBlockedOutcome } from "../../../../core/lib/report/outcome/emit-blocked-outcome.ts";
 import { errorMessage } from "../../../../core/lib/general/error-message.ts";
 import { wrapLogGroup } from "../../../../core/lib/actions/log-group.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";

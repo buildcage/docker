@@ -8356,26 +8356,7 @@ function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand
 	};
 }
 //#endregion
-//#region core/lib/report/known-blocked.ts
-/**
-* Shared logic for `known_blocked_rules`: domains expected to be blocked,
-* so a matching blocked connection doesn't fail the step even when
-* fail_on_blocked is true. Never sent to the container's ACL — only
-* affects this action's pass/fail decision and Job Summary rendering.
-*/
-/**
-* Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
-* its `host:port` matches at least one known_blocked_rules pattern.
-*
-* knownBlockedRules is as returned by parseAndValidateRules.
-*/
-function annotateKnownBlocked(blockedRows, knownBlockedRules) {
-	let matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
-	return blockedRows.map((row) => ({
-		...row,
-		expected: matchers.some((re) => re.test(`${row.host}:${row.port}`))
-	}));
-}
+//#region core/lib/report/outcome/blocked-outcome.ts
 function determineBlockedOutcome({ isAudit, failOnBlocked, blockedCount, blockedRows, logLooksPlausible }) {
 	if (!blockedCount) return logLooksPlausible ? {
 		level: "none",
@@ -8447,7 +8428,7 @@ function markdownTable(formats, rows) {
 	return lines.join("\n");
 }
 //#endregion
-//#region core/lib/report/host-table.ts
+//#region core/lib/report/render/host-table.ts
 /**
 * Render aggregated host rows as a GitHub-flavored markdown table.
 */
@@ -8479,7 +8460,7 @@ function renderHostTable(rows, { showReason = !1, showExpected = !1 } = {}) {
 	})));
 }
 //#endregion
-//#region core/lib/report/build-example.ts
+//#region core/lib/report/render/build-example.ts
 const ruleTypeToParam = {
 	HTTPS: "allowed_https_rules",
 	HTTP: "allowed_http_rules",
@@ -8513,7 +8494,7 @@ function buildRestrictExample(auditedRows, actionRepo, actionRef, { actionName =
 	return md += "<summary>🛡️ Switch to restrict mode</summary>\n\n", md += "```yaml\n", md += yaml, md += "```\n\n", md += "</details>\n", md;
 }
 //#endregion
-//#region core/lib/report/command-log.ts
+//#region core/lib/report/render/communication-details.ts
 /**
 * Render the explicit engine's communication detail as a collapsed markdown
 * section, or "" if there's nothing to show. Allowed Urls is listed before
@@ -8567,7 +8548,7 @@ function formatDuration(started, completed) {
 	return `${((Date.parse(completed) - Date.parse(started)) / 1e3).toFixed(3)}s`;
 }
 //#endregion
-//#region core/lib/report/render-report-markdown.ts
+//#region core/lib/report/render/render-report-markdown.ts
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
 *  duplicated per engine. actionRepo/actionRef are real values, not
 *  placeholders — this runs on the runner, with process.env available. */
@@ -8650,7 +8631,22 @@ async function scanHaproxyLog(lines, isAudit) {
 	};
 }
 //#endregion
-//#region core/lib/report/build-transparent-report-data.ts
+//#region core/lib/report/outcome/annotate-known-blocked.ts
+/**
+* Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
+* its `host:port` matches at least one known_blocked_rules pattern.
+*
+* knownBlockedRules is as returned by parseAndValidateRules.
+*/
+function annotateKnownBlocked(blockedRows, knownBlockedRules) {
+	let matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
+	return blockedRows.map((row) => ({
+		...row,
+		expected: matchers.some((re) => re.test(`${row.host}:${row.port}`))
+	}));
+}
+//#endregion
+//#region core/lib/report/build/transparent.ts
 /**
 * Pure — no I/O; callers (report-action.node.ts, run/src/lib/report.ts)
 * fetch lines/parameters themselves. An empty input naturally yields
@@ -8732,7 +8728,8 @@ async function resolveVerifiedImage({ actionRef, actionRepo }) {
 	};
 }
 /**
-* Never sent to the container's ACL — see core/lib/report/known-blocked.ts.
+* Never sent to the container's ACL — used only for report-time annotation
+* of expected vs. unexpected blocked connections.
 */
 function readKnownBlockedRules(input) {
 	return parseRulesOrThrow(input);

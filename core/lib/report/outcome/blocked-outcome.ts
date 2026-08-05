@@ -1,47 +1,13 @@
-/**
- * Shared logic for `known_blocked_rules`: domains expected to be blocked,
- * so a matching blocked connection doesn't fail the step even when
- * fail_on_blocked is true. Never sent to the container's ACL — only
- * affects this action's pass/fail decision and Job Summary rendering.
- */
-import { convertRule } from "../acl/wildcard-rules.ts";
-import type { AggregatedEntry } from "../log/aggregate.ts";
-
-export type BlockedRow = AggregatedEntry;
-
-export interface AnnotatedBlockedRow extends BlockedRow {
-  expected: boolean;
-}
-
-export interface ExpectedFlag {
-  expected: boolean;
-}
-
-/**
- * Tag each aggregated blocked-hosts row with `expected: boolean` — true iff
- * its `host:port` matches at least one known_blocked_rules pattern.
- *
- * knownBlockedRules is as returned by parseAndValidateRules.
- */
-export function annotateKnownBlocked(
-  blockedRows: BlockedRow[],
-  knownBlockedRules: string[],
-): AnnotatedBlockedRow[] {
-  const matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
-  return blockedRows.map((row) => ({
-    ...row,
-    expected: matchers.some((re) => re.test(`${row.host}:${row.port}`)),
-  }));
-}
+import type { ExpectedFlag } from "./annotate-known-blocked.ts";
 
 /**
  * Decide whether blocked connections should fail the step.
  *
  * `blockedRows` must already be annotated via annotateKnownBlocked. Uses
  * per-row matching rather than count arithmetic because `blockedCount`'s
- * meaning differs by proxy engine (see report-data.ts), so subtracting
- * summed row counts from it isn't reliable. An empty `blockedRows` with a
- * nonzero `blockedCount` is treated as unexpected too (fail closed).
+ * meaning differs by proxy engine, so subtracting summed row counts from it
+ * isn't reliable. An empty `blockedRows` with a nonzero `blockedCount` is
+ * treated as unexpected too (fail closed).
  */
 export interface BlockedOutcome {
   level: "none" | "notice" | "error";
@@ -53,7 +19,7 @@ export interface DetermineBlockedOutcomeOptions {
   failOnBlocked: boolean;
   blockedCount: number;
   blockedRows: ExpectedFlag[];
-  /** See report-data.ts's ReportDataCommon.logLooksPlausible. */
+  /** See ReportDataCommon.logLooksPlausible. */
   logLooksPlausible: boolean;
 }
 

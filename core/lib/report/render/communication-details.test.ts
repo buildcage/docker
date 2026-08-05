@@ -1,5 +1,5 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
-import { renderCommunicationDetails } from "./command-log.ts";
+import { describe, it, assert, reportResults } from "../../test/test-shim.ts";
+import { renderCommunicationDetails } from "./communication-details.ts";
 
 function wrap(body: string) {
   return "\n<details>\n<summary>💬 Communication details</summary>\n\n" + body + "</details>\n";

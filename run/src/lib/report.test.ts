@@ -2,8 +2,8 @@ import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import { computeReportOutcome, type Report, type ComputeReportOutcomeOptions } from "./report.ts";
-import { annotateKnownBlocked } from "../../../core/lib/report/known-blocked.ts";
-import type { GenReportParameters } from "../../../core/lib/report/report-data.ts";
+import { annotateKnownBlocked } from "../../../core/lib/report/outcome/annotate-known-blocked.ts";
+import type { GenReportParameters } from "../../../core/lib/report/types.ts";
 
 function parameters(overrides: Partial<GenReportParameters> = {}): GenReportParameters {
   return {
@@ -23,8 +23,8 @@ function options(
 }
 
 // blocked rows are already expected to be annotated by the time a Report
-// reaches computeReportOutcome (see build-transparent-report-data.ts) —
-// this mirrors that, applying parameters.knownBlockedRules the same way.
+// reaches computeReportOutcome — this mirrors that, applying
+// parameters.knownBlockedRules the same way.
 function report(overrides: Partial<Report> = {}): Report {
   const params = overrides.parameters ?? parameters();
   return {
