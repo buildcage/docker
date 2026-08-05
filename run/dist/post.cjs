@@ -470,7 +470,7 @@ function getState(name) {
 	return process.env[`STATE_${name}`] || "";
 }
 //#endregion
-//#region run/src/lib/compose-args.ts
+//#region core/lib/docker/compose-args.ts
 /** Build the `docker compose ... down` argv — see buildComposeUpArgs above. */
 function buildComposeDownArgs({ composeFile, projectName }) {
 	return [

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
 
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
-import { resolveProjectName } from "../../core/lib/docker/container.ts";
+import { resolveProjectName } from "../../core/lib/docker/compose-project-name.ts";
 import { createDocker } from "../../core/lib/docker/client.ts";
 import {
   REPORT_ACTION_SCRIPT_PATH,

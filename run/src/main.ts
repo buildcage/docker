@@ -12,14 +12,15 @@ import {
 } from "../../core/lib/provenance/verify-image.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
 import { createAnnotation, type Annotation } from "../../core/lib/actions/annotation.ts";
+import { logRules } from "../../core/lib/actions/log-rules.ts";
 import { ActionError } from "../../core/lib/general/action-error.ts";
 import { errorMessage } from "../../core/lib/general/error-message.ts";
 import { buildACLRules, parseRulesOrThrow } from "../../core/lib/acl/rules.ts";
 import { SandboxError } from "./lib/errors.ts";
 import { checkPasswordlessSudo } from "./lib/sudo-preflight.ts";
 import { generateContainerName, getContainerPid } from "./lib/container.ts";
-import { deriveProjectName } from "../../core/lib/docker/container.ts";
-import { buildComposeUpArgs, buildComposeDownArgs } from "./lib/compose-args.ts";
+import { deriveProjectName } from "../../core/lib/docker/compose-project-name.ts";
+import { buildComposeUpArgs, buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
 import {
   writeRunScript,
   writeResolvConf,
@@ -38,7 +39,7 @@ import {
 } from "./lib/report.ts";
 import { writeStepSummary } from "../../setup/docker/lib/write-step-summary.ts";
 
-export { buildComposeUpArgs, buildComposeDownArgs, buildACLRules };
+export { buildACLRules };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(__dirname, "../compose.yaml");
@@ -87,11 +88,6 @@ export function parseWritablePaths(input: string | undefined): string[] {
       .map((s) => s.trim())
       .filter(Boolean) ?? []
   );
-}
-
-function logRules(label: string, rules: string[]): void {
-  console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
-  for (const r of rules) console.log(`  ${r}`);
 }
 
 /**

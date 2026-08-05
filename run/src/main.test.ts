@@ -6,13 +6,7 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
-import {
-  buildACLRules,
-  buildComposeUpArgs,
-  buildComposeDownArgs,
-  parseWritablePaths,
-  readKnownBlockedRules,
-} from "./main.ts";
+import { buildACLRules, parseWritablePaths, readKnownBlockedRules } from "./main.ts";
 import { InvalidRulesError } from "../../core/lib/acl/rules.ts";
 
 describe("buildACLRules", () => {
@@ -84,57 +78,6 @@ describe("readKnownBlockedRules", () => {
         return true;
       },
     );
-  });
-});
-
-// -----------------------------------------------------------------------
-// buildComposeUpArgs / buildComposeDownArgs
-//
-// Regression guard for the concurrent-step container/network collision:
-// both must always include "-p" + the project name, or Compose falls back
-// to an implicit, directory-derived project name shared by every
-// concurrent `run` step in the job (see core/lib/docker/container.ts's
-// deriveProjectName).
-// -----------------------------------------------------------------------
-
-describe("buildComposeUpArgs", () => {
-  it("always includes -p <projectName> alongside -f <composeFile>", () => {
-    const args = buildComposeUpArgs({
-      composeFile: "/path/to/compose.yaml",
-      projectName: "buildcage-proxy-abcd1234",
-      pullPolicy: "always",
-    });
-    assert.deepEqual(args, [
-      "compose",
-      "-f",
-      "/path/to/compose.yaml",
-      "-p",
-      "buildcage-proxy-abcd1234",
-      "up",
-      "-d",
-      "--pull",
-      "always",
-      "--no-build",
-      "--wait",
-      "--quiet-pull",
-    ]);
-  });
-});
-
-describe("buildComposeDownArgs", () => {
-  it("always includes -p <projectName> alongside -f <composeFile>", () => {
-    const args = buildComposeDownArgs({
-      composeFile: "/path/to/compose.yaml",
-      projectName: "buildcage-proxy-abcd1234",
-    });
-    assert.deepEqual(args, [
-      "compose",
-      "-f",
-      "/path/to/compose.yaml",
-      "-p",
-      "buildcage-proxy-abcd1234",
-      "down",
-    ]);
   });
 });
 

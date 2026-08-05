@@ -14,7 +14,9 @@ import {
 } from "../../core/lib/provenance/verify-image.ts";
 import { resolveBuildcageImageRef } from "../../core/lib/provenance/image-ref.ts";
 import { describeDockerFailure } from "../../core/lib/actions/docker-error.ts";
-import { deriveProjectName } from "../../core/lib/docker/container.ts";
+import { logRules } from "../../core/lib/actions/log-rules.ts";
+import { deriveProjectName } from "../../core/lib/docker/compose-project-name.ts";
+import { buildComposeUpArgs, buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
 
 export { buildACLRules };
 
@@ -108,7 +110,7 @@ async function main(): Promise<void> {
   };
 
   try {
-    execFileSync("docker", ["compose", "-p", projectName, "-f", composeFile, "down"], {
+    execFileSync("docker", buildComposeDownArgs({ composeFile, projectName }), {
       stdio: "inherit",
       env: composeEnv,
     });
@@ -120,24 +122,10 @@ async function main(): Promise<void> {
   }
 
   try {
-    execFileSync(
-      "docker",
-      [
-        "compose",
-        "-p",
-        projectName,
-        "-f",
-        composeFile,
-        "up",
-        "-d",
-        "--pull",
-        pullPolicy,
-        "--no-build",
-        "--wait",
-        "--quiet-pull",
-      ],
-      { stdio: "inherit", env: composeEnv },
-    );
+    execFileSync("docker", buildComposeUpArgs({ composeFile, projectName, pullPolicy }), {
+      stdio: "inherit",
+      env: composeEnv,
+    });
   } catch (e) {
     throw new SetupError(
       describeDockerFailure(e, { operation: "docker compose up" }),
@@ -161,11 +149,6 @@ export function resolveProxyEngine(input: string | undefined): "transparent" | "
     );
   }
   return engine;
-}
-
-function logRules(label: string, rules: string[]): void {
-  console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
-  for (const r of rules) console.log(`  ${r}`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

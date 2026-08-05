@@ -2,7 +2,8 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as core from "@actions/core";
-import { resolveProjectName } from "../../core/lib/docker/container.ts";
+import { resolveProjectName } from "../../core/lib/docker/compose-project-name.ts";
+import { buildComposeDownArgs } from "../../core/lib/docker/compose-args.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -20,7 +21,7 @@ function main(): void {
 
   execFileSync(
     "docker",
-    ["compose", "-p", projectName, "-f", join(__dirname, "../compose.yaml"), "down"],
+    buildComposeDownArgs({ composeFile: join(__dirname, "../compose.yaml"), projectName }),
     {
       stdio: "inherit",
       env: {
