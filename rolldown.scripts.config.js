@@ -27,6 +27,12 @@ function settingsFor(input) {
         stripSuffix: /\.node\.ts$/,
         external: [/^node:/],
         platform: "node",
+        // report-action.node.ts only uses core.getInput/summary, but
+        // @actions/core statically imports @actions/http-client (for the
+        // unused getIDToken) which pulls in all of undici otherwise.
+        treeshake: {
+          moduleSideEffects: [{ test: /\/(@actions\/http-client|undici)\//, sideEffects: false }],
+        },
       };
 }
 
@@ -58,11 +64,12 @@ export default defineConfig(
         output: { file: `dist/test-qjs/${input.replace(/\.ts$/, ".js")}`, ...baseOutput },
       }))
     : scriptInputs.map((input) => {
-        const { outDir, stripSuffix, external, platform } = settingsFor(input);
+        const { outDir, stripSuffix, external, platform, treeshake } = settingsFor(input);
         return {
           input,
           external,
           platform,
+          treeshake,
           output: { file: `${outDir}/${input.replace(stripSuffix, ".js")}`, ...baseOutput },
         };
       }),
