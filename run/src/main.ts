@@ -36,6 +36,7 @@ import {
   type Report,
   type ComputeReportOutcomeOptions,
 } from "./lib/report.ts";
+import { writeStepSummary } from "../../setup/docker/lib/write-step-summary.ts";
 
 export { buildComposeUpArgs, buildComposeDownArgs, buildACLRules };
 
@@ -119,12 +120,7 @@ async function writeReportSummary(
 ): Promise<void> {
   const outcome = computeReportOutcome(report, options);
 
-  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-  if (summaryFile) {
-    await core.summary.addRaw(outcome.markdown).write();
-  } else {
-    console.log(outcome.markdown);
-  }
+  await writeStepSummary(outcome.markdown);
 
   // Debug-only mirror: GITHUB_STEP_SUMMARY is unique per step and can't be
   // reassigned, so a later step has no way to read this step's copy back.
