@@ -278,21 +278,24 @@ async function main(): Promise<void> {
         // computeReadonlyHostMounts).
         const hostMounts = listHostMounts();
         config = buildOciConfig(baseSpec, {
-          uid: process.getuid!(),
-          gid: process.getgid!(),
-          workdir,
-          home,
-          // Standard writable runner scratch; not always under $HOME on
-          // self-hosted runners, so covered explicitly (see buildOciConfig).
-          runnerTemp: env.RUNNER_TEMP || "",
-          writablePaths,
+          identity: { uid: process.getuid!(), gid: process.getgid!() },
+          writable: {
+            workdir,
+            home,
+            // Standard writable runner scratch; not always under $HOME on
+            // self-hosted runners, so covered explicitly (see buildOciConfig).
+            runnerTemp: env.RUNNER_TEMP || "",
+            writablePaths,
+          },
+          runtime: {
+            netnsPath: `/var/run/netns/${netnsName}`,
+            rootfsBindDir,
+            resolvConfPath,
+            seccompProfile,
+            scriptPath,
+            hostMounts,
+          },
           env,
-          netnsPath: `/var/run/netns/${netnsName}`,
-          rootfsBindDir,
-          resolvConfPath,
-          seccompProfile,
-          scriptPath,
-          hostMounts,
         });
       } catch (e) {
         throw new SandboxError(
