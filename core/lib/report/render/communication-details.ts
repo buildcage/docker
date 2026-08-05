@@ -1,4 +1,5 @@
-import type { AllowedRequest, VertexAllowedEntry } from "../../log/vertex-log.ts";
+import type { AllowedRequest } from "../../log/proxy-request-text-parser.ts";
+import type { VertexAllowedEntry } from "../../log/vertex-log-parser.ts";
 import type { DeniedEntry } from "../types.ts";
 
 /**

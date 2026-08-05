@@ -17,11 +17,11 @@ import { emitBlockedOutcome } from "../../../../core/lib/report/outcome/emit-blo
 import { errorMessage } from "../../../../core/lib/general/error-message.ts";
 import { wrapLogGroup } from "../../../../core/lib/actions/log-group.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
+import { selectAllRefs } from "../../../../core/lib/log/build-histories-parser.ts";
 import {
-  selectAllRefs,
   parseVertexAllowedLog,
   type VertexAllowedEntry,
-} from "../../../../core/lib/log/vertex-log.ts";
+} from "../../../../core/lib/log/vertex-log-parser.ts";
 
 const LOG_FILE = "/var/log/buildkitd/current";
 
