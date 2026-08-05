@@ -109,6 +109,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # report/src/main.ts is run straight from source below (Show logs
+      # step) and now imports @actions/core, so node_modules must exist.
+      - uses: ./.github/actions/setup-vp
+
       - name: Build containers
         env:
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
