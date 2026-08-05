@@ -8786,6 +8786,98 @@ async function withGroup(label, fn) {
 		console.log("::endgroup::");
 	}
 }
+/** Starts this step's own throwaway proxy container via `docker compose up`. */
+async function startSandboxProxy({ composeFile, projectName, pullPolicy, composeEnv }) {
+	await withGroup("buildcage: starting sandbox proxy", () => {
+		try {
+			(0, node_child_process.execFileSync)("docker", buildComposeUpArgs({
+				composeFile,
+				projectName,
+				pullPolicy
+			}), {
+				stdio: "inherit",
+				env: composeEnv
+			});
+		} catch (e) {
+			throw new SandboxError(describeDockerFailure(e, { operation: "docker compose up" }), "DOCKER_UNAVAILABLE");
+		}
+	});
+}
+/** Stops this step's proxy container via `docker compose down`. Reports
+*  failure as a warning rather than throwing — this runs in main()'s
+*  finally block, after the sandboxed command has already completed. */
+async function stopSandboxProxy({ composeFile, projectName, composeEnv, annotation }) {
+	await withGroup("buildcage: stopping sandbox proxy", () => {
+		try {
+			(0, node_child_process.execFileSync)("docker", buildComposeDownArgs({
+				composeFile,
+				projectName
+			}), {
+				stdio: "inherit",
+				env: composeEnv
+			});
+		} catch (e) {
+			annotation.warning(`Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`);
+		}
+	});
+}
+/**
+* Extracts runc/gen-seccomp-profile from the proxy container, builds the
+* OCI bundle, and runs the user's command inside it via run-isolated.sh.
+* Returns the isolated command's exit code.
+*/
+function runSandboxedCommand({ containerName, proxyPid, runInput, writablePaths, env }) {
+	let dns = "172.20.0.1";
+	return withScratchDir((dir) => {
+		let runcPath, seccompProfile, baseSpec;
+		try {
+			({runcPath, seccompProfile, baseSpec} = extractRuncBootstrap({
+				containerName,
+				destDir: dir
+			}));
+		} catch (e) {
+			throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${errorMessage(e)}`, "RUNC_EXTRACT_FAILED");
+		}
+		let workdir = env.GITHUB_WORKSPACE || "", home = env.HOME || "", netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-"), rootfsBindDir = (0, node_path.join)(dir, "rootfs"), config;
+		try {
+			let resolvConfPath = writeResolvConf(dns, dir), scriptPath = writeRunScript(runInput, dir), hostMounts = listHostMounts();
+			config = buildOciConfig(baseSpec, {
+				identity: {
+					uid: process.getuid(),
+					gid: process.getgid()
+				},
+				writable: {
+					workdir,
+					home,
+					runnerTemp: env.RUNNER_TEMP || "",
+					writablePaths
+				},
+				runtime: {
+					netnsPath: `/var/run/netns/${netnsName}`,
+					rootfsBindDir,
+					resolvConfPath,
+					seccompProfile,
+					scriptPath,
+					hostMounts
+				},
+				env
+			});
+		} catch (e) {
+			throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
+		}
+		return writeOciConfig(config, dir), runIsolated({
+			runcPath,
+			proxyPid,
+			bundleDir: dir,
+			containerId: containerName,
+			netnsName,
+			rootfsBindDir,
+			gateway: "172.20.0.1",
+			dns,
+			targetIp: "172.20.0.101"
+		});
+	}, containerName);
+}
 /**
 * Side-effecting half of the report step: computeReportOutcome() decides
 * what to say, this writes it to the Job Summary/annotations/exit code.
@@ -8822,74 +8914,23 @@ async function main() {
 		ALLOWED_IP_RULES: rules.ipRules.join("\n"),
 		BUILDCAGE_PROXY_IMAGE_REF: imageRef
 	};
-	await withGroup("buildcage: starting sandbox proxy", () => {
-		try {
-			(0, node_child_process.execFileSync)("docker", buildComposeUpArgs({
-				composeFile,
-				projectName,
-				pullPolicy
-			}), {
-				stdio: "inherit",
-				env: composeEnv
-			});
-		} catch (e) {
-			throw new SandboxError(describeDockerFailure(e, { operation: "docker compose up" }), "DOCKER_UNAVAILABLE");
-		}
+	await startSandboxProxy({
+		composeFile,
+		projectName,
+		pullPolicy,
+		composeEnv
 	});
 	let exitCode = 1;
 	try {
 		let proxyPid = getContainerPid(containerName);
 		if (proxyPid === null) throw new SandboxError(`Sandbox proxy container ${containerName} is not running.`, "PROXY_NOT_RUNNING");
-		let dns = "172.20.0.1";
-		exitCode = withScratchDir((dir) => {
-			let runcPath, seccompProfile, baseSpec;
-			try {
-				({runcPath, seccompProfile, baseSpec} = extractRuncBootstrap({
-					containerName,
-					destDir: dir
-				}));
-			} catch (e) {
-				throw new SandboxError(`Failed to extract runc/gen-seccomp-profile from the proxy image: ${errorMessage(e)}`, "RUNC_EXTRACT_FAILED");
-			}
-			let workdir = env.GITHUB_WORKSPACE || "", home = env.HOME || "", netnsName = containerName.replace(/^buildcage-proxy-/, "buildcage-sandbox-"), rootfsBindDir = (0, node_path.join)(dir, "rootfs"), config;
-			try {
-				let resolvConfPath = writeResolvConf(dns, dir), scriptPath = writeRunScript(runInput, dir), hostMounts = listHostMounts();
-				config = buildOciConfig(baseSpec, {
-					identity: {
-						uid: process.getuid(),
-						gid: process.getgid()
-					},
-					writable: {
-						workdir,
-						home,
-						runnerTemp: env.RUNNER_TEMP || "",
-						writablePaths
-					},
-					runtime: {
-						netnsPath: `/var/run/netns/${netnsName}`,
-						rootfsBindDir,
-						resolvConfPath,
-						seccompProfile,
-						scriptPath,
-						hostMounts
-					},
-					env
-				});
-			} catch (e) {
-				throw new SandboxError(`Failed to build the sandbox's OCI bundle: ${errorMessage(e)}`, "OCI_CONFIG_BUILD_FAILED");
-			}
-			return writeOciConfig(config, dir), runIsolated({
-				runcPath,
-				proxyPid,
-				bundleDir: dir,
-				containerId: containerName,
-				netnsName,
-				rootfsBindDir,
-				gateway: "172.20.0.1",
-				dns,
-				targetIp: "172.20.0.101"
-			});
-		}, containerName);
+		exitCode = runSandboxedCommand({
+			containerName,
+			proxyPid,
+			runInput,
+			writablePaths,
+			env
+		});
 	} finally {
 		try {
 			let report = await fetchReport(containerName, {
@@ -8914,18 +8955,11 @@ async function main() {
 		} catch (e) {
 			annotation.warning(`Failed to fetch sandbox report: ${errorMessage(e)}`);
 		}
-		await withGroup("buildcage: stopping sandbox proxy", () => {
-			try {
-				(0, node_child_process.execFileSync)("docker", buildComposeDownArgs({
-					composeFile,
-					projectName
-				}), {
-					stdio: "inherit",
-					env: composeEnv
-				});
-			} catch (e) {
-				annotation.warning(`Failed to stop the sandbox proxy container: ${describeDockerFailure(e, { operation: "docker compose down" })}`);
-			}
+		await stopSandboxProxy({
+			composeFile,
+			projectName,
+			composeEnv,
+			annotation
 		});
 	}
 	exitCode !== 0 && (process.exitCode = exitCode);
