@@ -1,6 +1,6 @@
 import type { HostTableRow } from "./render/host-table.ts";
 import type { AnnotatedBlockedRow } from "./outcome/annotate-known-blocked.ts";
-import type { VertexAllowedEntry } from "../log/vertex-log.ts";
+import type { VertexAllowedEntry } from "../log/vertex-log-parser.ts";
 
 /** Echoed back verbatim rather than re-derived — only the container's own
  *  env (or, for run, its own action input) reflects what was configured. */

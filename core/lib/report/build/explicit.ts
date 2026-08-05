@@ -1,5 +1,6 @@
 import { scanBuildkitdLog } from "../../log/buildkitd-log-parser.ts";
-import { aggregateAllowedHosts, type VertexAllowedEntry } from "../../log/vertex-log.ts";
+import { aggregateAllowedHosts } from "./aggregate-allowed-hosts.ts";
+import type { VertexAllowedEntry } from "../../log/vertex-log-parser.ts";
 import { annotateKnownBlocked } from "../outcome/annotate-known-blocked.ts";
 import type { GenReportParameters, ExplicitReportData } from "../types.ts";
 
