@@ -211,20 +211,24 @@ function fakeBaseSpec() {
 
 describe("buildOciConfig", () => {
   const baseArgs = {
-    uid: 1000,
-    gid: 1000,
-    workdir: "/home/runner/work/repo/repo",
-    home: "/home/runner",
+    identity: { uid: 1000, gid: 1000 },
+    writable: {
+      workdir: "/home/runner/work/repo/repo",
+      home: "/home/runner",
+      writablePaths: [] as string[],
+    },
+    runtime: {
+      netnsPath: "/var/run/netns/buildcage-sandbox-abcd1234",
+      rootfsBindDir: "/tmp/buildcage-sandbox-xyz/rootfs",
+      resolvConfPath: "/tmp/buildcage-sandbox-xyz/resolv.conf",
+      seccompProfile: { defaultAction: "SCMP_ACT_ERRNO" },
+      scriptPath: "/tmp/buildcage-sandbox-xyz/run-script.sh",
+    },
     env: { FOO: "bar", UNSET: undefined },
-    netnsPath: "/var/run/netns/buildcage-sandbox-abcd1234",
-    rootfsBindDir: "/tmp/buildcage-sandbox-xyz/rootfs",
-    resolvConfPath: "/tmp/buildcage-sandbox-xyz/resolv.conf",
-    seccompProfile: { defaultAction: "SCMP_ACT_ERRNO" },
-    scriptPath: "/tmp/buildcage-sandbox-xyz/run-script.sh",
   };
 
   it("clears all five capability sets and sets noNewPrivileges", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    const config = buildOciConfig(fakeBaseSpec(), baseArgs);
     assert.deepEqual(config.process.capabilities, {
       bounding: [],
       effective: [],
@@ -236,33 +240,37 @@ describe("buildOciConfig", () => {
   });
 
   it("sets uid/gid and cwd from the given options", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    const config = buildOciConfig(fakeBaseSpec(), baseArgs);
     assert.deepEqual(config.process.user, { uid: 1000, gid: 1000 });
-    assert.equal(config.process.cwd, baseArgs.workdir);
+    assert.equal(config.process.cwd, baseArgs.writable.workdir);
   });
 
   it("wraps the script in `setpriv --pdeathsig=KILL` (die-with-parent, see run-isolated.sh)", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    const config = buildOciConfig(fakeBaseSpec(), baseArgs);
     // args[0] is setpriv resolved to an absolute path where it exists (e.g.
     // /usr/bin/setpriv on Linux), falling back to bare "setpriv" otherwise.
     assert.match(config.process.args[0], /(^|\/)setpriv$/);
-    assert.deepEqual(config.process.args.slice(1), ["--pdeathsig=KILL", "--", baseArgs.scriptPath]);
+    assert.deepEqual(config.process.args.slice(1), [
+      "--pdeathsig=KILL",
+      "--",
+      baseArgs.runtime.scriptPath,
+    ]);
   });
 
   it("replaces process.env with the given env, dropping undefined values", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    const config = buildOciConfig(fakeBaseSpec(), baseArgs);
     assert.deepEqual(config.process.env, ["FOO=bar"]);
   });
 
   it("adds `path` to the network namespace entry, leaving other namespace types untouched", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    const config = buildOciConfig(fakeBaseSpec(), baseArgs);
     const netNs = config.linux.namespaces.find((ns) => ns.type === "network");
-    assert.equal(netNs!.path, baseArgs.netnsPath);
+    assert.equal(netNs!.path, baseArgs.runtime.netnsPath);
     assert.equal(config.linux.namespaces.length, 6);
   });
 
   it("extends maskedPaths with kallsyms/kmsg/sysrq-trigger and moves sysrq-trigger out of readonlyPaths", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    const config = buildOciConfig(fakeBaseSpec(), baseArgs);
     for (const p of [
       "/proc/kallsyms",
       "/proc/kmsg",
@@ -278,33 +286,50 @@ describe("buildOciConfig", () => {
   });
 
   it("embeds the seccomp profile as-is", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
-    assert.deepEqual(config.linux.seccomp, baseArgs.seccompProfile);
+    const config = buildOciConfig(fakeBaseSpec(), baseArgs);
+    assert.deepEqual(config.linux.seccomp, baseArgs.runtime.seccompProfile);
   });
 
   it("makes root read-only and binds workdir/home/tmp/writablePaths as writable exceptions", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/opt/cache"] });
+    const config = buildOciConfig(fakeBaseSpec(), {
+      ...baseArgs,
+      writable: { ...baseArgs.writable, writablePaths: ["/opt/cache"] },
+    });
     assert.equal(config.root.readonly, true);
-    assert.equal(config.root.path, baseArgs.rootfsBindDir);
+    assert.equal(config.root.path, baseArgs.runtime.rootfsBindDir);
     const rw = config.mounts.filter((m) => m.options?.includes("rw")).map((m) => m.destination);
-    assert.deepEqual(rw.sort(), ["/opt/cache", "/tmp", baseArgs.home, baseArgs.workdir].sort());
+    assert.deepEqual(
+      rw.sort(),
+      ["/opt/cache", "/tmp", baseArgs.writable.home, baseArgs.writable.workdir].sort(),
+    );
   });
 
   it("does not mount anything over rootfsBindDir (it lives under /var/tmp/buildcage, so nothing re-exposes it)", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/opt/cache"] });
-    assert.ok(!config.mounts.some((m) => m.destination === baseArgs.rootfsBindDir));
+    const config = buildOciConfig(fakeBaseSpec(), {
+      ...baseArgs,
+      writable: { ...baseArgs.writable, writablePaths: ["/opt/cache"] },
+    });
+    assert.ok(!config.mounts.some((m) => m.destination === baseArgs.runtime.rootfsBindDir));
   });
 
   it("fails closed when writable: lists the scratch base itself", () => {
     assert.throws(
-      () => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp/buildcage"] }),
+      () =>
+        buildOciConfig(fakeBaseSpec(), {
+          ...baseArgs,
+          writable: { ...baseArgs.writable, writablePaths: ["/var/tmp/buildcage"] },
+        }),
       /overlaps the sandbox's own scratch directory/,
     );
   });
 
   it("fails closed when writable: lists an ancestor of the scratch base", () => {
     assert.throws(
-      () => buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp"] }),
+      () =>
+        buildOciConfig(fakeBaseSpec(), {
+          ...baseArgs,
+          writable: { ...baseArgs.writable, writablePaths: ["/var/tmp"] },
+        }),
       /overlaps/,
     );
   });
@@ -314,7 +339,10 @@ describe("buildOciConfig", () => {
       () =>
         buildOciConfig(fakeBaseSpec(), {
           ...baseArgs,
-          writablePaths: ["/var/tmp/buildcage/some-other-run"],
+          writable: {
+            ...baseArgs.writable,
+            writablePaths: ["/var/tmp/buildcage/some-other-run"],
+          },
         }),
       /overlaps/,
     );
@@ -325,8 +353,7 @@ describe("buildOciConfig", () => {
       () =>
         buildOciConfig(fakeBaseSpec(), {
           ...baseArgs,
-          home: "/var/tmp/buildcage",
-          writablePaths: [],
+          writable: { ...baseArgs.writable, home: "/var/tmp/buildcage", writablePaths: [] },
         }),
       /overlaps/,
     );
@@ -334,13 +361,19 @@ describe("buildOciConfig", () => {
 
   it("does not fail closed for an unrelated sibling under /var/tmp", () => {
     assert.doesNotThrow(() =>
-      buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/var/tmp/some-other-tool"] }),
+      buildOciConfig(fakeBaseSpec(), {
+        ...baseArgs,
+        writable: { ...baseArgs.writable, writablePaths: ["/var/tmp/some-other-tool"] },
+      }),
     );
   });
 
   it("`writable: /` is exempt from the scratch-base guard (documented full opt-out)", () => {
     assert.doesNotThrow(() =>
-      buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/"] }),
+      buildOciConfig(fakeBaseSpec(), {
+        ...baseArgs,
+        writable: { ...baseArgs.writable, writablePaths: ["/"] },
+      }),
     );
   });
 
@@ -352,9 +385,8 @@ describe("buildOciConfig", () => {
     ];
     const config = buildOciConfig(fakeBaseSpec(), {
       ...baseArgs,
-      writablePaths: [],
-      runnerTemp,
-      hostMounts,
+      writable: { ...baseArgs.writable, writablePaths: [], runnerTemp },
+      runtime: { ...baseArgs.runtime, hostMounts },
     });
     const rw = config.mounts.filter((m) => m.options?.includes("rw")).map((m) => m.destination);
     assert.ok(rw.includes(runnerTemp), "RUNNER_TEMP must be bind-mounted writable");
@@ -367,8 +399,7 @@ describe("buildOciConfig", () => {
   it("does not double-mount RUNNER_TEMP when it duplicates another writable path", () => {
     const config = buildOciConfig(fakeBaseSpec(), {
       ...baseArgs,
-      writablePaths: [],
-      runnerTemp: "/tmp",
+      writable: { ...baseArgs.writable, writablePaths: [], runnerTemp: "/tmp" },
     });
     const tmpMounts = config.mounts.filter(
       (m) => m.destination === "/tmp" && m.options?.includes("rw"),
@@ -377,18 +408,21 @@ describe("buildOciConfig", () => {
   });
 
   it("adds a read-only resolv.conf bind mount", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [] });
+    const config = buildOciConfig(fakeBaseSpec(), baseArgs);
     const resolv = config.mounts.find((m) => m.destination === "/etc/resolv.conf");
     assert.deepEqual(resolv, {
       destination: "/etc/resolv.conf",
       type: "none",
-      source: baseArgs.resolvConfPath,
+      source: baseArgs.runtime.resolvConfPath,
       options: ["rbind", "ro"],
     });
   });
 
   it("`writable: /` disables the read-only root and skips the individual writable-path mounts", () => {
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: ["/"] });
+    const config = buildOciConfig(fakeBaseSpec(), {
+      ...baseArgs,
+      writable: { ...baseArgs.writable, writablePaths: ["/"] },
+    });
     assert.equal(config.root.readonly, false);
     const rw = config.mounts.filter((m) => m.options?.includes("rw"));
     assert.equal(rw.length, 0);
@@ -399,9 +433,13 @@ describe("buildOciConfig", () => {
       { mountPoint: "/", fsType: "ext4" },
       { mountPoint: "/proc", fsType: "proc" },
       { mountPoint: "/mnt", fsType: "ext4" },
-      { mountPoint: baseArgs.workdir, fsType: "ext4" },
+      { mountPoint: baseArgs.writable.workdir, fsType: "ext4" },
     ];
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], hostMounts });
+    const config = buildOciConfig(fakeBaseSpec(), {
+      ...baseArgs,
+      writable: { ...baseArgs.writable, writablePaths: [] },
+      runtime: { ...baseArgs.runtime, hostMounts },
+    });
     assert.ok(
       config.linux.readonlyPaths.includes("/mnt"),
       "a real, separate host mount not covered by root.readonly must be listed explicitly",
@@ -415,7 +453,7 @@ describe("buildOciConfig", () => {
       "pseudo-filesystems get their own fresh mount, not a readonly remount of the host copy",
     );
     assert.ok(
-      !config.linux.readonlyPaths.includes(baseArgs.workdir),
+      !config.linux.readonlyPaths.includes(baseArgs.writable.workdir),
       "workdir must stay writable, not be added to readonlyPaths",
     );
   });
@@ -424,8 +462,8 @@ describe("buildOciConfig", () => {
     const hostMounts = [{ mountPoint: "/mnt", fsType: "ext4" }];
     const config = buildOciConfig(fakeBaseSpec(), {
       ...baseArgs,
-      writablePaths: ["/"],
-      hostMounts,
+      writable: { ...baseArgs.writable, writablePaths: ["/"] },
+      runtime: { ...baseArgs.runtime, hostMounts },
     });
     assert.ok(!config.linux.readonlyPaths.includes("/mnt"));
   });
@@ -438,7 +476,11 @@ describe("buildOciConfig", () => {
     // e.g. securityfs at /sys/kernel/security, which is commonly mounted
     // read-write on AppArmor-enabled hosts.
     const hostMounts = [{ mountPoint: "/sys/kernel/security", fsType: "securityfs" }];
-    const config = buildOciConfig(fakeBaseSpec(), { ...baseArgs, writablePaths: [], hostMounts });
+    const config = buildOciConfig(fakeBaseSpec(), {
+      ...baseArgs,
+      writable: { ...baseArgs.writable, writablePaths: [] },
+      runtime: { ...baseArgs.runtime, hostMounts },
+    });
     assert.ok(config.linux.readonlyPaths.includes("/sys/kernel/security"));
   });
 });

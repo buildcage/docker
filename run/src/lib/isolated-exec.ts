@@ -330,14 +330,24 @@ function assertScratchBaseNotWritable(writableDirs: string[]): void {
  * read-only restriction entirely" (see docs/reference.md's `writable`
  * input).
  */
-export interface BuildOciConfigOptions {
+/** Linux-level identity the sandboxed process runs as. */
+export interface SandboxIdentity {
   uid: number;
   gid: number;
+}
+
+/** The directories kept writable on top of the read-only root; see the
+ *  writableDirs computation below for how these combine. */
+export interface WritablePolicy {
   workdir?: string;
   home?: string;
   runnerTemp?: string;
   writablePaths?: string[];
-  env: NodeJS.ProcessEnv;
+}
+
+/** How this OCI config wires into run-isolated.sh's own setup (the netns it
+ *  already created, the rootfs bind-mount it will do, etc). */
+export interface SandboxRuntimeWiring {
   netnsPath: string;
   rootfsBindDir: string;
   resolvConfPath: string;
@@ -346,24 +356,27 @@ export interface BuildOciConfigOptions {
   hostMounts?: HostMount[];
 }
 
+export interface BuildOciConfigOptions {
+  identity: SandboxIdentity;
+  writable: WritablePolicy;
+  runtime: SandboxRuntimeWiring;
+  env: NodeJS.ProcessEnv;
+}
+
 export function buildOciConfig(
   baseSpec: OciSpec,
-  {
-    uid,
-    gid,
-    workdir,
-    home,
-    runnerTemp,
-    writablePaths = [],
-    env,
+  { identity, writable, runtime, env }: BuildOciConfigOptions,
+): BuiltOciSpec {
+  const { uid, gid } = identity;
+  const { workdir, home, runnerTemp, writablePaths = [] } = writable;
+  const {
     netnsPath,
     rootfsBindDir,
     resolvConfPath,
     seccompProfile,
     scriptPath,
     hostMounts = [],
-  }: BuildOciConfigOptions,
-): BuiltOciSpec {
+  } = runtime;
   const disableReadonly = writablePaths.includes("/");
 
   const mounts = [
