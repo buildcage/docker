@@ -3,8 +3,7 @@
  *
  * Run with: vp test run core/lib/acl/wildcard-rules.property.test.ts
  */
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 
 import { convertRule, buildRules, parseAndValidateRules } from "./wildcard-rules.ts";
@@ -28,11 +27,11 @@ describe("convertRule – properties", () => {
     fc.assert(
       fc.property(simplePattern, (pattern) => {
         const regex = new RegExp(convertRule(pattern));
-        assert.ok(regex.test(pattern), "regex must match original pattern");
-        assert.ok(
+        expect(regex.test(pattern), "regex must match original pattern").toBeTruthy();
+        expect(
           !regex.test(`sub.${pattern}`),
           "regex must not match with extra subdomain prefix",
-        );
+        ).toBeTruthy();
       }),
     );
   });
@@ -52,7 +51,7 @@ describe("convertRule – properties", () => {
 
     fc.assert(
       fc.property(patternWithMeta, (pattern) => {
-        assert.doesNotThrow(() => new RegExp(convertRule(pattern)));
+        expect(() => new RegExp(convertRule(pattern))).not.toThrow();
       }),
     );
   });
@@ -69,13 +68,7 @@ describe("convertRule – properties", () => {
 
     fc.assert(
       fc.property(mixedWildcardLabel, (label) => {
-        assert.throws(
-          () => convertRule(`${label}.com:443`),
-          (err) => {
-            assert.ok(err instanceof Error);
-            return true;
-          },
-        );
+        expect(() => convertRule(`${label}.com:443`)).toThrow();
       }),
     );
   });
@@ -100,7 +93,7 @@ describe("buildRules – properties", () => {
     fc.assert(
       fc.property(fc.array(validRule, { minLength: 0, maxLength: 5 }), whitespace, (rules, sep) => {
         const result = buildRules(rules.join(sep));
-        assert.equal(result.length, rules.length);
+        expect(result.length).toBe(rules.length);
       }),
     );
   });
@@ -122,19 +115,19 @@ describe("parseAndValidateRules – properties", () => {
     fc.assert(
       fc.property(fc.array(validRule, { minLength: 0, maxLength: 5 }), (rules) => {
         const input = rules.join(" ");
-        assert.deepEqual(parseAndValidateRules(input), rules);
-        assert.equal(parseAndValidateRules(input).length, buildRules(input).length);
+        expect(parseAndValidateRules(input)).toStrictEqual(rules);
+        expect(parseAndValidateRules(input).length).toBe(buildRules(input).length);
       }),
     );
   });
 
   it("returns an empty array for empty/undefined input", () => {
-    assert.deepEqual(parseAndValidateRules(undefined), []);
-    assert.deepEqual(parseAndValidateRules(""), []);
+    expect(parseAndValidateRules(undefined)).toStrictEqual([]);
+    expect(parseAndValidateRules("")).toStrictEqual([]);
   });
 
   it("throws on invalid syntax, matching buildRules' own validation", () => {
-    assert.throws(() => parseAndValidateRules("no-port-specified"));
-    assert.throws(() => buildRules("no-port-specified"));
+    expect(() => parseAndValidateRules("no-port-specified")).toThrow();
+    expect(() => buildRules("no-port-specified")).toThrow();
   });
 });

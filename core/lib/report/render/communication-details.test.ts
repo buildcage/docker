@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "#core/lib/test/test-shim.ts";
+import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
 import { renderCommunicationDetails } from "./communication-details.ts";
 
 function wrap(body: string) {
@@ -41,24 +41,24 @@ const ALLOWED_B =
 
 describe("renderCommunicationDetails", () => {
   it("empty arrays → empty string", () => {
-    assert.equal(renderCommunicationDetails([], []), "");
+    expect(renderCommunicationDetails([], [])).toBe("");
   });
 
   it("null/undefined → empty string", () => {
-    assert.equal(renderCommunicationDetails(null, null), "");
-    assert.equal(renderCommunicationDetails(undefined, undefined), "");
+    expect(renderCommunicationDetails(null, null)).toBe("");
+    expect(renderCommunicationDetails(undefined, undefined)).toBe("");
   });
 
   it("a build containing only an all-empty vertex list is treated as no builds", () => {
-    assert.equal(renderCommunicationDetails([[]], []), "");
+    expect(renderCommunicationDetails([[]], [])).toBe("");
   });
 
   it("a vertex with no entries renders '(no communication)'", () => {
-    assert.equal(renderCommunicationDetails([[VERTEX_A]], []), wrap(ALLOWED_A));
+    expect(renderCommunicationDetails([[VERTEX_A]], [])).toBe(wrap(ALLOWED_A));
   });
 
   it("a vertex with an allowed entry renders the request line in a code block", () => {
-    assert.equal(renderCommunicationDetails([[VERTEX_B]], []), wrap(ALLOWED_B));
+    expect(renderCommunicationDetails([[VERTEX_B]], [])).toBe(wrap(ALLOWED_B));
   });
 
   it("an entry with no status omits the arrow", () => {
@@ -66,17 +66,15 @@ describe("renderCommunicationDetails", () => {
       ...VERTEX_B,
       entries: [{ method: "GET", url: "https://allowed.example.com/" }],
     };
-    assert.match(
-      renderCommunicationDetails([[vertex]], []),
+    expect(renderCommunicationDetails([[vertex]], [])).toMatch(
       /- GET https:\/\/allowed\.example\.com\/\n/,
     );
   });
 
   it("renders multiple vertices within one build under one 'Allowed Urls' item, no build item", () => {
     const md = renderCommunicationDetails([[VERTEX_A, VERTEX_B]], []);
-    assert.equal(md.includes("Build"), false);
-    assert.equal(
-      md,
+    expect(md.includes("Build")).toBe(false);
+    expect(md).toBe(
       wrap(
         "* **✅ Allowed Urls**\n\n" +
           "   * RUN echo no-network-here && mkdir -p /tmp/work\n\n" +
@@ -95,21 +93,20 @@ describe("renderCommunicationDetails", () => {
 
   it("adds a 'Build N' item per build, one level deeper, only when there is more than one build", () => {
     const md = renderCommunicationDetails([[VERTEX_A], [VERTEX_B]], []);
-    assert.equal(md.includes("   * Build 1\n\n      * RUN echo no-network-here"), true);
-    assert.equal(md.includes("   * Build 2\n\n      * RUN echo step-A"), true);
+    expect(md.includes("   * Build 1\n\n      * RUN echo no-network-here")).toBe(true);
+    expect(md.includes("   * Build 2\n\n      * RUN echo step-A")).toBe(true);
   });
 
   it("skips empty builds when deciding whether to show build items (only 1 non-empty build)", () => {
     const md = renderCommunicationDetails([[], [VERTEX_A], []], []);
-    assert.equal(md.includes("Build"), false);
+    expect(md.includes("Build")).toBe(false);
   });
 
   it("renders the Blocked Urls section with whole-second timestamps, no vertex attribution", () => {
     const deniedTimeline = [
       { url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" },
     ];
-    assert.equal(
-      renderCommunicationDetails([], deniedTimeline),
+    expect(renderCommunicationDetails([], deniedTimeline)).toBe(
       wrap("* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n"),
     );
   });
@@ -119,8 +116,7 @@ describe("renderCommunicationDetails", () => {
       { url: "https://blocked.example.com/a", timestamp: "2026-07-05T22:08:41Z" },
       { url: "https://blocked.example.com/b", timestamp: "2026-07-05T22:08:42Z" },
     ];
-    assert.equal(
-      renderCommunicationDetails([], deniedTimeline),
+    expect(renderCommunicationDetails([], deniedTimeline)).toBe(
       wrap(
         "* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/a\n   - (22:08:42Z) https://blocked.example.com/b\n\n",
       ),
@@ -131,8 +127,7 @@ describe("renderCommunicationDetails", () => {
     const deniedTimeline = [
       { url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" },
     ];
-    assert.equal(
-      renderCommunicationDetails([[VERTEX_B]], deniedTimeline),
+    expect(renderCommunicationDetails([[VERTEX_B]], deniedTimeline)).toBe(
       wrap(
         ALLOWED_B + "* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n",
       ),
@@ -143,14 +138,13 @@ describe("renderCommunicationDetails", () => {
     const deniedTimeline = [
       { url: "https://blocked.example.com/", timestamp: "2026-07-05T22:08:41Z" },
     ];
-    assert.equal(
-      renderCommunicationDetails([], deniedTimeline),
+    expect(renderCommunicationDetails([], deniedTimeline)).toBe(
       wrap("* **🚫 Blocked Urls**\n\n   - (22:08:41Z) https://blocked.example.com/\n\n"),
     );
   });
 
   it("renders only Allowed Urls when deniedTimeline is empty but builds is not", () => {
-    assert.equal(renderCommunicationDetails([[VERTEX_B]], []), wrap(ALLOWED_B));
+    expect(renderCommunicationDetails([[VERTEX_B]], [])).toBe(wrap(ALLOWED_B));
   });
 
   describe("markdown escaping", () => {
@@ -161,19 +155,19 @@ describe("renderCommunicationDetails", () => {
         entries: [],
       };
       const md = renderCommunicationDetails([[vertex]], []);
-      assert.match(md, /\* \\\[2\/2\\\] RUN echo "=== \\\[HTTPS - allowed\\\] ==="\n/);
+      expect(md).toMatch(/\* \\\[2\/2\\\] RUN echo "=== \\\[HTTPS - allowed\\\] ==="\n/);
     });
 
     it("escapes '*' and '_' in a command so they can't be misread as emphasis", () => {
       const vertex = { ...VERTEX_A, command: "RUN echo *hi* && echo _bye_", entries: [] };
       const md = renderCommunicationDetails([[vertex]], []);
-      assert.match(md, /\* RUN echo \\\*hi\\\* && echo \\_bye\\_\n/);
+      expect(md).toMatch(/\* RUN echo \\\*hi\\\* && echo \\_bye\\_\n/);
     });
 
     it("escapes backticks and backslashes in a command", () => {
       const vertex = { ...VERTEX_A, command: "RUN echo `whoami` && echo C:\\\\path", entries: [] };
       const md = renderCommunicationDetails([[vertex]], []);
-      assert.match(md, /echo \\`whoami\\` && echo C:\\\\\\\\path/);
+      expect(md).toMatch(/echo \\`whoami\\` && echo C:\\\\\\\\path/);
     });
 
     it("escapes special characters in an allowed request's URL inside the code block", () => {
@@ -182,7 +176,7 @@ describe("renderCommunicationDetails", () => {
         entries: [{ method: "GET", url: "https://allowed.example.com/[id]", status: 200 }],
       };
       const md = renderCommunicationDetails([[vertex]], []);
-      assert.match(md, /- GET https:\/\/allowed\.example\.com\/\\\[id\\\] -> 200/);
+      expect(md).toMatch(/- GET https:\/\/allowed\.example\.com\/\\\[id\\\] -> 200/);
     });
 
     it("escapes special characters in a denied URL", () => {
@@ -190,13 +184,13 @@ describe("renderCommunicationDetails", () => {
         { url: "https://blocked.example.com/[id]", timestamp: "2026-07-05T22:08:41Z" },
       ];
       const md = renderCommunicationDetails([], deniedTimeline);
-      assert.match(md, /- \(22:08:41Z\) https:\/\/blocked\.example\.com\/\\\[id\\\]/);
+      expect(md).toMatch(/- \(22:08:41Z\) https:\/\/blocked\.example\.com\/\\\[id\\\]/);
     });
 
     it("does not escape '.' or '-', which are common and harmless in URLs/commands", () => {
       const vertex = { ...VERTEX_A, command: "RUN echo hello-world.txt", entries: [] };
       const md = renderCommunicationDetails([[vertex]], []);
-      assert.match(md, /\* RUN echo hello-world\.txt\n/);
+      expect(md).toMatch(/\* RUN echo hello-world\.txt\n/);
     });
   });
 });

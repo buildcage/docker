@@ -3,8 +3,7 @@
  *
  * Run with: vp test run setup/src/main.test.ts
  */
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 
 import { resolveBuildcageImageRef } from "#core/lib/provenance/image-ref.ts";
 import { buildACLRules, resolveProxyEngine } from "./main.ts";
@@ -20,7 +19,7 @@ describe("resolveBuildcageImageRef", () => {
       imageDigest: digest,
       actionRepository: "Owner/Repo",
     });
-    assert.equal(result, `ghcr.io/owner/repo@${digest}`);
+    expect(result).toBe(`ghcr.io/owner/repo@${digest}`);
   });
 
   it("lowercases the repository", () => {
@@ -29,7 +28,7 @@ describe("resolveBuildcageImageRef", () => {
       imageDigest: digest,
       actionRepository: "MyOrg/MyRepo",
     });
-    assert.ok(result.startsWith("ghcr.io/myorg/myrepo@"));
+    expect(result.startsWith("ghcr.io/myorg/myrepo@")).toBeTruthy();
   });
 
   it("always derives repository from actionRepository (no external override)", () => {
@@ -38,7 +37,7 @@ describe("resolveBuildcageImageRef", () => {
       imageDigest: digest,
       actionRepository: "dash14/buildcage",
     });
-    assert.ok(result.startsWith("ghcr.io/dash14/buildcage@"));
+    expect(result.startsWith("ghcr.io/dash14/buildcage@")).toBeTruthy();
   });
 });
 
@@ -48,39 +47,27 @@ describe("resolveBuildcageImageRef", () => {
 
 describe("resolveProxyEngine", () => {
   it("defaults to transparent for undefined", () => {
-    assert.equal(resolveProxyEngine(undefined), "transparent");
+    expect(resolveProxyEngine(undefined)).toBe("transparent");
   });
 
   it("defaults to transparent for empty string", () => {
-    assert.equal(resolveProxyEngine(""), "transparent");
+    expect(resolveProxyEngine("")).toBe("transparent");
   });
 
   it("accepts transparent explicitly", () => {
-    assert.equal(resolveProxyEngine("transparent"), "transparent");
+    expect(resolveProxyEngine("transparent")).toBe("transparent");
   });
 
   it("accepts explicit", () => {
-    assert.equal(resolveProxyEngine("explicit"), "explicit");
+    expect(resolveProxyEngine("explicit")).toBe("explicit");
   });
 
   it("throws SetupError for an invalid value", () => {
-    assert.throws(
-      () => resolveProxyEngine("restrict"),
-      (err) => {
-        assert.ok(err instanceof Error);
-        return true;
-      },
-    );
+    expect(() => resolveProxyEngine("restrict")).toThrow();
   });
 
   it("throws SetupError for a value with different casing (case-sensitive)", () => {
-    assert.throws(
-      () => resolveProxyEngine("Explicit"),
-      (err) => {
-        assert.ok(err instanceof Error);
-        return true;
-      },
-    );
+    expect(() => resolveProxyEngine("Explicit")).toThrow();
   });
 });
 
@@ -95,7 +82,7 @@ describe("buildACLRules", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.deepEqual(httpsRules, ["example.com:443", "*.cdn.example.com:443"]);
+    expect(httpsRules).toStrictEqual(["example.com:443", "*.cdn.example.com:443"]);
   });
 
   it("handles newline-separated rules", () => {
@@ -104,7 +91,7 @@ describe("buildACLRules", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.deepEqual(httpsRules, ["a.com:443", "b.com:443"]);
+    expect(httpsRules).toStrictEqual(["a.com:443", "b.com:443"]);
   });
 
   it("returns empty arrays for empty/undefined inputs", () => {
@@ -113,23 +100,18 @@ describe("buildACLRules", () => {
       httpRulesInput: undefined,
       ipRulesInput: "   ",
     });
-    assert.deepEqual(result.httpsRules, []);
-    assert.deepEqual(result.httpRules, []);
-    assert.deepEqual(result.ipRules, []);
+    expect(result.httpsRules).toStrictEqual([]);
+    expect(result.httpRules).toStrictEqual([]);
+    expect(result.ipRules).toStrictEqual([]);
   });
 
   it("throws for invalid rule syntax", () => {
-    assert.throws(
-      () =>
-        buildACLRules({
-          httpsRulesInput: "no-port-specified",
-          httpRulesInput: "",
-          ipRulesInput: "",
-        }),
-      (err) => {
-        assert.ok(err instanceof Error, "expected Error");
-        return true;
-      },
-    );
+    expect(() =>
+      buildACLRules({
+        httpsRulesInput: "no-port-specified",
+        httpRulesInput: "",
+        ipRulesInput: "",
+      }),
+    ).toThrow();
   });
 });

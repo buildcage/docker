@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "#core/lib/test/test-shim.ts";
+import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
 import { buildRestrictExample } from "./build-example.ts";
 
 const REPO = "dash14/buildcage";
@@ -17,12 +17,12 @@ function wrap(yaml: string) {
 
 describe("buildRestrictExample", () => {
   it("empty array → empty string", () => {
-    assert.equal(buildRestrictExample([], REPO), "");
+    expect(buildRestrictExample([], REPO)).toBe("");
   });
 
   it("null/undefined → empty string", () => {
-    assert.equal(buildRestrictExample(null, REPO), "");
-    assert.equal(buildRestrictExample(undefined, REPO), "");
+    expect(buildRestrictExample(null, REPO)).toBe("");
+    expect(buildRestrictExample(undefined, REPO)).toBe("");
   });
 
   it("HTTPS only entries", () => {
@@ -30,8 +30,7 @@ describe("buildRestrictExample", () => {
       { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 5 },
       { host: "github.com", port: "443", ruleType: "HTTPS", count: 2 },
     ];
-    assert.equal(
-      buildRestrictExample(rows, REPO, REF),
+    expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -51,8 +50,7 @@ describe("buildRestrictExample", () => {
       { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 3 },
       { host: "deb.debian.org", port: "80", ruleType: "HTTP", count: 1 },
     ];
-    assert.equal(
-      buildRestrictExample(rows, REPO, REF),
+    expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -70,8 +68,7 @@ describe("buildRestrictExample", () => {
 
   it("IP entries", () => {
     const rows = [{ host: "192.168.1.1", port: "443", ruleType: "IP", count: 1 }];
-    assert.equal(
-      buildRestrictExample(rows, REPO, REF),
+    expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -91,8 +88,7 @@ describe("buildRestrictExample", () => {
       { host: "example.com", port: "80", ruleType: "HTTP", count: 1 },
       { host: "10.0.0.1", port: "8080", ruleType: "IP", count: 1 },
     ];
-    assert.equal(
-      buildRestrictExample(rows, REPO, REF),
+    expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -112,8 +108,7 @@ describe("buildRestrictExample", () => {
 
   it("uses custom actionRepo", () => {
     const rows = [{ host: "example.com", port: "443", ruleType: "HTTPS", count: 1 }];
-    assert.equal(
-      buildRestrictExample(rows, "myorg/myrepo", REF),
+    expect(buildRestrictExample(rows, "myorg/myrepo", REF)).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -129,8 +124,7 @@ describe("buildRestrictExample", () => {
 
   it("renders a tag actionRef as-is", () => {
     const rows = [{ host: "example.com", port: "443", ruleType: "HTTPS", count: 1 }];
-    assert.equal(
-      buildRestrictExample(rows, REPO, "v2.1.0"),
+    expect(buildRestrictExample(rows, REPO, "v2.1.0")).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -147,8 +141,7 @@ describe("buildRestrictExample", () => {
   it("renders a commit SHA actionRef as a <sha> placeholder", () => {
     const rows = [{ host: "example.com", port: "443", ruleType: "HTTPS", count: 1 }];
     const sha = "abc1234567890def1234567890abcdef12345678";
-    assert.equal(
-      buildRestrictExample(rows, REPO, sha),
+    expect(buildRestrictExample(rows, REPO, sha)).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -164,8 +157,9 @@ describe("buildRestrictExample", () => {
 
   it("uses the run action and includes the run command when actionName is 'run'", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 5 }];
-    assert.equal(
+    expect(
       buildRestrictExample(rows, REPO, REF, { actionName: "run", runCommand: "npm install" }),
+    ).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -183,8 +177,9 @@ describe("buildRestrictExample", () => {
 
   it("preserves multi-line run commands, indented under run: |", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    assert.equal(
+    expect(
       buildRestrictExample(rows, REPO, REF, { actionName: "run", runCommand: "npm ci\nnpm test" }),
+    ).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -203,11 +198,12 @@ describe("buildRestrictExample", () => {
 
   it("strips the trailing newline GitHub Actions adds to `run: |` block scalars", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    assert.equal(
+    expect(
       buildRestrictExample(rows, REPO, REF, {
         actionName: "run",
         runCommand: "npm ci\nnpm test\n",
       }),
+    ).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
@@ -226,8 +222,7 @@ describe("buildRestrictExample", () => {
 
   it("actionName 'run' without a runCommand omits the run: block", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    assert.equal(
-      buildRestrictExample(rows, REPO, REF, { actionName: "run" }),
+    expect(buildRestrictExample(rows, REPO, REF, { actionName: "run" })).toBe(
       wrap(
         [
           "- name: Start Buildcage in restrict mode",

@@ -1,5 +1,4 @@
-import { describe, it, beforeEach, afterEach, vi } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { emitBlockedOutcome } from "./emit.ts";
 import { annotateKnownBlocked } from "../build/aggregate.ts";
@@ -43,7 +42,7 @@ function report(overrides: Partial<ReportDataCommon> = {}): ReportDataCommon {
 describe("emitBlockedOutcome", () => {
   it("leaves exitCode untouched when there are no blocked connections", () => {
     emitBlockedOutcome(report(), { failOnBlocked: true, summaryFile: undefined });
-    assert.equal(process.exitCode, undefined);
+    expect(process.exitCode).toBe(undefined);
   });
 
   it("sets exitCode=1 when an unexpected blocked connection is found and failOnBlocked is true", () => {
@@ -63,7 +62,7 @@ describe("emitBlockedOutcome", () => {
       ),
     });
     emitBlockedOutcome(r, { failOnBlocked: true, summaryFile: undefined });
-    assert.equal(process.exitCode, 1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("emits ::notice:: (not ::error::) when console output is enabled and outcome level is notice", () => {
@@ -91,8 +90,8 @@ describe("emitBlockedOutcome", () => {
     const errors = log.mock.calls
       .map((c) => c[0] as string)
       .filter((s) => s.startsWith("::error::"));
-    assert.equal(notices.length, 1);
-    assert.equal(errors.length, 0);
+    expect(notices.length).toBe(1);
+    expect(errors.length).toBe(0);
   });
 
   it("emits ::error:: when console output is enabled and outcome level is error", () => {
@@ -116,7 +115,7 @@ describe("emitBlockedOutcome", () => {
     const errors = log.mock.calls
       .map((c) => c[0] as string)
       .filter((s) => s.startsWith("::error::"));
-    assert.equal(errors.length, 1);
+    expect(errors.length).toBe(1);
   });
 
   it("suppresses annotation output when summaryFile is undefined (not running as the real action)", () => {
@@ -140,6 +139,6 @@ describe("emitBlockedOutcome", () => {
     const annotations = log.mock.calls
       .map((c) => c[0] as string)
       .filter((s) => s.startsWith("::notice::") || s.startsWith("::error::"));
-    assert.equal(annotations.length, 0);
+    expect(annotations.length).toBe(0);
   });
 });

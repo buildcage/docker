@@ -1,5 +1,4 @@
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -9,11 +8,11 @@ import { writeRunScript } from "./oci-config.ts";
 describe("scratchDirFor", () => {
   it("derives a path under /var/tmp/buildcage from the container name (not under a writable exception)", () => {
     const dir = scratchDirFor("buildcage-proxy-abcd1234");
-    assert.equal(dir, "/var/tmp/buildcage/sandbox-abcd1234");
+    expect(dir).toBe("/var/tmp/buildcage/sandbox-abcd1234");
   });
 
   it("is deterministic for the same container name (so post.ts can reconstruct it)", () => {
-    assert.equal(scratchDirFor("buildcage-proxy-xyz"), scratchDirFor("buildcage-proxy-xyz"));
+    expect(scratchDirFor("buildcage-proxy-xyz")).toBe(scratchDirFor("buildcage-proxy-xyz"));
   });
 });
 
@@ -27,20 +26,22 @@ describe("parseMountsUnder", () => {
 
   it("finds only mount points nested under the given directory", () => {
     const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-abc");
-    assert.deepEqual(
-      result.sort(),
+    expect(result.sort()).toStrictEqual(
       ["/tmp/buildcage-sandbox-abc", "/tmp/buildcage-sandbox-abc/rootfs"].sort(),
     );
   });
 
   it("orders deepest paths first, so children are unmounted before their parents", () => {
     const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-abc");
-    assert.deepEqual(result, ["/tmp/buildcage-sandbox-abc/rootfs", "/tmp/buildcage-sandbox-abc"]);
+    expect(result).toStrictEqual([
+      "/tmp/buildcage-sandbox-abc/rootfs",
+      "/tmp/buildcage-sandbox-abc",
+    ]);
   });
 
   it("does not match a sibling directory with a similar prefix", () => {
     const result = parseMountsUnder(mountinfo, "/tmp/buildcage-sandbox-ab");
-    assert.deepEqual(result, []);
+    expect(result).toStrictEqual([]);
   });
 });
 
@@ -51,17 +52,17 @@ describe("withScratchDir", () => {
       capturedDir = dir;
       writeRunScript("echo hi", dir);
     });
-    assert.throws(() => readFileSync(join(capturedDir, "run-script.sh")));
+    expect(() => readFileSync(join(capturedDir, "run-script.sh"))).toThrow();
   });
 
   it("removes the directory even if the callback throws", () => {
     let capturedDir: string;
-    assert.throws(() => {
+    expect(() => {
       withScratchDir((dir) => {
         capturedDir = dir;
         throw new Error("boom");
       });
-    });
-    assert.throws(() => readFileSync(join(capturedDir, "run-script.sh")));
+    }).toThrow();
+    expect(() => readFileSync(join(capturedDir, "run-script.sh"))).toThrow();
   });
 });

@@ -1,9 +1,9 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { buildReportParameters } from "./parameters.ts";
 
 describe("buildReportParameters", () => {
   it("tokenizes each rules field and passes mode through", () => {
-    assert.deepEqual(
+    expect(
       buildReportParameters({
         PROXY_MODE: "restrict",
         ALLOWED_HTTPS_RULES: "a.com:443 b.com:443",
@@ -11,26 +11,25 @@ describe("buildReportParameters", () => {
         ALLOWED_IP_RULES: "",
         KNOWN_BLOCKED_RULES: "noisy.example.com:443",
       }),
-      {
-        mode: "restrict",
-        allowedHttpsRules: ["a.com:443", "b.com:443"],
-        allowedHttpRules: ["c.com:80"],
-        allowedIpRules: [],
-        knownBlockedRules: ["noisy.example.com:443"],
-      },
-    );
+    ).toStrictEqual({
+      mode: "restrict",
+      allowedHttpsRules: ["a.com:443", "b.com:443"],
+      allowedHttpRules: ["c.com:80"],
+      allowedIpRules: [],
+      knownBlockedRules: ["noisy.example.com:443"],
+    });
   });
 
   it('defaults mode to "restrict" when unset', () => {
-    assert.equal(buildReportParameters({}).mode, "restrict");
+    expect(buildReportParameters({}).mode).toBe("restrict");
   });
 
   it("returns empty arrays for unset rules fields", () => {
     const params = buildReportParameters({ PROXY_MODE: "audit" });
-    assert.deepEqual(params.allowedHttpsRules, []);
-    assert.deepEqual(params.allowedHttpRules, []);
-    assert.deepEqual(params.allowedIpRules, []);
-    assert.deepEqual(params.knownBlockedRules, []);
+    expect(params.allowedHttpsRules).toStrictEqual([]);
+    expect(params.allowedHttpRules).toStrictEqual([]);
+    expect(params.allowedIpRules).toStrictEqual([]);
+    expect(params.knownBlockedRules).toStrictEqual([]);
   });
 });
 

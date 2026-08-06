@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "#core/lib/test/test-shim.ts";
+import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
 import { renderReportMarkdown } from "./render-report-markdown.ts";
 import type { GenReportParameters, TransparentReportData, ExplicitReportData } from "../types.ts";
 
@@ -25,7 +25,7 @@ const blockedRow = {
 
 // test-shim's Assert interface has no doesNotMatch.
 function assertNotMatch(value: string, pattern: RegExp): void {
-  assert.equal(pattern.test(value), false);
+  expect(pattern.test(value)).toBe(false);
 }
 
 describe("renderReportMarkdown — transparent", () => {
@@ -42,9 +42,9 @@ describe("renderReportMarkdown — transparent", () => {
     const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "dash14/buildcage", "v2", {
       title: "Outbound Traffic Report during Docker Build",
     });
-    assert.match(md, /## Outbound Traffic Report during Docker Build \(restrict mode\)/);
-    assert.match(md, /### ✅ Allowed Hosts/);
-    assert.match(md, /good\.com/);
+    expect(md).toMatch(/## Outbound Traffic Report during Docker Build \(restrict mode\)/);
+    expect(md).toMatch(/### ✅ Allowed Hosts/);
+    expect(md).toMatch(/good\.com/);
   });
 
   it("renders the audit-mode heading and Audited Hosts table, plus a restrict-mode example", () => {
@@ -53,8 +53,8 @@ describe("renderReportMarkdown — transparent", () => {
       "dash14/buildcage",
       "v2",
     );
-    assert.match(md, /### 📋 Audited Hosts/);
-    assert.match(md, /Switch to restrict mode/);
+    expect(md).toMatch(/### 📋 Audited Hosts/);
+    expect(md).toMatch(/Switch to restrict mode/);
   });
 
   it("renders Blocked Hosts and shows the SNI footnote, not Communication details", () => {
@@ -63,14 +63,14 @@ describe("renderReportMarkdown — transparent", () => {
       "dash14/buildcage",
       "v2",
     );
-    assert.match(md, /### 🚫 Blocked Hosts/);
-    assert.match(md, /based on the Host header/);
+    expect(md).toMatch(/### 🚫 Blocked Hosts/);
+    expect(md).toMatch(/based on the Host header/);
     assertNotMatch(md, /Communication details/);
   });
 
   it("uses the real actionRepo in the footer, not a placeholder", () => {
     const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
-    assert.match(md, /Reported by \[Buildcage\]\(https:\/\/github\.com\/dash14\/buildcage\)/);
+    expect(md).toMatch(/Reported by \[Buildcage\]\(https:\/\/github\.com\/dash14\/buildcage\)/);
     assertNotMatch(md, /GITHUB_ACTION_REPOSITORY/);
   });
 
@@ -81,7 +81,7 @@ describe("renderReportMarkdown — transparent", () => {
 
   it("shows a '(no communication)' note when nothing passed and nothing blocked", () => {
     const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
-    assert.match(md, /_\(no communication\)_/);
+    expect(md).toMatch(/_\(no communication\)_/);
   });
 
   it("omits the '(no communication)' note once anything passed or was blocked", () => {
@@ -104,7 +104,7 @@ describe("renderReportMarkdown — transparent", () => {
     const md = renderReportMarkdown(base, "dash14/buildcage", "v2", {
       title: "Outbound Traffic Report — npm install",
     });
-    assert.match(md, /^## Outbound Traffic Report — npm install \(restrict mode\)/);
+    expect(md).toMatch(/^## Outbound Traffic Report — npm install \(restrict mode\)/);
   });
 
   it("shows a run-flavored restrict-mode example including the run: command", () => {
@@ -114,8 +114,8 @@ describe("renderReportMarkdown — transparent", () => {
       "v2",
       { actionName: "run", runCommand: "npm install" },
     );
-    assert.match(md, /uses: dash14\/buildcage\/run@v2/);
-    assert.match(md, /run: \|\n\s+npm install/);
+    expect(md).toMatch(/uses: dash14\/buildcage\/run@v2/);
+    expect(md).toMatch(/run: \|\n\s+npm install/);
   });
 
   it("adds an Expected column marking known_blocked_rules matches when set", () => {
@@ -124,7 +124,7 @@ describe("renderReportMarkdown — transparent", () => {
       "dash14/buildcage",
       "v2",
     );
-    assert.match(md, /\| Host \| Rule \| Reason \| Count \| Expected \|/);
+    expect(md).toMatch(/\| Host \| Rule \| Reason \| Count \| Expected \|/);
   });
 
   it("omits the Expected column when known_blocked_rules is not set", () => {
@@ -158,9 +158,9 @@ describe("renderReportMarkdown — explicit", () => {
 
   it("renders Communication details instead of the SNI footnote", () => {
     const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
-    assert.match(md, /Communication details/);
-    assert.match(md, /Allowed Urls/);
-    assert.match(md, /Blocked Urls/);
+    expect(md).toMatch(/Communication details/);
+    expect(md).toMatch(/Allowed Urls/);
+    expect(md).toMatch(/Blocked Urls/);
     assertNotMatch(md, /based on the Host header/);
   });
 });

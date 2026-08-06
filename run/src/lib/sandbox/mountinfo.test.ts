@@ -1,5 +1,4 @@
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import { parseMountinfo } from "./mountinfo.ts";
 
 // Realistic /proc/self/mountinfo lines (see parseMountinfo's doc comment
@@ -15,7 +14,7 @@ const SAMPLE_MOUNTINFO = [
 
 describe("parseMountinfo", () => {
   it("extracts the mount point and filesystem type of every line", () => {
-    assert.deepEqual(parseMountinfo(SAMPLE_MOUNTINFO), [
+    expect(parseMountinfo(SAMPLE_MOUNTINFO)).toStrictEqual([
       { mountPoint: "/", fsType: "ext4" },
       { mountPoint: "/proc", fsType: "proc" },
       { mountPoint: "/run", fsType: "tmpfs" },
@@ -25,6 +24,6 @@ describe("parseMountinfo", () => {
   });
 
   it("ignores trailing/blank lines", () => {
-    assert.deepEqual(parseMountinfo(`${SAMPLE_MOUNTINFO}\n\n`).length, 5);
+    expect(parseMountinfo(`${SAMPLE_MOUNTINFO}\n\n`).length).toStrictEqual(5);
   });
 });

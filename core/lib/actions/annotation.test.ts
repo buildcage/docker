@@ -1,5 +1,4 @@
-import { describe, it, vi } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect, vi } from "vitest";
 import { createAnnotation } from "./annotation.ts";
 
 describe("createAnnotation", () => {
@@ -7,22 +6,22 @@ describe("createAnnotation", () => {
     it("notice() logs a ::notice:: line", () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       createAnnotation(true).notice("hello");
-      assert.equal(log.mock.calls.length, 1);
-      assert.equal(log.mock.calls[0][0], "::notice::hello");
+      expect(log.mock.calls.length).toBe(1);
+      expect(log.mock.calls[0][0]).toBe("::notice::hello");
     });
 
     it("error() logs a ::error:: line", () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       createAnnotation(true).error("boom");
-      assert.equal(log.mock.calls.length, 1);
-      assert.equal(log.mock.calls[0][0], "::error::boom");
+      expect(log.mock.calls.length).toBe(1);
+      expect(log.mock.calls[0][0]).toBe("::error::boom");
     });
 
     it("warning() logs a ::warning:: line", () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       createAnnotation(true).warning("careful");
-      assert.equal(log.mock.calls.length, 1);
-      assert.equal(log.mock.calls[0][0], "::warning::careful");
+      expect(log.mock.calls.length).toBe(1);
+      expect(log.mock.calls[0][0]).toBe("::warning::careful");
     });
   });
 
@@ -30,19 +29,19 @@ describe("createAnnotation", () => {
     it("notice() logs nothing", () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       createAnnotation(false).notice("hello");
-      assert.equal(log.mock.calls.length, 0);
+      expect(log.mock.calls.length).toBe(0);
     });
 
     it("error() logs nothing", () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       createAnnotation(false).error("boom");
-      assert.equal(log.mock.calls.length, 0);
+      expect(log.mock.calls.length).toBe(0);
     });
 
     it("warning() logs nothing", () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       createAnnotation(false).warning("careful");
-      assert.equal(log.mock.calls.length, 0);
+      expect(log.mock.calls.length).toBe(0);
     });
   });
 });

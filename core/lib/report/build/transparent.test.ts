@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "#core/lib/test/test-shim.ts";
+import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
 import { buildTransparentReportData } from "./transparent.ts";
 import type { GenReportParameters } from "../types.ts";
 
@@ -20,19 +20,19 @@ describe("buildTransparentReportData", () => {
       '[2024-01-01T00:00:00] buildcage [BLOCKED] (HTTP) "bad.com:80" not-allowed',
     ].join("\n");
     const result = await buildTransparentReportData(log.split("\n"), params());
-    assert.equal(result.engine, "transparent");
-    assert.equal(result.passed.length, 1);
-    assert.equal(result.passed[0].host, "good.com");
-    assert.equal(result.blocked.length, 1);
-    assert.equal(result.blocked[0].host, "bad.com");
-    assert.equal(result.blockedCount, 1);
+    expect(result.engine).toBe("transparent");
+    expect(result.passed.length).toBe(1);
+    expect(result.passed[0].host).toBe("good.com");
+    expect(result.blocked.length).toBe(1);
+    expect(result.blocked[0].host).toBe("bad.com");
+    expect(result.blockedCount).toBe(1);
   });
 
   it("aggregates audited traffic in audit mode instead of allowed", async () => {
     const log = '[2024-01-01T00:00:00] buildcage [AUDIT] (HTTPS) "any.com:443"';
     const result = await buildTransparentReportData(log.split("\n"), params({ mode: "audit" }));
-    assert.equal(result.passed.length, 1);
-    assert.equal(result.passed[0].host, "any.com");
+    expect(result.passed.length).toBe(1);
+    expect(result.passed[0].host).toBe("any.com");
   });
 
   it("annotates blocked rows against knownBlockedRules", async () => {
@@ -42,15 +42,15 @@ describe("buildTransparentReportData", () => {
       log.split("\n"),
       params({ knownBlockedRules: ["noisy.example.com:443"] }),
     );
-    assert.equal(result.blocked[0].expected, true);
+    expect(result.blocked[0].expected).toBe(true);
   });
 
   it("returns empty passed/blocked and blockedCount 0 for empty log text", async () => {
     const result = await buildTransparentReportData("".split("\n"), params());
-    assert.deepEqual(result.passed, []);
-    assert.deepEqual(result.blocked, []);
-    assert.equal(result.blockedCount, 0);
-    assert.equal(result.logLooksPlausible, false);
+    expect(result.passed).toStrictEqual([]);
+    expect(result.blocked).toStrictEqual([]);
+    expect(result.blockedCount).toBe(0);
+    expect(result.logLooksPlausible).toBe(false);
   });
 
   it("logLooksPlausible is true for a genuinely quiet run (HAProxy's own startup noise, zero blocked)", async () => {
@@ -59,8 +59,8 @@ describe("buildTransparentReportData", () => {
       '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "good.com:443" -',
     ].join("\n");
     const result = await buildTransparentReportData(log.split("\n"), params());
-    assert.equal(result.blockedCount, 0);
-    assert.equal(result.logLooksPlausible, true);
+    expect(result.blockedCount).toBe(0);
+    expect(result.logLooksPlausible).toBe(true);
   });
 
   it("blockedCount counts raw events, not aggregated rows", async () => {
@@ -69,9 +69,9 @@ describe("buildTransparentReportData", () => {
       '[2024-01-01T00:00:01] buildcage [BLOCKED] (HTTPS) "bad.com:443" not-allowed',
     ].join("\n");
     const result = await buildTransparentReportData(log.split("\n"), params());
-    assert.equal(result.blockedCount, 2);
-    assert.equal(result.blocked.length, 1);
-    assert.equal(result.blocked[0].count, 2);
+    expect(result.blockedCount).toBe(2);
+    expect(result.blocked.length).toBe(1);
+    expect(result.blocked[0].count).toBe(2);
   });
 });
 

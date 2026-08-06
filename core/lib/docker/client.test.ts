@@ -1,20 +1,20 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { createDocker, parseContainerIds, type SpawnCommand } from "./client.ts";
 import { REPORT_ACTION_SCRIPT_PATH } from "./report-source.ts";
 
 describe("parseContainerIds", () => {
   it("splits one ID per line", () => {
-    assert.deepEqual(parseContainerIds("abc123\ndef456\n"), ["abc123", "def456"]);
+    expect(parseContainerIds("abc123\ndef456\n")).toStrictEqual(["abc123", "def456"]);
   });
 
   it("returns an empty array for empty output", () => {
-    assert.deepEqual(parseContainerIds(""), []);
+    expect(parseContainerIds("")).toStrictEqual([]);
   });
 
   it("drops blank lines and trims whitespace", () => {
-    assert.deepEqual(parseContainerIds("\n  abc123  \n\n"), ["abc123"]);
+    expect(parseContainerIds("\n  abc123  \n\n")).toStrictEqual(["abc123"]);
   });
 });
 
@@ -36,8 +36,8 @@ describe("createDocker", () => {
   it("findContainers ANDs every filter and parses the ID list", () => {
     const { run, calls } = fakeRun(["abc123\ndef456\n"]);
     const ids = createDocker(run).findContainers(["label=a=1", "label=b=2"]);
-    assert.deepEqual(ids, ["abc123", "def456"]);
-    assert.deepEqual(calls, [
+    expect(ids).toStrictEqual(["abc123", "def456"]);
+    expect(calls).toStrictEqual([
       ["ps", "--filter", "label=a=1", "--filter", "label=b=2", "--format", "{{.ID}}"],
     ]);
   });
@@ -49,7 +49,7 @@ describe("createDocker", () => {
       REPORT_ACTION_SCRIPT_PATH,
       "/tmp/report-action.js",
     );
-    assert.deepEqual(calls, [
+    expect(calls).toStrictEqual([
       ["cp", `abc123:${REPORT_ACTION_SCRIPT_PATH}`, "/tmp/report-action.js"],
     ]);
   });
@@ -57,8 +57,8 @@ describe("createDocker", () => {
   it("readEnv runs docker inspect and parses the Env JSON array", () => {
     const { run, calls } = fakeRun(['["PROXY_MODE=restrict","FOO=bar"]']);
     const env = createDocker(run).readEnv("abc123");
-    assert.deepEqual(env, { PROXY_MODE: "restrict", FOO: "bar" });
-    assert.deepEqual(calls, [["inspect", "abc123", "--format", "{{json .Config.Env}}"]]);
+    expect(env).toStrictEqual({ PROXY_MODE: "restrict", FOO: "bar" });
+    expect(calls).toStrictEqual([["inspect", "abc123", "--format", "{{json .Config.Env}}"]]);
   });
 
   it("exec runs docker exec with the given argv and returns its stdout", () => {
@@ -70,8 +70,8 @@ describe("createDocker", () => {
       "--format",
       "{{json .}}",
     ]);
-    assert.equal(out, "histories output");
-    assert.deepEqual(calls, [
+    expect(out).toBe("histories output");
+    expect(calls).toStrictEqual([
       ["exec", "abc123", "buildctl", "debug", "histories", "--format", "{{json .}}"],
     ]);
   });
@@ -132,7 +132,7 @@ describe("createDocker readFileLines", () => {
   it("is lazy — nothing spawns until iteration actually starts", () => {
     const { spawnDocker, calls } = fakeSpawn();
     createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current");
-    assert.deepEqual(calls, []);
+    expect(calls).toStrictEqual([]);
   });
 
   it("streams docker exec cat's stdout as lines, in argv order", async () => {
@@ -141,10 +141,10 @@ describe("createDocker readFileLines", () => {
       createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current"),
     );
     // drain()'s first pull has already triggered the spawn synchronously.
-    assert.deepEqual(calls, [["exec", "abc123", "cat", "/var/log/haproxy/current"]]);
+    expect(calls).toStrictEqual([["exec", "abc123", "cat", "/var/log/haproxy/current"]]);
     children[0].stdout.write("line one\nline two\n");
     children[0].finish(0);
-    assert.deepEqual(await iterablePromise, ["line one", "line two"]);
+    expect(await iterablePromise).toStrictEqual(["line one", "line two"]);
   });
 
   it("throws {status, stderr} on a non-zero exit", async () => {
@@ -154,8 +154,7 @@ describe("createDocker readFileLines", () => {
     await Promise.resolve();
     children[0].stderr.write("cat: /missing: No such file or directory\n");
     children[0].finish(1);
-    await assert.rejects(
-      drained,
+    await expect(drained).rejects.toSatisfy(
       (e) =>
         (e as { status?: number; stderr?: string }).status === 1 &&
         Boolean((e as { stderr?: string }).stderr?.includes("No such file or directory")),
@@ -167,7 +166,7 @@ describe("createDocker readFileLines", () => {
     const drained = drain(createDocker(undefined, spawnDocker).readFileLines("abc123", "/path"));
     await Promise.resolve();
     children[0].failToSpawn(Object.assign(new Error("spawn docker ENOENT"), { code: "ENOENT" }));
-    await assert.rejects(drained, (e) => (e as NodeJS.ErrnoException).code === "ENOENT");
+    await expect(drained).rejects.toSatisfy((e) => (e as NodeJS.ErrnoException).code === "ENOENT");
   });
 
   it("kills the child if the consumer stops iterating early", async () => {
@@ -181,9 +180,9 @@ describe("createDocker readFileLines", () => {
     // already exists once this returns.
     const firstLine = iterator.next();
     children[0].stdout.write("line one\nline two\n"); // never finish()'d — simulates a still-running process
-    assert.equal((await firstLine).value, "line one");
+    expect((await firstLine).value).toBe("line one");
     await iterator.return?.(undefined); // what `for await...of` does on an early break
-    assert.ok(children[0].killed);
+    expect(children[0].killed).toBeTruthy();
   });
 });
 

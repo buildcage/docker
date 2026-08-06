@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { aggregate } from "./aggregate.ts";
 
 describe("aggregate", () => {
@@ -9,11 +9,11 @@ describe("aggregate", () => {
       { host: "b.com", port: "80", ruleType: "HTTP", reason: "-" },
     ];
     const result = aggregate(entries);
-    assert.equal(result.length, 2);
-    assert.equal(result[0].host, "a.com");
-    assert.equal(result[0].count, 2);
-    assert.equal(result[1].host, "b.com");
-    assert.equal(result[1].count, 1);
+    expect(result.length).toBe(2);
+    expect(result[0].host).toBe("a.com");
+    expect(result[0].count).toBe(2);
+    expect(result[1].host).toBe("b.com");
+    expect(result[1].count).toBe(1);
   });
 
   it("sorts by count descending", () => {
@@ -23,10 +23,10 @@ describe("aggregate", () => {
       { host: "high.com", port: "443", ruleType: "HTTPS", reason: "r1" },
     ];
     const result = aggregate(entries);
-    assert.equal(result[0].host, "high.com");
-    assert.equal(result[0].count, 2);
-    assert.equal(result[1].host, "low.com");
-    assert.equal(result[1].count, 1);
+    expect(result[0].host).toBe("high.com");
+    expect(result[0].count).toBe(2);
+    expect(result[1].host).toBe("low.com");
+    expect(result[1].count).toBe(1);
   });
 
   it("breaks ties by host, then numeric port", () => {
@@ -36,14 +36,15 @@ describe("aggregate", () => {
       { host: "a.com", port: "80", ruleType: "HTTP", reason: "r1" },
     ];
     const result = aggregate(entries);
-    assert.deepEqual(
-      result.map((e) => `${e.host}:${e.port}`),
-      ["a.com:80", "a.com:8080", "b.com:443"],
-    );
+    expect(result.map((e) => `${e.host}:${e.port}`)).toStrictEqual([
+      "a.com:80",
+      "a.com:8080",
+      "b.com:443",
+    ]);
   });
 
   it("empty input returns empty array", () => {
-    assert.deepEqual(aggregate([]), []);
+    expect(aggregate([])).toStrictEqual([]);
   });
 });
 

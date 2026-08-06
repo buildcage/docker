@@ -1,14 +1,14 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { parseIdentifier } from "./parse-identifier.ts";
 
 describe("parseIdentifier", () => {
   it("fills in the default port when none is present", () => {
-    assert.deepEqual(parseIdentifier("https://allowed.example.com/"), {
+    expect(parseIdentifier("https://allowed.example.com/")).toStrictEqual({
       scheme: "https",
       host: "allowed.example.com",
       port: "443",
     });
-    assert.deepEqual(parseIdentifier("http://allowed.example.com/"), {
+    expect(parseIdentifier("http://allowed.example.com/")).toStrictEqual({
       scheme: "http",
       host: "allowed.example.com",
       port: "80",
@@ -16,7 +16,7 @@ describe("parseIdentifier", () => {
   });
 
   it("keeps an explicit non-default port", () => {
-    assert.deepEqual(parseIdentifier("https://allowed.example.com:8443/"), {
+    expect(parseIdentifier("https://allowed.example.com:8443/")).toStrictEqual({
       scheme: "https",
       host: "allowed.example.com",
       port: "8443",
@@ -24,7 +24,7 @@ describe("parseIdentifier", () => {
   });
 
   it("returns null for non-http(s) identifiers", () => {
-    assert.equal(parseIdentifier("docker-image://docker.io/library/alpine:latest"), null);
+    expect(parseIdentifier("docker-image://docker.io/library/alpine:latest")).toBe(null);
   });
 });
 

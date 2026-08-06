@@ -3,8 +3,7 @@
  *
  * Run with: vp test run run/src/main.property.test.ts
  */
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 
 import { buildACLRules } from "./main.ts";
@@ -24,9 +23,9 @@ describe("buildACLRules – properties", () => {
           httpRulesInput: p,
           ipRulesInput: i,
         });
-        assert.deepEqual(result.httpsRules, []);
-        assert.deepEqual(result.httpRules, []);
-        assert.deepEqual(result.ipRules, []);
+        expect(result.httpsRules).toStrictEqual([]);
+        expect(result.httpRules).toStrictEqual([]);
+        expect(result.ipRules).toStrictEqual([]);
       }),
     );
   });
@@ -46,7 +45,7 @@ describe("buildACLRules – properties", () => {
           httpRulesInput: "",
           ipRulesInput: "",
         });
-        assert.equal(result.httpsRules.length, rules.length);
+        expect(result.httpsRules.length).toBe(rules.length);
       }),
     );
   });
@@ -55,19 +54,19 @@ describe("buildACLRules – properties", () => {
   it("any token without a colon and without ~ prefix always throws SandboxError", () => {
     fc.assert(
       fc.property(fc.stringMatching(/^[^\s:~]{1,30}$/), (token) => {
-        assert.throws(
-          () =>
+        expect(() => {
+          try {
             buildACLRules({
               httpsRulesInput: token,
               httpRulesInput: "",
               ipRulesInput: "",
-            }),
-          (err) => {
-            assert.ok(err instanceof Error);
-            assert.equal((err as Error & { code?: string }).code, "INVALID_RULES");
-            return true;
-          },
-        );
+            });
+          } catch (err) {
+            expect(err).toBeInstanceOf(Error);
+            expect((err as Error & { code?: string }).code).toBe("INVALID_RULES");
+            throw err;
+          }
+        }).toThrow();
       }),
     );
   });
