@@ -1,5 +1,4 @@
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,55 +28,62 @@ function encode(text: string) {
 describe("parseVertexAllowedLog", () => {
   it("captures every single-digit step despite BuildKit's leading-space padding (regression: a real 15-step build)", () => {
     const result = parseVertexAllowedLog(PADDED_STEPS_RAWJSON);
-    assert.equal(result.length, 14); // steps 2/15 through 15/15
-    assert.equal(
-      result[0].command,
+    expect(result.length).toBe(14); // steps 2/15 through 15/15
+    expect(result[0].command).toBe(
       '[ 2/15] RUN echo "=== DNS Configuration ===" &&     cat /etc/resolv.conf',
     );
-    assert.deepEqual(result[0].entries, []);
-    assert.equal(
+    expect(result[0].entries).toStrictEqual([]);
+    expect(
       result[1].command.startsWith('[ 3/15] RUN echo "=== [HTTPS - allowed - exact match]'),
-      true,
-    );
-    assert.deepEqual(result[1].entries, [
+    ).toBe(true);
+    expect(result[1].entries).toStrictEqual([
       { method: "GET", url: "https://allowed.example.com/", status: 200 },
     ]);
     // step numbers stay in ascending order despite the "[ 2/15]" vs "[10/15]" width difference
-    assert.deepEqual(
-      result.map((v) => v.command.match(/^\[\s*(\d+)\/15\]/)![1]),
-      ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
-    );
+    expect(result.map((v) => v.command.match(/^\[\s*(\d+)\/15\]/)![1])).toStrictEqual([
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+    ]);
   });
 
   it("groups a real multi-stage build's RUN vertices by stage, stages ordered by earliest start, marking the no-op step's entries empty", () => {
     const result = parseVertexAllowedLog(MULTISTAGE_RAWJSON);
-    assert.deepEqual(
-      result.map((v) => v.command),
-      [
-        '[stage2 2/2] RUN echo "step B" && wget -q -O /dev/null --timeout=5 https://allowed.example.com/two && echo "B done"',
-        '[stage1 2/3] RUN echo "no network here" && mkdir -p /tmp/work',
-        '[stage1 3/3] RUN echo "step A" && wget -q -O /dev/null --timeout=5 https://allowed.example.com/one && echo "A done"',
-      ],
-    );
+    expect(result.map((v) => v.command)).toStrictEqual([
+      '[stage2 2/2] RUN echo "step B" && wget -q -O /dev/null --timeout=5 https://allowed.example.com/two && echo "B done"',
+      '[stage1 2/3] RUN echo "no network here" && mkdir -p /tmp/work',
+      '[stage1 3/3] RUN echo "step A" && wget -q -O /dev/null --timeout=5 https://allowed.example.com/one && echo "A done"',
+    ]);
     // stage1's two vertices stay adjacent and in step order, even though
     // stage2's single vertex (started ~109us earlier) sorts before the group.
-    assert.deepEqual(result[1].entries, []);
-    assert.deepEqual(result[2].entries, [
+    expect(result[1].entries).toStrictEqual([]);
+    expect(result[2].entries).toStrictEqual([
       { method: "GET", url: "https://allowed.example.com/one", status: 200 },
     ]);
-    assert.deepEqual(result[0].entries, [
+    expect(result[0].entries).toStrictEqual([
       { method: "GET", url: "https://allowed.example.com/two", status: 200 },
     ]);
     for (const v of result) {
-      assert.equal(typeof v.started, "string");
-      assert.equal(typeof v.completed, "string");
+      expect(typeof v.started).toBe("string");
+      expect(typeof v.completed).toBe("string");
     }
   });
 
   it("excludes non-RUN vertices (FROM, internal loads, COPY, exporting)", () => {
     const result = parseVertexAllowedLog(MULTISTAGE_RAWJSON);
     for (const v of result) {
-      assert.match(v.command, /\bRUN\b/);
+      expect(v.command).toMatch(/\bRUN\b/);
     }
   });
 
@@ -100,11 +106,8 @@ describe("parseVertexAllowedLog", () => {
       logs: [],
     });
     const result = parseVertexAllowedLog(rawJson);
-    assert.deepEqual(
-      result.map((v) => v.command),
-      ["[2/3] RUN first", "[3/3] RUN second"],
-    );
-    assert.deepEqual(result[0].entries, []);
+    expect(result.map((v) => v.command)).toStrictEqual(["[2/3] RUN first", "[3/3] RUN second"]);
+    expect(result[0].entries).toStrictEqual([]);
   });
 
   it("does not let an anonymous stage's auto-numbered prefix ('stage-0') collide across groups", () => {
@@ -127,10 +130,10 @@ describe("parseVertexAllowedLog", () => {
     });
     const result = parseVertexAllowedLog(rawJson);
     // stage-1 started earlier, so its (single-vertex) group sorts first.
-    assert.deepEqual(
-      result.map((v) => v.command),
-      ['[stage-1 2/2] RUN echo "one"', '[stage-0 2/2] RUN echo "zero"'],
-    );
+    expect(result.map((v) => v.command)).toStrictEqual([
+      '[stage-1 2/2] RUN echo "one"',
+      '[stage-0 2/2] RUN echo "zero"',
+    ]);
   });
 
   it("decodes base64 stderr logs and concatenates multiple fragments for the same vertex in timestamp order", () => {
@@ -165,7 +168,7 @@ describe("parseVertexAllowedLog", () => {
       ],
     });
     const result = parseVertexAllowedLog(rawJson);
-    assert.deepEqual(result[0].entries, [
+    expect(result[0].entries).toStrictEqual([
       { method: "GET", url: "https://allowed.example.com/", status: 200 },
     ]);
   });
@@ -184,8 +187,8 @@ describe("parseVertexAllowedLog", () => {
       logs: [],
     });
     const result = parseVertexAllowedLog(rawJson);
-    assert.equal(result.length, 1);
-    assert.equal(result[0].started, "2026-01-01T00:00:00.060Z");
+    expect(result.length).toBe(1);
+    expect(result[0].started).toBe("2026-01-01T00:00:00.060Z");
   });
 
   it("returns an empty array when there are no RUN vertices", () => {
@@ -200,7 +203,7 @@ describe("parseVertexAllowedLog", () => {
       ],
       logs: [],
     });
-    assert.deepEqual(parseVertexAllowedLog(rawJson), []);
+    expect(parseVertexAllowedLog(rawJson)).toStrictEqual([]);
   });
 
   it("merges vertexes and logs when buildctl emits multiple newline-separated JSON documents instead of one blob", () => {
@@ -244,9 +247,9 @@ describe("parseVertexAllowedLog", () => {
     // ("Unexpected non-whitespace character after JSON ... line 2 column 1")
     // — this is the exact failure this parses around.
     const result = parseVertexAllowedLog(`${doc1}\n${doc2}\n`);
-    assert.equal(result.length, 2);
-    assert.equal(result[0].entries[0].url, "https://one.example.com/");
-    assert.equal(result[1].entries[0].url, "https://two.example.com/");
+    expect(result.length).toBe(2);
+    expect(result[0].entries[0].url).toBe("https://one.example.com/");
+    expect(result[1].entries[0].url).toBe("https://two.example.com/");
   });
 
   it("skips a document line that fails to parse as JSON, keeping the rest", () => {
@@ -269,7 +272,7 @@ describe("parseVertexAllowedLog", () => {
       ],
     });
     const result = parseVertexAllowedLog(`${doc1}\nnot json at all\n`);
-    assert.equal(result.length, 1);
-    assert.equal(result[0].entries[0].url, "https://one.example.com/");
+    expect(result.length).toBe(1);
+    expect(result[0].entries[0].url).toBe("https://one.example.com/");
   });
 });

@@ -3,8 +3,7 @@
  *
  * Run with: vp test run setup/src/main.property.test.ts
  */
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 
 import { imageTagFromRef } from "#core/lib/provenance/image-tag.ts";
@@ -26,10 +25,7 @@ describe("imageTagFromRef – properties", () => {
         fc.stringMatching(/^[0-9a-fA-F]{40}$/),
         fc.constantFrom("transparent", "explicit"),
         (sha, engine) => {
-          assert.equal(
-            imageTagFromRef(sha, engine),
-            `sha-${sha.toLowerCase()}${suffixFor(engine)}`,
-          );
+          expect(imageTagFromRef(sha, engine)).toBe(`sha-${sha.toLowerCase()}${suffixFor(engine)}`);
         },
       ),
     );
@@ -41,7 +37,7 @@ describe("imageTagFromRef – properties", () => {
         fc.string({ minLength: 1 }).map((s) => `v${s}`),
         fc.constantFrom("transparent", "explicit"),
         (ref, engine) => {
-          assert.equal(imageTagFromRef(ref, engine), `${ref.slice(1)}${suffixFor(engine)}`);
+          expect(imageTagFromRef(ref, engine)).toBe(`${ref.slice(1)}${suffixFor(engine)}`);
         },
       ),
     );
@@ -54,7 +50,7 @@ describe("imageTagFromRef – properties", () => {
         fc.string({ minLength: 0, maxLength: 50 }).map((s) => `g${s}`),
         fc.constantFrom("transparent", "explicit"),
         (ref, engine) => {
-          assert.equal(imageTagFromRef(ref, engine), `${ref}${suffixFor(engine)}`);
+          expect(imageTagFromRef(ref, engine)).toBe(`${ref}${suffixFor(engine)}`);
         },
       ),
     );
@@ -65,7 +61,7 @@ describe("imageTagFromRef – properties", () => {
       fc.property(
         fc.string({ minLength: 0, maxLength: 50 }).map((s) => `g${s}`),
         (ref) => {
-          assert.equal(imageTagFromRef(ref), ref);
+          expect(imageTagFromRef(ref)).toBe(ref);
         },
       ),
     );
@@ -86,7 +82,7 @@ describe("resolveProxyEngine – properties", () => {
         } catch {
           return; // throwing is an acceptable outcome for invalid input
         }
-        assert.ok(result === "transparent" || result === "explicit");
+        expect(result === "transparent" || result === "explicit").toBeTruthy();
       }),
     );
   });
@@ -94,7 +90,7 @@ describe("resolveProxyEngine – properties", () => {
   it("is idempotent for its own valid outputs", () => {
     fc.assert(
       fc.property(fc.constantFrom("transparent", "explicit"), (engine) => {
-        assert.equal(resolveProxyEngine(resolveProxyEngine(engine)), engine);
+        expect(resolveProxyEngine(resolveProxyEngine(engine))).toBe(engine);
       }),
     );
   });
@@ -119,9 +115,9 @@ describe("buildACLRules – properties", () => {
           httpRulesInput: p,
           ipRulesInput: i,
         });
-        assert.deepEqual(result.httpsRules, []);
-        assert.deepEqual(result.httpRules, []);
-        assert.deepEqual(result.ipRules, []);
+        expect(result.httpsRules).toStrictEqual([]);
+        expect(result.httpRules).toStrictEqual([]);
+        expect(result.ipRules).toStrictEqual([]);
       }),
     );
   });
@@ -141,7 +137,7 @@ describe("buildACLRules – properties", () => {
           httpRulesInput: "",
           ipRulesInput: "",
         });
-        assert.equal(result.httpsRules.length, rules.length);
+        expect(result.httpsRules.length).toBe(rules.length);
       }),
     );
   });
@@ -150,18 +146,13 @@ describe("buildACLRules – properties", () => {
   it("any token without a colon and without ~ prefix always throws", () => {
     fc.assert(
       fc.property(fc.stringMatching(/^[^\s:~]{1,30}$/), (token) => {
-        assert.throws(
-          () =>
-            buildACLRules({
-              httpsRulesInput: token,
-              httpRulesInput: "",
-              ipRulesInput: "",
-            }),
-          (err) => {
-            assert.ok(err instanceof Error);
-            return true;
-          },
-        );
+        expect(() =>
+          buildACLRules({
+            httpsRulesInput: token,
+            httpRulesInput: "",
+            ipRulesInput: "",
+          }),
+        ).toThrow();
       }),
     );
   });
@@ -185,7 +176,7 @@ describe("resolveBuildcageImageRef – properties", () => {
           actionRepository,
         });
         const [repoPart] = result.split("@");
-        assert.equal(repoPart, `ghcr.io/${actionRepository.toLowerCase()}`);
+        expect(repoPart).toBe(`ghcr.io/${actionRepository.toLowerCase()}`);
       }),
     );
   });

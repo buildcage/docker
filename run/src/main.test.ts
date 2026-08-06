@@ -3,8 +3,7 @@
  *
  * Run with: vp test run run/src/main.test.ts
  */
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 
 import { buildACLRules, parseWritablePaths, readKnownBlockedRules } from "./main.ts";
 import { InvalidRulesError } from "#core/lib/acl/rules.ts";
@@ -16,7 +15,7 @@ describe("buildACLRules", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.deepEqual(httpsRules, ["example.com:443", "*.cdn.example.com:443"]);
+    expect(httpsRules).toStrictEqual(["example.com:443", "*.cdn.example.com:443"]);
   });
 
   it("handles newline-separated rules", () => {
@@ -25,7 +24,7 @@ describe("buildACLRules", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.deepEqual(httpsRules, ["a.com:443", "b.com:443"]);
+    expect(httpsRules).toStrictEqual(["a.com:443", "b.com:443"]);
   });
 
   it("returns empty arrays for empty/undefined inputs", () => {
@@ -34,75 +33,71 @@ describe("buildACLRules", () => {
       httpRulesInput: undefined,
       ipRulesInput: "   ",
     });
-    assert.deepEqual(result.httpsRules, []);
-    assert.deepEqual(result.httpRules, []);
-    assert.deepEqual(result.ipRules, []);
+    expect(result.httpsRules).toStrictEqual([]);
+    expect(result.httpRules).toStrictEqual([]);
+    expect(result.ipRules).toStrictEqual([]);
   });
 
   it("throws InvalidRulesError with code INVALID_RULES for invalid rule syntax", () => {
-    assert.throws(
-      () =>
-        buildACLRules({
-          httpsRulesInput: "no-port-specified",
-          httpRulesInput: "",
-          ipRulesInput: "",
-        }),
-      (err) => {
-        assert.ok(err instanceof InvalidRulesError);
-        assert.equal(err.code, "INVALID_RULES");
-        return true;
-      },
-    );
+    expect.assertions(2);
+    try {
+      buildACLRules({
+        httpsRulesInput: "no-port-specified",
+        httpRulesInput: "",
+        ipRulesInput: "",
+      });
+    } catch (err) {
+      expect(err).toBeInstanceOf(InvalidRulesError);
+      expect((err as InvalidRulesError).code).toBe("INVALID_RULES");
+    }
   });
 });
 
 describe("readKnownBlockedRules", () => {
   it("parses whitespace-separated rules", () => {
-    assert.deepEqual(readKnownBlockedRules("known-bad.example.com:443 *.noisy.example.com:80"), [
-      "known-bad.example.com:443",
-      "*.noisy.example.com:80",
-    ]);
+    expect(readKnownBlockedRules("known-bad.example.com:443 *.noisy.example.com:80")).toStrictEqual(
+      ["known-bad.example.com:443", "*.noisy.example.com:80"],
+    );
   });
 
   it("returns an empty array for empty/undefined input", () => {
-    assert.deepEqual(readKnownBlockedRules(undefined), []);
-    assert.deepEqual(readKnownBlockedRules(""), []);
+    expect(readKnownBlockedRules(undefined)).toStrictEqual([]);
+    expect(readKnownBlockedRules("")).toStrictEqual([]);
   });
 
   it("throws InvalidRulesError with code INVALID_RULES for invalid rule syntax", () => {
-    assert.throws(
-      () => readKnownBlockedRules("no-port-specified"),
-      (err) => {
-        assert.ok(err instanceof InvalidRulesError);
-        assert.equal(err.code, "INVALID_RULES");
-        return true;
-      },
-    );
+    expect.assertions(2);
+    try {
+      readKnownBlockedRules("no-port-specified");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InvalidRulesError);
+      expect((err as InvalidRulesError).code).toBe("INVALID_RULES");
+    }
   });
 });
 
 describe("parseWritablePaths", () => {
   it("splits on newlines, trimming each entry", () => {
-    assert.deepEqual(parseWritablePaths("/opt/extra\n /var/cache \n"), [
+    expect(parseWritablePaths("/opt/extra\n /var/cache \n")).toStrictEqual([
       "/opt/extra",
       "/var/cache",
     ]);
   });
 
   it("does not split on internal spaces (paths may contain them)", () => {
-    assert.deepEqual(parseWritablePaths("/path with spaces\n/other"), [
+    expect(parseWritablePaths("/path with spaces\n/other")).toStrictEqual([
       "/path with spaces",
       "/other",
     ]);
   });
 
   it("returns an empty array for empty/undefined input", () => {
-    assert.deepEqual(parseWritablePaths(""), []);
-    assert.deepEqual(parseWritablePaths(undefined), []);
-    assert.deepEqual(parseWritablePaths("   \n  \n"), []);
+    expect(parseWritablePaths("")).toStrictEqual([]);
+    expect(parseWritablePaths(undefined)).toStrictEqual([]);
+    expect(parseWritablePaths("   \n  \n")).toStrictEqual([]);
   });
 
   it("preserves a lone '/' entry (the disable-readonly sentinel)", () => {
-    assert.deepEqual(parseWritablePaths("/"), ["/"]);
+    expect(parseWritablePaths("/")).toStrictEqual(["/"]);
   });
 });

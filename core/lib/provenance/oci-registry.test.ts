@@ -5,8 +5,7 @@
  *
  * Run with: vp test run core/lib/provenance/oci-registry.test.ts
  */
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect, assert } from "vitest";
 
 import {
   fetchManifestDigest,
@@ -36,8 +35,8 @@ describe("fetchManifestDigest", () => {
       return makeResp(200, digest);
     };
     const result = await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
-    assert.equal(result, digest);
-    assert.equal(capturedOpts?.method, "HEAD");
+    expect(result).toBe(digest);
+    expect(capturedOpts?.method).toBe("HEAD");
   });
 
   it("throws NOT_FOUND on 404", async () => {
@@ -46,8 +45,8 @@ describe("fetchManifestDigest", () => {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "NOT_FOUND");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("NOT_FOUND");
     }
   });
 
@@ -57,8 +56,8 @@ describe("fetchManifestDigest", () => {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
     }
   });
 
@@ -68,12 +67,12 @@ describe("fetchManifestDigest", () => {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
-      assert.ok(
-        err.message.includes("authenticated"),
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
+      expect(
+        (err as VerifyImageError).message.includes("authenticated"),
         "error message should hint at authentication",
-      );
+      ).toBeTruthy();
     }
   });
 
@@ -83,12 +82,12 @@ describe("fetchManifestDigest", () => {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
-      assert.ok(
-        err.message.includes("authenticated"),
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
+      expect(
+        (err as VerifyImageError).message.includes("authenticated"),
         "error message should hint at authentication",
-      );
+      ).toBeTruthy();
     }
   });
 
@@ -98,8 +97,8 @@ describe("fetchManifestDigest", () => {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
     }
   });
 
@@ -111,8 +110,8 @@ describe("fetchManifestDigest", () => {
       await fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
     }
   });
 });
@@ -126,12 +125,12 @@ describe("fetchRegistryToken", () => {
     let callCount = 0;
     const mockFetch = async (url: string, opts?: { headers?: Record<string, string> }) => {
       callCount++;
-      assert.equal(opts, undefined, "should send no auth header");
+      expect(opts, "should send no auth header").toBe(undefined);
       return { ok: true, status: 200, json: async () => ({ token: "anon-token" }) };
     };
     const token = await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
-    assert.equal(token, "anon-token");
-    assert.equal(callCount, 1, "should make exactly one request");
+    expect(token).toBe("anon-token");
+    expect(callCount, "should make exactly one request").toBe(1);
   });
 
   it("throws TOKEN_ERROR on 401 when no Docker credentials (private, not logged in)", async () => {
@@ -140,9 +139,12 @@ describe("fetchRegistryToken", () => {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TOKEN_ERROR");
-      assert.ok(err.message.includes("docker login"), "error message should mention docker login");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TOKEN_ERROR");
+      expect(
+        (err as VerifyImageError).message.includes("docker login"),
+        "error message should mention docker login",
+      ).toBeTruthy();
     }
   });
 
@@ -152,8 +154,8 @@ describe("fetchRegistryToken", () => {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TOKEN_ERROR");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TOKEN_ERROR");
     }
   });
 
@@ -163,8 +165,8 @@ describe("fetchRegistryToken", () => {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
     }
   });
 
@@ -176,8 +178,8 @@ describe("fetchRegistryToken", () => {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
     }
   });
 
@@ -193,9 +195,9 @@ describe("fetchRegistryToken", () => {
       return { ok: true, status: 200, json: async () => ({ token: "jwt-token" }) };
     };
     const token = await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
-    assert.equal(token, "jwt-token");
-    assert.equal(callCount, 1, "should make exactly one request (no anonymous attempt)");
-    assert.equal(capturedAuth, `Basic ${basicAuth}`, "should send the Docker config auth directly");
+    expect(token).toBe("jwt-token");
+    expect(callCount, "should make exactly one request (no anonymous attempt)").toBe(1);
+    expect(capturedAuth, "should send the Docker config auth directly").toBe(`Basic ${basicAuth}`);
   });
 
   it("throws TOKEN_ERROR immediately on 401 when Docker credentials are present (no fallback)", async () => {
@@ -209,10 +211,13 @@ describe("fetchRegistryToken", () => {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TOKEN_ERROR");
-      assert.ok(err.message.includes("docker login"), "error message should mention docker login");
-      assert.equal(callCount, 1, "should not retry with anonymous");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TOKEN_ERROR");
+      expect(
+        (err as VerifyImageError).message.includes("docker login"),
+        "error message should mention docker login",
+      ).toBeTruthy();
+      expect(callCount, "should not retry with anonymous").toBe(1);
     }
   });
 
@@ -223,8 +228,8 @@ describe("fetchRegistryToken", () => {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TOKEN_ERROR");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TOKEN_ERROR");
     }
   });
 
@@ -235,8 +240,8 @@ describe("fetchRegistryToken", () => {
       await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
     }
   });
 });
@@ -249,39 +254,39 @@ describe("readGhcrBasicAuth", () => {
   it("returns auth when auths['ghcr.io'].auth is present", () => {
     const config = JSON.stringify({ auths: { "ghcr.io": { auth: "dGVzdDp0b2tlbg==" } } });
     const result = readGhcrBasicAuth({}, mockReadFileSync(config));
-    assert.equal(result, "dGVzdDp0b2tlbg==");
+    expect(result).toBe("dGVzdDp0b2tlbg==");
   });
 
   it("normalizes https:// prefix and trailing slash in key", () => {
     const config = JSON.stringify({ auths: { "https://ghcr.io/": { auth: "dGVzdA==" } } });
     const result = readGhcrBasicAuth({}, mockReadFileSync(config));
-    assert.equal(result, "dGVzdA==");
+    expect(result).toBe("dGVzdA==");
   });
 
   it("returns null when ghcr.io entry is absent", () => {
     const config = JSON.stringify({ auths: { "docker.io": { auth: "dGVzdA==" } } });
-    assert.equal(readGhcrBasicAuth({}, mockReadFileSync(config)), null);
+    expect(readGhcrBasicAuth({}, mockReadFileSync(config))).toBe(null);
   });
 
   it("returns null when auth field is empty string (credsStore environment)", () => {
     const config = JSON.stringify({ auths: { "ghcr.io": {} } });
-    assert.equal(readGhcrBasicAuth({}, mockReadFileSync(config)), null);
+    expect(readGhcrBasicAuth({}, mockReadFileSync(config))).toBe(null);
   });
 
   it("returns null when auths is absent", () => {
     const config = JSON.stringify({ credsStore: "desktop" });
-    assert.equal(readGhcrBasicAuth({}, mockReadFileSync(config)), null);
+    expect(readGhcrBasicAuth({}, mockReadFileSync(config))).toBe(null);
   });
 
   it("returns null on file read error (not logged in at all)", () => {
     const throwingRead = () => {
       throw new Error("ENOENT");
     };
-    assert.equal(readGhcrBasicAuth({}, throwingRead), null);
+    expect(readGhcrBasicAuth({}, throwingRead)).toBe(null);
   });
 
   it("returns null on invalid JSON", () => {
-    assert.equal(readGhcrBasicAuth({}, mockReadFileSync("not json")), null);
+    expect(readGhcrBasicAuth({}, mockReadFileSync("not json"))).toBe(null);
   });
 
   it("uses DOCKER_CONFIG env var to resolve config path", () => {
@@ -291,10 +296,10 @@ describe("readGhcrBasicAuth", () => {
       return JSON.stringify({ auths: {} });
     };
     readGhcrBasicAuth({ DOCKER_CONFIG: "/custom/docker" }, readSpy);
-    assert.ok(
+    expect(
       capturedPath?.startsWith("/custom/docker"),
       `expected path under DOCKER_CONFIG, got: ${capturedPath}`,
-    );
+    ).toBeTruthy();
   });
 });
 
@@ -345,7 +350,7 @@ describe("fetchBundle — Referrers API path", () => {
       { ok: true, status: 200, json: async () => bundleObj },
     ]);
     const result = await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
-    assert.deepEqual(result, bundleObj);
+    expect(result).toStrictEqual(bundleObj);
   });
 
   it("throws NOT_FOUND when Referrers returns no matching artifactType", async () => {
@@ -365,8 +370,8 @@ describe("fetchBundle — Referrers API path", () => {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "NOT_FOUND");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("NOT_FOUND");
     }
   });
 });
@@ -393,7 +398,7 @@ describe("fetchBundle — fallback tag path", () => {
       { ok: true, status: 200, json: async () => bundleObj },
     ]);
     const result = await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
-    assert.deepEqual(result, bundleObj);
+    expect(result).toStrictEqual(bundleObj);
   });
 
   it("falls back to sha256-<hex> tag as OCI image index (standard artifactType match)", async () => {
@@ -427,7 +432,7 @@ describe("fetchBundle — fallback tag path", () => {
       { ok: true, status: 200, json: async () => bundleObj },
     ]);
     const result = await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
-    assert.deepEqual(result, bundleObj);
+    expect(result).toStrictEqual(bundleObj);
   });
 
   it("falls back to sha256-<hex> tag as OCI image index (GHCR: config.mediaType used as artifactType)", async () => {
@@ -475,7 +480,7 @@ describe("fetchBundle — fallback tag path", () => {
       { ok: true, status: 200, json: async () => bundleObj },
     ]);
     const result = await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
-    assert.deepEqual(result, bundleObj);
+    expect(result).toStrictEqual(bundleObj);
   });
 
   it("throws TRANSIENT on 5xx from Referrers API", async () => {
@@ -484,8 +489,8 @@ describe("fetchBundle — fallback tag path", () => {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
     }
   });
 
@@ -497,8 +502,8 @@ describe("fetchBundle — fallback tag path", () => {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(err.code, "TRANSIENT");
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect((err as VerifyImageError).code).toBe("TRANSIENT");
     }
   });
 
@@ -521,12 +526,11 @@ describe("fetchBundle — fallback tag path", () => {
       await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
-      assert.ok(err instanceof VerifyImageError);
-      assert.equal(
-        err.code,
-        "TRANSIENT",
+      expect(err).toBeInstanceOf(VerifyImageError);
+      expect(
+        (err as VerifyImageError).code,
         "auth error must not be reported as NOT_FOUND (unsigned image)",
-      );
+      ).toBe("TRANSIENT");
     }
   });
 });

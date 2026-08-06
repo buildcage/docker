@@ -3,8 +3,7 @@
  *
  * Run with: vp test run core/lib/log/haproxy.property.test.ts
  */
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 
 import { scanHaproxyLog } from "./haproxy.ts";
@@ -43,23 +42,23 @@ describe("scanHaproxyLog – properties", () => {
           const passedDecision = audit ? "AUDIT" : "ALLOWED";
 
           if (d === "BLOCKED") {
-            assert.equal(result.passed.length, 0);
-            assert.equal(result.blocked.length, 1);
-            assert.equal(result.blocked[0].ruleType, rt);
-            assert.equal(result.blocked[0].host, h);
-            assert.equal(result.blocked[0].port, p);
-            assert.equal(result.blocked[0].reason, r);
+            expect(result.passed.length).toBe(0);
+            expect(result.blocked.length).toBe(1);
+            expect(result.blocked[0].ruleType).toBe(rt);
+            expect(result.blocked[0].host).toBe(h);
+            expect(result.blocked[0].port).toBe(p);
+            expect(result.blocked[0].reason).toBe(r);
           } else if (d === passedDecision) {
-            assert.equal(result.blocked.length, 0);
-            assert.equal(result.passed.length, 1);
-            assert.equal(result.passed[0].ruleType, rt);
-            assert.equal(result.passed[0].host, h);
-            assert.equal(result.passed[0].port, p);
-            assert.equal(result.passed[0].reason, r);
+            expect(result.blocked.length).toBe(0);
+            expect(result.passed.length).toBe(1);
+            expect(result.passed[0].ruleType).toBe(rt);
+            expect(result.passed[0].host).toBe(h);
+            expect(result.passed[0].port).toBe(p);
+            expect(result.passed[0].reason).toBe(r);
           } else {
             // The "other" of ALLOWED/AUDIT for this mode — dropped entirely.
-            assert.equal(result.passed.length, 0);
-            assert.equal(result.blocked.length, 0);
+            expect(result.passed.length).toBe(0);
+            expect(result.blocked.length).toBe(0);
           }
         },
       ),
@@ -75,8 +74,8 @@ describe("scanHaproxyLog – properties", () => {
       fc.asyncProperty(word, word, async (w1, w2) => {
         const line = `[ts] buildcage [ALLOWED] (HTTPS) "example.com:443" ${w1} ${w2}`;
         const result = await scanHaproxyLog([line], false);
-        assert.equal(result.passed.length, 1);
-        assert.equal(result.passed[0].reason, w1);
+        expect(result.passed.length).toBe(1);
+        expect(result.passed[0].reason).toBe(w1);
       }),
     );
   });
@@ -99,7 +98,7 @@ describe("aggregate – properties", () => {
 
     fc.assert(
       fc.property(fc.array(entryWithAlphaPort, { minLength: 1, maxLength: 5 }), (entries) => {
-        assert.doesNotThrow(() => aggregate(entries));
+        expect(() => aggregate(entries)).not.toThrow();
       }),
     );
   });

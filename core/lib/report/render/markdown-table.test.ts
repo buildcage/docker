@@ -1,5 +1,4 @@
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import { markdownTable } from "./markdown-table.ts";
 
 describe("markdownTable", () => {
@@ -11,7 +10,7 @@ describe("markdownTable", () => {
       ],
       [{ a: "1", b: "2" }],
     );
-    assert.equal(table, "| A | B |\n| --- | --- |\n| 1 | 2 |");
+    expect(table).toBe("| A | B |\n| --- | --- |\n| 1 | 2 |");
   });
 
   it("supports right and center alignment per column", () => {
@@ -23,11 +22,11 @@ describe("markdownTable", () => {
       ],
       [{ a: 1, b: 2, c: 3 }],
     );
-    assert.equal(table, "| A | B | C |\n| ---: | :---: | --- |\n| 1 | 2 | 3 |");
+    expect(table).toBe("| A | B | C |\n| ---: | :---: | --- |\n| 1 | 2 | 3 |");
   });
 
   it("renders only the header rows for an empty row list", () => {
     const table = markdownTable([{ key: "a", title: "A" }], []);
-    assert.equal(table, "| A |\n| --- |");
+    expect(table).toBe("| A |\n| --- |");
   });
 });

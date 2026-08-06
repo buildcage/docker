@@ -1,5 +1,4 @@
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 
 import { computeReportOutcome, type Report, type ComputeReportOutcomeOptions } from "./report.ts";
 import { annotateKnownBlocked } from "#core/lib/report/build/aggregate.ts";
@@ -47,7 +46,7 @@ function report(overrides: Partial<Report> = {}): Report {
 describe("computeReportOutcome", () => {
   it("does not fail when there are no blocked connections", () => {
     const r = report({ blockedCount: 0 });
-    assert.equal(computeReportOutcome(r, options({ failOnBlocked: true })).shouldFail, false);
+    expect(computeReportOutcome(r, options({ failOnBlocked: true })).shouldFail).toBe(false);
   });
 
   it("fails when blocked connections are detected and failOnBlocked is true", () => {
@@ -66,7 +65,7 @@ describe("computeReportOutcome", () => {
         [],
       ),
     });
-    assert.equal(computeReportOutcome(r, options({ failOnBlocked: true })).shouldFail, true);
+    expect(computeReportOutcome(r, options({ failOnBlocked: true })).shouldFail).toBe(true);
   });
 
   // Audit's outcome never depends on known_blocked_rules matching, so the
@@ -82,8 +81,8 @@ describe("computeReportOutcome", () => {
       ),
     });
     const outcome = computeReportOutcome(r, options({ failOnBlocked: true }));
-    assert.equal(outcome.level, "notice");
-    assert.equal(outcome.message, "2 blocked connection(s) detected by buildcage sandbox");
+    expect(outcome.level).toBe("notice");
+    expect(outcome.message).toBe("2 blocked connection(s) detected by buildcage sandbox");
   });
 
   it("passes stepLabel/runCommand through to the rendered markdown", () => {
@@ -97,8 +96,8 @@ describe("computeReportOutcome", () => {
       r,
       options({ stepLabel: "npm install", runCommand: "npm install" }),
     );
-    assert.match(markdown, /^## Outbound Traffic Report — npm install \(audit mode\)/);
-    assert.match(markdown, /uses: dash14\/buildcage\/run@v2/);
-    assert.match(markdown, /run: \|\n\s+npm install/);
+    expect(markdown).toMatch(/^## Outbound Traffic Report — npm install \(audit mode\)/);
+    expect(markdown).toMatch(/uses: dash14\/buildcage\/run@v2/);
+    expect(markdown).toMatch(/run: \|\n\s+npm install/);
   });
 });

@@ -59,7 +59,12 @@ export default defineConfig(
   target === "qjs-test"
     ? qjsTestInputs.map((input) => ({
         input,
-        external: ["qjs:std", "qjs:os"],
+        // "vitest" is only ever reached by test-shim.ts's Node branch (dead at
+        // qjs runtime), but its dynamic import()'s specifier is a compile-time
+        // constant, so rolldown resolves and inlines it unless excluded here —
+        // dragging in vitest's own devDependencies (e.g. expect-type), which
+        // aren't installed for/resolvable under qjs's "neutral" platform.
+        external: ["qjs:std", "qjs:os", "vitest"],
         platform: "neutral",
         output: { file: `dist/test-qjs/${input.replace(/\.ts$/, ".js")}`, ...baseOutput },
       }))

@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "#core/lib/test/test-shim.ts";
+import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
 import {
   determineBlockedOutcome,
   buildBlockedMessage,
@@ -7,7 +7,7 @@ import {
 
 describe("determineBlockedOutcome", () => {
   it("returns none when there are no blocked connections", () => {
-    assert.deepEqual(
+    expect(
       determineBlockedOutcome({
         isAudit: false,
         failOnBlocked: true,
@@ -15,12 +15,11 @@ describe("determineBlockedOutcome", () => {
         blockedRows: [],
         logLooksPlausible: true,
       }),
-      { level: "none", shouldFail: false },
-    );
+    ).toStrictEqual({ level: "none", shouldFail: false });
   });
 
   it("always returns notice in audit mode, even with unmatched rows", () => {
-    assert.deepEqual(
+    expect(
       determineBlockedOutcome({
         isAudit: true,
         failOnBlocked: true,
@@ -28,12 +27,11 @@ describe("determineBlockedOutcome", () => {
         blockedRows: [{ expected: false }],
         logLooksPlausible: true,
       }),
-      { level: "notice", shouldFail: false },
-    );
+    ).toStrictEqual({ level: "notice", shouldFail: false });
   });
 
   it("returns notice (not error) when every blocked row matched known_blocked_rules", () => {
-    assert.deepEqual(
+    expect(
       determineBlockedOutcome({
         isAudit: false,
         failOnBlocked: true,
@@ -41,12 +39,11 @@ describe("determineBlockedOutcome", () => {
         blockedRows: [{ expected: true }, { expected: true }],
         logLooksPlausible: true,
       }),
-      { level: "notice", shouldFail: false },
-    );
+    ).toStrictEqual({ level: "notice", shouldFail: false });
   });
 
   it("returns error when at least one blocked row is unexpected", () => {
-    assert.deepEqual(
+    expect(
       determineBlockedOutcome({
         isAudit: false,
         failOnBlocked: true,
@@ -54,12 +51,11 @@ describe("determineBlockedOutcome", () => {
         blockedRows: [{ expected: true }, { expected: false }],
         logLooksPlausible: true,
       }),
-      { level: "error", shouldFail: true },
-    );
+    ).toStrictEqual({ level: "error", shouldFail: true });
   });
 
   it("returns notice when failOnBlocked is false, even with unexpected rows", () => {
-    assert.deepEqual(
+    expect(
       determineBlockedOutcome({
         isAudit: false,
         failOnBlocked: false,
@@ -67,12 +63,11 @@ describe("determineBlockedOutcome", () => {
         blockedRows: [{ expected: false }],
         logLooksPlausible: true,
       }),
-      { level: "notice", shouldFail: false },
-    );
+    ).toStrictEqual({ level: "notice", shouldFail: false });
   });
 
   it("fails closed when blockedRows is empty but blockedCount is nonzero", () => {
-    assert.deepEqual(
+    expect(
       determineBlockedOutcome({
         isAudit: false,
         failOnBlocked: true,
@@ -80,13 +75,12 @@ describe("determineBlockedOutcome", () => {
         blockedRows: [],
         logLooksPlausible: true,
       }),
-      { level: "error", shouldFail: true },
-    );
+    ).toStrictEqual({ level: "error", shouldFail: true });
   });
 
   describe("logLooksPlausible: false (log has no trace of a real proxy run)", () => {
     it("fails closed when blockedCount is 0 and failOnBlocked is true", () => {
-      assert.deepEqual(
+      expect(
         determineBlockedOutcome({
           isAudit: false,
           failOnBlocked: true,
@@ -94,12 +88,11 @@ describe("determineBlockedOutcome", () => {
           blockedRows: [],
           logLooksPlausible: false,
         }),
-        { level: "error", shouldFail: true },
-      );
+      ).toStrictEqual({ level: "error", shouldFail: true });
     });
 
     it("returns notice (not error) when blockedCount is 0 and failOnBlocked is false", () => {
-      assert.deepEqual(
+      expect(
         determineBlockedOutcome({
           isAudit: false,
           failOnBlocked: false,
@@ -107,12 +100,11 @@ describe("determineBlockedOutcome", () => {
           blockedRows: [],
           logLooksPlausible: false,
         }),
-        { level: "notice", shouldFail: false },
-      );
+      ).toStrictEqual({ level: "notice", shouldFail: false });
     });
 
     it("never fails in audit mode, even with an implausible log", () => {
-      assert.deepEqual(
+      expect(
         determineBlockedOutcome({
           isAudit: true,
           failOnBlocked: true,
@@ -120,12 +112,11 @@ describe("determineBlockedOutcome", () => {
           blockedRows: [],
           logLooksPlausible: false,
         }),
-        { level: "notice", shouldFail: false },
-      );
+      ).toStrictEqual({ level: "notice", shouldFail: false });
     });
 
     it("has no additional effect when blockedCount is already nonzero", () => {
-      assert.deepEqual(
+      expect(
         determineBlockedOutcome({
           isAudit: false,
           failOnBlocked: true,
@@ -133,8 +124,7 @@ describe("determineBlockedOutcome", () => {
           blockedRows: [{ expected: true }, { expected: true }],
           logLooksPlausible: false,
         }),
-        { level: "notice", shouldFail: false },
-      );
+      ).toStrictEqual({ level: "notice", shouldFail: false });
     });
   });
 });
@@ -147,7 +137,7 @@ describe("buildBlockedMessage", () => {
       engineLabel: "sandbox",
       isAudit: false,
     });
-    assert.equal(message, "2 blocked connection(s) detected by buildcage sandbox");
+    expect(message).toBe("2 blocked connection(s) detected by buildcage sandbox");
   });
 
   it("notes that all rows matched when every row is expected", () => {
@@ -157,7 +147,7 @@ describe("buildBlockedMessage", () => {
       engineLabel: "proxy",
       isAudit: false,
     });
-    assert.match(message, /all matched known_blocked_rules \(expected\)/);
+    expect(message).toMatch(/all matched known_blocked_rules \(expected\)/);
   });
 
   it("reports the unmatched count when some rows are unexpected", () => {
@@ -167,7 +157,7 @@ describe("buildBlockedMessage", () => {
       engineLabel: "sandbox",
       isAudit: false,
     });
-    assert.match(message, /1 of 2 distinct blocked host\(s\) unmatched by known_blocked_rules/);
+    expect(message).toMatch(/1 of 2 distinct blocked host\(s\) unmatched by known_blocked_rules/);
   });
 
   // Audit's outcome never depends on matching (see determineBlockedOutcome),
@@ -182,7 +172,7 @@ describe("buildBlockedMessage", () => {
         engineLabel: "sandbox",
         isAudit: true,
       });
-      assert.equal(message, fixedText);
+      expect(message).toBe(fixedText);
     });
 
     it("stays fixed when some rows are unmatched", () => {
@@ -192,7 +182,7 @@ describe("buildBlockedMessage", () => {
         engineLabel: "sandbox",
         isAudit: true,
       });
-      assert.equal(message, fixedText);
+      expect(message).toBe(fixedText);
     });
 
     it("stays fixed when no rows matched", () => {
@@ -202,7 +192,7 @@ describe("buildBlockedMessage", () => {
         engineLabel: "sandbox",
         isAudit: true,
       });
-      assert.equal(message, fixedText);
+      expect(message).toBe(fixedText);
     });
   });
 });
@@ -217,7 +207,7 @@ describe("describeBlockedOutcome", () => {
       logLooksPlausible: true,
       engineLabel: "proxy",
     });
-    assert.deepEqual(result, {
+    expect(result).toStrictEqual({
       level: "error",
       shouldFail: true,
       message: "1 blocked connection(s) detected by buildcage proxy",
@@ -233,7 +223,7 @@ describe("describeBlockedOutcome", () => {
       logLooksPlausible: true,
       engineLabel: "sandbox",
     });
-    assert.equal(result.level, "none");
+    expect(result.level).toBe("none");
   });
 });
 

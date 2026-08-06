@@ -1,16 +1,15 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { buildDockerCpArgs, buildComposeUpArgs, buildComposeDownArgs } from "./args.ts";
 
 describe("buildDockerCpArgs", () => {
   it("builds a `docker cp <container>:<containerPath> <hostPath>` argv", () => {
-    assert.deepEqual(
+    expect(
       buildDockerCpArgs({
         containerName: "buildcage-proxy-abcd1234",
         containerPath: "/opt/buildcage/bin/runc",
         hostPath: "/tmp/x/runc",
       }),
-      ["cp", "buildcage-proxy-abcd1234:/opt/buildcage/bin/runc", "/tmp/x/runc"],
-    );
+    ).toStrictEqual(["cp", "buildcage-proxy-abcd1234:/opt/buildcage/bin/runc", "/tmp/x/runc"]);
   });
 });
 
@@ -26,7 +25,7 @@ describe("buildComposeUpArgs", () => {
       projectName: "buildcage-proxy-abcd1234",
       pullPolicy: "always",
     });
-    assert.deepEqual(args, [
+    expect(args).toStrictEqual([
       "compose",
       "-f",
       "/path/to/compose.yaml",
@@ -49,7 +48,7 @@ describe("buildComposeDownArgs", () => {
       composeFile: "/path/to/compose.yaml",
       projectName: "buildcage-proxy-abcd1234",
     });
-    assert.deepEqual(args, [
+    expect(args).toStrictEqual([
       "compose",
       "-f",
       "/path/to/compose.yaml",

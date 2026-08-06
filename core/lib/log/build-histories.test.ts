@@ -1,5 +1,4 @@
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +16,7 @@ const MULTISTAGE_HISTORIES = readFileSync(join(fixturesDir, "histories.json"), "
 
 describe("selectAllRefs", () => {
   it("returns the ref from a real single-record histories.json capture", () => {
-    assert.deepEqual(selectAllRefs(MULTISTAGE_HISTORIES), ["jsvnbiyvnlslxxui8ap3i2na2"]);
+    expect(selectAllRefs(MULTISTAGE_HISTORIES)).toStrictEqual(["jsvnbiyvnlslxxui8ap3i2na2"]);
   });
 
   it("returns every ref ordered oldest-first by CreatedAt", () => {
@@ -25,7 +24,7 @@ describe("selectAllRefs", () => {
       JSON.stringify({ type: 1, record: { Ref: "newer", CreatedAt: { seconds: 200, nanos: 0 } } }),
       JSON.stringify({ type: 1, record: { Ref: "older", CreatedAt: { seconds: 100, nanos: 0 } } }),
     ].join("\n");
-    assert.deepEqual(selectAllRefs(historiesText), ["older", "newer"]);
+    expect(selectAllRefs(historiesText)).toStrictEqual(["older", "newer"]);
   });
 
   it("breaks ties within the same second using nanos", () => {
@@ -39,7 +38,7 @@ describe("selectAllRefs", () => {
         record: { Ref: "earlier-nanos", CreatedAt: { seconds: 100, nanos: 500 } },
       }),
     ].join("\n");
-    assert.deepEqual(selectAllRefs(historiesText), ["earlier-nanos", "later-nanos"]);
+    expect(selectAllRefs(historiesText)).toStrictEqual(["earlier-nanos", "later-nanos"]);
   });
 
   it("deduplicates a ref reported on multiple lines as its build progresses", () => {
@@ -57,7 +56,7 @@ describe("selectAllRefs", () => {
         },
       }),
     ].join("\n");
-    assert.deepEqual(selectAllRefs(historiesText), ["build-1"]);
+    expect(selectAllRefs(historiesText)).toStrictEqual(["build-1"]);
   });
 
   it("ignores blank lines and records with no Ref/CreatedAt", () => {
@@ -67,10 +66,10 @@ describe("selectAllRefs", () => {
       "",
       MULTISTAGE_HISTORIES.trim(),
     ].join("\n");
-    assert.deepEqual(selectAllRefs(historiesText), ["jsvnbiyvnlslxxui8ap3i2na2"]);
+    expect(selectAllRefs(historiesText)).toStrictEqual(["jsvnbiyvnlslxxui8ap3i2na2"]);
   });
 
   it("returns an empty array when there are no records at all", () => {
-    assert.deepEqual(selectAllRefs(""), []);
+    expect(selectAllRefs("")).toStrictEqual([]);
   });
 });
