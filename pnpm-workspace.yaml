@@ -4,6 +4,13 @@ minimumReleaseAge: 20160 # 2 weeks
 minimumReleaseAgeExclude:
   - brace-expansion@5.0.7 || 5.0.8
 
-# Lets tsc resolve vitest's types, even though it's only vite-plus's transitive dependency.
+# Lets tsc/rolldown resolve these, even though they're only vite-plus's
+# transitive dependencies. chai/@vitest/expect/@types/chai are vitest's own
+# expect() engine, reused directly under QuickJS — hoisting (rather than
+# pinning our own copies) keeps them locked to whatever version vitest
+# itself uses on Node.
 publicHoistPattern:
   - vitest
+  - chai
+  - "@vitest/expect"
+  - "@types/chai"
