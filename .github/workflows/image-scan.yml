@@ -24,8 +24,6 @@ jobs:
             dockerfile: setup/docker/transparent/Dockerfile
           - engine: explicit
             dockerfile: setup/docker/explicit/Dockerfile
-          - engine: proxy
-            dockerfile: run/docker/Dockerfile
 
     steps:
       - name: Checkout

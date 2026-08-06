@@ -35,17 +35,14 @@ jobs:
             dockerfile: setup/docker/transparent/Dockerfile
           - engine: explicit
             dockerfile: setup/docker/explicit/Dockerfile
-          - engine: proxy
-            dockerfile: run/docker/Dockerfile
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       # Matrix legs sharing one output name would clobber each other (last
       # completed leg wins) — each leg instead writes to a step-output key
-      # suffixed with its own matrix.engine value, so all three never collide
-      # and all survive into this job's own (statically-declared) outputs.
+      # suffixed with its own matrix.engine value, so both never collide
+      # and both survive into this job's own (statically-declared) outputs.
       bundle-content-transparent: ${{ steps.bundle.outputs['content-transparent'] }}
       bundle-content-explicit: ${{ steps.bundle.outputs['content-explicit'] }}
-      bundle-content-proxy: ${{ steps.bundle.outputs['content-proxy'] }}
 
     steps:
       - name: Checkout
@@ -90,8 +87,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           # transparent (default) publishes the plain version tag, matching the
-          # pre-multi-engine tagging scheme; every other engine (explicit,
-          # proxy) publishes under a -<engine> suffix.
+          # pre-multi-engine tagging scheme; explicit publishes under a
+          # -<engine> suffix.
           # "latest" is applied later, by update-major-tag.yml on release publish.
           flavor: latest=false
           tags: |
@@ -178,13 +175,10 @@ jobs:
           TAG: ${{ needs.build-and-push.outputs.tag }}
           BUNDLE_TRANSPARENT: ${{ needs.build-and-push.outputs['bundle-content-transparent'] }}
           BUNDLE_EXPLICIT: ${{ needs.build-and-push.outputs['bundle-content-explicit'] }}
-          BUNDLE_PROXY: ${{ needs.build-and-push.outputs['bundle-content-proxy'] }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "$BUNDLE_TRANSPARENT" > buildcage-container.sigstore.json
           echo "$BUNDLE_EXPLICIT" > buildcage-container-explicit.sigstore.json
-          echo "$BUNDLE_PROXY" > buildcage-container-proxy.sigstore.json
           gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" \
             buildcage-container.sigstore.json \
-            buildcage-container-explicit.sigstore.json \
-            buildcage-container-proxy.sigstore.json
+            buildcage-container-explicit.sigstore.json

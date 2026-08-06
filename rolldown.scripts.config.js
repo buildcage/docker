@@ -47,8 +47,8 @@ const baseOutput = {
   },
 };
 
-// Unset BUILD_TARGET builds everything but qjs-test (run/docker/Dockerfile,
-// which doesn't need report-action.node.ts, requests "qjs" explicitly).
+// Unset BUILD_TARGET builds everything but qjs-test (an image Dockerfile
+// that doesn't need report-action.node.ts requests "qjs" explicitly).
 const target = process.env.BUILD_TARGET;
 const scriptInputs =
   target === "qjs"
