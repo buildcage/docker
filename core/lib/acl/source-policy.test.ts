@@ -1,4 +1,4 @@
-import { describe, it, assert, reportResults } from "../test/test-shim.ts";
+import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { buildSourcePolicy } from "./source-policy.ts";
 
 // Simulates BuildKit's sourcepolicy engine evaluation order exactly
@@ -32,8 +32,8 @@ describe("buildSourcePolicy — rule order (last-match-wins engine semantics)", 
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(policy.rules[0].action, "DENY");
-    assert.equal(policy.rules[1].action, "ALLOW");
+    expect(policy.rules[0].action).toBe("DENY");
+    expect(policy.rules[1].action).toBe("ALLOW");
   });
 
   it("an allowed domain evaluates to ALLOW end-to-end", () => {
@@ -43,8 +43,8 @@ describe("buildSourcePolicy — rule order (last-match-wins engine semantics)", 
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(evaluate(policy, "https://example.com/"), "ALLOW");
-    assert.equal(evaluate(policy, "https://example.com:443/"), "ALLOW");
+    expect(evaluate(policy, "https://example.com/")).toBe("ALLOW");
+    expect(evaluate(policy, "https://example.com:443/")).toBe("ALLOW");
   });
 
   it("a non-allowed domain evaluates to DENY end-to-end", () => {
@@ -54,7 +54,7 @@ describe("buildSourcePolicy — rule order (last-match-wins engine semantics)", 
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(evaluate(policy, "https://blocked.example.com/"), "DENY");
+    expect(evaluate(policy, "https://blocked.example.com/")).toBe("DENY");
   });
 
   it("non-http(s) sources evaluate to ALLOW (no rule ever matches them)", () => {
@@ -64,8 +64,8 @@ describe("buildSourcePolicy — rule order (last-match-wins engine semantics)", 
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(evaluate(policy, "docker-image://docker.io/library/alpine:latest"), "ALLOW");
-    assert.equal(evaluate(policy, "git://github.com/foo/bar.git"), "ALLOW");
+    expect(evaluate(policy, "docker-image://docker.io/library/alpine:latest")).toBe("ALLOW");
+    expect(evaluate(policy, "git://github.com/foo/bar.git")).toBe("ALLOW");
   });
 });
 
@@ -77,8 +77,8 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(policy.version, 1);
-    assert.deepEqual(policy.rules, [
+    expect(policy.version).toBe(1);
+    expect(policy.rules).toStrictEqual([
       { action: "DENY", selector: { identifier: "^https?://.*", matchType: "REGEX" } },
       {
         action: "ALLOW",
@@ -94,7 +94,7 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       httpRulesInput: "deb.debian.org:80",
       ipRulesInput: "",
     });
-    assert.deepEqual(policy.rules[1], {
+    expect(policy.rules[1]).toStrictEqual({
       action: "ALLOW",
       selector: { identifier: "^http://deb\\.debian\\.org(:80)?(/.*)?$", matchType: "REGEX" },
     });
@@ -107,7 +107,7 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(policy.rules[1].selector.identifier, "^https://example\\.com:8443(/.*)?$");
+    expect(policy.rules[1].selector.identifier).toBe("^https://example\\.com:8443(/.*)?$");
   });
 
   it("a wildcard port (:*) is optional too, so it also covers the implicit default port", () => {
@@ -118,9 +118,9 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       ipRulesInput: "",
     });
     const re = new RegExp(policy.rules[1].selector.identifier);
-    assert.ok(re.test("https://example.com/")); // no port in the URL at all
-    assert.ok(re.test("https://example.com:443/"));
-    assert.ok(re.test("https://example.com:8080/"));
+    expect(re.test("https://example.com/")).toBeTruthy(); // no port in the URL at all
+    expect(re.test("https://example.com:443/")).toBeTruthy();
+    expect(re.test("https://example.com:8080/")).toBeTruthy();
   });
 
   it("expands each ip rule into both an https and an http ALLOW rule", () => {
@@ -130,7 +130,7 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       httpRulesInput: "",
       ipRulesInput: "192.168.1.1:443",
     });
-    assert.deepEqual(policy.rules.slice(1, 3), [
+    expect(policy.rules.slice(1, 3)).toStrictEqual([
       {
         action: "ALLOW",
         selector: { identifier: "^https://192\\.168\\.1\\.1(:443)?(/.*)?$", matchType: "REGEX" },
@@ -150,8 +150,7 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(
-      policy.rules[1].selector.identifier,
+    expect(policy.rules[1].selector.identifier).toBe(
       "^https://[^.]+\\.example\\.com(:443)?(/.*)?$",
     );
   });
@@ -164,14 +163,14 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       ipRulesInput: "",
     });
     const deny = policy.rules[0];
-    assert.equal(deny.action, "DENY");
+    expect(deny.action).toBe("DENY");
     const re = new RegExp(deny.selector.identifier);
-    assert.ok(!re.test("docker-image://docker.io/library/alpine:latest"));
-    assert.ok(!re.test("git://github.com/foo/bar.git"));
-    assert.ok(!re.test("local://context"));
-    assert.ok(!re.test("oci-layout://foo"));
-    assert.ok(re.test("https://blocked.example.com/"));
-    assert.ok(re.test("http://blocked.example.com/"));
+    expect(!re.test("docker-image://docker.io/library/alpine:latest")).toBeTruthy();
+    expect(!re.test("git://github.com/foo/bar.git")).toBeTruthy();
+    expect(!re.test("local://context")).toBeTruthy();
+    expect(!re.test("oci-layout://foo")).toBeTruthy();
+    expect(re.test("https://blocked.example.com/")).toBeTruthy();
+    expect(re.test("http://blocked.example.com/")).toBeTruthy();
   });
 
   it("the ALLOW rule matches the domain with any path, with or without an explicit default port", () => {
@@ -182,11 +181,11 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       ipRulesInput: "",
     });
     const re = new RegExp(policy.rules[1].selector.identifier);
-    assert.ok(re.test("https://example.com/")); // BuildKit omits :443 when the client didn't specify a port
-    assert.ok(re.test("https://example.com:443/"));
-    assert.ok(re.test("https://example.com:443/some/path?query=1"));
-    assert.ok(!re.test("https://other.com:443/"));
-    assert.ok(!re.test("https://other.com/"));
+    expect(re.test("https://example.com/")).toBeTruthy(); // BuildKit omits :443 when the client didn't specify a port
+    expect(re.test("https://example.com:443/")).toBeTruthy();
+    expect(re.test("https://example.com:443/some/path?query=1")).toBeTruthy();
+    expect(!re.test("https://other.com:443/")).toBeTruthy();
+    expect(!re.test("https://other.com/")).toBeTruthy();
   });
 
   it("empty rule inputs still produce the DENY catch-all only", () => {
@@ -196,7 +195,7 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.deepEqual(policy.rules, [
+    expect(policy.rules).toStrictEqual([
       { action: "DENY", selector: { identifier: "^https?://.*", matchType: "REGEX" } },
     ]);
   });
@@ -210,7 +209,7 @@ describe("buildSourcePolicy — regex (~) rules", () => {
       httpRulesInput: "",
       ipRulesInput: "",
     });
-    assert.equal(policy.rules[1].selector.identifier, "^https://custom\\.regex:443(/.*)?$");
+    expect(policy.rules[1].selector.identifier).toBe("^https://custom\\.regex:443(/.*)?$");
   });
 
   it("works the same way for an http rule (scheme is a parameter, not hardcoded)", () => {
@@ -220,7 +219,7 @@ describe("buildSourcePolicy — regex (~) rules", () => {
       httpRulesInput: "~^custom\\.regex:80$",
       ipRulesInput: "",
     });
-    assert.equal(policy.rules[1].selector.identifier, "^http://custom\\.regex:80(/.*)?$");
+    expect(policy.rules[1].selector.identifier).toBe("^http://custom\\.regex:80(/.*)?$");
   });
 
   it("an anchor-less regex matches as a substring within the domain, but the missing anchors don't reach into the path", () => {
@@ -231,13 +230,13 @@ describe("buildSourcePolicy — regex (~) rules", () => {
       ipRulesInput: "",
     });
     const re = new RegExp(policy.rules[1].selector.identifier);
-    assert.ok(re.test("https://example.com/"));
-    assert.ok(re.test("https://notexample.com/")); // no leading anchor: matches anywhere
-    assert.ok(re.test("https://example.company/")); // no trailing anchor: matches anywhere
+    expect(re.test("https://example.com/")).toBeTruthy();
+    expect(re.test("https://notexample.com/")).toBeTruthy(); // no leading anchor: matches anywhere
+    expect(re.test("https://example.company/")).toBeTruthy(); // no trailing anchor: matches anywhere
     // ...but the domain-side [^/]* filling each missing anchor can't reach
     // past a "/" to satisfy a match that only exists in the path, unlike a
     // naive unbounded ".*" would.
-    assert.ok(!re.test("https://evil.com/example.com/"));
+    expect(!re.test("https://evil.com/example.com/")).toBeTruthy();
   });
 
   it("only the anchors actually present are stripped — an unanchored end still gets its own [^/]*", () => {
@@ -248,8 +247,8 @@ describe("buildSourcePolicy — regex (~) rules", () => {
       ipRulesInput: "",
     });
     const re = new RegExp(policy.rules[1].selector.identifier);
-    assert.ok(re.test("https://example.com/")); // leading-anchored, trailing open
-    assert.ok(!re.test("https://notexample.com/")); // leading anchor still enforced
+    expect(re.test("https://example.com/")).toBeTruthy(); // leading-anchored, trailing open
+    expect(!re.test("https://notexample.com/")).toBeTruthy(); // leading anchor still enforced
   });
 
   it("the user's own \".*\" is confined to the domain (converted to [^/]*), so it can't cross into the path", () => {
@@ -260,8 +259,8 @@ describe("buildSourcePolicy — regex (~) rules", () => {
       ipRulesInput: "",
     });
     const re = new RegExp(policy.rules[1].selector.identifier);
-    assert.ok(re.test("https://sub.example.com:443/"));
-    assert.ok(!re.test("https://evil.com/sub.example.com:443/"));
+    expect(re.test("https://sub.example.com:443/")).toBeTruthy();
+    expect(!re.test("https://evil.com/sub.example.com:443/")).toBeTruthy();
   });
 
   it("an escaped literal trailing $ is not mistaken for the end anchor (regression)", () => {
@@ -275,8 +274,8 @@ describe("buildSourcePolicy — regex (~) rules", () => {
     // the wrapper's own "(" — see git history for the exact failure): the
     // trailing "$" here is escaped (a literal dollar sign), not an anchor.
     const re = new RegExp(policy.rules[1].selector.identifier);
-    assert.ok(re.test("https://foo$/"));
-    assert.ok(!re.test("https://bar$/"));
+    expect(re.test("https://foo$/")).toBeTruthy();
+    expect(!re.test("https://bar$/")).toBeTruthy();
   });
 
   it("an escaped literal '.' followed by a real '*' quantifier is left alone (not confined)", () => {
@@ -289,8 +288,8 @@ describe("buildSourcePolicy — regex (~) rules", () => {
     // `\.*` here means "zero or more literal dots", not the wildcard `.*` —
     // confineDotStarToDomain must not touch it.
     const re = new RegExp(policy.rules[1].selector.identifier);
-    assert.ok(re.test("https://example.com:443/"));
-    assert.ok(re.test("https://example.com:443.../"));
+    expect(re.test("https://example.com:443/")).toBeTruthy();
+    expect(re.test("https://example.com:443.../")).toBeTruthy();
   });
 });
 
@@ -302,7 +301,7 @@ describe("buildSourcePolicy — audit mode", () => {
       httpRulesInput: "deb.debian.org:80",
       ipRulesInput: "192.168.1.1:443",
     });
-    assert.deepEqual(policy, { version: 1, rules: [] });
+    expect(policy).toStrictEqual({ version: 1, rules: [] });
   });
 });
 
