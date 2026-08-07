@@ -13,7 +13,6 @@
 When a compromised dependency pulled in by `RUN npm install`, `RUN pip install`, or any other build command tries to exfiltrate secrets or phone home, Buildcage blocks it: only the domains you specify are reachable. No Dockerfile changes, no proxy configuration, no certificates to install: works with any language or package manager.
 
 - **Protects `docker build`**: every `RUN` step, zero Dockerfile changes
-- **Also protects plain `run:` steps**: the `run` action applies the same isolation to any command, not just Docker builds
 - **Self-contained on GitHub**: no external service, no telemetry, free and open source
 
 This is not a hypothetical risk: the [Shai-Hulud npm worm](https://unit42.paloaltonetworks.com/npm-supply-chain-attack/) compromised hundreds of packages whose `postinstall` scripts exfiltrated CI/CD secrets straight out of the build environment. npm v12 disables install scripts by default, closing off that specific path, but builds still handle secrets and run plenty of other commands that could do the same thing. That's the layer Buildcage protects, regardless of which command triggers it.
@@ -27,15 +26,10 @@ _A build tries to reach an unexpected domain. Buildcage blocks it and records it
 - 🚀 **Zero build script changes**: Your Dockerfile or shell commands stay exactly as they are
 - 🔍 **Dependency discovery**: Discover what your build already talks to before enforcing anything (`audit` mode)
 - 🛡️ **Allowlist enforcement**: Block every destination except the ones you explicitly allow (`restrict` mode)
-- 🔒 **Network isolation**: Isolates network access per Dockerfile `RUN` step or workflow `run:` step, so only explicitly allowed destinations are reachable
+- 🔒 **Network isolation**: Isolates network access per Dockerfile `RUN` step, so only explicitly allowed destinations are reachable
 - 📊 **Detailed logging**: Every destination your build reaches, reported directly in GitHub's Job Summary
 
 ## Quick Start
-
-Buildcage protects your build in two ways: wrap `docker build` itself, or isolate a `run:` step
-directly. Both follow the same audit → restrict flow.
-
-### Protect a Docker Build
 
 Using Buildcage comes down to three steps: start the Buildcage container, point Docker Buildx at it
 as a remote builder, then run your build as usual: your Dockerfile and build commands don't change.
@@ -111,26 +105,6 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 
 See the [complete example workflow](.github/workflows/example-restrict.yml).
 
-### Protect a `run:` Step
-
-For commands that aren't part of a Docker build (`npm install`, a test suite, a build script running
-directly in the job), wrap them with the `run` action instead. Same audit → restrict flow, same
-report, just applied to one step rather than a whole `docker build`.
-
-```yaml
-- name: Run tests with outbound network isolation
-  uses: dash14/buildcage/run@f40c162979dc9f095993ad26049b08b2eca77911 # v2.2.5
-  with:
-    proxy_mode: restrict
-    allowed_https_rules: |
-      registry.npmjs.org:443
-    run: |
-      npm install
-      npm test
-```
-
-See the [complete example workflow](.github/workflows/example-run-restrict.yml).
-
 ---
 
 Your builds are now protected. Any unexpected connections will be blocked and reported.
@@ -139,17 +113,9 @@ For the full parameter reference, rule syntax, and operation modes, see the [Ref
 
 ## How It Works
 
-For Docker builds, Buildcage runs as a remote driver for Docker Buildx and routes each `RUN`
-step's outbound traffic through a proxy that enforces your allowlist, without touching your
-Dockerfile.
-
-For the `run` action, Buildcage isolates the command directly on the runner: its own network
-namespace enforces the same kind of allowlist proxy, while capability and namespace restrictions
-keep it from escaping to the rest of the runner. It keeps the same UID and `$HOME` as the rest of
-the job, though, so things configured by earlier steps, like AWS credentials or an npm cache, keep
-working unmodified.
-
-Neither approach requires an agent installed on the runner.
+Buildcage runs as a remote driver for Docker Buildx and routes each `RUN` step's outbound traffic
+through a proxy that enforces your allowlist, without touching your Dockerfile. No agent installed
+on the runner is required.
 
 See [Reference](./docs/reference.md) for the full mechanism, including Docker build's experimental
 proxy engine switch.
@@ -174,16 +140,16 @@ an entire GitHub Actions job rather than one build step.
 
 **Harden-Runner** is a broader security agent, monitoring network, file integrity, and process
 activity across the whole runner. Buildcage stays narrower on purpose: it only restricts outbound
-traffic during a build, either a `docker build` or a `run:` step, and does nothing else. That
-focus is also why it stays entirely within your GitHub Actions job: no external dashboard, no
-account, no tier to unlock for private repos or self-hosted runners.
+traffic during a Docker build and does nothing else. That focus is also why it stays entirely
+within your GitHub Actions job: no external dashboard, no account, no tier to unlock for private
+repos or self-hosted runners.
 
 **Bullfrog** is free and open source too, but the architecture differs. It allowlists by resolving
 a domain to an IP address and then permitting that IP, without inspecting the SNI or Host header of
 the actual connection, so shared infrastructure like a CDN can end up permitting more than the
 intended domain. Its own documentation also states that jobs running in containers aren't
 supported, which rules out protecting a Docker build. Buildcage matches on the domain itself and
-isolates each `RUN` step or `run:` command individually.
+isolates each `RUN` step individually.
 
 ## FAQ
 
@@ -215,10 +181,12 @@ isolates each `RUN` step or `run:` command individually.
 
   No. Buildcage only controls network access. It doesn't prevent malicious code from running; it prevents that code from communicating with external servers.
 
-- **Can a `run:` step wrapped by `run` use Docker itself?**
+- **I need to isolate a `run:` step, not a Docker build — is there something for that?**
 
-  No. `run` clears the `docker` group before the command executes, so even if the Docker socket is
-  visible on the filesystem, the isolated command has no permission to use it.
+  Yes: [buildcage/isolated-run](https://github.com/buildcage/isolated-run) applies the same
+  network-isolation technology directly to a workflow `run:` step. It used to live in this
+  repository as an experimental `run` action; it's now a separate project so it can version and
+  release independently of Docker-build isolation.
 
 - **Can I host Buildcage in my own private repository?**
 
@@ -229,13 +197,13 @@ isolates each `RUN` step or `run:` command individually.
 
 ## Documentation
 
-| Doc                                          | What's in it                                                                                                  |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| [Reference](./docs/reference.md)             | Full parameter reference, operation modes, and how each proxy engine and the `run` action work under the hood |
-| [Rule Syntax](./docs/rules.md)               | Wildcard, regex, and IP rule syntax in detail                                                                 |
-| [Security Details](./docs/security.md)       | Architecture, attack resistance, and known limitations for Docker builds and the `run` action                 |
-| [Self-Hosting Guide](./docs/self-hosting.md) | Hosting your own Buildcage image in a private repository                                                      |
-| [Development Guide](./docs/development.md)   | Local usage, testing, logs, and implementation internals                                                      |
+| Doc                                          | What's in it                                                                              |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [Reference](./docs/reference.md)             | Full parameter reference, operation modes, and how each proxy engine works under the hood |
+| [Rule Syntax](./docs/rules.md)               | Wildcard, regex, and IP rule syntax in detail                                             |
+| [Security Details](./docs/security.md)       | Architecture, attack resistance, and known limitations                                    |
+| [Self-Hosting Guide](./docs/self-hosting.md) | Hosting your own Buildcage image in a private repository                                  |
+| [Development Guide](./docs/development.md)   | Local usage, testing, logs, and implementation internals                                  |
 
 ## Why I Built This
 

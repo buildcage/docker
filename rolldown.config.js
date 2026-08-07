@@ -33,19 +33,10 @@ const configs = [
     file: "report/dist/main.cjs",
     plugins: mainPlugins,
   },
-  {
-    input: "run/src/main.ts",
-    file: "run/dist/main.cjs",
-    // Pulls in setup/src/lib/verify-image.js, which uses sigstore the same
-    // way setup/src/main.js does — same plugin set for the same reason.
-    plugins: mainPlugins,
-    codeSplitting: false,
-  },
-  { input: "run/src/post.ts", file: "run/dist/post.cjs" },
 ];
 
 export default defineConfig(
-  configs.map(({ input, file, plugins = [], codeSplitting = true }) => ({
+  configs.map(({ input, file, plugins, codeSplitting = true }) => ({
     input,
     external: [/^node:/],
     platform: "node",

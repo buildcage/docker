@@ -1,3 +1,2 @@
 setup/dist/*.cjs linguist-generated=true
 report/dist/*.cjs linguist-generated=true
-run/dist/*.cjs linguist-generated=true

@@ -15,7 +15,6 @@
   "include": [
     "core/lib/**/*.ts",
     "setup/src/**/*.ts",
-    "run/src/**/*.ts",
     "report/src/**/*.ts",
     "setup/docker/*/scripts/*.node.ts",
     "setup/docker/lib/**/*.ts"

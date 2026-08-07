@@ -14,13 +14,6 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^run/docker/Dockerfile$/", "/^run/dev/Dockerfile$/"],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG RUNC_VERSION=(?<currentValue>v[\\d.]+)"
-      ]
-    },
-    {
-      "customType": "regex",
       "managerFilePatterns": ["/\\.md$/"],
       "matchStrings": [
         "uses: (?<depName>[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)(?:/[^@\\s]+)?@(?<currentDigest>[a-f0-9]{40}) # (?<currentValue>v[0-9.]+)"

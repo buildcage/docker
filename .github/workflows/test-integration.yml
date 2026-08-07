@@ -21,7 +21,6 @@ jobs:
     outputs:
       test: ${{ steps.filter.outputs.test }}
       test_multiarch: ${{ steps.filter.outputs.test_multiarch }}
-      test_sandbox: ${{ steps.filter.outputs.test_sandbox }}
     steps:
       - name: Filter changed paths
         id: filter
@@ -46,13 +45,6 @@ jobs:
               - *docker
               - *workflow
               - 'setup/test/Dockerfile.multiarch'
-            test_sandbox:
-              - *docker
-              - *workflow
-              - 'run/docker/**'
-              - 'run/src/**'
-              - 'run/test/**'
-              - 'Makefile'
 
   test:
     needs: changes
@@ -264,44 +256,6 @@ jobs:
           BUILDER_NAME: buildcage-multiarch
         run: docker compose down -v --rmi all 2>/dev/null || true
 
-  # Drives run/dist/main.cjs directly via `make test_integration_sandbox_linux`
-  # (see run/test/integration-test-*.sh), not through the real run action —
-  # mirrors how the `test` job above drives report/src/main.js directly.
-  # test-e2e.yml's test_sandbox_* jobs keep one representative case each
-  # that does exercise the real action.
-  test_sandbox:
-    needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.test_sandbox == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    name: "integration: test (sandbox)"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-vp
-
-      - name: Build local sandbox proxy image
-        run: docker compose build proxy
-
-      - name: Resolve local image ref
-        id: local_image
-        run: echo "ref=$(docker compose config --images proxy)" >> "$GITHUB_OUTPUT"
-
-      - name: Rebuild run action with the local-image test hook enabled
-        env:
-          BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: vp run build
-
-      - name: Run run-action integration tests
-        env:
-          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
-        run: make test_integration_sandbox_linux
-
   # Single, stably-named required status check for branch protection: the
   # `test` job's own name varies per matrix entry (test (transparent-audit),
   # test (explicit-restrict), etc.), so branch protection can't target it
@@ -310,7 +264,7 @@ jobs:
   integration-tests-passed:
     name: Integration tests passed
     runs-on: ubuntu-latest
-    needs: [changes, test, test_multiarch, test_sandbox]
+    needs: [changes, test, test_multiarch]
     if: always()
     permissions: {}
     steps:

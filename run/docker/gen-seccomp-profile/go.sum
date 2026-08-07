@@ -1,6 +1,0 @@
-github.com/moby/profiles/seccomp v0.2.3 h1:nrHNSiECQQvq4WjgceCUgJXIXUJBIswVQ133k4Do2mA=
-github.com/moby/profiles/seccomp v0.2.3/go.mod h1:8m3qkkWZXrRsMqlUUN2zyccnYmBf3EAdQYPMVJ3NBhk=
-github.com/opencontainers/runtime-spec v1.3.0 h1:YZupQUdctfhpZy3TM39nN9Ika5CBWT5diQ8ibYCRkxg=
-github.com/opencontainers/runtime-spec v1.3.0/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
-golang.org/x/sys v0.45.0 h1:dO4czNzziLiiXplLQgBCEpCvXQ3dnkn0SdaZSYdQ+FY=
-golang.org/x/sys v0.45.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
