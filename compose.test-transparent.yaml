@@ -11,14 +11,14 @@ services:
 
   # Test HTTP server (with self-signed certificate)
   test-server:
-    build: setup/test/test-server
+    build: test/test-server
     networks:
       test-net:
         ipv4_address: 10.200.0.100
 
   # DNS used by builder (resolves all domains to test-server)
   test-dns:
-    build: setup/test/test-dns
+    build: test/test-dns
     networks:
       test-net:
         ipv4_address: 10.200.0.53

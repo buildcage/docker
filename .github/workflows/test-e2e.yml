@@ -27,8 +27,7 @@ jobs:
         with:
           filters: |
             docker: &docker
-              - 'core/**'
-              - 'setup/docker/**'
+              - 'docker/**'
               - 'compose.yaml'
             js-built: &js-built
               - 'package.json'
@@ -44,10 +43,10 @@ jobs:
               - *docker
               - *js-built
               - *workflow
-              - 'setup/**'
+              - 'src/**'
               - 'report/**'
 
-  # Exercises the real setup/report actions end-to-end (uses: ./setup,
+  # Exercises the real setup/report actions end-to-end (uses: ./,
   # uses: ./report) against an image built from this branch, no registry
   # involved — see docs/development.md#local-development.
   test_action:
@@ -88,7 +87,7 @@ jobs:
 
       # Default builder_name is fine: each matrix entry runs on its own VM.
       - name: Start Buildcage builder via the real setup action
-        uses: ./setup
+        uses: ./
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
         with:
@@ -100,7 +99,7 @@ jobs:
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
         with:
           driver: remote
-          # Matches setup/action.yml's default builder_name — update together.
+          # Matches action.yml's default builder_name — update together.
           endpoint: docker-container://buildcage
 
       - name: Create test Dockerfile

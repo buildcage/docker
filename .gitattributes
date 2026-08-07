@@ -1,2 +1,2 @@
-setup/dist/*.cjs linguist-generated=true
+dist/*.cjs linguist-generated=true
 report/dist/*.cjs linguist-generated=true

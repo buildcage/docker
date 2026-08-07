@@ -20,19 +20,19 @@ import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.
 export { buildACLRules };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const composeFile = join(__dirname, "../compose.yaml");
+const composeFile = join(__dirname, "../docker/compose.action.yaml");
 
 // Gates a local-image override used only by this repo's own CI/dev testing
 // (see test_action in .github/workflows/test-e2e.yml), never by a consumer of
 // a published action. A normal build physically excludes
-// core/lib/provenance/local-image-override.ts (rolldown tree-shakes the dead import); the
+// src/core/lib/provenance/local-image-override.ts (rolldown tree-shakes the dead import); the
 // unit_test CI job also greps the built output as a backstop.
 const LOCAL_IMAGE_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1";
 
 /**
  * Verifies image provenance and resolves the digest-pinned image ref.
  * Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
- * performed (branch ref / local ./setup) — printed by the top-level catch.
+ * performed (branch ref / local ./) — printed by the top-level catch.
  */
 async function resolveVerifiedImage({
   actionRef,
@@ -58,9 +58,7 @@ async function main(): Promise<void> {
   console.log(`Proxy engine: ${proxyEngine}`);
 
   const localOverride = LOCAL_IMAGE_OVERRIDE_ENABLED
-    ? (await import("../../core/lib/provenance/local-image-override.ts")).readLocalImageOverride(
-        env,
-      )
+    ? (await import("./core/lib/provenance/local-image-override.ts")).readLocalImageOverride(env)
     : null;
   if (localOverride) {
     console.log(

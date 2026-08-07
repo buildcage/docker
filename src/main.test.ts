@@ -1,7 +1,7 @@
 /**
- * Unit tests for setup/main.ts
+ * Unit tests for main.ts
  *
- * Run with: vp test run setup/src/main.test.ts
+ * Run with: vp test run src/main.test.ts
  */
 import { describe, it, expect } from "vitest";
 

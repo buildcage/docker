@@ -3,7 +3,7 @@ services:
     container_name: ${BUILDER_NAME:-buildcage}
     build:
       context: .
-      dockerfile: setup/docker/${PROXY_ENGINE:-transparent}/Dockerfile
+      dockerfile: docker/${PROXY_ENGINE:-transparent}/Dockerfile
     # Instead of privileged: true, grant only the minimum privileges required
     # to run BuildKit and iptables. This avoids granting full device access
     # and unrestricted /sys write permissions that privileged mode includes.

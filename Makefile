@@ -1,10 +1,10 @@
 COMPOSE_FILE ?= compose.yaml
 # Lets test_integration_buildkit_explicit_* clean up the explicit-engine overlay.
-TEST_COMPOSE_FILE ?= setup/compose.test-transparent.yaml
+TEST_COMPOSE_FILE ?= compose.test-transparent.yaml
 
 # Fixed Compose project name, trusted by report/src/main.ts and
-# setup/src/post.ts via their own BUILDCAGE_BUILD_TEST_HOOKS-gated overrides
-# instead of deriveProjectName("buildcage") (core/lib/docker/container.ts).
+# src/post.ts via their own BUILDCAGE_BUILD_TEST_HOOKS-gated overrides
+# instead of deriveProjectName("buildcage") (src/core/lib/docker/container.ts).
 # Scoped to the targets that touch this Compose project; test_unit_* is
 # excluded on purpose (see its own section below).
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export COMPOSE_PROJECT_NAME := buildcage-project
@@ -24,11 +24,11 @@ test_unit: test_unit_core test_unit_setup test_unit_report test_unit_qjs ## Run 
 # vitest matches these by path substring, not glob, so keep them package-specific.
 .PHONY: test_unit_core
 test_unit_core: ## Run core unit tests
-	@vp test run core/
+	@vp test run src/core
 
 .PHONY: test_unit_setup
 test_unit_setup: ## Run setup action unit tests
-	@vp test run setup/src
+	@vp test run src/lib src/main
 
 .PHONY: test_unit_report
 # report/src has no package-local pure functions to unit-test.
@@ -39,14 +39,14 @@ test_unit_report: ## Run report unit tests
 # and bind-mount the output in. qjs itself is identical across images, so one
 # representative build is enough.
 QJS_MOUNTS := \
-	-v "$(CURDIR)/dist/test-qjs/core:/opt/buildcage/core:ro"
+	-v "$(CURDIR)/dist/qjs-test/src/core:/opt/buildcage/core:ro"
 QJS_TEST_DIRS := \
 	/opt/buildcage/core/lib/acl
 
 .PHONY: test_unit_qjs
 test_unit_qjs: ## Run unit tests in Docker
 	@vp run build:qjs-test
-	@docker build -f setup/docker/transparent/Dockerfile -t buildcage-qjs-test .
+	@docker build -f docker/transparent/Dockerfile -t buildcage-qjs-test .
 	@docker run --rm --entrypoint qjs $(QJS_MOUNTS) buildcage-qjs-test \
 		--std -m /opt/buildcage/core/scripts/test/run-tests.qjs.js $(QJS_TEST_DIRS)
 
@@ -133,66 +133,66 @@ test_integration_buildkit: test_integration_buildkit_transparent_audit test_inte
 .PHONY: test_integration_buildkit_transparent_audit
 test_integration_buildkit_transparent_audit: ## Run transparent-engine audit mode tests
 	@echo "Running transparent-engine audit mode tests..."
-	@COMPOSE_FILE=compose.yaml:setup/compose.test-transparent.yaml \
+	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
 	  $(MAKE) setup_buildkit_transparent_audit
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f setup/test/Dockerfile.transparent-audit setup/test/ \
+	  --progress=plain -f test/Dockerfile.transparent-audit test/ \
 	  --load -t buildcage-test
 	@node report/src/main.ts
-	@./setup/test/assert-transparent-audit.sh
-	@node setup/src/post.ts
-	@./setup/test/assert-post.sh
+	@./test/assert-transparent-audit.sh
+	@node src/post.ts
+	@./test/assert-post.sh
 	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_transparent_restrict
 test_integration_buildkit_transparent_restrict: ## Run transparent-engine restrict mode tests
 	@echo "Running transparent-engine restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:setup/compose.test-transparent.yaml \
+	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
 	  $(MAKE) setup_buildkit_transparent_restrict
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f setup/test/Dockerfile.transparent-restrict setup/test/ \
+	  --progress=plain -f test/Dockerfile.transparent-restrict test/ \
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
-	@./setup/test/assert-transparent-restrict.sh
-	@node setup/src/post.ts
-	@./setup/test/assert-post.sh
+	@./test/assert-transparent-restrict.sh
+	@node src/post.ts
+	@./test/assert-post.sh
 	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_explicit_audit
 test_integration_buildkit_explicit_audit: ## Run explicit-engine audit mode tests
 	@echo "Running explicit-engine audit mode tests..."
-	@COMPOSE_FILE=compose.yaml:setup/compose.test-explicit.yaml \
+	@COMPOSE_FILE=compose.yaml:compose.test-explicit.yaml \
 	  $(MAKE) setup_buildkit_explicit_audit
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f setup/test/Dockerfile.explicit-audit setup/test/ \
+	  --progress=plain -f test/Dockerfile.explicit-audit test/ \
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
-	@./setup/test/assert-explicit-audit.sh
-	@node setup/src/post.ts
-	@./setup/test/assert-post.sh
-	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean_buildkit
+	@./test/assert-explicit-audit.sh
+	@node src/post.ts
+	@./test/assert-post.sh
+	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_explicit_restrict
 test_integration_buildkit_explicit_restrict: ## Run explicit-engine restrict mode tests
 	@echo "Running explicit-engine restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:setup/compose.test-explicit.yaml \
+	@COMPOSE_FILE=compose.yaml:compose.test-explicit.yaml \
 	  $(MAKE) setup_buildkit_explicit_restrict
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f setup/test/Dockerfile.explicit-restrict setup/test/ \
+	  --progress=plain -f test/Dockerfile.explicit-restrict test/ \
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
-	@./setup/test/assert-explicit-restrict.sh
-	@node setup/src/post.ts
-	@./setup/test/assert-post.sh
-	@TEST_COMPOSE_FILE=setup/compose.test-explicit.yaml $(MAKE) clean_buildkit
+	@./test/assert-explicit-restrict.sh
+	@node src/post.ts
+	@./test/assert-post.sh
+	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean_buildkit
 
 # ---------------------------------------------------------------------------
 # example_{engine}_{mode} — smoke test against a plain Dockerfile

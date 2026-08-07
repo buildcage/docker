@@ -2,7 +2,7 @@ import { defineConfig } from "vite-plus";
 
 // Committed build artifacts (verified against source by the "Check dist is
 // up to date" CI step) — never lint/format generated output.
-const generatedOutputs = ["setup/dist/**", "report/dist/**", "dist/**"];
+const generatedOutputs = ["dist/**", "report/dist/**"];
 
 // Recorded/golden fixtures: some (e.g. core/lib/log/__fixtures__/*.json) are
 // parsed line-by-line to mimic buildctl's real NDJSON-ish log output, so
@@ -26,10 +26,10 @@ export default defineConfig({
   },
   staged: {
     "*.{ts,tsx,js,jsx,json,jsonc,yaml,yml,md}": "vp check --fix",
-    "setup/docker/explicit/buildkit-proxy/**/*.go": "gofmt -w",
+    "docker/explicit/buildkit-proxy/**/*.go": "gofmt -w",
   },
   test: {
-    include: ["core/**/*.test.ts", "setup/src/**/*.test.ts", "report/src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "report/src/**/*.test.ts"],
     restoreMocks: true,
   },
 });

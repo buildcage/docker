@@ -4,7 +4,7 @@
  * overrides are intentionally not supported to preserve Sigstore verification
  * integrity.
  *
- * Kept in its own module (rather than inline in setup/src/main.ts) so it can
+ * Kept in its own module (rather than inline in src/main.ts) so it can
  * be imported without also pulling in main.ts's own self-invocation guard.
  */
 export interface ResolveBuildcageImageRefOptions {

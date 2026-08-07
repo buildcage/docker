@@ -10,7 +10,7 @@
  * filename 'std'" even with --std passed).
  *
  * Covers only the APIs this codebase actually calls (verified by grep across
- * core/scripts, core/lib, setup/docker/explicit/scripts) — not a general
+ * src/core/scripts, src/core/lib, docker/explicit/scripts) — not a general
  * QuickJS type definition. This file must only ever be visible to
  * tsconfig.qjs.json's program (see its "types": []) — @types/node also
  * declares a module named "os", with an incompatible shape, and the two

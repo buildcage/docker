@@ -510,7 +510,7 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region core/lib/docker/compose-project-name.ts
+//#region src/core/lib/docker/compose-project-name.ts
 /**
 * An explicit, deterministic Compose project name, so concurrent
 * `up`/`down`/`ps` from different steps in the same job never collide on
@@ -530,7 +530,7 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 	return composeProjectNameOverride || deriveProjectName(builderName);
 }
 //#endregion
-//#region core/lib/docker/args.ts
+//#region src/core/lib/docker/args.ts
 function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	return [
 		"cp",
@@ -539,7 +539,7 @@ function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
 	];
 }
 //#endregion
-//#region core/lib/docker/container-env.ts
+//#region src/core/lib/docker/container-env.ts
 /**
 * Parses `docker inspect <id> --format '{{json .Config.Env}}'`'s output — a
 * JSON array of "KEY=VALUE" strings — into a lookup map. Used to read a
@@ -555,7 +555,7 @@ function parseDockerInspectEnv(inspectOutput) {
 	return env;
 }
 //#endregion
-//#region core/lib/docker/client.ts
+//#region src/core/lib/docker/client.ts
 /** `docker ps --format '{{.ID}}'` prints one ID per line, possibly with
 *  trailing blank lines. */
 function parseContainerIds(psOutput) {
@@ -664,7 +664,7 @@ function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand
 	};
 }
 //#endregion
-//#region core/lib/errors.ts
+//#region src/core/lib/errors.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an

@@ -13,10 +13,10 @@
     "types": []
   },
   "include": [
-    "core/scripts/**/*.ts",
-    "core/lib/acl/**/*.ts",
-    "core/lib/test/**/*.ts",
-    "setup/docker/explicit/scripts/**/*.ts"
+    "src/core/scripts/**/*.ts",
+    "src/core/lib/acl/**/*.ts",
+    "src/core/lib/test/**/*.ts",
+    "docker/explicit/scripts/**/*.ts"
   ],
   "exclude": ["**/*.property.test.ts", "**/*.node.ts"]
 }
