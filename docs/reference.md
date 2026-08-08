@@ -6,7 +6,7 @@ Starts the Buildcage builder container.
 
 ```yaml
 - name: Start Buildcage builder
-  uses: dash14/buildcage/setup@f40c162979dc9f095993ad26049b08b2eca77911 # v2.2.5
+  uses: dash14/buildcage/setup@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
   with:
     proxy_mode: restrict
     allowed_https_rules: |
@@ -169,7 +169,7 @@ Displays communication logs after builds and optionally fails if any BLOCKED con
 ```yaml
 - name: Show proxy report
   if: always()
-  uses: dash14/buildcage/report@f40c162979dc9f095993ad26049b08b2eca77911 # v2.2.5
+  uses: dash14/buildcage/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
 ```
 
 ### Job Summary
