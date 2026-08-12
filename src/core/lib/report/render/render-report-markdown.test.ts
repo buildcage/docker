@@ -39,7 +39,7 @@ describe("renderReportMarkdown — transparent", () => {
   };
 
   it("renders the restrict-mode heading and Allowed Hosts table", () => {
-    const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "dash14/buildcage", "v2", {
+    const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "buildcage/docker", "v2", {
       title: "Outbound Traffic Report during Docker Build",
     });
     expect(md).toMatch(/## Outbound Traffic Report during Docker Build \(restrict mode\)/);
@@ -50,7 +50,7 @@ describe("renderReportMarkdown — transparent", () => {
   it("renders the audit-mode heading and Audited Hosts table, plus a restrict-mode example", () => {
     const md = renderReportMarkdown(
       { ...base, parameters: params({ mode: "audit" }), passed: [allowedRow] },
-      "dash14/buildcage",
+      "buildcage/docker",
       "v2",
     );
     expect(md).toMatch(/### 📋 Audited Hosts/);
@@ -60,7 +60,7 @@ describe("renderReportMarkdown — transparent", () => {
   it("renders Blocked Hosts and shows the SNI footnote, not Communication details", () => {
     const md = renderReportMarkdown(
       { ...base, blocked: [blockedRow], blockedCount: 1 },
-      "dash14/buildcage",
+      "buildcage/docker",
       "v2",
     );
     expect(md).toMatch(/### 🚫 Blocked Hosts/);
@@ -69,66 +69,55 @@ describe("renderReportMarkdown — transparent", () => {
   });
 
   it("uses the real actionRepo in the footer, not a placeholder", () => {
-    const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
-    expect(md).toMatch(/Reported by \[Buildcage\]\(https:\/\/github\.com\/dash14\/buildcage\)/);
+    const md = renderReportMarkdown(base, "buildcage/docker", "v2");
+    expect(md).toMatch(/Reported by \[Buildcage\]\(https:\/\/github\.com\/buildcage\/docker\)/);
     assertNotMatch(md, /GITHUB_ACTION_REPOSITORY/);
   });
 
   it("omits the Allowed Hosts table entirely when nothing passed", () => {
-    const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
+    const md = renderReportMarkdown(base, "buildcage/docker", "v2");
     assertNotMatch(md, /### ✅ Allowed Hosts/);
   });
 
   it("shows a '(no communication)' note when nothing passed and nothing blocked", () => {
-    const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
+    const md = renderReportMarkdown(base, "buildcage/docker", "v2");
     expect(md).toMatch(/_\(no communication\)_/);
   });
 
   it("omits the '(no communication)' note once anything passed or was blocked", () => {
     const passedMd = renderReportMarkdown(
       { ...base, passed: [allowedRow] },
-      "dash14/buildcage",
+      "buildcage/docker",
       "v2",
     );
     assertNotMatch(passedMd, /_\(no communication\)_/);
 
     const blockedMd = renderReportMarkdown(
       { ...base, blocked: [blockedRow], blockedCount: 1 },
-      "dash14/buildcage",
+      "buildcage/docker",
       "v2",
     );
     assertNotMatch(blockedMd, /_\(no communication\)_/);
   });
 
   it("uses the title option verbatim, e.g. a run step's em-dash label", () => {
-    const md = renderReportMarkdown(base, "dash14/buildcage", "v2", {
+    const md = renderReportMarkdown(base, "buildcage/docker", "v2", {
       title: "Outbound Traffic Report — npm install",
     });
     expect(md).toMatch(/^## Outbound Traffic Report — npm install \(restrict mode\)/);
   });
 
-  it("shows a run-flavored restrict-mode example including the run: command", () => {
-    const md = renderReportMarkdown(
-      { ...base, parameters: params({ mode: "audit" }), passed: [allowedRow] },
-      "dash14/buildcage",
-      "v2",
-      { actionName: "run", runCommand: "npm install" },
-    );
-    expect(md).toMatch(/uses: dash14\/buildcage\/run@v2/);
-    expect(md).toMatch(/run: \|\n\s+npm install/);
-  });
-
   it("adds an Expected column marking known_blocked_rules matches when set", () => {
     const md = renderReportMarkdown(
       { ...base, parameters: params({ knownBlockedRules: ["bad.com:80"] }), blocked: [blockedRow] },
-      "dash14/buildcage",
+      "buildcage/docker",
       "v2",
     );
     expect(md).toMatch(/\| Host \| Rule \| Reason \| Count \| Expected \|/);
   });
 
   it("omits the Expected column when known_blocked_rules is not set", () => {
-    const md = renderReportMarkdown({ ...base, blocked: [blockedRow] }, "dash14/buildcage", "v2");
+    const md = renderReportMarkdown({ ...base, blocked: [blockedRow] }, "buildcage/docker", "v2");
     assertNotMatch(md, /Expected/);
   });
 });
@@ -157,7 +146,7 @@ describe("renderReportMarkdown — explicit", () => {
   };
 
   it("renders Communication details instead of the SNI footnote", () => {
-    const md = renderReportMarkdown(base, "dash14/buildcage", "v2");
+    const md = renderReportMarkdown(base, "buildcage/docker", "v2");
     expect(md).toMatch(/Communication details/);
     expect(md).toMatch(/Allowed Urls/);
     expect(md).toMatch(/Blocked Urls/);

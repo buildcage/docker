@@ -1,4 +1,4 @@
-module github.com/dash14/buildcage/buildkit-proxy
+module github.com/buildcage/docker/buildkit-proxy
 
 go 1.26.3
 

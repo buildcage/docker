@@ -35,9 +35,9 @@ describe("resolveBuildcageImageRef", () => {
     const digest = "sha256:" + "c".repeat(64);
     const result = resolveBuildcageImageRef({
       imageDigest: digest,
-      actionRepository: "dash14/buildcage",
+      actionRepository: "buildcage/docker",
     });
-    expect(result.startsWith("ghcr.io/dash14/buildcage@")).toBeTruthy();
+    expect(result.startsWith("ghcr.io/buildcage/docker@")).toBeTruthy();
   });
 });
 

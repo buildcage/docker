@@ -25,7 +25,7 @@ The following are **out of scope** (please report to the respective projects ins
 
 ## Verifying Releases
 
-Buildcage ships one artifact: a Docker image at `ghcr.io/dash14/buildcage`, tagged `vX.Y.Z` for the
+Buildcage ships one artifact: a Docker image at `ghcr.io/buildcage/docker`, tagged `vX.Y.Z` for the
 default `transparent` engine and `vX.Y.Z-explicit` for the `explicit` engine. Each release is signed
 keylessly with [cosign](https://github.com/sigstore/cosign) and carries a GitHub build-provenance
 attestation, both issued via GitHub Actions OIDC at release time — there is no long-lived signing key
@@ -34,15 +34,15 @@ to leak or rotate. The `setup` action verifies this automatically, in-process, o
 to verify a release manually instead:
 
 ```sh
-cosign verify ghcr.io/dash14/buildcage:<tag> \
-  --certificate-identity-regexp '^https://github.com/dash14/buildcage/' \
+cosign verify ghcr.io/buildcage/docker:<tag> \
+  --certificate-identity-regexp '^https://github.com/buildcage/docker/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify oci://ghcr.io/dash14/buildcage:<tag> --owner dash14
+gh attestation verify oci://ghcr.io/buildcage/docker:<tag> --owner buildcage
 ```
 
 The Sigstore bundle for each release is also attached as a downloadable asset
 (`buildcage-container.sigstore.json` / `buildcage-container-explicit.sigstore.json`) on the
-corresponding [GitHub Release](https://github.com/dash14/buildcage/releases).
+corresponding [GitHub Release](https://github.com/buildcage/docker/releases).
 
 ## Dependency Management
 
@@ -60,7 +60,7 @@ corresponding [GitHub Release](https://github.com/dash14/buildcage/releases).
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Use [GitHub Security Advisories](https://github.com/dash14/buildcage/security/advisories/new) to report vulnerabilities privately:
+Use [GitHub Security Advisories](https://github.com/buildcage/docker/security/advisories/new) to report vulnerabilities privately:
 
 1. Go to the **Security** tab of this repository
 2. Click **Report a vulnerability**

@@ -24,8 +24,8 @@
   ],
   "packageRules": [
     {
-      "description": "Self-referencing actions (dash14/buildcage*) are exempt from minimumReleaseAge, matching the previous Dependabot cooldown exclusion.",
-      "matchPackageNames": ["/^dash14\\/buildcage/"],
+      "description": "Self-referencing actions (buildcage/docker*) are exempt from minimumReleaseAge, matching the previous Dependabot cooldown exclusion.",
+      "matchPackageNames": ["/^buildcage\\/docker/"],
       "minimumReleaseAge": "0 days"
     }
   ]
