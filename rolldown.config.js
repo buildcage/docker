@@ -2,11 +2,11 @@ import { defineConfig } from "rolldown";
 import { replacePlugin } from "rolldown/plugins";
 
 // Plugin required to substitute BUILDCAGE_BUILD_TEST_HOOKS at build time.
-// Applied to setup/src/main.js and report/src/main.js only.
+// Applied to src/main.js and report/src/main.js only.
 //
 // replacePlugin() substitutes BUILDCAGE_BUILD_TEST_HOOKS with the value from
 // this build's own env, not the resulting action's runtime env — see
-// LOCAL_IMAGE_OVERRIDE_ENABLED in setup/src/main.js.
+// LOCAL_IMAGE_OVERRIDE_ENABLED in src/main.js.
 const mainPlugins = [
   replacePlugin({
     "process.env.BUILDCAGE_BUILD_TEST_HOOKS": JSON.stringify(
@@ -17,15 +17,15 @@ const mainPlugins = [
 
 const configs = [
   {
-    input: "setup/src/main.ts",
-    file: "setup/dist/main.cjs",
+    input: "src/main.ts",
+    file: "dist/main.cjs",
     plugins: mainPlugins,
     // sigstore uses dynamic imports; inline them so dist is a single file.
     codeSplitting: false,
   },
   {
-    input: "setup/src/post.ts",
-    file: "setup/dist/post.cjs",
+    input: "src/post.ts",
+    file: "dist/post.cjs",
     plugins: mainPlugins,
   },
   {

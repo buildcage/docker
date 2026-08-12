@@ -11,7 +11,7 @@ services:
     build:
       args:
         # Compiles in the test-only CA-trust escape hatch (see
-        # setup/docker/explicit/buildkit-proxy/ca_testhooks.go). Never set for
+        # docker/explicit/buildkit-proxy/ca_testhooks.go). Never set for
         # real builds/releases.
         BUILDKIT_PROXY_BUILD_TAGS: testhooks
     environment:
@@ -20,15 +20,15 @@ services:
       - ALLOWED_HTTP_RULES=allowed.example.com:80 allowed.example.com:8080 *.wildcard.example.com:80 *.wildcard.example.com:8080
       - BUILDKIT_PROXY_EXTRA_CA_FILE=/test-fixtures/test-server-cert.pem
     volumes:
-      - ./setup/test/test-server-explicit/cert.pem:/test-fixtures/test-server-cert.pem:ro
+      - ./test/test-server-explicit/cert.pem:/test-fixtures/test-server-cert.pem:ro
     networks:
       default:
       test-net:
 
   # Test HTTP server (with a static self-signed certificate covering the
-  # fake test domains — see setup/test/test-server-explicit/cert.pem).
+  # fake test domains — see test/test-server-explicit/cert.pem).
   test-server:
-    build: setup/test/test-server-explicit
+    build: test/test-server-explicit
     networks:
       test-net:
         ipv4_address: 10.200.0.100
@@ -36,7 +36,7 @@ services:
   # DNS used by builder (resolves the fake test domains to test-server,
   # forwards everything else to a real upstream resolver).
   test-dns:
-    build: setup/test/test-dns-explicit
+    build: test/test-dns-explicit
     networks:
       test-net:
         ipv4_address: 10.200.0.53

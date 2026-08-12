@@ -28,9 +28,9 @@ ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make setup_bu
 
 The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/DNS-redirect/HAProxy
 stack (see [Proxy Engines](./reference.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
-`setup/docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
-`build.dockerfile: setup/docker/${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
-`setup/docker/transparent/Dockerfile` exactly as before.
+`docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
+`build.dockerfile: docker/${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
+`docker/transparent/Dockerfile` exactly as before.
 
 ### End-to-End Workflow
 
@@ -57,7 +57,7 @@ builder container. Raw builder logs are also available via `docker compose logs 
 
 Each `setup_buildkit_{engine}_{mode}` target has a matching
 `test_integration_buildkit_{engine}_{mode}` target (start → build the matching
-`setup/test/Dockerfile.*` → verify → clean up):
+`test/Dockerfile.*` → verify → clean up):
 
 ```bash
 make test_integration_buildkit_transparent_audit
@@ -107,7 +107,7 @@ This section covers how `proxy_engine: explicit` is implemented internally. For 
 behavior — what's enforced, what's visible in the report — see
 [Explicit Proxy Engine](./security.md#explicit-proxy-engine) in Security Details.
 
-- A small statically-linked Go binary (`setup/docker/explicit/buildkit-proxy/`) is the image's entrypoint
+- A small statically-linked Go binary (`docker/explicit/buildkit-proxy/`) is the image's entrypoint
   (PID 1) and directly supervises the real `buildkitd` as a child process. `RUN` steps are isolated
   into their own point-to-point network namespace by `proxyNetwork = true`, built directly on
   netlink/veth rather than CNI.
@@ -142,13 +142,13 @@ Sigstore verification requires a real, published GHCR image, so the setup action
 run against an unpublished branch or local changes. This repo's own CI (`test_action` job in
 `.github/workflows/test-e2e.yml`) tests the real `setup`/`report` actions end-to-end against a
 locally built image instead, via a build-time-gated mechanism: `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm
-build` compiles `setup/dist/main.cjs` where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable.
-The override logic lives in its own module (`core/lib/provenance/local-image-override.ts`), loaded
+build` compiles `dist/main.cjs` where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable.
+The override logic lives in its own module (`src/core/lib/provenance/local-image-override.ts`), loaded
 only via a dynamic `import()` gated by that build-time flag. Without the flag (i.e. every
 normal/committed build), rolldown's own module-graph tree-shaking excludes that entire file from
 the bundle — it's physically absent, not just unreachable. A CI check (`unit_test` job)
 additionally confirms a normal build never contains a live runtime read of
-`BUILDCAGE_BUILD_TEST_HOOKS` in `setup/dist`, guarding against a future refactor silently breaking
+`BUILDCAGE_BUILD_TEST_HOOKS` in `dist`, guarding against a future refactor silently breaking
 that guarantee.
 
 To exercise it locally:
@@ -156,7 +156,7 @@ To exercise it locally:
 1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine).
 2. `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build`
 3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set (e.g. via `act`, or by
-   invoking `node setup/dist/main.cjs` directly with the relevant `INPUT_*` env vars). Never commit
+   invoking `node dist/main.cjs` directly with the relevant `INPUT_*` env vars). Never commit
    a `dist/main.cjs` built this way — run `pnpm build` again (without the flag) before committing.
 
 See [security.md](./security.md#verification-limitations) for more details.
@@ -237,43 +237,45 @@ reports for the allowed side.
 
 ```text
 .
-├── setup/                    # GitHub Actions setup action
-│   ├── action.yml            # Action entry (node24 → dist/main.cjs, dist/post.cjs)
-│   ├── src/                  # Source (ESM): verify image provenance, resolve image ref, compose up
-│   ├── dist/                 # Bundled output (rolldown → CommonJS)
-│   ├── compose.yaml          # Runtime compose file the action itself uses (verified, digest-pinned
+├── action.yml                # Setup action entry (node24 → dist/main.cjs, dist/post.cjs)
+├── src/                      # Source (ESM): verify image provenance, resolve image ref, compose up
+│   ├── lib/                  # Setup action's own small helpers (errors.ts)
+│   └── core/                 # Code shared across actions
+│       ├── lib/               # All shared library code, consolidated: acl/ (rule parsing) is
+│       │                     # dual-consumed by Node and QuickJS; test/test-shim.ts is a portable
+│       │                     # node:test-alike shim used by *.test.ts across the whole tree
+│       │                     # (Node and QuickJS alike). Everything else — log/, report/,
+│       │                     # docker/, provenance/ (Sigstore, OCI registry lookups, image ref
+│       │                     # resolution, local-image test-hook override), actions/ — is
+│       │                     # Node-only, used by this action's and report's Node runtime and
+│       │                     # report-action.node.ts, never by the QuickJS scripts
+│       └── scripts/           # QuickJS entry point (convert-rule.ts), run inside the built images
+│                             # (rolldown-bundled into /opt/buildcage/scripts/ at image build time
+│                             # — see rolldown.scripts.config.js); test/ is a qjs test runner, types/ is
+│                             # the qjs:std/qjs:os ambient type declaration
+├── dist/                     # Bundled output (rolldown → CommonJS); dist/qjs, dist/qjs-test,
+│                             # dist/report-action are gitignored build-time scratch output, not committed
+├── docker/                   # proxy_engine build contexts
+│   ├── compose.action.yaml   # Runtime compose file the action itself uses (verified, digest-pinned
 │   │                         # image ref) — distinct from the top-level compose.yaml below
-│   ├── docker/               # proxy_engine build contexts
-│   │   ├── transparent/      # proxy_engine: transparent — Dockerfile + BuildKit/haproxy/dnsmasq/
-│   │   │                     # s6-overlay config + scripts/report-action.node.ts (runs under Node
-│   │   │                     # on the runner, `docker cp`'d out by the report action)
-│   │   └── explicit/         # proxy_engine: explicit — Dockerfile + buildkit-proxy/ (Go module:
-│   │                         # entrypoint/PID1, supervises buildkitd, injects the source policy
-│   │                         # into Solve via a gRPC proxy) + scripts/ (gen-source-policy.ts runs
-│   │                         # under QuickJS; report-action.node.ts runs under Node on the runner,
-│   │                         # `docker cp`'d out by the report action — TypeScript, rolldown-bundled
-│   │                         # at image build time)
-│   ├── test/                 # Dockerfile.*/assert-*.sh per {engine}-{mode} combination, plus
-│   │                         # test-server(-explicit)/test-dns(-explicit) fixture containers
-│   └── compose.test-*.yaml   # Test override config, one per engine
+│   ├── lib/                  # write-step-summary.ts, shared by both engines' report-action.node.ts
+│   ├── transparent/          # proxy_engine: transparent — Dockerfile + BuildKit/haproxy/dnsmasq/
+│   │                         # s6-overlay config + scripts/report-action.node.ts (runs under Node
+│   │                         # on the runner, `docker cp`'d out by the report action)
+│   └── explicit/             # proxy_engine: explicit — Dockerfile + buildkit-proxy/ (Go module:
+│                             # entrypoint/PID1, supervises buildkitd, injects the source policy
+│                             # into Solve via a gRPC proxy) + scripts/ (gen-source-policy.ts runs
+│                             # under QuickJS; report-action.node.ts runs under Node on the runner,
+│                             # `docker cp`'d out by the report action — TypeScript, rolldown-bundled
+│                             # at image build time)
+├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode} combination, plus
+│                             # test-server(-explicit)/test-dns(-explicit) fixture containers
+├── compose.test-*.yaml       # Test override config, one per engine
 ├── report/                   # GitHub Actions report action
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
 │   └── dist/                 # Bundled output (rolldown → CommonJS)
-├── core/                     # Code shared across actions
-│   ├── lib/                  # All shared library code, consolidated: acl/ (rule parsing) is
-│   │                         # dual-consumed by Node and QuickJS; test/test-shim.ts is a portable
-│   │                         # node:test-alike shim used by *.test.ts across the whole tree
-│   │                         # (Node and QuickJS alike). Everything else — log/, report/,
-│   │                         # docker/, provenance/ (Sigstore, OCI registry lookups, image ref
-│   │                         # resolution, local-image test-hook override), actions/ — is
-│   │                         # Node-only, used by setup/report's Node runtime and
-│   │                         # report-action.node.ts, never by the QuickJS scripts
-│   └── scripts/              # QuickJS entry point (convert-rule.ts), run inside the built images
-│                             # (rolldown-bundled into /opt/buildcage/scripts/ at image build time
-│                             # — see rolldown.scripts.config.js); test/ is a qjs test runner, types/ is
-│                             # the qjs:std/qjs:os ambient type declaration
-├── docs/                     # development.md, rules.md, security.md, self-hosting.md
+├── docs/                     # development.md, reference.md, rules.md, security.md, self-hosting.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
 │                             # PROXY_ENGINE; also defines the local-dev `proxy` service)
 └── Makefile                  # Operational commands

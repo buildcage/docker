@@ -26,7 +26,7 @@ Since forking creates a public repository, use **GitHub's import** feature to cr
 
 ## 2. Build and Publish the Docker Image
 
-Your imported repository already contains the **Build and Push Docker Image** workflow (`.github/workflows/docker-publish.yml`). This workflow builds **two images per release** — one per `proxy_engine` (`transparent` and `explicit`), from `setup/docker/transparent/Dockerfile` and `setup/docker/explicit/Dockerfile` respectively — and publishes both to your repository's GitHub Container Registry (GHCR), each signed independently.
+Your imported repository already contains the **Build and Push Docker Image** workflow (`.github/workflows/docker-publish.yml`). This workflow builds **two images per release** — one per `proxy_engine` (`transparent` and `explicit`), from `docker/transparent/Dockerfile` and `docker/explicit/Dockerfile` respectively — and publishes both to your repository's GitHub Container Registry (GHCR), each signed independently.
 
 To trigger the build:
 
@@ -85,14 +85,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start Buildcage
-        uses: <your_org>/buildcage/setup@<40-char-sha> # vX.Y.Z
+        uses: <your_org>/buildcage@<40-char-sha> # vX.Y.Z
         with:
           proxy_mode: audit
       # ... rest of your workflow
 ```
 
-Note that `uses:` now points to `<your_org>/buildcage/setup@<40-char-sha> # vX.Y.Z` instead of
-`dash14/buildcage/setup@...`. Replace `<40-char-sha>` with the commit SHA of the release tag in
+Note that `uses:` now points to `<your_org>/buildcage@<40-char-sha> # vX.Y.Z` instead of
+`dash14/buildcage@...`. Replace `<40-char-sha>` with the commit SHA of the release tag in
 your fork. The same applies to the report action (`<your_org>/buildcage/report@<40-char-sha> # vX.Y.Z`).
 
 ### Image provenance verification
@@ -101,7 +101,7 @@ The setup action automatically verifies the Docker image's build provenance befo
 
 - The `docker-publish.yml` workflow in your fork will sign images with **your fork's** GitHub Actions OIDC identity.
 - The setup action will verify against your fork's workflow identity, so verification passes correctly.
-- If you use `uses: <your_org>/buildcage/setup@<40-char-sha>`, `github.action_repository` resolves to `<your_org>/buildcage` and the image is pulled from `ghcr.io/<your_org>/buildcage` automatically.
+- If you use `uses: <your_org>/buildcage@<40-char-sha>`, `github.action_repository` resolves to `<your_org>/buildcage` and the image is pulled from `ghcr.io/<your_org>/buildcage` automatically.
 
 > [!NOTE]
 > The `buildcage_image` and `buildcage_version` parameters have been **removed** as of v2.1.

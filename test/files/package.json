@@ -1,0 +1,8 @@
+{
+  "name": "buildcage-network-isolation-probe",
+  "private": true,
+  "description": "Fixture installed by test/Dockerfile.* to exercise a real npm install through buildcage's network isolation.",
+  "dependencies": {
+    "express": "5.2.1"
+  }
+}

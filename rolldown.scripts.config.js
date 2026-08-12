@@ -7,11 +7,11 @@ const productionInputs = globSync(["**/scripts/*.ts"], {
   exclude: ["node_modules/**", "dist/**", "**/*.test.ts"],
 });
 
-// core/lib/acl/*.test.ts is dual-consumed (also runs under vitest);
+// src/core/lib/acl/*.test.ts is dual-consumed (also runs under vitest);
 // *.property.test.ts siblings are vitest/fast-check only, not qjs-compatible.
 const qjsTestInputs = [
-  "core/scripts/test/run-tests.qjs.ts",
-  ...globSync(["core/lib/acl/*.test.ts"], { exclude: ["**/*.property.test.ts"] }),
+  "src/core/scripts/test/run-tests.qjs.ts",
+  ...globSync(["src/core/lib/acl/*.test.ts"], { exclude: ["**/*.property.test.ts"] }),
 ];
 
 function settingsFor(input) {
@@ -66,7 +66,7 @@ export default defineConfig(
         // aren't installed for/resolvable under qjs's "neutral" platform.
         external: ["qjs:std", "qjs:os", "vitest"],
         platform: "neutral",
-        output: { file: `dist/test-qjs/${input.replace(/\.ts$/, ".js")}`, ...baseOutput },
+        output: { file: `dist/qjs-test/${input.replace(/\.ts$/, ".js")}`, ...baseOutput },
       }))
     : scriptInputs.map((input) => {
         const { outDir, stripSuffix, external, platform, treeshake } = settingsFor(input);

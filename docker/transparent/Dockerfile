@@ -21,20 +21,19 @@ RUN apk add --no-cache curl gettext && \
 # the QuickJS scripts and report-action.node.ts. Architecture-independent
 # output, so pinned to --platform=$BUILDPLATFORM like the `deps` stage
 # above (no QEMU). Keep byte-identical to the same stage in
-# setup/docker/explicit/Dockerfile (run/docker/Dockerfile only needs the
-# qjs half — it builds its own report in-process instead). Needs both
-# engines' scripts/ dirs: gen-source-policy.qjs.ts only exists under
-# explicit/, report-action.node.ts under this engine's own dir.
+# docker/explicit/Dockerfile. Needs both engines' scripts/ dirs:
+# gen-source-policy.qjs.ts only exists under explicit/, report-action.node.ts
+# under this engine's own dir.
 FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS scripts-build
 WORKDIR /build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
 COPY rolldown.scripts.config.js ./
-COPY core/ ./core/
-COPY setup/docker/lib/ ./setup/docker/lib/
-COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
-COPY setup/docker/transparent/scripts/ ./setup/docker/transparent/scripts/
+COPY src/core/ ./src/core/
+COPY docker/lib/ ./docker/lib/
+COPY docker/explicit/scripts/ ./docker/explicit/scripts/
+COPY docker/transparent/scripts/ ./docker/transparent/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:scripts
 
@@ -46,7 +45,7 @@ LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage" \
       io.github.buildcage.report-source="true"
-# report finds this container by this label — must match core/lib/docker/report-source.ts.
+# report finds this container by this label — must match src/core/lib/docker/report-source.ts.
 
 RUN apk add --no-cache \
       s6-overlay \
@@ -68,31 +67,31 @@ COPY --from=deps /opt/cni/bin /opt/cni/bin
 
 # BuildKit
 RUN mkdir -p /etc/buildkit
-COPY setup/docker/transparent/files/buildkitd.toml /etc/buildkit/buildkitd.toml
-COPY setup/docker/transparent/files/cni.conflist   /etc/buildkit/cni.conflist
+COPY docker/transparent/files/buildkitd.toml /etc/buildkit/buildkitd.toml
+COPY docker/transparent/files/cni.conflist   /etc/buildkit/cni.conflist
 
 # DNS
-COPY setup/docker/transparent/files/dnsmasq.conf /etc/dnsmasq.conf
+COPY docker/transparent/files/dnsmasq.conf /etc/dnsmasq.conf
 
 # HAProxy
 RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
-COPY setup/docker/transparent/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
+COPY docker/transparent/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
 # Tools (QuickJS scripts, rolldown-bundled by scripts-build above). Each is a self-contained
 # bundle — no separate /opt/buildcage/shared/ copy is needed, unlike before TypeScript
 # migration.
-COPY --from=scripts-build /build/dist/qjs/core/scripts/convert-rule.js /opt/buildcage/scripts/convert-rule.js
+COPY --from=scripts-build /build/dist/qjs/src/core/scripts/convert-rule.js /opt/buildcage/scripts/convert-rule.js
 
 # report-action.js — the runner-side report generator `docker cp`'d out by
 # the report action itself (never staged elsewhere); see its own header
 # comment for details.
-COPY --from=scripts-build /build/dist/report-action/setup/docker/transparent/scripts/report-action.js /opt/buildcage/scripts/report-action.js
+COPY --from=scripts-build /build/dist/report-action/docker/transparent/scripts/report-action.js /opt/buildcage/scripts/report-action.js
 
 # License
-COPY setup/docker/transparent/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
+COPY docker/transparent/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 
 # s6 service definitions and init scripts
-COPY setup/docker/transparent/files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
-COPY setup/docker/transparent/files/s6-scripts/ /etc/s6-overlay/scripts/
+COPY docker/transparent/files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+COPY docker/transparent/files/s6-scripts/ /etc/s6-overlay/scripts/
 
 ENTRYPOINT ["/init"]

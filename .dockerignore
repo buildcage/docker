@@ -1,8 +1,7 @@
 .git
 node_modules
-setup/dist
 report/dist
 sandbox/dist
 /dist
 **/*.test.ts
-core/scripts/test
+src/core/scripts/test

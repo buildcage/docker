@@ -13,11 +13,11 @@
     "types": ["node"]
   },
   "include": [
-    "core/lib/**/*.ts",
-    "setup/src/**/*.ts",
+    "src/core/lib/**/*.ts",
+    "src/**/*.ts",
     "report/src/**/*.ts",
-    "setup/docker/*/scripts/*.node.ts",
-    "setup/docker/lib/**/*.ts"
+    "docker/*/scripts/*.node.ts",
+    "docker/lib/**/*.ts"
   ],
-  "exclude": ["**/dist/**"]
+  "exclude": ["**/dist/**", "src/core/scripts/**"]
 }

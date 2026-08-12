@@ -480,7 +480,7 @@ function getInput(name, options) {
 	return options && options.trimWhitespace === !1 ? val : val.trim();
 }
 //#endregion
-//#region core/lib/errors.ts
+//#region src/core/lib/errors.ts
 /**
 * Base class for an action's own "intentional" errors — a caught failure
 * whose message is safe to print directly via ::error::, as opposed to an
@@ -502,10 +502,10 @@ function errorMessage(e) {
 	return e instanceof Error ? e.message : String(e);
 }
 //#endregion
-//#region setup/src/lib/errors.ts
+//#region src/lib/errors.ts
 var SetupError = class extends ActionError {};
 //#endregion
-//#region core/lib/acl/wildcard-rules.ts
+//#region src/core/lib/acl/wildcard-rules.ts
 /**
 * Rule conversion library for buildcage container.
 * Converts wildcard patterns to regex strings for HAProxy ACLs.
@@ -569,7 +569,7 @@ function wildcardToRegex(pattern) {
 	return `${domainToRegex(domain)}:${portRegex}`;
 }
 //#endregion
-//#region core/lib/acl/rules.ts
+//#region src/core/lib/acl/rules.ts
 /**
 * Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
 * allowed_ip_rules/known_blocked_rules) fails to parse — shared by the
@@ -598,7 +598,7 @@ function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 	};
 }
 //#endregion
-//#region core/lib/provenance/errors.ts
+//#region src/core/lib/provenance/errors.ts
 var VerifyImageError = class extends Error {
 	code;
 	constructor(message, code) {
@@ -606,7 +606,7 @@ var VerifyImageError = class extends Error {
 	}
 }, ProvenanceError = class extends ActionError {};
 //#endregion
-//#region core/lib/provenance/oci-registry.ts
+//#region src/core/lib/provenance/oci-registry.ts
 /**
 * oci-registry.ts — OCI registry I/O helpers
 *
@@ -7429,7 +7429,7 @@ function assertSignedDigest(bundleJson, expectedDigest) {
 	}
 }
 //#endregion
-//#region core/lib/provenance/sigstore.ts
+//#region src/core/lib/provenance/sigstore.ts
 /**
 * Cryptographically verify a Sigstore Bundle (DSSE format) against a policy,
 * then assert that the bundle's signed manifest digest matches the fetched digest.
@@ -7465,7 +7465,7 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 	assertSignedDigest(bundleJson, expectedDigest);
 }
 //#endregion
-//#region core/lib/provenance/image-tag.ts
+//#region src/core/lib/provenance/image-tag.ts
 /**
 * Convert an action ref into the base Docker image tag, then append the
 * proxy engine suffix for non-default engines. The `transparent` engine
@@ -7483,7 +7483,7 @@ function imageTagFromRef(actionRef, proxyEngine = "transparent") {
 	return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, proxyEngine === "explicit" || proxyEngine === "proxy" ? `${base}-${proxyEngine}` : base;
 }
 //#endregion
-//#region core/lib/provenance/verify-policy.ts
+//#region src/core/lib/provenance/verify-policy.ts
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /**
 * Build verify options encoding the expected certificate identity.
@@ -7512,7 +7512,7 @@ function buildVerifyOptions({ actionRef, actionRepo }) {
 	} : null;
 }
 //#endregion
-//#region core/lib/provenance/verify-image.ts
+//#region src/core/lib/provenance/verify-image.ts
 /**
 * verify-image.ts — Image provenance verification helpers
 *
@@ -7573,7 +7573,7 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine }) 
 	return requireDigest(digest, actionRef);
 }
 //#endregion
-//#region core/lib/provenance/image-ref.ts
+//#region src/core/lib/provenance/image-ref.ts
 function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
 	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
@@ -7612,14 +7612,14 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
-//#region core/lib/actions/log.ts
+//#region src/core/lib/actions/log.ts
 /** Logs a labeled ACL rule list, one rule per line, for a `::group::` block. */
 function logRules(label, rules) {
 	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
 	for (let r of rules) console.log(`  ${r}`);
 }
 //#endregion
-//#region core/lib/docker/compose-project-name.ts
+//#region src/core/lib/docker/compose-project-name.ts
 /**
 * An explicit, deterministic Compose project name, so concurrent
 * `up`/`down`/`ps` from different steps in the same job never collide on
@@ -7634,7 +7634,7 @@ function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
 }
 //#endregion
-//#region core/lib/docker/args.ts
+//#region src/core/lib/docker/args.ts
 function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
 	return [
 		"compose",
@@ -7663,12 +7663,12 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 	];
 }
 //#endregion
-//#region setup/src/main.ts
-const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../compose.yaml");
+//#region src/main.ts
+const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../docker/compose.action.yaml");
 /**
 * Verifies image provenance and resolves the digest-pinned image ref.
 * Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
-* performed (branch ref / local ./setup) — printed by the top-level catch.
+* performed (branch ref / local ./) — printed by the top-level catch.
 */
 async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }) {
 	let digest = await verifyImageDigestOrThrow({

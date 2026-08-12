@@ -32,9 +32,9 @@ jobs:
       matrix:
         include:
           - engine: transparent
-            dockerfile: setup/docker/transparent/Dockerfile
+            dockerfile: docker/transparent/Dockerfile
           - engine: explicit
-            dockerfile: setup/docker/explicit/Dockerfile
+            dockerfile: docker/explicit/Dockerfile
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       # Matrix legs sharing one output name would clobber each other (last

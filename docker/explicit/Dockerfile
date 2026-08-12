@@ -2,7 +2,7 @@
 #
 # BUILDKIT_PROXY_BUILD_TAGS is empty for every real build (including
 # published releases): the "testhooks" build tag (see
-# setup/docker/explicit/buildkit-proxy/ca_testhooks.go) is compiled in only
+# docker/explicit/buildkit-proxy/ca_testhooks.go) is compiled in only
 # when compose.test-explicit.yaml explicitly passes it, so
 # integration-test-only code (a self-signed-cert CA-trust escape hatch) is
 # physically absent from the published image's binary.
@@ -18,26 +18,25 @@ ARG BUILDKIT_PROXY_BUILD_TAGS=""
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
-COPY setup/docker/explicit/buildkit-proxy/go.mod setup/docker/explicit/buildkit-proxy/go.sum ./
+COPY docker/explicit/buildkit-proxy/go.mod docker/explicit/buildkit-proxy/go.sum ./
 RUN go mod download
-COPY setup/docker/explicit/buildkit-proxy/ ./
+COPY docker/explicit/buildkit-proxy/ ./
 RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -tags="${BUILDKIT_PROXY_BUILD_TAGS}" -o /out/buildkit-proxy .
 
 # Bundle the Docker-image scripts (rolldown; see rolldown.scripts.config.js):
 # the QuickJS scripts and report-action.node.ts. Architecture-independent
 # output, so pinned to --platform=$BUILDPLATFORM like buildkit-proxy-build
 # above (no QEMU). Keep byte-identical to the same stage in
-# setup/docker/transparent/Dockerfile (run/docker/Dockerfile only needs
-# the qjs half — it builds its own report in-process instead).
+# docker/transparent/Dockerfile.
 FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS scripts-build
 WORKDIR /build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
 COPY rolldown.scripts.config.js ./
-COPY core/ ./core/
-COPY setup/docker/lib/ ./setup/docker/lib/
-COPY setup/docker/explicit/scripts/ ./setup/docker/explicit/scripts/
+COPY src/core/ ./src/core/
+COPY docker/lib/ ./docker/lib/
+COPY docker/explicit/scripts/ ./docker/explicit/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:scripts
 
@@ -49,7 +48,7 @@ LABEL org.opencontainers.image.title="buildcage (explicit proxy engine)" \
       org.opencontainers.image.licenses="MIT AND Apache-2.0" \
       org.opencontainers.image.source="https://github.com/dash14/buildcage" \
       io.github.buildcage.report-source="true"
-# report finds this container by this label — must match core/lib/docker/report-source.ts.
+# report finds this container by this label — must match src/core/lib/docker/report-source.ts.
 
 # quickjs-ng is the only extra package needed, for source-policy generation.
 RUN apk add --no-cache quickjs-ng
@@ -59,20 +58,20 @@ COPY --from=buildkit-proxy-build /out/buildkit-proxy /opt/buildcage/bin/buildkit
 
 # BuildKit config
 RUN mkdir -p /etc/buildkit /var/log/buildkitd
-COPY setup/docker/explicit/files/buildkitd.toml /etc/buildkit/buildkitd.toml
+COPY docker/explicit/files/buildkitd.toml /etc/buildkit/buildkitd.toml
 
 # Tools (QuickJS scripts, rolldown-bundled by scripts-build above). gen-source-policy.js
-# is explicit-only, so it lives next to this Dockerfile instead of core/ (see
-# setup/docker/explicit/scripts/). Self-contained bundle — no separate
+# is explicit-only, so it lives next to this Dockerfile instead of src/core/ (see
+# docker/explicit/scripts/). Self-contained bundle — no separate
 # /opt/buildcage/shared/ copy is needed, unlike before TypeScript migration.
-COPY --from=scripts-build /build/dist/qjs/setup/docker/explicit/scripts/gen-source-policy.js /opt/buildcage/scripts/gen-source-policy.js
+COPY --from=scripts-build /build/dist/qjs/docker/explicit/scripts/gen-source-policy.js /opt/buildcage/scripts/gen-source-policy.js
 
 # report-action.js — the runner-side report generator `docker cp`'d out by
 # the report action itself (never staged elsewhere); see its own header
 # comment for details.
-COPY --from=scripts-build /build/dist/report-action/setup/docker/explicit/scripts/report-action.js /opt/buildcage/scripts/report-action.js
+COPY --from=scripts-build /build/dist/report-action/docker/explicit/scripts/report-action.js /opt/buildcage/scripts/report-action.js
 
 # License
-COPY setup/docker/explicit/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
+COPY docker/explicit/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 
 ENTRYPOINT ["/opt/buildcage/bin/buildkit-proxy"]

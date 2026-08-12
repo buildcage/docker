@@ -1,3 +1,5 @@
 .DS_Store
 node_modules
-/dist
+/dist/qjs
+/dist/qjs-test
+/dist/report-action

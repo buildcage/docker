@@ -21,7 +21,10 @@ function main(): void {
 
   execFileSync(
     "docker",
-    buildComposeDownArgs({ composeFile: join(__dirname, "../compose.yaml"), projectName }),
+    buildComposeDownArgs({
+      composeFile: join(__dirname, "../docker/compose.action.yaml"),
+      projectName,
+    }),
     {
       stdio: "inherit",
       env: {
