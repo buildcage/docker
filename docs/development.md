@@ -306,7 +306,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
    [CA Trust for Tools with Their Own CA Store](./reference.md#ca-trust-for-tools-with-their-own-ca-store)
    in the Reference doc.
 
-4. **Open an issue** at [github.com/dash14/buildcage/issues](https://github.com/dash14/buildcage/issues) with:
+4. **Open an issue** at [github.com/buildcage/docker/issues](https://github.com/buildcage/docker/issues) with:
    - Your Dockerfile
    - The audit mode report output
    - Full error messages from `docker compose logs builder`

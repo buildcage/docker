@@ -1,12 +1,12 @@
 # Reference
 
-## Setup Action (`dash14/buildcage/setup`)
+## Setup Action (`buildcage/docker`)
 
 Starts the Buildcage builder container.
 
 ```yaml
 - name: Start Buildcage builder
-  uses: dash14/buildcage/setup@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
+  uses: buildcage/docker@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
   with:
     proxy_mode: restrict
     allowed_https_rules: |
@@ -24,7 +24,7 @@ Starts the Buildcage builder container.
 | `allowed_https_rules` | No       | empty         | HTTPS allow rules (wildcard or regex, port required)                                                                                                                                                                                                     |
 | `allowed_http_rules`  | No       | empty         | HTTP allow rules (wildcard or regex, port required)                                                                                                                                                                                                      |
 | `allowed_ip_rules`    | No       | empty         | IP address allow rules (wildcard or regex, port required)                                                                                                                                                                                                |
-| `known_blocked_rules` | No       | empty         | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the `report` step even when `fail_on_blocked` is `true` — see [Report Action](#report-action-dash14buildcagereport) below |
+| `known_blocked_rules` | No       | empty         | Domains expected to be blocked intentionally (wildcard or regex, port required); blocked connections matching these don't fail the `report` step even when `fail_on_blocked` is `true` — see [Report Action](#report-action-buildcagedockerreport) below |
 
 ### Rule Syntax
 
@@ -153,7 +153,7 @@ rather than consulting the system one.
 > The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its
 > build provenance is cryptographically verified (keyless signature) before the image is pulled.
 > External image overrides are not supported to preserve this guarantee. For best security, pin the
-> action to a commit SHA: `uses: dash14/buildcage/setup@<40-char-sha> # vX.Y.Z`
+> action to a commit SHA: `uses: buildcage/docker@<40-char-sha> # vX.Y.Z`
 >
 > Self-hosting with a custom image requires forking the repository. See the [Self-Hosting Guide](./self-hosting.md).
 > If the action package is private (self-hosted in a private repository), run
@@ -162,14 +162,14 @@ rather than consulting the system one.
 
 ---
 
-## Report Action (`dash14/buildcage/report`)
+## Report Action (`buildcage/docker/report`)
 
 Displays communication logs after builds and optionally fails if any BLOCKED connections are found.
 
 ```yaml
 - name: Show proxy report
   if: always()
-  uses: dash14/buildcage/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
+  uses: buildcage/docker/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
 ```
 
 ### Job Summary

@@ -2,11 +2,11 @@
 
 ![Buildcage](./assets/banner.png)
 
-[![GitHub](https://img.shields.io/badge/GitHub-dash14%2Fbuildcage-blue?logo=github)](https://github.com/dash14/buildcage)
-![version](https://img.shields.io/github/v/release/dash14/buildcage)
-![build](https://img.shields.io/github/actions/workflow/status/dash14/buildcage/docker-publish.yml)
-![test](https://img.shields.io/github/actions/workflow/status/dash14/buildcage/test-e2e.yml?label=test)
-![license](https://img.shields.io/github/license/dash14/buildcage)
+[![GitHub](https://img.shields.io/badge/GitHub-buildcage%2Fdocker-blue?logo=github)](https://github.com/buildcage/docker)
+![version](https://img.shields.io/github/v/release/buildcage/docker)
+![build](https://img.shields.io/github/actions/workflow/status/buildcage/docker/docker-publish.yml)
+![test](https://img.shields.io/github/actions/workflow/status/buildcage/docker/test-e2e.yml?label=test)
+![license](https://img.shields.io/github/license/buildcage/docker)
 
 **Secure your builds against supply chain attacks in GitHub Actions: restrict outbound network access to only the domains you allow.**
 
@@ -41,7 +41,7 @@ tool works the same way, including `docker/bake-action`: just point its `driver:
 
 ```yaml
 - name: Start Buildcage in audit mode
-  uses: dash14/buildcage/setup@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
+  uses: buildcage/docker@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
   with:
     proxy_mode: audit # Log every destination, block nothing
 
@@ -59,7 +59,7 @@ tool works the same way, including `docker/bake-action`: just point its `driver:
 
 - name: Show Buildcage report
   if: always()
-  uses: dash14/buildcage/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
+  uses: buildcage/docker/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
 ```
 
 See the [complete example workflow](.github/workflows/example-audit.yml).
@@ -78,7 +78,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 
 ```yaml
 - name: Start Buildcage in restrict mode
-  uses: dash14/buildcage/setup@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
+  uses: buildcage/docker@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
   with:
     proxy_mode: restrict # Block every destination except the ones you allow
     allowed_https_rules: |
@@ -99,7 +99,7 @@ Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for S
 
 - name: Show Buildcage report
   if: always()
-  uses: dash14/buildcage/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
+  uses: buildcage/docker/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
   # Build fails if any unexpected connections were blocked
 ```
 
@@ -191,7 +191,7 @@ isolates each `RUN` step individually.
 - **Can I host Buildcage in my own private repository?**
 
   Yes, see the [Self-Hosting Guide](./docs/self-hosting.md). Most projects don't need to, though:
-  pinning the action to a commit SHA (`uses: dash14/buildcage/setup@<sha> # vX.Y.Z`) locks in an
+  pinning the action to a commit SHA (`uses: buildcage/docker@<sha> # vX.Y.Z`) locks in an
   exact, Sigstore-verified image for that release, which covers most of the same risk self-hosting
   is meant to address, without the overhead of maintaining a fork.
 
@@ -223,7 +223,7 @@ personal information stays where it belongs.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests at [github.com/dash14/buildcage](https://github.com/dash14/buildcage).
+Contributions are welcome! Please feel free to submit issues or pull requests at [github.com/buildcage/docker](https://github.com/buildcage/docker).
 
 ## Show Your Support
 

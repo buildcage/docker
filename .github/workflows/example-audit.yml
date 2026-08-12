@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Start Buildcage builder
-        uses: dash14/buildcage/setup@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
+        uses: buildcage/docker@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
         with:
           proxy_mode: audit
 
@@ -41,4 +41,4 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        uses: dash14/buildcage/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0
+        uses: buildcage/docker/report@83f51c5f1d45fbe05391c70e705fcafac056fc7c # v2.3.0

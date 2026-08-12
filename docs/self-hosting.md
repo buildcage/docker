@@ -7,7 +7,7 @@ This guide explains how to host your own Buildcage Docker image in a private Git
 - Meet compliance requirements that mandate use of an internal container registry
 
 > [!NOTE]
-> The upstream image (`ghcr.io/dash14/buildcage`) is verified at action startup via Sigstore, confirming it was built from the exact source commit of the release — sufficient provenance assurance for most use cases. Self-hosting adds operational overhead: keeping your fork in sync with upstream and managing your own signing pipeline.
+> The upstream image (`ghcr.io/buildcage/docker`) is verified at action startup via Sigstore, confirming it was built from the exact source commit of the release — sufficient provenance assurance for most use cases. Self-hosting adds operational overhead: keeping your fork in sync with upstream and managing your own signing pipeline.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ This guide explains how to host your own Buildcage Docker image in a private Git
 Since forking creates a public repository, use **GitHub's import** feature to create a private copy.
 
 1. Go to [github.com/new/import](https://github.com/new/import)
-2. Enter the source URL: `https://github.com/dash14/buildcage.git`
+2. Enter the source URL: `https://github.com/buildcage/docker.git`
 3. Select your organization as the owner
 4. Set the repository name (e.g., `buildcage`)
 5. Choose **Private**
@@ -92,7 +92,7 @@ jobs:
 ```
 
 Note that `uses:` now points to `<your_org>/buildcage@<40-char-sha> # vX.Y.Z` instead of
-`dash14/buildcage@...`. Replace `<40-char-sha>` with the commit SHA of the release tag in
+`buildcage/docker@...`. Replace `<40-char-sha>` with the commit SHA of the release tag in
 your fork. The same applies to the report action (`<your_org>/buildcage/report@<40-char-sha> # vX.Y.Z`).
 
 ### Image provenance verification
@@ -128,7 +128,7 @@ Clone your private repository and register the upstream remote:
 ```bash
 git clone https://github.com/<your_org>/buildcage.git
 cd buildcage
-git remote add upstream https://github.com/dash14/buildcage.git
+git remote add upstream https://github.com/buildcage/docker.git
 ```
 
 ### Pulling updates
