@@ -13,7 +13,7 @@ import type { VerifyBundleOptions } from "./sigstore.ts";
 const EXPECTED_ISSUER = "https://token.actions.githubusercontent.com";
 const RELEASE_WORKFLOW = ".github/workflows/docker-publish.yml";
 const OID_SOURCE_REPO_DIGEST = "1.3.6.1.4.1.57264.1.13";
-const REPO = "dash14/buildcage";
+const REPO = "buildcage/docker";
 
 /** Build a sample SAN URI as Fulcio would embed it. */
 function makeSAN(ref: string) {

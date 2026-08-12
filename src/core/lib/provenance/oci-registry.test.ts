@@ -128,7 +128,7 @@ describe("fetchRegistryToken", () => {
       expect(opts, "should send no auth header").toBe(undefined);
       return { ok: true, status: 200, json: async () => ({ token: "anon-token" }) };
     };
-    const token = await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
+    const token = await fetchRegistryToken("ghcr.io", "buildcage/docker", null, mockFetch);
     expect(token).toBe("anon-token");
     expect(callCount, "should make exactly one request").toBe(1);
   });
@@ -136,7 +136,7 @@ describe("fetchRegistryToken", () => {
   it("throws TOKEN_ERROR on 401 when no Docker credentials (private, not logged in)", async () => {
     const mockFetch = async () => ({ ok: false, status: 401 });
     try {
-      await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
+      await fetchRegistryToken("ghcr.io", "buildcage/docker", null, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -151,7 +151,7 @@ describe("fetchRegistryToken", () => {
   it("throws TOKEN_ERROR on 403 when no Docker credentials (private, not logged in)", async () => {
     const mockFetch = async () => ({ ok: false, status: 403 });
     try {
-      await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
+      await fetchRegistryToken("ghcr.io", "buildcage/docker", null, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -162,7 +162,7 @@ describe("fetchRegistryToken", () => {
   it("throws TRANSIENT on 5xx when no Docker credentials", async () => {
     const mockFetch = async () => ({ ok: false, status: 503 });
     try {
-      await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
+      await fetchRegistryToken("ghcr.io", "buildcage/docker", null, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -175,7 +175,7 @@ describe("fetchRegistryToken", () => {
       throw new Error("ECONNREFUSED");
     };
     try {
-      await fetchRegistryToken("ghcr.io", "dash14/buildcage", null, mockFetch);
+      await fetchRegistryToken("ghcr.io", "buildcage/docker", null, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -194,7 +194,7 @@ describe("fetchRegistryToken", () => {
       capturedAuth = opts?.headers?.Authorization;
       return { ok: true, status: 200, json: async () => ({ token: "jwt-token" }) };
     };
-    const token = await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
+    const token = await fetchRegistryToken("ghcr.io", "buildcage/docker", basicAuth, mockFetch);
     expect(token).toBe("jwt-token");
     expect(callCount, "should make exactly one request (no anonymous attempt)").toBe(1);
     expect(capturedAuth, "should send the Docker config auth directly").toBe(`Basic ${basicAuth}`);
@@ -208,7 +208,7 @@ describe("fetchRegistryToken", () => {
       return { ok: false, status: 401 };
     };
     try {
-      await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
+      await fetchRegistryToken("ghcr.io", "buildcage/docker", basicAuth, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -225,7 +225,7 @@ describe("fetchRegistryToken", () => {
     const basicAuth = Buffer.from("actor:token").toString("base64");
     const mockFetch = async () => ({ ok: false, status: 403 });
     try {
-      await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
+      await fetchRegistryToken("ghcr.io", "buildcage/docker", basicAuth, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -237,7 +237,7 @@ describe("fetchRegistryToken", () => {
     const basicAuth = Buffer.from("actor:token").toString("base64");
     const mockFetch = async () => ({ ok: false, status: 500 });
     try {
-      await fetchRegistryToken("ghcr.io", "dash14/buildcage", basicAuth, mockFetch);
+      await fetchRegistryToken("ghcr.io", "buildcage/docker", basicAuth, mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -349,7 +349,7 @@ describe("fetchBundle — Referrers API path", () => {
       // GET /blobs/<blobDig>
       { ok: true, status: 200, json: async () => bundleObj },
     ]);
-    const result = await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
+    const result = await fetchBundle("ghcr.io", "buildcage/docker", digest, "token", mockFetch);
     expect(result).toStrictEqual(bundleObj);
   });
 
@@ -367,7 +367,7 @@ describe("fetchBundle — Referrers API path", () => {
       { ok: false, status: 404, json: async () => ({}) },
     ]);
     try {
-      await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
+      await fetchBundle("ghcr.io", "buildcage/docker", digest, "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -397,7 +397,7 @@ describe("fetchBundle — fallback tag path", () => {
       // Blob
       { ok: true, status: 200, json: async () => bundleObj },
     ]);
-    const result = await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
+    const result = await fetchBundle("ghcr.io", "buildcage/docker", digest, "token", mockFetch);
     expect(result).toStrictEqual(bundleObj);
   });
 
@@ -431,7 +431,7 @@ describe("fetchBundle — fallback tag path", () => {
       // Blob
       { ok: true, status: 200, json: async () => bundleObj },
     ]);
-    const result = await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
+    const result = await fetchBundle("ghcr.io", "buildcage/docker", digest, "token", mockFetch);
     expect(result).toStrictEqual(bundleObj);
   });
 
@@ -479,14 +479,14 @@ describe("fetchBundle — fallback tag path", () => {
       // Blob
       { ok: true, status: 200, json: async () => bundleObj },
     ]);
-    const result = await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
+    const result = await fetchBundle("ghcr.io", "buildcage/docker", digest, "token", mockFetch);
     expect(result).toStrictEqual(bundleObj);
   });
 
   it("throws TRANSIENT on 5xx from Referrers API", async () => {
     const mockFetch = makeFetchReturning([{ ok: false, status: 503 }]);
     try {
-      await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
+      await fetchBundle("ghcr.io", "buildcage/docker", digest, "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -499,7 +499,7 @@ describe("fetchBundle — fallback tag path", () => {
       throw new Error("ECONNRESET");
     };
     try {
-      await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
+      await fetchBundle("ghcr.io", "buildcage/docker", digest, "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
@@ -523,7 +523,7 @@ describe("fetchBundle — fallback tag path", () => {
       { ok: false, status: 403 },
     ]);
     try {
-      await fetchBundle("ghcr.io", "dash14/buildcage", digest, "token", mockFetch);
+      await fetchBundle("ghcr.io", "buildcage/docker", digest, "token", mockFetch);
       assert.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
