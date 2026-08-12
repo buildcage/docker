@@ -46,7 +46,7 @@ FROM moby/buildkit:v0.31.2@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5
 LABEL org.opencontainers.image.title="buildcage (explicit proxy engine)" \
       org.opencontainers.image.description="Secure Docker build environment using BuildKit's native --proxy-network" \
       org.opencontainers.image.licenses="MIT AND Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/dash14/buildcage" \
+      org.opencontainers.image.source="https://github.com/buildcage/docker" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label — must match src/core/lib/docker/report-source.ts.
 
