@@ -8,10 +8,6 @@ export interface RenderReportMarkdownOptions {
    *  or "Outbound Traffic Report — npm install". Defaults to a bare
    *  "Outbound Traffic Report". */
   title?: string;
-  /** Which action's restrict-mode example to show in audit mode. */
-  actionName?: "setup" | "run";
-  /** The `run:` input, included in the example only when actionName is "run". */
-  runCommand?: string;
 }
 
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
@@ -21,7 +17,7 @@ export function renderReportMarkdown(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
-  { title = "Outbound Traffic Report", actionName, runCommand }: RenderReportMarkdownOptions = {},
+  { title = "Outbound Traffic Report" }: RenderReportMarkdownOptions = {},
 ): string {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
@@ -33,10 +29,7 @@ export function renderReportMarkdown(
     markdown += `### ${heading}\n\n` + renderHostTable(report.passed) + "\n";
   }
   if (isAudit) {
-    markdown += buildRestrictExample(report.passed, actionRepo, actionRef, {
-      actionName,
-      runCommand,
-    });
+    markdown += buildRestrictExample(report.passed, actionRepo, actionRef);
   }
   if (report.blocked.length > 0) {
     if (report.passed.length > 0) markdown += "\n";

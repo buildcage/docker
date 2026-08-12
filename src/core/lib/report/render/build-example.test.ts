@@ -1,7 +1,7 @@
 import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
 import { buildRestrictExample } from "./build-example.ts";
 
-const REPO = "dash14/buildcage";
+const REPO = "buildcage/docker";
 const REF = "v2";
 
 function wrap(yaml: string) {
@@ -34,7 +34,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@${REF}`,
+          `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -54,7 +54,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@${REF}`,
+          `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -72,7 +72,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@${REF}`,
+          `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_ip_rules: >-",
@@ -92,7 +92,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@${REF}`,
+          `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -112,7 +112,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: myorg/myrepo/setup@${REF}`,
+          `  uses: myorg/myrepo@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -128,7 +128,7 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@v2.1.0`,
+          `  uses: ${REPO}@v2.1.0`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
@@ -145,92 +145,11 @@ describe("buildRestrictExample", () => {
       wrap(
         [
           "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/setup@<sha>`,
+          `  uses: ${REPO}@<sha>`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
           "      example.com:443",
-        ].join("\n") + "\n",
-      ),
-    );
-  });
-
-  it("uses the run action and includes the run command when actionName is 'run'", () => {
-    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 5 }];
-    expect(
-      buildRestrictExample(rows, REPO, REF, { actionName: "run", runCommand: "npm install" }),
-    ).toBe(
-      wrap(
-        [
-          "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/run@${REF}`,
-          "  with:",
-          "    run: |",
-          "      npm install",
-          "    proxy_mode: restrict",
-          "    allowed_https_rules: >-",
-          "      registry.npmjs.org:443",
-        ].join("\n") + "\n",
-      ),
-    );
-  });
-
-  it("preserves multi-line run commands, indented under run: |", () => {
-    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    expect(
-      buildRestrictExample(rows, REPO, REF, { actionName: "run", runCommand: "npm ci\nnpm test" }),
-    ).toBe(
-      wrap(
-        [
-          "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/run@${REF}`,
-          "  with:",
-          "    run: |",
-          "      npm ci",
-          "      npm test",
-          "    proxy_mode: restrict",
-          "    allowed_https_rules: >-",
-          "      registry.npmjs.org:443",
-        ].join("\n") + "\n",
-      ),
-    );
-  });
-
-  it("strips the trailing newline GitHub Actions adds to `run: |` block scalars", () => {
-    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    expect(
-      buildRestrictExample(rows, REPO, REF, {
-        actionName: "run",
-        runCommand: "npm ci\nnpm test\n",
-      }),
-    ).toBe(
-      wrap(
-        [
-          "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/run@${REF}`,
-          "  with:",
-          "    run: |",
-          "      npm ci",
-          "      npm test",
-          "    proxy_mode: restrict",
-          "    allowed_https_rules: >-",
-          "      registry.npmjs.org:443",
-        ].join("\n") + "\n",
-      ),
-    );
-  });
-
-  it("actionName 'run' without a runCommand omits the run: block", () => {
-    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    expect(buildRestrictExample(rows, REPO, REF, { actionName: "run" })).toBe(
-      wrap(
-        [
-          "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}/run@${REF}`,
-          "  with:",
-          "    proxy_mode: restrict",
-          "    allowed_https_rules: >-",
-          "      registry.npmjs.org:443",
         ].join("\n") + "\n",
       ),
     );

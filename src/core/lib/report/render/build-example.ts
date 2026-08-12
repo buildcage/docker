@@ -8,24 +8,18 @@ const ruleTypeToParam: Record<string, string> = {
 
 export type AuditedRow = Pick<AggregatedEntry, "host" | "port" | "ruleType">;
 
-export interface BuildRestrictExampleOptions {
-  /** "setup" (default) or "run" */
-  actionName?: "setup" | "run";
-  /** the `run:` input, included only when actionName is "run" */
-  runCommand?: string;
-}
-
 /**
  * Build a restrict-mode YAML configuration example from audited rows.
  * Returns a markdown string wrapped in <details> tags, or "" if no rows.
  *
  * actionRef is the ref (tag or commit SHA) this action was invoked with.
+ * setup's action.yml lives at the repo root (not a subdirectory), so the
+ * example's `uses:` never has an action-name path segment.
  */
 export function buildRestrictExample(
   auditedRows: AuditedRow[] | null | undefined,
   actionRepo: string,
   actionRef?: string,
-  { actionName = "setup", runCommand }: BuildRestrictExampleOptions = {},
 ): string {
   if (!auditedRows || auditedRows.length === 0) return "";
 
@@ -47,19 +41,8 @@ export function buildRestrictExample(
   // Build YAML lines
   let yaml = "";
   yaml += "- name: Start Buildcage in restrict mode\n";
-  yaml += `  uses: ${actionRepo}/${actionName}@${ref}\n`;
+  yaml += `  uses: ${actionRepo}@${ref}\n`;
   yaml += "  with:\n";
-  // `run` is a single self-contained step, so the example must repeat the
-  // run: command to stay copy-pasteable on its own.
-  if (actionName === "run" && runCommand) {
-    yaml += "    run: |\n";
-    // GitHub Actions' `run: |` block scalar always keeps one trailing
-    // newline (YAML's default "clip" chomping), which would otherwise
-    // split into a spurious blank line at the end.
-    for (const line of runCommand.replace(/\r?\n$/, "").split(/\r?\n/)) {
-      yaml += `      ${line}\n`;
-    }
-  }
   yaml += "    proxy_mode: restrict\n";
   for (const [param, rules] of groups) {
     yaml += `    ${param}: >-\n`;
