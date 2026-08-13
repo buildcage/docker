@@ -1,3 +1,5 @@
 #!/command/with-contenv sh
 exec 2>&1
+# Guaranteed non-decision line for report's plausibility check (see haproxy.ts).
+echo "buildcage haproxy starting"
 exec s6-notifyoncheck -d -w 250 -n 12 haproxy -f /etc/haproxy/haproxy.cfg -db
