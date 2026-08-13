@@ -8,7 +8,7 @@
 ![test](https://img.shields.io/github/actions/workflow/status/buildcage/docker/test-e2e.yml?label=test)
 ![license](https://img.shields.io/github/license/buildcage/docker)
 
-**Secure your builds against supply chain attacks in GitHub Actions: restrict outbound network access to only the domains you allow.**
+**Secure your Docker builds against supply chain attacks: restrict outbound network access to only the domains you allow.**
 
 When a compromised dependency pulled in by `RUN npm install`, `RUN pip install`, or any other build command tries to exfiltrate secrets or phone home, Buildcage blocks it: only the domains you specify are reachable. No Dockerfile changes, no proxy configuration, no certificates to install: works with any language or package manager.
 
@@ -23,7 +23,7 @@ _A build tries to reach an unexpected domain. Buildcage blocks it and records it
 
 ## Features
 
-- 🚀 **Zero build script changes**: Your Dockerfile or shell commands stay exactly as they are
+- 🚀 **Zero Dockerfile changes**: Your Dockerfile and build commands stay exactly as they are
 - 🔍 **Dependency discovery**: Discover what your build already talks to before enforcing anything (`audit` mode)
 - 🛡️ **Allowlist enforcement**: Block every destination except the ones you explicitly allow (`restrict` mode)
 - 🔒 **Network isolation**: Isolates network access per Dockerfile `RUN` step, so only explicitly allowed destinations are reachable
@@ -37,7 +37,7 @@ Steps 2 and 3 use Docker's own `setup-buildx-action` and `build-push-action`, so
 tool works the same way, including `docker/bake-action`: just point its `driver: remote` and
 `endpoint` at Buildcage.
 
-#### Step 1: Discover what domains your build needs (Audit Mode)
+### Step 1: Discover what domains your build needs (Audit Mode)
 
 ```yaml
 - name: Start Buildcage in audit mode
@@ -64,7 +64,7 @@ tool works the same way, including `docker/bake-action`: just point its `driver:
 
 See the [complete example workflow](.github/workflows/example-audit.yml).
 
-#### Step 2: Check the report
+### Step 2: Check the report
 
 The report action outputs a Job Summary showing every destination your build contacted:
 
@@ -74,7 +74,7 @@ _Same workflow, run first in audit mode: every destination is logged, nothing is
 
 Copy these domain names into `allowed_https_rules` or `allowed_http_rules` for Step 3.
 
-#### Step 3: Create your allowlist and switch to restrict mode
+### Step 3: Create your allowlist and switch to restrict mode
 
 ```yaml
 - name: Start Buildcage in restrict mode
