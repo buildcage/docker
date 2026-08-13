@@ -110,6 +110,13 @@ describe("scanHaproxyLog", () => {
     expect(result.hasNonBuildcageContent).toBe(true);
   });
 
+  it("hasNonBuildcageContent is true for a zero-traffic run thanks to the guaranteed startup marker", async () => {
+    // See docker/transparent/files/s6-rc.d/haproxy/run
+    const result = await scanHaproxyLog(["buildcage haproxy starting"], false);
+    expect(result.hasNonBuildcageContent).toBe(true);
+    expect(result.blockedCount).toBe(0);
+  });
+
   it("hasNonBuildcageContent ignores blank lines when deciding", async () => {
     const result = await scanHaproxyLog("\n\n  \n".split("\n"), false);
     expect(result.hasNonBuildcageContent).toBe(false);
