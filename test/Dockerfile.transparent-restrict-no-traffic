@@ -1,0 +1,5 @@
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
+
+# No RUN step touches the network — regression test for the haproxy log
+# plausibility check (see docker/transparent/files/s6-rc.d/haproxy/run).
+RUN echo "no network activity in this build"

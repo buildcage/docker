@@ -128,7 +128,7 @@ report_buildkit: ## Show the buildcage report for the currently running builder
 # ---------------------------------------------------------------------------
 
 .PHONY: test_integration_buildkit
-test_integration_buildkit: test_integration_buildkit_transparent_audit test_integration_buildkit_transparent_restrict test_integration_buildkit_explicit_audit test_integration_buildkit_explicit_restrict ## Run all buildkit integration tests
+test_integration_buildkit: test_integration_buildkit_transparent_audit test_integration_buildkit_transparent_restrict test_integration_buildkit_transparent_restrict_no_traffic test_integration_buildkit_explicit_audit test_integration_buildkit_explicit_restrict ## Run all buildkit integration tests
 
 .PHONY: test_integration_buildkit_transparent_audit
 test_integration_buildkit_transparent_audit: ## Run transparent-engine audit mode tests
@@ -158,6 +158,22 @@ test_integration_buildkit_transparent_restrict: ## Run transparent-engine restri
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
 	@./test/assert-transparent-restrict.sh
+	@node src/post.ts
+	@./test/assert-post.sh
+	@$(MAKE) clean_buildkit
+
+.PHONY: test_integration_buildkit_transparent_restrict_no_traffic
+test_integration_buildkit_transparent_restrict_no_traffic: ## Run transparent-engine restrict mode tests with zero outbound traffic
+	@echo "Running transparent-engine restrict mode tests with zero outbound traffic..."
+	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
+	  $(MAKE) setup_buildkit_transparent_restrict
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.transparent-restrict-no-traffic test/ \
+	  --load -t buildcage-test
+	@INPUT_FAIL_ON_BLOCKED=true node report/src/main.ts
+	@./test/assert-transparent-restrict-no-traffic.sh
 	@node src/post.ts
 	@./test/assert-post.sh
 	@$(MAKE) clean_buildkit
