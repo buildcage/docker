@@ -138,18 +138,21 @@ The closest tools in this space are [StepSecurity Harden-Runner](https://github.
 and [Bullfrog](https://github.com/bullfrogsec/bullfrog), both of which control outbound traffic for
 an entire GitHub Actions job rather than one build step.
 
-**Harden-Runner** is a broader security agent, monitoring network, file integrity, and process
-activity across the whole runner. Buildcage stays narrower on purpose: it only restricts outbound
-traffic during a Docker build and does nothing else. That focus is also why it stays entirely
-within your GitHub Actions job: no external dashboard, no account, no tier to unlock for private
-repos or self-hosted runners.
+Both decide what to block at DNS time and then allow the address the name resolved to, rather than
+reading the SNI or Host header of the connection itself, so shared infrastructure like a CDN can
+end up permitting more than the domain you named. Buildcage matches on the domain in each
+connection and scopes the policy to the build, so two steps in the same job can carry different
+allowlists.
 
-**Bullfrog** is free and open source too, but the architecture differs. It allowlists by resolving
-a domain to an IP address and then permitting that IP, without inspecting the SNI or Host header of
-the actual connection, so shared infrastructure like a CDN can end up permitting more than the
-intended domain. Its own documentation also states that jobs running in containers aren't
-supported, which rules out protecting a Docker build. Buildcage matches on the domain itself and
-isolates each `RUN` step individually.
+**Harden-Runner** is a broader security agent besides, correlating network, file, and process
+events back to the step that caused them. On its paid plans it can also read inside HTTPS by
+hooking the TLS library with eBPF, though that feeds its reporting rather than the block decision.
+Buildcage stays narrower on purpose: it only restricts outbound traffic during a Docker build and
+does nothing else. That focus is also why it stays entirely within your GitHub Actions job, with no
+external dashboard and no account. Harden-Runner's Community tier covers public repositories on
+GitHub-hosted Linux runners; private repositories are an Enterprise feature.
+
+**Bullfrog** is free and open source too, and covers private repositories as well.
 
 ## FAQ
 
