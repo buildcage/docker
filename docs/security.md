@@ -5,7 +5,8 @@ Docker builds: what's inspected, what's blocked, what attacks are resisted, and 
 report. For implementation internals (the supervisor binary, RPC plumbing, log parsing), see the
 [Development Guide](./development.md).
 
-For a high-level overview, see [How It Works](../README.md#how-it-works) in the README.
+For a high-level overview, see [buildcage.github.io](https://buildcage.github.io/); for how to
+configure the action, see the [README](../README.md).
 
 ## Transparent Proxy Engine (default)
 
