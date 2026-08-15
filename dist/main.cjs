@@ -6,7 +6,7 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 		enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
 	});
 	return to;
-}, __toESM = (mod, isNodeMode, target) => (target = mod == null ? {} : __create(__getProtoOf(mod)), __copyProps(isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", {
+}, __toESM = (mod, isNodeMode, target) => (target = mod == null ? {} : __create(__getProtoOf(mod)), __copyProps(isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", {
 	value: mod,
 	enumerable: !0
 }) : target, mod));
@@ -289,172 +289,8 @@ new class {
 		return this.addRaw(element).addEOL();
 	}
 }();
-//#endregion
-//#region node_modules/.pnpm/@actions+io@3.0.2/node_modules/@actions/io/lib/io-util.js
-var __awaiter$5 = function(thisArg, _arguments, P, generator) {
-	function adopt(value) {
-		return value instanceof P ? value : new P(function(resolve) {
-			resolve(value);
-		});
-	}
-	return new (P ||= Promise)(function(resolve, reject) {
-		function fulfilled(value) {
-			try {
-				step(generator.next(value));
-			} catch (e) {
-				reject(e);
-			}
-		}
-		function rejected(value) {
-			try {
-				step(generator.throw(value));
-			} catch (e) {
-				reject(e);
-			}
-		}
-		function step(result) {
-			result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
-		}
-		step((generator = generator.apply(thisArg, _arguments || [])).next());
-	});
-};
-const { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs.promises, IS_WINDOWS$1 = process.platform === "win32";
-fs.constants.O_RDONLY;
-/**
-* On OSX/Linux, true if path starts with '/'. On Windows, true for paths like:
-* \, \hello, \\hello\share, C:, and C:\hello (and corresponding alternate separator cases).
-*/
-function isRooted(p) {
-	if (p = normalizeSeparators(p), !p) throw Error("isRooted() parameter \"p\" cannot be empty");
-	return IS_WINDOWS$1 ? p.startsWith("\\") || /^[A-Z]:/i.test(p) : p.startsWith("/");
-}
-/**
-* Best effort attempt to determine whether a file exists and is executable.
-* @param filePath    file path to check
-* @param extensions  additional file extensions to try
-* @return if file exists and is executable, returns the file path. otherwise empty string.
-*/
-function tryGetExecutablePath(filePath, extensions) {
-	return __awaiter$5(this, void 0, void 0, function* () {
-		let stats;
-		try {
-			stats = yield stat(filePath);
-		} catch (err) {
-			err.code !== "ENOENT" && console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
-		}
-		if (stats && stats.isFile()) {
-			if (IS_WINDOWS$1) {
-				let upperExt = path.extname(filePath).toUpperCase();
-				if (extensions.some((validExt) => validExt.toUpperCase() === upperExt)) return filePath;
-			} else if (isUnixExecutable(stats)) return filePath;
-		}
-		let originalFilePath = filePath;
-		for (let extension of extensions) {
-			filePath = originalFilePath + extension, stats = void 0;
-			try {
-				stats = yield stat(filePath);
-			} catch (err) {
-				err.code !== "ENOENT" && console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
-			}
-			if (stats && stats.isFile()) {
-				if (IS_WINDOWS$1) {
-					try {
-						let directory = path.dirname(filePath), upperName = path.basename(filePath).toUpperCase();
-						for (let actualName of yield readdir(directory)) if (upperName === actualName.toUpperCase()) {
-							filePath = path.join(directory, actualName);
-							break;
-						}
-					} catch (err) {
-						console.log(`Unexpected error attempting to determine the actual case of the file '${filePath}': ${err}`);
-					}
-					return filePath;
-				} else if (isUnixExecutable(stats)) return filePath;
-			}
-		}
-		return "";
-	});
-}
-function normalizeSeparators(p) {
-	return p ||= "", IS_WINDOWS$1 ? (p = p.replace(/\//g, "\\"), p.replace(/\\\\+/g, "\\")) : p.replace(/\/\/+/g, "/");
-}
-function isUnixExecutable(stats) {
-	return (stats.mode & 1) > 0 || (stats.mode & 8) > 0 && process.getgid !== void 0 && stats.gid === process.getgid() || (stats.mode & 64) > 0 && process.getuid !== void 0 && stats.uid === process.getuid();
-}
-//#endregion
-//#region node_modules/.pnpm/@actions+io@3.0.2/node_modules/@actions/io/lib/io.js
-var __awaiter$4 = function(thisArg, _arguments, P, generator) {
-	function adopt(value) {
-		return value instanceof P ? value : new P(function(resolve) {
-			resolve(value);
-		});
-	}
-	return new (P ||= Promise)(function(resolve, reject) {
-		function fulfilled(value) {
-			try {
-				step(generator.next(value));
-			} catch (e) {
-				reject(e);
-			}
-		}
-		function rejected(value) {
-			try {
-				step(generator.throw(value));
-			} catch (e) {
-				reject(e);
-			}
-		}
-		function step(result) {
-			result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
-		}
-		step((generator = generator.apply(thisArg, _arguments || [])).next());
-	});
-};
-/**
-* Returns path of a tool had the tool actually been invoked.  Resolves via paths.
-* If you check and the tool does not exist, it will throw.
-*
-* @param     tool              name of the tool
-* @param     check             whether to check if tool exists
-* @returns   Promise<string>   path to tool
-*/
-function which(tool, check) {
-	return __awaiter$4(this, void 0, void 0, function* () {
-		if (!tool) throw Error("parameter 'tool' is required");
-		if (check) {
-			let result = yield which(tool, !1);
-			if (!result) throw Error(IS_WINDOWS$1 ? `Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also verify the file has a valid extension for an executable file.` : `Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also check the file mode to verify the file is executable.`);
-			return result;
-		}
-		let matches = yield findInPath(tool);
-		return matches && matches.length > 0 ? matches[0] : "";
-	});
-}
-/**
-* Returns a list of all occurrences of the given tool on the system path.
-*
-* @returns   Promise<string[]>  the paths of the tool
-*/
-function findInPath(tool) {
-	return __awaiter$4(this, void 0, void 0, function* () {
-		if (!tool) throw Error("parameter 'tool' is required");
-		let extensions = [];
-		if (IS_WINDOWS$1 && process.env.PATHEXT) for (let extension of process.env.PATHEXT.split(path.delimiter)) extension && extensions.push(extension);
-		if (isRooted(tool)) {
-			let filePath = yield tryGetExecutablePath(tool, extensions);
-			return filePath ? [filePath] : [];
-		}
-		if (tool.includes(path.sep)) return [];
-		let directories = [];
-		if (process.env.PATH) for (let p of process.env.PATH.split(path.delimiter)) p && directories.push(p);
-		let matches = [];
-		for (let directory of directories) {
-			let filePath = yield tryGetExecutablePath(path.join(directory, tool), extensions);
-			filePath && matches.push(filePath);
-		}
-		return matches;
-	});
-}
-process.platform, events.EventEmitter, events.EventEmitter, os.default.platform(), os.default.arch();
+const { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs.promises;
+process.platform, fs.constants.O_RDONLY, process.platform, events.EventEmitter, events.EventEmitter, os.default.platform(), os.default.arch();
 /**
 * The code to exit an action
 */
@@ -1691,9 +1527,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 			case "messageSignature":
 				b.content.messageSignature.messageDigest === void 0 ? invalidValues.push("content.messageSignature.messageDigest") : b.content.messageSignature.messageDigest.digest.length === 0 && invalidValues.push("content.messageSignature.messageDigest.digest"), b.content.messageSignature.signature.length === 0 && invalidValues.push("content.messageSignature.signature");
 				break;
-			case "dsseEnvelope":
-				b.content.dsseEnvelope.payload.length === 0 && invalidValues.push("content.dsseEnvelope.payload"), b.content.dsseEnvelope.signatures.length === 1 ? b.content.dsseEnvelope.signatures[0].sig.length === 0 && invalidValues.push("content.dsseEnvelope.signatures[0].sig") : invalidValues.push("content.dsseEnvelope.signatures");
-				break;
+			case "dsseEnvelope": b.content.dsseEnvelope.payload.length === 0 && invalidValues.push("content.dsseEnvelope.payload"), b.content.dsseEnvelope.signatures.length === 1 ? b.content.dsseEnvelope.signatures[0].sig.length === 0 && invalidValues.push("content.dsseEnvelope.signatures[0].sig") : invalidValues.push("content.dsseEnvelope.signatures");
 		}
 		if (b.verificationMaterial === void 0) invalidValues.push("verificationMaterial");
 		else {
@@ -1704,9 +1538,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 						cert.rawBytes.length === 0 && invalidValues.push(`verificationMaterial.content.x509CertificateChain.certificates[${i}].rawBytes`);
 					});
 					break;
-				case "certificate":
-					b.verificationMaterial.content.certificate.rawBytes.length === 0 && invalidValues.push("verificationMaterial.content.certificate.rawBytes");
-					break;
+				case "certificate": b.verificationMaterial.content.certificate.rawBytes.length === 0 && invalidValues.push("verificationMaterial.content.certificate.rawBytes");
 			}
 			b.verificationMaterial.tlogEntries === void 0 ? invalidValues.push("verificationMaterial.tlogEntries") : b.verificationMaterial.tlogEntries.length > 0 && b.verificationMaterial.tlogEntries.forEach((entry, i) => {
 				entry.logId === void 0 && invalidValues.push(`verificationMaterial.tlogEntries[${i}].logId`), entry.kindVersion === void 0 && invalidValues.push(`verificationMaterial.tlogEntries[${i}].kindVersion`);
@@ -1742,9 +1574,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 			case bundle_1.BUNDLE_V02_MEDIA_TYPE:
 				(0, validate_1.assertBundleV02)(bundle);
 				break;
-			default:
-				(0, validate_1.assertBundleLatest)(bundle);
-				break;
+			default: (0, validate_1.assertBundleLatest)(bundle);
 		}
 		return bundle;
 	}, exports.bundleToJSON = (bundle) => protobuf_specs_1.Bundle.toJSON(bundle), exports.envelopeFromJSON = (obj) => protobuf_specs_1.Envelope.fromJSON(obj), exports.envelopeToJSON = (envelope) => protobuf_specs_1.Envelope.toJSON(envelope);
@@ -2647,7 +2477,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 			return this.#hasMagic;
 		}
 		toString() {
-			return this.#toString === void 0 ? this.type ? this.#toString = this.type + "(" + this.#parts.map((p) => String(p)).join("|") + ")" : this.#toString = this.#parts.map((p) => String(p)).join("") : this.#toString;
+			return this.#toString === void 0 ? this.#toString = this.type ? this.type + "(" + this.#parts.map((p) => String(p)).join("|") + ")" : this.#parts.map((p) => String(p)).join("") : this.#toString;
 		}
 		#fillNegs() {
 			/* c8 ignore start */
@@ -2723,7 +2553,8 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 					if (inBrace) {
 						i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
 						continue;
-					} else if (c === "[") {
+					}
+					if (c === "[") {
 						inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
 						continue;
 					}
@@ -2747,7 +2578,8 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 				if (inBrace) {
 					i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
 					continue;
-				} else if (c === "[") {
+				}
+				if (c === "[") {
 					inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
 					continue;
 				}
@@ -2903,8 +2735,8 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 					if (inStar) continue;
 					inStar = !0, re += noEmpty && /^[*]+$/.test(glob) ? starNoEmpty : "[^/]*?", hasMagic = !0;
 					continue;
-				} else inStar = !1;
-				if (c === "\\") {
+				}
+				if (inStar = !1, c === "\\") {
 					i === glob.length - 1 ? re += "\\\\" : escaping = !0;
 					continue;
 				}
@@ -4523,7 +4355,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	* Detect Electron renderer / nwjs process, which is node, but we should
 	* treat as a browser.
 	*/
-	typeof process > "u" || process.type === "renderer" || process.browser === !0 || process.__nwjs ? module.exports = require_browser() : module.exports = require_node();
+	module.exports = typeof process > "u" || process.type === "renderer" || process.browser === !0 || process.__nwjs ? require_browser() : require_node();
 })), require_error$4 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.DownloadHTTPError = exports.DownloadLengthMismatchError = exports.DownloadError = exports.ExpiredMetadataError = exports.EqualVersionError = exports.BadVersionError = exports.RepositoryError = exports.PersistError = exports.RuntimeError = exports.ValueError = void 0, exports.ValueError = class extends Error {}, exports.RuntimeError = class extends Error {}, exports.PersistError = class extends Error {};
 	var RepositoryError = class extends Error {};
@@ -4620,7 +4452,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 			let opts = {
 				retries: 10,
 				factor: 2,
-				minTimeout: 1 * 1e3,
+				minTimeout: 1e3,
 				maxTimeout: Infinity,
 				randomize: !1,
 				...options
@@ -6150,7 +5982,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 		}
 		get subjectAltName() {
 			let ext = this.extSubjectAltName;
-			return ext?.uri || ext?.rfc822Name;
+			return ext?.uri || /* istanbul ignore next */ ext?.rfc822Name;
 		}
 		get extensions() {
 			/* istanbul ignore next */
@@ -6174,7 +6006,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 		}
 		get extSubjectKeyID() {
 			let ext = this.findExtension("2.5.29.14");
-			return ext ? new ext_1.X509SubjectKeyIDExtension(ext) : 			/* istanbul ignore next */ void 0;
+			return ext ? new ext_1.X509SubjectKeyIDExtension(ext) : /* istanbul ignore next */ void 0;
 		}
 		get extSCT() {
 			let ext = this.findExtension(exports.EXTENSION_OID_SCT);
@@ -6374,7 +6206,8 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 		artifact;
 		hashAlgorithm;
 		constructor(messageSignature, artifact) {
-			this.signature = messageSignature.signature, this.messageDigest = messageSignature.messageDigest.digest, this.artifact = artifact, this.hashAlgorithm = HASH_ALGORITHM_MAP[messageSignature.messageDigest.algorithm] ?? "sha256";
+			this.signature = messageSignature.signature, this.messageDigest = messageSignature.messageDigest.digest, this.artifact = artifact, this.hashAlgorithm = HASH_ALGORITHM_MAP[messageSignature.messageDigest.algorithm] ?? 
+			/* istanbul ignore next */ "sha256";
 		}
 		compareSignature(signature) {
 			return core_1.crypto.bufferEqual(signature, this.signature);
@@ -7448,7 +7281,7 @@ function assertSignedDigest(bundleJson, expectedDigest) {
 * must match the digest inside the signed payload.
 */
 async function verifyBundle(bundleJson, options, expectedDigest) {
-	let verifier = new import_dist$2.Verifier((0, import_dist$2.toTrustMaterial)(await (0, import_dist$1.getTrustedRoot)()), {
+	let trustedRoot = await (0, import_dist$1.getTrustedRoot)(), verifier = new import_dist$2.Verifier((0, import_dist$2.toTrustMaterial)(trustedRoot), {
 		ctlogThreshold: options.ctLogThreshold,
 		tlogThreshold: options.tlogThreshold
 	}), policy = {};
@@ -7664,7 +7497,7 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 }
 //#endregion
 //#region src/main.ts
-const composeFile = (0, node_path.join)((0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), "../docker/compose.action.yaml");
+const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), composeFile = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
 /**
 * Verifies image provenance and resolves the digest-pinned image ref.
 * Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
