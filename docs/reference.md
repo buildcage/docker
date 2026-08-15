@@ -6,7 +6,7 @@ Starts the Buildcage builder container.
 
 ```yaml
 - name: Start Buildcage builder
-  uses: buildcage/docker@4878a0c897d728304820dc65005ad22bac353be2 # v3.0.0
+  uses: buildcage/docker@567c77b193bcb93d3a534e3bf1481e2543bb9811 # v3.0.1
   with:
     proxy_mode: restrict
     allowed_https_rules: |
@@ -169,7 +169,7 @@ Displays communication logs after builds and optionally fails if any BLOCKED con
 ```yaml
 - name: Show proxy report
   if: always()
-  uses: buildcage/docker/report@4878a0c897d728304820dc65005ad22bac353be2 # v3.0.0
+  uses: buildcage/docker/report@567c77b193bcb93d3a534e3bf1481e2543bb9811 # v3.0.1
 ```
 
 ### Job Summary
