@@ -133,3 +133,36 @@ CVE-2026-39822
 # ECH is an opt-in TLS extension that is never configured by any component in this product;
 # buildkitd/buildkit-runc/buildkit-proxy only ever connect to trusted local endpoints.
 CVE-2026-42505
+
+# Go stdlib/x/net CVEs requiring a TLS/HTTP server, or parsing of untrusted XML/HTML/DNS.
+# Transparent-engine binaries (CNI plugins, buildkit-runc, buildctl) never run such code —
+# HAProxy/dnsmasq (not Go) handle all untrusted RUN step traffic there. In the explicit
+# engine, buildkitd's built-in --proxy-network MITM proxy (verified against moby/buildkit
+# v0.32.0's util/network/proxyprovider/provider_linux.go) forces client-facing TLS to
+# http/1.1 only and registers no h2c handler, so the HTTP/2 and h2c-preface paths aren't
+# reached either; certs are validated against trusted CAs / its own generated MITM CA only
+# (same constraint as the x509 CVEs above); and DNS responses come from the host's own
+# trusted resolver for real, allowlisted destinations (same rationale as CVE-2026-33811).
+CVE-2026-56860
+CVE-2026-56859
+CVE-2026-56858
+CVE-2026-56853
+CVE-2026-33818
+CVE-2026-46600
+
+# Go stdlib crypto/tls: no limit on post-handshake messages (e.g. repeated KeyUpdate),
+# letting a peer force unbounded key-derivation work on the server (CPU DoS). Unlike the
+# CVEs above, this one is reachable: buildkitd's --proxy-network MITM proxy (explicit
+# engine) does terminate RUN-step TLS traffic via tls.Server(). But that RUN step already
+# runs fully untrusted code with unrestricted CPU/memory in its own container, so this
+# grants no new capability and doesn't bypass the allowlist or exfiltrate data — out of
+# scope for a tool whose threat model is network exfiltration, not build-step self-DoS.
+CVE-2026-56862
+
+# golang.org/x/mod: GOPROXY/GOSUMDB sumdb-tile verification can be forged/bypassed,
+# compromising `go build`/`go mod tidy` supply-chain integrity. buildkitd links this
+# library but never itself runs `go mod`/`go build` against untrusted input at runtime —
+# any such invocation happens inside the RUN step's own toolchain, already outside
+# buildcage's proxy trust boundary.
+CVE-2026-56865
+CVE-2026-56864
