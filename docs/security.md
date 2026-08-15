@@ -133,7 +133,7 @@ Given these implementation costs versus the strict preconditions for the attack 
 - **Be specific with allowed domains** — Avoid broad wildcard CDN domains (e.g., `*.cdn.example.com`) when possible.
 - **Use service-specific domains** — Prefer `registry.npmjs.org` over generic CDN wildcard domains.
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
-- **Regular audits** — Periodically run in [audit mode](./reference.md#operation-modes) to detect anomalies in connection patterns.
+- **Regular audits** — Periodically run in [audit mode](../README.md#operation-modes) to detect anomalies in connection patterns.
 
 ## Explicit Proxy Engine
 
@@ -156,7 +156,7 @@ automatically — no Dockerfile changes needed for tools that already respect th
 The proxy decrypts the traffic and checks the host against a BuildKit
 [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md) compiled from your
 allowlist — the exact same `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` syntax as
-`transparent` mode (see [Rule Syntax](./rules.md)). Enforcement is domain (and port) granularity, same
+`transparent` mode (see [Rule syntax](../README.md#rule-syntax)). Enforcement is domain (and port) granularity, same
 as `transparent` — the generated policy always allows any path once the host matches, since the rule
 syntax has no path component. The decrypted path is still visible, so it shows up in the report and
 BuildKit's own build output even though it isn't used to allow or deny the request. `allowed_ip_rules`

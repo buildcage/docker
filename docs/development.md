@@ -27,7 +27,7 @@ ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make setup_bu
 ```
 
 The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/DNS-redirect/HAProxy
-stack (see [Proxy Engines](./reference.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
+stack (see [Proxy engines](../README.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
 `docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
 `build.dockerfile: docker/${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
 `docker/transparent/Dockerfile` exactly as before.
@@ -115,7 +115,7 @@ behavior — what's enforced, what's visible in the report — see
   set (otherwise the container's own resolv.conf, e.g. Docker's embedded DNS, is left untouched);
   runs a QuickJS script that compiles `allowed_https_rules` / `allowed_http_rules` /
   `allowed_ip_rules` (the exact same syntax as `transparent` mode — see
-  [Rule Syntax](./rules.md)) into a BuildKit
+  [Rule syntax](../README.md#rule-syntax)) into a BuildKit
   [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md); starts `buildkitd`
   with `proxyNetwork = true` bound to an internal Unix socket; and starts its own gRPC listener on
   the socket path Buildx actually connects to.
@@ -275,7 +275,7 @@ reports for the allowed side.
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
 │   └── dist/                 # Bundled output (rolldown → CommonJS)
-├── docs/                     # development.md, reference.md, rules.md, security.md, self-hosting.md
+├── docs/                     # development.md, security.md, self-hosting.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
 │                             # PROXY_ENGINE; also defines the local-dev `proxy` service)
 └── Makefile                  # Operational commands
@@ -303,7 +303,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 3. **TLS/certificate errors under `proxy_engine: explicit`**: if a `RUN` step fails with a
    certificate error there but works fine under `transparent` (or without Buildcage at all), the tool
    likely bundles its own CA store instead of consulting the system one BuildKit already trusts — see
-   [CA Trust for Tools with Their Own CA Store](./reference.md#ca-trust-for-tools-with-their-own-ca-store)
+   [CA trust for tools with their own CA store](../README.md#ca-trust-for-tools-with-their-own-ca-store)
    in the Reference doc.
 
 4. **Open an issue** at [github.com/buildcage/docker/issues](https://github.com/buildcage/docker/issues) with:
