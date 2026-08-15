@@ -6,8 +6,6 @@
 ![test](https://img.shields.io/github/actions/workflow/status/buildcage/docker/test-e2e.yml?label=test)
 ![license](https://img.shields.io/github/license/buildcage/docker)
 
-## About
-
 GitHub Action that restricts outbound network access during `docker build` to an allowlist of
 domains. Every `RUN` step is isolated, with no Dockerfile changes, no proxy configuration, and no
 certificates to install — it works with any language or package manager.
@@ -71,8 +69,7 @@ Its **Switch to restrict mode** section contains the allowlist already filled in
 
 The rest of the workflow is unchanged. Complete workflows:
 [audit](.github/workflows/example-audit.yml) ·
-[restrict](.github/workflows/example-restrict.yml) ·
-[explicit engine](.github/workflows/example-explicit.yml).
+[restrict](.github/workflows/example-restrict.yml).
 
 ### Notes
 
@@ -96,7 +93,7 @@ The rest of the workflow is unchanged. Complete workflows:
 | --------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `builder_name`        | No       | `buildcage`   | Name of the builder container                                                                                                                                                             |
 | `proxy_mode`          | No       | `restrict`    | Operation mode (`audit` / `restrict`, see [Operation modes](#operation-modes))                                                                                                            |
-| `proxy_engine`        | No       | `transparent` | Network enforcement engine (`transparent` / `explicit`, see [Proxy engines](#proxy-engines))                                                                                              |
+| `proxy_engine`        | No       | `transparent` | Network enforcement engine (`transparent`, or the experimental `explicit` — see [Proxy engines](#proxy-engines))                                                                          |
 | `allowed_https_rules` | No       | empty         | HTTPS allow rules (wildcard or regex, port required)                                                                                                                                      |
 | `allowed_http_rules`  | No       | empty         | HTTP allow rules (wildcard or regex, port required)                                                                                                                                       |
 | `allowed_ip_rules`    | No       | empty         | IP address allow rules (wildcard or regex, port required)                                                                                                                                 |
@@ -209,58 +206,16 @@ with:
 
 ## Proxy engines
 
-`proxy_engine` selects how Buildcage intercepts and enforces traffic. It is independent of
-`proxy_mode`: either engine works with either mode, and both use identical rule syntax.
+`proxy_engine` selects how Buildcage intercepts and enforces traffic. The default, `transparent`,
+intercepts at the network level and needs no proxy configuration or CA trust inside the build — it
+works with any tool whether or not the tool is proxy-aware, which is why it is the default.
 
-- **`transparent`** (default): traffic is intercepted at the network level, with no proxy
-  configuration or CA trust needed inside the build
-- **`explicit`**: BuildKit's native `--proxy-network` — injects `HTTP_PROXY`/`HTTPS_PROXY` and a CA
-  certificate, then MITMs the traffic to inspect requests directly
-
-|                                                                    | `transparent` (default)                                                     | `explicit`                                                                                                                                                                                                                                 |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Isolation mechanism                                                | CNI network + DNS redirection                                               | BuildKit native `--proxy-network` (point-to-point network namespace)                                                                                                                                                                       |
-| TLS handling                                                       | Not terminated — SNI (HTTPS) / Host header (HTTP) inspected only            | Terminated (MITM) via an injected CA — full host **and path** visible                                                                                                                                                                      |
-| Dockerfile / tool changes                                          | None required                                                               | None for tools that respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store; a tool bundling its own CA store (e.g. npm) needs a flag pointing it at the system one — see [CA trust](#ca-trust-for-tools-with-their-own-ca-store) |
-| Enforcement granularity                                            | Domain (and port)                                                           | Domain (and port) — the decrypted path is visible for logging but isn't matched by `allowed_*_rules`                                                                                                                                       |
-| `allowed_ip_rules` enforcement                                     | Raw TCP passthrough — no protocol inspection once `ip:port` matches         | Same as domain rules — matched via the BuildKit source policy, not a special-cased passthrough                                                                                                                                             |
-| Non-cooperative tools (ignore proxy env vars, or open raw sockets) | Still observed, blocked, and logged — network-level enforcement, no opt-out | Blocked with "network unreachable" — invisible, no trace anywhere in the report                                                                                                                                                            |
-| Report detail                                                      | Allowed / blocked hosts                                                     | Allowed / blocked hosts (with full path), plus a per-step "Communication details" breakdown                                                                                                                                                |
-| BuildKit provenance / SLSA integration                             | Not integrated                                                              | Integrated into BuildKit's own build output and SLSA provenance                                                                                                                                                                            |
-| Best for                                                           | Default choice — works with any tool regardless of proxy-awareness          | Cooperative tools, when path-level visibility or provenance integration matters more than catching non-cooperative traffic                                                                                                                 |
-
-`transparent` enforces at the network layer whether or not a tool cooperates, so every connection
-attempt is observed and recorded — this is why it is the default. Use `explicit` when you need
-URL/path-level visibility in BuildKit's own build output and SLSA provenance, and your build's tools
-are known to respect `HTTP_PROXY`/`HTTPS_PROXY`. See
-[Explicit Proxy Engine](./docs/security.md#explicit-proxy-engine) for the full technical detail.
-
-### CA trust for tools with their own CA store
-
-Under `proxy_engine: explicit`, BuildKit injects its generated CA into the container's system CA
-bundle, so tools that consult that file the normal way (most tools built on OpenSSL — `curl`, `git`,
-Go binaries) already trust it with no configuration. A tool that bundles its own separate CA store
-ignores that file and still fails with a TLS/certificate error, even though the proxy variables are
-set correctly.
-
-**npm** is the common case — point it at the system CA store BuildKit already patched, either inline
-on the command that needs it:
-
-```dockerfile
-RUN NODE_USE_SYSTEM_CA=1 npm install
-```
-
-or once per stage if it runs npm more than once:
-
-```dockerfile
-FROM node:22-alpine
-ARG NODE_USE_SYSTEM_CA=1
-RUN npm install
-RUN npm run build
-```
-
-If a different tool fails the same way — a `RUN` step that works under `transparent` but fails with a
-TLS/certificate error under `explicit` — check that tool's documentation for an equivalent setting.
+`proxy_engine: explicit` is an **experimental** alternative built on BuildKit's native
+`--proxy-network`: it terminates TLS through an injected CA, so the full URL path shows up in the
+report and in BuildKit's own build output and SLSA provenance. In exchange, it only sees tools that
+respect `HTTP_PROXY`/`HTTPS_PROXY`. See
+[Explicit Proxy Engine](./docs/explicit-engine.md) for the comparison, the CA-trust workaround, and
+its limitations.
 
 ## Report action
 
@@ -291,11 +246,12 @@ gains an **Expected** column (✅) marking the matched rows.
 
 ## Documentation
 
-| Doc                                          | What's in it                                             |
-| -------------------------------------------- | -------------------------------------------------------- |
-| [Security Details](./docs/security.md)       | Architecture, attack resistance, and known limitations   |
-| [Self-Hosting Guide](./docs/self-hosting.md) | Hosting your own Buildcage image in a private repository |
-| [Development Guide](./docs/development.md)   | Local usage, testing, logs, and implementation internals |
+| Doc                                                | What's in it                                             |
+| -------------------------------------------------- | -------------------------------------------------------- |
+| [Explicit Proxy Engine](./docs/explicit-engine.md) | The experimental `proxy_engine: explicit` in full        |
+| [Security Details](./docs/security.md)             | Architecture, attack resistance, and known limitations   |
+| [Self-Hosting Guide](./docs/self-hosting.md)       | Hosting your own Buildcage image in a private repository |
+| [Development Guide](./docs/development.md)         | Local usage, testing, logs, and implementation internals |
 
 ## Contributing
 

@@ -275,7 +275,7 @@ reports for the allowed side.
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
 │   └── dist/                 # Bundled output (rolldown → CommonJS)
-├── docs/                     # development.md, security.md, self-hosting.md
+├── docs/                     # development.md, explicit-engine.md, security.md, self-hosting.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
 │                             # PROXY_ENGINE; also defines the local-dev `proxy` service)
 └── Makefile                  # Operational commands
@@ -303,7 +303,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 3. **TLS/certificate errors under `proxy_engine: explicit`**: if a `RUN` step fails with a
    certificate error there but works fine under `transparent` (or without Buildcage at all), the tool
    likely bundles its own CA store instead of consulting the system one BuildKit already trusts — see
-   [CA trust for tools with their own CA store](../README.md#ca-trust-for-tools-with-their-own-ca-store)
+   [CA trust for tools with their own CA store](./explicit-engine.md#ca-trust-for-tools-with-their-own-ca-store)
    in the Reference doc.
 
 4. **Open an issue** at [github.com/buildcage/docker/issues](https://github.com/buildcage/docker/issues) with:

@@ -140,8 +140,12 @@ Given these implementation costs versus the strict preconditions for the attack 
 > [!WARNING]
 > `explicit` is an **experimental** engine. Its underlying BuildKit feature (`--proxy-network`) is
 > still maturing, and it has structural limitations not present in the `transparent` engine — see
-> [Coverage and known limitations](#coverage-and-known-limitations) below before relying on it.
+> [Coverage and Visibility](#coverage-and-visibility) below before relying on it.
 > `transparent` remains the default and recommended engine.
+
+For how to enable it, how the two engines compare, and the CA-trust workaround, see
+[Explicit Proxy Engine](./explicit-engine.md). This section covers the architecture and threat
+model.
 
 ### Architecture
 
