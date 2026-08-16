@@ -94,3 +94,5 @@ jobs:
           echo "### $TAG draft release is ready" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Review and publish: $RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tick **Publish this Action to the GitHub Marketplace** on that page before publishing — the release API has no field for it, so it has to be set by hand every time." >> "$GITHUB_STEP_SUMMARY"
