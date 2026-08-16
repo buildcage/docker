@@ -1,5 +1,7 @@
 # Buildcage for Docker
 
+![Buildcage](./assets/banner.png)
+
 [![GitHub](https://img.shields.io/badge/GitHub-buildcage%2Fdocker-blue?logo=github)](https://github.com/buildcage/docker)
 ![version](https://img.shields.io/github/v/release/buildcage/docker)
 ![build](https://img.shields.io/github/actions/workflow/status/buildcage/docker/docker-publish.yml)
@@ -13,6 +15,17 @@ certificates to install — it works with any language or package manager.
 See [buildcage.github.io](https://buildcage.github.io/) for what it does and why. To isolate a
 workflow `run:` step rather than a Docker build, use
 [Buildcage for `run:` Steps](https://github.com/buildcage/isolated-run).
+
+## Contents
+
+- [Usage](#usage)
+- [Inputs](#inputs)
+- [Operation modes](#operation-modes)
+- [Rule syntax](#rule-syntax)
+- [Proxy engines](#proxy-engines)
+- [Report action](#report-action)
+- [Scope](#scope)
+- [Documentation](#documentation)
 
 ## Usage
 
