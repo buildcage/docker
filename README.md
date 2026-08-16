@@ -14,12 +14,6 @@ See [buildcage.github.io](https://buildcage.github.io/) for what it does and why
 workflow `run:` step rather than a Docker build, use
 [Buildcage for `run:` Steps](https://github.com/buildcage/isolated-run).
 
-> [!IMPORTANT]
-> Buildcage controls _where_ your build can connect, not _what code_ it runs. A malicious package
-> delivered through an allowed domain still runs. Use it as one layer in a defense-in-depth
-> strategy — a last line of defense so that if something slips through your other measures, at
-> least it can't call home. See [Security Details](./docs/security.md) for the full threat model.
-
 ## Usage
 
 Start the builder, point Docker Buildx at it as a remote driver, then build as usual. Run once in
@@ -103,17 +97,6 @@ The rest of the workflow is unchanged. Complete workflows:
 | `allowed_http_rules`  | No       | empty         | HTTP allow rules (wildcard or regex, port required)                                                                                                                                       |
 | `allowed_ip_rules`    | No       | empty         | IP address allow rules (wildcard or regex, port required)                                                                                                                                 |
 | `known_blocked_rules` | No       | empty         | Domains expected to be blocked intentionally; blocked connections matching these don't fail the `report` step even when `fail_on_blocked` is `true` — see [Report action](#report-action) |
-
-> [!NOTE]
-> The Docker image is always pulled from `ghcr.io/<action-owner>/<action-repo>` and its build
-> provenance is cryptographically verified (keyless signature) before the image is pulled. External
-> image overrides are not supported, to preserve that guarantee. Pin the action to a commit SHA:
-> `uses: buildcage/docker@<40-char-sha> # vX.Y.Z`
->
-> Running your own image requires forking the repository — see the
-> [Self-Hosting Guide](./docs/self-hosting.md). If the action package is private, run
-> [`docker/login-action`](https://github.com/docker/login-action) with `packages: read` before this
-> action; credentials stored by Docker are picked up automatically.
 
 ## Operation modes
 
@@ -248,6 +231,13 @@ keeping off the allowlist to confirm it stays blocked — list them in the setup
 with `fail_on_blocked: true`, and a `::notice::` is emitted instead of `::error::`; any unmatched
 blocked connection still fails the step. Once `known_blocked_rules` is set, the Blocked Hosts table
 gains an **Expected** column (✅) marking the matched rows.
+
+## Scope
+
+Buildcage controls _where_ your build can connect, not _what code_ it runs. A malicious package
+delivered through an allowed domain still runs. Use it as one layer in a defense-in-depth strategy —
+a last line of defense so that if something slips through your other measures, at least it can't
+call home. See [Security Details](./docs/security.md) for the full threat model.
 
 ## Documentation
 
