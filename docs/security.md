@@ -309,10 +309,41 @@ The binding of the image digest to the exact source commit SHA also serves as an
 
 ### Verification Limitations
 
-- **The signing identity is the trust root**: Verification proves an image was built by this repository's release workflow from the pinned commit. It cannot distinguish a release published by the maintainer from one published by someone who has taken over that identity — inherent to any signing scheme, since the signature attests to _who built it_, not to _what the code does_. Two things limit the blast radius: pinning to a commit SHA means a newly published release cannot reach your workflow until you change the pin yourself, and every signature is recorded in the Rekor transparency log, so a release that was never intended is discoverable after the fact.
-- **Trust in Sigstore infrastructure**: Verification relies on the availability and integrity of the Rekor transparency log and the Fulcio certificate authority. The TUF-backed trust root is fetched at verification time; a network outage will cause the main phase to hard-fail.
-- **Registry-controlled tag resolution**: The tag is first resolved to a manifest digest (`HEAD /v2/<repo>/manifests/<tag>`), and every step after that is keyed to _that_ digest: the Sigstore bundle is fetched by digest, the verified signature must cover the same digest, and the final `docker pull` is digest-pinned (`image@sha256:…`). So there is no time-of-check/time-of-use gap for a registry swap to exploit — content substituted after the tag lookup makes verification **fail**, not falsely pass, because a bundle for the substituted content would have to carry both the pinned commit SHA in its Fulcio certificate and a signature over the digest that was actually fetched. What the tag lookup does still decide is _which_ signed artifact gets verified: an attacker with write access to the registry could repoint the tag, but only to an image that genuinely carries a signature naming the same pinned commit — in practice, another image published from that same release.
-- **Local/CI self-test bypass**: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` compiles a `dist/main.cjs` where a `BUILDCAGE_LOCAL_IMAGE_REF` escape hatch is reachable, used only by this repo's own `test_action` CI job and local development. The bypass logic lives in its own module (`src/core/lib/provenance/local-image-override.ts`), loaded only via a dynamic `import()` behind this build-time flag; in every normal build (including every published release), rolldown's own module-graph tree-shaking excludes that entire file from the bundle — not just the call to it. A consumer of the published `buildcage/docker@<ref>` action cannot reach it no matter what `env:` they set, since the code is physically absent from what they execute. `unit_test`'s CI job additionally asserts, by inspecting the built file directly, that a normal build never contains a live runtime read of `BUILDCAGE_BUILD_TEST_HOOKS` — guarding against a future refactor silently breaking that guarantee. See [development.md](./development.md#local-development) for details.
-- **Co-located workflow step tampering (out of scope by design)**: Buildcage's threat model is preventing network exfiltration by malicious code inside a Docker `RUN` step (a compromised dependency's install script, etc.) — the contents of the build itself. **A malicious workflow environment — a compromised or untrustworthy third-party action running as another step in the same job — is out of scope by design.** If such a step runs between `setup` and `report`, it can use `docker exec`/`docker cp` (or, with the host root a passwordless-sudo runner grants by default, direct access to the underlying filesystem) to tamper with the proxy container's state — most notably its traffic log or the script `report` executes — since the Sigstore verification above only proves the image was genuine at startup, not afterward.
+Verification establishes where the image came from. Here is what it leaves uncovered.
 
-  This is still mitigated a little: `report` treats a log with no trace of a real proxy run (e.g. wiped down to nothing) as suspicious rather than an automatic pass, even when `blockedCount` is zero. This catches a wholesale erasure, but not a deliberate, format-aware forgery. The effective defense is procedural, not technical: don't place an untrusted workflow step between `setup` and `report`.
+- **A signature says who built the image, not what the code does.** It attests that this
+  repository's release workflow built it from the pinned commit — a release published by someone who
+  has taken over that identity verifies just as cleanly as a legitimate one. Two things limit the
+  damage: with a commit-SHA pin, a newly published release cannot reach your workflow until you
+  change the pin yourself, and every signature is recorded in the Rekor transparency log, so an
+  unintended release is discoverable after the fact.
+
+- **Sigstore has to be reachable.** Verification depends on the Rekor transparency log and the
+  Fulcio CA, and fetches the TUF trust root at verification time. An outage there fails the action
+  rather than skipping the check.
+
+- **The registry decides which signed image gets verified.** Resolving the tag yields a manifest
+  digest, and everything after that is bound to it: the bundle is fetched by digest, the verified
+  signature must cover that same digest, and the `docker pull` is digest-pinned. Content substituted
+  at any point after the tag lookup therefore makes verification **fail** rather than falsely pass —
+  there is no time-of-check/time-of-use gap. What remains is the tag lookup itself: an attacker with
+  write access to the registry could repoint the tag, but only at an image genuinely signed for the
+  same pinned commit — in practice, another image from that same release.
+
+- **A build-time test hook exists, but not in what you run.**
+  `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` produces a `dist/` where a `BUILDCAGE_LOCAL_IMAGE_REF`
+  override can point the action at an unpublished image, used only by this repo's own CI and local
+  development. Tree-shaking drops that module out of every normal build, and a CI check inspects the
+  published `dist/` to confirm it never reads the flag — so no `env:` a consumer sets can reach it.
+  See [development.md](./development.md#local-development).
+
+- **Another step in the same job can tamper with the container (out of scope by design).**
+  Buildcage's threat model is malicious code _inside_ a `RUN` step. An untrusted step elsewhere in
+  the same job is not: running between `setup` and `report`, it can reach the proxy container
+  through `docker exec`/`docker cp` — or the host filesystem directly, on a passwordless-sudo
+  runner — and rewrite its traffic log or the script `report` executes. Sigstore proves the image
+  was genuine at startup, not that nothing touched it afterwards.
+
+  `report` does refuse to pass a log carrying no trace of a real proxy run, which catches wholesale
+  erasure but not a format-aware forgery. The effective defense is procedural: don't place an
+  untrusted step between `setup` and `report`.
