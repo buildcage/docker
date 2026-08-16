@@ -39,10 +39,8 @@ describe("renderReportMarkdown — transparent", () => {
   };
 
   it("renders the restrict-mode heading and Allowed Hosts table", () => {
-    const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "buildcage/docker", "v2", {
-      title: "Outbound Traffic Report during Docker Build",
-    });
-    expect(md).toMatch(/## Outbound Traffic Report during Docker Build \(restrict mode\)/);
+    const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "buildcage/docker", "v2");
+    expect(md).toMatch(/## Outbound Traffic Report \(restrict mode\)/);
     expect(md).toMatch(/### ✅ Allowed Hosts/);
     expect(md).toMatch(/good\.com/);
   });

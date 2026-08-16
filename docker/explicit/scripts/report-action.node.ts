@@ -79,7 +79,6 @@ async function main(): Promise<void> {
     report,
     process.env.GITHUB_ACTION_REPOSITORY || "buildcage/docker",
     process.env.GITHUB_ACTION_REF || "v2",
-    { title: "Outbound Traffic Report during Docker Build" },
   );
 
   await writeStepSummary(markdown);
