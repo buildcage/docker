@@ -27,6 +27,7 @@ jobs:
       contents: read
       packages: write
       attestations: write
+      artifact-metadata: write
     strategy:
       fail-fast: false
       matrix:
