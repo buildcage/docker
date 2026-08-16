@@ -4,9 +4,9 @@ import { renderCommunicationDetails } from "./communication-details.ts";
 import type { ReportData } from "../types.ts";
 
 export interface RenderReportMarkdownOptions {
-  /** Full heading text, e.g. "Outbound Traffic Report during Docker Build"
-   *  or "Outbound Traffic Report — npm install". Defaults to a bare
-   *  "Outbound Traffic Report". */
+  /** Full heading text, e.g. "Outbound Traffic Report — npm install".
+   *  Defaults to a bare "Outbound Traffic Report", which is what both
+   *  engines' report scripts use. */
   title?: string;
 }
 
