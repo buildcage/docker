@@ -94,12 +94,7 @@ linting (via `oxlint-tsgolint`) catches a subset of type-driven issues fast but 
 
 Running `vp install` (in place of `pnpm install`) automatically sets up a pre-commit hook — via
 the `prepare` script — that formats and lints your staged files (`vite.config.ts`'s `staged`
-config) before each commit, auto-fixing and re-staging what it can. To skip it in an emergency
-(not recommended — CI runs the same check and will fail if you rely on this):
-
-```bash
-git commit --no-verify
-```
+config) before each commit, auto-fixing and re-staging what it can.
 
 ## Explicit Engine Internals
 
