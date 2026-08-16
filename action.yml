@@ -1,5 +1,8 @@
-name: Setup Builder
-description: Start Buildcage builder container
+name: "Buildcage for Docker"
+description: "Restrict outbound network access during docker build to an allowlist of domains"
+branding:
+  icon: package
+  color: blue
 
 inputs:
   builder_name:

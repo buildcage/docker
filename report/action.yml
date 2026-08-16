@@ -1,5 +1,5 @@
-name: Report
-description: Show proxy communication logs and fail if blocked connections detected
+name: "Buildcage Report"
+description: "Write the outbound traffic report to the Job Summary and fail the job when blocked connections are detected"
 
 inputs:
   builder_name:
