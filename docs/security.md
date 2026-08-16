@@ -5,7 +5,8 @@ Docker builds: what's inspected, what's blocked, what attacks are resisted, and 
 report. For implementation internals (the supervisor binary, RPC plumbing, log parsing), see the
 [Development Guide](./development.md).
 
-For a high-level overview, see [How It Works](../README.md#how-it-works) in the README.
+For a high-level overview, see [buildcage.github.io](https://buildcage.github.io/); for how to
+configure the action, see the [README](../README.md).
 
 ## Transparent Proxy Engine (default)
 
@@ -133,15 +134,19 @@ Given these implementation costs versus the strict preconditions for the attack 
 - **Be specific with allowed domains** — Avoid broad wildcard CDN domains (e.g., `*.cdn.example.com`) when possible.
 - **Use service-specific domains** — Prefer `registry.npmjs.org` over generic CDN wildcard domains.
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
-- **Regular audits** — Periodically run in [audit mode](./reference.md#operation-modes) to detect anomalies in connection patterns.
+- **Regular audits** — Periodically run in [audit mode](../README.md#operation-modes) to detect anomalies in connection patterns.
 
 ## Explicit Proxy Engine
 
 > [!WARNING]
 > `explicit` is an **experimental** engine. Its underlying BuildKit feature (`--proxy-network`) is
 > still maturing, and it has structural limitations not present in the `transparent` engine — see
-> [Coverage and known limitations](#coverage-and-known-limitations) below before relying on it.
+> [Coverage and Visibility](#coverage-and-visibility) below before relying on it.
 > `transparent` remains the default and recommended engine.
+
+For how to enable it, how the two engines compare, and the CA-trust workaround, see
+[Explicit Proxy Engine](./explicit-engine.md). This section covers the architecture and threat
+model.
 
 ### Architecture
 
@@ -156,7 +161,7 @@ automatically — no Dockerfile changes needed for tools that already respect th
 The proxy decrypts the traffic and checks the host against a BuildKit
 [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md) compiled from your
 allowlist — the exact same `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` syntax as
-`transparent` mode (see [Rule Syntax](./rules.md)). Enforcement is domain (and port) granularity, same
+`transparent` mode (see [Rule syntax](../README.md#rule-syntax)). Enforcement is domain (and port) granularity, same
 as `transparent` — the generated policy always allows any path once the host matches, since the rule
 syntax has no path component. The decrypted path is still visible, so it shows up in the report and
 BuildKit's own build output even though it isn't used to allow or deny the request. `allowed_ip_rules`
@@ -175,12 +180,12 @@ For how the supervisor binary, gRPC interception, and policy compilation work in
 
 ### Coverage and Visibility
 
-| Traffic                                        | Allowed                                                                                                                            | Denied                                                                                      |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `RUN` step, proxy-aware tool                   | Logged per-step in the report's "Communication details"                                                                            | Logged in a flat `DENIED` list (no per-step attribution; whole-second timestamps)           |
-| `RUN` step, non-cooperative tool or raw socket | — (immediate "network unreachable"; **no trace anywhere** — not in the build log, the report, or provenance)                       | same as above                                                                               |
-| `ADD <url>`                                    | Not tracked by the report — the URL is developer-specified in the Dockerfile, already an intentional, reviewable part of the build | Aborts the entire build immediately at LLB load time; logged the same way as a denied `RUN` |
-| `FROM` / git contexts                          | Unaffected — buildcage's policy only ever matches `http(s)://` sources                                                             | Unaffected                                                                                  |
+| Traffic                                        | Allowed                                                                                                                            | Denied                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `RUN` step, proxy-aware tool                   | Logged per-step in the report's "Communication details"                                                                            | Logged in a flat `DENIED` list (no per-step attribution; whole-second timestamps)            |
+| `RUN` step, non-cooperative tool or raw socket | — (immediate "network unreachable"; **no trace anywhere** — not in the build log, the report, or provenance)                       | Identical — the request never reaches the proxy, so allowed and denied are indistinguishable |
+| `ADD <url>`                                    | Not tracked by the report — the URL is developer-specified in the Dockerfile, already an intentional, reviewable part of the build | Aborts the entire build immediately at LLB load time; logged the same way as a denied `RUN`  |
+| `FROM` / git contexts                          | Unaffected — buildcage's policy only ever matches `http(s)://` sources                                                             | Unaffected                                                                                   |
 
 The key structural difference from `transparent` mode: there, a non-cooperative process still reaches
 the CNI bridge and is observed, blocked, and logged. Under `explicit`, each `RUN` step's network
@@ -304,10 +309,41 @@ The binding of the image digest to the exact source commit SHA also serves as an
 
 ### Verification Limitations
 
-- **Account compromise**: If the repository owner's GitHub account or the repository itself is compromised, an attacker could trigger the release workflow and produce a legitimately-signed malicious image.
-- **Trust in Sigstore infrastructure**: Verification relies on the availability and integrity of the Rekor transparency log and the Fulcio certificate authority. The TUF-backed trust root is fetched at verification time; a network outage will cause the main phase to hard-fail.
-- **TOCTOU window**: The manifest digest is fetched before the bundle is pulled. A highly targeted attack that replaces the registry content in the window between these two steps would still succeed — though such an attack requires compromising the registry itself. Note that the subsequent `docker pull` is digest-pinned (`image@sha256:…`), so there is no TOCTOU between verification and the actual image pull; the residual window is limited to between the manifest-digest fetch and the bundle fetch.
-- **Local/CI self-test bypass**: `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build` compiles a `dist/main.cjs` where a `BUILDCAGE_LOCAL_IMAGE_REF` escape hatch is reachable, used only by this repo's own `test_action` CI job and local development. The bypass logic lives in its own module (`src/core/lib/provenance/local-image-override.ts`), loaded only via a dynamic `import()` behind this build-time flag; in every normal build (including every published release), rolldown's own module-graph tree-shaking excludes that entire file from the bundle — not just the call to it. A consumer of the published `buildcage/docker@<ref>` action cannot reach it no matter what `env:` they set, since the code is physically absent from what they execute. `unit_test`'s CI job additionally asserts, by inspecting the built file directly, that a normal build never contains a live runtime read of `BUILDCAGE_BUILD_TEST_HOOKS` — guarding against a future refactor silently breaking that guarantee. See [development.md](./development.md#local-development) for details.
-- **Co-located workflow step tampering (out of scope by design)**: Buildcage's threat model is preventing network exfiltration by malicious code inside a Docker `RUN` step (a compromised dependency's install script, etc.) — the contents of the build itself. **A malicious workflow environment — a compromised or untrustworthy third-party action running as another step in the same job — is out of scope by design.** If such a step runs between `setup` and `report`, it can use `docker exec`/`docker cp` (or, with the host root a passwordless-sudo runner grants by default, direct access to the underlying filesystem) to tamper with the proxy container's state — most notably its traffic log or the script `report` executes — since the Sigstore verification above only proves the image was genuine at startup, not afterward.
+Verification establishes where the image came from. Here is what it leaves uncovered.
 
-  This is still mitigated a little: `report` treats a log with no trace of a real proxy run (e.g. wiped down to nothing) as suspicious rather than an automatic pass, even when `blockedCount` is zero. This catches a wholesale erasure, but not a deliberate, format-aware forgery. The effective defense is procedural, not technical: don't place an untrusted workflow step between `setup` and `report`.
+- **A signature says who built the image, not what the code does.** It attests that this
+  repository's release workflow built it from the pinned commit — a release published by someone who
+  has taken over that identity verifies just as cleanly as a legitimate one. Two things limit the
+  damage: with a commit-SHA pin, a newly published release cannot reach your workflow until you
+  change the pin yourself, and every signature is recorded in the Rekor transparency log, so an
+  unintended release is discoverable after the fact.
+
+- **Sigstore has to be reachable.** Verification depends on the Rekor transparency log and the
+  Fulcio CA, and fetches the TUF trust root at verification time. An outage there fails the action
+  rather than skipping the check.
+
+- **The registry decides which signed image gets verified.** Resolving the tag yields a manifest
+  digest, and everything after that is bound to it: the bundle is fetched by digest, the verified
+  signature must cover that same digest, and the `docker pull` is digest-pinned. Content substituted
+  at any point after the tag lookup therefore makes verification **fail** rather than falsely pass —
+  there is no time-of-check/time-of-use gap. What remains is the tag lookup itself: an attacker with
+  write access to the registry could repoint the tag, but only at an image genuinely signed for the
+  same pinned commit — in practice, another image from that same release.
+
+- **A build-time test hook exists, but not in what you run.**
+  `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` produces a `dist/` where a `BUILDCAGE_LOCAL_IMAGE_REF`
+  override can point the action at an unpublished image, used only by this repo's own CI and local
+  development. Tree-shaking drops that module out of every normal build, and a CI check inspects the
+  published `dist/` to confirm it never reads the flag — so no `env:` a consumer sets can reach it.
+  See [development.md](./development.md#local-development).
+
+- **Another step in the same job can tamper with the container (out of scope by design).**
+  Buildcage's threat model is malicious code _inside_ a `RUN` step. An untrusted step elsewhere in
+  the same job is not: running between `setup` and `report`, it can reach the proxy container
+  through `docker exec`/`docker cp` — or the host filesystem directly, on a passwordless-sudo
+  runner — and rewrite its traffic log or the script `report` executes. Sigstore proves the image
+  was genuine at startup, not that nothing touched it afterwards.
+
+  `report` does refuse to pass a log carrying no trace of a real proxy run, which catches wholesale
+  erasure but not a format-aware forgery. The effective defense is procedural: don't place an
+  untrusted step between `setup` and `report`.

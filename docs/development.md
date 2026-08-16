@@ -27,7 +27,7 @@ ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make setup_bu
 ```
 
 The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/DNS-redirect/HAProxy
-stack (see [Proxy Engines](./reference.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
+stack (see [Proxy engines](../README.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
 `docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
 `build.dockerfile: docker/${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
 `docker/transparent/Dockerfile` exactly as before.
@@ -89,17 +89,12 @@ vp lint --fix
 vp fmt --write
 ```
 
-`pnpm typecheck` (`tsc`) remains the authoritative full type check; `vp check`'s type-aware
+`vp run typecheck` (`tsc`) remains the authoritative full type check; `vp check`'s type-aware
 linting (via `oxlint-tsgolint`) catches a subset of type-driven issues fast but doesn't replace it.
 
 Running `vp install` (in place of `pnpm install`) automatically sets up a pre-commit hook — via
 the `prepare` script — that formats and lints your staged files (`vite.config.ts`'s `staged`
-config) before each commit, auto-fixing and re-staging what it can. To skip it in an emergency
-(not recommended — CI runs the same check and will fail if you rely on this):
-
-```bash
-git commit --no-verify
-```
+config) before each commit, auto-fixing and re-staging what it can.
 
 ## Explicit Engine Internals
 
@@ -115,7 +110,7 @@ behavior — what's enforced, what's visible in the report — see
   set (otherwise the container's own resolv.conf, e.g. Docker's embedded DNS, is left untouched);
   runs a QuickJS script that compiles `allowed_https_rules` / `allowed_http_rules` /
   `allowed_ip_rules` (the exact same syntax as `transparent` mode — see
-  [Rule Syntax](./rules.md)) into a BuildKit
+  [Rule syntax](../README.md#rule-syntax)) into a BuildKit
   [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md); starts `buildkitd`
   with `proxyNetwork = true` bound to an internal Unix socket; and starts its own gRPC listener on
   the socket path Buildx actually connects to.
@@ -141,7 +136,7 @@ behavior — what's enforced, what's visible in the report — see
 Sigstore verification requires a real, published GHCR image, so the setup action normally can't
 run against an unpublished branch or local changes. This repo's own CI (`test_action` job in
 `.github/workflows/test-e2e.yml`) tests the real `setup`/`report` actions end-to-end against a
-locally built image instead, via a build-time-gated mechanism: `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm
+locally built image instead, via a build-time-gated mechanism: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run
 build` compiles `dist/main.cjs` where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable.
 The override logic lives in its own module (`src/core/lib/provenance/local-image-override.ts`), loaded
 only via a dynamic `import()` gated by that build-time flag. Without the flag (i.e. every
@@ -154,10 +149,10 @@ that guarantee.
 To exercise it locally:
 
 1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine).
-2. `BUILDCAGE_BUILD_TEST_HOOKS=1 pnpm build`
+2. `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build`
 3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set (e.g. via `act`, or by
    invoking `node dist/main.cjs` directly with the relevant `INPUT_*` env vars). Never commit
-   a `dist/main.cjs` built this way — run `pnpm build` again (without the flag) before committing.
+   a `dist/main.cjs` built this way — run `vp run build` again (without the flag) before committing.
 
 See [security.md](./security.md#verification-limitations) for more details.
 
@@ -275,7 +270,7 @@ reports for the allowed side.
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
 │   └── dist/                 # Bundled output (rolldown → CommonJS)
-├── docs/                     # development.md, reference.md, rules.md, security.md, self-hosting.md
+├── docs/                     # development.md, explicit-engine.md, security.md, self-hosting.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
 │                             # PROXY_ENGINE; also defines the local-dev `proxy` service)
 └── Makefile                  # Operational commands
@@ -303,7 +298,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 3. **TLS/certificate errors under `proxy_engine: explicit`**: if a `RUN` step fails with a
    certificate error there but works fine under `transparent` (or without Buildcage at all), the tool
    likely bundles its own CA store instead of consulting the system one BuildKit already trusts — see
-   [CA Trust for Tools with Their Own CA Store](./reference.md#ca-trust-for-tools-with-their-own-ca-store)
+   [CA trust for tools with their own CA store](./explicit-engine.md#ca-trust-for-tools-with-their-own-ca-store)
    in the Reference doc.
 
 4. **Open an issue** at [github.com/buildcage/docker/issues](https://github.com/buildcage/docker/issues) with:
