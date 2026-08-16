@@ -14,6 +14,13 @@
 - **`explicit`**: BuildKit's native `--proxy-network` — injects `HTTP_PROXY`/`HTTPS_PROXY` and a CA
   certificate, then MITMs the traffic to inspect requests directly
 
+That interception is entirely BuildKit's own feature. buildkitd generates the CA, injects it into
+the step along with the proxy variables, and runs the proxy that terminates TLS — Buildcage neither
+implements nor operates it, never holds the CA private key, and no build traffic passes through
+Buildcage's own code. Buildcage's only part is compiling your `allowed_*_rules` into a BuildKit
+[source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md) and attaching it to the
+build request.
+
 ```yaml
 - name: Start Buildcage
   uses: buildcage/docker@567c77b193bcb93d3a534e3bf1481e2543bb9811 # v3.0.1
@@ -31,10 +38,10 @@ Everything else in the workflow is unchanged — see the
 
 |                                                                    | `transparent` (default)                                                     | `explicit`                                                                                                                                                                                                                                 |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Isolation mechanism                                                | CNI network + DNS redirection                                               | BuildKit native `--proxy-network` (point-to-point network namespace)                                                                                                                                                                       |
+| Isolation mechanism                                                | CNI network + DNS redirection                                               | BuildKit native `--proxy-network` — each `RUN` step gets its own network whose only reachable peer is BuildKit's proxy                                                                                                                     |
 | TLS handling                                                       | Not terminated — SNI (HTTPS) / Host header (HTTP) inspected only            | Terminated (MITM) via an injected CA — full host **and path** visible                                                                                                                                                                      |
 | Dockerfile / tool changes                                          | None required                                                               | None for tools that respect `HTTP_PROXY`/`HTTPS_PROXY` and trust the system CA store; a tool bundling its own CA store (e.g. npm) needs a flag pointing it at the system one — see [CA trust](#ca-trust-for-tools-with-their-own-ca-store) |
-| Enforcement granularity                                            | Domain (and port)                                                           | Domain (and port) — the decrypted path is visible for logging but isn't matched by `allowed_*_rules`                                                                                                                                       |
+| Enforcement granularity                                            | Domain (and port)                                                           | Domain (and port) — see [What the report shows](#what-the-report-shows)                                                                                                                                                                    |
 | `allowed_ip_rules` enforcement                                     | Raw TCP passthrough — no protocol inspection once `ip:port` matches         | Same as domain rules — matched via the BuildKit source policy, not a special-cased passthrough                                                                                                                                             |
 | Non-cooperative tools (ignore proxy env vars, or open raw sockets) | Still observed, blocked, and logged — network-level enforcement, no opt-out | Blocked with "network unreachable" — invisible, no trace anywhere in the report                                                                                                                                                            |
 | Report detail                                                      | Allowed / blocked hosts                                                     | Allowed / blocked hosts (with full path), plus a per-step "Communication details" breakdown                                                                                                                                                |
@@ -45,6 +52,19 @@ Everything else in the workflow is unchanged — see the
 attempt is observed and recorded — this is why it is the default. Use `explicit` when you need
 URL/path-level visibility in BuildKit's own build output and SLSA provenance, and your build's tools
 are known to respect `HTTP_PROXY`/`HTTPS_PROXY`.
+
+## What the report shows
+
+Because TLS is terminated, the report carries the full URL of every request — not just the host —
+and groups them under the `RUN` step that made them:
+
+<img src="../assets/report-explicit-engine.png" alt="Outbound Traffic Report - explicit engine" width="556">
+
+The path is **visibility only**. `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules`
+have no path component, so the allow/deny decision is still made on `host:port` alone: the rule
+`registry.npmjs.org:443` above permits every path on that host, and each one is logged individually
+rather than being matched against anything. Enforcement granularity is therefore identical to
+`transparent` — what changes is how much you can see afterwards.
 
 ## CA trust for tools with their own CA store
 
