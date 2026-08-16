@@ -67,6 +67,10 @@ Its **Switch to restrict mode** section contains the allowlist already filled in
       fonts.googleapis.com:443
 ```
 
+Anything outside the allowlist is now blocked, and the report step fails the job with the host named:
+
+<img src="assets/report-restrict-mode.png" alt="Outbound Traffic Report - restrict mode" width="556">
+
 The rest of the workflow is unchanged. Complete workflows:
 [audit](.github/workflows/example-audit.yml) ·
 [restrict](.github/workflows/example-restrict.yml).
