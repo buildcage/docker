@@ -3,6 +3,7 @@
 ![Buildcage](./assets/banner.png)
 
 [![GitHub](https://img.shields.io/badge/GitHub-buildcage%2Fdocker-blue?logo=github)](https://github.com/buildcage/docker)
+[![Marketplace](https://img.shields.io/badge/marketplace-Buildcage%20for%20Docker-blue?logo=github)](https://github.com/marketplace/actions/buildcage-for-docker)
 ![version](https://img.shields.io/github/v/release/buildcage/docker)
 ![build](https://img.shields.io/github/actions/workflow/status/buildcage/docker/docker-publish.yml)
 ![test](https://img.shields.io/github/actions/workflow/status/buildcage/docker/test-e2e.yml?label=test)
