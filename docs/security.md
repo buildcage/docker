@@ -136,6 +136,49 @@ Given these implementation costs versus the strict preconditions for the attack 
 - **Major CDN countermeasures** — Major CDN providers like CloudFront and Cloudflare have already introduced measures to restrict domain fronting. Consult your CDN provider's documentation for current details.
 - **Regular audits** — Periodically run in [audit mode](../README.md#operation-modes) to detect anomalies in connection patterns.
 
+## Hardening
+
+An allowlist decides which destinations a build can reach. It works on domain names, so it cannot
+tell a legitimate use of an allowed destination from an abusive one. Anything leaving through a
+service you had to allow anyway still leaves. That is a structural limit, not something a better
+rule set fixes.
+
+What it does stop is narrower. Traffic to a destination that is not on the list does not go out, and
+infrastructure an attacker set up is normally not on it, because the build has no reason to reach
+it. That is also the hardest kind of leak to find afterwards, which is why closing it is worth doing
+even though the rest stays open.
+
+An attacker who sends the same data through a service the build already uses stays inside the limit
+above. The rest of this section is about making that set of services smaller. Buildcage runs against
+your Dockerfile as it is, and an allowlist generated from an audit run already blocks every
+destination the audit did not record. Weigh what follows against what the build has access to.
+
+### Keep each rule as narrow as it can be
+
+An audit run only ever emits the exact `host:port` pairs it observed. Wildcards and `:*` ports come
+from broadening a rule by hand, and each one covers destinations the build never asked for. Where a
+broad rule exists, it is worth checking whether the build can be changed instead.
+
+Pay particular attention to general-purpose destinations: a gist host, object storage, or an API
+that can create repositories. They accept uploads as readily as they serve downloads, which is what
+makes them useful for sending data out.
+
+### Reduce what has to be reachable
+
+A package registry is usually the one entry a build cannot do without, and the fetch has to happen
+inside the build. What can change is which registry. A mirror configured as a read-only
+pull-through cache serves upstream packages on demand and accepts no publishes, so nothing can be
+uploaded to the destination on your allowlist. Running one is a bigger commitment than anything
+else in this section.
+
+### Keep the rest of your supply chain practice
+
+Pinning versions, lockfiles, review, least-privilege tokens, and a dependency cooldown each cover
+something an allowlist does not. Pinning base images by digest belongs here too: `FROM`
+instructions are resolved by buildkitd itself, which is not on the isolated network, so image pulls
+are never filtered (see [Architecture](#architecture)). Buildcage is one layer among them, not a
+replacement for any.
+
 ## Explicit Proxy Engine
 
 > [!WARNING]
