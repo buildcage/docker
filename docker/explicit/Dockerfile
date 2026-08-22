@@ -41,7 +41,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:scripts
 
 # Final image
-FROM moby/buildkit:v0.32.0@sha256:1f8167fcb0eca5b7126353d35299386945cbb8949cc516c592a49f80cfce4fa2
+FROM moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
 
 LABEL org.opencontainers.image.title="buildcage (explicit proxy engine)" \
       org.opencontainers.image.description="Secure Docker build environment using BuildKit's native --proxy-network" \
