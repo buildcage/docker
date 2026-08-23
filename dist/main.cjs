@@ -6934,7 +6934,7 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function verifySignedNote(signedNote, tlogs) {
 		let data = Buffer.from(signedNote.note, "utf-8");
 		return signedNote.signatures.some((signature) => {
-			let tlog = tlogs.find((tlog) => core_1.crypto.bufferEqual(tlog.logID.subarray(0, 4), signature.keyHint) && tlog.baseURL.match(signature.name));
+			let tlog = tlogs.find((tlog) => core_1.crypto.bufferEqual(tlog.logID.subarray(0, 4), signature.keyHint) && tlog.baseURL.includes(signature.name));
 			return tlog ? core_1.crypto.verify(data, tlog.publicKey, signature.signature) : !1;
 		});
 	}
@@ -6981,7 +6981,16 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 				code: "TLOG_INCLUSION_PROOF_ERROR",
 				message: "too few lines in checkpoint header"
 			});
-			let origin = lines[0], logSize = BigInt(lines[1]), rootHash = Buffer.from(lines[2], "base64"), rest = lines.slice(3);
+			let origin = lines[0], logSize;
+			try {
+				logSize = BigInt(lines[1]);
+			} catch {
+				throw new error_1.VerificationError({
+					code: "TLOG_INCLUSION_PROOF_ERROR",
+					message: "invalid checkpoint log size"
+				});
+			}
+			let rootHash = Buffer.from(lines[2], "base64"), rest = lines.slice(3);
 			return new LogCheckpoint(origin, logSize, rootHash, rest);
 		}
 	};
@@ -6990,7 +6999,16 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.verifyMerkleInclusion = verifyMerkleInclusion;
 	let core_1 = require_dist$1(), error_1 = require_error(), RFC6962_LEAF_HASH_PREFIX = Buffer.from([0]), RFC6962_NODE_HASH_PREFIX = Buffer.from([1]);
 	function verifyMerkleInclusion(entry, checkpoint) {
-		let inclusionProof = entry.inclusionProof, logIndex = BigInt(inclusionProof.logIndex), treeSize = BigInt(checkpoint.logSize);
+		let inclusionProof = entry.inclusionProof, logIndex;
+		try {
+			logIndex = BigInt(inclusionProof.logIndex);
+		} catch {
+			throw new error_1.VerificationError({
+				code: "TLOG_INCLUSION_PROOF_ERROR",
+				message: "invalid inclusion proof log index"
+			});
+		}
+		let treeSize = BigInt(checkpoint.logSize);
 		if (logIndex < 0n || logIndex >= treeSize) throw new error_1.VerificationError({
 			code: "TLOG_INCLUSION_PROOF_ERROR",
 			message: `invalid index: ${logIndex}`
@@ -7062,7 +7080,15 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.verifyTLogBody = verifyTLogBody, exports.verifyTLogInclusion = verifyTLogInclusion;
 	let v2_1 = require_v2(), error_1 = require_error(), dsse_1 = require_dsse(), hashedrekord_1 = require_hashedrekord(), intoto_1 = require_intoto(), checkpoint_1 = require_checkpoint(), merkle_1 = require_merkle(), set_1 = require_set();
 	function verifyTLogBody(entry, sigContent) {
-		let { kind, version } = entry.kindVersion, body = JSON.parse(entry.canonicalizedBody.toString("utf8"));
+		let { kind, version } = entry.kindVersion, body;
+		try {
+			body = JSON.parse(entry.canonicalizedBody.toString("utf8"));
+		} catch {
+			throw new error_1.VerificationError({
+				code: "TLOG_BODY_ERROR",
+				message: "invalid canonicalized body"
+			});
+		}
 		if (kind !== body.kind || version !== body.apiVersion) throw new error_1.VerificationError({
 			code: "TLOG_BODY_ERROR",
 			message: `kind/version mismatch - expected: ${kind}/${version}, received: ${body.kind}/${body.apiVersion}`
@@ -7164,12 +7190,19 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 			}
 		}
 		verifyTLogs({ signature: content, tlogEntries }) {
-			let tlogCount = 0;
+			let entryIDs = [];
 			if (tlogEntries.forEach((entry) => {
-				tlogCount++, (0, tlog_1.verifyTLogInclusion)(entry, this.trustMaterial.tlogs), (0, tlog_1.verifyTLogBody)(entry, content);
-			}), tlogCount < this.options.tlogThreshold) throw new error_1.VerificationError({
+				(0, tlog_1.verifyTLogInclusion)(entry, this.trustMaterial.tlogs), (0, tlog_1.verifyTLogBody)(entry, content), entryIDs.push({
+					logID: entry.logId.keyId,
+					logIndex: entry.logIndex
+				});
+			}), containsDupes(entryIDs)) throw new error_1.VerificationError({
 				code: "TLOG_ERROR",
-				message: `expected ${this.options.tlogThreshold} tlog entries, got ${tlogCount}`
+				message: "duplicate tlog entry"
+			});
+			if (entryIDs.length < this.options.tlogThreshold) throw new error_1.VerificationError({
+				code: "TLOG_ERROR",
+				message: `expected ${this.options.tlogThreshold} tlog entries, got ${entryIDs.length}`
 			});
 		}
 		verifySignature(entity, signer) {
