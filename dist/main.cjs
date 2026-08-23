@@ -3507,11 +3507,13 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	}
 	function metaFromJSON(data) {
 		let meta;
-		if (utils_1.guard.isDefined(data)) if (utils_1.guard.isObjectRecord(data)) meta = Object.entries(data).reduce((acc, [path, metadata]) => ({
-			...acc,
-			[path]: file_1.MetaFile.fromJSON(metadata)
-		}), {});
-		else throw TypeError("meta field is malformed");
+		if (utils_1.guard.isDefined(data)) {
+			if (utils_1.guard.isObjectRecord(data)) meta = Object.entries(data).reduce((acc, [path, metadata]) => ({
+				...acc,
+				[path]: file_1.MetaFile.fromJSON(metadata)
+			}), {});
+			else throw TypeError("meta field is malformed");
+		}
 		return meta;
 	}
 })), require_delegations = /* @__PURE__ */ __commonJSMin(((exports) => {
@@ -3637,17 +3639,21 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	}
 	function targetsFromJSON(data) {
 		let targets;
-		if (utils_1.guard.isDefined(data)) if (utils_1.guard.isObjectRecord(data)) targets = Object.entries(data).reduce((acc, [path, target]) => ({
-			...acc,
-			[path]: file_1.TargetFile.fromJSON(path, target)
-		}), {});
-		else throw TypeError("targets must be an object");
+		if (utils_1.guard.isDefined(data)) {
+			if (utils_1.guard.isObjectRecord(data)) targets = Object.entries(data).reduce((acc, [path, target]) => ({
+				...acc,
+				[path]: file_1.TargetFile.fromJSON(path, target)
+			}), {});
+			else throw TypeError("targets must be an object");
+		}
 		return targets;
 	}
 	function delegationsFromJSON(data) {
 		let delegations;
-		if (utils_1.guard.isDefined(data)) if (utils_1.guard.isObject(data)) delegations = delegations_1.Delegations.fromJSON(data);
-		else throw TypeError("delegations must be an object");
+		if (utils_1.guard.isDefined(data)) {
+			if (utils_1.guard.isObject(data)) delegations = delegations_1.Delegations.fromJSON(data);
+			else throw TypeError("delegations must be an object");
+		}
 		return delegations;
 	}
 })), require_timestamp$2 = /* @__PURE__ */ __commonJSMin(((exports) => {
@@ -4432,8 +4438,10 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 		retry(err) {
 			if (this.#errors.push(err), (/* @__PURE__ */ new Date()).getTime() - this.#operationStart >= this.#maxRetryTime) return this.#errors.unshift(/* @__PURE__ */ Error("RetryOperation timeout occurred")), !1;
 			let timeout = this.#timeouts.shift();
-			if (timeout === void 0) if (this.#cachedTimeouts) this.#errors.pop(), timeout = this.#cachedTimeouts.at(-1);
-			else return !1;
+			if (timeout === void 0) {
+				if (this.#cachedTimeouts) this.#errors.pop(), timeout = this.#cachedTimeouts.at(-1);
+				else return !1;
+			}
 			return this.#timer = setTimeout(() => {
 				this.#attempts++, this.#fn(this.#attempts);
 			}, timeout), this.#unref && this.#timer.unref(), !0;
@@ -5067,16 +5075,18 @@ var require_envelope = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function seedCache({ cachePath, mirrorURL, tufRootPath, forceInit }) {
 		let cachedRootPath = path_1.default.join(cachePath, "root.json");
 		/* istanbul ignore else */
-		if (!fs_1.default.existsSync(cachedRootPath) || forceInit) if (tufRootPath) fs_1.default.copyFileSync(tufRootPath, cachedRootPath);
-		else {
-			let repoSeed = require_seeds()[mirrorURL];
-			if (!repoSeed) throw new _1.TUFError({
-				code: "TUF_INIT_CACHE_ERROR",
-				message: `No root.json found for mirror: ${mirrorURL}`
-			});
-			fs_1.default.writeFileSync(cachedRootPath, Buffer.from(repoSeed["root.json"], "base64")), Object.entries(repoSeed.targets).forEach(([targetName, target]) => {
-				fs_1.default.writeFileSync(path_1.default.join(cachePath, TARGETS_DIR_NAME, targetName), Buffer.from(target, "base64"));
-			});
+		if (!fs_1.default.existsSync(cachedRootPath) || forceInit) {
+			if (tufRootPath) fs_1.default.copyFileSync(tufRootPath, cachedRootPath);
+			else {
+				let repoSeed = require_seeds()[mirrorURL];
+				if (!repoSeed) throw new _1.TUFError({
+					code: "TUF_INIT_CACHE_ERROR",
+					message: `No root.json found for mirror: ${mirrorURL}`
+				});
+				fs_1.default.writeFileSync(cachedRootPath, Buffer.from(repoSeed["root.json"], "base64")), Object.entries(repoSeed.targets).forEach(([targetName, target]) => {
+					fs_1.default.writeFileSync(path_1.default.join(cachePath, TARGETS_DIR_NAME, targetName), Buffer.from(target, "base64"));
+				});
+			}
 		}
 	}
 	function initClient(options) {
