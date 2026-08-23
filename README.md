@@ -38,7 +38,7 @@ Start the builder, point Docker Buildx at it as a remote driver, then build as u
 
 ```yaml
 - name: Start Buildcage in audit mode
-  uses: buildcage/docker@abd2df9ccd0b4169e5fd74c5f40481fb95e353fe # v3.0.3
+  uses: buildcage/docker@b989e17f748acff676cbf94ce6bb73ed288ddd58 # v3.0.4
   with:
     proxy_mode: audit # Log every destination, block nothing
 
@@ -55,7 +55,7 @@ Start the builder, point Docker Buildx at it as a remote driver, then build as u
 
 - name: Show Buildcage report
   if: always()
-  uses: buildcage/docker/report@abd2df9ccd0b4169e5fd74c5f40481fb95e353fe # v3.0.3
+  uses: buildcage/docker/report@b989e17f748acff676cbf94ce6bb73ed288ddd58 # v3.0.4
 ```
 
 The [report action](#report-action) writes every destination the build contacted to the Job Summary:
@@ -68,7 +68,7 @@ Its **Switch to restrict mode** section contains the allowlist already filled in
 
 ```yaml
 - name: Start Buildcage in restrict mode
-  uses: buildcage/docker@abd2df9ccd0b4169e5fd74c5f40481fb95e353fe # v3.0.3
+  uses: buildcage/docker@b989e17f748acff676cbf94ce6bb73ed288ddd58 # v3.0.4
   with:
     proxy_mode: restrict # Block every destination except the ones you allow
     allowed_https_rules: |
@@ -228,7 +228,7 @@ optionally fails the job when blocked connections are found.
 ```yaml
 - name: Show Buildcage report
   if: always()
-  uses: buildcage/docker/report@abd2df9ccd0b4169e5fd74c5f40481fb95e353fe # v3.0.3
+  uses: buildcage/docker/report@b989e17f748acff676cbf94ce6bb73ed288ddd58 # v3.0.4
 ```
 
 | Input             | Required | Default     | Description                                                                                   |
