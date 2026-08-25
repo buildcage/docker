@@ -112,6 +112,32 @@ setup_buildkit_explicit_restrict: ## Start explicit proxy engine in restrict mod
 		--name buildcage \
 		--driver remote docker-container://buildcage
 
+.PHONY: setup_buildkit_inspect_audit
+setup_buildkit_inspect_audit: ## Start inspect proxy engine in audit mode
+	@echo "Starting buildcage (inspect proxy engine) in AUDIT mode..."
+	@COMPOSE_FILE=$(COMPOSE_FILE) \
+	  PROXY_ENGINE=inspect \
+	  PROXY_MODE=audit \
+	  docker compose -p $(COMPOSE_PROJECT_NAME) up -d --wait --build
+	@docker buildx rm buildcage 2>/dev/null || true
+	@echo "Creating buildx builder..."
+	@docker buildx create --bootstrap \
+		--name buildcage \
+		--driver remote docker-container://buildcage
+
+.PHONY: setup_buildkit_inspect_restrict
+setup_buildkit_inspect_restrict: ## Start inspect proxy engine in restrict mode
+	@echo "Starting buildcage (inspect proxy engine) in RESTRICT mode..."
+	@COMPOSE_FILE=$(COMPOSE_FILE) \
+	  PROXY_ENGINE=inspect \
+	  PROXY_MODE=restrict \
+	  docker compose -p $(COMPOSE_PROJECT_NAME) up -d --wait --build
+	@docker buildx rm buildcage 2>/dev/null || true
+	@echo "Creating buildx builder..."
+	@docker buildx create --bootstrap \
+		--name buildcage \
+		--driver remote docker-container://buildcage
+
 .PHONY: clean_buildkit
 clean_buildkit: ## Stop and remove the buildkit builder's containers/images and buildx builder
 	@echo "Stopping and removing all containers..."
@@ -128,7 +154,7 @@ report_buildkit: ## Show the buildcage report for the currently running builder
 # ---------------------------------------------------------------------------
 
 .PHONY: test_integration_buildkit
-test_integration_buildkit: test_integration_buildkit_transparent_audit test_integration_buildkit_transparent_restrict test_integration_buildkit_transparent_restrict_no_traffic test_integration_buildkit_explicit_audit test_integration_buildkit_explicit_restrict ## Run all buildkit integration tests
+test_integration_buildkit: test_integration_buildkit_transparent_audit test_integration_buildkit_transparent_restrict test_integration_buildkit_transparent_restrict_no_traffic test_integration_buildkit_explicit_audit test_integration_buildkit_explicit_restrict test_integration_buildkit_inspect_audit test_integration_buildkit_inspect_restrict test_integration_buildkit_inspect_debian_audit test_integration_buildkit_inspect_debian_restrict test_integration_buildkit_inspect_roundtrip ## Run all buildkit integration tests
 
 .PHONY: test_integration_buildkit_transparent_audit
 test_integration_buildkit_transparent_audit: ## Run transparent-engine audit mode tests
@@ -209,6 +235,76 @@ test_integration_buildkit_explicit_restrict: ## Run explicit-engine restrict mod
 	@node src/post.ts
 	@./test/assert-post.sh
 	@TEST_COMPOSE_FILE=compose.test-explicit.yaml $(MAKE) clean_buildkit
+
+.PHONY: test_integration_buildkit_inspect_audit
+test_integration_buildkit_inspect_audit: ## Run inspect-engine audit mode tests
+	@echo "Running inspect-engine audit mode tests..."
+	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	  $(MAKE) setup_buildkit_inspect_audit
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.inspect-audit test/ \
+	  --load -t buildcage-test
+	@./test/assert-inspect-no-ca-residue.sh buildcage-test
+	@node report/src/main.ts || true
+	@./test/assert-inspect-audit.sh
+	@node src/post.ts
+	@./test/assert-post.sh
+	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+
+.PHONY: test_integration_buildkit_inspect_restrict
+test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode tests
+	@echo "Running inspect-engine restrict mode tests..."
+	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	  $(MAKE) setup_buildkit_inspect_restrict
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.inspect-restrict test/ \
+	  --load -t buildcage-test
+	@./test/assert-inspect-no-ca-residue.sh buildcage-test
+	@node report/src/main.ts || true
+	@./test/assert-inspect-restrict.sh
+	@node src/post.ts
+	@./test/assert-post.sh
+	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+
+.PHONY: test_integration_buildkit_inspect_debian_audit
+test_integration_buildkit_inspect_debian_audit: ## Run inspect-engine audit mode tests against a Debian (apt) build
+	@echo "Running inspect-engine audit mode tests (Debian/apt)..."
+	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	  $(MAKE) setup_buildkit_inspect_audit
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.inspect-debian test/ \
+	  --load -t buildcage-test
+	@./test/assert-inspect-no-ca-residue.sh buildcage-test
+	@node report/src/main.ts || true
+	@./test/assert-inspect-debian.sh
+	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+
+.PHONY: test_integration_buildkit_inspect_debian_restrict
+test_integration_buildkit_inspect_debian_restrict: ## Run inspect-engine restrict mode tests against a Debian (apt) build
+	@echo "Running inspect-engine restrict mode tests (Debian/apt)..."
+	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	  $(MAKE) setup_buildkit_inspect_restrict
+	@docker buildx build --no-cache \
+	  --builder buildcage \
+	  --platform linux/arm64 \
+	  --progress=plain -f test/Dockerfile.inspect-debian test/ \
+	  --load -t buildcage-test
+	@./test/assert-inspect-no-ca-residue.sh buildcage-test
+	@node report/src/main.ts || true
+	@./test/assert-inspect-debian.sh
+	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+
+.PHONY: test_integration_buildkit_inspect_roundtrip
+test_integration_buildkit_inspect_roundtrip: ## Learn rules from an inspect audit run, then enforce them
+	@echo "Running inspect-engine audit-to-restrict round trip..."
+	@./test/run-inspect-roundtrip.sh
+	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
 # ---------------------------------------------------------------------------
 # example_{engine}_{mode} — smoke test against a plain Dockerfile

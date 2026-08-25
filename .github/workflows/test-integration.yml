@@ -39,6 +39,7 @@ jobs:
               - *workflow
               - 'compose.test-transparent.yaml'
               - 'compose.test-explicit.yaml'
+              - 'compose.test-inspect.yaml'
               - 'test/**'
               - 'report/src/**'
             test_multiarch:
@@ -85,6 +86,38 @@ jobs:
             test_dockerfile: test/Dockerfile.explicit-restrict
             assert_script: ./test/assert-explicit-restrict.sh
             builder_name: buildcage-explicit-restrict
+          - mode: inspect-audit
+            proxy_mode: audit
+            proxy_engine: inspect
+            compose_file: compose.yaml:compose.test-inspect.yaml
+            test_dockerfile: test/Dockerfile.inspect-audit
+            assert_script: ./test/assert-inspect-audit.sh
+            builder_name: buildcage-inspect-audit
+            # A second origin nothing resolves to, so a forged Host has
+            # somewhere to have reached if the proxy ever honoured one.
+            extra_services: test-server-impostor test-udp-echo
+          - mode: inspect-restrict
+            proxy_mode: restrict
+            proxy_engine: inspect
+            compose_file: compose.yaml:compose.test-inspect.yaml
+            test_dockerfile: test/Dockerfile.inspect-restrict
+            assert_script: ./test/assert-inspect-restrict.sh
+            builder_name: buildcage-inspect-restrict
+            extra_services: test-server-impostor test-udp-echo
+          - mode: inspect-debian-audit
+            proxy_mode: audit
+            proxy_engine: inspect
+            compose_file: compose.yaml:compose.test-inspect.yaml
+            test_dockerfile: test/Dockerfile.inspect-debian
+            assert_script: ./test/assert-inspect-debian.sh
+            builder_name: buildcage-inspect-debian-audit
+          - mode: inspect-debian-restrict
+            proxy_mode: restrict
+            proxy_engine: inspect
+            compose_file: compose.yaml:compose.test-inspect.yaml
+            test_dockerfile: test/Dockerfile.inspect-debian
+            assert_script: ./test/assert-inspect-debian.sh
+            builder_name: buildcage-inspect-debian-restrict
 
     name: "integration: test (${{ matrix.mode }})"
 
@@ -111,14 +144,14 @@ jobs:
           BUILDER_NAME: ${{ matrix.builder_name }}
         # Scoped to the services this job needs: builder, plus the
         # test-server/test-dns fixtures from matrix.compose_file's overlay.
-        run: docker compose build builder test-server test-dns
+        run: docker compose build builder test-server test-dns ${{ matrix.extra_services }}
 
       - name: Start containers
         env:
           PROXY_MODE: ${{ matrix.proxy_mode }}
           PROXY_ENGINE: ${{ matrix.proxy_engine }}
           BUILDER_NAME: ${{ matrix.builder_name }}
-        run: docker compose up -d --wait builder test-server test-dns
+        run: docker compose up -d --wait builder test-server test-dns ${{ matrix.extra_services }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -147,6 +180,13 @@ jobs:
           load: true
           tags: buildcage-test
 
+      # Only the inspect engine's buildkit-runc wrapper injects a CA into
+      # each RUN step; transparent never does and explicit uses BuildKit's
+      # own separate mechanism, so this only applies here.
+      - name: Verify no CA residue in the built image
+        if: contains(matrix.mode, 'inspect')
+        run: ./test/assert-inspect-no-ca-residue.sh buildcage-test
+
       - name: Show logs
         if: always()
         env:
@@ -173,6 +213,39 @@ jobs:
         if: always()
         env:
           BUILDER_NAME: ${{ matrix.builder_name }}
+        run: docker compose down -v --rmi all 2>/dev/null || true
+
+  test_inspect_roundtrip:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.test == 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    name: "integration: test (inspect round trip)"
+
+    env:
+      COMPOSE_PROJECT_NAME: buildcage-project
+      BUILDCAGE_BUILD_TEST_HOOKS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-vp
+
+      # Two phases, the second configured by the first, so this is one script
+      # rather than a matrix entry: the rules an audit run generates are fed
+      # straight back as restrict and must both permit what happened and
+      # refuse what did not.
+      - name: Learn rules from audit, then enforce them
+        run: ./test/run-inspect-roundtrip.sh
+
+      - name: Cleanup
+        if: always()
+        env:
+          COMPOSE_FILE: compose.yaml:compose.test-inspect.yaml
         run: docker compose down -v --rmi all 2>/dev/null || true
 
   test_multiarch:
@@ -264,7 +337,7 @@ jobs:
   integration-tests-passed:
     name: Integration tests passed
     runs-on: ubuntu-latest
-    needs: [changes, test, test_multiarch]
+    needs: [changes, test, test_inspect_roundtrip, test_multiarch]
     if: always()
     permissions: {}
     steps:
