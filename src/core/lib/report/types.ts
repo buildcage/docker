@@ -1,6 +1,7 @@
 import type { HostTableRow } from "./render/host-table.ts";
 import type { AnnotatedBlockedRow } from "./build/aggregate.ts";
 import type { VertexAllowedEntry } from "../log/vertex.ts";
+import type { TrafficEvent } from "../log/traffic-event.ts";
 
 /** Echoed back verbatim rather than re-derived — only the container's own
  *  env (or, for run, its own action input) reflects what was configured. */
@@ -53,7 +54,24 @@ export interface ExplicitReportData extends ReportDataCommon {
   };
 }
 
-export type ReportData = TransparentReportData | ExplicitReportData;
+/** The inspect engine decrypts, so it has the method and full URL of every
+ *  request, refused ones included. Nothing is attributable to a RUN step: the
+ *  proxy log carries no vertex identifier, unlike the explicit engine's
+ *  buildkitd log. One timeline is therefore the only structure available, and
+ *  the more useful one: a refusal reads in the context of what the build was
+ *  doing when it happened. */
+export interface InspectReportData extends ReportDataCommon {
+  engine: "inspect";
+  /** Every request, passthrough and refused name, oldest first. */
+  timeline: TrafficEvent[];
+  /** Seconds since the epoch the proxy itself started, so the report can
+   *  show every event's time relative to it. Undefined exactly when
+   *  logLooksPlausible is false -- there was no startup marker to read it
+   *  from. */
+  startedAt: number | undefined;
+}
+
+export type ReportData = TransparentReportData | ExplicitReportData | InspectReportData;
 
 export interface DeniedEntry {
   url: string;

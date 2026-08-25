@@ -10,6 +10,19 @@ inputs:
     description: "Fail the step if blocked connections are detected"
     required: false
     default: "true"
+  upload_traffic_artifact:
+    description: >-
+      Upload the observed traffic as a JSON artifact named buildcage-traffic, fetchable afterwards by
+      whoever turns out to want it — a later job in the same run via actions/download-artifact, or
+      anyone else via the API, subject to the retention period below. Requires proxy_engine: inspect.
+    required: false
+    default: "false"
+  traffic_artifact_retention_days:
+    description: >-
+      How long to keep that artifact, in days. Empty uses the repository's own default, and a value
+      above the repository maximum is refused by GitHub.
+    required: false
+    default: ""
 
 runs:
   using: node24

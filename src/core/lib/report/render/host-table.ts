@@ -27,7 +27,9 @@ export function renderHostTable(
   if (showExpected) formats.push({ key: "expected", title: "Expected", align: "center" });
 
   const tableRows = rows.map((r) => ({
-    host: `${r.host}:${r.port}`,
+    // A name refused by the resolver was never connected to, so it has no port
+    // to show and "name:-" would only invite the reader to look for one.
+    host: r.port === "-" ? r.host : `${r.host}:${r.port}`,
     ruleType: r.ruleType,
     reason: r.reason,
     count: r.count,

@@ -19,6 +19,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.qjs.json"
   },
   "dependencies": {
+    "@actions/artifact": "^6.2.1",
     "@actions/core": "^3.0.1",
     "@sigstore/bundle": "^5.0.0",
     "@sigstore/tuf": "^5.0.0",

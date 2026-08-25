@@ -50,4 +50,14 @@ describe("renderHostTable", () => {
   });
 });
 
+describe("a row with no port", () => {
+  it("shows the name alone, since a refused name was never connected to", () => {
+    const md = renderHostTable([
+      { host: "attacker.example", port: "-", ruleType: "DNS", reason: "dns-not-allowed", count: 1 },
+    ]);
+    expect(md.includes("attacker.example |")).toBe(true);
+    expect(md.includes("attacker.example:-")).toBe(false);
+  });
+});
+
 reportResults();
