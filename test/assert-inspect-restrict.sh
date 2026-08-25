@@ -142,9 +142,9 @@ else
   fail "the exfiltration name was not recorded as refused"
 fi
 if grep -qiF "buildcage dns allowed name=allowed.example.com" <<< "$DNS_LOG"; then
-  pass "an allowlisted name was forwarded"
+  pass "an allowlisted name was logged as allowed"
 else
-  fail "no allowlisted name was recorded as forwarded"
+  fail "no allowlisted name was recorded as allowed"
 fi
 echo ""
 

@@ -6,6 +6,13 @@ function gen(options: Parameters<typeof generateHaproxyConfig>[0] = {}): string 
   return generateHaproxyConfig(options).config;
 }
 
+/** The text of one `frontend <name> ... ` block, up to the next `frontend`. */
+function frontendSegment(config: string, name: string): string {
+  const start = config.indexOf(`frontend ${name}`);
+  const nextFrontend = config.indexOf("\nfrontend", start + 1);
+  return config.slice(start, nextFrontend === -1 ? undefined : nextFrontend);
+}
+
 const FULL = {
   httpsRules: ["a.example.com:443"],
   httpRules: ["b.example.com:80"],
@@ -198,9 +205,7 @@ describe("resolves only once a request already passed the rules", () => {
 
   it("denies on host, path and method before resolving, on both listeners", () => {
     for (const frontend of ["https_in", "http_in"]) {
-      const start = config.indexOf(`frontend ${frontend}`);
-      const nextFrontend = config.indexOf("\nfrontend", start + 1);
-      const segment = config.slice(start, nextFrontend === -1 ? undefined : nextFrontend);
+      const segment = frontendSegment(config, frontend);
       const deny = segment.indexOf("http-request deny unless");
       const resolve = segment.indexOf("do-resolve(txn.dst,buildcage,ipv4) req.hdr(host)");
       expect(deny).not.toBe(-1);
@@ -221,9 +226,7 @@ describe("resolves only once a request already passed the rules", () => {
     // destination instead of the real one that tripped the guard -- silently
     // losing exactly the forensic value an SSRF refusal exists to keep.
     for (const frontend of ["https_in", "http_in"]) {
-      const start = config.indexOf(`frontend ${frontend}`);
-      const nextFrontend = config.indexOf("\nfrontend", start + 1);
-      const segment = config.slice(start, nextFrontend === -1 ? undefined : nextFrontend);
+      const segment = frontendSegment(config, frontend);
       const setDst = segment.indexOf("http-request set-dst var(txn.dst)");
       const internalDeny = segment.indexOf("deny deny_status 403 if dst_internal");
       expect(setDst).not.toBe(-1);
@@ -240,6 +243,22 @@ describe("resolves only once a request already passed the rules", () => {
     expect(setDst).not.toBe(-1);
     expect(internalReject).not.toBe(-1);
     expect(setDst < internalReject).toBe(true);
+  });
+
+  it("gates the passthrough's do-resolve on the same SNI match that admits it", () => {
+    // Not just ordering: a passthrough rule has no path or method, so this
+    // flag -- set only when an SNI already matched -- is the entire rule
+    // check do-resolve sits behind. A request no rule admits must never
+    // reach it, same invariant as the host+path+method check above.
+    const tlsRuleSet = config.indexOf("set-var(txn.tlsrule)");
+    const resolveLine = config
+      .split("\n")
+      .find((l) => l.includes("do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni"))!;
+    const resolve = config.indexOf(resolveLine);
+    expect(tlsRuleSet).not.toBe(-1);
+    expect(resolveLine).toBeTruthy();
+    expect(tlsRuleSet < resolve).toBe(true);
+    expect(resolveLine.includes("if { var(txn.tlsrule) -m found }")).toBe(true);
   });
 
   it("does not fold the upstream resolvers into the internal-address guard", () => {

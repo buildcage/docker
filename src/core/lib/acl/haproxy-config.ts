@@ -106,7 +106,8 @@ function ruleBlock(rules: CompiledRule[], mode: string): string[] {
 /**
  * Generate a haproxy.cfg from buildcage's rules.
  *
- * @throws {Error} if a host rule has invalid wildcard syntax
+ * @throws {Error} if a host rule has invalid wildcard syntax, or if
+ *   resolverAddress is given without proxyAddress
  */
 export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): GeneratedHaproxyConfig {
   const opts = { ...DEFAULTS, ...options };
@@ -119,6 +120,13 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
   } = compileRuleSet(options);
 
   const resolvers = opts.resolverAddress ?? [];
+  // Required together, not just individually optional: without proxyAddress
+  // here, a name do-resolve sends back to the proxy's own gateway would not
+  // be caught by the internal-address guard below, silently rather than
+  // loudly. This must fail closed instead of falling through.
+  if (resolvers.length > 0 && !opts.proxyAddress) {
+    throw new Error("proxyAddress is required whenever resolverAddress is given");
+  }
   // The proxy's own address, not the upstream(s) a name is resolved against:
   // see the resolverAddress/proxyAddress doc comments above.
   const dstInternalAddrs = [...INTERNAL_RANGES, ...(opts.proxyAddress ? [opts.proxyAddress] : [])];
@@ -215,9 +223,9 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
         // Falling through would connect to the address the client chose.
         "    tcp-request content reject if { var(txn.tlsrule) -m found } " +
           "!{ var(txn.dst) -m found }",
-        // Set before the internal-destination check below, not after: %[dst] in
-        // the log-format is this, and a refusal must show the address that
-        // tripped it, not the client's own (fake, unresolved) one.
+        // Before the internal-destination check below, not after, for the
+        // same reason and with the same log-format consequence as the
+        // inspected path; see the matching comment in stage() below.
         "    tcp-request content set-dst var(txn.dst) if { var(txn.dst) -m found }",
         // Same internal-destination guard as the inspected path; see INTERNAL_RANGES.
         `    acl pass_dst_internal var(txn.dst) -m ip ${dstInternalAddrs.join(" ")}`,
