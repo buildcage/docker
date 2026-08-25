@@ -194,14 +194,19 @@ refused.
 
 Three properties carry the enforcement, and each is worth knowing before relying on the engine:
 
-- **The destination is resolved by the proxy, never chosen by the build.** A forged `Host`, a
-  doctored `/etc/hosts` or a `Host` naming one host while the connection aims at another all reach
-  the address the proxy resolved.
+- **The destination is resolved by the proxy, never chosen by the build, and only once a request has
+  already passed the rules.** A forged `Host`, a doctored `/etc/hosts` or a `Host` naming one host
+  while the connection aims at another all reach the address the proxy resolved. A request the rules
+  were always going to refuse never triggers that resolution at all.
 - **A resolved name may not land on an internal address.** An allowlisted name that resolves to
   loopback, link-local, CGNAT, the IETF protocol block or the proxy itself is refused, so a name
   under an attacker's control cannot turn the proxy into a route to cloud metadata.
-- **The resolver is part of the boundary.** Its scope is generated from the same rules, so a name
-  outside the allowlist is never forwarded and cannot be used as an exfiltration channel on its own.
+- **The build's own DNS resolver never forwards a query, allowed or not.** Every name it looks up is
+  answered locally with the proxy's own address, so a lookup alone — even one the build never
+  connects on — cannot be used as an exfiltration channel, and a path or method paired with a wide
+  host does not change that: DNS has no notion of either, so nothing about them can narrow what the
+  resolver would otherwise leak. Getting a name's real address is the proxy's own job, done after the
+  rules already decided, never the resolver's.
 
 For the rule syntax, the full behaviour table, the report format and the limitations, see
 [Inspect Proxy Engine](./inspect-engine.md).

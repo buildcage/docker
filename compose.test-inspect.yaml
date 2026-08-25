@@ -23,7 +23,11 @@ services:
       # to the archive's own path prefixes rather than the whole host — the
       # bookworm-slim default sources span both /debian/ and /debian-security/.
       # A URL rule contains a space, so this input is newline separated.
-      - "ALLOWED_URL_RULES=GET https://allowed.example.com/public/**\nGET https://allowed.example.com:9443/public/**\nGET|POST https://api.example.com/v1/*\nGET http://10.200.0.100/pub-by-addr/**\nGET http://deb.debian.org/debian/**\nGET http://deb.debian.org/debian-security/**"
+      # The wildcard-host rule below (unlike sub.wildcard.example.com, a
+      # literal host with no path restriction) is scoped by path: the DNS
+      # layer cannot see that scoping, so this is what proves a name that
+      # only matches the wildcard, not the path, is never resolved for real.
+      - "ALLOWED_URL_RULES=GET https://allowed.example.com/public/**\nGET https://allowed.example.com:9443/public/**\nGET|POST https://api.example.com/v1/*\nGET http://10.200.0.100/pub-by-addr/**\nGET http://deb.debian.org/debian/**\nGET http://deb.debian.org/debian-security/**\nGET https://*.wildcard.example.com/public/**"
     volumes:
       - ./test/test-server-inspect/cert.pem:/test-fixtures/test-server-cert.pem:ro
     networks:
@@ -54,7 +58,9 @@ services:
       test-net:
         ipv4_address: 10.200.0.102
 
-  # Upstream for the builder's CoreDNS, which forwards only allowlisted names.
+  # Upstream for the builder's HAProxy, which resolves the real destination
+  # against it once a request has already passed the rules; CoreDNS itself
+  # never forwards here.
   test-dns:
     build: test/test-dns-inspect
     networks:

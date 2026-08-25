@@ -22,6 +22,7 @@ ENV C='curl -sS -o /dev/null -w %{http_code} --max-time 10'
 #     GET https://allowed.example.com/public/**
 #     GET https://allowed.example.com:9443/public/**
 #     GET|POST https://api.example.com/v1/*
+#     GET https://*.wildcard.example.com/public/**
 #   allowed_https_rules: sub.wildcard.example.com:443 absent.example.com:443
 #   allowed_http_rules:  allowed.example.com:80
 #   allow_tls_rules:     tlspass.example.com:443
@@ -112,6 +113,24 @@ RUN echo "=== [Host rule] ===" && \
     echo "$OUT" && \
     case "$OUT" in ROOT\ DELETE*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
 
+# [Wildcard host + path rule - path outside the rule]
+# attacker.wildcard.example.com matches only the wildcard host, never the
+# literal sub.wildcard.example.com rule above, so this is covered solely by
+# the path-restricted URL rule. The DNS resolver cannot see the path, so if it
+# ever resolved this name for real, the path restriction a rule author wrote
+# would give no protection at the DNS layer -- only the log (checked in
+# assert-inspect-restrict.sh) proves the name was never actually looked up.
+RUN echo "=== [Wildcard host, path outside the rule] ===" && \
+    CODE=$($C https://attacker.wildcard.example.com/private/secret) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# [Wildcard host + path rule - path allowed]
+RUN echo "=== [Wildcard host, path allowed] ===" && \
+    OUT=$($S https://attacker.wildcard.example.com/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
 # [Plaintext host rule]
 RUN echo "=== [HTTP host rule] ===" && \
     OUT=$($S http://allowed.example.com/public/pkg.tgz) && \
@@ -127,12 +146,14 @@ RUN echo "=== [Blocked host] ===" && \
     [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
 
 # [Allowlisted name that does not resolve]
-# Reached by address so the client's own lookup cannot fail first: the build
-# resolves through the same resolver, so asking it for this name directly would
-# never get as far as the proxy. The proxy then resolves the Host header,
-# fails, and refuses rather than falling back to the address it was handed.
+# CoreDNS answers every name with the proxy's own address regardless of
+# whether it is allowed, so the build's own lookup always succeeds and this
+# needs no address+forged-Host workaround to reach the proxy: HAProxy's own
+# resolution against the real upstream is what fails here, refusing rather
+# than falling back to any address. [Forged Host] below already covers "the
+# destination comes from our resolution, not the client's" more directly.
 RUN echo "=== [Name does not resolve] ===" && \
-    CODE=$($C --insecure -H 'Host: absent.example.com' https://10.200.0.101/) && \
+    CODE=$($C https://absent.example.com/) && \
     echo "status=$CODE" && \
     [ "$CODE" = "502" ] || (echo "FAILED: expected 502" && exit 1)
 

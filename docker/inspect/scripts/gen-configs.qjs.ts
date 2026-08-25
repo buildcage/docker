@@ -1,18 +1,18 @@
 /**
  * Generate the `inspect` engine's haproxy.cfg and Corefile from one rule set,
- * so the proxy and resolver cannot describe different allowlists (a wider
- * resolver would let a build leak through a DNS query, a narrower one would
- * break permitted traffic).
+ * so what CoreDNS logs as allowed and what HAProxy actually lets through
+ * cannot drift apart: a narrower view would misreport an allowed name as
+ * denied, a wider one would misreport a denied name as allowed. CoreDNS never
+ * resolves a name for real either way; only HAProxy does, and only once a
+ * request has already passed these same rules.
  *
  * Usage:
  *   qjs --std -m gen-configs.js <haproxy_out> <corefile_out> <proxy_address> \
- *     <resolver_address> <upstream_resolvers> <mode> <https_rules> \
- *     <http_rules> <ip_rules> <tls_rules> <url_rules>
+ *     <upstream_resolvers> <mode> <https_rules> <http_rules> <ip_rules> \
+ *     <tls_rules> <url_rules>
  *
- * The proxy and resolver share a container, so their addresses are the same;
- * kept as separate arguments to keep visible that the proxy must resolve
- * through the build's own resolver. Host and IP rules are whitespace separated,
- * URL rules newline separated (each carries a method and a space).
+ * Host and IP rules are whitespace separated, URL rules newline separated
+ * (each carries a method and a space).
  */
 import * as std from "qjs:std";
 import { generateHaproxyConfig } from "#core/lib/acl/haproxy-config.js";
@@ -24,7 +24,6 @@ const [
   haproxyOut,
   corefileOut,
   proxyAddress,
-  resolverAddress,
   upstreamsInput,
   mode,
   httpsInput,
@@ -60,7 +59,8 @@ try {
     tlsRules,
     urlRules,
     mode: mode === "audit" ? "audit" : "restrict",
-    resolverAddress: resolverAddress || proxyAddress,
+    resolverAddress: upstreams,
+    proxyAddress,
   });
   const coredns = generateCorednsConfig({
     httpsRules,
@@ -68,7 +68,6 @@ try {
     tlsRules,
     urlRules,
     proxyAddress,
-    upstreams,
     mode: mode === "audit" ? "audit" : "restrict",
   });
 

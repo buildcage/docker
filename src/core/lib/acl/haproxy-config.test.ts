@@ -6,12 +6,20 @@ function gen(options: Parameters<typeof generateHaproxyConfig>[0] = {}): string 
   return generateHaproxyConfig(options).config;
 }
 
+/** The text of one `frontend <name> ... ` block, up to the next `frontend`. */
+function frontendSegment(config: string, name: string): string {
+  const start = config.indexOf(`frontend ${name}`);
+  const nextFrontend = config.indexOf("\nfrontend", start + 1);
+  return config.slice(start, nextFrontend === -1 ? undefined : nextFrontend);
+}
+
 const FULL = {
   httpsRules: ["a.example.com:443"],
   httpRules: ["b.example.com:80"],
   ipRules: ["10.0.0.5:5432"],
   tlsRules: ["db.example.com:443"],
-  resolverAddress: "172.20.0.1",
+  resolverAddress: ["1.1.1.1", "8.8.8.8"],
+  proxyAddress: "172.20.0.1",
 };
 
 // ---------------------------------------------------------------------------
@@ -182,6 +190,86 @@ describe("load-bearing directives", () => {
     // Pointing the default at the CA makes the first handshake per name fail.
     expect(config.includes("ssl crt /etc/haproxy/default.pem generate-certificates")).toBe(true);
     expect(config.includes("ca-sign-file /etc/haproxy/ca.pem")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// This resolver is the only place a real DNS query leaves the proxy: CoreDNS
+// never forwards, even for an allowed name (see coredns-config.ts). A request
+// that the rules would deny must never reach do-resolve, or the real upstream
+// sees a query for a name the rules never granted -- the exact channel this
+// design exists to close.
+// ---------------------------------------------------------------------------
+describe("resolves only once a request already passed the rules", () => {
+  const config = gen(FULL);
+
+  it("denies on host, path and method before resolving, on both listeners", () => {
+    for (const frontend of ["https_in", "http_in"]) {
+      const segment = frontendSegment(config, frontend);
+      const deny = segment.indexOf("http-request deny unless");
+      const resolve = segment.indexOf("do-resolve(txn.dst,buildcage,ipv4) req.hdr(host)");
+      expect(deny).not.toBe(-1);
+      expect(resolve).not.toBe(-1);
+      expect(deny < resolve).toBe(true);
+    }
+  });
+
+  it("supports more than one upstream nameserver, not just the first", () => {
+    expect(config.includes("nameserver ns1 1.1.1.1:53")).toBe(true);
+    expect(config.includes("nameserver ns2 8.8.8.8:53")).toBe(true);
+  });
+
+  it("sets the resolved destination before the internal-address check, not after", () => {
+    // %[dst] in the log-format reads whatever set-dst last wrote. CoreDNS
+    // never hands the build a real address (see coredns-config.ts), so a
+    // refusal logged before set-dst ran would show the build's own fake
+    // destination instead of the real one that tripped the guard -- silently
+    // losing exactly the forensic value an SSRF refusal exists to keep.
+    for (const frontend of ["https_in", "http_in"]) {
+      const segment = frontendSegment(config, frontend);
+      const setDst = segment.indexOf("http-request set-dst var(txn.dst)");
+      const internalDeny = segment.indexOf("deny deny_status 403 if dst_internal");
+      expect(setDst).not.toBe(-1);
+      expect(internalDeny).not.toBe(-1);
+      expect(setDst < internalDeny).toBe(true);
+    }
+  });
+
+  it("does the same for a passthrough, which logs its own destination too", () => {
+    const setDst = config.indexOf("tcp-request content set-dst var(txn.dst)");
+    const internalReject = config.indexOf(
+      "reject if { var(txn.tlsrule) -m found } pass_dst_internal",
+    );
+    expect(setDst).not.toBe(-1);
+    expect(internalReject).not.toBe(-1);
+    expect(setDst < internalReject).toBe(true);
+  });
+
+  it("gates the passthrough's do-resolve on the same SNI match that admits it", () => {
+    // Not just ordering: a passthrough rule has no path or method, so this
+    // flag -- set only when an SNI already matched -- is the entire rule
+    // check do-resolve sits behind. A request no rule admits must never
+    // reach it, same invariant as the host+path+method check above.
+    const tlsRuleSet = config.indexOf("set-var(txn.tlsrule)");
+    const resolveLine = config
+      .split("\n")
+      .find((l) => l.includes("do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni"))!;
+    const resolve = config.indexOf(resolveLine);
+    expect(tlsRuleSet).not.toBe(-1);
+    expect(resolveLine).toBeTruthy();
+    expect(tlsRuleSet < resolve).toBe(true);
+    expect(resolveLine.includes("if { var(txn.tlsrule) -m found }")).toBe(true);
+  });
+
+  it("does not fold the upstream resolvers into the internal-address guard", () => {
+    // resolverAddress now names real, external nameservers, not the gateway;
+    // conflating the two would make a rule resolving to 1.1.1.1 unreachable
+    // and, worse, would have masked a resolved destination actually landing
+    // on the proxy's own address.
+    const acl = config.split("\n").find((l) => l.includes("acl dst_internal"))!;
+    expect(acl.includes("1.1.1.1")).toBe(false);
+    expect(acl.includes("8.8.8.8")).toBe(false);
+    expect(acl.trim().endsWith("172.20.0.1")).toBe(true);
   });
 });
 
