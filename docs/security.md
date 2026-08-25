@@ -179,15 +179,43 @@ instructions are resolved by buildkitd itself, which is not on the isolated netw
 are never filtered (see [Architecture](#architecture)). Buildcage is one layer among them, not a
 replacement for any.
 
+## Inspect Proxy Engine
+
+> [!WARNING]
+> `inspect` is an **experimental** engine. It terminates TLS inside the cage, so a tool that pins a
+> certificate or ships its own trust store will not work under it.
+> `transparent` remains the default and recommended engine.
+
+`inspect` uses the same network layout as `transparent`: a CNI bridge per `RUN` step, all TCP
+redirected to one listener, everything else dropped. What differs is what the proxy can see. It
+terminates TLS with a CA injected into the step for the life of that step only, so a rule can name a
+method and a URL path, and every request is recorded with its full URL whether it was allowed or
+refused.
+
+Three properties carry the enforcement, and each is worth knowing before relying on the engine:
+
+- **The destination is resolved by the proxy, never chosen by the build.** A forged `Host`, a
+  doctored `/etc/hosts` or a `Host` naming one host while the connection aims at another all reach
+  the address the proxy resolved.
+- **A resolved name may not land on an internal address.** An allowlisted name that resolves to
+  loopback, link-local, CGNAT, the IETF protocol block or the proxy itself is refused, so a name
+  under an attacker's control cannot turn the proxy into a route to cloud metadata.
+- **The resolver is part of the boundary.** Its scope is generated from the same rules, so a name
+  outside the allowlist is never forwarded and cannot be used as an exfiltration channel on its own.
+
+For the rule syntax, the full behaviour table, the report format and the limitations, see
+[Inspect Proxy Engine](./inspect-engine.md).
+
 ## Explicit Proxy Engine
 
 > [!WARNING]
-> `explicit` is an **experimental** engine. Its underlying BuildKit feature (`--proxy-network`) is
-> still maturing, and it has structural limitations not present in the `transparent` engine — see
-> [Coverage and Visibility](#coverage-and-visibility) below before relying on it.
-> `transparent` remains the default and recommended engine.
+> `explicit` is **deprecated**. It still works and existing workflows keep running, but it receives
+> no further development, and it has structural limitations not present in the `transparent` engine:
+> see [Coverage and Visibility](#coverage-and-visibility) below. For request-level enforcement, use
+> [`inspect`](#inspect-proxy-engine) instead. `transparent` remains the default and recommended
+> engine.
 
-For how to enable it, how the two engines compare, and the CA-trust workaround, see
+For how to enable it, how it compares with `transparent`, and the CA-trust workaround, see
 [Explicit Proxy Engine](./explicit-engine.md). This section covers the architecture and threat
 model.
 
