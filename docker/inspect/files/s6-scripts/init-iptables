@@ -1,0 +1,31 @@
+#!/command/with-contenv sh
+set -e
+
+PORT=${BUILDCAGE_LISTEN_PORT:-10024}
+
+# Everything TCP goes to the one listener, which decides for itself whether it
+# is looking at a handshake or a plain request. Nothing has to be declared as
+# one or the other, which is what lets an audit run record a build it was never
+# configured for.
+# Port 53 is excluded, or a resolver falling back to TCP (a truncated answer,
+# a large TXT or DNSSEC record) would be rewritten to the listener and handed
+# to the TLS/HTTP classifier, which cannot read a DNS query. The INPUT rule
+# below would never see it either.
+iptables -t nat -A PREROUTING -i buildkit0 -p tcp ! --dport 53 -j REDIRECT --to-ports "$PORT"
+
+# Reaching the proxy and the resolver is all a step may do with the gateway.
+iptables -A INPUT -i buildkit0 -p tcp --dport "$PORT" -j ACCEPT
+iptables -A INPUT -i buildkit0 -p udp --dport 53 -j ACCEPT
+iptables -A INPUT -i buildkit0 -p tcp --dport 53 -j ACCEPT
+iptables -A INPUT -i buildkit0 -j DROP
+
+# Nothing is routed onward, so a packet that escaped redirection goes nowhere.
+iptables -A FORWARD -i buildkit0 -j DROP
+
+if [ -e /proc/net/if_inet6 ]; then
+    ip6tables -A INPUT -i buildkit0 -j DROP
+    ip6tables -A FORWARD -i buildkit0 -j DROP
+    echo "init-iptables: configured (IPv4/IPv6)"
+else
+    echo "init-iptables: configured (IPv4; kernel has no IPv6 support)"
+fi

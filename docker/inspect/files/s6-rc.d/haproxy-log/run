@@ -1,0 +1,2 @@
+#!/usr/bin/execlineb -P
+s6-log 1 /var/log/haproxy

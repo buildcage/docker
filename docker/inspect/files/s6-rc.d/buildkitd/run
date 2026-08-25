@@ -1,0 +1,2 @@
+#!/command/with-contenv sh
+exec buildkitd --oci-worker-net=cni

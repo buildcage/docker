@@ -1,0 +1,8 @@
+#!/command/with-contenv sh
+exec 2>&1
+# Guaranteed non-decision line, so report can tell "haproxy logged nothing"
+# apart from "haproxy never started". Carries a millisecond epoch so the
+# report can show every other line's time relative to this moment; qjs
+# rather than `date`, because BusyBox's `date` has no sub-second precision.
+echo "buildcage haproxy starting $(qjs -e 'console.log(Date.now())')"
+exec haproxy -f /etc/haproxy/haproxy.cfg -db
