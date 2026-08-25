@@ -29,6 +29,9 @@ services:
       - ALLOWED_HTTPS_RULES=${ALLOWED_HTTPS_RULES:-}
       - ALLOWED_HTTP_RULES=${ALLOWED_HTTP_RULES:-}
       - ALLOWED_IP_RULES=${ALLOWED_IP_RULES:-}
+      # inspect only: it is the one engine that can see a method or a path.
+      - ALLOWED_URL_RULES=${ALLOWED_URL_RULES:-}
+      - ALLOW_TLS_RULES=${ALLOW_TLS_RULES:-}
       - KNOWN_BLOCKED_RULES=${KNOWN_BLOCKED_RULES:-}
       - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-}
       - PROXY_ENGINE=${PROXY_ENGINE:-transparent}
