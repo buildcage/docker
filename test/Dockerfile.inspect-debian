@@ -1,0 +1,39 @@
+# apt is the default package manager on the most common Linux base image
+# family, and unlike Node/Python/Ruby it has no CA store of its own: it
+# trusts whatever the OS provides. Debian's own slim image ships with none
+# until ca-certificates is installed, which the first RUN step below does.
+# That step itself gets no CA from the wrapper, because there is no store yet
+# for it to add to — but the real Debian archive is plain HTTP by default, so
+# nothing here needs one: apt authenticates packages by the archive's GPG key
+# (already present via debian-archive-keyring), never by TLS.
+#
+# FROM is deliberately not governed by this engine (see docs/inspect-engine.md),
+# so this pull succeeds whatever the rules say.
+FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241
+
+SHELL ["/bin/sh", "-c"]
+
+# [Bootstrap over plain HTTP - no CA involved]
+RUN echo "=== [apt bootstrap: ca-certificates over plain HTTP] ===" && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    echo "OK"
+
+# [apt over HTTPS, on the CA the wrapper just injected]
+# A new layer starts with the ca-certificates.crt the previous step just
+# created, so this step gets the wrapper's CA the normal way. Reusing
+# /public/** as a fake index only exercises the TLS leg: a signature error
+# proves the handshake (and the rule) passed, while a certificate error is
+# what an uninjected CA would produce instead.
+RUN echo "=== [apt over the injected CA] ===" && \
+    echo "deb [trusted=yes] https://allowed.example.com/public/debian ./" \
+      > /etc/apt/sources.list.d/inspect-test.list && \
+    OUT=$(apt-get update 2>&1); CODE=$?; \
+    echo "$OUT"; \
+    case "$OUT" in \
+      *"Certificate verification failed"*|*"NOT trusted"*|*"unable to get local issuer"*) \
+        echo "FAILED: the injected CA was not trusted" && exit 1 ;; \
+      *) echo "OK: reached the origin over TLS (exit=$CODE, a content error is expected)" ;; \
+    esac
+
+RUN echo "=== End of test ==="

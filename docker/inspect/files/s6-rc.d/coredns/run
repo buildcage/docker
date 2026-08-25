@@ -1,0 +1,3 @@
+#!/command/with-contenv sh
+exec 2>&1
+exec coredns -conf /etc/coredns/Corefile

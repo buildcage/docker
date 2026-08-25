@@ -36,6 +36,13 @@ CNI Plugins
 
 ------------------------------------------------------------------------------
 
+CoreDNS (used only by the `inspect` proxy engine image, docker/inspect/Dockerfile)
+  Website : https://coredns.io/
+  License : Apache License 2.0 (Apache-2.0)
+  Source  : https://github.com/coredns/coredns
+
+------------------------------------------------------------------------------
+
 s6-overlay
   Website : https://github.com/just-containers/s6-overlay
   License : ISC License

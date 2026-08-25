@@ -32,6 +32,9 @@ const configs = [
     input: "report/src/main.ts",
     file: "report/dist/main.cjs",
     plugins: mainPlugins,
+    // @actions/artifact is imported dynamically, so a run that asks for no
+    // artifact never loads it; inline it so dist stays a single file.
+    codeSplitting: false,
   },
 ];
 

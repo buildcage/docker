@@ -42,4 +42,11 @@ describe("imageTagFromRef", () => {
     expect(imageTagFromRef("v2.1.0", "explicit")).toBe("2.1.0-explicit");
     expect(imageTagFromRef("a".repeat(40), "explicit")).toBe(`sha-${"a".repeat(40)}-explicit`);
   });
+
+  it("gives every non-default engine its own suffix", () => {
+    // A new engine is a separately published image, so forgetting the suffix
+    // would silently pull the transparent one.
+    expect(imageTagFromRef("v2.1.0", "inspect")).toBe("2.1.0-inspect");
+    expect(imageTagFromRef("v2.1.0", "proxy")).toBe("2.1.0-proxy");
+  });
 });

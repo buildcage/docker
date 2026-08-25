@@ -1,0 +1,62 @@
+name: Example (inspect engine)
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      # `allowed_url_rules` names a method and a path, not just a host. npm
+      # fetches package metadata and tarballs with GET, and POSTs once to the
+      # advisory endpoint; publishing to the same registry is a POST elsewhere,
+      # so these rules allow the install without allowing a publish.
+      - name: Start Buildcage builder
+        uses: buildcage/docker@abd2df9ccd0b4169e5fd74c5f40481fb95e353fe # v3.0.3
+        with:
+          proxy_mode: restrict
+          proxy_engine: inspect
+          allowed_url_rules: |
+            GET|HEAD https://registry.npmjs.org/**
+            POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk
+            GET https://dl-cdn.alpinelinux.org/**
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          driver: remote
+          endpoint: docker-container://buildcage
+
+      - name: Create test Dockerfile
+        run: |
+          mkdir -p /tmp/build-context
+          cat <<'EOF' > /tmp/build-context/Dockerfile
+          FROM node:24-alpine
+          WORKDIR /app
+          # No NODE_USE_SYSTEM_CA needed: the runc wrapper points npm's own CA
+          # variable at a store carrying the proxy's CA.
+          RUN npm init -y && npm install --ignore-scripts express
+          # apk has no CA store of its own, unlike npm: it trusts whatever the
+          # OS store trusts, which is the one the wrapper already patched.
+          RUN apk add --no-cache jq
+          # Refused by the rules above, so the report shows the full URL.
+          RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
+          EOF
+
+      - name: Build test image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: /tmp/build-context
+          push: false
+          no-cache: true
+
+      - name: Show proxy report
+        if: always()
+        uses: buildcage/docker/report@abd2df9ccd0b4169e5fd74c5f40481fb95e353fe # v3.0.3
+        with:
+          fail_on_blocked: false

@@ -1,0 +1,6 @@
+#!/usr/bin/execlineb -P
+# `1 T dir`, not `T 1 dir`: a timestamp directive applies to the output that
+# follows it, so putting T first stamps stdout and leaves the file bare. The
+# file is what report reads, and a refused name has no other source of time --
+# CoreDNS's log plugin has no timestamp replacement of its own.
+s6-log 1 T /var/log/coredns

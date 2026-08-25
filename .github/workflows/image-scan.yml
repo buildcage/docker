@@ -24,6 +24,8 @@ jobs:
             dockerfile: docker/transparent/Dockerfile
           - engine: explicit
             dockerfile: docker/explicit/Dockerfile
+          - engine: inspect
+            dockerfile: docker/inspect/Dockerfile
 
     steps:
       - name: Checkout

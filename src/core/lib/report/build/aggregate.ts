@@ -26,8 +26,20 @@ export function annotateKnownBlocked(
   const matchers = knownBlockedRules.map((rule) => new RegExp(convertRule(rule)));
   return blockedRows.map((row) => ({
     ...row,
-    expected: matchers.some((re) => re.test(`${row.host}:${row.port}`)),
+    expected: matchers.some((re) => re.test(targetOf(row))),
   }));
+}
+
+/**
+ * What a known_blocked_rules pattern is tested against, normally `host:port`.
+ *
+ * A row with no port is a refused name, connected to nothing. It is tested as
+ * port 0, which `host:*` matches (compiling to `host:\d+`) but `host:443` does
+ * not -- right, since no port was involved. Without this a refused name could
+ * never be marked expected.
+ */
+function targetOf(row: BlockedRow): string {
+  return `${row.host}:${row.port === "-" ? "0" : row.port}`;
 }
 
 /**

@@ -1,0 +1,64 @@
+#!/command/with-contenv sh
+set -e
+
+GATEWAY=${BUILDCAGE_GATEWAY:-172.20.0.1}
+
+echo "init-inspect-cfg: proxy_mode=${PROXY_MODE:-restrict}"
+
+# The CA is generated per container and never leaves it. A build trusts it only
+# for the life of its own step, because the runc wrapper removes it again
+# before the snapshot is committed.
+if [ ! -f /etc/haproxy/ca.pem ]; then
+    echo "init-inspect-cfg: generating the proxy CA"
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+      -keyout /tmp/ca.key -out /tmp/ca.crt \
+      -subj "/CN=buildcage proxy CA" \
+      -addext "basicConstraints=critical,CA:TRUE" 2>/dev/null
+    cat /tmp/ca.crt /tmp/ca.key > /etc/haproxy/ca.pem
+    cp /tmp/ca.crt /opt/buildcage/ca.pem
+
+    # The default certificate is the template every generated one is based on,
+    # so it has to be a server certificate signed by the CA. Pointing it at the
+    # CA itself makes the first handshake for each name fail.
+    openssl req -newkey rsa:2048 -nodes -keyout /tmp/d.key -out /tmp/d.csr \
+      -subj "/CN=buildcage-default" 2>/dev/null
+    openssl x509 -req -in /tmp/d.csr -CA /tmp/ca.crt -CAkey /tmp/ca.key \
+      -CAcreateserial -days 3650 -out /tmp/d.crt 2>/dev/null
+    cat /tmp/d.crt /tmp/d.key > /etc/haproxy/default.pem
+    rm -f /tmp/ca.key /tmp/d.key /tmp/d.csr
+fi
+chmod 600 /etc/haproxy/ca.pem /etc/haproxy/default.pem
+
+# Test-only, and only in an image built with BUILDCAGE_TEST_HOOKS: trust one
+# more CA when verifying an origin. A released image has no marker file, so
+# setting the variable there does nothing.
+if [ -f /opt/buildcage/.test-hooks ] && [ -n "$BUILDCAGE_EXTRA_CA_FILE" ]; then
+    echo "init-inspect-cfg: WARNING test build, trusting $BUILDCAGE_EXTRA_CA_FILE as a CA"
+    cat "$BUILDCAGE_EXTRA_CA_FILE" >> /etc/ssl/certs/ca-certificates.crt
+fi
+
+# audit has no allowlist to pass on; the generators decide what the mode means.
+if [ "$PROXY_MODE" = "audit" ]; then
+    HTTPS_RULES=""
+    HTTP_RULES=""
+    URL_RULES=""
+else
+    HTTPS_RULES="$ALLOWED_HTTPS_RULES"
+    HTTP_RULES="$ALLOWED_HTTP_RULES"
+    URL_RULES="$ALLOWED_URL_RULES"
+fi
+
+qjs --std -m /opt/buildcage/scripts/gen-configs.js \
+    /etc/haproxy/haproxy.cfg \
+    /etc/coredns/Corefile \
+    "$GATEWAY" \
+    "$GATEWAY" \
+    "${EXTERNAL_RESOLVER:-1.1.1.1 8.8.8.8}" \
+    "${PROXY_MODE:-restrict}" \
+    "$HTTPS_RULES" \
+    "$HTTP_RULES" \
+    "$ALLOWED_IP_RULES" \
+    "$ALLOW_TLS_RULES" \
+    "$URL_RULES"
+
+echo "init-inspect-cfg: configuration generated"

@@ -62,6 +62,10 @@ describe("resolveProxyEngine", () => {
     expect(resolveProxyEngine("explicit")).toBe("explicit");
   });
 
+  it("accepts inspect", () => {
+    expect(resolveProxyEngine("inspect")).toBe("inspect");
+  });
+
   it("throws SetupError for an invalid value", () => {
     expect(() => resolveProxyEngine("restrict")).toThrow();
   });

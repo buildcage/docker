@@ -1,0 +1,24 @@
+debug = true
+
+[dns]
+# The build's own resolver is CoreDNS on the bridge gateway; buildkitd resolves
+# through it too, so the proxy, the build and buildkitd never disagree about
+# what a name points at.
+nameservers = ["172.20.0.1"]
+# Without this, the host's own search domain leaks into every RUN step's
+# resolv.conf and doubles each lookup.
+options = ["ndots:0"]
+
+[worker.oci]
+enabled = true
+snapshotter = "auto"
+networkMode = "cni"
+cniConfigPath = "/etc/buildkit/cni.conflist"
+cniPoolSize = 16
+cniPortForward = true
+# Replaces buildkit-runc with buildcage's wrapper, which makes each step trust
+# the proxy's CA and puts the trust store back before the snapshot is committed.
+binary = "/opt/buildcage/bin/buildcage-runc"
+
+[[worker.oci.gcpolicy]]
+all = true

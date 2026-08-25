@@ -1,6 +1,8 @@
 import { renderHostTable } from "./host-table.ts";
 import { buildRestrictExample } from "./build-example.ts";
 import { renderCommunicationDetails } from "./communication-details.ts";
+import { renderInspectDetails } from "./inspect-details.ts";
+import { buildInspectRestrictExample } from "./inspect-example.ts";
 import type { ReportData } from "../types.ts";
 
 export interface RenderReportMarkdownOptions {
@@ -29,7 +31,12 @@ export function renderReportMarkdown(
     markdown += `### ${heading}\n\n` + renderHostTable(report.passed) + "\n";
   }
   if (isAudit) {
-    markdown += buildRestrictExample(report.passed, actionRepo, actionRef);
+    // inspect saw the method and the path of every request, so its example can
+    // be that much narrower than one built from hosts alone.
+    markdown +=
+      report.engine === "inspect"
+        ? buildInspectRestrictExample(report.timeline, actionRepo, actionRef)
+        : buildRestrictExample(report.passed, actionRepo, actionRef);
   }
   if (report.blocked.length > 0) {
     if (report.passed.length > 0) markdown += "\n";
@@ -46,6 +53,8 @@ export function renderReportMarkdown(
 
   if (report.engine === "explicit") {
     markdown += renderCommunicationDetails(report.proxyLogs.builds, report.proxyLogs.denied);
+  } else if (report.engine === "inspect") {
+    markdown += renderInspectDetails(report.timeline, report.startedAt);
   } else {
     // SNI-based sniffing only applies to the transparent engine — the
     // explicit engine terminates TLS itself, so this caveat doesn't apply

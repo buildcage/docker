@@ -6,6 +6,7 @@ import * as core from "@actions/core";
 import { SetupError } from "./lib/errors.ts";
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
 import { buildACLRules, parseRulesOrThrow } from "#core/lib/acl/rules.ts";
+import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
 import {
   verifyImageDigestOrThrow,
   type VerifyImageDigestOptions,
@@ -78,11 +79,25 @@ async function main(): Promise<void> {
     ipRulesInput: core.getInput("allowed_ip_rules"),
   });
   const knownBlockedRules = parseRulesOrThrow(core.getInput("known_blocked_rules"));
+  // Only inspect can enforce on a method or a path, so these are compiled here
+  // purely to fail on a typo at setup rather than inside the container.
+  const urlRulesInput = core.getInput("allowed_url_rules");
+  const tlsRules = parseRulesOrThrow(core.getInput("allow_tls_rules"));
+  const urlRules = buildUrlRules(urlRulesInput).map((r) => r.raw);
+  if (proxyEngine !== "inspect" && (urlRules.length > 0 || tlsRules.length > 0)) {
+    throw new SetupError(
+      "allowed_url_rules and allow_tls_rules need proxy_engine: inspect. " +
+        `The ${proxyEngine} engine cannot see a method or a path.`,
+      "INVALID_PROXY_ENGINE",
+    );
+  }
 
   console.log("::group::buildcage: Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
   logRules("HTTP", rules.httpRules);
   logRules("IP", rules.ipRules);
+  logRules("URL", urlRules);
+  logRules("TLS", tlsRules);
   logRules("Known blocked", knownBlockedRules);
   console.log("::endgroup::");
 
@@ -102,6 +117,9 @@ async function main(): Promise<void> {
     ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
+    // Newline separated because a URL rule contains a space, unlike the others.
+    ALLOWED_URL_RULES: urlRules.join("\n"),
+    ALLOW_TLS_RULES: tlsRules.join("\n"),
     KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
     BUILDCAGE_IMAGE_REF: imageRef,
   };
@@ -133,19 +151,21 @@ async function main(): Promise<void> {
 
 /**
  * Resolve and validate the proxy_engine input.
- * Only "transparent" (default) and "explicit" are accepted — each maps to a
- * separately published, separately tagged Docker image (see
- * provenance/image-tag.ts's imageTagFromRef).
+ * Each accepted value maps to a separately published, separately tagged
+ * Docker image (see provenance/image-tag.ts's imageTagFromRef).
  */
-export function resolveProxyEngine(input: string | undefined): "transparent" | "explicit" {
+const ENGINES = ["transparent", "explicit", "inspect"] as const;
+export type ProxyEngine = (typeof ENGINES)[number];
+
+export function resolveProxyEngine(input: string | undefined): ProxyEngine {
   const engine = input?.trim() || "transparent";
-  if (engine !== "transparent" && engine !== "explicit") {
+  if (!(ENGINES as readonly string[]).includes(engine)) {
     throw new SetupError(
-      `Invalid proxy_engine: ${JSON.stringify(input)}. Must be "transparent" or "explicit".`,
+      `Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`,
       "INVALID_PROXY_ENGINE",
     );
   }
-  return engine;
+  return engine as ProxyEngine;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

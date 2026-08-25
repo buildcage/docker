@@ -10,12 +10,14 @@ You can run Buildcage locally without GitHub Actions using Docker Compose and Ma
 
 ### Starting the Builder
 
-There's one `setup_buildkit_{engine}_{mode}` target per (`transparent`, `explicit`) x (`audit`, `restrict`)
-combination:
+There's one `setup_buildkit_{engine}_{mode}` target per (`transparent`, `inspect`, `explicit`) x
+(`audit`, `restrict`) combination:
 
 ```bash
 make setup_buildkit_transparent_audit
 make setup_buildkit_transparent_restrict
+make setup_buildkit_inspect_audit
+make setup_buildkit_inspect_restrict
 make setup_buildkit_explicit_audit
 make setup_buildkit_explicit_restrict
 ```
@@ -64,6 +66,13 @@ make test_integration_buildkit_transparent_audit
 make test_integration_buildkit_transparent_restrict
 make test_integration_buildkit_explicit_audit
 make test_integration_buildkit_explicit_restrict
+make test_integration_buildkit_inspect_audit
+make test_integration_buildkit_inspect_restrict
+# Debian/apt build, which starts with no CA store at all
+make test_integration_buildkit_inspect_debian_audit
+make test_integration_buildkit_inspect_debian_restrict
+# Learns rules from an inspect audit run, then enforces them unedited
+make test_integration_buildkit_inspect_roundtrip
 ```
 
 ## Formatting & Linting
@@ -97,6 +106,10 @@ the `prepare` script — that formats and lints your staged files (`vite.config.
 config) before each commit, auto-fixing and re-staging what it can.
 
 ## Explicit Engine Internals
+
+> [!WARNING]
+> `explicit` is **deprecated** — see [Explicit Proxy Engine](./explicit-engine.md). This section is
+> kept for existing maintenance only; it receives no further development.
 
 This section covers how `proxy_engine: explicit` is implemented internally. For the user-facing
 behavior — what's enforced, what's visible in the report — see
@@ -176,40 +189,6 @@ docker compose logs -f builder
 
 Fields: `[timestamp] buildcage [status] "domain:port" reason`
 
-**In `proxy_engine: explicit`**, there is no HAProxy log — instead, denied requests end up in
-buildkitd's own debug log at `/var/log/buildkitd/current` inside the container, logged by BuildKit's
-source-policy engine. Allowed/audited requests are _not_ read from this log file: BuildKit's own
-"proxy network requests:" build output only ends up there if buildkitd runs with
-`BUILDKIT_DEBUG_EXEC_OUTPUT=1`, which also mirrors every RUN step's own console output into the same
-log. That data is instead fetched via `buildctl debug logs --progress=rawjson`, described below,
-which needs no such flag. `report-action.js` — the runner-side report generator baked into each
-engine's image and `docker cp`'d out fresh by the `report` action on every run (see Directory
-Structure below) — reads whichever of transparent/explicit's two log files exists for the denied
-side and raw console output, so `docker compose logs builder` and the `report` action work
-unmodified against either engine.
-
-The `explicit` engine's job summary builds its "Allowed"/"Audited Hosts" table, and a collapsed
-**Communication details** section (a per-command breakdown `transparent` mode has no equivalent for),
-from the same source: `core/lib/log/vertex-log.ts` calls `buildctl debug histories` (to enumerate
-_every_ build recorded since the container started — a workflow may run several builds against the
-same buildcage container before calling the report action once, and each is independently tracked)
-and `buildctl debug logs --progress=rawjson <ref>` for each one, whose log entries are each tagged
-with the exact vertex (RUN step) that produced them — reliable even under concurrent execution, since
-BuildKit can run independent RUN steps concurrently. The host-aggregated table sums these
-vertex-tagged entries across every RUN step and build; the Communication details section lists them
-per-step instead, with each step's own start time and duration — steps with no communication at all
-are still listed, marked `(no communication)`. Independent build stages are grouped together (ordered
-by each stage's earliest start) rather than interleaved by raw timestamp, since that's easier to read
-when debugging; if more than one build is found, each gets its own `### Build N` heading so
-identically-numbered steps from different builds aren't mistaken for one another.
-
-Denied requests are listed separately, as a flat, timestamped `DENIED` list at the end — BuildKit's
-own source-policy denial log carries no vertex/span identifier at all, so there's no reliable way to
-attribute a denial to a specific RUN step; a human has to compare its timestamp against the per-step
-times above. That timestamp is also only whole-seconds precise (buildkitd's own logrus formatter
-doesn't record sub-second precision), unlike the millisecond-precision start/duration `buildctl`
-reports for the allowed side.
-
 ## Makefile Commands
 
 | Command                                               | Description                                                                    |
@@ -217,12 +196,16 @@ reports for the allowed side.
 | `make help`                                           | Show available commands                                                        |
 | `make setup_buildkit_transparent_audit`               | Start transparent engine in audit mode                                         |
 | `make setup_buildkit_transparent_restrict`            | Start transparent engine in restrict mode (default domains)                    |
+| `make setup_buildkit_inspect_audit`                   | Start inspect proxy engine in audit mode                                       |
+| `make setup_buildkit_inspect_restrict`                | Start inspect proxy engine in restrict mode                                    |
 | `make setup_buildkit_explicit_audit`                  | Start explicit proxy engine in audit mode                                      |
 | `make setup_buildkit_explicit_restrict`               | Start explicit proxy engine in restrict mode                                   |
 | `make report_buildkit`                                | Show the buildcage report for the currently running builder                    |
 | `make test_integration_buildkit`                      | Run all `test_integration_buildkit_*` tests                                    |
 | `make test_integration_buildkit_transparent_audit`    | Run transparent-engine audit mode tests (start → build → verify → clean up)    |
 | `make test_integration_buildkit_transparent_restrict` | Run transparent-engine restrict mode tests (start → build → verify → clean up) |
+| `make test_integration_buildkit_inspect_audit`        | Run inspect-engine audit mode tests (start → build → verify → clean up)        |
+| `make test_integration_buildkit_inspect_restrict`     | Run inspect-engine restrict mode tests (start → build → verify → clean up)     |
 | `make test_integration_buildkit_explicit_audit`       | Run explicit-engine audit mode tests (start → build → verify → clean up)       |
 | `make test_integration_buildkit_explicit_restrict`    | Run explicit-engine restrict mode tests (start → build → verify → clean up)    |
 | `make test_unit`                                      | Run unit tests                                                                 |
@@ -270,7 +253,8 @@ reports for the allowed side.
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
 │   └── dist/                 # Bundled output (rolldown → CommonJS)
-├── docs/                     # development.md, explicit-engine.md, security.md, self-hosting.md
+├── docs/                     # development.md, inspect-engine.md, explicit-engine.md, security.md,
+│                             # self-hosting.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
 │                             # PROXY_ENGINE; also defines the local-dev `proxy` service)
 └── Makefile                  # Operational commands

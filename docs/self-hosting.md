@@ -26,7 +26,7 @@ Since forking creates a public repository, use **GitHub's import** feature to cr
 
 ## 2. Build and Publish the Docker Image
 
-Your imported repository already contains the **Build and Push Docker Image** workflow (`.github/workflows/docker-publish.yml`). This workflow builds **two images per release** — one per `proxy_engine` (`transparent` and `explicit`), from `docker/transparent/Dockerfile` and `docker/explicit/Dockerfile` respectively — and publishes both to your repository's GitHub Container Registry (GHCR), each signed independently.
+Your imported repository already contains the **Build and Push Docker Image** workflow (`.github/workflows/docker-publish.yml`). This workflow builds **three images per release**, one per `proxy_engine` (`transparent`, `inspect` and `explicit`), from `docker/transparent/Dockerfile`, `docker/inspect/Dockerfile` and `docker/explicit/Dockerfile` respectively, and publishes all of them to your repository's GitHub Container Registry (GHCR), each signed independently.
 
 To trigger the build:
 
@@ -38,6 +38,7 @@ Once complete, the images will be available at:
 
 ```
 ghcr.io/<your_org>/buildcage:<version>
+ghcr.io/<your_org>/buildcage:<version>-inspect
 ghcr.io/<your_org>/buildcage:<version>-explicit
 ```
 

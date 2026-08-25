@@ -107,7 +107,7 @@ The rest of the workflow is unchanged. Complete workflows:
 | --------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `builder_name`        | No       | `buildcage`   | Name of the builder container                                                                                                                                                             |
 | `proxy_mode`          | No       | `restrict`    | Operation mode (`audit` / `restrict`, see [Operation modes](#operation-modes))                                                                                                            |
-| `proxy_engine`        | No       | `transparent` | Network enforcement engine (`transparent`, or the experimental `explicit` — see [Proxy engines](#proxy-engines))                                                                          |
+| `proxy_engine`        | No       | `transparent` | Network enforcement engine (`transparent`, the experimental `inspect`, or the deprecated `explicit` — see [Proxy engines](#proxy-engines))                                                |
 | `allowed_https_rules` | No       | empty         | HTTPS allow rules (wildcard or regex, port required)                                                                                                                                      |
 | `allowed_http_rules`  | No       | empty         | HTTP allow rules (wildcard or regex, port required)                                                                                                                                       |
 | `allowed_ip_rules`    | No       | empty         | IP address allow rules (wildcard or regex, port required)                                                                                                                                 |
@@ -213,12 +213,16 @@ with:
 intercepts at the network level and needs no proxy configuration or CA trust inside the build — it
 works with any tool whether or not the tool is proxy-aware, which is why it is the default.
 
-`proxy_engine: explicit` is an **experimental** alternative built on BuildKit's native
-`--proxy-network`: it terminates TLS through an injected CA, so the full URL path shows up in the
-report and in BuildKit's own build output and SLSA provenance. In exchange, it only sees tools that
-respect `HTTP_PROXY`/`HTTPS_PROXY`. See
-[Explicit Proxy Engine](./docs/explicit-engine.md) for the comparison, the CA-trust workaround, and
+`proxy_engine: inspect` is an **experimental** alternative that terminates TLS inside the cage and
+re-signs it with a CA the build is made to trust. That is what lets a rule name a method and a URL
+path rather than only a host, so fetching a package can be allowed while publishing one is refused.
+Every request is recorded with its full URL, refused ones included. In exchange, a tool that pins a
+certificate or ships its own trust store will not work under it. See
+[Inspect Proxy Engine](./docs/inspect-engine.md) for the rule syntax, the report it produces, and
 its limitations.
+
+`proxy_engine: explicit` is **deprecated**. It still works, so existing workflows keep running, but
+it receives no further development. See [Explicit Proxy Engine](./docs/explicit-engine.md).
 
 ## Report action
 
@@ -270,7 +274,8 @@ credentials, personal data, or source you do not publish.
 
 | Doc                                                | What's in it                                             |
 | -------------------------------------------------- | -------------------------------------------------------- |
-| [Explicit Proxy Engine](./docs/explicit-engine.md) | The experimental `proxy_engine: explicit` in full        |
+| [Inspect Proxy Engine](./docs/inspect-engine.md)   | The experimental `proxy_engine: inspect` in full         |
+| [Explicit Proxy Engine](./docs/explicit-engine.md) | The deprecated `proxy_engine: explicit` in full          |
 | [Security Details](./docs/security.md)             | Architecture, attack resistance, and known limitations   |
 | [Self-Hosting Guide](./docs/self-hosting.md)       | Hosting your own Buildcage image in a private repository |
 | [Development Guide](./docs/development.md)         | Local usage, testing, logs, and implementation internals |
