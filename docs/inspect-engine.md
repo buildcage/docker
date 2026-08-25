@@ -52,13 +52,15 @@ Two components, plus a wrapper around runc.
 1. **It tells a TLS handshake from a plain request by its first bytes** (`req.ssl_hello_type`), so
    one listener takes both and no port has to be declared as plaintext or TLS in advance. That is
    what lets an audit run record everything without being configured for it first.
-2. **It resolves the requested name itself and connects there** (`do-resolve` then `set-dst`), so
-   where a connection ends up is never the client's choice.
+2. **It resolves the requested name itself and connects there**, only once a request has already
+   passed the rules (`do-resolve` then `set-dst`), so where a connection ends up is never the
+   client's choice, and a name a request would be refused for never triggers a real DNS query.
 3. **It resolves `..` in the path before the rules see it** (`normalize-uri`), so a rule cannot be
    walked out of.
 
-**CoreDNS** is the resolver, because the resolver's scope has to match the rules exactly and it
-matches on a regex rather than a domain suffix; see [DNS](#dns).
+**CoreDNS** never resolves a name for real, allowed or not; it only decides what gets logged as
+allowed or denied, which still has to match the rules exactly, on a regex rather than a domain
+suffix; see [DNS](#dns).
 
 **`buildkit-runc`** is a wrapper standing in front of the real runc, selected with
 `[worker.oci] binary` in `buildkitd.toml`. For the subcommands that carry a bundle it makes the step
@@ -92,10 +94,18 @@ no default, so a rule always states what it permits and nobody has to guess what
 `abc*.amazonaws.com`, `/pkg-*/**`. The other engines require a label containing `*` to be exactly
 `*` or `**`, and for them that is only a restriction on phrasing. For `inspect` it would be a
 hazard, because an author who cannot write `abc*` has to widen the rule to `*.amazonaws.com`
-instead. On the domain side that widening is also load-bearing: the resolver's scope is generated
-from these patterns, so every extra name it admits is a name the build can leak through a DNS query
-alone. The grammar lives in its own compiler, so relaxing it cannot change what the other engines
-accept.
+instead — and CoreDNS's allow/deny decision is generated from the same host pattern the HTTP rule
+is, so a wider host is a wider grant on both sides at once, not just a less precise log line. The
+grammar lives in its own compiler, so relaxing it cannot change what the other engines accept.
+
+**A path or method never narrows what a wildcard host resolves.** DNS has no notion of a path: a
+rule of `GET https://*.example.com/release/**` still makes CoreDNS log any name under
+`*.example.com` as allowed, `SECRET-DATA.example.com` included, because the allow/deny decision is
+host-only by construction — the path is only enforced afterward, by HAProxy. This is not a gap: it
+is exactly why CoreDNS never resolves anything for real (see [DNS](#dns)) — the query itself cannot
+leak a path that was never sent, and the request that follows is refused all the same, before it
+ever reaches an origin. Writing the host half as narrowly as the name actually needs is what
+narrows the DNS-layer exposure; the path half narrows only the HTTP-layer one.
 
 `allowed_https_rules` and `allowed_http_rules` keep their existing `host:port` syntax and meaning,
 and are equivalent to a URL rule with any method and any path.
@@ -167,7 +177,7 @@ Everything below was verified against HAProxy rather than reasoned about.
 
 | What the build does                                    | What happens                                                                                                             |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Asks for a name outside the allowlist                  | Answered locally; the query is never forwarded                                                                           |
+| Asks for any name, on or off the allowlist             | Answered locally with the proxy's own address; the query is never forwarded, allowed or not                              |
 | Requests a host no rule covers                         | **403**, recorded with its full URL, origin never contacted                                                              |
 | Requests a path or method no rule covers               | **403**, recorded with its full URL                                                                                      |
 | Walks out of an allowed path with `..`                 | **403**: the path is normalised before the rules see it                                                                  |
@@ -195,10 +205,12 @@ Because one listener classifies by content, **audit needs no configuration to re
 including plaintext on a port nobody declared. That is the point of the engine: a build's traffic
 can be learned before any rule is written.
 
-**The resolver forwards everything under audit.** It has no allowlist to enforce, so answering a
-name locally would point it at the proxy, which would then resolve it to itself and reach no origin
-at all: the mode whose whole purpose is to observe real traffic would observe a build that could not
-run. Every query is still logged, so a name that was only looked up still appears in the report.
+**The resolver still answers every query locally, even under audit.** It never forwards, in either
+mode; forwarding would make it a live exfiltration channel for any name a build only looks up, never
+connecting to. Audit's own let-everything-through policy is HAProxy's job: with no ACL to deny it,
+`do-resolve` runs for every request and reaches the real address directly, so the mode whose whole
+purpose is to observe real traffic still does. Every query CoreDNS sees is still logged as allowed,
+so a name that was only looked up still appears in the report.
 
 **Audit is not a passive observer.** TLS is still terminated, so a tool that pins a certificate, or
 that consults a trust store the wrapper cannot reach, fails under `audit` exactly as under
@@ -240,41 +252,52 @@ traverse `FORWARD`. Both endpoints are inside the cage, so this is not an egress
 
 ## DNS
 
-**The resolver is a security boundary, not a convenience.** A build can exfiltrate through the query
-itself: `SECRET-DATA.amazonaws.com` reaches the attacker's authoritative nameserver the moment it is
-forwarded, no connection is ever made, and the proxy never sees it. Whatever the resolver is willing
-to look up is what a build can leak.
-
-That rules out matching by domain suffix. dnsmasq can only express `/amazonaws.com/`, which covers
-everything beneath it, so a rule of `abc*.amazonaws.com` would silently grant far more than it says.
-The resolver has to honour the rule exactly, which means it has to take a regex, so this engine uses
-**CoreDNS**. `transparent` is unaffected and keeps dnsmasq.
+**Every name is answered locally with the proxy's own address, allowed or not.** CoreDNS never
+forwards a query anywhere: a build can exfiltrate through the query itself
+(`SECRET-DATA.amazonaws.com` would reach an attacker's own authoritative nameserver the moment it is
+forwarded, no connection ever needed), and closing that off unconditionally is simpler, and safer,
+than closing it off only for the names a rule happens to deny. All the resolver decides is what gets
+logged as `allowed` or `denied`, which still has to match the rules exactly, on a regex rather than a
+domain suffix — dnsmasq can only express `/amazonaws.com/`, which covers everything beneath it, so a
+rule of `abc*.amazonaws.com` would be logged as allowed for names it never meant to grant. That
+precision is why this engine uses **CoreDNS**. `transparent` is unaffected and keeps dnsmasq.
 
 ```
-# Allowlisted names resolve for real.
+# Allowlisted names are logged as allowed, but answered exactly like a denied
+# one below: this resolver never gets a request any closer to a real address.
 . {
     view allowlist {
       expr name() matches '^(abc[^.]*\\.amazonaws\\.com|registry\\.npmjs\\.org)\\.$'
     }
-    forward . <upstream>
+    template IN A   { answer "{{ .Name }} 60 IN A <proxy-ip>" }
+    template IN AAAA { }
     log . "buildcage dns allowed name={name}"
 }
 
-# Everything else resolves to the proxy, answered locally.
+# Everything else: the same answer, logged as denied instead.
 . {
     template IN A   { answer "{{ .Name }} 60 IN A <proxy-ip>" }
-    template IN AAAA { rcode NXDOMAIN }
+    template IN AAAA { }
     log . "buildcage dns denied name={name}"
 }
 ```
 
-A name outside the allowlist is **answered locally with the proxy's own address**, not NXDOMAIN. The
-query never leaves either way, so the exfiltration channel stays shut, and the build then connects
-to the proxy, where the full URL including its query string is recorded before the request is
-refused. NXDOMAIN would close the channel just as well but leave only a bare name in the log.
+The query never leaves either way, so the exfiltration channel stays shut regardless of how wide a
+rule turns out to be — a name outside the allowlist is **answered locally with the proxy's own
+address**, not NXDOMAIN, so the build connects there and the full URL including its query string is
+recorded before the request is decided on. NXDOMAIN would close the channel just as well but leave
+only a bare name in the log.
 
-HAProxy resolves through this same resolver, so the proxy, the build and buildkitd never disagree
-about where a name points.
+**Real resolution happens exactly once, in HAProxy, strictly after a request has already passed the
+full rule check** (host, path and method) — never through CoreDNS, and never before that check. This
+ordering is a security invariant, not an optimisation: getting it backwards would make HAProxy's own
+`do-resolve` a live exfiltration channel of exactly the kind CoreDNS was built to avoid being, for
+any request the rules were always going to refuse. It is also why a wildcard host is never made safer
+by pairing it with a path or method restriction: DNS has no notion of a path, so `SECRET-DATA` under
+an allowed `*.example.com` is logged as allowed the moment it is looked up, before any path is even
+known — see [Rule syntax](#rule-syntax). The request that follows is still refused, and still never
+reaches an origin; only the log line, not the outcome, reflects the host-only nature of this
+resolver's decision.
 
 ## What the report reads
 
@@ -406,8 +429,8 @@ on the same host, publishing included; these rules permit the one endpoint npm a
 A generated rule must never permit more than was observed, so:
 
 - **Hosts are enumerated, never generalised.** `a.example.com` and `b.example.com` never become
-  `*.example.com`. The resolver's scope is generated from these same patterns, so a widened host is
-  a name the build can leak through a DNS query alone.
+  `*.example.com`. HAProxy's own rule check is generated from these same patterns, so a widened host
+  is a wider grant there too, not only a less precise one in the DNS log.
 - **Methods are listed exactly**, never `*`.
 - **A path keeps its longest unchanging prefix**, and only what varied becomes `**`. A single
   observed path stays exact.

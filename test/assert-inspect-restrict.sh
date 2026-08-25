@@ -33,12 +33,14 @@ assert_logged GET "https://allowed.example.com/public/pkg.tgz" 200
 assert_logged POST "https://api.example.com/v1/thing" 200
 assert_logged DELETE "https://sub.wildcard.example.com/anything/at/all" 200
 assert_logged GET "http://allowed.example.com/public/pkg.tgz" 200
+assert_logged GET "https://attacker.wildcard.example.com/public/pkg.tgz" 200
 echo ""
 
 echo "[refused] recorded with the method and the full URL, before any origin was contacted:"
 assert_logged GET "https://allowed.example.com/private/secret" 403
 assert_logged POST "https://allowed.example.com/public/pkg.tgz" 403
 assert_logged GET "https://absent.example.com/" 502
+assert_logged GET "https://attacker.wildcard.example.com/private/secret" 403
 echo ""
 
 echo "[traversal] the path is normalised before the rules see it:"
@@ -143,6 +145,20 @@ if grep -qiF "buildcage dns allowed name=allowed.example.com" <<< "$DNS_LOG"; th
   pass "an allowlisted name was forwarded"
 else
   fail "no allowlisted name was recorded as forwarded"
+fi
+echo ""
+
+echo "[DNS] a wildcard-host rule's path restriction does not narrow the DNS-layer decision:"
+# *.wildcard.example.com/public/** is the rule; attacker.wildcard.example.com
+# matches only the host half. CoreDNS cannot see the path, so it logs this
+# name as allowed regardless -- and answers it with the proxy's own address
+# either way (see coredns-config.ts), never resolving it for real. The path
+# restriction is enforced entirely by HAProxy, after this DNS decision, which
+# is why the request itself still gets refused (checked above via the 403).
+if grep -qiF "buildcage dns allowed name=attacker.wildcard.example.com" <<< "$DNS_LOG"; then
+  pass "the wildcard-matching name was logged as allowed, on the host alone"
+else
+  fail "the wildcard-matching name was not recorded as allowed"
 fi
 echo ""
 

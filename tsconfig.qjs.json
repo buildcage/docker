@@ -16,7 +16,8 @@
     "src/core/scripts/**/*.ts",
     "src/core/lib/acl/**/*.ts",
     "src/core/lib/test/**/*.ts",
-    "docker/explicit/scripts/**/*.ts"
+    "docker/explicit/scripts/**/*.ts",
+    "docker/inspect/scripts/**/*.ts"
   ],
   "exclude": ["**/*.property.test.ts", "**/*.node.ts"]
 }

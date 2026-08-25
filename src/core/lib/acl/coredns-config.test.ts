@@ -2,7 +2,7 @@ import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { escapeForCel, generateCorednsConfig } from "./coredns-config.ts";
 import { buildUrlRules } from "./url-rules.ts";
 
-const BASE = { proxyAddress: "172.20.0.1", upstreams: ["1.1.1.1"] };
+const BASE = { proxyAddress: "172.20.0.1" };
 
 function gen(options: Partial<Parameters<typeof generateCorednsConfig>[0]> = {}): string {
   return generateCorednsConfig({ ...BASE, ...options }).config;
@@ -14,14 +14,15 @@ function exprLine(config: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// The resolver's scope is a boundary: a forwarded query is an exfiltration
-// channel on its own, so it must match the rules and nothing more.
+// Nothing is ever forwarded, but a name is still logged as allowed or denied,
+// and that decision has to match the rules and nothing more, or a name
+// outside them would be misreported as allowed.
 // ---------------------------------------------------------------------------
 describe("allowlist scope", () => {
-  it("forwards only names matching the rule, not the whole parent domain", () => {
+  it("logs only names matching the rule as allowed, not the whole parent domain", () => {
     // `*` is one label, so the resolver must not degrade to a suffix match the
-    // way dnsmasq's `/amazonaws.com/` would: that would resolve, and therefore
-    // leak, every name beneath it.
+    // way dnsmasq's `/amazonaws.com/` would: that would misreport, as allowed,
+    // every name beneath it.
     const config = gen({ urlRules: buildUrlRules("GET https://*.amazonaws.com/x") });
     const pattern = exprLine(config).replace(/\\\\/g, "\\");
     const regex = new RegExp(pattern.slice(pattern.indexOf("'") + 1, pattern.lastIndexOf("'")));
@@ -116,8 +117,11 @@ describe("denied names", () => {
 
   it("answers AAAA with NODATA rather than an unusable address or NXDOMAIN", () => {
     // NXDOMAIN would tell musl's getaddrinfo the name doesn't exist at all,
-    // discarding the valid A answer above along with it.
-    const aaaaBlock = config.slice(config.indexOf("template IN AAAA"));
+    // discarding the valid A answer above along with it. Scoped to the deny
+    // block specifically: the allow block above it has its own AAAA template,
+    // identical in shape, and a plain indexOf would find that one first.
+    const denyBlock = config.slice(config.indexOf("# Everything else"));
+    const aaaaBlock = denyBlock.slice(denyBlock.indexOf("template IN AAAA"));
     expect(aaaaBlock.includes("answer")).toBe(false);
     expect(config.includes("rcode NXDOMAIN")).toBe(false);
   });
@@ -129,17 +133,59 @@ describe("denied names", () => {
 });
 
 // ---------------------------------------------------------------------------
-// audit has no allowlist to enforce, so it must not withhold any answer
+// Allowed names: answered exactly like a denied one. Real resolution is
+// HAProxy's job, strictly after a request has already passed its own rule
+// ACLs (host, path and method) -- see haproxy-config.ts. Nothing about a name
+// being on the allowlist may change what CoreDNS answers with, or a name a
+// build only resolves, never connecting to, would leak through the query
+// alone.
+// ---------------------------------------------------------------------------
+describe("allowed names", () => {
+  const config = gen({ httpsRules: ["a.example.com:443"] });
+  const allowBlock = config.slice(
+    config.indexOf("view allowlist"),
+    config.indexOf("# Everything else"),
+  );
+  const denyBlock = config.slice(config.indexOf("# Everything else"));
+  // Both blocks share proxyAnswerLines() in the generator, so this is a
+  // stronger, single check in place of separately re-asserting the same
+  // answer/AAAA shape "denied names" above already covers in full: it proves
+  // the two cannot drift apart, not just that each happens to look right.
+  const answerLines = (s: string) =>
+    s
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("template") || l.startsWith("answer"))
+      .join("\n");
+
+  it("answers exactly like a denied name", () => {
+    expect(answerLines(allowBlock)).toBe(answerLines(denyBlock));
+  });
+
+  it("never forwards, even for a name the rules allow", () => {
+    expect(allowBlock.includes("forward")).toBe(false);
+  });
+
+  it("logs it as allowed, the one place it differs from a denied name", () => {
+    expect(allowBlock.includes('"buildcage dns allowed name={name}"')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// audit has no allowlist to enforce, but it must not forward either: it
+// records without connecting to anything CoreDNS resolved for real.
 // ---------------------------------------------------------------------------
 describe("audit mode", () => {
   const config = gen({ ...BASE, httpsRules: ["a.example.com:443"], mode: "audit" });
 
-  it("forwards every name instead of answering it locally", () => {
-    // Answering locally would point a name at the proxy, which resolves it to
-    // itself and never reaches an origin: audit would observe a build that
-    // could not run.
-    expect(config.includes("template IN A")).toBe(false);
-    expect(config.includes("forward . 1.1.1.1")).toBe(true);
+  it("answers every name locally instead of forwarding it", () => {
+    // Forwarding would make this resolver a live exfiltration channel for any
+    // name a build only looks up, never connecting to -- audit mode's own
+    // allow-everything policy is HAProxy's job (do-resolve after the ACLs),
+    // not this resolver's.
+    expect(config.includes("template IN A")).toBe(true);
+    expect(config.includes('answer "{{ .Name }} 60 IN A 172.20.0.1"')).toBe(true);
+    expect(config.includes("forward")).toBe(false);
   });
 
   it("still records every name that was looked up", () => {

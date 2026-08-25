@@ -10,8 +10,8 @@
  * filename 'std'" even with --std passed).
  *
  * Covers only the APIs this codebase actually calls (verified by grep across
- * src/core/scripts, src/core/lib, docker/explicit/scripts) — not a general
- * QuickJS type definition. This file must only ever be visible to
+ * src/core/scripts, src/core/lib, docker/explicit/scripts, docker/inspect/scripts)
+ * — not a general QuickJS type definition. This file must only ever be visible to
  * tsconfig.qjs.json's program (see its "types": []) — @types/node also
  * declares a module named "os", with an incompatible shape, and the two
  * would collide if this file were ever included alongside it.
@@ -31,7 +31,7 @@ declare module "qjs:std" {
   export function open(
     path: string,
     mode: string,
-  ): { readAsString(): string; close(): void } | null;
+  ): { readAsString(): string; puts(s: string): void; close(): void } | null;
 
   export function getenv(name: string): string | undefined;
 }

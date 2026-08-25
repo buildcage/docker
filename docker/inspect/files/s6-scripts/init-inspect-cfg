@@ -52,7 +52,6 @@ qjs --std -m /opt/buildcage/scripts/gen-configs.js \
     /etc/haproxy/haproxy.cfg \
     /etc/coredns/Corefile \
     "$GATEWAY" \
-    "$GATEWAY" \
     "${EXTERNAL_RESOLVER:-1.1.1.1 8.8.8.8}" \
     "${PROXY_MODE:-restrict}" \
     "$HTTPS_RULES" \
