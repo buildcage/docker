@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        proxy_engine: [transparent, explicit]
+        proxy_engine: [transparent, explicit, inspect]
 
     name: "e2e: test (action, ${{ matrix.proxy_engine }})"
 
@@ -85,6 +85,24 @@ jobs:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
         run: vp run build
 
+      # allowed_url_rules is newline-separated, which a ${{ }} ternary can't
+      # carry reliably, so it's built here instead. *, not **, so each rule
+      # only matches its one path shape (package metadata / tarball) rather
+      # than falling back to matching any path under the host.
+      - name: Choose allowed_url_rules for this engine
+        id: url_rules
+        run: |
+          if [ "${{ matrix.proxy_engine }}" = "inspect" ]; then
+            {
+              echo "value<<EOF"
+              echo "GET|HEAD https://registry.npmjs.org/*"
+              echo "GET|HEAD https://registry.npmjs.org/*/-/*"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "value=" >> "$GITHUB_OUTPUT"
+          fi
+
       # Default builder_name is fine: each matrix entry runs on its own VM.
       - name: Start Buildcage builder via the real setup action
         uses: ./
@@ -93,7 +111,12 @@ jobs:
         with:
           proxy_mode: restrict
           proxy_engine: ${{ matrix.proxy_engine }}
-          allowed_https_rules: registry.npmjs.org:443
+          # inspect uses allowed_url_rules instead, so a host-level rule here
+          # wouldn't prove method/path enforcement actually happened.
+          allowed_https_rules: ${{ matrix.proxy_engine != 'inspect' && 'registry.npmjs.org:443' || '' }}
+          # inspect only; empty is a no-op for the other engines.
+          allow_tls_rules: ${{ matrix.proxy_engine == 'inspect' && 'github.com:443' || '' }}
+          allowed_url_rules: ${{ steps.url_rules.outputs.value }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -109,9 +132,35 @@ jobs:
           FROM node:24-alpine
           WORKDIR /app
           # NODE_USE_SYSTEM_CA=1: required for the explicit engine (always
-          # MITMs TLS); harmless for transparent.
-          RUN npm init -y && NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts express
-          RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
+          # MITMs TLS); harmless for transparent. inspect also terminates TLS
+          # but needs nothing here, because its runc wrapper points
+          # NODE_EXTRA_CA_CERTS at a store carrying the CA.
+          RUN npm init -y && NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --no-audit express
+          # Refused by the rules above, so the report shows the full URL, not
+          # just the host. Engines differ in exactly how the refusal shows up
+          # (a proxy-level HTTP error under inspect, a rejected connection
+          # under transparent/explicit), so only success here is unexpected.
+          RUN if wget -q -O /dev/null --timeout=5 https://example.com/some/path; then \
+                echo "FAILED: example.com should have been refused" && exit 1; \
+              fi
+          EOF
+
+      - name: Add a TLS passthrough request to the test Dockerfile
+        if: matrix.proxy_engine == 'inspect'
+        run: |
+          cat <<'EOF' >> /tmp/build-context/Dockerfile
+          RUN wget -q -O /dev/null https://github.com/
+          EOF
+
+      # allowed_url_rules only permits GET|HEAD, so a POST proves the rule is
+      # enforced by method, not just by host.
+      - name: Add a method-refused request to the test Dockerfile
+        if: matrix.proxy_engine == 'inspect'
+        run: |
+          cat <<'EOF' >> /tmp/build-context/Dockerfile
+          RUN if wget -q -O /dev/null --post-data='' https://registry.npmjs.org/some-path; then \
+                echo "FAILED: POST to registry.npmjs.org should have been refused" && exit 1; \
+              fi
           EOF
 
       - name: Build test image
@@ -130,6 +179,52 @@ jobs:
         uses: ./report
         with:
           fail_on_blocked: false
+          # Only inspect produces a traffic JSON; a short retention keeps this
+          # e2e run's own artifacts from lingering.
+          upload_traffic_artifact: ${{ matrix.proxy_engine == 'inspect' }}
+          traffic_artifact_retention_days: ${{ matrix.proxy_engine == 'inspect' && '1' || '' }}
+
+      # GITHUB_STEP_SUMMARY is a separate file per step -- a later step can't
+      # read what an earlier one wrote there -- so this instead downloads the
+      # artifact the report step above just uploaded. inspect only: it's the
+      # only engine upload_traffic_artifact does anything for. The Dockerfile's
+      # own wget step swallows its exit code (`|| true`), so this is what would
+      # actually catch example.com silently *not* being refused.
+      - name: Download the traffic artifact
+        if: matrix.proxy_engine == 'inspect'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: buildcage-traffic
+          path: /tmp/buildcage-traffic
+
+      - name: Verify the traffic artifact
+        if: matrix.proxy_engine == 'inspect'
+        run: |
+          node -e '
+            const rows = JSON.parse(require("node:fs").readFileSync("/tmp/buildcage-traffic/traffic.json", "utf8"));
+            const blocked = rows.some(
+              (r) => r.action === "block" && r.host === "example.com" && r.url === "https://example.com/some/path",
+            );
+            const passthrough = rows.some(
+              (r) => r.protocol === "tls" && r.host === "github.com" && r.bytes > 0,
+            );
+            const methodRefused = rows.some(
+              (r) => r.action === "block" && r.host === "registry.npmjs.org" && r.method === "POST",
+            );
+            if (!blocked) {
+              console.log("::error::example.com/some/path was not recorded as blocked in the traffic artifact");
+              process.exit(1);
+            }
+            if (!passthrough) {
+              console.log("::error::github.com was not recorded as an undecrypted TLS passthrough");
+              process.exit(1);
+            }
+            if (!methodRefused) {
+              console.log("::error::the POST to registry.npmjs.org was not recorded as blocked by allowed_url_rules");
+              process.exit(1);
+            }
+            console.log("example.com blocked, github.com passed through undecrypted, and the out-of-rule POST was refused");
+          '
 
       # No cleanup step: ephemeral runner, and setup's post-hook already
       # stops the container.
