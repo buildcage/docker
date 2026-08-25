@@ -25,7 +25,7 @@ build request.
 
 ```yaml
 - name: Start Buildcage
-  uses: buildcage/docker@b989e17f748acff676cbf94ce6bb73ed288ddd58 # v3.0.4
+  uses: buildcage/docker@95174404738f8bbfa3da91ac2446fc8fab523067 # v3.1.0
   with:
     proxy_engine: explicit
     proxy_mode: restrict
