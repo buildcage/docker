@@ -40,8 +40,13 @@ export async function buildInspectReportData(
   parameters: GenReportParameters,
 ): Promise<InspectReportData> {
   const isAudit = parameters.mode === "audit";
-  const { events: proxyEvents, startedAt } = await scanInspectLog(proxyLines, isAudit);
-  const dnsEvents = await scanInspectDnsLog(dnsLines, isAudit);
+  // Independent inputs (separate `docker exec` log streams, no data
+  // dependency between them) -- read concurrently rather than paying their
+  // combined latency serially.
+  const [{ events: proxyEvents, startedAt }, dnsEvents] = await Promise.all([
+    scanInspectLog(proxyLines, isAudit),
+    scanInspectDnsLog(dnsLines, isAudit),
+  ]);
 
   const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
 

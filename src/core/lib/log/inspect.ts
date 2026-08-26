@@ -55,9 +55,11 @@ function actionFor(refused: boolean, isAudit: boolean): TrafficAction {
   return isAudit ? "audit" : "allow";
 }
 
+const URL_AUTHORITY = /^https?:\/\/([^/?#]+)/;
+
 /** The host half of an absolute URL's authority, without its port. */
 function hostOf(url: string): string {
-  const match = /^https?:\/\/([^/?#]+)/.exec(url);
+  const match = URL_AUTHORITY.exec(url);
   if (!match) return url;
   const authority = match[1];
   const colon = authority.lastIndexOf(":");

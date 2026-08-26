@@ -369,6 +369,15 @@ describe("passthrough", () => {
     ).toBe(true);
   });
 
+  it("also scopes the early do-resolve trigger by port, not just the backend selection", () => {
+    // Regression: this used to set txn.tlsrule from the SNI ACL alone, so an
+    // SNI matching db.example.com on a *different* port than the rule names
+    // still triggered do-resolve/set-dst here -- overwriting the connection's
+    // destination before the inspected path ever saw it -- even though
+    // txn.pass (gated on sni+port together) correctly never fired for it.
+    expect(config.includes("set-var(txn.tlsrule) int(1) if tls0_sni tls0_port")).toBe(true);
+  });
+
   it("runs every content rule before the accept that ends their evaluation", () => {
     // `tcp-request content accept` stops the rest of the content rules, so a
     // set-var or do-resolve placed after it never runs at all -- silently, and

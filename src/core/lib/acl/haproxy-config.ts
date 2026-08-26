@@ -215,7 +215,15 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
       // grouping: `a or b !c` reads as `a or (b and !c)`.
       l.push("");
       for (const host of tlsHosts) {
-        l.push(`    tcp-request content set-var(txn.tlsrule) int(1) if ${host.id}_sni`);
+        // Ports scope a tls rule (see the ip0/tls0 comment above): without
+        // the port ACL here too, an SNI matching a port-scoped rule on a
+        // *different* port would still set txn.tlsrule, triggering an early
+        // do-resolve/set-dst that overwrites the connection's destination
+        // before the inspected path ever sees it, even though txn.pass
+        // (gated on sni+port together) correctly never fires for it.
+        l.push(
+          `    tcp-request content set-var(txn.tlsrule) int(1) if ${host.id}_sni${host.port ? ` ${host.id}_port` : ""}`,
+        );
       }
       l.push(
         "    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower " +
