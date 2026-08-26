@@ -7,9 +7,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^docker/transparent/Dockerfile$/"],
+      "managerFilePatterns": ["/^docker/transparent/Dockerfile$/", "/^docker/inspect/Dockerfile$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG CNI_VERSION=(?<currentValue>v[\\d.]+)"
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG CNI_VERSION=(?<currentValue>v[\\d.]+)",
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG COREDNS_VERSION=(?<currentValue>[\\d.]+)"
       ]
     },
     {
