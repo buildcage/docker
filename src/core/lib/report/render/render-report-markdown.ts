@@ -25,7 +25,10 @@ export function renderReportMarkdown(
   const showExpected = report.parameters.knownBlockedRules.length > 0;
   const heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts";
 
-  let markdown = `## ${title} (${report.parameters.mode} mode)\n\n`;
+  // restrict is what a real run normally uses day to day, so its heading
+  // stays bare; audit is the occasional, deliberately-different mode and
+  // says so, the same way the heading below calls out "Audited" vs "Allowed".
+  let markdown = `## ${title}${isAudit ? " (audit mode)" : ""}\n\n`;
 
   if (report.passed.length > 0) {
     markdown += `### ${heading}\n\n` + renderHostTable(report.passed) + "\n";
