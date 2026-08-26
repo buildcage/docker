@@ -11,7 +11,7 @@ import { createDocker } from "#core/lib/docker/client.ts";
 import { buildReportParameters } from "#core/lib/report/parameters.ts";
 import { buildInspectReportData } from "#core/lib/report/build/inspect.ts";
 import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
-import { renderInspectDetails } from "#core/lib/report/render/inspect-details.ts";
+import { renderInspectDetailsBody } from "#core/lib/report/render/inspect-details.ts";
 import { emitBlockedOutcome } from "#core/lib/report/outcome/emit.ts";
 import { writeTrafficFile, buildTrafficRecords } from "#core/lib/report/outcome/traffic-output.ts";
 import { errorMessage } from "#core/lib/errors.ts";
@@ -36,8 +36,8 @@ async function main(): Promise<void> {
   );
 
   for (const line of wrapLogGroup(
-    "HTTP Proxy communication logs",
-    renderInspectDetails(report.timeline, report.startedAt),
+    "Communication details",
+    renderInspectDetailsBody(report.timeline, report.startedAt),
   )) {
     console.log(line);
   }

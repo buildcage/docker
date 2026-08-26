@@ -19,12 +19,27 @@ export function renderCommunicationDetails(
   builds: VertexAllowedEntry[][] | null | undefined,
   deniedTimeline: DeniedEntry[] | null | undefined,
 ): string {
+  const body = renderCommunicationDetailsBody(builds, deniedTimeline);
+  if (!body) return "";
+  return `\n<details>\n<summary>💬 Communication details</summary>\n\n${body}</details>\n`;
+}
+
+/**
+ * The same content with no `<details>`/`<summary>` wrapper, or "" if
+ * there's nothing to show -- for a plain-text destination like the job log,
+ * where those HTML tags render as literal text rather than a collapsible
+ * section (unlike the Job Summary, which is what the wrapper is for).
+ */
+export function renderCommunicationDetailsBody(
+  builds: VertexAllowedEntry[][] | null | undefined,
+  deniedTimeline: DeniedEntry[] | null | undefined,
+): string {
   const nonEmptyBuilds = (builds || []).filter((b) => b && b.length > 0);
   const hasVertexLog = nonEmptyBuilds.length > 0;
   const hasDenied = deniedTimeline && deniedTimeline.length > 0;
   if (!hasVertexLog && !hasDenied) return "";
 
-  let md = "\n<details>\n<summary>💬 Communication details</summary>\n\n";
+  let md = "";
 
   if (hasVertexLog) {
     md += "* **✅ Allowed Urls**\n\n";
@@ -44,7 +59,6 @@ export function renderCommunicationDetails(
     md += "\n";
   }
 
-  md += "</details>\n";
   return md;
 }
 

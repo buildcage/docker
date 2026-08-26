@@ -1,5 +1,8 @@
 import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
-import { renderCommunicationDetails } from "./communication-details.ts";
+import {
+  renderCommunicationDetails,
+  renderCommunicationDetailsBody,
+} from "./communication-details.ts";
 
 function wrap(body: string) {
   return "\n<details>\n<summary>💬 Communication details</summary>\n\n" + body + "</details>\n";
@@ -192,6 +195,17 @@ describe("renderCommunicationDetails", () => {
       const md = renderCommunicationDetails([[vertex]], []);
       expect(md).toMatch(/\* RUN echo hello-world\.txt\n/);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// wrapLogGroup skips emitting a ::group:: at all when handed "" -- the
+// property that actually matters here, not the tag shape of a non-empty one.
+// ---------------------------------------------------------------------------
+describe("renderCommunicationDetailsBody", () => {
+  it("renders nothing at all when there is nothing to show", () => {
+    expect(renderCommunicationDetailsBody([], [])).toBe("");
+    expect(renderCommunicationDetailsBody(null, null)).toBe("");
   });
 });
 
