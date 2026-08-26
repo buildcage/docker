@@ -36,7 +36,7 @@ async function main(): Promise<void> {
   );
 
   for (const line of wrapLogGroup(
-    "HTTP Proxy communication logs",
+    "Communication details",
     renderInspectDetailsBody(report.timeline, report.startedAt),
   )) {
     console.log(line);
