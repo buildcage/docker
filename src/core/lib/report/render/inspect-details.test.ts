@@ -1,5 +1,5 @@
 import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
-import { renderInspectDetails } from "./inspect-details.ts";
+import { renderInspectDetails, renderInspectDetailsBody } from "./inspect-details.ts";
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
 const t = 1787471975;
@@ -166,6 +166,16 @@ describe("renderInspectDetails elapsed time", () => {
     );
     expect(md.includes("00:00.000:")).toBe(false);
     expect(md.includes("Z:")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// wrapLogGroup skips emitting a ::group:: at all when handed "" -- the
+// property that actually matters here, not the tag shape of a non-empty one.
+// ---------------------------------------------------------------------------
+describe("renderInspectDetailsBody", () => {
+  it("renders nothing at all when there was no traffic", () => {
+    expect(renderInspectDetailsBody([], t)).toBe("");
   });
 });
 

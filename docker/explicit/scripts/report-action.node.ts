@@ -12,7 +12,7 @@ import { createDocker, type Docker } from "#core/lib/docker/client.ts";
 import { buildReportParameters } from "#core/lib/report/parameters.ts";
 import { buildExplicitReportData } from "#core/lib/report/build/explicit.ts";
 import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
-import { renderCommunicationDetails } from "#core/lib/report/render/communication-details.ts";
+import { renderCommunicationDetailsBody } from "#core/lib/report/render/communication-details.ts";
 import { emitBlockedOutcome } from "#core/lib/report/outcome/emit.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 import { wrapLogGroup } from "#core/lib/actions/log.ts";
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
 
   for (const line of wrapLogGroup(
     "HTTP Proxy communication logs",
-    renderCommunicationDetails(report.proxyLogs.builds, report.proxyLogs.denied),
+    renderCommunicationDetailsBody(report.proxyLogs.builds, report.proxyLogs.denied),
   )) {
     console.log(line);
   }

@@ -19,17 +19,30 @@ export function renderInspectDetails(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
 ): string {
+  const body = renderInspectDetailsBody(timeline, startedAt);
+  if (!body) return "";
+  return `\n<details>\n<summary>💬 Communication details</summary>\n\n${body}</details>\n`;
+}
+
+/**
+ * The same content with no `<details>`/`<summary>` wrapper, or "" if
+ * there's nothing to show -- for a plain-text destination like the job log,
+ * where those HTML tags render as literal text rather than a collapsible
+ * section (unlike the Job Summary, which is what the wrapper is for).
+ */
+export function renderInspectDetailsBody(
+  timeline: TrafficEvent[],
+  startedAt: number | undefined,
+): string {
   const shown = timeline.filter(
     (e) => (e.protocol !== "dns" || e.action === "block") && !isRedundantBlockedDns(e, timeline),
   );
   if (shown.length === 0) return "";
 
-  let md = "\n<details>\n<summary>💬 Communication details</summary>\n\n";
   // A fenced block, so URLs need no markdown escaping and stay copy-pastable.
-  md += "```\n";
+  let md = "```\n";
   for (const event of shown) md += `${renderEvent(event, startedAt)}\n`;
   md += "```\n\n";
-  md += "</details>\n";
   return md;
 }
 
