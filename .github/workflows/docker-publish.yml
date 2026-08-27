@@ -32,8 +32,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - engine: transparent
-            dockerfile: docker/transparent/Dockerfile
+          - engine: universal
+            dockerfile: docker/universal/Dockerfile
           - engine: explicit
             dockerfile: docker/explicit/Dockerfile
           - engine: inspect
@@ -44,7 +44,7 @@ jobs:
       # completed leg wins) — each leg instead writes to a step-output key
       # suffixed with its own matrix.engine value, so both never collide
       # and both survive into this job's own (statically-declared) outputs.
-      bundle-content-transparent: ${{ steps.bundle.outputs['content-transparent'] }}
+      bundle-content-universal: ${{ steps.bundle.outputs['content-universal'] }}
       bundle-content-explicit: ${{ steps.bundle.outputs['content-explicit'] }}
       bundle-content-inspect: ${{ steps.bundle.outputs['content-inspect'] }}
 
@@ -90,14 +90,14 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/${{ github.repository }}
-          # transparent (default) publishes the plain version tag, matching the
+          # universal (default) publishes the plain version tag, matching the
           # pre-multi-engine tagging scheme; explicit publishes under a
           # -<engine> suffix.
           # "latest" is applied later, by update-major-tag.yml on release publish.
           flavor: latest=false
           tags: |
-            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}${{ matrix.engine != 'transparent' && format(',suffix=-{0}', matrix.engine) || '' }}
-            type=raw,value=sha-${{ steps.version.outputs.sha }}${{ matrix.engine != 'transparent' && format('-{0}', matrix.engine) || '' }},priority=100
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}${{ matrix.engine != 'universal' && format(',suffix=-{0}', matrix.engine) || '' }}
+            type=raw,value=sha-${{ steps.version.outputs.sha }}${{ matrix.engine != 'universal' && format('-{0}', matrix.engine) || '' }},priority=100
 
       - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -177,12 +177,12 @@ jobs:
         if: steps.check.outputs.upload == 'true'
         env:
           TAG: ${{ needs.build-and-push.outputs.tag }}
-          BUNDLE_TRANSPARENT: ${{ needs.build-and-push.outputs['bundle-content-transparent'] }}
+          BUNDLE_UNIVERSAL: ${{ needs.build-and-push.outputs['bundle-content-universal'] }}
           BUNDLE_EXPLICIT: ${{ needs.build-and-push.outputs['bundle-content-explicit'] }}
           BUNDLE_INSPECT: ${{ needs.build-and-push.outputs['bundle-content-inspect'] }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "$BUNDLE_TRANSPARENT" > buildcage-container.sigstore.json
+          echo "$BUNDLE_UNIVERSAL" > buildcage-container.sigstore.json
           echo "$BUNDLE_EXPLICIT" > buildcage-container-explicit.sigstore.json
           echo "$BUNDLE_INSPECT" > buildcage-container-inspect.sigstore.json
           gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" \

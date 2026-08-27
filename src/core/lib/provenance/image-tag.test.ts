@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { imageTagFromRef } from "./image-tag.ts";
 
 describe("imageTagFromRef", () => {
-  it("converts a 40-char hex SHA to sha-<sha> by default (no suffix for transparent)", () => {
+  it("converts a 40-char hex SHA to sha-<sha> by default (no suffix for universal)", () => {
     const sha = "a".repeat(40);
     expect(imageTagFromRef(sha)).toBe(`sha-${"a".repeat(40)}`);
   });
@@ -45,8 +45,13 @@ describe("imageTagFromRef", () => {
 
   it("gives every non-default engine its own suffix", () => {
     // A new engine is a separately published image, so forgetting the suffix
-    // would silently pull the transparent one.
+    // would silently pull the universal one.
     expect(imageTagFromRef("v2.1.0", "inspect")).toBe("2.1.0-inspect");
     expect(imageTagFromRef("v2.1.0", "proxy")).toBe("2.1.0-proxy");
+  });
+
+  it("treats 'universal' the same as omitting the engine — no suffix", () => {
+    expect(imageTagFromRef("v2.1.0", "universal")).toBe("2.1.0");
+    expect(imageTagFromRef("v2.1.0")).toBe(imageTagFromRef("v2.1.0", "universal"));
   });
 });

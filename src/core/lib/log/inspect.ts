@@ -41,7 +41,7 @@ function isRefusal(terminationState: string): boolean {
   return terminationState.startsWith("P") || terminationState.startsWith("S");
 }
 
-/** Refusal reason, matching the transparent engine's kebab-case vocabulary. */
+/** Refusal reason, matching the universal engine's kebab-case vocabulary. */
 function reasonForStatus(status: number): string {
   if (status === 502) return "dns-failed";
   if (status === 503) return "origin-unreachable";

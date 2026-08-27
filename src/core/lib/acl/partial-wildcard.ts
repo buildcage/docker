@@ -18,7 +18,7 @@
  *   `?`  — a single character, dots excluded
  *
  * Kept separate from wildcard-rules.ts rather than added to it, so widening
- * this grammar cannot change what the `transparent` and `explicit` engines
+ * this grammar cannot change what the `universal` and `explicit` engines
  * accept.
  */
 

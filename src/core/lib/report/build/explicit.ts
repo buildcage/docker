@@ -12,7 +12,7 @@ export async function buildExplicitReportData(
   const isAudit = parameters.mode === "audit";
   const { blocked: blockedRawRows, denied, hasNonDenialContent } = await scanBuildkitdLog(lines);
   const blocked = annotateKnownBlocked(blockedRawRows, parameters.knownBlockedRules);
-  // blockedCount equals blocked.length here, unlike the transparent engine:
+  // blockedCount equals blocked.length here, unlike the universal engine:
   // buildkitd's denial log has no finer per-event granularity to count.
   const blockedCount = blocked.length;
 

@@ -1,5 +1,5 @@
 services:
-  # inspect-engine overlay. Unlike the transparent overlay, the builder needs
+  # inspect-engine overlay. Unlike the universal overlay, the builder needs
   # to trust the fixtures' certificate: this engine verifies the origin when it
   # connects, so a self-signed test server would otherwise be a 503 in every
   # case and nothing downstream would be exercised.

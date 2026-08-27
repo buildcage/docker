@@ -6,7 +6,7 @@ set -e
 # container (via BUILDKIT_PROXY_EXTRA_CA_FILE, compose.test-explicit.yaml
 # only) trust the exact same file as an extra CA — BuildKit's internal MITM
 # proxy makes its own upstream TLS connection to this server and validates
-# its certificate normally (unlike transparent-mode tests, which use
+# its certificate normally (unlike universal-mode tests, which use
 # test/test-server/ instead: HAProxy never terminates TLS, so clients there
 # use --no-check-certificate and this server's cert is never validated), so
 # it must both match the requested hostname and be trusted.

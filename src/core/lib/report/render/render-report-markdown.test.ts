@@ -1,6 +1,6 @@
 import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts";
 import { renderReportMarkdown } from "./render-report-markdown.ts";
-import type { GenReportParameters, TransparentReportData, ExplicitReportData } from "../types.ts";
+import type { GenReportParameters, UniversalReportData, ExplicitReportData } from "../types.ts";
 
 function params(overrides: Partial<GenReportParameters> = {}): GenReportParameters {
   return {
@@ -28,9 +28,9 @@ function assertNotMatch(value: string, pattern: RegExp): void {
   expect(pattern.test(value)).toBe(false);
 }
 
-describe("renderReportMarkdown — transparent", () => {
-  const base: TransparentReportData = {
-    engine: "transparent",
+describe("renderReportMarkdown — universal", () => {
+  const base: UniversalReportData = {
+    engine: "universal",
     parameters: params(),
     passed: [],
     blocked: [],

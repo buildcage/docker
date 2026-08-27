@@ -1,6 +1,6 @@
 COMPOSE_FILE ?= compose.yaml
 # Lets test_integration_buildkit_explicit_* clean up the explicit-engine overlay.
-TEST_COMPOSE_FILE ?= compose.test-transparent.yaml
+TEST_COMPOSE_FILE ?= compose.test-universal.yaml
 
 # Fixed Compose project name, trusted by report/src/main.ts and
 # src/post.ts via their own BUILDCAGE_BUILD_TEST_HOOKS-gated overrides
@@ -46,7 +46,7 @@ QJS_TEST_DIRS := \
 .PHONY: test_unit_qjs
 test_unit_qjs: ## Run unit tests in Docker
 	@vp run build:qjs-test
-	@docker build -f docker/transparent/Dockerfile -t buildcage-qjs-test .
+	@docker build -f docker/universal/Dockerfile -t buildcage-qjs-test .
 	@docker run --rm --entrypoint qjs $(QJS_MOUNTS) buildcage-qjs-test \
 		--std -m /opt/buildcage/core/scripts/test/run-tests.qjs.js $(QJS_TEST_DIRS)
 
@@ -58,9 +58,9 @@ test_unit_qjs: ## Run unit tests in Docker
 # setup_buildkit_{engine}_{mode} — start the builder only
 # ---------------------------------------------------------------------------
 
-.PHONY: setup_buildkit_transparent_audit
-setup_buildkit_transparent_audit: ## Start transparent engine in audit mode
-	@echo "Starting buildcage (transparent engine) in AUDIT mode..."
+.PHONY: setup_buildkit_universal_audit
+setup_buildkit_universal_audit: ## Start universal engine in audit mode
+	@echo "Starting buildcage (universal engine) in AUDIT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=audit \
 	  docker compose -p $(COMPOSE_PROJECT_NAME) up -d --wait --build
@@ -70,9 +70,9 @@ setup_buildkit_transparent_audit: ## Start transparent engine in audit mode
 		--name buildcage \
 		--driver remote docker-container://buildcage
 
-.PHONY: setup_buildkit_transparent_restrict
-setup_buildkit_transparent_restrict: ## Start transparent engine in restrict mode
-	@echo "Starting buildcage (transparent engine) in RESTRICT mode..."
+.PHONY: setup_buildkit_universal_restrict
+setup_buildkit_universal_restrict: ## Start universal engine in restrict mode
+	@echo "Starting buildcage (universal engine) in RESTRICT mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
 	  PROXY_MODE=restrict \
 	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
@@ -154,52 +154,52 @@ report_buildkit: ## Show the buildcage report for the currently running builder
 # ---------------------------------------------------------------------------
 
 .PHONY: test_integration_buildkit
-test_integration_buildkit: test_integration_buildkit_transparent_audit test_integration_buildkit_transparent_restrict test_integration_buildkit_transparent_restrict_no_traffic test_integration_buildkit_explicit_audit test_integration_buildkit_explicit_restrict test_integration_buildkit_inspect_audit test_integration_buildkit_inspect_restrict test_integration_buildkit_inspect_debian_audit test_integration_buildkit_inspect_debian_restrict test_integration_buildkit_inspect_roundtrip ## Run all buildkit integration tests
+test_integration_buildkit: test_integration_buildkit_universal_audit test_integration_buildkit_universal_restrict test_integration_buildkit_universal_restrict_no_traffic test_integration_buildkit_explicit_audit test_integration_buildkit_explicit_restrict test_integration_buildkit_inspect_audit test_integration_buildkit_inspect_restrict test_integration_buildkit_inspect_debian_audit test_integration_buildkit_inspect_debian_restrict test_integration_buildkit_inspect_roundtrip ## Run all buildkit integration tests
 
-.PHONY: test_integration_buildkit_transparent_audit
-test_integration_buildkit_transparent_audit: ## Run transparent-engine audit mode tests
-	@echo "Running transparent-engine audit mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
-	  $(MAKE) setup_buildkit_transparent_audit
+.PHONY: test_integration_buildkit_universal_audit
+test_integration_buildkit_universal_audit: ## Run universal-engine audit mode tests
+	@echo "Running universal-engine audit mode tests..."
+	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
+	  $(MAKE) setup_buildkit_universal_audit
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.transparent-audit test/ \
+	  --progress=plain -f test/Dockerfile.universal-audit test/ \
 	  --load -t buildcage-test
 	@node report/src/main.ts
-	@./test/assert-transparent-audit.sh
+	@./test/assert-universal-audit.sh
 	@node src/post.ts
 	@./test/assert-post.sh
 	@$(MAKE) clean_buildkit
 
-.PHONY: test_integration_buildkit_transparent_restrict
-test_integration_buildkit_transparent_restrict: ## Run transparent-engine restrict mode tests
-	@echo "Running transparent-engine restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
-	  $(MAKE) setup_buildkit_transparent_restrict
+.PHONY: test_integration_buildkit_universal_restrict
+test_integration_buildkit_universal_restrict: ## Run universal-engine restrict mode tests
+	@echo "Running universal-engine restrict mode tests..."
+	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
+	  $(MAKE) setup_buildkit_universal_restrict
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.transparent-restrict test/ \
+	  --progress=plain -f test/Dockerfile.universal-restrict test/ \
 	  --load -t buildcage-test
 	@node report/src/main.ts || true
-	@./test/assert-transparent-restrict.sh
+	@./test/assert-universal-restrict.sh
 	@node src/post.ts
 	@./test/assert-post.sh
 	@$(MAKE) clean_buildkit
 
-.PHONY: test_integration_buildkit_transparent_restrict_no_traffic
-test_integration_buildkit_transparent_restrict_no_traffic: ## Run transparent-engine restrict mode tests with zero outbound traffic
-	@echo "Running transparent-engine restrict mode tests with zero outbound traffic..."
-	@COMPOSE_FILE=compose.yaml:compose.test-transparent.yaml \
-	  $(MAKE) setup_buildkit_transparent_restrict
+.PHONY: test_integration_buildkit_universal_restrict_no_traffic
+test_integration_buildkit_universal_restrict_no_traffic: ## Run universal-engine restrict mode tests with zero outbound traffic
+	@echo "Running universal-engine restrict mode tests with zero outbound traffic..."
+	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
+	  $(MAKE) setup_buildkit_universal_restrict
 	@docker buildx build --no-cache \
 	  --builder buildcage \
 	  --platform linux/arm64 \
-	  --progress=plain -f test/Dockerfile.transparent-restrict-no-traffic test/ \
+	  --progress=plain -f test/Dockerfile.universal-restrict-no-traffic test/ \
 	  --load -t buildcage-test
 	@INPUT_FAIL_ON_BLOCKED=true node report/src/main.ts
-	@./test/assert-transparent-restrict-no-traffic.sh
+	@./test/assert-universal-restrict-no-traffic.sh
 	@node src/post.ts
 	@./test/assert-post.sh
 	@$(MAKE) clean_buildkit
@@ -310,10 +310,10 @@ test_integration_buildkit_inspect_roundtrip: ## Learn rules from an inspect audi
 # example_{engine}_{mode} — smoke test against a plain Dockerfile
 # ---------------------------------------------------------------------------
 
-.PHONY: example_transparent_audit
-example_transparent_audit: ## Run audit mode example tests
+.PHONY: example_universal_audit
+example_universal_audit: ## Run audit mode example tests
 	@echo "Running audit mode example tests..."
-	@$(MAKE) setup_buildkit_transparent_audit
+	@$(MAKE) setup_buildkit_universal_audit
 	@mkdir -p /tmp/build-context
 	@printf '%s\n' \
 	  "FROM node:24-alpine" \
@@ -329,11 +329,11 @@ example_transparent_audit: ## Run audit mode example tests
 	@$(MAKE) clean_buildkit
 	rm -fr /tmp/build-context
 
-.PHONY: example_transparent_restrict
-example_transparent_restrict: ## Run restrict mode example tests
+.PHONY: example_universal_restrict
+example_universal_restrict: ## Run restrict mode example tests
 	@echo "Running restrict mode example tests..."
 	@ALLOWED_HTTPS_RULES="registry.npmjs.org:443" \
-	  $(MAKE) setup_buildkit_transparent_restrict
+	  $(MAKE) setup_buildkit_universal_restrict
 	@mkdir -p /tmp/build-context
 	@printf '%s\n' \
 	  "FROM node:24-alpine" \

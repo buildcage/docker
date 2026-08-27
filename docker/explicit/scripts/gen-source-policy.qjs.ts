@@ -1,6 +1,6 @@
 /**
  * Generate a BuildKit source policy (protobuf-JSON) from the same rule inputs
- * used by transparent mode's HAProxy ACLs.
+ * used by universal mode's HAProxy ACLs.
  *
  * Usage: qjs --std -m gen-source-policy.js <proxy_mode> <https_rules> <http_rules> <ip_rules>
  */

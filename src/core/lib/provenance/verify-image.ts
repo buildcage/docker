@@ -45,7 +45,7 @@ export interface ResolvedImage {
 export async function verifyImageDigest({
   actionRef,
   actionRepo,
-  proxyEngine = "transparent",
+  proxyEngine = "universal",
 }: VerifyImageDigestOptions): Promise<string | null> {
   const repoPath = actionRepo.toLowerCase();
 

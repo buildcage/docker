@@ -37,7 +37,7 @@ jobs:
             test:
               - *docker
               - *workflow
-              - 'compose.test-transparent.yaml'
+              - 'compose.test-universal.yaml'
               - 'compose.test-explicit.yaml'
               - 'compose.test-inspect.yaml'
               - 'test/**'
@@ -58,20 +58,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - mode: transparent-audit
+          - mode: universal-audit
             proxy_mode: audit
-            proxy_engine: transparent
-            compose_file: compose.yaml:compose.test-transparent.yaml
-            test_dockerfile: test/Dockerfile.transparent-audit
-            assert_script: ./test/assert-transparent-audit.sh
-            builder_name: buildcage-transparent-audit
-          - mode: transparent-restrict
+            proxy_engine: universal
+            compose_file: compose.yaml:compose.test-universal.yaml
+            test_dockerfile: test/Dockerfile.universal-audit
+            assert_script: ./test/assert-universal-audit.sh
+            builder_name: buildcage-universal-audit
+          - mode: universal-restrict
             proxy_mode: restrict
-            proxy_engine: transparent
-            compose_file: compose.yaml:compose.test-transparent.yaml
-            test_dockerfile: test/Dockerfile.transparent-restrict
-            assert_script: ./test/assert-transparent-restrict.sh
-            builder_name: buildcage-transparent-restrict
+            proxy_engine: universal
+            compose_file: compose.yaml:compose.test-universal.yaml
+            test_dockerfile: test/Dockerfile.universal-restrict
+            assert_script: ./test/assert-universal-restrict.sh
+            builder_name: buildcage-universal-restrict
           - mode: explicit-audit
             proxy_mode: audit
             proxy_engine: explicit
@@ -181,7 +181,7 @@ jobs:
           tags: buildcage-test
 
       # Only the inspect engine's buildkit-runc wrapper injects a CA into
-      # each RUN step; transparent never does and explicit uses BuildKit's
+      # each RUN step; universal never does and explicit uses BuildKit's
       # own separate mechanism, so this only applies here.
       - name: Verify no CA residue in the built image
         if: contains(matrix.mode, 'inspect')
@@ -330,7 +330,7 @@ jobs:
         run: docker compose down -v --rmi all 2>/dev/null || true
 
   # Single, stably-named required status check for branch protection: the
-  # `test` job's own name varies per matrix entry (test (transparent-audit),
+  # `test` job's own name varies per matrix entry (test (universal-audit),
   # test (explicit-restrict), etc.), so branch protection can't target it
   # directly without listing every combination and having to update that list
   # whenever the matrix changes.

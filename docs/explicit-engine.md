@@ -5,14 +5,14 @@
 > no further development. If you chose it to see full URL paths in the report, use
 > [`inspect`](./inspect-engine.md) instead: it enforces on the method and the path as well, and it
 > sees every tool rather than only the ones that respect `HTTP_PROXY`/`HTTPS_PROXY`.
-> `transparent` remains the default and recommended engine.
+> `universal` remains the default and recommended engine.
 
 `proxy_engine` selects how Buildcage intercepts and enforces traffic. It is independent of
 `proxy_mode`: either engine works with either mode, and both use the same
 [rule syntax](../README.md#rule-syntax).
 
-- **`transparent`** (default): traffic is intercepted at the network level, with no proxy
-  configuration or CA trust needed inside the build
+- **`universal`** (default; `transparent` is accepted as an alias): traffic is intercepted at the
+  network level, with no proxy configuration or CA trust needed inside the build
 - **`explicit`**: BuildKit's native `--proxy-network` — injects `HTTP_PROXY`/`HTTPS_PROXY` and a CA
   certificate, then MITMs the traffic to inspect requests directly
 
@@ -38,7 +38,7 @@ Everything else in the workflow is unchanged — see the
 
 ## Comparison
 
-|                                                                    | `transparent` (default)                                                     | `explicit`                                                                                                                                                                                                                                 |
+|                                                                    | `universal` (default)                                                       | `explicit`                                                                                                                                                                                                                                 |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Isolation mechanism                                                | CNI network + DNS redirection                                               | BuildKit native `--proxy-network` — each `RUN` step gets its own network whose only reachable peer is BuildKit's proxy                                                                                                                     |
 | TLS handling                                                       | Not terminated — SNI (HTTPS) / Host header (HTTP) inspected only            | Terminated (MITM) via an injected CA — full host **and path** visible                                                                                                                                                                      |
@@ -50,7 +50,7 @@ Everything else in the workflow is unchanged — see the
 | BuildKit provenance / SLSA integration                             | Not integrated                                                              | Integrated into BuildKit's own build output and SLSA provenance                                                                                                                                                                            |
 | Best for                                                           | Default choice — works with any tool regardless of proxy-awareness          | Cooperative tools, when path-level visibility or provenance integration matters more than catching non-cooperative traffic                                                                                                                 |
 
-`transparent` enforces at the network layer whether or not a tool cooperates, so every connection
+`universal` enforces at the network layer whether or not a tool cooperates, so every connection
 attempt is observed and recorded — this is why it is the default. Use `explicit` when you need
 URL/path-level visibility in BuildKit's own build output and SLSA provenance, and your build's tools
 are known to respect `HTTP_PROXY`/`HTTPS_PROXY`.
@@ -66,7 +66,7 @@ The path is **visibility only**. `allowed_https_rules` / `allowed_http_rules` / 
 have no path component, so the allow/deny decision is still made on `host:port` alone: the rule
 `registry.npmjs.org:443` above permits every path on that host, and each one is logged individually
 rather than being matched against anything. Enforcement granularity is therefore identical to
-`transparent` — what changes is how much you can see afterwards.
+`universal` — what changes is how much you can see afterwards.
 
 ## CA trust for tools with their own CA store
 
@@ -92,7 +92,7 @@ RUN npm install
 RUN npm run build
 ```
 
-If a different tool fails the same way — a `RUN` step that works under `transparent` but fails with a
+If a different tool fails the same way — a `RUN` step that works under `universal` but fails with a
 TLS/certificate error under `explicit` — check that tool's documentation for an equivalent setting.
 
 ## Further reading

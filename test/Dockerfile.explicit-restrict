@@ -10,7 +10,7 @@ FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432
 RUN echo "=== DNS Configuration ===" && \
     cat /etc/resolv.conf
 
-# No --no-check-certificate here (unlike test/Dockerfile.transparent-restrict): BuildKit's
+# No --no-check-certificate here (unlike test/Dockerfile.universal-restrict): BuildKit's
 # native --proxy-network injects its own generated CA into this container's
 # trust store, so a cooperative HTTPS client validates normally against the
 # MITM leaf certificate.
@@ -82,16 +82,16 @@ RUN echo "=== [npm install - system CA trust, allowed registry] ===" && \
     (NODE_USE_SYSTEM_CA=1 npm ci --ignore-scripts --fetch-retries=0 >/dev/null 2>&1 && \
      echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
 
-# Note: unlike test/Dockerfile.transparent-restrict, this Dockerfile has no missing-sni /
+# Note: unlike test/Dockerfile.universal-restrict, this Dockerfile has no missing-sni /
 # missing-host-header / dns-failed probes. Those exercise buildcage's
-# transparent-mode network-layer interception, which does not exist in
+# universal-mode network-layer interception, which does not exist in
 # explicit mode: a raw TCP/TLS connection that bypasses HTTP_PROXY never
 # reaches BuildKit's internal proxy at all (it gets "network unreachable"
 # inside the exec's own captive netns) — a known, documented limitation
 # (see docs/security.md), not something to assert a specific log line for.
 
 # Network configuration check — the exec's own netns is a captive /30 with no
-# default route (BuildKit's --proxy-network model), unlike transparent mode's
+# default route (BuildKit's --proxy-network model), unlike universal mode's
 # CNI-bridged network. This is expected and not itself an assertion target.
 RUN echo "=== Network Configuration ===" && \
     ip route show && \

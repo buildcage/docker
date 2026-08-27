@@ -26,13 +26,13 @@ describe("deriveProjectName", () => {
 
 describe("resolveProjectName", () => {
   it("falls back to deriveProjectName(builderName) when there's no override", () => {
-    expect(resolveProjectName("buildcage-transparent-audit", undefined)).toBe(
-      deriveProjectName("buildcage-transparent-audit"),
+    expect(resolveProjectName("buildcage-universal-audit", undefined)).toBe(
+      deriveProjectName("buildcage-universal-audit"),
     );
   });
 
   it("prefers the override when given one", () => {
-    expect(resolveProjectName("buildcage-transparent-audit", "buildcage-project")).toBe(
+    expect(resolveProjectName("buildcage-universal-audit", "buildcage-project")).toBe(
       "buildcage-project",
     );
   });

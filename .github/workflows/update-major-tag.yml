@@ -68,9 +68,9 @@ jobs:
           LATEST_IN_MINOR=$(echo "$TAGS" | grep -E "^v${MINOR}\.[0-9]+$" | sort -V | tail -1)
           LATEST_OVERALL=$(echo "$TAGS" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
 
-          for ENGINE in transparent explicit inspect; do
+          for ENGINE in universal explicit inspect; do
             SUFFIX=""
-            if [ "$ENGINE" != "transparent" ]; then
+            if [ "$ENGINE" != "universal" ]; then
               SUFFIX="-${ENGINE}"
             fi
             if [ "$TAG" = "$LATEST_IN_MINOR" ]; then
@@ -79,7 +79,7 @@ jobs:
             if [ "$TAG" = "$LATEST_IN_MAJOR" ]; then
               docker buildx imagetools create --tag "${REPO}:${MAJOR#v}${SUFFIX}" "${REPO}:${VERSION}${SUFFIX}"
             fi
-            if [ "$ENGINE" = "transparent" ] && [ "$TAG" = "$LATEST_OVERALL" ]; then
+            if [ "$ENGINE" = "universal" ] && [ "$TAG" = "$LATEST_OVERALL" ]; then
               docker buildx imagetools create --tag "${REPO}:latest" "${REPO}:${VERSION}"
             fi
           done

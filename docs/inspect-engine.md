@@ -3,19 +3,19 @@
 > [!WARNING]
 > `inspect` is an **experimental** engine. It terminates TLS inside the cage, so a tool that pins a
 > certificate or ships its own trust store will not work under it. Read this page before relying on
-> it. `transparent` remains the default and recommended engine.
+> it. `universal` remains the default and recommended engine.
 
 `inspect` terminates TLS inside the cage and re-signs it with a CA the build is made to trust. That
 is what lets it enforce on the method, path and query of a request rather than only on its
 destination.
 
-|                     | `transparent` (default) | `inspect`                     |
-| ------------------- | ----------------------- | ----------------------------- |
-| Interception        | network level           | network level                 |
-| Visible to policy   | destination             | method, full URL, path, query |
-| CA trusted by build | not needed              | **required**                  |
+|                     | `universal` (default) | `inspect`                     |
+| ------------------- | --------------------- | ----------------------------- |
+| Interception        | network level         | network level                 |
+| Visible to policy   | destination           | method, full URL, path, query |
+| CA trusted by build | not needed            | **required**                  |
 
-Nothing about `transparent` changes when this engine is used, and it stays the default. The
+Nothing about `universal` changes when this engine is used, and it stays the default. The
 deprecated [`explicit`](./explicit-engine.md) engine is unaffected.
 
 ```yaml
@@ -37,7 +37,7 @@ requires terminating TLS.
 
 ## Scope
 
-Like `transparent`, this engine governs `RUN` step traffic: its iptables rule redirects only what
+Like `universal`, this engine governs `RUN` step traffic: its iptables rule redirects only what
 arrives on the CNI bridge (`-i buildkit0`, the `RUN` step side).
 
 `FROM` (`docker-image://`) is not governed — buildkitd's own egress is left alone, and the engine
@@ -214,7 +214,7 @@ so a name that was only looked up still appears in the report.
 
 **Audit is not a passive observer.** TLS is still terminated, so a tool that pins a certificate, or
 that consults a trust store the wrapper cannot reach, fails under `audit` exactly as under
-`restrict`. That differs from `transparent`, whose audit mode inspects nothing and breaks nothing.
+`restrict`. That differs from `universal`, whose audit mode inspects nothing and breaks nothing.
 
 ### The resolved address, not just the name
 
@@ -248,7 +248,7 @@ The boundary is the network layout, not the proxy configuration.
 
 Traffic between two concurrent `RUN` steps on the same bridge is switched at layer 2 and does not
 traverse `FORWARD`. Both endpoints are inside the cage, so this is not an egress path, and
-`transparent` has the same property.
+`universal` has the same property.
 
 ## DNS
 
@@ -260,7 +260,7 @@ than closing it off only for the names a rule happens to deny. All the resolver 
 logged as `allowed` or `denied`, which still has to match the rules exactly, on a regex rather than a
 domain suffix — dnsmasq can only express `/amazonaws.com/`, which covers everything beneath it, so a
 rule of `abc*.amazonaws.com` would be logged as allowed for names it never meant to grant. That
-precision is why this engine uses **CoreDNS**. `transparent` is unaffected and keeps dnsmasq.
+precision is why this engine uses **CoreDNS**. `universal` is unaffected and keeps dnsmasq.
 
 ```
 # Allowlisted names are logged as allowed, but answered exactly like a denied
