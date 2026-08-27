@@ -1,5 +1,5 @@
 /**
- * Generates and emits the transparent engine's outbound-traffic report.
+ * Generates and emits the universal engine's outbound-traffic report.
  * Baked into the image, fetched fresh via `docker cp` by the `report`
  * action on every run (never staged on the runner — see report/src/main.ts)
  * and run with `node report-action.js <container-id>`. Runs on the runner,
@@ -10,7 +10,7 @@
 import * as core from "@actions/core";
 import { createDocker } from "#core/lib/docker/client.ts";
 import { buildReportParameters } from "#core/lib/report/parameters.ts";
-import { buildTransparentReportData } from "#core/lib/report/build/transparent.ts";
+import { buildUniversalReportData } from "#core/lib/report/build/universal.ts";
 import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
 import { emitBlockedOutcome } from "#core/lib/report/outcome/emit.ts";
 import { errorMessage } from "#core/lib/errors.ts";
@@ -26,7 +26,7 @@ async function main(): Promise<void> {
 
   const docker = createDocker();
   const parameters = buildReportParameters(docker.readEnv(containerId));
-  const report = await buildTransparentReportData(
+  const report = await buildUniversalReportData(
     docker.readFileLines(containerId, LOG_FILE),
     parameters,
   );

@@ -455,7 +455,7 @@ function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 *   `?`  — a single character, dots excluded
 *
 * Kept separate from wildcard-rules.ts rather than added to it, so widening
-* this grammar cannot change what the `transparent` and `explicit` engines
+* this grammar cannot change what the `universal` and `explicit` engines
 * accept.
 */
 /** Characters that must be escaped to appear literally in a regex. */
@@ -7576,8 +7576,10 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 //#region src/core/lib/provenance/image-tag.ts
 /**
 * Convert an action ref into the base Docker image tag, then append the
-* proxy engine suffix for non-default engines. The `transparent` engine
-* (default) publishes the plain version tag (e.g. `2.1.0`), matching the
+* proxy engine suffix for non-default engines. The `universal` engine
+* (default; formerly named `transparent` — see resolveProxyEngine's
+* ENGINE_ALIASES, which normalizes that alias away before this ever runs)
+* publishes the plain version tag (e.g. `2.1.0`), matching the
 * pre-multi-engine tagging scheme; `explicit` (deprecated), `inspect` and
 * `proxy` (the buildkitd-less network-isolation proxy used by the run action)
 * each publish under their own suffix (e.g. `2.1.0-explicit`,
@@ -7585,10 +7587,10 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 * (same workflow, same git ref) — only the published Docker tag differs, so
 * this does not affect verify-policy.ts's buildVerifyOptions.
 */
-function imageTagFromRef(actionRef, proxyEngine = "transparent") {
+function imageTagFromRef(actionRef, proxyEngine = "universal") {
 	if (!actionRef) return "";
 	let base;
-	return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, proxyEngine !== "transparent" && proxyEngine !== "" ? `${base}-${proxyEngine}` : base;
+	return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, proxyEngine !== "universal" && proxyEngine !== "" ? `${base}-${proxyEngine}` : base;
 }
 //#endregion
 //#region src/core/lib/provenance/verify-policy.ts
@@ -7640,7 +7642,7 @@ const REGISTRY = "ghcr.io";
 * the error message.
 *
 */
-async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "transparent" }) {
+async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "universal" }) {
 	let repoPath = actionRepo.toLowerCase(), verifyOptions = buildVerifyOptions({
 		actionRef,
 		actionRepo
@@ -7851,12 +7853,14 @@ async function main() {
 * Docker image (see provenance/image-tag.ts's imageTagFromRef).
 */
 const ENGINES = [
-	"transparent",
+	"universal",
 	"explicit",
 	"inspect"
-];
+], ENGINE_ALIASES = { transparent: "universal" };
 function resolveProxyEngine(input) {
-	let engine = input?.trim() || "transparent";
+	let trimmed = input?.trim() || "universal", alias = ENGINE_ALIASES[trimmed];
+	alias && console.log("::notice::proxy_engine: transparent is now called universal; transparent still works, but consider updating to proxy_engine: universal.");
+	let engine = alias ?? trimmed;
 	if (!ENGINES.includes(engine)) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`, "INVALID_PROXY_ENGINE");
 	return engine;
 }

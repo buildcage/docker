@@ -3,14 +3,14 @@ services:
     container_name: ${BUILDER_NAME:-buildcage}
     build:
       context: .
-      dockerfile: docker/${PROXY_ENGINE:-transparent}/Dockerfile
+      dockerfile: docker/${PROXY_ENGINE:-universal}/Dockerfile
     # Instead of privileged: true, grant only the minimum privileges required
     # to run BuildKit and iptables. This avoids granting full device access
     # and unrestricted /sys write permissions that privileged mode includes.
     #
     # BuildKit OCI worker requires SYS_ADMIN for mount, namespaces, and cgroups.
     # NET_ADMIN is required for network namespace setup: iptables and CNI
-    # networking in transparent mode; the proxy-network isolation veth/netns
+    # networking in universal mode; the proxy-network isolation veth/netns
     # (unrelated to CNI) in explicit mode.
     # runc needs SYS_PTRACE to access /proc/PID/ns/mnt for mount namespace setup.
     cap_add:
@@ -38,5 +38,5 @@ services:
       - ALLOW_TLS_RULES=${ALLOW_TLS_RULES:-}
       - KNOWN_BLOCKED_RULES=${KNOWN_BLOCKED_RULES:-}
       - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-}
-      - PROXY_ENGINE=${PROXY_ENGINE:-transparent}
+      - PROXY_ENGINE=${PROXY_ENGINE:-universal}
     restart: unless-stopped

@@ -1,12 +1,12 @@
 /**
  * Build a BuildKit sourcepolicy.pb.Policy (protobuf-JSON shape) from the same
  * allowed_https_rules/allowed_http_rules/allowed_ip_rules syntax used by
- * transparent mode's HAProxy ACLs.
+ * universal mode's HAProxy ACLs.
  *
  * The DENY catch-all is scoped to ^https?:// only, so docker-image://,
  * git://, local://, and oci-layout:// sources (which never match any rule
  * here) fall through to BuildKit's default-allow-when-unmatched behavior —
- * FROM/git sources remain unfiltered by buildcage, matching transparent
+ * FROM/git sources remain unfiltered by buildcage, matching universal
  * mode's documented behavior that only RUN-step network is controlled.
  */
 import { convertRule, splitRuleTokens, wildcardToRegex } from "./wildcard-rules.ts";
@@ -110,7 +110,7 @@ function confineDotStarToDomain(s: string): string {
 }
 
 // User-supplied `~regex` rules match against "domain:port" as a whole, with
-// the same substring-search semantics as transparent mode's HAProxy ACLs (no
+// the same substring-search semantics as universal mode's HAProxy ACLs (no
 // implicit anchoring there either): an explicit leading `^`/trailing `$`
 // anchors that end same as in any regex, and omitting either lets that end
 // match anywhere within the domain — e.g. `~example` matches `example.com`.

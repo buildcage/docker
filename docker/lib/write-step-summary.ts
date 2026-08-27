@@ -8,7 +8,7 @@ import { truncateForStepSummary } from "#core/lib/report/render/truncate-communi
  * `artifactAvailable` only affects the wording of a truncation notice if the
  * report turns out to be too large for GitHub's own per-step limit — it does
  * not gate whether truncation happens. Callers with no artifact story
- * (transparent, explicit) can omit it.
+ * (universal, explicit) can omit it.
  */
 export async function writeStepSummary(markdown: string, artifactAvailable = false): Promise<void> {
   if (process.env.GITHUB_STEP_SUMMARY) {

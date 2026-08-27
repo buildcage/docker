@@ -1,8 +1,8 @@
 services:
   # Point builder's resolver to test-dns + configure test rules.
-  # Explicit-engine-specific overlay (see compose.test-transparent.yaml for
-  # transparent mode, which is unmodified): test-dns/test-server here use fixtures the
-  # explicit engine needs and transparent mode does not — a real upstream
+  # Explicit-engine-specific overlay (see compose.test-universal.yaml for
+  # universal mode, which is unmodified): test-dns/test-server here use fixtures the
+  # explicit engine needs and universal mode does not — a real upstream
   # resolver (buildkit-proxy points the container's own /etc/resolv.conf at
   # this server, so FROM pulls need real DNS too) and a self-signed
   # certificate the internal MITM proxy's own upstream TLS connection can

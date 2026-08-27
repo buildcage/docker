@@ -10,12 +10,12 @@ You can run Buildcage locally without GitHub Actions using Docker Compose and Ma
 
 ### Starting the Builder
 
-There's one `setup_buildkit_{engine}_{mode}` target per (`transparent`, `inspect`, `explicit`) x
+There's one `setup_buildkit_{engine}_{mode}` target per (`universal`, `inspect`, `explicit`) x
 (`audit`, `restrict`) combination:
 
 ```bash
-make setup_buildkit_transparent_audit
-make setup_buildkit_transparent_restrict
+make setup_buildkit_universal_audit
+make setup_buildkit_universal_restrict
 make setup_buildkit_inspect_audit
 make setup_buildkit_inspect_restrict
 make setup_buildkit_explicit_audit
@@ -25,20 +25,23 @@ make setup_buildkit_explicit_restrict
 **Start with custom domains** (restrict mode only):
 
 ```bash
-ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make setup_buildkit_transparent_restrict
+ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make setup_buildkit_universal_restrict
 ```
 
 The `explicit_*` targets use BuildKit's native `--proxy-network` instead of the CNI/DNS-redirect/HAProxy
 stack (see [Proxy engines](../README.md#proxy-engines)). `PROXY_ENGINE=explicit` selects
 `docker/explicit/Dockerfile` at build time (see `compose.yaml`'s
-`build.dockerfile: docker/${PROXY_ENGINE:-transparent}/Dockerfile`); the `transparent_*` targets build
-`docker/transparent/Dockerfile` exactly as before.
+`build.dockerfile: docker/${PROXY_ENGINE:-universal}/Dockerfile`); the `universal_*` targets build
+`docker/universal/Dockerfile` exactly as before. `transparent` remains a working alias for the real
+action's own `proxy_engine` **input** (see [Proxy engines](../README.md#proxy-engines)), resolved in
+TypeScript — it is not understood by `PROXY_ENGINE` here, which is a raw Compose build-context
+selector with no such alias layer.
 
 ### End-to-End Workflow
 
 ```bash
 # 1. Start Buildcage
-make setup_buildkit_transparent_audit
+make setup_buildkit_universal_audit
 
 # 2. Build
 docker buildx build --builder buildcage --progress=plain -f Dockerfile .
@@ -62,8 +65,8 @@ Each `setup_buildkit_{engine}_{mode}` target has a matching
 `test/Dockerfile.*` → verify → clean up):
 
 ```bash
-make test_integration_buildkit_transparent_audit
-make test_integration_buildkit_transparent_restrict
+make test_integration_buildkit_universal_audit
+make test_integration_buildkit_universal_restrict
 make test_integration_buildkit_explicit_audit
 make test_integration_buildkit_explicit_restrict
 make test_integration_buildkit_inspect_audit
@@ -122,7 +125,7 @@ behavior — what's enforced, what's visible in the report — see
 - At startup, the binary: writes `/etc/resolv.conf` from `EXTERNAL_RESOLVER` if that variable is
   set (otherwise the container's own resolv.conf, e.g. Docker's embedded DNS, is left untouched);
   runs a QuickJS script that compiles `allowed_https_rules` / `allowed_http_rules` /
-  `allowed_ip_rules` (the exact same syntax as `transparent` mode — see
+  `allowed_ip_rules` (the exact same syntax as `universal` mode — see
   [Rule syntax](../README.md#rule-syntax)) into a BuildKit
   [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md); starts `buildkitd`
   with `proxyNetwork = true` bound to an internal Unix socket; and starts its own gRPC listener on
@@ -191,25 +194,25 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 
 ## Makefile Commands
 
-| Command                                               | Description                                                                    |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `make help`                                           | Show available commands                                                        |
-| `make setup_buildkit_transparent_audit`               | Start transparent engine in audit mode                                         |
-| `make setup_buildkit_transparent_restrict`            | Start transparent engine in restrict mode (default domains)                    |
-| `make setup_buildkit_inspect_audit`                   | Start inspect proxy engine in audit mode                                       |
-| `make setup_buildkit_inspect_restrict`                | Start inspect proxy engine in restrict mode                                    |
-| `make setup_buildkit_explicit_audit`                  | Start explicit proxy engine in audit mode                                      |
-| `make setup_buildkit_explicit_restrict`               | Start explicit proxy engine in restrict mode                                   |
-| `make report_buildkit`                                | Show the buildcage report for the currently running builder                    |
-| `make test_integration_buildkit`                      | Run all `test_integration_buildkit_*` tests                                    |
-| `make test_integration_buildkit_transparent_audit`    | Run transparent-engine audit mode tests (start → build → verify → clean up)    |
-| `make test_integration_buildkit_transparent_restrict` | Run transparent-engine restrict mode tests (start → build → verify → clean up) |
-| `make test_integration_buildkit_inspect_audit`        | Run inspect-engine audit mode tests (start → build → verify → clean up)        |
-| `make test_integration_buildkit_inspect_restrict`     | Run inspect-engine restrict mode tests (start → build → verify → clean up)     |
-| `make test_integration_buildkit_explicit_audit`       | Run explicit-engine audit mode tests (start → build → verify → clean up)       |
-| `make test_integration_buildkit_explicit_restrict`    | Run explicit-engine restrict mode tests (start → build → verify → clean up)    |
-| `make test_unit`                                      | Run unit tests                                                                 |
-| `make clean_buildkit`                                 | Stop and remove the buildkit builder's containers/images and buildx builder    |
+| Command                                             | Description                                                                  |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `make help`                                         | Show available commands                                                      |
+| `make setup_buildkit_universal_audit`               | Start universal engine in audit mode                                         |
+| `make setup_buildkit_universal_restrict`            | Start universal engine in restrict mode (default domains)                    |
+| `make setup_buildkit_inspect_audit`                 | Start inspect proxy engine in audit mode                                     |
+| `make setup_buildkit_inspect_restrict`              | Start inspect proxy engine in restrict mode                                  |
+| `make setup_buildkit_explicit_audit`                | Start explicit proxy engine in audit mode                                    |
+| `make setup_buildkit_explicit_restrict`             | Start explicit proxy engine in restrict mode                                 |
+| `make report_buildkit`                              | Show the buildcage report for the currently running builder                  |
+| `make test_integration_buildkit`                    | Run all `test_integration_buildkit_*` tests                                  |
+| `make test_integration_buildkit_universal_audit`    | Run universal-engine audit mode tests (start → build → verify → clean up)    |
+| `make test_integration_buildkit_universal_restrict` | Run universal-engine restrict mode tests (start → build → verify → clean up) |
+| `make test_integration_buildkit_inspect_audit`      | Run inspect-engine audit mode tests (start → build → verify → clean up)      |
+| `make test_integration_buildkit_inspect_restrict`   | Run inspect-engine restrict mode tests (start → build → verify → clean up)   |
+| `make test_integration_buildkit_explicit_audit`     | Run explicit-engine audit mode tests (start → build → verify → clean up)     |
+| `make test_integration_buildkit_explicit_restrict`  | Run explicit-engine restrict mode tests (start → build → verify → clean up)  |
+| `make test_unit`                                    | Run unit tests                                                               |
+| `make clean_buildkit`                               | Stop and remove the buildkit builder's containers/images and buildx builder  |
 
 ## Directory Structure
 
@@ -237,7 +240,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │   ├── compose.action.yaml   # Runtime compose file the action itself uses (verified, digest-pinned
 │   │                         # image ref) — distinct from the top-level compose.yaml below
 │   ├── lib/                  # write-step-summary.ts, shared by both engines' report-action.node.ts
-│   ├── transparent/          # proxy_engine: transparent — Dockerfile + BuildKit/haproxy/dnsmasq/
+│   ├── universal/            # proxy_engine: universal — Dockerfile + BuildKit/haproxy/dnsmasq/
 │   │                         # s6-overlay config + scripts/report-action.node.ts (runs under Node
 │   │                         # on the runner, `docker cp`'d out by the report action)
 │   └── explicit/             # proxy_engine: explicit — Dockerfile + buildkit-proxy/ (Go module:
@@ -274,13 +277,13 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 
    ```bash
    make clean_buildkit
-   make setup_buildkit_transparent_audit
+   make setup_buildkit_universal_audit
    docker buildx build --builder buildcage --no-cache -f Dockerfile .
    docker compose logs builder
    ```
 
 3. **TLS/certificate errors under `proxy_engine: explicit`**: if a `RUN` step fails with a
-   certificate error there but works fine under `transparent` (or without Buildcage at all), the tool
+   certificate error there but works fine under `universal` (or without Buildcage at all), the tool
    likely bundles its own CA store instead of consulting the system one BuildKit already trusts — see
    [CA trust for tools with their own CA store](./explicit-engine.md#ca-trust-for-tools-with-their-own-ca-store)
    in the Reference doc.

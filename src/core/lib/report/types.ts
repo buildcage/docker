@@ -26,7 +26,7 @@ export interface ReportDataCommon {
   blocked: AnnotatedBlockedRow[];
 
   /** Raw blocked-event count — can differ from blocked.length for the
-   *  transparent engine (pre-aggregation log line count). */
+   *  universal engine (pre-aggregation log line count). */
   blockedCount: number;
 
   /** False iff the log looks structurally implausible for a real run (no
@@ -37,8 +37,8 @@ export interface ReportDataCommon {
   logLooksPlausible: boolean;
 }
 
-export interface TransparentReportData extends ReportDataCommon {
-  engine: "transparent";
+export interface UniversalReportData extends ReportDataCommon {
+  engine: "universal";
 }
 
 /** Discriminated union (keyed on `engine`) rather than an optional field,
@@ -71,7 +71,7 @@ export interface InspectReportData extends ReportDataCommon {
   startedAt: number | undefined;
 }
 
-export type ReportData = TransparentReportData | ExplicitReportData | InspectReportData;
+export type ReportData = UniversalReportData | ExplicitReportData | InspectReportData;
 
 export interface DeniedEntry {
   url: string;

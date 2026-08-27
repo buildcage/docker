@@ -2,12 +2,12 @@
 
 ## Scope
 
-I welcome reports about all three proxy engines (`transparent`, the experimental `inspect`, and the
+I welcome reports about all three proxy engines (`universal`, the experimental `inspect`, and the
 deprecated `explicit`):
 
-- **Proxy bypass (`transparent`)** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#known-limitations))
-- **Network isolation escape (`transparent`)** — bypassing CNI isolation or iptables rules to reach the internet directly
-- **DNS filtering bypass (`transparent`)** — bypassing the DNS redirect mechanism
+- **Proxy bypass (`universal`)** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#known-limitations))
+- **Network isolation escape (`universal`)** — bypassing CNI isolation or iptables rules to reach the internet directly
+- **DNS filtering bypass (`universal`)** — bypassing the DNS redirect mechanism
 - **Rule bypass (`inspect`)** — ways to reach a destination, method or path that the rules do not permit: a request that escapes its path rule, a forged `Host` or SNI that changes where the proxy connects, or a name resolved to somewhere the rules never named
 - **Source policy bypass (`explicit`, deprecated)** — ways to make network connections from `RUN` steps that evade the BuildKit source policy _compiled by buildcage_ from your allowlist (e.g., a flaw in how buildcage translates rules into policy, or in how it injects/merges that policy via the gRPC `Solve` intercept)
 - **GitHub Actions setup** — vulnerabilities in the `setup` or `report` actions (e.g., injection, credential leak)
@@ -28,7 +28,7 @@ The following are **out of scope** (please report to the respective projects ins
 ## Verifying Releases
 
 Buildcage ships one artifact: a Docker image at `ghcr.io/buildcage/docker`, tagged `vX.Y.Z` for the
-default `transparent` engine, and `vX.Y.Z-inspect` / `vX.Y.Z-explicit` for the other two engines.
+default `universal` engine, and `vX.Y.Z-inspect` / `vX.Y.Z-explicit` for the other two engines.
 Each release is signed
 keylessly with [cosign](https://github.com/sigstore/cosign) and carries a GitHub build-provenance
 attestation, both issued via GitHub Actions OIDC at release time — there is no long-lived signing key

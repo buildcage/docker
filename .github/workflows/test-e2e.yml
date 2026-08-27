@@ -59,7 +59,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        proxy_engine: [transparent, explicit, inspect]
+        include:
+          - proxy_engine: universal
+            build_engine: universal
+          - proxy_engine: explicit
+            build_engine: explicit
+          - proxy_engine: inspect
+            build_engine: inspect
+          # `transparent` is universal's old name, kept working permanently
+          # as an alias (see resolveProxyEngine's ENGINE_ALIASES). No image
+          # is published under that name any more, so build_engine still
+          # resolves to the real (universal) Dockerfile -- what this proves
+          # is that the real action's own proxy_engine input still accepts
+          # and correctly normalizes the alias, not that compose.yaml does.
+          - proxy_engine: transparent
+            build_engine: universal
 
     name: "e2e: test (action, ${{ matrix.proxy_engine }})"
 
@@ -73,7 +87,7 @@ jobs:
 
       - name: Build local buildcage image
         env:
-          PROXY_ENGINE: ${{ matrix.proxy_engine }}
+          PROXY_ENGINE: ${{ matrix.build_engine }}
         run: docker compose build builder
 
       - name: Resolve local image ref
@@ -132,14 +146,14 @@ jobs:
           FROM node:24-alpine
           WORKDIR /app
           # NODE_USE_SYSTEM_CA=1: required for the explicit engine (always
-          # MITMs TLS); harmless for transparent. inspect also terminates TLS
+          # MITMs TLS); harmless for universal. inspect also terminates TLS
           # but needs nothing here, because its runc wrapper points
           # NODE_EXTRA_CA_CERTS at a store carrying the CA.
           RUN npm init -y && NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --no-audit express
           # Refused by the rules above, so the report shows the full URL, not
           # just the host. Engines differ in exactly how the refusal shows up
           # (a proxy-level HTTP error under inspect, a rejected connection
-          # under transparent/explicit), so only success here is unexpected.
+          # under universal/explicit), so only success here is unexpected.
           RUN if wget -q -O /dev/null --timeout=5 https://example.com/some/path; then \
                 echo "FAILED: example.com should have been refused" && exit 1; \
               fi
@@ -231,7 +245,7 @@ jobs:
 
   # Single, stably-named required status check for branch protection: the
   # jobs above vary their own names by matrix entry (e2e: test (action,
-  # transparent), etc.), so branch protection can't target them directly
+  # universal), etc.), so branch protection can't target them directly
   # without listing every combination.
   e2e-tests-passed:
     name: E2E tests passed

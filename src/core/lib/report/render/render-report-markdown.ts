@@ -59,7 +59,7 @@ export function renderReportMarkdown(
   } else if (report.engine === "inspect") {
     markdown += renderInspectDetails(report.timeline, report.startedAt);
   } else {
-    // SNI-based sniffing only applies to the transparent engine — the
+    // SNI-based sniffing only applies to the universal engine — the
     // explicit engine terminates TLS itself, so this caveat doesn't apply
     // there (renderCommunicationDetails above covers explicit instead).
     markdown +=

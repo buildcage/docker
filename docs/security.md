@@ -8,11 +8,11 @@ report. For implementation internals (the supervisor binary, RPC plumbing, log p
 For a high-level overview, see [buildcage.github.io](https://buildcage.github.io/); for how to
 configure the action, see the [README](../README.md).
 
-## Transparent Proxy Engine (default)
+## Universal Proxy Engine (default)
 
 ### Architecture
 
-<img src="../assets/diagram-architecture-transparent.png" alt="Transparent proxy engine architecture" width="611" height="490">
+<img src="../assets/diagram-architecture-transparent.png" alt="Universal proxy engine architecture" width="611" height="490">
 
 All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). Only **TCP** is intercepted — non-TCP protocols never reach the proxy at all (see [Non-TCP Protocol Tunneling](#non-tcp-protocol-tunneling-icmp-udp-quic)). DNS queries resolve to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking; direct-IP connections take a third, uninspected path (see below).
 
@@ -184,9 +184,9 @@ replacement for any.
 > [!WARNING]
 > `inspect` is an **experimental** engine. It terminates TLS inside the cage, so a tool that pins a
 > certificate or ships its own trust store will not work under it.
-> `transparent` remains the default and recommended engine.
+> `universal` remains the default and recommended engine.
 
-`inspect` uses the same network layout as `transparent`: a CNI bridge per `RUN` step, all TCP
+`inspect` uses the same network layout as `universal`: a CNI bridge per `RUN` step, all TCP
 redirected to one listener, everything else dropped. What differs is what the proxy can see. It
 terminates TLS with a CA injected into the step for the life of that step only, so a rule can name a
 method and a URL path, and every request is recorded with its full URL whether it was allowed or
@@ -215,12 +215,12 @@ For the rule syntax, the full behaviour table, the report format and the limitat
 
 > [!WARNING]
 > `explicit` is **deprecated**. It still works and existing workflows keep running, but it receives
-> no further development, and it has structural limitations not present in the `transparent` engine:
+> no further development, and it has structural limitations not present in the `universal` engine:
 > see [Coverage and Visibility](#coverage-and-visibility) below. For request-level enforcement, use
-> [`inspect`](#inspect-proxy-engine) instead. `transparent` remains the default and recommended
+> [`inspect`](#inspect-proxy-engine) instead. `universal` remains the default and recommended
 > engine.
 
-For how to enable it, how it compares with `transparent`, and the CA-trust workaround, see
+For how to enable it, how it compares with `universal`, and the CA-trust workaround, see
 [Explicit Proxy Engine](./explicit-engine.md). This section covers the architecture and threat
 model.
 
@@ -230,19 +230,19 @@ model.
 
 `proxy_engine: explicit` uses BuildKit's native `--proxy-network` (available since moby/buildkit
 v0.31.0) instead of the CNI/DNS-redirect/HAProxy stack described in
-[Transparent Proxy Engine](#transparent-proxy-engine-default). Each `RUN` step is isolated into its
+[Universal Proxy Engine](#universal-proxy-engine-default). Each `RUN` step is isolated into its
 own private point-to-point network namespace whose only reachable peer is buildkitd's built-in MITM
 proxy. `HTTP_PROXY`/`HTTPS_PROXY` and a generated CA certificate are injected into the step
 automatically — no Dockerfile changes needed for tools that already respect these standard variables.
 The proxy decrypts the traffic and checks the host against a BuildKit
 [source policy](https://github.com/moby/buildkit/blob/master/docs/proxy.md) compiled from your
 allowlist — the exact same `allowed_https_rules` / `allowed_http_rules` / `allowed_ip_rules` syntax as
-`transparent` mode (see [Rule syntax](../README.md#rule-syntax)). Enforcement is domain (and port) granularity, same
-as `transparent` — the generated policy always allows any path once the host matches, since the rule
+`universal` mode (see [Rule syntax](../README.md#rule-syntax)). Enforcement is domain (and port) granularity, same
+as `universal` — the generated policy always allows any path once the host matches, since the rule
 syntax has no path component. The decrypted path is still visible, so it shows up in the report and
 BuildKit's own build output even though it isn't used to allow or deny the request. `allowed_ip_rules`
 entries are compiled into the same kind of policy rule as domain rules (matched as an `https`/`http`
-identifier) — unlike `transparent` mode, there's no raw, uninspected TCP passthrough for IP-based
+identifier) — unlike `universal` mode, there's no raw, uninspected TCP passthrough for IP-based
 rules here.
 
 If the build client already sets its own **static** source policy (e.g. via
@@ -263,7 +263,7 @@ For how the supervisor binary, gRPC interception, and policy compilation work in
 | `ADD <url>`                                    | Not tracked by the report — the URL is developer-specified in the Dockerfile, already an intentional, reviewable part of the build | Aborts the entire build immediately at LLB load time; logged the same way as a denied `RUN`  |
 | `FROM` / git contexts                          | Unaffected — buildcage's policy only ever matches `http(s)://` sources                                                             | Unaffected                                                                                   |
 
-The key structural difference from `transparent` mode: there, a non-cooperative process still reaches
+The key structural difference from `universal` mode: there, a non-cooperative process still reaches
 the CNI bridge and is observed, blocked, and logged. Under `explicit`, each `RUN` step's network
 namespace has no broader network to route through, so that traffic leaves no trace at all — a
 structural trade-off for gaining full path-level visibility and BuildKit-native provenance

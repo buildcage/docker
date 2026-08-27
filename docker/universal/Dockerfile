@@ -33,7 +33,7 @@ COPY rolldown.scripts.config.js ./
 COPY src/core/ ./src/core/
 COPY docker/lib/ ./docker/lib/
 COPY docker/explicit/scripts/ ./docker/explicit/scripts/
-COPY docker/transparent/scripts/ ./docker/transparent/scripts/
+COPY docker/universal/scripts/ ./docker/universal/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:scripts
 
@@ -67,15 +67,15 @@ COPY --from=deps /opt/cni/bin /opt/cni/bin
 
 # BuildKit
 RUN mkdir -p /etc/buildkit
-COPY docker/transparent/files/buildkitd.toml /etc/buildkit/buildkitd.toml
-COPY docker/transparent/files/cni.conflist   /etc/buildkit/cni.conflist
+COPY docker/universal/files/buildkitd.toml /etc/buildkit/buildkitd.toml
+COPY docker/universal/files/cni.conflist   /etc/buildkit/cni.conflist
 
 # DNS
-COPY docker/transparent/files/dnsmasq.conf /etc/dnsmasq.conf
+COPY docker/universal/files/dnsmasq.conf /etc/dnsmasq.conf
 
 # HAProxy
 RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
-COPY docker/transparent/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
+COPY docker/universal/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
 # Tools (QuickJS scripts, rolldown-bundled by scripts-build above). Each is a self-contained
 # bundle — no separate /opt/buildcage/shared/ copy is needed, unlike before TypeScript
@@ -85,13 +85,13 @@ COPY --from=scripts-build /build/dist/qjs/src/core/scripts/convert-rule.js /opt/
 # report-action.js — the runner-side report generator `docker cp`'d out by
 # the report action itself (never staged elsewhere); see its own header
 # comment for details.
-COPY --from=scripts-build /build/dist/report-action/docker/transparent/scripts/report-action.js /opt/buildcage/scripts/report-action.js
+COPY --from=scripts-build /build/dist/report-action/docker/universal/scripts/report-action.js /opt/buildcage/scripts/report-action.js
 
 # License
-COPY docker/transparent/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
+COPY docker/universal/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 
 # s6 service definitions and init scripts
-COPY docker/transparent/files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
-COPY docker/transparent/files/s6-scripts/ /etc/s6-overlay/scripts/
+COPY docker/universal/files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+COPY docker/universal/files/s6-scripts/ /etc/s6-overlay/scripts/
 
 ENTRYPOINT ["/init"]

@@ -34,5 +34,5 @@ services:
       - ALLOW_TLS_RULES=${ALLOW_TLS_RULES:-}
       - KNOWN_BLOCKED_RULES=${KNOWN_BLOCKED_RULES:-}
       - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-}
-      - PROXY_ENGINE=${PROXY_ENGINE:-transparent}
+      - PROXY_ENGINE=${PROXY_ENGINE:-universal}
     restart: unless-stopped

@@ -20,8 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - engine: transparent
-            dockerfile: docker/transparent/Dockerfile
+          - engine: universal
+            dockerfile: docker/universal/Dockerfile
           - engine: explicit
             dockerfile: docker/explicit/Dockerfile
           - engine: inspect

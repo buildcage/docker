@@ -103,15 +103,15 @@ The rest of the workflow is unchanged. Complete workflows:
 
 ## Inputs
 
-| Input                 | Required | Default       | Description                                                                                                                                                                               |
-| --------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `builder_name`        | No       | `buildcage`   | Name of the builder container                                                                                                                                                             |
-| `proxy_mode`          | No       | `restrict`    | Operation mode (`audit` / `restrict`, see [Operation modes](#operation-modes))                                                                                                            |
-| `proxy_engine`        | No       | `transparent` | Network enforcement engine (`transparent`, the experimental `inspect`, or the deprecated `explicit` — see [Proxy engines](#proxy-engines))                                                |
-| `allowed_https_rules` | No       | empty         | HTTPS allow rules (wildcard or regex, port required)                                                                                                                                      |
-| `allowed_http_rules`  | No       | empty         | HTTP allow rules (wildcard or regex, port required)                                                                                                                                       |
-| `allowed_ip_rules`    | No       | empty         | IP address allow rules (wildcard or regex, port required)                                                                                                                                 |
-| `known_blocked_rules` | No       | empty         | Domains expected to be blocked intentionally; blocked connections matching these don't fail the `report` step even when `fail_on_blocked` is `true` — see [Report action](#report-action) |
+| Input                 | Required | Default     | Description                                                                                                                                                                               |
+| --------------------- | -------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `builder_name`        | No       | `buildcage` | Name of the builder container                                                                                                                                                             |
+| `proxy_mode`          | No       | `restrict`  | Operation mode (`audit` / `restrict`, see [Operation modes](#operation-modes))                                                                                                            |
+| `proxy_engine`        | No       | `universal` | Network enforcement engine (`universal`, the experimental `inspect`, or the deprecated `explicit` — see [Proxy engines](#proxy-engines))                                                  |
+| `allowed_https_rules` | No       | empty       | HTTPS allow rules (wildcard or regex, port required)                                                                                                                                      |
+| `allowed_http_rules`  | No       | empty       | HTTP allow rules (wildcard or regex, port required)                                                                                                                                       |
+| `allowed_ip_rules`    | No       | empty       | IP address allow rules (wildcard or regex, port required)                                                                                                                                 |
+| `known_blocked_rules` | No       | empty       | Domains expected to be blocked intentionally; blocked connections matching these don't fail the `report` step even when `fail_on_blocked` is `true` — see [Report action](#report-action) |
 
 ## Operation modes
 
@@ -209,9 +209,13 @@ with:
 
 ## Proxy engines
 
-`proxy_engine` selects how Buildcage intercepts and enforces traffic. The default, `transparent`,
+`proxy_engine` selects how Buildcage intercepts and enforces traffic. The default, `universal`,
 intercepts at the network level and needs no proxy configuration or CA trust inside the build — it
-works with any tool whether or not the tool is proxy-aware, which is why it is the default.
+works with any tool whether or not the tool is proxy-aware, which is why it is the default, and why
+it is the one to fall back to for a tool `inspect` can't be used with (certificate pinning, a JVM's
+own truststore, etc.). `proxy_engine: transparent` is accepted as an alias for `universal` —
+`transparent` was this engine's name before `inspect` existed, kept working permanently for
+backward compatibility.
 
 `proxy_engine: inspect` is an **experimental** alternative that terminates TLS inside the cage and
 re-signs it with a CA the build is made to trust. That is what lets a rule name a method and a URL

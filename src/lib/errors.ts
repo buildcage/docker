@@ -8,7 +8,7 @@ import { ActionError } from "#core/lib/errors.ts";
  *
  * Codes:
  *   DOCKER_UNAVAILABLE    – docker CLI missing from PATH or a docker command failed
- *   INVALID_PROXY_ENGINE  – proxy_engine input isn't "transparent" or "explicit"
+ *   INVALID_PROXY_ENGINE  – proxy_engine input isn't "universal", "explicit", or "inspect"
  */
 export type SetupErrorCode = "DOCKER_UNAVAILABLE" | "INVALID_PROXY_ENGINE";
 
