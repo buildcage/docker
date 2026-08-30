@@ -66,6 +66,6 @@ export function renderReportMarkdown(
       "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
   }
 
-  markdown += `\n*Reported by [Buildcage](https://github.com/${actionRepo})*\n`;
+  markdown += `\n*Reported by [${actionRepo}](https://github.com/${actionRepo})*\n`;
   return markdown;
 }
