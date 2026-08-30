@@ -281,7 +281,6 @@ credentials, personal data, or source you do not publish.
 | [Inspect Proxy Engine](./docs/inspect-engine.md)   | The experimental `proxy_engine: inspect` in full         |
 | [Explicit Proxy Engine](./docs/explicit-engine.md) | The deprecated `proxy_engine: explicit` in full          |
 | [Security Details](./docs/security.md)             | Architecture, attack resistance, and known limitations   |
-| [Self-Hosting Guide](./docs/self-hosting.md)       | Hosting your own Buildcage image in a private repository |
 | [Development Guide](./docs/development.md)         | Local usage, testing, logs, and implementation internals |
 
 ## Contributing

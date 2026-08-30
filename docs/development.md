@@ -256,8 +256,7 @@ Fields: `[timestamp] buildcage [status] "domain:port" reason`
 │   ├── action.yml            # Action entry (node24 → dist/main.cjs)
 │   ├── src/                  # Source (ESM): log analysis, per-command breakdown, Job Summary output
 │   └── dist/                 # Bundled output (rolldown → CommonJS)
-├── docs/                     # development.md, inspect-engine.md, explicit-engine.md, security.md,
-│                             # self-hosting.md
+├── docs/                     # development.md, inspect-engine.md, explicit-engine.md, security.md
 ├── compose.yaml              # Docker Compose config for local dev (dockerfile path selected by
 │                             # PROXY_ENGINE; also defines the local-dev `proxy` service)
 └── Makefile                  # Operational commands

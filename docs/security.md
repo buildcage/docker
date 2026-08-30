@@ -278,18 +278,8 @@ Buildcage is a security tool — so it's fair to ask: _how do you trust Buildcag
 
 The upstream image is verified at action startup via Sigstore: the signature cryptographically binds
 the published image to the exact source commit SHA, so a tampered or substituted image fails
-verification before use.
-
-**Using the upstream image**
-
-The simplest option. Pin to a commit SHA (or version tag) and update on your own schedule — the
-Sigstore verification ensures you are always running exactly what was built from that commit.
-
-**Self-hosting**
-
-If you need to keep build infrastructure private or control exactly which version is deployed, you can
-fork the repository and build the Docker image within your own infrastructure. See the
-[Self-Hosting Guide](./self-hosting.md).
+verification before use. Pin to a commit SHA (or version tag) and update on your own schedule —
+the verification ensures you are always running exactly what was built from that commit.
 
 ## Image Provenance Verification
 
@@ -328,8 +318,6 @@ Buildcage uses [Sigstore](https://sigstore.dev) keyless signing to cryptographic
        Must equal the digest fetched in step 1 (strict string equality)
        Mismatch → VERIFY_FAILED (closes the Referrers API attribution gap)
 ```
-
-For **private self-hosted packages**, place `docker/login-action` before the buildcage setup step in your workflow and ensure the job has `packages: read` permission. Credentials stored by Docker login are picked up automatically.
 
 All identity checks — OIDC issuer, signing workflow, ref/SHA claim, and manifest digest — are enforced inside the single `verifyBundle()` call, equivalent to cosign's `--certificate-oidc-issuer`, `--certificate-identity-regexp`, `--certificate-github-workflow-sha`, and the implicit digest-match that cosign performs against its target image argument.
 
