@@ -473,11 +473,38 @@ integrity-bound materials.
   CA, but a tool that consults none of them cannot be reached. The JVM (Java, Kotlin, Scala, ...) is
   one such case: it only reads its own `cacerts` file, which nothing here points anywhere, so it is
   not supported yet.
-- **The CA is added to a store that already exists, not created.** A `scratch`/distroless image, or a
-  bare `debian:bookworm-slim` before `ca-certificates` is installed, has nothing for the wrapper to
-  add to. This only matters to a tool that needs TLS trust for something: `apt`'s own archive is
-  plain HTTP by default and authenticates by GPG signature, not TLS, so installing `ca-certificates`
-  itself needs no CA at all — the gap only shows up once something _else_ in that layer needs one.
+- **The system store is added to if one already exists, never created.** A `scratch`/distroless
+  image, or a bare `debian:bookworm-slim` before `ca-certificates` is installed, has nothing for the
+  wrapper to add to. This only affects the variables that mean "the system store" — `REQUESTS_CA_BUNDLE`,
+  `PIP_CERT`, `SSL_CERT_FILE` — and anything reading the store directly (`apt`, `curl`) once
+  something in that layer needs TLS trust: `apt`'s own archive is plain HTTP by default and
+  authenticates by GPG signature, not TLS, so installing `ca-certificates` itself needs no CA at all.
+  `NODE_EXTRA_CA_CERTS` and `DENO_CERT` are unaffected either way: they add to a tool's own built-in
+  set through a dedicated file the wrapper writes itself, so Node and Deno trust the proxy's CA even
+  in a layer with no system store at all — the common case is a `node:*-slim` image, which never
+  carries one, and where the gap would otherwise go unnoticed because Node reads its own bundled
+  roots for everything else.
+- **Injection is computed once, from the rootfs as it stood when the step started.** The wrapper
+  does not revisit that decision as the step's script runs, so creating the system store and relying
+  on it in the same `RUN` step does not work. Installing `ca-certificates` and then running `pip` in
+  one step still fails, because `PIP_CERT` was already fixed as unset before `apt-get` had created
+  anything for it to point at:
+
+  ```dockerfile
+  RUN apt-get install -y ca-certificates && pip install requests   # still fails
+  ```
+
+  Splitting it into two steps fixes it — the store `apt-get` creates in the first is part of the
+  rootfs the second one starts from, so that step's own injection finds it:
+
+  ```dockerfile
+  RUN apt-get install -y ca-certificates
+  RUN pip install requests   # this step's injection sees the store the previous one created
+  ```
+
+  `NODE_EXTRA_CA_CERTS`/`DENO_CERT` are unaffected: their file is written unconditionally at the same
+  instant regardless of what the store looks like.
+
 - **`allow_tls_rules` and `allowed_ip_rules` are uninspected by design.** They are recorded, with a
   byte count, but nothing inside them is.
 - **Query strings are kept in the log**, so a credential passed as a query parameter is recorded

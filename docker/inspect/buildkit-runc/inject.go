@@ -122,14 +122,23 @@ func inject(bundle string, ca []byte) (func(), error) {
 		return nil, err
 	}
 
-	systemStore, systemStorePath, err := findSystemStore(s.rootfs)
-	if err != nil {
-		return nil, err
+	// A store's absence is not fatal: only the variables that need one
+	// (pointAtSystemStore below, and the store itself as an append target)
+	// are affected. NODE_EXTRA_CA_CERTS and DENO_CERT get their own file
+	// regardless, so a scratch/distroless image, or a base before
+	// ca-certificates is installed, still gets those working.
+	systemStore, systemStorePath, storeErr := findSystemStore(s.rootfs)
+	haveSystemStore := storeErr == nil
+	if !haveSystemStore {
+		logf("no system CA store in %s (%v); only variables independent of it will be set", s.rootfs, storeErr)
 	}
 
 	// Every bundle the CA has to go into, keyed by resolved path so a file
 	// named by two variables is only written once.
-	targets := map[string]bool{systemStore: true}
+	targets := map[string]bool{}
+	if haveSystemStore {
+		targets[systemStore] = true
+	}
 	newEnv := map[string]string{}
 	createdOwnCA := ""
 
@@ -150,6 +159,9 @@ func inject(bundle string, ca []byte) (func(), error) {
 		switch variable.whenUnset {
 		case leaveUnset:
 		case pointAtSystemStore:
+			if !haveSystemStore {
+				continue
+			}
 			newEnv[variable.name] = systemStorePath
 		case pointAtOwnCA:
 			resolved, err := resolveInRoot(s.rootfs, ownCAPath)
