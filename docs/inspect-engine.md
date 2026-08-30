@@ -486,12 +486,25 @@ integrity-bound materials.
   roots for everything else.
 - **Injection is computed once, from the rootfs as it stood when the step started.** The wrapper
   does not revisit that decision as the step's script runs, so creating the system store and relying
-  on it in the same `RUN` step does not work: `RUN apt-get install -y ca-certificates && pip install
-requests` still fails, because `PIP_CERT` was already fixed as unset before `apt-get` had created
-  anything for it to point at. Splitting it into two steps fixes it — the store `apt-get` creates in
-  the first is part of the rootfs the second one starts from, so that step's own injection finds it.
+  on it in the same `RUN` step does not work. Installing `ca-certificates` and then running `pip` in
+  one step still fails, because `PIP_CERT` was already fixed as unset before `apt-get` had created
+  anything for it to point at:
+
+  ```dockerfile
+  RUN apt-get install -y ca-certificates && pip install requests   # still fails
+  ```
+
+  Splitting it into two steps fixes it — the store `apt-get` creates in the first is part of the
+  rootfs the second one starts from, so that step's own injection finds it:
+
+  ```dockerfile
+  RUN apt-get install -y ca-certificates
+  RUN pip install requests   # this step's injection sees the store the previous one created
+  ```
+
   `NODE_EXTRA_CA_CERTS`/`DENO_CERT` are unaffected: their file is written unconditionally at the same
   instant regardless of what the store looks like.
+
 - **`allow_tls_rules` and `allowed_ip_rules` are uninspected by design.** They are recorded, with a
   byte count, but nothing inside them is.
 - **Query strings are kept in the log**, so a credential passed as a query parameter is recorded
