@@ -45,6 +45,8 @@ carries no BuildKit source policy at all.
 
 ## Architecture
 
+<img src="../assets/diagram-architecture-inspect.png" alt="Inspect proxy engine architecture" width="611" height="796">
+
 Two components, plus a wrapper around runc.
 
 **HAProxy** does the inspecting, and the engine depends on three of its behaviours:
