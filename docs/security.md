@@ -12,7 +12,7 @@ configure the action, see the [README](../README.md).
 
 ### Architecture
 
-<img src="../assets/diagram-architecture-transparent.png" alt="Universal proxy engine architecture" width="611" height="490">
+<img src="../assets/diagram-architecture-universal.png" alt="Universal proxy engine architecture" width="611" height="490">
 
 All containers spawned by BuildKit `RUN` steps are placed on an isolated network (CNI). Only **TCP** is intercepted — non-TCP protocols never reach the proxy at all (see [Non-TCP Protocol Tunneling](#non-tcp-protocol-tunneling-icmp-udp-quic)). DNS queries resolve to the proxy IP, and the proxy checks each request's SNI (HTTPS) or Host header (HTTP) against the allowlist before forwarding or blocking; direct-IP connections take a third, uninspected path (see below).
 

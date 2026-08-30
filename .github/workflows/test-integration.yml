@@ -180,7 +180,7 @@ jobs:
           load: true
           tags: buildcage-test
 
-      # Only the inspect engine's buildkit-runc wrapper injects a CA into
+      # Only the inspect engine's buildcage-runc wrapper injects a CA into
       # each RUN step; universal never does and explicit uses BuildKit's
       # own separate mechanism, so this only applies here.
       - name: Verify no CA residue in the built image
