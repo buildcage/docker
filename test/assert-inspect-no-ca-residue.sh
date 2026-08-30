@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Regression guard for the inspect engine's per-RUN-step CA injection
-# (docker/inspect/buildkit-runc/inject.go): the environment it sets lives only
+# (docker/inspect/buildcage-runc/inject.go): the environment it sets lives only
 # in the transient OCI process spec, never in what BuildKit commits, and the
 # CA file(s) it writes to the rootfs are undone by its own restore() before
 # the snapshot is taken. This checks both hold against the real image this
