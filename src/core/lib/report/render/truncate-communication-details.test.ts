@@ -2,7 +2,7 @@ import { describe, it, expect, reportResults } from "#core/lib/test/test-shim.ts
 import { truncateForStepSummary } from "./truncate-communication-details.ts";
 
 const HEADER = "## Outbound Traffic Report (restrict mode)\n\n### ✅ Allowed Hosts\n\n";
-const FOOTER = "\n*Reported by [Buildcage](https://github.com/buildcage/docker)*\n";
+const FOOTER = "\n*Reported by [buildcage/docker](https://github.com/buildcage/docker)*\n";
 
 function withCommunicationDetails(lines: string[]): string {
   return (

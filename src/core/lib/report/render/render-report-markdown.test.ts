@@ -70,7 +70,9 @@ describe("renderReportMarkdown — universal", () => {
 
   it("uses the real actionRepo in the footer, not a placeholder", () => {
     const md = renderReportMarkdown(base, "buildcage/docker", "v2");
-    expect(md).toMatch(/Reported by \[Buildcage\]\(https:\/\/github\.com\/buildcage\/docker\)/);
+    expect(md).toMatch(
+      /Reported by \[buildcage\/docker\]\(https:\/\/github\.com\/buildcage\/docker\)/,
+    );
     assertNotMatch(md, /GITHUB_ACTION_REPOSITORY/);
   });
 
