@@ -89,4 +89,4 @@ I'll credit reporters in the security advisory unless they prefer to remain anon
 
 ## Code Auditing
 
-All code is public and I welcome security reviews. If you prefer to audit or control the code yourself, feel free to fork and self-host.
+All code is public and I welcome security reviews. If you prefer to audit the code yourself, feel free to fork it.
