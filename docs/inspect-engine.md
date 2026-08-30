@@ -473,37 +473,47 @@ integrity-bound materials.
   CA, but a tool that consults none of them cannot be reached. The JVM (Java, Kotlin, Scala, ...) is
   one such case: it only reads its own `cacerts` file, which nothing here points anywhere, so it is
   not supported yet.
-- **The system store is added to if one already exists, never created.** A `scratch`/distroless
-  image, or a bare `debian:bookworm-slim` before `ca-certificates` is installed, has nothing for the
-  wrapper to add to. This only affects the variables that mean "the system store" — `REQUESTS_CA_BUNDLE`,
-  `PIP_CERT`, `SSL_CERT_FILE` — and anything reading the store directly (`apt`, `curl`) once
-  something in that layer needs TLS trust: `apt`'s own archive is plain HTTP by default and
-  authenticates by GPG signature, not TLS, so installing `ca-certificates` itself needs no CA at all.
-  `NODE_EXTRA_CA_CERTS` and `DENO_CERT` are unaffected either way: they add to a tool's own built-in
-  set through a dedicated file the wrapper writes itself, so Node and Deno trust the proxy's CA even
-  in a layer with no system store at all — the common case is a `node:*-slim` image, which never
-  carries one, and where the gap would otherwise go unnoticed because Node reads its own bundled
-  roots for everything else.
-- **Injection is computed once, from the rootfs as it stood when the step started.** The wrapper
-  does not revisit that decision as the step's script runs, so creating the system store and relying
-  on it in the same `RUN` step does not work. Installing `ca-certificates` and then running `pip` in
-  one step still fails, because `PIP_CERT` was already fixed as unset before `apt-get` had created
-  anything for it to point at:
+- **No system CA store: every variable still gets set, but only to a file that trusts the proxy's
+  own CA — not a passthrough connection's real certificate.** A `scratch`/distroless image, or a
+  bare `debian:bookworm-slim` before `ca-certificates` is installed, has no system store for the
+  wrapper to add the CA to. `NODE_EXTRA_CA_CERTS`, `DENO_CERT`, `CURL_CA_BUNDLE`,
+  `REQUESTS_CA_BUNDLE`, `PIP_CERT` and `SSL_CERT_FILE` are then all pointed at one dedicated file
+  holding only the proxy's own CA, no public roots. That is enough for ordinary HTTP(S) traffic,
+  because `inspect` re-signs all of it with this same CA — but it is **not** enough to verify a
+  connection that presents its real, unmodified certificate: an `allow_tls_rules` or
+  `allowed_ip_rules` passthrough destination, or any other TLS use these variables happen to govern
+  outside of HTTP(S) through the proxy. That request fails certificate verification, and there is no
+  way to tell from the failure alone that the cause is "no store," because the same fallback file is
+  used whether or not one ever shows up.
+
+  This decision is made once, from the rootfs as the step began, and is never revisited as the
+  step's script runs — so installing `ca-certificates` partway through the same step does not
+  change anything for a passthrough connection made later in that same script, even though the
+  store that `apt-get` just created genuinely does have the right roots by then:
 
   ```dockerfile
-  RUN apt-get install -y ca-certificates && pip install requests   # still fails
+  RUN apt-get install -y ca-certificates && \
+      curl https://internal.example.com/pkg.tgz -o pkg.tgz   # allow_tls_rules passthrough: still fails,
+                                                                # CURL_CA_BUNDLE was already fixed to the
+                                                                # proxy-CA-only fallback before apt-get ran
   ```
 
-  Splitting it into two steps fixes it — the store `apt-get` creates in the first is part of the
-  rootfs the second one starts from, so that step's own injection finds it:
+  The same one-shot timing is what makes ordinary (inspected) traffic in that same step work,
+  though — `CURL_CA_BUNDLE` there is the proxy-CA-only fallback from the moment the step starts, so
+  a plain `curl` of an `inspect`-terminated URL right after `apt-get install ca-certificates` in one
+  `RUN` succeeds without needing a second step.
+
+  What a passthrough connection in a store-less step actually needs is a real store already in
+  place _before_ the step starts, so its variables get pointed at that store (public roots plus the
+  proxy's CA) instead of the fallback:
 
   ```dockerfile
   RUN apt-get install -y ca-certificates
-  RUN pip install requests   # this step's injection sees the store the previous one created
+  RUN curl https://internal.example.com/pkg.tgz -o pkg.tgz   # this step starts with a store, so
+                                                                # CURL_CA_BUNDLE points at it (real
+                                                                # roots + the proxy's CA), not at the
+                                                                # proxy-CA-only fallback
   ```
-
-  `NODE_EXTRA_CA_CERTS`/`DENO_CERT` are unaffected: their file is written unconditionally at the same
-  instant regardless of what the store looks like.
 
 - **`allow_tls_rules` and `allowed_ip_rules` are uninspected by design.** They are recorded, with a
   byte count, but nothing inside them is.
@@ -520,16 +530,18 @@ integrity-bound materials.
 
 If a variable below is already set — by the base image or the Dockerfile — the wrapper appends the
 CA to whatever file it already points at, rather than redirecting the variable elsewhere. If it is
-unset, where the wrapper points it depends on what the variable means to the tool that reads it:
-some add to a built-in set, so pointing them at a file holding only this CA leaves everything else
-trusted; others replace the bundle outright, so those are pointed at the system store instead, which
-already carries the CA by then.
+unset and a system CA store exists, where the wrapper points it depends on what the variable means
+to the tool that reads it: some add to a built-in set, so pointing them at a file holding only this
+CA leaves everything else trusted; others replace the bundle outright, so those are pointed at the
+system store instead, which already carries the CA by then. If it is unset and **no** system store
+exists, all six fall back to the same dedicated proxy-CA-only file — see "No system CA store" above
+for exactly what that does and does not cover.
 
-| Variable              | Read by                                                                                                 | If unset                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `NODE_EXTRA_CA_CERTS` | Node.js                                                                                                 | Additive — pointed at a file holding only this CA |
-| `DENO_CERT`           | Deno                                                                                                    | Additive — pointed at a file holding only this CA |
-| `CURL_CA_BUNDLE`      | curl                                                                                                    | Left unset — curl already reads the system store  |
-| `REQUESTS_CA_BUNDLE`  | Python `requests`                                                                                       | Replaces the bundle — pointed at the system store |
-| `PIP_CERT`            | pip                                                                                                     | Replaces the bundle — pointed at the system store |
-| `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go's `crypto/x509` on Unix, Ruby, wget, Rust's `rustls-native-certs`) | Replaces the bundle — pointed at the system store |
+| Variable              | Read by                                                                                                 | If unset, with a store                            | If unset, with no store     |
+| --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------- |
+| `NODE_EXTRA_CA_CERTS` | Node.js                                                                                                 | Additive — pointed at a file holding only this CA | same, store or no store     |
+| `DENO_CERT`           | Deno                                                                                                    | Additive — pointed at a file holding only this CA | same, store or no store     |
+| `CURL_CA_BUNDLE`      | curl                                                                                                    | Left unset — curl already reads the system store  | proxy-CA-only fallback file |
+| `REQUESTS_CA_BUNDLE`  | Python `requests`                                                                                       | Replaces the bundle — pointed at the system store | proxy-CA-only fallback file |
+| `PIP_CERT`            | pip                                                                                                     | Replaces the bundle — pointed at the system store | proxy-CA-only fallback file |
+| `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go's `crypto/x509` on Unix, Ruby, wget, Rust's `rustls-native-certs`) | Replaces the bundle — pointed at the system store | proxy-CA-only fallback file |

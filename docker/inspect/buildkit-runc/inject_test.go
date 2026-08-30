@@ -181,13 +181,15 @@ func TestInjectRestoreUndoesTheFilesOnly(t *testing.T) {
 	}
 }
 
-
 // A base image with no CA store of its own (node:*-slim before
 // ca-certificates is installed, or a scratch/distroless image) must not lose
-// the additive variables just because the system store is missing: they get
-// their own file regardless of it. This is the corepack/node:22-slim failure
-// mode under the inspect engine.
-func TestInjectWithoutSystemStoreStillSetsAdditiveVariables(t *testing.T) {
+// every variable just because the system store is missing: all six fall back
+// to the same proxy-CA-only file. This is the corepack/node:22-slim and
+// apt-install-then-curl/debian:bookworm-slim failure modes under the inspect
+// engine — see docs/inspect-engine.md's "No system CA store" for what this
+// fallback does and does not cover (ordinary MITM'd traffic works; a
+// passthrough connection's real certificate still does not verify).
+func TestInjectWithoutSystemStoreFallsBackToOwnCAForEveryVariable(t *testing.T) {
 	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
 
 	restore, err := inject(bundle, []byte("BUILDCAGE-CA"))
@@ -197,9 +199,12 @@ func TestInjectWithoutSystemStoreStillSetsAdditiveVariables(t *testing.T) {
 
 	env := loadEnv(t, bundle)
 
-	for _, additive := range []string{"NODE_EXTRA_CA_CERTS", "DENO_CERT"} {
-		if env[additive] != ownCAPath {
-			t.Errorf("%s = %q, want %q", additive, env[additive], ownCAPath)
+	for _, variable := range []string{
+		"NODE_EXTRA_CA_CERTS", "DENO_CERT",
+		"CURL_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "PIP_CERT", "SSL_CERT_FILE",
+	} {
+		if env[variable] != ownCAPath {
+			t.Errorf("%s = %q, want %q", variable, env[variable], ownCAPath)
 		}
 	}
 	own, err := os.ReadFile(filepath.Join(rootfs, strings.TrimPrefix(ownCAPath, "/")))
@@ -208,13 +213,6 @@ func TestInjectWithoutSystemStoreStillSetsAdditiveVariables(t *testing.T) {
 	}
 	if string(own) != "BUILDCAGE-CA" {
 		t.Fatalf("own CA file = %q", own)
-	}
-
-	// Nowhere to point these: no system store exists for them to replace.
-	for _, replacing := range []string{"REQUESTS_CA_BUNDLE", "PIP_CERT", "SSL_CERT_FILE"} {
-		if _, set := env[replacing]; set {
-			t.Errorf("%s should be left unset; there is no system store to point it at", replacing)
-		}
 	}
 
 	restore()
