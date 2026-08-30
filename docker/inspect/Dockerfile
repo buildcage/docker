@@ -37,7 +37,7 @@ FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
-COPY docker/inspect/buildkit-runc/ ./
+COPY docker/inspect/buildcage-runc/ ./
 RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
     go build -trimpath -ldflags="-s -w" -o /out/buildcage-runc .
 
