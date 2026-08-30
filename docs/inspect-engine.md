@@ -473,11 +473,17 @@ integrity-bound materials.
   CA, but a tool that consults none of them cannot be reached. The JVM (Java, Kotlin, Scala, ...) is
   one such case: it only reads its own `cacerts` file, which nothing here points anywhere, so it is
   not supported yet.
-- **The CA is added to a store that already exists, not created.** A `scratch`/distroless image, or a
-  bare `debian:bookworm-slim` before `ca-certificates` is installed, has nothing for the wrapper to
-  add to. This only matters to a tool that needs TLS trust for something: `apt`'s own archive is
-  plain HTTP by default and authenticates by GPG signature, not TLS, so installing `ca-certificates`
-  itself needs no CA at all — the gap only shows up once something _else_ in that layer needs one.
+- **The system store is added to if one already exists, never created.** A `scratch`/distroless
+  image, or a bare `debian:bookworm-slim` before `ca-certificates` is installed, has nothing for the
+  wrapper to add to. This only affects the variables that mean "the system store" — `REQUESTS_CA_BUNDLE`,
+  `PIP_CERT`, `SSL_CERT_FILE` — and anything reading the store directly (`apt`, `curl`) once
+  something in that layer needs TLS trust: `apt`'s own archive is plain HTTP by default and
+  authenticates by GPG signature, not TLS, so installing `ca-certificates` itself needs no CA at all.
+  `NODE_EXTRA_CA_CERTS` and `DENO_CERT` are unaffected either way: they add to a tool's own built-in
+  set through a dedicated file the wrapper writes itself, so Node and Deno trust the proxy's CA even
+  in a layer with no system store at all — the common case is a `node:*-slim` image, which never
+  carries one, and where the gap would otherwise go unnoticed because Node reads its own bundled
+  roots for everything else.
 - **`allow_tls_rules` and `allowed_ip_rules` are uninspected by design.** They are recorded, with a
   byte count, but nothing inside them is.
 - **Query strings are kept in the log**, so a credential passed as a query parameter is recorded

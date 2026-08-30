@@ -43,6 +43,33 @@ func toAny(env []string) []any {
 	return out
 }
 
+// newBundleNoStore lays out a bundle with no CA store at all under
+// rootfs/etc/ssl/certs — the node:*-slim shape: no OS trust store, only
+// Node's own bundled roots, which findSystemStore cannot find.
+func newBundleNoStore(t *testing.T, env []string) (bundle, rootfs string) {
+	t.Helper()
+	bundle = t.TempDir()
+	rootfs = filepath.Join(bundle, "rootfs")
+	// /etc exists, as it does in any real base image (passwd, hostname, ...);
+	// only etc/ssl/certs and its siblings are absent, which is what actually
+	// makes findSystemStore fail.
+	if err := os.MkdirAll(filepath.Join(rootfs, "etc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := map[string]any{
+		"root":    map[string]any{"path": "rootfs"},
+		"process": map[string]any{"env": toAny(env)},
+	}
+	raw, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bundle, "config.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return bundle, rootfs
+}
+
 func loadEnv(t *testing.T, bundle string) map[string]string {
 	t.Helper()
 	s, err := loadSpec(bundle)
@@ -151,5 +178,47 @@ func TestInjectRestoreUndoesTheFilesOnly(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(rootfs, strings.TrimPrefix(ownCAPath, "/"))); !os.IsNotExist(err) {
 		t.Fatalf("own CA file still present: %v", err)
+	}
+}
+
+
+// A base image with no CA store of its own (node:*-slim before
+// ca-certificates is installed, or a scratch/distroless image) must not lose
+// the additive variables just because the system store is missing: they get
+// their own file regardless of it. This is the corepack/node:22-slim failure
+// mode under the inspect engine.
+func TestInjectWithoutSystemStoreStillSetsAdditiveVariables(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+
+	restore, err := inject(bundle, []byte("BUILDCAGE-CA"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env := loadEnv(t, bundle)
+
+	for _, additive := range []string{"NODE_EXTRA_CA_CERTS", "DENO_CERT"} {
+		if env[additive] != ownCAPath {
+			t.Errorf("%s = %q, want %q", additive, env[additive], ownCAPath)
+		}
+	}
+	own, err := os.ReadFile(filepath.Join(rootfs, strings.TrimPrefix(ownCAPath, "/")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(own) != "BUILDCAGE-CA" {
+		t.Fatalf("own CA file = %q", own)
+	}
+
+	// Nowhere to point these: no system store exists for them to replace.
+	for _, replacing := range []string{"REQUESTS_CA_BUNDLE", "PIP_CERT", "SSL_CERT_FILE"} {
+		if _, set := env[replacing]; set {
+			t.Errorf("%s should be left unset; there is no system store to point it at", replacing)
+		}
+	}
+
+	restore()
+	if _, err := os.Stat(filepath.Join(rootfs, strings.TrimPrefix(ownCAPath, "/"))); !os.IsNotExist(err) {
+		t.Fatalf("own CA file still present after restore: %v", err)
 	}
 }
