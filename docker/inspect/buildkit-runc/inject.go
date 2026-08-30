@@ -11,23 +11,31 @@ import (
 // tool needs one of its own. Removed again when the step ends.
 const ownCAPath = "/etc/buildcage-ca.pem"
 
-// How each variable is treated when the image or Dockerfile did not set it.
+// How each variable is treated when the image or Dockerfile did not set it,
+// and what it falls back to when there is no system CA store to work with.
 //
-// The distinction is what the variable means to the tool that reads it:
-// NODE_EXTRA_CA_CERTS and DENO_CERT are added to a built-in set, so pointing
-// them at a file holding only this CA leaves everything else trusted. The
-// others replace the bundle outright, so pointing them at that file would
-// leave the tool trusting nothing but this CA. Those are pointed at the
-// system store instead, which by then already carries it, and curl needs
-// nothing at all because that store is what it reads by default.
+// The distinction between the kinds is what the variable means to the tool
+// that reads it: NODE_EXTRA_CA_CERTS and DENO_CERT are added to a built-in
+// set, so pointing them at a file holding only this CA leaves everything
+// else trusted, store or no store. The others replace the bundle outright:
+// with a store, they are pointed at it (which by then carries the CA plus
+// the real public roots); with no store there is nothing left that still
+// carries those roots, so they fall back to the same proxy-CA-only file
+// NODE_EXTRA_CA_CERTS/DENO_CERT use. That covers ordinary HTTP(S) traffic
+// (inspect re-signs all of it with this same CA) but not a passthrough
+// connection's real certificate — see "No system CA store" in
+// docs/inspect-engine.md for exactly which requests that leaves unable to
+// verify.
 type unsetBehaviour int
 
 const (
-	// Leave it alone: the tool already reads the system store.
+	// The tool reads the system store on its own; with no store, falls back
+	// to proxy-CA-only trust the same way pointAtSystemStore does.
 	leaveUnset unsetBehaviour = iota
 	// Point at a file holding only this CA, added to the tool's own set.
 	pointAtOwnCA
-	// Point at the system store, which replaces the tool's bundle.
+	// Point at the system store, which replaces the tool's bundle; with no
+	// store, falls back to the same proxy-CA-only file as pointAtOwnCA.
 	pointAtSystemStore
 )
 
@@ -122,15 +130,13 @@ func inject(bundle string, ca []byte) (func(), error) {
 		return nil, err
 	}
 
-	// A store's absence is not fatal: only the variables that need one
-	// (pointAtSystemStore below, and the store itself as an append target)
-	// are affected. NODE_EXTRA_CA_CERTS and DENO_CERT get their own file
-	// regardless, so a scratch/distroless image, or a base before
-	// ca-certificates is installed, still gets those working.
+	// A store's absence is not fatal: the store itself is simply not an
+	// append target, and every otherwise-unset variable falls back to the
+	// proxy-CA-only file instead (see the unsetBehaviour comment above).
 	systemStore, systemStorePath, storeErr := findSystemStore(s.rootfs)
 	haveSystemStore := storeErr == nil
 	if !haveSystemStore {
-		logf("no system CA store in %s (%v); only variables independent of it will be set", s.rootfs, storeErr)
+		logf("no system CA store in %s (%v); falling back to proxy-CA-only trust", s.rootfs, storeErr)
 	}
 
 	// Every bundle the CA has to go into, keyed by resolved path so a file
@@ -141,6 +147,30 @@ func inject(bundle string, ca []byte) (func(), error) {
 	}
 	newEnv := map[string]string{}
 	createdOwnCA := ""
+
+	// setOwnCA points variableName at ownCAPath, writing it once and sharing
+	// it across every variable that falls back to it.
+	setOwnCA := func(variableName string) {
+		resolved, err := resolveInRoot(s.rootfs, ownCAPath)
+		if err != nil {
+			logf("cannot place %s: %v", ownCAPath, err)
+			return
+		}
+		// More than one variable can take this path, and all of them share
+		// the file: only the first to get here writes it.
+		if createdOwnCA == "" {
+			if _, err := os.Stat(resolved); err == nil {
+				logf("%s already exists; not setting %s", ownCAPath, variableName)
+				return
+			}
+			if err := os.WriteFile(resolved, ca, 0o644); err != nil {
+				logf("cannot write %s: %v", ownCAPath, err)
+				return
+			}
+			createdOwnCA = resolved
+		}
+		newEnv[variableName] = ownCAPath
+	}
 
 	for _, variable := range caVariables {
 		if value, set := s.env[variable.name]; set && value != "" {
@@ -158,31 +188,17 @@ func inject(bundle string, ca []byte) (func(), error) {
 		}
 		switch variable.whenUnset {
 		case leaveUnset:
-		case pointAtSystemStore:
 			if !haveSystemStore {
-				continue
+				setOwnCA(variable.name)
 			}
-			newEnv[variable.name] = systemStorePath
+		case pointAtSystemStore:
+			if haveSystemStore {
+				newEnv[variable.name] = systemStorePath
+			} else {
+				setOwnCA(variable.name)
+			}
 		case pointAtOwnCA:
-			resolved, err := resolveInRoot(s.rootfs, ownCAPath)
-			if err != nil {
-				logf("cannot place %s: %v", ownCAPath, err)
-				continue
-			}
-			// More than one variable takes this branch, and all of them share
-			// the file: only the first to get here writes it.
-			if createdOwnCA == "" {
-				if _, err := os.Stat(resolved); err == nil {
-					logf("%s already exists; not setting %s", ownCAPath, variable.name)
-					continue
-				}
-				if err := os.WriteFile(resolved, ca, 0o644); err != nil {
-					logf("cannot write %s: %v", ownCAPath, err)
-					continue
-				}
-				createdOwnCA = resolved
-			}
-			newEnv[variable.name] = ownCAPath
+			setOwnCA(variable.name)
 		}
 	}
 
