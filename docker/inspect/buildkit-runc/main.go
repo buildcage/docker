@@ -1,5 +1,5 @@
-// Command buildkit-runc stands in front of the real runc for the `inspect`
-// engine.
+// Command buildcage-runc stands in front of BuildKit's own buildkit-runc for
+// the `inspect` engine.
 //
 // BuildKit resolves its OCI worker binary with exec.LookPath and hands it to
 // go-runc, and `[worker.oci] binary` in buildkitd.toml names which one. That

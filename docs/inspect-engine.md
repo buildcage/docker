@@ -64,7 +64,7 @@ Two components, plus a wrapper around runc.
 allowed or denied, which still has to match the rules exactly, on a regex rather than a domain
 suffix; see [DNS](#dns).
 
-**`buildkit-runc`** is a wrapper standing in front of the real runc, selected with
+**`buildcage-runc`** is a wrapper standing in front of BuildKit's own `buildkit-runc`, selected with
 `[worker.oci] binary` in `buildkitd.toml`. For the subcommands that carry a bundle it makes the step
 trust the proxy's CA, runs the real runc, then undoes that before BuildKit commits the snapshot.
 Injection never touches LLB and happens at exec time, so it cannot affect a cache key.
