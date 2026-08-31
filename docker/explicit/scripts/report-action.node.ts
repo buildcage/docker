@@ -80,7 +80,7 @@ async function main(): Promise<void> {
     report,
     process.env.GITHUB_ACTION_REPOSITORY || "buildcage/docker",
     process.env.GITHUB_ACTION_REF || "v2",
-    { actionVersion: readActionVersion(docker, containerId) },
+    { actionVersion: readActionVersion(docker, containerId, "explicit") },
   );
 
   await writeStepSummary(markdown);
