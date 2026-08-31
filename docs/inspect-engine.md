@@ -20,7 +20,7 @@ deprecated [`explicit`](./explicit-engine.md) engine is unaffected.
 
 ```yaml
 - name: Start Buildcage
-  uses: buildcage/docker@cd96c2d0d25598e9d92550490b0b39128d14e189 # v3.1.1
+  uses: buildcage/docker@0387f9e87afc1776ca811dc36ae23dc4b14d98dc # v3.1.3
   with:
     proxy_mode: restrict
     proxy_engine: inspect
