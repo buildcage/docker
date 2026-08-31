@@ -138,14 +138,14 @@ describe("buildRestrictExample", () => {
     );
   });
 
-  it("renders a commit SHA actionRef as a <sha> placeholder", () => {
+  it("renders a commit SHA actionRef as-is, same as a tag", () => {
     const rows = [{ host: "example.com", port: "443", ruleType: "HTTPS", count: 1 }];
     const sha = "abc1234567890def1234567890abcdef12345678";
     expect(buildRestrictExample(rows, REPO, sha)).toBe(
       wrap(
         [
           "- name: Start Buildcage",
-          `  uses: ${REPO}@<sha>`,
+          `  uses: ${REPO}@${sha}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",

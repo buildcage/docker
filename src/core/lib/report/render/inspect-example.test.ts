@@ -211,9 +211,10 @@ describe("buildInspectRestrictExample", () => {
     expect(md.includes("proxy_engine: inspect")).toBe(true);
   });
 
-  it("shows a placeholder for a commit sha, which is opaque and run-specific", () => {
-    const md = buildInspectRestrictExample(requests, "buildcage/docker", "a".repeat(40));
-    expect(md.includes("@<sha>")).toBe(true);
+  it("renders a commit sha as-is, same as a tag", () => {
+    const sha = "a".repeat(40);
+    const md = buildInspectRestrictExample(requests, "buildcage/docker", sha);
+    expect(md.includes(`@${sha}`)).toBe(true);
   });
 
   it("keeps a tag as written, since it is stable", () => {
