@@ -9,6 +9,7 @@
  */
 import * as core from "@actions/core";
 import { createDocker } from "#core/lib/docker/client.ts";
+import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
 import { buildReportParameters } from "#core/lib/report/parameters.ts";
 import { buildUniversalReportData } from "#core/lib/report/build/universal.ts";
 import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
@@ -16,7 +17,7 @@ import { emitBlockedOutcome } from "#core/lib/report/outcome/emit.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
 
-const LOG_FILE = "/var/log/haproxy/current";
+const LOG_DIR = "/var/log/haproxy";
 
 async function main(): Promise<void> {
   const containerId = process.argv[2];
@@ -27,7 +28,7 @@ async function main(): Promise<void> {
   const docker = createDocker();
   const parameters = buildReportParameters(docker.readEnv(containerId));
   const report = await buildUniversalReportData(
-    docker.readFileLines(containerId, LOG_FILE),
+    readRotatedLog(docker, containerId, LOG_DIR),
     parameters,
   );
 

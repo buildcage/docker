@@ -8,6 +8,7 @@
  */
 import * as core from "@actions/core";
 import { createDocker } from "#core/lib/docker/client.ts";
+import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
 import { buildReportParameters } from "#core/lib/report/parameters.ts";
 import { buildInspectReportData } from "#core/lib/report/build/inspect.ts";
 import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
@@ -18,8 +19,8 @@ import { errorMessage } from "#core/lib/errors.ts";
 import { wrapLogGroup } from "#core/lib/actions/log.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
 
-const PROXY_LOG = "/var/log/haproxy/current";
-const RESOLVER_LOG = "/var/log/coredns/current";
+const PROXY_LOG_DIR = "/var/log/haproxy";
+const RESOLVER_LOG_DIR = "/var/log/coredns";
 
 async function main(): Promise<void> {
   const containerId = process.argv[2];
@@ -30,8 +31,8 @@ async function main(): Promise<void> {
   const docker = createDocker();
   const parameters = buildReportParameters(docker.readEnv(containerId));
   const report = await buildInspectReportData(
-    docker.readFileLines(containerId, PROXY_LOG),
-    docker.readFileLines(containerId, RESOLVER_LOG),
+    readRotatedLog(docker, containerId, PROXY_LOG_DIR),
+    readRotatedLog(docker, containerId, RESOLVER_LOG_DIR),
     parameters,
   );
 
