@@ -200,17 +200,17 @@ export function convertUrlRule(rule: string): UrlRule {
 }
 
 /**
- * Split a rules input into rule lines.
- *
- * Newline-separated, because a rule contains a space between its method list
- * and its URL.
+ * Split a rules input into rule lines. Newline-separated, because a rule
+ * contains a space between its method list and its URL. A blank line, or a
+ * line starting with `#`, is dropped — only a full-line `#`, since a `~`
+ * rule's own regex might legitimately contain one.
  */
 export function splitUrlRuleLines(rulesInput: string | undefined): string[] {
   return (
     rulesInput
       ?.split(/\r?\n/)
       .map((line) => line.trim())
-      .filter(Boolean) ?? []
+      .filter((line) => line !== "" && !line.startsWith("#")) ?? []
   );
 }
 

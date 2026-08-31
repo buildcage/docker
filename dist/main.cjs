@@ -649,13 +649,13 @@ function convertUrlRule(rule) {
 	};
 }
 /**
-* Split a rules input into rule lines.
-*
-* Newline-separated, because a rule contains a space between its method list
-* and its URL.
+* Split a rules input into rule lines. Newline-separated, because a rule
+* contains a space between its method list and its URL. A blank line, or a
+* line starting with `#`, is dropped — only a full-line `#`, since a `~`
+* rule's own regex might legitimately contain one.
 */
 function splitUrlRuleLines(rulesInput) {
-	return rulesInput?.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) ?? [];
+	return rulesInput?.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#")) ?? [];
 }
 /**
 * Compile a newline-separated URL rules input.

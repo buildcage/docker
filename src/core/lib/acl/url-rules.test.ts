@@ -114,6 +114,18 @@ describe("buildUrlRules", () => {
     expect(buildUrlRules(undefined).length).toBe(0);
     expect(buildUrlRules("   ").length).toBe(0);
   });
+
+  it("drops a full-line comment, same as a blank line", () => {
+    const rules = buildUrlRules(
+      "# npm packages\nGET https://a.com/x\n\n  # cdn assets\nGET https://b.com/y\n",
+    );
+    expect(rules.map((r) => r.raw)).toStrictEqual(["GET https://a.com/x", "GET https://b.com/y"]);
+  });
+
+  it("does not treat a mid-line # as a comment marker", () => {
+    const rules = buildUrlRules("GET ~^https://a\\.com/x#frag$");
+    expect(rules[0].raw).toBe("GET ~^https://a\\.com/x#frag$");
+  });
 });
 
 // ---------------------------------------------------------------------------
