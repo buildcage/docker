@@ -146,18 +146,20 @@ export function buildUrlRuleLines(requests: TrafficEvent[]): string[] {
  * Render the rules as a collapsed markdown section, or "" if nothing was
  * observed.
  *
- * `actionRef` is the ref this action was invoked with.
+ * `actionRef` is the ref this action was invoked with; `actionVersion`, if
+ * known, is appended as a trailing `# 3.1.4` comment.
  */
 export function buildInspectRestrictExample(
   requests: TrafficEvent[] | null | undefined,
   actionRepo: string,
   actionRef?: string,
+  actionVersion?: string,
 ): string {
   const lines = buildUrlRuleLines(requests ?? []);
   if (lines.length === 0) return "";
 
   let yaml = "- name: Start Buildcage\n";
-  yaml += `  uses: ${actionRepo}@${actionRef}\n`;
+  yaml += `  uses: ${actionRepo}@${actionRef}${actionVersion ? ` # ${actionVersion}` : ""}\n`;
   yaml += "  with:\n";
   yaml += "    proxy_mode: restrict\n";
   yaml += "    proxy_engine: inspect\n";

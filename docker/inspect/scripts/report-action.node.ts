@@ -18,6 +18,7 @@ import { writeTrafficFile, buildTrafficRecords } from "#core/lib/report/outcome/
 import { errorMessage } from "#core/lib/errors.ts";
 import { wrapLogGroup } from "#core/lib/actions/log.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
+import { readActionVersion } from "../../lib/read-action-version.ts";
 
 const PROXY_LOG_DIR = "/var/log/haproxy";
 const RESOLVER_LOG_DIR = "/var/log/coredns";
@@ -47,6 +48,7 @@ async function main(): Promise<void> {
     report,
     process.env.GITHUB_ACTION_REPOSITORY || "buildcage/docker",
     process.env.GITHUB_ACTION_REF || "v2",
+    { actionVersion: readActionVersion(docker, containerId) },
   );
 
   // The report action uploads this file as an artifact if asked; the upload

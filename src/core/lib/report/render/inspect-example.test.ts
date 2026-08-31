@@ -232,6 +232,19 @@ describe("buildInspectRestrictExample", () => {
     expect(buildInspectRestrictExample([], "buildcage/docker", "v2")).toBe("");
     expect(buildInspectRestrictExample(null, "buildcage/docker", "v2")).toBe("");
   });
+
+  it("appends the version as a trailing comment when known", () => {
+    const sha = "a".repeat(40);
+    const md = buildInspectRestrictExample(requests, "buildcage/docker", sha, "3.1.4");
+    expect(md.includes(`@${sha} # 3.1.4\n`)).toBe(true);
+  });
+
+  it("omits the comment when the version is not known", () => {
+    const sha = "a".repeat(40);
+    const md = buildInspectRestrictExample(requests, "buildcage/docker", sha);
+    expect(md.includes(`@${sha}\n`)).toBe(true);
+    expect(md.includes("#")).toBe(false);
+  });
 });
 
 reportResults();

@@ -10,6 +10,8 @@ export interface RenderReportMarkdownOptions {
    *  Defaults to a bare "Outbound Traffic Report", which is what both
    *  engines' report scripts use. */
   title?: string;
+  /** Version to annotate the restrict-mode example's `uses:` line with. */
+  actionVersion?: string;
 }
 
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
@@ -19,7 +21,7 @@ export function renderReportMarkdown(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
-  { title = "Outbound Traffic Report" }: RenderReportMarkdownOptions = {},
+  { title = "Outbound Traffic Report", actionVersion }: RenderReportMarkdownOptions = {},
 ): string {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
@@ -38,8 +40,8 @@ export function renderReportMarkdown(
     // be that much narrower than one built from hosts alone.
     markdown +=
       report.engine === "inspect"
-        ? buildInspectRestrictExample(report.timeline, actionRepo, actionRef)
-        : buildRestrictExample(report.passed, actionRepo, actionRef);
+        ? buildInspectRestrictExample(report.timeline, actionRepo, actionRef, actionVersion)
+        : buildRestrictExample(report.passed, actionRepo, actionRef, actionVersion);
   }
   if (report.blocked.length > 0) {
     if (report.passed.length > 0) markdown += "\n";
