@@ -5,11 +5,17 @@ const REPO = "buildcage/docker";
 const REF = "v2";
 
 function wrap(yaml: string) {
+  // Mirrors the production code's own 6-space step-indent transform, so the
+  // test cases below can stay written as an unindented, readable fragment.
+  const indented = yaml
+    .split("\n")
+    .map((line) => (line ? `      ${line}` : line))
+    .join("\n");
   return (
     "\n<details>\n" +
     "<summary>🛡️ Switch to restrict mode</summary>\n\n" +
     "```yaml\n" +
-    yaml +
+    indented +
     "```\n\n" +
     "</details>\n"
   );

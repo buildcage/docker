@@ -47,6 +47,15 @@ export function buildRestrictExample(
     }
   }
 
+  // GitHub Actions' own indentation convention (jobs: -> <id>: -> steps: ->
+  // "- name:") always puts a step 6 spaces in, so the generated snippet can
+  // be pasted directly into an existing steps: list without re-indenting it.
+  const STEP_INDENT = "      ";
+  yaml = yaml
+    .split("\n")
+    .map((line) => (line ? STEP_INDENT + line : line))
+    .join("\n");
+
   let md = "\n<details>\n";
   md += "<summary>🛡️ Switch to restrict mode</summary>\n\n";
   md += "```yaml\n";
