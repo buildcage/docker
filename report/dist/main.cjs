@@ -12153,6 +12153,11 @@ function parseDockerInspectEnv(inspectOutput) {
 	}
 	return env;
 }
+/** Parses `docker inspect <id> --format '{{json .Config.Labels}}'`'s output
+*  into a lookup map; `null` (no labels) becomes `{}`. */
+function parseDockerInspectLabels(inspectOutput) {
+	return JSON.parse(inspectOutput) ?? {};
+}
 //#endregion
 //#region src/core/lib/docker/client.ts
 /** `docker ps --format '{{.ID}}'` prints one ID per line, possibly with
@@ -12251,6 +12256,14 @@ function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand
 				containerId,
 				"--format",
 				"{{json .Config.Env}}"
+			]));
+		},
+		readLabels(containerId) {
+			return parseDockerInspectLabels(run([
+				"inspect",
+				containerId,
+				"--format",
+				"{{json .Config.Labels}}"
 			]));
 		},
 		exec(containerId, args) {
