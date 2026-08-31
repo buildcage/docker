@@ -652,10 +652,15 @@ function convertUrlRule(rule) {
 * Split a rules input into rule lines.
 *
 * Newline-separated, because a rule contains a space between its method list
-* and its URL.
+* and its URL. A line whose first non-whitespace character is `#` is a
+* comment and is dropped, same as a blank line — useful for grouping and
+* annotating rules once the list gets long. Only a full-line `#` counts: a
+* URL never legitimately contains one (a fragment is never sent to a
+* server), but a `~` rule's own regex might, so a trailing `#` is left
+* alone rather than silently truncating someone's pattern.
 */
 function splitUrlRuleLines(rulesInput) {
-	return rulesInput?.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) ?? [];
+	return rulesInput?.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#")) ?? [];
 }
 /**
 * Compile a newline-separated URL rules input.

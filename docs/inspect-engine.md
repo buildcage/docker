@@ -72,12 +72,16 @@ Injection never touches LLB and happens at exec time, so it cannot affect a cach
 ## Rule syntax
 
 A rule is a method list, a space, then a URL pattern. Because a rule contains a space, this input is
-newline separated.
+newline separated. A blank line, or a line starting with `#`, is ignored — useful for grouping and
+annotating rules once the list gets long.
 
 ```yaml
 allowed_url_rules: |
+  # npm installs
   GET https://registry.npmjs.org/@myorg/**
   GET|HEAD https://example.com/public/*
+
+  # internal write access
   POST,PUT https://api.internal.example.com/v1/*
   * https://internal.example.com
 ```
