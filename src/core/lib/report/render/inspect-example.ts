@@ -146,9 +146,7 @@ export function buildUrlRuleLines(requests: TrafficEvent[]): string[] {
  * Render the rules as a collapsed markdown section, or "" if nothing was
  * observed.
  *
- * `actionRef` is the ref this action was invoked with. A 40-character SHA is
- * specific to this run and opaque to the reader, so it is shown as a
- * placeholder; a tag is stable and useful as written.
+ * `actionRef` is the ref this action was invoked with.
  */
 export function buildInspectRestrictExample(
   requests: TrafficEvent[] | null | undefined,
@@ -158,10 +156,8 @@ export function buildInspectRestrictExample(
   const lines = buildUrlRuleLines(requests ?? []);
   if (lines.length === 0) return "";
 
-  const ref = actionRef && /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef;
-
-  let yaml = "- name: Start Buildcage in restrict mode\n";
-  yaml += `  uses: ${actionRepo}@${ref}\n`;
+  let yaml = "- name: Start Buildcage\n";
+  yaml += `  uses: ${actionRepo}@${actionRef}\n`;
   yaml += "  with:\n";
   yaml += "    proxy_mode: restrict\n";
   yaml += "    proxy_engine: inspect\n";
@@ -169,6 +165,15 @@ export function buildInspectRestrictExample(
   // rules are separated by newlines and folding would join them into one.
   yaml += "    allowed_url_rules: |\n";
   for (const line of lines) yaml += `      ${line}\n`;
+
+  // GitHub Actions' own indentation convention (jobs: -> <id>: -> steps: ->
+  // "- name:") always puts a step 6 spaces in, so the generated snippet can
+  // be pasted directly into an existing steps: list without re-indenting it.
+  const STEP_INDENT = "      ";
+  yaml = yaml
+    .split("\n")
+    .map((line) => (line ? STEP_INDENT + line : line))
+    .join("\n");
 
   let md = "\n<details>\n";
   md += "<summary>🛡️ Switch to restrict mode</summary>\n\n";

@@ -5,11 +5,17 @@ const REPO = "buildcage/docker";
 const REF = "v2";
 
 function wrap(yaml: string) {
+  // Mirrors the production code's own 6-space step-indent transform, so the
+  // test cases below can stay written as an unindented, readable fragment.
+  const indented = yaml
+    .split("\n")
+    .map((line) => (line ? `      ${line}` : line))
+    .join("\n");
   return (
     "\n<details>\n" +
     "<summary>🛡️ Switch to restrict mode</summary>\n\n" +
     "```yaml\n" +
-    yaml +
+    indented +
     "```\n\n" +
     "</details>\n"
   );
@@ -33,7 +39,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -53,7 +59,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -71,7 +77,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -91,7 +97,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -111,7 +117,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, "myorg/myrepo", REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: myorg/myrepo@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -127,7 +133,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, "v2.1.0")).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@v2.1.0`,
           "  with:",
           "    proxy_mode: restrict",
@@ -138,14 +144,14 @@ describe("buildRestrictExample", () => {
     );
   });
 
-  it("renders a commit SHA actionRef as a <sha> placeholder", () => {
+  it("renders a commit SHA actionRef as-is, same as a tag", () => {
     const rows = [{ host: "example.com", port: "443", ruleType: "HTTPS", count: 1 }];
     const sha = "abc1234567890def1234567890abcdef12345678";
     expect(buildRestrictExample(rows, REPO, sha)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
-          `  uses: ${REPO}@<sha>`,
+          "- name: Start Buildcage",
+          `  uses: ${REPO}@${sha}`,
           "  with:",
           "    proxy_mode: restrict",
           "    allowed_https_rules: >-",
