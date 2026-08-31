@@ -14,3 +14,9 @@ export function parseDockerInspectEnv(inspectOutput: string): Record<string, str
   }
   return env;
 }
+
+/** Parses `docker inspect <id> --format '{{json .Config.Labels}}'`'s output
+ *  into a lookup map; `null` (no labels) becomes `{}`. */
+export function parseDockerInspectLabels(inspectOutput: string): Record<string, string> {
+  return JSON.parse(inspectOutput) ?? {};
+}

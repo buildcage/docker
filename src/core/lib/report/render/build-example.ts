@@ -14,12 +14,14 @@ export type AuditedRow = Pick<AggregatedEntry, "host" | "port" | "ruleType">;
  *
  * actionRef is the ref (tag or commit SHA) this action was invoked with.
  * setup's action.yml lives at the repo root (not a subdirectory), so the
- * example's `uses:` never has an action-name path segment.
+ * example's `uses:` never has an action-name path segment. actionVersion,
+ * if known, is appended as a trailing `# 3.1.4` comment.
  */
 export function buildRestrictExample(
   auditedRows: AuditedRow[] | null | undefined,
   actionRepo: string,
   actionRef?: string,
+  actionVersion?: string,
 ): string {
   if (!auditedRows || auditedRows.length === 0) return "";
 
@@ -37,7 +39,7 @@ export function buildRestrictExample(
   // Build YAML lines
   let yaml = "";
   yaml += "- name: Start Buildcage\n";
-  yaml += `  uses: ${actionRepo}@${actionRef}\n`;
+  yaml += `  uses: ${actionRepo}@${actionRef}${actionVersion ? ` # ${actionVersion}` : ""}\n`;
   yaml += "  with:\n";
   yaml += "    proxy_mode: restrict\n";
   for (const [param, rules] of groups) {

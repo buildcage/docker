@@ -2,7 +2,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { createInterface } from "node:readline";
 import { buildDockerCpArgs } from "./args.ts";
-import { parseDockerInspectEnv } from "./container-env.ts";
+import { parseDockerInspectEnv, parseDockerInspectLabels } from "./container-env.ts";
 
 /** `docker ps --format '{{.ID}}'` prints one ID per line, possibly with
  *  trailing blank lines. */
@@ -112,6 +112,8 @@ export interface Docker {
   readFileLines(containerId: string, path: string): AsyncIterable<string>;
   /** `docker inspect <containerId>`'s own env, as a lookup map. */
   readEnv(containerId: string): Record<string, string>;
+  /** `docker inspect <containerId>`'s own labels, as a lookup map. */
+  readLabels(containerId: string): Record<string, string>;
   /** `docker exec <containerId> <...args>` — raw stdout, for anything else
    *  (e.g. buildctl). */
   exec(containerId: string, args: string[]): string;
@@ -143,6 +145,11 @@ export function createDocker(
     readEnv(containerId) {
       return parseDockerInspectEnv(
         run(["inspect", containerId, "--format", "{{json .Config.Env}}"]),
+      );
+    },
+    readLabels(containerId) {
+      return parseDockerInspectLabels(
+        run(["inspect", containerId, "--format", "{{json .Config.Labels}}"]),
       );
     },
     exec(containerId, args) {

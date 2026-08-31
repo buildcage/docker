@@ -57,6 +57,7 @@ function fakeDocker(
     findContainers: () => [],
     copyFromContainer: () => {},
     readEnv: () => ({}),
+    readLabels: () => ({}),
     exec: (_id, args) => {
       if (args[0] === "ls") return lsOutput;
       throw new Error(`unexpected exec: ${args.join(" ")}`);
@@ -106,6 +107,7 @@ describe("readRotatedLog", () => {
       findContainers: () => [],
       copyFromContainer: () => {},
       readEnv: () => ({}),
+      readLabels: () => ({}),
       exec: (_id, args) => {
         seenArgs = args;
         return "current\n";

@@ -61,6 +61,18 @@ describe("createDocker", () => {
     expect(calls).toStrictEqual([["inspect", "abc123", "--format", "{{json .Config.Env}}"]]);
   });
 
+  it("readLabels runs docker inspect and parses the Labels JSON object", () => {
+    const { run, calls } = fakeRun(['{"org.opencontainers.image.version":"3.1.4"}']);
+    const labels = createDocker(run).readLabels("abc123");
+    expect(labels).toStrictEqual({ "org.opencontainers.image.version": "3.1.4" });
+    expect(calls).toStrictEqual([["inspect", "abc123", "--format", "{{json .Config.Labels}}"]]);
+  });
+
+  it("readLabels returns an empty object for a container with no labels", () => {
+    const { run } = fakeRun(["null"]);
+    expect(createDocker(run).readLabels("abc123")).toStrictEqual({});
+  });
+
   it("exec runs docker exec with the given argv and returns its stdout", () => {
     const { run, calls } = fakeRun(["histories output"]);
     const out = createDocker(run).exec("abc123", [

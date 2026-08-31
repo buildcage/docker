@@ -17,6 +17,7 @@ import { emitBlockedOutcome } from "#core/lib/report/outcome/emit.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 import { wrapLogGroup } from "#core/lib/actions/log.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
+import { readActionVersion } from "../../lib/read-action-version.ts";
 import { selectAllRefs } from "#core/lib/log/build-histories.ts";
 import { parseVertexAllowedLog, type VertexAllowedEntry } from "#core/lib/log/vertex.ts";
 
@@ -79,6 +80,7 @@ async function main(): Promise<void> {
     report,
     process.env.GITHUB_ACTION_REPOSITORY || "buildcage/docker",
     process.env.GITHUB_ACTION_REF || "v2",
+    { actionVersion: readActionVersion(docker, containerId, "explicit") },
   );
 
   await writeStepSummary(markdown);

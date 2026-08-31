@@ -16,6 +16,7 @@ import { renderReportMarkdown } from "#core/lib/report/render/render-report-mark
 import { emitBlockedOutcome } from "#core/lib/report/outcome/emit.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 import { writeStepSummary } from "../../lib/write-step-summary.ts";
+import { readActionVersion } from "../../lib/read-action-version.ts";
 
 const LOG_DIR = "/var/log/haproxy";
 
@@ -36,6 +37,7 @@ async function main(): Promise<void> {
     report,
     process.env.GITHUB_ACTION_REPOSITORY || "buildcage/docker",
     process.env.GITHUB_ACTION_REF || "v2",
+    { actionVersion: readActionVersion(docker, containerId, "universal") },
   );
 
   await writeStepSummary(markdown);
