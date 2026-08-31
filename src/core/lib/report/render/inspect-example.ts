@@ -160,7 +160,7 @@ export function buildInspectRestrictExample(
 
   const ref = actionRef && /^[0-9a-f]{40}$/i.test(actionRef) ? "<sha>" : actionRef;
 
-  let yaml = "- name: Start Buildcage in restrict mode\n";
+  let yaml = "- name: Start Buildcage\n";
   yaml += `  uses: ${actionRepo}@${ref}\n`;
   yaml += "  with:\n";
   yaml += "    proxy_mode: restrict\n";

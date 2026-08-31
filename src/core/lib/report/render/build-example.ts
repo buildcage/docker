@@ -40,7 +40,7 @@ export function buildRestrictExample(
 
   // Build YAML lines
   let yaml = "";
-  yaml += "- name: Start Buildcage in restrict mode\n";
+  yaml += "- name: Start Buildcage\n";
   yaml += `  uses: ${actionRepo}@${ref}\n`;
   yaml += "  with:\n";
   yaml += "    proxy_mode: restrict\n";

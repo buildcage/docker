@@ -33,7 +33,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -53,7 +53,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -71,7 +71,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -91,7 +91,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -111,7 +111,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, "myorg/myrepo", REF)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: myorg/myrepo@${REF}`,
           "  with:",
           "    proxy_mode: restrict",
@@ -127,7 +127,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, "v2.1.0")).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@v2.1.0`,
           "  with:",
           "    proxy_mode: restrict",
@@ -144,7 +144,7 @@ describe("buildRestrictExample", () => {
     expect(buildRestrictExample(rows, REPO, sha)).toBe(
       wrap(
         [
-          "- name: Start Buildcage in restrict mode",
+          "- name: Start Buildcage",
           `  uses: ${REPO}@<sha>`,
           "  with:",
           "    proxy_mode: restrict",
