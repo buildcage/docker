@@ -313,6 +313,13 @@ The `report` action reads **two** logs, not one.
 Leaving the resolver's log out would let a build exfiltrate through a DNS query alone and have the
 report show nothing, since no connection is ever made in that case.
 
+Each is really an s6-log directory, not a single file: once `current` crosses 1MB it rotates into a
+timestamped archive (`@<timestamp>.s`) and starts over, up to 100 archives kept. `report` reads every
+archive, oldest first, then `current`, so a large build's early traffic is never silently dropped
+just because a later part of the same build pushed the log past one rotation. Reading `current` alone
+— e.g. `docker compose exec builder cat /var/log/haproxy/current` for a quick manual look — only shows
+what has accumulated since the most recent rotation.
+
 Refused requests carry their full URL, which is what this engine has and the others do not: the
 request is read before it is decided on, and the origin is never contacted. A blocked entry
 therefore names the exact URL that was attempted, query string included, rather than a bare host.
