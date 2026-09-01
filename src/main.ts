@@ -7,6 +7,7 @@ import { SetupError } from "./lib/errors.ts";
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
 import { buildACLRules, parseRulesOrThrow } from "#core/lib/acl/rules.ts";
 import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
+import { checkUrlAndTlsRuleSupport } from "./lib/engine-rule-support.ts";
 import {
   verifyImageDigestOrThrow,
   type VerifyImageDigestOptions,
@@ -73,6 +74,8 @@ async function main(): Promise<void> {
     localOverride ?? (await resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }));
   console.log(`buildcage: image: ${imageRef}`);
 
+  const proxyMode = core.getInput("proxy_mode") || "restrict";
+
   const rules = buildACLRules({
     httpsRulesInput: core.getInput("allowed_https_rules"),
     httpRulesInput: core.getInput("allowed_http_rules"),
@@ -84,13 +87,9 @@ async function main(): Promise<void> {
   const urlRulesInput = core.getInput("allowed_url_rules");
   const tlsRules = parseRulesOrThrow(core.getInput("allow_tls_rules"));
   const urlRules = buildUrlRules(urlRulesInput).map((r) => r.raw);
-  if (proxyEngine !== "inspect" && (urlRules.length > 0 || tlsRules.length > 0)) {
-    throw new SetupError(
-      "allowed_url_rules and allow_tls_rules need proxy_engine: inspect. " +
-        `The ${proxyEngine} engine cannot see a method or a path.`,
-      "INVALID_PROXY_ENGINE",
-    );
-  }
+  checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, (message) =>
+    console.log(`::warning::${message}`),
+  );
 
   console.log("::group::buildcage: Configured ACL Rules");
   logRules("HTTPS", rules.httpsRules);
@@ -112,7 +111,7 @@ async function main(): Promise<void> {
   const composeEnv = {
     ...env,
     BUILDER_NAME: builderName,
-    PROXY_MODE: core.getInput("proxy_mode") || "restrict",
+    PROXY_MODE: proxyMode,
     PROXY_ENGINE: proxyEngine,
     ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),

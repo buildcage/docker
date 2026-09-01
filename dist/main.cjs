@@ -666,6 +666,30 @@ function buildUrlRules(rulesInput) {
 	return splitUrlRuleLines(rulesInput).map(convertUrlRule);
 }
 //#endregion
+//#region src/lib/engine-rule-support.ts
+/**
+* Only `inspect` terminates TLS, so it's the only engine that can see an HTTP
+* method or a path — `allowed_url_rules` and `allow_tls_rules` are no-ops on
+* `universal` / `explicit`. Called once at setup, before the container starts,
+* so a mismatch is caught immediately instead of silently not enforcing.
+*
+* In `restrict` mode this is an error: a rule that looks like it protects the
+* build but can't actually be enforced is worse than no rule at all. In
+* `audit` mode nothing is enforced anyway, so it's a warning — the build
+* still runs, with these rules ignored.
+*/
+function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn) {
+	if (proxyEngine === "inspect") return;
+	let unsupported = [];
+	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allow_tls_rules"), unsupported.length === 0) return;
+	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy_engine: ${proxyEngine} — this engine only sees the host and port, never a method or a path.`;
+	if (proxyMode === "audit") {
+		warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
+		return;
+	}
+	throw new SetupError(`${reason} In restrict mode that means ${list} would not actually be enforced — the build would look protected but isn't. Switch to proxy_engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
+}
+//#endregion
 //#region src/core/lib/provenance/errors.ts
 var VerifyImageError = class extends Error {
 	code;
@@ -7803,17 +7827,21 @@ async function main() {
 		proxyEngine
 	});
 	console.log(`buildcage: image: ${imageRef}`);
-	let rules = buildACLRules({
+	let proxyMode = getInput("proxy_mode") || "restrict", rules = buildACLRules({
 		httpsRulesInput: getInput("allowed_https_rules"),
 		httpRulesInput: getInput("allowed_http_rules"),
 		ipRulesInput: getInput("allowed_ip_rules")
 	}), knownBlockedRules = parseRulesOrThrow(getInput("known_blocked_rules")), urlRulesInput = getInput("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput("allow_tls_rules")), urlRules = buildUrlRules(urlRulesInput).map((r) => r.raw);
-	if (proxyEngine !== "inspect" && (urlRules.length > 0 || tlsRules.length > 0)) throw new SetupError(`allowed_url_rules and allow_tls_rules need proxy_engine: inspect. The ${proxyEngine} engine cannot see a method or a path.`, "INVALID_PROXY_ENGINE");
-	console.log("::group::buildcage: Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("URL", urlRules), logRules("TLS", tlsRules), logRules("Known blocked", knownBlockedRules), console.log("::endgroup::");
+	checkUrlAndTlsRuleSupport({
+		proxyEngine,
+		proxyMode,
+		urlRules,
+		tlsRules
+	}, (message) => console.log(`::warning::${message}`)), console.log("::group::buildcage: Configured ACL Rules"), logRules("HTTPS", rules.httpsRules), logRules("HTTP", rules.httpRules), logRules("IP", rules.ipRules), logRules("URL", urlRules), logRules("TLS", tlsRules), logRules("Known blocked", knownBlockedRules), console.log("::endgroup::");
 	let builderName = getInput("builder_name") || "buildcage", projectName = deriveProjectName(builderName), composeEnv = {
 		...env,
 		BUILDER_NAME: builderName,
-		PROXY_MODE: getInput("proxy_mode") || "restrict",
+		PROXY_MODE: proxyMode,
 		PROXY_ENGINE: proxyEngine,
 		ALLOWED_HTTPS_RULES: rules.httpsRules.join("\n"),
 		ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
