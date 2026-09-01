@@ -14,6 +14,7 @@ export function buildReportParameters(
     allowedHttpsRules: splitRuleTokens(env.ALLOWED_HTTPS_RULES),
     allowedHttpRules: splitRuleTokens(env.ALLOWED_HTTP_RULES),
     allowedIpRules: splitRuleTokens(env.ALLOWED_IP_RULES),
+    allowTlsRules: splitRuleTokens(env.ALLOW_TLS_RULES),
     knownBlockedRules: splitRuleTokens(env.KNOWN_BLOCKED_RULES),
   };
 }
