@@ -84,7 +84,17 @@ else
   fail "no restrict-mode URL rule example was rendered"
 fi
 
-RULES=$(sed -n '/allowed_url_rules: |/,/```/p' <<< "$REPORT_MARKDOWN" | sed '1d;$d' | sed 's/^ *//')
+RULES=$(
+  awk '
+    # Stops at the next top-level key (allow_tls_rules/allowed_ip_rules are
+    # now echoed into the same fenced block, see inspect-example.ts) as well
+    # as the closing fence, so only the allowed_url_rules value is captured.
+    /allowed_url_rules: \|/ { capture=1; next }
+    capture && /^ *(allow_tls_rules|allowed_ip_rules): \|/ { exit }
+    capture && /```/ { exit }
+    capture { print }
+  ' <<< "$REPORT_MARKDOWN" | sed 's/^ *//'
+)
 echo "  ---- generated rules ----"
 sed 's/^/  /' <<< "$RULES"
 
