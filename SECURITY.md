@@ -2,10 +2,10 @@
 
 ## Scope
 
-I welcome reports about all three proxy engines (`universal`, the experimental `inspect`, and the
-deprecated `explicit`):
+I welcome reports about all three proxy engines (`universal`, `inspect`, and the deprecated
+`explicit`):
 
-- **Proxy bypass (`universal`)** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#known-limitations))
+- **Proxy bypass (`universal`)** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#universal-proxy-engine))
 - **Network isolation escape (`universal`)** — bypassing CNI isolation or iptables rules to reach the internet directly
 - **DNS filtering bypass (`universal`)** — bypassing the DNS redirect mechanism
 - **Rule bypass (`inspect`)** — ways to reach a destination, method or path that the rules do not permit: a request that escapes its path rule, a forged `Host` or SNI that changes where the proxy connects, or a name resolved to somewhere the rules never named
@@ -16,7 +16,7 @@ The following are **out of scope** (please report to the respective projects ins
 
 - Vulnerabilities in BuildKit, Docker, or other upstream dependencies — including BuildKit's own `--proxy-network` isolation, its MITM/TLS handling, or its source-policy evaluation engine itself. Buildcage's `explicit`-engine scope is limited to the policy it compiles and injects, not BuildKit's enforcement of that policy.
 - Issues that require the attacker to already have privileged access to the host
-- Domain fronting via shared CDN infrastructure (documented in [Security Details](./docs/security.md#known-limitations))
+- Domain fronting via shared CDN infrastructure (documented in [Security Details](./docs/security.md#universal-proxy-engine))
 
 ## Supported Versions
 
