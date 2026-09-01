@@ -457,10 +457,13 @@ alternatives are listing every URL, which nobody can maintain, or clustering the
 permissions nobody observed. Such a rule still constrains the method, which no host-level rule can.
 
 The rules are a starting point, not an answer. A URL carrying a version or a date will not match the
-next run, and anything reached through `allow_tls_rules` or `allowed_ip_rules` is absent, having
-never been inspected. `make test_integration_buildkit_inspect_roundtrip` runs an audit build, feeds
-its own generated rules back as `restrict`, and checks both halves: that every request still passes,
-and that a path, method, host or port the build never used is refused.
+next run. `allow_tls_rules` and `allowed_ip_rules` aren't derived from what the build reached either
+way -- a passthrough is never decrypted, so there is nothing in the traffic to build them from --
+they're carried over unchanged from whatever the audit run was configured with, since the same rule
+applies as-is under `restrict` (only enforcement differs; see [Audit mode](#audit-mode)).
+`make test_integration_buildkit_inspect_roundtrip` runs an audit build, feeds its own generated rules
+back as `restrict`, and checks both halves: that every request still passes, and that a path, method,
+host or port the build never used is refused.
 
 A `~` regex rule cannot be split into a host and a path, so it cannot be matched by an engine that
 matches the two separately. The generator warns and emits nothing for it; such a rule needs an

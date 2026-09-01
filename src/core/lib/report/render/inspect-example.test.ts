@@ -223,14 +223,42 @@ describe("buildInspectRestrictExample", () => {
     );
   });
 
-  it("says what the rules do not cover", () => {
-    const md = buildInspectRestrictExample(requests, "buildcage/docker", "v2");
-    expect(md.includes("allow_tls_rules")).toBe(true);
-  });
-
-  it("renders nothing when nothing was observed", () => {
+  it("renders nothing when nothing was observed and no tls/ip rules were configured", () => {
     expect(buildInspectRestrictExample([], "buildcage/docker", "v2")).toBe("");
     expect(buildInspectRestrictExample(null, "buildcage/docker", "v2")).toBe("");
+  });
+
+  it("echoes allow_tls_rules and allowed_ip_rules as configured, not derived from traffic", () => {
+    // Neither is ever decrypted, so there is nothing in `requests` to build
+    // them from -- they are the same values the audit run was given.
+    const md = buildInspectRestrictExample(requests, "buildcage/docker", "v2", undefined, [
+      "10.0.0.5:5432",
+    ]);
+    expect(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/.test(md)).toBe(true);
+
+    const md2 = buildInspectRestrictExample(
+      requests,
+      "buildcage/docker",
+      "v2",
+      undefined,
+      [],
+      ["db.internal.example.com:8443"],
+    );
+    expect(/allow_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/.test(md2)).toBe(true);
+  });
+
+  it("still renders a section for tls/ip rules alone, with no observed traffic", () => {
+    const md = buildInspectRestrictExample(
+      [],
+      "buildcage/docker",
+      "v2",
+      undefined,
+      ["10.0.0.5:5432"],
+      ["db.internal.example.com:8443"],
+    );
+    expect(md.includes("allowed_url_rules")).toBe(false);
+    expect(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/.test(md)).toBe(true);
+    expect(/allow_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/.test(md)).toBe(true);
   });
 
   it("appends the version as a trailing comment when known", () => {
