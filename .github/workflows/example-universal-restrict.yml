@@ -1,4 +1,4 @@
-name: Example (inspect engine)
+name: Example (universal engine, restrict mode)
 
 on:
   workflow_dispatch:
@@ -12,19 +12,18 @@ jobs:
       contents: read
 
     steps:
-      # `allowed_url_rules` names a method and a path, not just a host. npm
-      # fetches package metadata and tarballs with GET, and POSTs once to the
-      # advisory endpoint; publishing to the same registry is a POST elsewhere,
-      # so these rules allow the install without allowing a publish.
+      # Same build as the audit example, with the rules that run produced.
+      # The universal engine enforces on host and port, which is as far as it
+      # can see without decrypting, and is all a JVM build can be given: Maven
+      # reads the JVM's own cacerts store, so an injected CA would not be
+      # trusted.
       - name: Start Buildcage builder
         uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
         with:
           proxy_mode: restrict
-          proxy_engine: inspect
-          allowed_url_rules: |
-            GET|HEAD https://registry.npmjs.org/**
-            POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk
-            GET https://dl-cdn.alpinelinux.org/**
+          proxy_engine: universal
+          allowed_https_rules: |
+            repo.maven.apache.org:443
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -36,15 +35,10 @@ jobs:
         run: |
           mkdir -p /tmp/build-context
           cat <<'EOF' > /tmp/build-context/Dockerfile
-          FROM node:24-alpine
+          FROM maven:3-eclipse-temurin-21-alpine
           WORKDIR /app
-          # No NODE_USE_SYSTEM_CA needed: the runc wrapper points npm's own CA
-          # variable at a store carrying the proxy's CA.
-          RUN npm init -y && npm install --ignore-scripts express
-          # apk has no CA store of its own, unlike npm: it trusts whatever the
-          # OS store trusts, which is the one the wrapper already patched.
-          RUN apk add --no-cache jq
-          # Refused by the rules above, so the report shows the full URL.
+          RUN mvn -B dependency:get -Dartifact=org.apache.commons:commons-lang3:3.17.0
+          # Not on the allowlist, so the report shows it as a blocked host.
           RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
           EOF
 
@@ -55,6 +49,9 @@ jobs:
           push: false
           no-cache: true
 
+      # fail_on_blocked is false only because this example blocks something on
+      # purpose. Leave it at its default so a real workflow fails on a
+      # destination it did not allow.
       - name: Show proxy report
         if: always()
         uses: buildcage/docker/report@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5

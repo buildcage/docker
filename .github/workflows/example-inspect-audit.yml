@@ -1,4 +1,4 @@
-name: Example (audit mode)
+name: Example (inspect engine, audit mode)
 
 on:
   workflow_dispatch:
@@ -12,10 +12,15 @@ jobs:
       contents: read
 
     steps:
+      # The inspect engine terminates TLS, so it records the method and the
+      # full URL of every request, apt's plain HTTP included. The report's
+      # "Switch to restrict mode" section returns them as allowed_url_rules
+      # rather than a list of hosts.
       - name: Start Buildcage builder
         uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
         with:
           proxy_mode: audit
+          proxy_engine: inspect
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -27,9 +32,17 @@ jobs:
         run: |
           mkdir -p /tmp/build-context
           cat <<'EOF' > /tmp/build-context/Dockerfile
-          FROM node:24-alpine
+          FROM node:24-bookworm-slim
           WORKDIR /app
+          # The Debian archive is plain HTTP by default, so apt's rules are
+          # http:// URLs.
+          RUN apt-get update && \
+              apt-get install -y --no-install-recommends curl && \
+              rm -rf /var/lib/apt/lists/*
           RUN npm init -y && npm install --ignore-scripts express
+          # Nothing in the build needs this. audit records it like any other
+          # request, so leave it out of the rules you paste back in.
+          RUN curl -sS --max-time 5 -o /dev/null https://example.com/ || true
           EOF
 
       - name: Build test image
