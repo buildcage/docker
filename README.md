@@ -182,12 +182,12 @@ Direct IP access bypasses DNS resolution, so it is handled separately: put those
 Prefix a rule with `~` to use a regular expression, matched against `domain:port`. Include a port
 pattern if you want to restrict by port — a range of addresses can be matched this way.
 
-| Rule                             | Effect                                                     |
-| -------------------------------- | ---------------------------------------------------------- |
-| `~^example\.com:443$`            | Matches `example.com` on port 443 only                     |
-| `~^example\.com:\d+$`            | Matches `example.com` on any port                          |
-| `~^.*\.example\.com:{443,8443}$` | Matches any subdomain of `example.com` on port 443 or 8443 |
-| `~^192\.168\.1\.\d+:80$`         | Matches a range of IP addresses (in `allowed_ip_rules`)    |
+| Rule                     | Effect                                                  |
+| ------------------------ | ------------------------------------------------------- |
+| `~^example\.com:443$`    | Matches `example.com` on port 443 only                  |
+| `~^example\.com:\d+$`    | Matches `example.com` on any port                       |
+| `~^.*\.example\.com:(443 | 8443)$`                                                 | Matches any subdomain of `example.com` on port 443 or 8443 |
+| `~^192\.168\.1\.\d+:80$` | Matches a range of IP addresses (in `allowed_ip_rules`) |
 
 ### Together
 

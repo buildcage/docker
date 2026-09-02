@@ -98,9 +98,11 @@ no default, so a rule always states what it permits and nobody has to guess what
 
 **A `~` rule is split at the first `/` after `://`, not applied to the whole URL.** Everything before
 that `/` is the host, everything from it onward is the path — so `GET ~^https://example\.com/pub/.*$`
-becomes a host match on `example\.com` and a path match on `/pub/.*$`. A port in the host part must
-be a literal number (`example\.com:8443`); a regex there is not supported, since the destination port
-cannot be matched with one.
+becomes a host match on `example\.com` and a path match on `/pub/.*$`. The host half's own port
+pattern, if any, can be any regex (`example\.com:(443|8443)`, `example\.com:\d+`), matched against
+the connection's actual `host:port`. Omit it entirely and the rule matches only the scheme's default
+port (443 for `https`, 80 for `http`) — there is no implicit "any port"; write the port pattern
+yourself (e.g. `example\.com:.*`) to allow more than the default.
 
 **A wildcard may sit among literal text here**, in a path segment as in a domain label:
 `abc*.amazonaws.com`, `/pkg-*/**`. The other engines require a label containing `*` to be exactly
@@ -120,9 +122,10 @@ ever reaches an origin. Writing the host half as narrowly as the name actually n
 narrows the DNS-layer exposure; the path half narrows only the HTTP-layer one.
 
 `allowed_https_rules` and `allowed_http_rules` keep their existing `host:port` syntax and meaning,
-and are equivalent to a URL rule with any method and any path. Their own `~` regex, and
-`allow_tls_rules`'s, is checked the same way as a URL rule's: the destination port can never be
-matched with a regex, so a port must be a literal number or omitted, on penalty of the same error.
+and are equivalent to a URL rule with any method and any path. Their own `~` regex works unlike a URL
+rule's: the whole pattern is matched as one expression against `host:port` together, so the port can
+be any regex, but — unlike a URL rule — it can never be omitted; a `~` rule with no `:` at all is
+rejected. `allow_tls_rules` follows the same `~` rule.
 
 A rule may name an address rather than a name, in `allowed_url_rules` or the host rules. The proxy
 resolves the Host header to decide where to connect, and no resolver can answer an address, so one
@@ -141,8 +144,9 @@ the destination port are checked and the connection is passed through undecrypte
 validates the origin's own certificate. The name is still resolved here, so a passthrough goes where
 we resolved it and not where the client aimed. `allowed_ip_rules` covers the same for a destination
 with no name at all, and additionally accepts CIDR notation (`192.168.1.0/24:443`) directly; its `~`
-regex is checked the same literal-number-only way as the host rules above, matched against the
-destination stringified rather than HAProxy's IP-typed `dst` fetch, which a regex cannot match
+regex follows the same rule as the host rules above — a mandatory port, matched as part of one
+`address:port` expression — against the destination stringified rather than HAProxy's IP-typed `dst`
+fetch, which a regex cannot match
 directly.
 
 ## How a request is handled
