@@ -92,6 +92,29 @@ describe("ip rule compilation", () => {
   it("accepts a CIDR block", () => {
     expect(compileRuleSet({ ipRules: ["10.0.0.0/24:5432"] }).ip[0].address).toBe("10.0.0.0/24");
   });
+
+  it("passes a ~regex ip rule through instead of requiring a literal address", () => {
+    const [rule] = compileRuleSet({ ipRules: ["~^192\\.168\\.1\\.\\d+$"] }).ip;
+    expect(rule.address).toBe("192\\.168\\.1\\.\\d+");
+    expect(rule.isRegex).toBe(true);
+    expect(rule.port).toBe(null);
+  });
+
+  it("carries a literal port in a ~regex ip rule through to a real port restriction", () => {
+    const [rule] = compileRuleSet({ ipRules: ["~^192\\.168\\.1\\.\\d+:8080$"] }).ip;
+    expect(rule.address).toBe("192\\.168\\.1\\.\\d+");
+    expect(rule.port).toBe("8080");
+  });
+
+  it("rejects a non-literal port in a ~regex ip rule", () => {
+    expect(() => compileRuleSet({ ipRules: ["~^192\\.168\\.1\\.\\d+:\\d+$"] })).toThrow(
+      /literal number/,
+    );
+  });
+
+  it("does not treat a literal address as a regex", () => {
+    expect(compileRuleSet({ ipRules: ["10.0.0.5:5432"] }).ip[0].isRegex).toBe(false);
+  });
 });
 
 describe("tls rule compilation", () => {

@@ -419,6 +419,22 @@ describe("passthrough", () => {
     expect(result.warnings.length).toBe(1);
     expect(result.config.includes("ip0_dst")).toBe(false);
   });
+
+  it("matches a ~regex ip rule against the destination stringified, not as a literal address", () => {
+    const result = generateHaproxyConfig({ ipRules: ["~^192\\.168\\.1\\.\\d+:8080$"] });
+    expect(result.warnings.length).toBe(0);
+    expect(result.config.includes("set-var-fmt(txn.dst_str) %[dst]")).toBe(true);
+    expect(
+      result.config.includes("acl ip0_dst var(txn.dst_str) -m reg ^192\\.168\\.1\\.\\d+$"),
+    ).toBe(true);
+    expect(result.config.includes("acl ip0_port dst_port 8080")).toBe(true);
+    // A literal rule still matches dst directly -- no need to stringify it.
+    expect(
+      generateHaproxyConfig({ ipRules: ["10.0.0.5:5432"] }).config.includes(
+        "set-var-fmt(txn.dst_str)",
+      ),
+    ).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

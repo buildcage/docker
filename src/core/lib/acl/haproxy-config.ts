@@ -179,12 +179,19 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
     l.push(
       "    # Captured now, since the request buffer is gone by log time.",
       "    tcp-request content set-var(txn.sni) req.ssl_sni",
-      "",
-      "    # Passed through untouched: judged before anything is decrypted.",
     );
+    if (ipRules.some((rule) => rule.isRegex)) {
+      // dst is IP-typed; -m reg needs it as a string first.
+      l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]");
+    }
+    l.push("", "    # Passed through untouched: judged before anything is decrypted.");
     for (const rule of ipRules) {
       l.push(`    # ${rule.raw}`);
-      l.push(`    acl ${rule.id}_dst dst ${rule.address}`);
+      l.push(
+        rule.isRegex
+          ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ^${rule.address}$`
+          : `    acl ${rule.id}_dst dst ${rule.address}`,
+      );
       if (rule.port) l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
     }
     for (const host of tlsHosts) {

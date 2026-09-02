@@ -20,6 +20,9 @@ services:
       # host regex that was mangled as a wildcard would break the existing
       # :443 rule too, not just fail to add the new port.
       ALLOW_TLS_RULES: "tlspass.example.com:443 ~^tlspass\\.example\\.com:8443$"
+      # 9080 is distinct from the :80 the URL rule below already allows, so
+      # reaching it proves this rule's own doing.
+      ALLOWED_IP_RULES: "~^10\\.200\\.0\\.\\d+:9080$"
       ALLOWED_URL_RULES: |
         GET https://allowed.example.com/public/**
         GET https://allowed.example.com:9443/public/**

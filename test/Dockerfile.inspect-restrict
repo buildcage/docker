@@ -267,6 +267,20 @@ RUN echo "=== [Direct address] ===" && \
     echo "status=$CODE" && \
     [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
 
+# [~regex allowed_ip_rules - uninspected passthrough by address]
+# Port 9080, distinct from the :80 the URL rule above allows.
+RUN echo "=== [Regex IP rule] ===" && \
+    OUT=$($S http://10.200.0.100:9080/anything) && \
+    echo "$OUT" && \
+    case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# Same address, a port only the URL rule's :80 default would cover -- proves
+# the ~regex ip rule's own literal port (9080) is enforced, not "any port".
+RUN echo "=== [Regex IP rule - other port not covered] ===" && \
+    CODE=$($C http://10.200.0.100:8080/anything) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
 # [UDP is dropped]
 # The cage forwards nothing, so a build cannot leave over UDP: no QUIC, no
 # HTTP/3, no DNS to a resolver of its own choosing. assert-inspect-restrict.sh

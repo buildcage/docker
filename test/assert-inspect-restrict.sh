@@ -134,11 +134,22 @@ if grep -qE "^buildcage [0-9]+ https? [A-Z]+ \S*tlspass\.example\.com" <<< "$PRO
 else
   pass "no request-level record, so nothing was decrypted"
 fi
+echo ""
+
+echo "[Regex IP rule] a ~regex allowed_ip_rules entry passes through, on its own port:"
+if grep -qE "^buildcage [0-9]+ pass tcp sni=- [0-9]+ ts=\S+ dst=10\.200\.0\.100:9080$" <<< "$PROXY_LOG"; then
+  pass "recorded as an undecrypted tcp passthrough, on the rule's own port"
+else
+  fail "no tcp passthrough was recorded on the ~regex ip rule's port 9080"
+fi
+echo ""
+
 # Everything not passed through is recorded by the frontend that terminates it,
 # so nothing else may appear at the tcp stage or it would be counted twice.
 # The count is not asserted: a reused container's log spans several builds.
 OTHER=$(grep -E "^buildcage [0-9]+ pass " <<< "$PROXY_LOG" \
-  | grep -cv "sni=tlspass\.example\.com" || true)
+  | grep -v "sni=tlspass\.example\.com" \
+  | grep -cv "dst=10\.200\.0\.100:9080" || true)
 if [ "$OTHER" -eq 0 ]; then
   pass "only the passthrough is logged at the tcp stage"
 else
@@ -192,7 +203,8 @@ REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= node report/src/main.ts 2>&1 || true)
 echo "[report] Allowed Hosts:"
 if grep -qF "### ✅ Allowed Hosts" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| allowed.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| allowed.example.com:80 | HTTP |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| allowed.example.com:80 | HTTP |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| 10.200.0.100:9080 | IP |" <<< "$REPORT_MARKDOWN"; then
   pass "the table lists the hosts that were reached"
 else
   fail "the Allowed Hosts table is missing expected rows"

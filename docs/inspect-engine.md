@@ -139,7 +139,11 @@ a passthrough destination in practice.
 `allow_tls_rules` takes the same `host:port` syntax and covers TLS that is not HTTPS: the SNI and
 the destination port are checked and the connection is passed through undecrypted, so the build
 validates the origin's own certificate. The name is still resolved here, so a passthrough goes where
-we resolved it and not where the client aimed. `allowed_ip_rules` covers the same for a destination with no name at all.
+we resolved it and not where the client aimed. `allowed_ip_rules` covers the same for a destination
+with no name at all, and additionally accepts CIDR notation (`192.168.1.0/24:443`) directly; its `~`
+regex is checked the same literal-number-only way as the host rules above, matched against the
+destination stringified rather than HAProxy's IP-typed `dst` fetch, which a regex cannot match
+directly.
 
 ## How a request is handled
 

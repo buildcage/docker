@@ -55,7 +55,10 @@ export interface CompiledRule {
 /** An IP rule, tunnelled at TCP level without inspection. */
 export interface CompiledIpRule {
   id: string;
+  /** A literal IPv4 address or CIDR block, or (when `isRegex`) an unanchored regex matching one as text. */
   address: string;
+  /** Whether `address` is a `~` rule's regex, matched against the destination stringified. */
+  isRegex: boolean;
   port: string | null;
   raw: string;
 }
@@ -157,6 +160,11 @@ function compileSchemeRules(
 function compileIpRules(rules: string[] | undefined, warnings: string[]): CompiledIpRule[] {
   const out: CompiledIpRule[] = [];
   (rules ?? []).forEach((rule, index) => {
+    if (rule.startsWith("~")) {
+      const { host, port } = splitRawRegexHost(rule);
+      out.push({ id: `ip${index}`, address: host, isRegex: true, port, raw: rule });
+      return;
+    }
     const colonIndex = rule.lastIndexOf(":");
     if (colonIndex === -1) {
       warnings.push(`IP rule ${JSON.stringify(rule)} has no port. It is ignored.`);
@@ -171,7 +179,13 @@ function compileIpRules(rules: string[] | undefined, warnings: string[]): Compil
       );
       return;
     }
-    out.push({ id: `ip${index}`, address, port: port === "*" ? null : port, raw: rule });
+    out.push({
+      id: `ip${index}`,
+      address,
+      isRegex: false,
+      port: port === "*" ? null : port,
+      raw: rule,
+    });
   });
   return out;
 }
