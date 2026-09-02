@@ -121,7 +121,6 @@ function compileSchemeRules(
   hostRules: string[] | undefined,
   urlRules: UrlRule[] | undefined,
   scheme: "https" | "http",
-  warnings: string[],
 ): CompiledRule[] {
   const out: CompiledRule[] = [];
   for (const pattern of hostRules ?? []) {
@@ -136,13 +135,6 @@ function compileSchemeRules(
   }
   for (const rule of urlRules ?? []) {
     if (rule.scheme !== scheme) continue;
-    if (!rule.authorityRegex || !rule.pathRegex) {
-      warnings.push(
-        `Rule ${JSON.stringify(rule.raw)} has no derivable host, so its host and path cannot be ` +
-          `matched separately. Add a matching allowed_https_rules entry for the host it targets.`,
-      );
-      continue;
-    }
     out.push({
       id: "",
       // authorityRegex is `^<hostRegex>:<port>$`.
@@ -189,8 +181,8 @@ function compileIpRules(rules: string[] | undefined, warnings: string[]): Compil
 export function compileRuleSet(inputs: RuleInputs): CompiledRuleSet {
   const warnings: string[] = [];
   return {
-    https: compileSchemeRules(inputs.httpsRules, inputs.urlRules, "https", warnings),
-    http: compileSchemeRules(inputs.httpRules, inputs.urlRules, "http", warnings),
+    https: compileSchemeRules(inputs.httpsRules, inputs.urlRules, "https"),
+    http: compileSchemeRules(inputs.httpRules, inputs.urlRules, "http"),
     ip: compileIpRules(inputs.ipRules, warnings),
     tls: (inputs.tlsRules ?? []).map((pattern, index) => ({
       id: `tls${index}`,

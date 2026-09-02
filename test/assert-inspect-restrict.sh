@@ -34,6 +34,7 @@ assert_logged POST "https://api.example.com/v1/thing" 200
 assert_logged DELETE "https://sub.wildcard.example.com/anything/at/all" 200
 assert_logged GET "http://allowed.example.com/public/pkg.tgz" 200
 assert_logged GET "https://attacker.wildcard.example.com/public/pkg.tgz" 200
+assert_logged GET "https://blocked.example.com:9443/public/pkg.tgz" 200
 echo ""
 
 echo "[refused] recorded with the method and the full URL, before any origin was contacted:"
@@ -41,6 +42,8 @@ assert_logged GET "https://allowed.example.com/private/secret" 403
 assert_logged POST "https://allowed.example.com/public/pkg.tgz" 403
 assert_logged GET "https://absent.example.com/" 502
 assert_logged GET "https://attacker.wildcard.example.com/private/secret" 403
+assert_logged GET "https://blocked.example.com:9443/private/secret" 403
+assert_logged GET "https://blocked.example.com/public/pkg.tgz" 403
 echo ""
 
 echo "[traversal] the path is normalised before the rules see it:"

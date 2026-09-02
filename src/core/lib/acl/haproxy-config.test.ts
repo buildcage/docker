@@ -448,14 +448,24 @@ describe("audit mode", () => {
 });
 
 // ---------------------------------------------------------------------------
-// ~regex rules cannot be split into a host and a path
+// ~regex rules split at the first / after :// into a host and path ACL
 // ---------------------------------------------------------------------------
 describe("regex rules", () => {
-  const result = generateHaproxyConfig({ urlRules: buildUrlRules("GET ~^https://a\\.com/x$") });
+  it("emits a host and path ACL, with no port ACL when the rule names none", () => {
+    const result = generateHaproxyConfig({ urlRules: buildUrlRules("GET ~^https://a\\.com/x$") });
+    expect(result.warnings.length).toBe(0);
+    const segment = frontendSegment(result.config, "https_in");
+    expect(segment.includes("-m reg -i ^a\\.com$")).toBe(true);
+    expect(segment.includes("path -m reg ^/x$")).toBe(true);
+    expect(segment.includes("s0_port")).toBe(false);
+  });
 
-  it("warns and emits nothing for them", () => {
-    expect(result.warnings.length).toBe(1);
-    expect(result.warnings[0].includes("allowed_https_rules")).toBe(true);
+  it("emits a real dst_port ACL when the rule names a literal port", () => {
+    const result = generateHaproxyConfig({
+      urlRules: buildUrlRules("GET ~^https://a\\.com:8443/x$"),
+    });
+    const segment = frontendSegment(result.config, "https_in");
+    expect(segment.includes("dst_port 8443")).toBe(true);
   });
 });
 

@@ -10,24 +10,33 @@ services:
         # Never set for real builds/releases.
         BUILDCAGE_TEST_HOOKS: "1"
     environment:
-      - EXTERNAL_RESOLVER=10.200.0.53
-      - BUILDCAGE_EXTRA_CA_FILE=/test-fixtures/test-server-cert.pem
+      EXTERNAL_RESOLVER: 10.200.0.53
+      BUILDCAGE_EXTRA_CA_FILE: /test-fixtures/test-server-cert.pem
       # The rules live here rather than in the Makefile so CI, which drives
       # compose directly, tests the same ones. audit ignores them all.
-      - ALLOWED_HTTPS_RULES=sub.wildcard.example.com:443 absent.example.com:443 metadata.example.com:443
-      - ALLOWED_HTTP_RULES=allowed.example.com:80
-      - ALLOW_TLS_RULES=tlspass.example.com:443
-      # deb.debian.org is the one real, non-fixture host: apt has to bootstrap
-      # ca-certificates over the real archive before it has anything of its
-      # own to reuse the fixture with (see Dockerfile.inspect-debian). Scoped
-      # to the archive's own path prefixes rather than the whole host — the
-      # bookworm-slim default sources span both /debian/ and /debian-security/.
-      # A URL rule contains a space, so this input is newline separated.
-      # The wildcard-host rule below (unlike sub.wildcard.example.com, a
-      # literal host with no path restriction) is scoped by path: the DNS
-      # layer cannot see that scoping, so this is what proves a name that
-      # only matches the wildcard, not the path, is never resolved for real.
-      - "ALLOWED_URL_RULES=GET https://allowed.example.com/public/**\nGET https://allowed.example.com:9443/public/**\nGET|POST https://api.example.com/v1/*\nGET http://10.200.0.100/pub-by-addr/**\nGET http://deb.debian.org/debian/**\nGET http://deb.debian.org/debian-security/**\nGET https://*.wildcard.example.com/public/**"
+      ALLOWED_HTTPS_RULES: "sub.wildcard.example.com:443 absent.example.com:443 metadata.example.com:443"
+      ALLOWED_HTTP_RULES: allowed.example.com:80
+      ALLOW_TLS_RULES: tlspass.example.com:443
+      ALLOWED_URL_RULES: |
+        GET https://allowed.example.com/public/**
+        GET https://allowed.example.com:9443/public/**
+        GET|POST https://api.example.com/v1/*
+        GET http://10.200.0.100/pub-by-addr/**
+
+        # The one real, non-fixture host: apt has to bootstrap ca-certificates
+        # over the real archive before it has anything of its own to reuse the
+        # fixture with (see Dockerfile.inspect-debian).
+        GET http://deb.debian.org/debian/**
+        GET http://deb.debian.org/debian-security/**
+
+        # Scoped by path, unlike sub.wildcard.example.com: DNS cannot see that
+        # scoping, so this proves a name matching only the wildcard host is
+        # never resolved for real.
+        GET https://*.wildcard.example.com/public/**
+
+        # Reuses blocked.example.com (see [Blocked host]), so it needs no cert
+        # or DNS entry of its own.
+        GET ~^https://blocked\.example\.com:9443/public/.*$
     volumes:
       - ./test/test-server-inspect/cert.pem:/test-fixtures/test-server-cert.pem:ro
     networks:

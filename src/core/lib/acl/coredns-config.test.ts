@@ -78,6 +78,15 @@ describe("allowlist scope", () => {
       exprLine(gen({ tlsRules: ["db.example.com:5432"] })).includes("db\\\\.example\\\\.com"),
     ).toBe(true);
   });
+
+  it("takes the host from a ~regex url rule, with its port stripped from the host match", () => {
+    const result = generateCorednsConfig({
+      ...BASE,
+      urlRules: buildUrlRules("GET ~^https://a\\.com:8443/x$"),
+    });
+    expect(exprLine(result.config).includes("a\\\\.com")).toBe(true);
+    expect(result.warnings.length).toBe(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -206,16 +215,6 @@ describe("degenerate inputs", () => {
     const config = gen({});
     expect(config.includes("view allowlist")).toBe(false);
     expect(config.includes("buildcage dns denied")).toBe(true);
-  });
-
-  it("warns for a regex rule whose host cannot be derived", () => {
-    const result = generateCorednsConfig({
-      ...BASE,
-      urlRules: buildUrlRules("GET ~^https://a\\.com/x$"),
-    });
-    expect(result.warnings.length).toBe(1);
-    expect(result.warnings[0].includes("will not resolve")).toBe(true);
-    expect(result.config.includes("view allowlist")).toBe(false);
   });
 });
 

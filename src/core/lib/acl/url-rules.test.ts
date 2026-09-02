@@ -97,6 +97,37 @@ describe("convertUrlRule regex escape hatch", () => {
   it("rejects an invalid regex", () => {
     expect(() => convertUrlRule("GET ~^https://(")).toThrow();
   });
+
+  it("splits into a host half and a path half at the first / after ://", () => {
+    const r = convertUrlRule("GET ~^https://a\\.com/x$");
+    expect(r.authorityRegex).toBe("^a\\.com:[0-9]+$");
+    expect(r.pathRegex).toBe("^/x$");
+  });
+
+  it("recognises an escaped slash for either the scheme separator or the path start", () => {
+    const r = convertUrlRule("GET ~^https:\\/\\/a\\.com\\/x$");
+    expect(r.authorityRegex).toBe("^a\\.com:[0-9]+$");
+    expect(r.pathRegex).toBe("^\\/x$");
+  });
+
+  it("rejects a raw regex with no scheme separator", () => {
+    expect(() => convertUrlRule("GET ~^a\\.com/x$")).toThrow(/:\/\//);
+  });
+
+  it("rejects a raw regex with no path separator after ://", () => {
+    expect(() => convertUrlRule("GET ~^https://a\\.com$")).toThrow(/path/);
+  });
+
+  it("carries a literal port in the host half through to authorityRegex", () => {
+    const r = convertUrlRule("GET ~^https://a\\.com:8443/x$");
+    expect(r.authorityRegex).toBe("^a\\.com:8443$");
+    expect(r.pathRegex).toBe("^/x$");
+  });
+
+  it("rejects a non-literal port after the host's :", () => {
+    expect(() => convertUrlRule("GET ~^https://a\\.com:\\d+/x$")).toThrow(/literal number/);
+    expect(() => convertUrlRule("GET ~^https://a\\.com(:\\d+)?/x$")).toThrow(/literal number/);
+  });
 });
 
 // ---------------------------------------------------------------------------
