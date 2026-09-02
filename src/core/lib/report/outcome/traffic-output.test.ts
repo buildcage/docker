@@ -27,6 +27,7 @@ const EVENTS: TrafficEvent[] = [
     url: "https://a.example.com/pkg",
     status: 200,
     bytes: 708,
+    destination: "203.0.113.10",
   },
   {
     time: t + 1,
@@ -60,6 +61,16 @@ describe("buildTrafficRecords", () => {
     expect(r.url).toBe("https://a.example.com/pkg");
     expect(r.status).toBe(200);
     expect(r.bytes).toBe(708);
+  });
+
+  it("carries the resolved destination when the event has one", () => {
+    const r = records.find((r) => r.host === "a.example.com" && r.protocol === "https")!;
+    expect(r.destination).toBe("203.0.113.10");
+  });
+
+  it("omits destination when the event has none", () => {
+    const blocked = records.find((r) => r.action === "block" && r.protocol === "https")!;
+    expect("destination" in blocked).toBe(false);
   });
 
   it("keeps millisecond precision, not just whole seconds", () => {
