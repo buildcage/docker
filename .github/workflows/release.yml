@@ -50,14 +50,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PRERELEASE_FLAG=""
+          NOTES_ARGS=()
           case "$TAG" in
-            *-*) PRERELEASE_FLAG="--prerelease" ;;
+            *-*)
+              PRERELEASE_FLAG="--prerelease"
+              # GitHub's --generate-notes picks the wrong previous tag for a
+              # prerelease (skips the actual latest release, e.g. compares
+              # against v3.1.4 instead of v3.1.5 for v3.1.6-rc1) — pin it to
+              # the latest non-prerelease tag ourselves.
+              PREV_TAG=$(git tag --sort=-version:refname --list 'v*.*.*' | grep -vE '^v[0-9]+\.[0-9]+\.[0-9]+-' | head -1)
+              if [ -n "$PREV_TAG" ]; then
+                NOTES_ARGS=(--notes-start-tag "$PREV_TAG")
+              fi
+              ;;
           esac
           gh release create "$TAG" \
             --draft \
             --title "$TAG" \
             --generate-notes \
-            $PRERELEASE_FLAG
+            $PRERELEASE_FLAG \
+            "${NOTES_ARGS[@]}"
 
       - name: Push tag
         env:
