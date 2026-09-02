@@ -582,9 +582,10 @@ function splitDomainFromPortPattern(hostPlusPort) {
 * decodes %-escapes before matching, so that guard catches the encoded forms
 * too; see the squid config generator.
 */
+/** The scheme's own port, tried without being spelled out at all in a `~` URL rule's host half. */
 const DEFAULT_PORT = {
-	http: "80",
-	https: "443"
+	https: "443",
+	http: "80"
 };
 /**
 * Parse the method list preceding a URL.

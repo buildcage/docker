@@ -40,7 +40,8 @@ import {
   wildcardToRegexPartial,
 } from "./partial-wildcard.ts";
 
-const DEFAULT_PORT: Record<string, string> = { http: "80", https: "443" };
+/** The scheme's own port, tried without being spelled out at all in a `~` URL rule's host half. */
+export const DEFAULT_PORT: Record<"https" | "http", string> = { https: "443", http: "80" };
 
 export interface UrlRule {
   /** Uppercased HTTP methods, or null when the rule allows any method (`*`). */
@@ -105,14 +106,17 @@ export function parseMethods(spec: string, rule: string): string[] | null {
  *
  * @throws {Error} if the pattern is not an http(s) URL
  */
-function splitUrl(url: string, rule: string): { scheme: string; authority: string; path: string } {
+function splitUrl(
+  url: string,
+  rule: string,
+): { scheme: "https" | "http"; authority: string; path: string } {
   const match = /^(https?):\/\/([^/]+)(\/.*)?$/.exec(url);
   if (!match) {
     throw new Error(
       `Invalid URL in rule "${rule}": expected http:// or https:// followed by a host`,
     );
   }
-  return { scheme: match[1], authority: match[2], path: match[3] ?? "" };
+  return { scheme: match[1] as "https" | "http", authority: match[2], path: match[3] ?? "" };
 }
 
 /** A literal `/`, or its escaped form `\/`. */

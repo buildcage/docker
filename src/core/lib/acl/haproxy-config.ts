@@ -25,6 +25,7 @@ import {
   type CompiledRule,
   type RuleInputs,
 } from "./haproxy-rules.ts";
+import { DEFAULT_PORT } from "./url-rules.ts";
 
 export interface HaproxyConfigOptions extends RuleInputs {
   /** `audit` records without enforcing, so nothing may be refused. */
@@ -62,9 +63,6 @@ export interface GeneratedHaproxyConfig {
   config: string;
   warnings: string[];
 }
-
-/** The scheme's own port, tried without being spelled out at all in a `~` URL rule's host half. */
-const DEFAULT_PORT: Record<"https" | "http", number> = { https: 443, http: 80 };
 
 /** Emit the rule ACLs and the single deny that enforces them. */
 function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" | "http"): string[] {
