@@ -37,6 +37,8 @@ export interface TrafficRecord {
   bytes?: number;
   /** Present only when action is `block`. */
   reason?: string;
+  /** Address it was actually sent to. Absent for dns. */
+  destination?: string;
 }
 
 /**
@@ -67,6 +69,7 @@ export function buildTrafficRecords(
       if (e.status !== undefined) record.status = e.status;
       if (e.bytes !== undefined) record.bytes = e.bytes;
       if (e.reason !== undefined) record.reason = e.reason;
+      if (e.destination !== undefined) record.destination = e.destination;
       return record;
     });
 }
