@@ -212,6 +212,13 @@ RUN echo "=== [TLS passthrough] ===" && \
     echo "$OUT" && \
     case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
 
+# [~regex TLS rule - host and its own literal port]
+# Same host as [TLS passthrough], a second port only the ~regex rule names.
+RUN echo "=== [Regex TLS rule] ===" && \
+    OUT=$($S --insecure https://tlspass.example.com:8443/public/x) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
 # [DNS-only exfiltration]
 # No connection is ever made, so the resolver's log is the only record. The
 # lookup is expected to fail; what matters is that it was refused and recorded.

@@ -120,7 +120,9 @@ ever reaches an origin. Writing the host half as narrowly as the name actually n
 narrows the DNS-layer exposure; the path half narrows only the HTTP-layer one.
 
 `allowed_https_rules` and `allowed_http_rules` keep their existing `host:port` syntax and meaning,
-and are equivalent to a URL rule with any method and any path.
+and are equivalent to a URL rule with any method and any path. Their own `~` regex, and
+`allow_tls_rules`'s, is checked the same way as a URL rule's: the destination port can never be
+matched with a regex, so a port must be a literal number or omitted, on penalty of the same error.
 
 A rule may name an address rather than a name, in `allowed_url_rules` or the host rules. The proxy
 resolves the Host header to decide where to connect, and no resolver can answer an address, so one

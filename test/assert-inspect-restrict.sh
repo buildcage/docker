@@ -120,6 +120,14 @@ if grep -qE "^buildcage [0-9]+ pass tls sni=tlspass\.example\.com [0-9]+ ts=" <<
 else
   fail "the passthrough was not recorded at all"
 fi
+# Only the ~regex rule names port 8443, so reaching it there proves the rule
+# was matched by regex rather than mangled into a wildcard that happens to
+# also match :443.
+if grep -qE "^buildcage [0-9]+ pass tls sni=tlspass\.example\.com [0-9]+ ts=\S+ dst=10\.200\.0\.100:8443$" <<< "$PROXY_LOG"; then
+  pass "the ~regex TLS rule's own port (8443) reached the resolved origin"
+else
+  fail "no passthrough was recorded on the ~regex rule's port 8443"
+fi
 # A request line for it would mean the TLS was terminated after all.
 if grep -qE "^buildcage [0-9]+ https? [A-Z]+ \S*tlspass\.example\.com" <<< "$PROXY_LOG"; then
   fail "a passthrough connection was decrypted and logged as a request"

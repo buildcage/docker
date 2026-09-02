@@ -5,7 +5,7 @@
  */
 
 import type { UrlRule } from "./url-rules.ts";
-import { domainToRegexPartial } from "./partial-wildcard.ts";
+import { domainToRegexPartial, splitRawRegexHost } from "./partial-wildcard.ts";
 
 /** An IPv4 address or CIDR block, which is what HAProxy's `dst` acl accepts. */
 const IPV4_OR_CIDR = /^\d{1,3}(?:\.\d{1,3}){3}(?:\/\d{1,2})?$/;
@@ -106,8 +106,12 @@ function splitHostAndPort(hostRegexWithPort: string): { hostRegex: string; port:
   };
 }
 
-/** Turn a `host:port` wildcard into a host matcher and the port it names. */
+/** Turn a `host:port` wildcard, or a `~` regex, into a host matcher and the port it names. */
 function hostRuleToMatcher(pattern: string): { hostRegex: string; port: string | null } {
+  if (pattern.startsWith("~")) {
+    const { host, port } = splitRawRegexHost(pattern);
+    return { hostRegex: `^${host}$`, port };
+  }
   const colonIndex = pattern.lastIndexOf(":");
   const portText = colonIndex === -1 ? "*" : pattern.slice(colonIndex + 1);
   const hostPattern = colonIndex === -1 ? pattern : pattern.slice(0, colonIndex);

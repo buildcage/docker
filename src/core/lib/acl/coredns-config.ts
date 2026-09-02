@@ -19,7 +19,7 @@
  */
 
 import type { UrlRule } from "./url-rules.ts";
-import { wildcardToRegexPartial } from "./partial-wildcard.ts";
+import { splitRawRegexHost, wildcardToRegexPartial } from "./partial-wildcard.ts";
 
 export interface CorednsConfigOptions {
   /** Host rules (`host:port` wildcards). Only the host half is used here. */
@@ -61,8 +61,9 @@ export function escapeForCel(regex: string): string {
   return regex.replace(/\\/g, "\\\\");
 }
 
-/** The host half of a `host:port` wildcard, as a regex. */
+/** The host half of a `host:port` wildcard, or a `~` regex, as a regex. */
 function hostRegexOfHostRule(pattern: string): string {
+  if (pattern.startsWith("~")) return splitRawRegexHost(pattern).host;
   const combined = wildcardToRegexPartial(pattern);
   return combined.slice(0, combined.lastIndexOf(":"));
 }

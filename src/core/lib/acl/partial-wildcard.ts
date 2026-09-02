@@ -112,3 +112,56 @@ export function wildcardToRegexPartial(pattern: string): string {
   const port = pattern.slice(colonIndex + 1);
   return `${domainToRegexPartial(domain)}:${port === "*" ? "\\d+" : port}`;
 }
+
+/**
+ * Split a `~` host rule's raw regex into an unanchored host fragment and its
+ * port. Bypasses domainToRegexPartial/wildcardToRegexPartial entirely, since
+ * those would mangle the user's own regex syntax. HAProxy's dst_port ACL only
+ * accepts a literal number, never a regex, so the port is honoured only when
+ * it is one.
+ *
+ * @throws {Error} if the regex is invalid, its port is not a literal number,
+ *   or the host half does not compile as a regex on its own
+ */
+export function splitRawRegexHost(pattern: string): { host: string; port: string | null } {
+  const regex = pattern.slice(1);
+  try {
+    new RegExp(regex);
+  } catch (e) {
+    throw new Error(`Invalid regex in rule "${pattern}": ${(e as Error).message}`);
+  }
+
+  const colonIndex = regex.lastIndexOf(":");
+  let host: string;
+  let port: string | null;
+  if (colonIndex === -1) {
+    host = regex;
+    port = null;
+  } else {
+    host = regex.slice(0, colonIndex);
+    let portText = regex.slice(colonIndex + 1);
+    if (portText.endsWith("$")) portText = portText.slice(0, -1);
+    if (!/^\d+$/.test(portText)) {
+      throw new Error(
+        `Invalid regex in rule "${pattern}": the port after the last ":" ("${portText}") must be ` +
+          `a literal number, since the destination port cannot be matched with a regex; write a ` +
+          `plain number (e.g. "~^example\\.com:8443$") or omit the port entirely to allow any port`,
+      );
+    }
+    port = portText;
+  }
+  // A leftover $ would close coredns-config.ts's larger alternation early;
+  // each caller re-anchors the host on its own terms instead.
+  if (host.startsWith("^")) host = host.slice(1);
+  if (host.endsWith("$")) host = host.slice(0, -1);
+
+  try {
+    new RegExp(host);
+  } catch (e) {
+    throw new Error(
+      `Invalid regex in rule "${pattern}": the host part "${host}" does not compile on its own: ` +
+        `${(e as Error).message}`,
+    );
+  }
+  return { host, port };
+}

@@ -104,6 +104,29 @@ describe("tls rule compilation", () => {
   it("reports any-port as null", () => {
     expect(compileRuleSet({ tlsRules: ["db.example.com:*"] }).tls[0].port).toBe(null);
   });
+
+  it("passes a ~regex host rule through instead of treating it as a wildcard", () => {
+    // "." and "*" would otherwise be rewritten by domainToRegexPartial's own
+    // wildcard vocabulary; a ~ rule must skip that and use the regex as-is.
+    const [rule] = compileRuleSet({ tlsRules: ["~^.*\\.example\\.com$"] }).tls;
+    expect(rule.hostRegex).toBe("^.*\\.example\\.com$");
+    expect(rule.port).toBe(null);
+  });
+
+  it("carries a literal port in a ~regex host rule through to a real port restriction", () => {
+    const [rule] = compileRuleSet({ tlsRules: ["~^example\\.com:8443$"] }).tls;
+    expect(rule.hostRegex).toBe("^example\\.com$");
+    expect(rule.port).toBe("8443");
+  });
+
+  it("rejects a non-literal port in a ~regex host rule", () => {
+    // Neither a \d+ shorthand nor an alternation is a literal number, and
+    // HAProxy's dst_port ACL cannot match either as a regex.
+    expect(() => compileRuleSet({ tlsRules: ["~^example\\.com:\\d+$"] })).toThrow(/literal number/);
+    expect(() => compileRuleSet({ tlsRules: ["~^example\\.com:(443|8443)$"] })).toThrow(
+      /literal number/,
+    );
+  });
 });
 
 reportResults();
