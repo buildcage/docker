@@ -5,7 +5,7 @@
  */
 
 import type { UrlRule } from "./url-rules.ts";
-import { domainToRegexPartial } from "./partial-wildcard.ts";
+import { domainToRegexPartial, splitRawRegexHost } from "./partial-wildcard.ts";
 
 /** An IPv4 address or CIDR block, which is what HAProxy's `dst` acl accepts. */
 const IPV4_OR_CIDR = /^\d{1,3}(?:\.\d{1,3}){3}(?:\/\d{1,2})?$/;
@@ -40,12 +40,29 @@ export const INTERNAL_RANGES = [
   "fc00::/7",
 ];
 
+/**
+ * How a rule's host half is matched:
+ *
+ *  - "wildcard": `hostRegex` names the host alone; `port`, if any, is a
+ *    literal number matched separately (HAProxy's dst_port ACL).
+ *  - "hostPort": a `~` host/tls/ip rule. `hostRegex` is the user's whole
+ *    regex, covering host and port together, matched as one expression
+ *    against the connection stringified. `port` is always null -- the
+ *    pattern's own port coverage replaces it, and a port can never be
+ *    matched with a regex through dst_port.
+ *  - "hostBareFull": a `~` URL rule's host half. `hostRegex` covers the host
+ *    alone (port optional in the pattern), tried against two forms of the
+ *    connection: without a port when the connection is on the scheme's
+ *    default port, and with the real port otherwise. `port` is always null.
+ */
+export type HostMatch = "wildcard" | "hostPort" | "hostBareFull";
+
 /** A host/URL rule, matched on host, port, path and (for URL rules) method. */
 export interface CompiledRule {
   id: string;
-  /** Matches the name alone; the port is matched separately. */
+  hostMatch: HostMatch;
   hostRegex: string;
-  /** The port the rule names, or null for any port. */
+  /** The port the rule names, or null for any port. Only meaningful when `hostMatch` is "wildcard". */
   port: string | null;
   pathRegex: string;
   methods: string[] | null;
@@ -55,7 +72,9 @@ export interface CompiledRule {
 /** An IP rule, tunnelled at TCP level without inspection. */
 export interface CompiledIpRule {
   id: string;
+  /** A literal IPv4 address or CIDR block, or (when `hostMatch` is "hostPort") the whole "address:port" regex. */
   address: string;
+  hostMatch: "wildcard" | "hostPort";
   port: string | null;
   raw: string;
 }
@@ -63,6 +82,7 @@ export interface CompiledIpRule {
 /** A TLS rule, judged on SNI and passed through undecrypted. */
 export interface CompiledTlsRule {
   id: string;
+  hostMatch: "wildcard" | "hostPort";
   hostRegex: string;
   port: string | null;
   raw: string;
@@ -106,12 +126,30 @@ function splitHostAndPort(hostRegexWithPort: string): { hostRegex: string; port:
   };
 }
 
-/** Turn a `host:port` wildcard into a host matcher and the port it names. */
-function hostRuleToMatcher(pattern: string): { hostRegex: string; port: string | null } {
+/** Turn a `host:port` wildcard, or a `~` regex, into a host matcher and the port it names. */
+function hostRuleToMatcher(pattern: string): {
+  hostMatch: "wildcard" | "hostPort";
+  hostRegex: string;
+  port: string | null;
+} {
+  if (pattern.startsWith("~")) {
+    // Validates: the regex compiles, it names a port, and the host half
+    // compiles alone -- the host half itself is only needed by
+    // coredns-config.ts, but the checks apply here just the same.
+    splitRawRegexHost(pattern);
+    return { hostMatch: "hostPort", hostRegex: pattern.slice(1), port: null };
+  }
   const colonIndex = pattern.lastIndexOf(":");
-  const portText = colonIndex === -1 ? "*" : pattern.slice(colonIndex + 1);
-  const hostPattern = colonIndex === -1 ? pattern : pattern.slice(0, colonIndex);
+  if (colonIndex === -1) {
+    throw new Error(`Invalid rule "${pattern}": missing port`);
+  }
+  const portText = pattern.slice(colonIndex + 1);
+  const hostPattern = pattern.slice(0, colonIndex);
+  if (!/^(?:\d+|\*)$/.test(portText)) {
+    throw new Error(`Invalid port in rule "${pattern}": "${portText}"`);
+  }
   return {
+    hostMatch: "wildcard",
     hostRegex: `^${domainToRegexPartial(hostPattern)}$`,
     port: portText === "*" ? null : portText,
   };
@@ -135,8 +173,21 @@ function compileSchemeRules(
   }
   for (const rule of urlRules ?? []) {
     if (rule.scheme !== scheme) continue;
+    if (rule.isRegex) {
+      out.push({
+        id: "",
+        hostMatch: "hostBareFull",
+        hostRegex: rule.hostRegex,
+        port: null,
+        pathRegex: rule.pathRegex,
+        methods: rule.methods,
+        raw: rule.raw,
+      });
+      continue;
+    }
     out.push({
       id: "",
+      hostMatch: "wildcard",
       // authorityRegex is `^<hostRegex>:<port>$`.
       ...splitHostAndPort(rule.authorityRegex.slice(1, -1)),
       pathRegex: rule.pathRegex,
@@ -153,6 +204,19 @@ function compileSchemeRules(
 function compileIpRules(rules: string[] | undefined, warnings: string[]): CompiledIpRule[] {
   const out: CompiledIpRule[] = [];
   (rules ?? []).forEach((rule, index) => {
+    if (rule.startsWith("~")) {
+      // Validates: the regex compiles and it names a port -- see
+      // hostRuleToMatcher for why this is checked here too.
+      splitRawRegexHost(rule);
+      out.push({
+        id: `ip${index}`,
+        address: rule.slice(1),
+        hostMatch: "hostPort",
+        port: null,
+        raw: rule,
+      });
+      return;
+    }
     const colonIndex = rule.lastIndexOf(":");
     if (colonIndex === -1) {
       warnings.push(`IP rule ${JSON.stringify(rule)} has no port. It is ignored.`);
@@ -167,7 +231,13 @@ function compileIpRules(rules: string[] | undefined, warnings: string[]): Compil
       );
       return;
     }
-    out.push({ id: `ip${index}`, address, port: port === "*" ? null : port, raw: rule });
+    out.push({
+      id: `ip${index}`,
+      address,
+      hostMatch: "wildcard",
+      port: port === "*" ? null : port,
+      raw: rule,
+    });
   });
   return out;
 }

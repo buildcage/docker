@@ -25,6 +25,7 @@ import {
   type CompiledRule,
   type RuleInputs,
 } from "./haproxy-rules.ts";
+import { DEFAULT_PORT } from "./url-rules.ts";
 
 export interface HaproxyConfigOptions extends RuleInputs {
   /** `audit` records without enforcing, so nothing may be refused. */
@@ -64,7 +65,7 @@ export interface GeneratedHaproxyConfig {
 }
 
 /** Emit the rule ACLs and the single deny that enforces them. */
-function ruleBlock(rules: CompiledRule[], mode: string): string[] {
+function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" | "http"): string[] {
   const lines: string[] = [];
   if (mode === "audit") {
     lines.push("    # audit records without enforcing, so nothing is refused here.", "");
@@ -78,12 +79,42 @@ function ruleBlock(rules: CompiledRule[], mode: string): string[] {
     );
     return lines;
   }
+
+  if (rules.some((r) => r.hostMatch === "hostPort")) {
+    // A ~ rule's own regex covers host and port together, so hdr(host) is
+    // stringified with the real port once here for every such rule to match.
+    lines.push("    http-request set-var-fmt(txn.host_port) %[hdr(host),host_only]:%[dst_port]");
+  }
+  if (rules.some((r) => r.hostMatch === "hostBareFull")) {
+    // A ~ URL rule's port is optional, exactly as in a literal URL: tried
+    // without a port on the scheme's own default, and with the real port
+    // otherwise -- see haproxy-rules.ts's HostMatch doc comment.
+    lines.push(
+      `    acl is_default_port dst_port ${DEFAULT_PORT[scheme]}`,
+      "    http-request set-var(txn.host_bare) hdr(host),host_only",
+      "    http-request set-var-fmt(txn.host_full) %[hdr(host),host_only]:%[dst_port]",
+    );
+  }
+
   for (const rule of rules) {
     lines.push(`    # ${rule.raw}`);
-    // -i, since a name is case-insensitive and do-resolve lowercases anyway.
-    lines.push(`    acl ${rule.id}_host hdr(host),host_only -m reg -i ${rule.hostRegex}`);
-    if (rule.port) {
-      lines.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
+    if (rule.hostMatch === "hostPort") {
+      lines.push(`    acl ${rule.id}_host var(txn.host_port) -m reg -i ${rule.hostRegex}`);
+    } else if (rule.hostMatch === "hostBareFull") {
+      lines.push(
+        `    http-request set-var(txn.${rule.id}_ok) bool(false)`,
+        `    http-request set-var(txn.${rule.id}_ok) bool(true) if is_default_port ` +
+          `{ var(txn.host_bare) -m reg -i ${rule.hostRegex} }`,
+        `    http-request set-var(txn.${rule.id}_ok) bool(true) if ` +
+          `{ var(txn.host_full) -m reg -i ${rule.hostRegex} }`,
+        `    acl ${rule.id}_host var(txn.${rule.id}_ok) -m bool`,
+      );
+    } else {
+      // -i, since a name is case-insensitive and do-resolve lowercases anyway.
+      lines.push(`    acl ${rule.id}_host hdr(host),host_only -m reg -i ${rule.hostRegex}`);
+      if (rule.port) {
+        lines.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
+      }
     }
     lines.push(`    acl ${rule.id}_path path -m reg ${rule.pathRegex}`);
     if (rule.methods) {
@@ -179,17 +210,32 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
     l.push(
       "    # Captured now, since the request buffer is gone by log time.",
       "    tcp-request content set-var(txn.sni) req.ssl_sni",
-      "",
-      "    # Passed through untouched: judged before anything is decrypted.",
     );
+    if (ipRules.some((rule) => rule.hostMatch === "hostPort")) {
+      // dst is IP-typed; a ~ rule's own regex covers address and port
+      // together, so dst is stringified with the real port to match it.
+      l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]");
+    }
+    if (tlsHosts.some((host) => host.hostMatch === "hostPort")) {
+      l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]");
+    }
+    l.push("", "    # Passed through untouched: judged before anything is decrypted.");
     for (const rule of ipRules) {
       l.push(`    # ${rule.raw}`);
-      l.push(`    acl ${rule.id}_dst dst ${rule.address}`);
+      l.push(
+        rule.hostMatch === "hostPort"
+          ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${rule.address}`
+          : `    acl ${rule.id}_dst dst ${rule.address}`,
+      );
       if (rule.port) l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
     }
     for (const host of tlsHosts) {
       l.push(`    # ${host.raw}`);
-      l.push(`    acl ${host.id}_sni req.ssl_sni -m reg -i ${host.hostRegex}`);
+      l.push(
+        host.hostMatch === "hostPort"
+          ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${host.hostRegex}`
+          : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${host.hostRegex}`,
+      );
       if (host.port) l.push(`    acl ${host.id}_port dst_port ${host.port}`);
     }
     const conds = [
@@ -280,7 +326,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
     name: string,
     port: number,
     bindExtra: string,
-    scheme: string,
+    scheme: "https" | "http",
     rules: CompiledRule[],
     backend: string,
   ) => {
@@ -316,7 +362,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
     // allow reaches the do-resolve below, so a name a request would be denied
     // for never triggers a real DNS query -- do-resolve is the only place a
     // real query leaves this proxy, and it must never run ahead of a deny.
-    l.push(...ruleBlock(rules, opts.mode ?? "restrict"));
+    l.push(...ruleBlock(rules, opts.mode ?? "restrict", scheme));
     if (resolvers.length > 0) {
       l.push(
         "    # Connect where WE resolve the Host, discarding the client's address,",

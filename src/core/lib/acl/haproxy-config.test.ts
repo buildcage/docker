@@ -302,6 +302,19 @@ describe("rules", () => {
     expect(config.includes("acl s0_port dst_port 8443")).toBe(true);
   });
 
+  it("matches a ~regex host rule's host and port as one expression", () => {
+    const config = gen({ httpsRules: ["~^.*\\.example\\.com:(443|8443)$"] });
+    expect(config.includes("set-var-fmt(txn.host_port) %[hdr(host),host_only]:%[dst_port]")).toBe(
+      true,
+    );
+    expect(
+      config.includes("acl s0_host var(txn.host_port) -m reg -i ^.*\\.example\\.com:(443|8443)$"),
+    ).toBe(true);
+    // The pattern's own port coverage replaces dst_port entirely.
+    expect(config.includes("s0_port")).toBe(false);
+    expect(config.includes("http-request deny unless s0_host s0_path")).toBe(true);
+  });
+
   it("omits the port acl only when the rule names every port", () => {
     const config = gen({ httpsRules: ["a.com:*"] });
     expect(config.includes("s0_port")).toBe(false);
@@ -369,6 +382,20 @@ describe("passthrough", () => {
     ).toBe(true);
   });
 
+  it("matches a ~regex tls rule's host and port as one expression against the SNI stringified", () => {
+    const result = generateHaproxyConfig({ tlsRules: ["~^.*\\.example\\.com:(5432|5433)$"] });
+    expect(result.config.includes("set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]")).toBe(
+      true,
+    );
+    expect(
+      result.config.includes(
+        "acl tls0_sni var(txn.sni_port) -m reg -i ^.*\\.example\\.com:(5432|5433)$",
+      ),
+    ).toBe(true);
+    // The pattern's own port coverage replaces dst_port entirely.
+    expect(result.config.includes("tls0_port")).toBe(false);
+  });
+
   it("also scopes the early do-resolve trigger by port, not just the backend selection", () => {
     // Regression: this used to set txn.tlsrule from the SNI ACL alone, so an
     // SNI matching db.example.com on a *different* port than the rule names
@@ -419,6 +446,27 @@ describe("passthrough", () => {
     expect(result.warnings.length).toBe(1);
     expect(result.config.includes("ip0_dst")).toBe(false);
   });
+
+  it("matches a ~regex ip rule's address and port as one expression against the destination stringified", () => {
+    const result = generateHaproxyConfig({
+      ipRules: ["~^192\\.168\\.1\\.\\d+:(8080|8081)$"],
+    });
+    expect(result.warnings.length).toBe(0);
+    expect(result.config.includes("set-var-fmt(txn.dst_str) %[dst]:%[dst_port]")).toBe(true);
+    expect(
+      result.config.includes(
+        "acl ip0_dst var(txn.dst_str) -m reg ^192\\.168\\.1\\.\\d+:(8080|8081)$",
+      ),
+    ).toBe(true);
+    // The pattern's own port coverage replaces dst_port entirely.
+    expect(result.config.includes("ip0_port")).toBe(false);
+    // A literal rule still matches dst directly -- no need to stringify it.
+    expect(
+      generateHaproxyConfig({ ipRules: ["10.0.0.5:5432"] }).config.includes(
+        "set-var-fmt(txn.dst_str)",
+      ),
+    ).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -448,24 +496,48 @@ describe("audit mode", () => {
 });
 
 // ---------------------------------------------------------------------------
-// ~regex rules split at the first / after :// into a host and path ACL
+// ~regex url rules: host half matched bare/full, path stays a separate ACL
 // ---------------------------------------------------------------------------
-describe("regex rules", () => {
-  it("emits a host and path ACL, with no port ACL when the rule names none", () => {
+describe("regex url rules", () => {
+  it("builds the shared bare/full host variables and the default-port gate", () => {
     const result = generateHaproxyConfig({ urlRules: buildUrlRules("GET ~^https://a\\.com/x$") });
     expect(result.warnings.length).toBe(0);
     const segment = frontendSegment(result.config, "https_in");
-    expect(segment.includes("-m reg -i ^a\\.com$")).toBe(true);
+    expect(segment.includes("acl is_default_port dst_port 443")).toBe(true);
+    expect(segment.includes("set-var(txn.host_bare) hdr(host),host_only")).toBe(true);
+    expect(segment.includes("set-var-fmt(txn.host_full) %[hdr(host),host_only]:%[dst_port]")).toBe(
+      true,
+    );
+  });
+
+  it("ORs a bare (default-port-only) match with a full (real-port) match per rule", () => {
+    const result = generateHaproxyConfig({ urlRules: buildUrlRules("GET ~^https://a\\.com/x$") });
+    const segment = frontendSegment(result.config, "https_in");
+    expect(segment.includes("set-var(txn.s0_ok) bool(false)")).toBe(true);
+    expect(
+      segment.includes(
+        "set-var(txn.s0_ok) bool(true) if is_default_port { var(txn.host_bare) -m reg -i ^a\\.com$ }",
+      ),
+    ).toBe(true);
+    expect(
+      segment.includes(
+        "set-var(txn.s0_ok) bool(true) if { var(txn.host_full) -m reg -i ^a\\.com$ }",
+      ),
+    ).toBe(true);
+    expect(segment.includes("acl s0_host var(txn.s0_ok) -m bool")).toBe(true);
     expect(segment.includes("path -m reg ^/x$")).toBe(true);
+    expect(segment.includes("http-request deny unless s0_host s0_path s0_method")).toBe(true);
+    // No dst_port ACL at all: the bare/full duality covers the port.
     expect(segment.includes("s0_port")).toBe(false);
   });
 
-  it("emits a real dst_port ACL when the rule names a literal port", () => {
+  it("allows a non-literal port in the host half, matched as written", () => {
     const result = generateHaproxyConfig({
-      urlRules: buildUrlRules("GET ~^https://a\\.com:8443/x$"),
+      urlRules: buildUrlRules("GET ~^https://a\\.com:(443|8443)/x$"),
     });
+    expect(result.warnings.length).toBe(0);
     const segment = frontendSegment(result.config, "https_in");
-    expect(segment.includes("dst_port 8443")).toBe(true);
+    expect(segment.includes("-m reg -i ^a\\.com:(443|8443)$")).toBe(true);
   });
 });
 

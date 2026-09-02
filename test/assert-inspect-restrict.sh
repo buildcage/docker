@@ -35,6 +35,7 @@ assert_logged DELETE "https://sub.wildcard.example.com/anything/at/all" 200
 assert_logged GET "http://allowed.example.com/public/pkg.tgz" 200
 assert_logged GET "https://attacker.wildcard.example.com/public/pkg.tgz" 200
 assert_logged GET "https://blocked.example.com:9443/public/pkg.tgz" 200
+assert_logged GET "https://blocked.example.com/defaultport/pkg.tgz" 200
 echo ""
 
 echo "[refused] recorded with the method and the full URL, before any origin was contacted:"
@@ -44,6 +45,7 @@ assert_logged GET "https://absent.example.com/" 502
 assert_logged GET "https://attacker.wildcard.example.com/private/secret" 403
 assert_logged GET "https://blocked.example.com:9443/private/secret" 403
 assert_logged GET "https://blocked.example.com/public/pkg.tgz" 403
+assert_logged GET "https://blocked.example.com:9443/defaultport/pkg.tgz" 403
 echo ""
 
 echo "[traversal] the path is normalised before the rules see it:"
@@ -120,17 +122,36 @@ if grep -qE "^buildcage [0-9]+ pass tls sni=tlspass\.example\.com [0-9]+ ts=" <<
 else
   fail "the passthrough was not recorded at all"
 fi
+# Only the ~regex rule names port 8443, so reaching it there proves the rule
+# was matched by regex rather than mangled into a wildcard that happens to
+# also match :443.
+if grep -qE "^buildcage [0-9]+ pass tls sni=tlspass\.example\.com [0-9]+ ts=\S+ dst=10\.200\.0\.100:8443$" <<< "$PROXY_LOG"; then
+  pass "the ~regex TLS rule's own port (8443) reached the resolved origin"
+else
+  fail "no passthrough was recorded on the ~regex rule's port 8443"
+fi
 # A request line for it would mean the TLS was terminated after all.
 if grep -qE "^buildcage [0-9]+ https? [A-Z]+ \S*tlspass\.example\.com" <<< "$PROXY_LOG"; then
   fail "a passthrough connection was decrypted and logged as a request"
 else
   pass "no request-level record, so nothing was decrypted"
 fi
+echo ""
+
+echo "[Regex IP rule] a ~regex allowed_ip_rules entry passes through, on its own port:"
+if grep -qE "^buildcage [0-9]+ pass tcp sni=- [0-9]+ ts=\S+ dst=10\.200\.0\.100:9080$" <<< "$PROXY_LOG"; then
+  pass "recorded as an undecrypted tcp passthrough, on the rule's own port"
+else
+  fail "no tcp passthrough was recorded on the ~regex ip rule's port 9080"
+fi
+echo ""
+
 # Everything not passed through is recorded by the frontend that terminates it,
 # so nothing else may appear at the tcp stage or it would be counted twice.
 # The count is not asserted: a reused container's log spans several builds.
 OTHER=$(grep -E "^buildcage [0-9]+ pass " <<< "$PROXY_LOG" \
-  | grep -cv "sni=tlspass\.example\.com" || true)
+  | grep -v "sni=tlspass\.example\.com" \
+  | grep -cv "dst=10\.200\.0\.100:9080" || true)
 if [ "$OTHER" -eq 0 ]; then
   pass "only the passthrough is logged at the tcp stage"
 else
@@ -184,7 +205,8 @@ REPORT_MARKDOWN=$(GITHUB_STEP_SUMMARY= node report/src/main.ts 2>&1 || true)
 echo "[report] Allowed Hosts:"
 if grep -qF "### ✅ Allowed Hosts" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| allowed.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| allowed.example.com:80 | HTTP |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| allowed.example.com:80 | HTTP |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| 10.200.0.100:9080 | IP |" <<< "$REPORT_MARKDOWN"; then
   pass "the table lists the hosts that were reached"
 else
   fail "the Allowed Hosts table is missing expected rows"

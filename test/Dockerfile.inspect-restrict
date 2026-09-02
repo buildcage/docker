@@ -131,6 +131,21 @@ RUN echo "=== [Regex URL rule - default port not covered by the literal-port rul
     echo "status=$CODE" && \
     [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
 
+# [~regex URL rule - no port names, so only the scheme's default port matches]
+# A separate ~regex rule on blocked.example.com, /defaultport/ this time,
+# names no port at all. It must match the default port (443) and nothing
+# else: a bare/full check that always resolved "true" would wrongly let
+# 9443 through too.
+RUN echo "=== [Regex URL rule - no port names the default port only] ===" && \
+    OUT=$($S https://blocked.example.com/defaultport/pkg.tgz) && \
+    echo "$OUT" && \
+    case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+RUN echo "=== [Regex URL rule - portless rule does not also grant a non-default port] ===" && \
+    CODE=$($C https://blocked.example.com:9443/defaultport/pkg.tgz) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
 # [Host rule - any path, any method]
 RUN echo "=== [Host rule] ===" && \
     OUT=$($S -X DELETE https://sub.wildcard.example.com/anything/at/all) && \
@@ -212,6 +227,13 @@ RUN echo "=== [TLS passthrough] ===" && \
     echo "$OUT" && \
     case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
 
+# [~regex TLS rule - host and its own literal port]
+# Same host as [TLS passthrough], a second port only the ~regex rule names.
+RUN echo "=== [Regex TLS rule] ===" && \
+    OUT=$($S --insecure https://tlspass.example.com:8443/public/x) && \
+    echo "$OUT" && \
+    case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
 # [DNS-only exfiltration]
 # No connection is ever made, so the resolver's log is the only record. The
 # lookup is expected to fail; what matters is that it was refused and recorded.
@@ -257,6 +279,20 @@ RUN echo "=== [SSRF via allowlisted name] ===" && \
 # [Direct address, no ip rule]
 RUN echo "=== [Direct address] ===" && \
     CODE=$($C http://10.200.0.101/) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
+
+# [~regex allowed_ip_rules - uninspected passthrough by address]
+# Port 9080, distinct from the :80 the URL rule above allows.
+RUN echo "=== [Regex IP rule] ===" && \
+    OUT=$($S http://10.200.0.100:9080/anything) && \
+    echo "$OUT" && \
+    case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
+
+# Same address, a port only the URL rule's :80 default would cover -- proves
+# the ~regex ip rule's own literal port (9080) is enforced, not "any port".
+RUN echo "=== [Regex IP rule - other port not covered] ===" && \
+    CODE=$($C http://10.200.0.100:8080/anything) && \
     echo "status=$CODE" && \
     [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
 

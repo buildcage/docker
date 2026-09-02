@@ -79,6 +79,14 @@ describe("allowlist scope", () => {
     ).toBe(true);
   });
 
+  it("takes the host from a ~regex host rule instead of mangling it as a wildcard", () => {
+    const result = generateCorednsConfig({
+      ...BASE,
+      tlsRules: ["~^.*\\.example\\.com:8443$"],
+    });
+    expect(exprLine(result.config).includes(".*\\\\.example\\\\.com")).toBe(true);
+  });
+
   it("takes the host from a ~regex url rule, with its port stripped from the host match", () => {
     const result = generateCorednsConfig({
       ...BASE,

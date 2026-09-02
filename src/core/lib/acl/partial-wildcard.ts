@@ -112,3 +112,69 @@ export function wildcardToRegexPartial(pattern: string): string {
   const port = pattern.slice(colonIndex + 1);
   return `${domainToRegexPartial(domain)}:${port === "*" ? "\\d+" : port}`;
 }
+
+/**
+ * Where a port pattern starts in a `<host>[:<port>]` regex fragment written
+ * by a user: a bare `:`, or the `(` of a group opening right at the colon
+ * (`(:8443)?`, `(:443|:8443)`). Splitting there, rather than at the last `:`
+ * in the whole fragment, keeps a port group's own `(` out of the host half
+ * so both halves stay balanced regexes on their own.
+ */
+const PORT_PATTERN_START = /\(:|:/;
+
+/**
+ * Split a `<host>[:<port>]` regex fragment -- a `~` rule's own text, minus
+ * any scheme/path around it -- into its domain-only prefix and the port
+ * pattern (including its own leading `:` or `(`). `portPattern` is `null`
+ * when the fragment names no port at all.
+ */
+export function splitDomainFromPortPattern(hostPlusPort: string): {
+  domain: string;
+  portPattern: string | null;
+} {
+  const match = PORT_PATTERN_START.exec(hostPlusPort);
+  if (!match) return { domain: hostPlusPort, portPattern: null };
+  return {
+    domain: hostPlusPort.slice(0, match.index),
+    portPattern: hostPlusPort.slice(match.index),
+  };
+}
+
+/**
+ * Extract the host-only fragment from a `~` host rule's raw regex, for the
+ * resolver's allowlist: a DNS query carries no port, so whatever names a port
+ * is dropped here regardless of its shape. Enforcement uses the raw regex
+ * directly instead (see haproxy-rules.ts), matched as one expression against
+ * the connection, so this function exists only for coredns-config.ts.
+ *
+ * @throws {Error} if the regex is invalid, it names no port at all (a port is
+ *   always required), or the host half does not compile as a regex on its own
+ */
+export function splitRawRegexHost(pattern: string): { host: string } {
+  const regex = pattern.slice(1);
+  try {
+    new RegExp(regex);
+  } catch (e) {
+    throw new Error(`Invalid regex in rule "${pattern}": ${(e as Error).message}`);
+  }
+
+  const { domain, portPattern } = splitDomainFromPortPattern(regex);
+  if (portPattern === null) {
+    throw new Error(
+      `Invalid regex in rule "${pattern}": expected ":" separating the host from a port; a port ` +
+        `is always required`,
+    );
+  }
+  let host = domain;
+  if (host.startsWith("^")) host = host.slice(1);
+
+  try {
+    new RegExp(host);
+  } catch (e) {
+    throw new Error(
+      `Invalid regex in rule "${pattern}": the host part "${host}" does not compile on its own: ` +
+        `${(e as Error).message}`,
+    );
+  }
+  return { host };
+}

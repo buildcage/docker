@@ -34,9 +34,14 @@
  * too; see the squid config generator.
  */
 
-import { pathToRegexPartial, wildcardToRegexPartial } from "./partial-wildcard.ts";
+import {
+  pathToRegexPartial,
+  splitDomainFromPortPattern,
+  wildcardToRegexPartial,
+} from "./partial-wildcard.ts";
 
-const DEFAULT_PORT: Record<string, string> = { http: "80", https: "443" };
+/** The scheme's own port, tried without being spelled out at all in a `~` URL rule's host half. */
+export const DEFAULT_PORT: Record<"https" | "http", string> = { https: "443", http: "80" };
 
 export interface UrlRule {
   /** Uppercased HTTP methods, or null when the rule allows any method (`*`). */
@@ -46,9 +51,10 @@ export interface UrlRule {
   /** Regex matching the full URL, without anchors. */
   regex: string;
   /**
-   * Regex matching the authority (`host:port`), which the proxy and resolver
-   * configs are both built from. See splitRawRegexUrl for how a `~` rule
-   * derives this.
+   * Host-only regex (no port), which the resolver's allowlist is built from:
+   * a DNS query carries no port to match against. For a `~` rule, this is
+   * `hostRegex` with anything after its own `:` discarded; see
+   * splitRawRegexUrl.
    */
   authorityRegex: string;
   /**
@@ -57,6 +63,16 @@ export interface UrlRule {
    * rather than `regex`.
    */
   pathRegex: string;
+  /**
+   * For a `~` rule: the host half's own regex, port included verbatim if the
+   * user wrote one. The proxy matches this against the connection's host
+   * both with and without a port, since the pattern's port (if any) is
+   * optional -- see haproxy-config.ts. Meaningless when `isRegex` is false,
+   * since a wildcard rule's host and (literal) port are matched separately.
+   */
+  hostRegex: string;
+  /** Whether this is a `~` rule. */
+  isRegex: boolean;
   /** The rule exactly as the user wrote it, for reports and error messages. */
   raw: string;
 }
@@ -90,14 +106,17 @@ export function parseMethods(spec: string, rule: string): string[] | null {
  *
  * @throws {Error} if the pattern is not an http(s) URL
  */
-function splitUrl(url: string, rule: string): { scheme: string; authority: string; path: string } {
+function splitUrl(
+  url: string,
+  rule: string,
+): { scheme: "https" | "http"; authority: string; path: string } {
   const match = /^(https?):\/\/([^/]+)(\/.*)?$/.exec(url);
   if (!match) {
     throw new Error(
       `Invalid URL in rule "${rule}": expected http:// or https:// followed by a host`,
     );
   }
-  return { scheme: match[1], authority: match[2], path: match[3] ?? "" };
+  return { scheme: match[1] as "https" | "http", authority: match[2], path: match[3] ?? "" };
 }
 
 /** A literal `/`, or its escaped form `\/`. */
@@ -111,17 +130,22 @@ const SCHEME_SEP = /:(?:\\?\/){2}/;
  * expressions, never as one full-URL regex (see haproxy-config.ts's
  * ruleBlock), so the regex has to be cut at the first `/` after `://`.
  *
- * HAProxy's `dst_port` ACL only accepts a literal number, never a regex, so
- * a `:` in the host half is honoured only when followed by one; otherwise
- * the rule matches any port.
+ * The host half's port is optional, exactly as in a literal URL: the proxy
+ * tries it against the connection's host both bare and with the real port,
+ * so a pattern with no port at all matches only the scheme's default port,
+ * and one ending in an optional port group (`(:8443)?`) matches either.
+ * `authorityRegex` is the same host half with its port pattern dropped --
+ * from its own `:`, or the `(` opening a group right at the colon -- for
+ * the resolver's allowlist, which has no notion of a port to match against
+ * either way; see splitDomainFromPortPattern.
  *
- * @throws {Error} if the text can't be split into a host and a path, its
- *   port isn't a literal number, or either half fails to compile alone
+ * @throws {Error} if the text can't be split into a host and a path, or a
+ *   resulting half fails to compile as a regex on its own
  */
 function splitRawRegexUrl(
   regex: string,
   rule: string,
-): { authorityRegex: string; pathRegex: string } {
+): { hostRegex: string; authorityRegex: string; pathRegex: string } {
   const schemeSep = SCHEME_SEP.exec(regex);
   if (!schemeSep) {
     throw new Error(
@@ -140,28 +164,15 @@ function splitRawRegexUrl(
   }
   const pathStart = hostStart + pathSep.index;
 
-  let hostPart = regex.slice(hostStart, pathStart);
-  let port: string | null = null;
-  const colonIdx = hostPart.indexOf(":");
-  if (colonIdx !== -1) {
-    const portText = hostPart.slice(colonIdx + 1);
-    if (!/^\d+$/.test(portText)) {
-      throw new Error(
-        `Invalid regex in rule "${rule}": the port after ":" in the host ("${portText}") must be ` +
-          `a literal number, since the destination port cannot be matched with a regex; write a ` +
-          `plain number (e.g. "https://host:8443/x") or omit the port entirely to allow any port`,
-      );
-    }
-    port = portText;
-    hostPart = hostPart.slice(0, colonIdx);
-  }
+  const hostPart = regex.slice(hostStart, pathStart);
+  const { domain: hostOnly } = splitDomainFromPortPattern(hostPart);
 
-  // "[0-9]+" is the existing any-port sentinel (splitHostAndPort in
-  // haproxy-rules.ts, hostRegexOfUrlRule in coredns-config.ts).
-  const authorityRegex = `^${hostPart}:${port ?? "[0-9]+"}$`;
+  const hostRegex = `^${hostPart}$`;
+  const authorityRegex = `^${hostOnly}$`;
   const pathRegex = `^${regex.slice(pathStart)}`;
   for (const [label, fragment] of [
-    ["host", `^${hostPart}$`],
+    ["host", hostRegex],
+    ["host-only", authorityRegex],
     ["path", pathRegex],
   ] as const) {
     try {
@@ -174,7 +185,7 @@ function splitRawRegexUrl(
     }
   }
 
-  return { authorityRegex, pathRegex };
+  return { hostRegex, authorityRegex, pathRegex };
 }
 
 /**
@@ -193,7 +204,14 @@ function splitRawRegexUrl(
 function compileUrl(
   url: string,
   rule: string,
-): { scheme: string; regex: string; authorityRegex: string; pathRegex: string } {
+): {
+  scheme: string;
+  regex: string;
+  authorityRegex: string;
+  pathRegex: string;
+  hostRegex: string;
+  isRegex: boolean;
+} {
   if (url.startsWith("~")) {
     const regex = url.slice(1);
     try {
@@ -203,8 +221,8 @@ function compileUrl(
     }
     // A raw regex governs its own scheme; callers that bucket by scheme treat
     // it as https, the stricter of the two.
-    const { authorityRegex, pathRegex } = splitRawRegexUrl(regex, rule);
-    return { scheme: "https", regex, authorityRegex, pathRegex };
+    const { hostRegex, authorityRegex, pathRegex } = splitRawRegexUrl(regex, rule);
+    return { scheme: "https", regex, authorityRegex, pathRegex, hostRegex, isRegex: true };
   }
 
   const { scheme, authority, path } = splitUrl(url, rule);
@@ -246,6 +264,8 @@ function compileUrl(
     authorityRegex,
     // A rule with no path allows any, which is what the URL regex says too.
     pathRegex: path === "" ? "^/" : `^${pathRegex}$`,
+    hostRegex, // unused: a wildcard rule's host and port are matched separately.
+    isRegex: false,
   };
 }
 
@@ -272,8 +292,8 @@ export function convertUrlRule(rule: string): UrlRule {
   }
 
   const methods = parseMethods(methodSpec, trimmed);
-  const { scheme, regex, authorityRegex, pathRegex } = compileUrl(url, trimmed);
-  return { methods, scheme, regex, authorityRegex, pathRegex, raw: trimmed };
+  const { scheme, regex, authorityRegex, pathRegex, hostRegex, isRegex } = compileUrl(url, trimmed);
+  return { methods, scheme, regex, authorityRegex, pathRegex, hostRegex, isRegex, raw: trimmed };
 }
 
 /**
