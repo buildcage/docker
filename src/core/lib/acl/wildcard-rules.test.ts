@@ -82,6 +82,14 @@ describe("convertRule", () => {
   it("rejects invalid regex (~ prefix)", () => {
     expect(() => convertRule("~^(unclosed")).toThrow(/Invalid regex/);
   });
+
+  it("rejects a regex rule (~ prefix) with no port", () => {
+    expect(() => convertRule("~^example\\.com$")).toThrow(/a port is always required/);
+  });
+
+  it("rejects a regex rule (~ prefix) with no port even without anchors", () => {
+    expect(() => convertRule("~example\\.com")).toThrow(/a port is always required/);
+  });
 });
 
 // ---------------------------------------------------------------------------

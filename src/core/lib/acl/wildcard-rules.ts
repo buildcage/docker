@@ -3,6 +3,8 @@
  * Converts wildcard patterns to regex strings for HAProxy ACLs.
  */
 
+import { splitRawRegexHost } from "./partial-wildcard.ts";
+
 /**
  * Split a whitespace-separated rules string into individual rule tokens.
  */
@@ -32,16 +34,16 @@ export function parseAndValidateRules(rulesInput: string | undefined): string[] 
 
 /**
  * Convert a single rule (wildcard or `~`-prefixed regex) to a regex string.
+ *
+ * The `~` case reuses the `inspect` engine's own validator (a port is always
+ * required there too) so both engines reject the same malformed regex the
+ * same way, instead of this engine silently accepting a rule that then never
+ * matches -- or, absent an anchor, matches more than the author intended.
  */
 export function convertRule(rule: string): string {
   if (rule.startsWith("~")) {
-    const regex = rule.slice(1);
-    try {
-      new RegExp(regex);
-    } catch (e) {
-      throw new Error(`Invalid regex in rule "${rule}": ${(e as Error).message}`);
-    }
-    return regex;
+    splitRawRegexHost(rule);
+    return rule.slice(1);
   }
   return `^${wildcardToRegex(rule)}$`;
 }

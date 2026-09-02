@@ -341,99 +341,6 @@ function errorMessage(e) {
 //#region src/lib/errors.ts
 var SetupError = class extends ActionError {};
 //#endregion
-//#region src/core/lib/acl/wildcard-rules.ts
-/**
-* Rule conversion library for buildcage container.
-* Converts wildcard patterns to regex strings for HAProxy ACLs.
-*/
-/**
-* Split a whitespace-separated rules string into individual rule tokens.
-*/
-function splitRuleTokens(rulesInput) {
-	return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
-}
-/**
-* Split+validate a space-separated rules string, returning the raw
-* (unconverted) rule tokens — for callers that need the original
-* wildcard/~regex syntax preserved, such as known_blocked_rules.
-*
-* @throws {Error} if any rule has invalid wildcard/regex syntax
-*/
-function parseAndValidateRules(rulesInput) {
-	let rules = splitRuleTokens(rulesInput);
-	return rules.forEach(convertRule), rules;
-}
-/**
-* Convert a single rule (wildcard or `~`-prefixed regex) to a regex string.
-*/
-function convertRule(rule) {
-	if (rule.startsWith("~")) {
-		let regex = rule.slice(1);
-		try {
-			new RegExp(regex);
-		} catch (e) {
-			throw Error(`Invalid regex in rule "${rule}": ${e.message}`);
-		}
-		return regex;
-	}
-	return `^${wildcardToRegex(rule)}$`;
-}
-/**
-* Convert a domain wildcard to a regex string (without anchors or port).
-*
-* Supported wildcards:
-*   `**` — matches one or more characters including dots
-*   `*`  — matches one or more characters excluding dots
-*   `?`  — matches a single character excluding dots
-*
-* A dot-separated part containing `*` must be exactly `*` or `**`.
-*/
-function domainToRegex(domain) {
-	return domain.split(".").map((part) => {
-		if (part === "**") return ".+";
-		if (part === "*") return "[^.]+";
-		if (part.includes("*")) throw Error(`Invalid wildcard in "${domain}": part "${part}" mixes "*" with other characters`);
-		return part.replace(/[.+^$()[\]{}|\\]/g, "\\$&").replace(/\?/g, "[^.]");
-	}).join("\\.");
-}
-/**
-* Convert a wildcard pattern (`<domain>:<port|*>`) to a regex string (without anchors).
-*/
-function wildcardToRegex(pattern) {
-	if (!/^[^:]+:(?:\d+|\*)$/.test(pattern)) throw Error(`Invalid pattern "${pattern}"`);
-	let [domain, port] = pattern.split(":"), portRegex = port === "*" ? "\\d+" : port;
-	return `${domainToRegex(domain)}:${portRegex}`;
-}
-//#endregion
-//#region src/core/lib/acl/rules.ts
-/**
-* Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
-* allowed_ip_rules/known_blocked_rules) fails to parse — shared by the
-* setup and run actions, which both accept the same rule syntax.
-*/
-var InvalidRulesError = class extends ActionError {};
-/**
-* Rethrow a rule-parser's syntax errors as an InvalidRulesError.
-*/
-function parseRulesOrThrow(rulesInput) {
-	try {
-		return parseAndValidateRules(rulesInput);
-	} catch (e) {
-		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
-	}
-}
-/**
-* Build ACL rules from input strings. Rules are passed through as-is
-* (wildcard format), validated eagerly.
-*/
-function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
-	return {
-		httpsRules: parseRulesOrThrow(httpsRulesInput),
-		httpRules: parseRulesOrThrow(httpRulesInput),
-		ipRules: parseRulesOrThrow(ipRulesInput)
-	};
-}
-//#endregion
 //#region src/core/lib/acl/partial-wildcard.ts
 /**
 * Domain pattern compiler for the `inspect` engine, which allows a wildcard
@@ -543,6 +450,123 @@ function splitDomainFromPortPattern(hostPlusPort) {
 	} : {
 		domain: hostPlusPort,
 		portPattern: null
+	};
+}
+/**
+* Extract the host-only fragment from a `~` host rule's raw regex, for the
+* resolver's allowlist: a DNS query carries no port, so whatever names a port
+* is dropped here regardless of its shape. Enforcement uses the raw regex
+* directly instead (see haproxy-rules.ts), matched as one expression against
+* the connection, so this function exists only for coredns-config.ts.
+*
+* @throws {Error} if the regex is invalid, it names no port at all (a port is
+*   always required), or the host half does not compile as a regex on its own
+*/
+function splitRawRegexHost(pattern) {
+	let regex = pattern.slice(1);
+	try {
+		new RegExp(regex);
+	} catch (e) {
+		throw Error(`Invalid regex in rule "${pattern}": ${e.message}`);
+	}
+	let { domain, portPattern } = splitDomainFromPortPattern(regex);
+	if (portPattern === null) throw Error(`Invalid regex in rule "${pattern}": expected ":" separating the host from a port; a port is always required`);
+	let host = domain;
+	host.startsWith("^") && (host = host.slice(1));
+	try {
+		new RegExp(host);
+	} catch (e) {
+		throw Error(`Invalid regex in rule "${pattern}": the host part "${host}" does not compile on its own: ${e.message}`);
+	}
+	return { host };
+}
+//#endregion
+//#region src/core/lib/acl/wildcard-rules.ts
+/**
+* Rule conversion library for buildcage container.
+* Converts wildcard patterns to regex strings for HAProxy ACLs.
+*/
+/**
+* Split a whitespace-separated rules string into individual rule tokens.
+*/
+function splitRuleTokens(rulesInput) {
+	return rulesInput?.trim().split(/\s+/).filter(Boolean) ?? [];
+}
+/**
+* Split+validate a space-separated rules string, returning the raw
+* (unconverted) rule tokens — for callers that need the original
+* wildcard/~regex syntax preserved, such as known_blocked_rules.
+*
+* @throws {Error} if any rule has invalid wildcard/regex syntax
+*/
+function parseAndValidateRules(rulesInput) {
+	let rules = splitRuleTokens(rulesInput);
+	return rules.forEach(convertRule), rules;
+}
+/**
+* Convert a single rule (wildcard or `~`-prefixed regex) to a regex string.
+*
+* The `~` case reuses the `inspect` engine's own validator (a port is always
+* required there too) so both engines reject the same malformed regex the
+* same way, instead of this engine silently accepting a rule that then never
+* matches -- or, absent an anchor, matches more than the author intended.
+*/
+function convertRule(rule) {
+	return rule.startsWith("~") ? (splitRawRegexHost(rule), rule.slice(1)) : `^${wildcardToRegex(rule)}$`;
+}
+/**
+* Convert a domain wildcard to a regex string (without anchors or port).
+*
+* Supported wildcards:
+*   `**` — matches one or more characters including dots
+*   `*`  — matches one or more characters excluding dots
+*   `?`  — matches a single character excluding dots
+*
+* A dot-separated part containing `*` must be exactly `*` or `**`.
+*/
+function domainToRegex(domain) {
+	return domain.split(".").map((part) => {
+		if (part === "**") return ".+";
+		if (part === "*") return "[^.]+";
+		if (part.includes("*")) throw Error(`Invalid wildcard in "${domain}": part "${part}" mixes "*" with other characters`);
+		return part.replace(/[.+^$()[\]{}|\\]/g, "\\$&").replace(/\?/g, "[^.]");
+	}).join("\\.");
+}
+/**
+* Convert a wildcard pattern (`<domain>:<port|*>`) to a regex string (without anchors).
+*/
+function wildcardToRegex(pattern) {
+	if (!/^[^:]+:(?:\d+|\*)$/.test(pattern)) throw Error(`Invalid pattern "${pattern}"`);
+	let [domain, port] = pattern.split(":"), portRegex = port === "*" ? "\\d+" : port;
+	return `${domainToRegex(domain)}:${portRegex}`;
+}
+//#endregion
+//#region src/core/lib/acl/rules.ts
+/**
+* Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
+* allowed_ip_rules/known_blocked_rules) fails to parse — shared by the
+* setup and run actions, which both accept the same rule syntax.
+*/
+var InvalidRulesError = class extends ActionError {};
+/**
+* Rethrow a rule-parser's syntax errors as an InvalidRulesError.
+*/
+function parseRulesOrThrow(rulesInput) {
+	try {
+		return parseAndValidateRules(rulesInput);
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+	}
+}
+/**
+* Build ACL rules from input strings. Rules are passed through as-is
+* (wildcard format), validated eagerly.
+*/
+function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+	return {
+		httpsRules: parseRulesOrThrow(httpsRulesInput),
+		httpRules: parseRulesOrThrow(httpRulesInput),
+		ipRules: parseRulesOrThrow(ipRulesInput)
 	};
 }
 //#endregion
