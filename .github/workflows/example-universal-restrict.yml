@@ -13,10 +13,8 @@ jobs:
 
     steps:
       # Same build as the audit example, with the rules that run produced.
-      # The universal engine enforces on host and port, which is as far as it
-      # can see without decrypting, and is all a JVM build can be given: Maven
-      # reads the JVM's own cacerts store, so an injected CA would not be
-      # trusted.
+      # universal enforces on host and port only -- as far as it can see
+      # without decrypting, and all a JVM build like this one can accept.
       - name: Start Buildcage builder
         uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
         with:
@@ -49,9 +47,8 @@ jobs:
           push: false
           no-cache: true
 
-      # fail_on_blocked is false only because this example blocks something on
-      # purpose. Leave it at its default so a real workflow fails on a
-      # destination it did not allow.
+      # fail_on_blocked is false only because this example blocks on purpose;
+      # leave it at its default so a real workflow fails on a disallowed destination.
       - name: Show proxy report
         if: always()
         uses: buildcage/docker/report@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5

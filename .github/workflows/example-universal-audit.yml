@@ -12,13 +12,10 @@ jobs:
       contents: read
 
     steps:
-      # The universal engine reads the SNI without decrypting, so nothing in
-      # the build has to trust an injected CA. A JVM build needs that: Maven
-      # verifies TLS against the JVM's own cacerts store and ignores the
-      # CA-trust environment variables the inspect engine sets.
-      #
-      # audit blocks nothing and records every destination. The report's
-      # "Switch to restrict mode" section returns them as allowed_https_rules.
+      # universal reads the SNI without decrypting, so a JVM build like this
+      # one (Maven trusts only its own cacerts store) needs no injected CA.
+      # audit records every destination; "Switch to restrict mode" in the
+      # report returns them as allowed_https_rules.
       - name: Start Buildcage builder
         uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
         with:
@@ -38,8 +35,7 @@ jobs:
           FROM maven:3-eclipse-temurin-21-alpine
           WORKDIR /app
           RUN mvn -B dependency:get -Dartifact=org.apache.commons:commons-lang3:3.17.0
-          # Nothing in the build needs this. audit records it like any other
-          # destination, so leave it out of the rules you paste back in.
+          # Unneeded by the build; leave it out of the rules you paste back in.
           RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
           EOF
 

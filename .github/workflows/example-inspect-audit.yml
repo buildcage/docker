@@ -12,10 +12,8 @@ jobs:
       contents: read
 
     steps:
-      # The inspect engine terminates TLS, so it records the method and the
-      # full URL of every request, apt's plain HTTP included. The report's
-      # "Switch to restrict mode" section returns them as allowed_url_rules
-      # rather than a list of hosts.
+      # inspect decrypts, so it logs each request's method and full URL, and
+      # the report's "Switch to restrict mode" section returns allowed_url_rules.
       - name: Start Buildcage builder
         uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
         with:
@@ -34,14 +32,12 @@ jobs:
           cat <<'EOF' > /tmp/build-context/Dockerfile
           FROM node:24-bookworm-slim
           WORKDIR /app
-          # The Debian archive is plain HTTP by default, so apt's rules are
-          # http:// URLs.
+          # Debian's archive is plain HTTP, so apt's rules are http:// URLs.
           RUN apt-get update && \
               apt-get install -y --no-install-recommends curl && \
               rm -rf /var/lib/apt/lists/*
           RUN npm init -y && npm install --ignore-scripts express
-          # Nothing in the build needs this. audit records it like any other
-          # request, so leave it out of the rules you paste back in.
+          # Unneeded by the build; leave it out of the rules you paste back in.
           RUN curl -sS --max-time 5 -o /dev/null https://example.com/ || true
           EOF
 

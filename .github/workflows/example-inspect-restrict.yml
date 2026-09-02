@@ -12,23 +12,19 @@ jobs:
       contents: read
 
     steps:
-      # Same build as the audit example, with the rules that run produced.
-      # Each rule names the methods it permits, so npm can install a package
-      # but not publish one: npm publish is a PUT to the same host, which no
-      # rule here covers.
+      # Same build as the audit example, with the rules that run produced. npm
+      # publish is a PUT, so it's refused: no rule here covers that method.
       - name: Start Buildcage builder
         uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
         with:
           proxy_mode: restrict
           proxy_engine: inspect
           allowed_url_rules: |
-            # apt, over plain HTTP. bookworm-slim's default sources span both
-            # of these path prefixes.
+            # apt, over plain HTTP
             GET http://deb.debian.org/debian/**
             GET http://deb.debian.org/debian-security/**
 
-            # npm: package metadata and tarballs, plus the one POST npm makes
-            # to the audit endpoint after an install.
+            # npm install, plus its post-install audit-endpoint POST
             GET|HEAD https://registry.npmjs.org/**
             POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk
 
@@ -44,14 +40,12 @@ jobs:
           cat <<'EOF' > /tmp/build-context/Dockerfile
           FROM node:24-bookworm-slim
           WORKDIR /app
-          # The Debian archive is plain HTTP by default, so apt's rules are
-          # http:// URLs.
+          # Debian's archive is plain HTTP, so apt's rules are http:// URLs.
           RUN apt-get update && \
               apt-get install -y --no-install-recommends curl && \
               rm -rf /var/lib/apt/lists/*
           RUN npm init -y && npm install --ignore-scripts express
-          # No rule covers it, so the report names the full URL that was
-          # refused, not just the host.
+          # Refused: the report names the full URL, not just the host.
           RUN curl -sS --max-time 5 -o /dev/null https://example.com/ || true
           EOF
 
@@ -62,9 +56,8 @@ jobs:
           push: false
           no-cache: true
 
-      # fail_on_blocked is false only because this example blocks something on
-      # purpose. Leave it at its default so a real workflow fails on a request
-      # it did not allow.
+      # fail_on_blocked is false only because this example blocks on purpose;
+      # leave it at its default so a real workflow fails on a disallowed request.
       - name: Show proxy report
         if: always()
         uses: buildcage/docker/report@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5

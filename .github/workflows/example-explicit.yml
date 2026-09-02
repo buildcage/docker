@@ -34,8 +34,7 @@ jobs:
           FROM node:24-alpine
           WORKDIR /app
           RUN npm init -y
-          # npm bundles its own CA store, so it needs NODE_USE_SYSTEM_CA=1 to trust
-          # the CA that BuildKit's explicit engine injected into the system store.
+          # npm bundles its own CA store, so it needs NODE_USE_SYSTEM_CA=1 to trust the proxy CA.
           RUN NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts express
           RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
           EOF
