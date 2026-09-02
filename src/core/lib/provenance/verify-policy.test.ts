@@ -92,6 +92,28 @@ describe("buildVerifyOptions — version tag", () => {
     const opts = getOpts("v2.1.0");
     expect(opts.certificateOIDs).toBe(undefined);
   });
+
+  // ── prerelease tags ─────────────────────────────────────────────────────────
+  it("matches exact prerelease @v3.1.6-rc1 against cert SAN v3.1.6-rc1", () => {
+    const opts = getOpts("v3.1.6-rc1");
+    expect(matchesSAN(opts, makeSAN("refs/tags/v3.1.6-rc1"))).toBeTruthy();
+  });
+
+  it("does NOT match @v3.1.6-rc1 against cert SAN v3.1.6 (base release, boundary check)", () => {
+    const opts = getOpts("v3.1.6-rc1");
+    expect(
+      !matchesSAN(opts, makeSAN("refs/tags/v3.1.6")),
+      "@v3.1.6-rc1 must not match the base release v3.1.6",
+    ).toBeTruthy();
+  });
+
+  it("does NOT match @v3.1.6-rc1 against cert SAN v3.1.6-rc10 (boundary check)", () => {
+    const opts = getOpts("v3.1.6-rc1");
+    expect(
+      !matchesSAN(opts, makeSAN("refs/tags/v3.1.6-rc10")),
+      "@v3.1.6-rc1 must not match v3.1.6-rc10",
+    ).toBeTruthy();
+  });
 });
 
 describe("buildVerifyOptions — SHA pin", () => {
