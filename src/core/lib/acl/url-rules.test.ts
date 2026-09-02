@@ -100,13 +100,15 @@ describe("convertUrlRule regex escape hatch", () => {
 
   it("splits into a host half and a path half at the first / after ://", () => {
     const r = convertUrlRule("GET ~^https://a\\.com/x$");
-    expect(r.authorityRegex).toBe("^a\\.com:[0-9]+$");
+    expect(r.hostRegex).toBe("^a\\.com$");
+    expect(r.authorityRegex).toBe("^a\\.com$");
     expect(r.pathRegex).toBe("^/x$");
+    expect(r.isRegex).toBe(true);
   });
 
   it("recognises an escaped slash for either the scheme separator or the path start", () => {
     const r = convertUrlRule("GET ~^https:\\/\\/a\\.com\\/x$");
-    expect(r.authorityRegex).toBe("^a\\.com:[0-9]+$");
+    expect(r.hostRegex).toBe("^a\\.com$");
     expect(r.pathRegex).toBe("^\\/x$");
   });
 
@@ -118,15 +120,23 @@ describe("convertUrlRule regex escape hatch", () => {
     expect(() => convertUrlRule("GET ~^https://a\\.com$")).toThrow(/path/);
   });
 
-  it("carries a literal port in the host half through to authorityRegex", () => {
+  it("keeps the host half's own port pattern for enforcement, but drops it for the resolver", () => {
+    // hostRegex (matched against the connection, with and without a port --
+    // see haproxy-config.ts) keeps whatever the user wrote; authorityRegex
+    // (the resolver's allowlist, which has no notion of a port) never does.
     const r = convertUrlRule("GET ~^https://a\\.com:8443/x$");
-    expect(r.authorityRegex).toBe("^a\\.com:8443$");
+    expect(r.hostRegex).toBe("^a\\.com:8443$");
+    expect(r.authorityRegex).toBe("^a\\.com$");
     expect(r.pathRegex).toBe("^/x$");
   });
 
-  it("rejects a non-literal port after the host's :", () => {
-    expect(() => convertUrlRule("GET ~^https://a\\.com:\\d+/x$")).toThrow(/literal number/);
-    expect(() => convertUrlRule("GET ~^https://a\\.com(:\\d+)?/x$")).toThrow(/literal number/);
+  it("accepts a non-literal port in the host half, unlike the other rule kinds", () => {
+    // A URL rule's port is optional, so its host half is matched with and
+    // without one rather than folded into a single dst_port ACL -- any
+    // regex is fine there, literal or not.
+    const r = convertUrlRule("GET ~^https://a\\.com:(443|8443)/x$");
+    expect(r.hostRegex).toBe("^a\\.com:(443|8443)$");
+    expect(r.authorityRegex).toBe("^a\\.com$");
   });
 });
 

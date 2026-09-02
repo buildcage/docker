@@ -43,6 +43,10 @@ services:
         # Reuses blocked.example.com (see [Blocked host]), so it needs no cert
         # or DNS entry of its own.
         GET ~^https://blocked\.example\.com:9443/public/.*$
+
+        # No port at all: matches only the scheme's default (443), not 9443
+        # above -- a ~ URL rule's port is optional, unlike the other kinds.
+        GET ~^https://blocked\.example\.com/defaultport/.*$
     volumes:
       - ./test/test-server-inspect/cert.pem:/test-fixtures/test-server-cert.pem:ro
     networks:

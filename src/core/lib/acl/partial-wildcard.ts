@@ -114,16 +114,16 @@ export function wildcardToRegexPartial(pattern: string): string {
 }
 
 /**
- * Split a `~` host rule's raw regex into an unanchored host fragment and its
- * port. Bypasses domainToRegexPartial/wildcardToRegexPartial entirely, since
- * those would mangle the user's own regex syntax. HAProxy's dst_port ACL only
- * accepts a literal number, never a regex, so the port is honoured only when
- * it is one.
+ * Extract the host-only fragment from a `~` host rule's raw regex, for the
+ * resolver's allowlist: a DNS query carries no port, so whatever follows the
+ * last ":" is dropped here regardless of its shape. Enforcement uses the raw
+ * regex directly instead (see haproxy-rules.ts), matched as one expression
+ * against the connection, so this function exists only for coredns-config.ts.
  *
- * @throws {Error} if the regex is invalid, its port is not a literal number,
- *   or the host half does not compile as a regex on its own
+ * @throws {Error} if the regex is invalid, it names no port at all (a port is
+ *   always required), or the host half does not compile as a regex on its own
  */
-export function splitRawRegexHost(pattern: string): { host: string; port: string | null } {
+export function splitRawRegexHost(pattern: string): { host: string } {
   const regex = pattern.slice(1);
   try {
     new RegExp(regex);
@@ -132,28 +132,14 @@ export function splitRawRegexHost(pattern: string): { host: string; port: string
   }
 
   const colonIndex = regex.lastIndexOf(":");
-  let host: string;
-  let port: string | null;
   if (colonIndex === -1) {
-    host = regex;
-    port = null;
-  } else {
-    host = regex.slice(0, colonIndex);
-    let portText = regex.slice(colonIndex + 1);
-    if (portText.endsWith("$")) portText = portText.slice(0, -1);
-    if (!/^\d+$/.test(portText)) {
-      throw new Error(
-        `Invalid regex in rule "${pattern}": the port after the last ":" ("${portText}") must be ` +
-          `a literal number, since the destination port cannot be matched with a regex; write a ` +
-          `plain number (e.g. "~^example\\.com:8443$") or omit the port entirely to allow any port`,
-      );
-    }
-    port = portText;
+    throw new Error(
+      `Invalid regex in rule "${pattern}": expected ":" separating the host from a port; a port ` +
+        `is always required`,
+    );
   }
-  // A leftover $ would close coredns-config.ts's larger alternation early;
-  // each caller re-anchors the host on its own terms instead.
+  let host = regex.slice(0, colonIndex);
   if (host.startsWith("^")) host = host.slice(1);
-  if (host.endsWith("$")) host = host.slice(0, -1);
 
   try {
     new RegExp(host);
@@ -163,5 +149,5 @@ export function splitRawRegexHost(pattern: string): { host: string; port: string
         `${(e as Error).message}`,
     );
   }
-  return { host, port };
+  return { host };
 }

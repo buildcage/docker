@@ -70,8 +70,12 @@ function hostRegexOfHostRule(pattern: string): string {
 
 /** The host half of a compiled URL rule, as a regex. */
 function hostRegexOfUrlRule(rule: UrlRule): string {
-  // authorityRegex is `^<hostRegex>:<port>$`.
+  // For a ~ rule, authorityRegex is already host-only (`^<host>$`): its port,
+  // if it named one, is optional and matched separately -- see
+  // haproxy-config.ts -- so there is nothing left to strip here.
   const inner = rule.authorityRegex.slice(1, -1);
+  if (rule.isRegex) return inner;
+  // Otherwise it is `^<hostRegex>:<port>$`.
   return inner.slice(0, inner.lastIndexOf(":"));
 }
 

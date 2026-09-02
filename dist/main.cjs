@@ -596,31 +596,34 @@ const SLASH_TOKEN = /\\?\//, SCHEME_SEP = /:(?:\\?\/){2}/;
 * expressions, never as one full-URL regex (see haproxy-config.ts's
 * ruleBlock), so the regex has to be cut at the first `/` after `://`.
 *
-* HAProxy's `dst_port` ACL only accepts a literal number, never a regex, so
-* a `:` in the host half is honoured only when followed by one; otherwise
-* the rule matches any port.
+* The host half's port is optional, exactly as in a literal URL: the proxy
+* tries it against the connection's host both bare and with the real port,
+* so a pattern with no port at all matches only the scheme's default port,
+* and one ending in an optional port group (`(:8443)?`) matches either.
+* `authorityRegex` is the same host half with anything from its own `:`
+* onward dropped, for the resolver's allowlist, which has no notion of a
+* port to match against either way.
 *
-* @throws {Error} if the text can't be split into a host and a path, its
-*   port isn't a literal number, or either half fails to compile alone
+* @throws {Error} if the text can't be split into a host and a path, or a
+*   resulting half fails to compile as a regex on its own
 */
 function splitRawRegexUrl(regex, rule) {
 	let schemeSep = SCHEME_SEP.exec(regex);
 	if (!schemeSep) throw Error(`Invalid regex in rule "${rule}": expected "://" (or an escaped equivalent like ":\\/\\/ ") separating the scheme from the host, so the host and path can be matched separately`);
 	let hostStart = schemeSep.index + schemeSep[0].length, pathSep = SLASH_TOKEN.exec(regex.slice(hostStart));
 	if (!pathSep) throw Error(`Invalid regex in rule "${rule}": expected a "/" (or "\\/") after "://" to start the path; a host-only rule belongs in allowed_https_rules instead`);
-	let pathStart = hostStart + pathSep.index, hostPart = regex.slice(hostStart, pathStart), port = null, colonIdx = hostPart.indexOf(":");
-	if (colonIdx !== -1) {
-		let portText = hostPart.slice(colonIdx + 1);
-		if (!/^\d+$/.test(portText)) throw Error(`Invalid regex in rule "${rule}": the port after ":" in the host ("${portText}") must be a literal number, since the destination port cannot be matched with a regex; write a plain number (e.g. "https://host:8443/x") or omit the port entirely to allow any port`);
-		port = portText, hostPart = hostPart.slice(0, colonIdx);
-	}
-	let authorityRegex = `^${hostPart}:${port ?? "[0-9]+"}$`, pathRegex = `^${regex.slice(pathStart)}`;
-	for (let [label, fragment] of [["host", `^${hostPart}$`], ["path", pathRegex]]) try {
+	let pathStart = hostStart + pathSep.index, hostPart = regex.slice(hostStart, pathStart), colonIdx = hostPart.indexOf(":"), hostOnly = colonIdx === -1 ? hostPart : hostPart.slice(0, colonIdx), hostRegex = `^${hostPart}$`, authorityRegex = `^${hostOnly}$`, pathRegex = `^${regex.slice(pathStart)}`;
+	for (let [label, fragment] of [
+		["host", hostRegex],
+		["host-only", authorityRegex],
+		["path", pathRegex]
+	]) try {
 		new RegExp(fragment);
 	} catch (e) {
 		throw Error(`Invalid regex in rule "${rule}": the ${label} part "${fragment}" does not compile on its own: ${e.message}`);
 	}
 	return {
+		hostRegex,
 		authorityRegex,
 		pathRegex
 	};
@@ -646,12 +649,14 @@ function compileUrl(url, rule) {
 		} catch (e) {
 			throw Error(`Invalid regex in rule "${rule}": ${e.message}`);
 		}
-		let { authorityRegex, pathRegex } = splitRawRegexUrl(regex, rule);
+		let { hostRegex, authorityRegex, pathRegex } = splitRawRegexUrl(regex, rule);
 		return {
 			scheme: "https",
 			regex,
 			authorityRegex,
-			pathRegex
+			pathRegex,
+			hostRegex,
+			isRegex: !0
 		};
 	}
 	let { scheme, authority, path } = splitUrl(url, rule), colonIndex = authority.lastIndexOf(":"), hasPort = colonIndex !== -1 && !authority.slice(colonIndex + 1).includes("]"), host = hasPort ? authority.slice(0, colonIndex) : authority, port = hasPort ? authority.slice(colonIndex + 1) : "";
@@ -662,7 +667,9 @@ function compileUrl(url, rule) {
 		scheme,
 		regex: `^${scheme}://${hostRegex}${portRegex}${pathRegex}$`,
 		authorityRegex,
-		pathRegex: path === "" ? "^/" : `^${pathRegex}$`
+		pathRegex: path === "" ? "^/" : `^${pathRegex}$`,
+		hostRegex,
+		isRegex: !1
 	};
 }
 /**
@@ -676,13 +683,15 @@ function convertUrlRule(rule) {
 	let methodSpec = trimmed.slice(0, separator.index), url = trimmed.slice(separator.index + separator[0].length).trim();
 	if (url === "") throw Error(`Invalid rule "${trimmed}": missing URL`);
 	if (/\s/.test(url)) throw Error(`Invalid rule "${trimmed}": URL must not contain whitespace`);
-	let methods = parseMethods(methodSpec, trimmed), { scheme, regex, authorityRegex, pathRegex } = compileUrl(url, trimmed);
+	let methods = parseMethods(methodSpec, trimmed), { scheme, regex, authorityRegex, pathRegex, hostRegex, isRegex } = compileUrl(url, trimmed);
 	return {
 		methods,
 		scheme,
 		regex,
 		authorityRegex,
 		pathRegex,
+		hostRegex,
+		isRegex,
 		raw: trimmed
 	};
 }
