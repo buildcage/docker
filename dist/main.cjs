@@ -521,6 +521,30 @@ function wildcardToRegexPartial(pattern) {
 	let colonIndex = pattern.lastIndexOf(":"), domain = pattern.slice(0, colonIndex), port = pattern.slice(colonIndex + 1);
 	return `${domainToRegexPartial(domain)}:${port === "*" ? "\\d+" : port}`;
 }
+/**
+* Where a port pattern starts in a `<host>[:<port>]` regex fragment written
+* by a user: a bare `:`, or the `(` of a group opening right at the colon
+* (`(:8443)?`, `(:443|:8443)`). Splitting there, rather than at the last `:`
+* in the whole fragment, keeps a port group's own `(` out of the host half
+* so both halves stay balanced regexes on their own.
+*/
+const PORT_PATTERN_START = /\(:|:/;
+/**
+* Split a `<host>[:<port>]` regex fragment -- a `~` rule's own text, minus
+* any scheme/path around it -- into its domain-only prefix and the port
+* pattern (including its own leading `:` or `(`). `portPattern` is `null`
+* when the fragment names no port at all.
+*/
+function splitDomainFromPortPattern(hostPlusPort) {
+	let match = PORT_PATTERN_START.exec(hostPlusPort);
+	return match ? {
+		domain: hostPlusPort.slice(0, match.index),
+		portPattern: hostPlusPort.slice(match.index)
+	} : {
+		domain: hostPlusPort,
+		portPattern: null
+	};
+}
 //#endregion
 //#region src/core/lib/acl/url-rules.ts
 /**
@@ -600,9 +624,10 @@ const SLASH_TOKEN = /\\?\//, SCHEME_SEP = /:(?:\\?\/){2}/;
 * tries it against the connection's host both bare and with the real port,
 * so a pattern with no port at all matches only the scheme's default port,
 * and one ending in an optional port group (`(:8443)?`) matches either.
-* `authorityRegex` is the same host half with anything from its own `:`
-* onward dropped, for the resolver's allowlist, which has no notion of a
-* port to match against either way.
+* `authorityRegex` is the same host half with its port pattern dropped --
+* from its own `:`, or the `(` opening a group right at the colon -- for
+* the resolver's allowlist, which has no notion of a port to match against
+* either way; see splitDomainFromPortPattern.
 *
 * @throws {Error} if the text can't be split into a host and a path, or a
 *   resulting half fails to compile as a regex on its own
@@ -612,7 +637,7 @@ function splitRawRegexUrl(regex, rule) {
 	if (!schemeSep) throw Error(`Invalid regex in rule "${rule}": expected "://" (or an escaped equivalent like ":\\/\\/ ") separating the scheme from the host, so the host and path can be matched separately`);
 	let hostStart = schemeSep.index + schemeSep[0].length, pathSep = SLASH_TOKEN.exec(regex.slice(hostStart));
 	if (!pathSep) throw Error(`Invalid regex in rule "${rule}": expected a "/" (or "\\/") after "://" to start the path; a host-only rule belongs in allowed_https_rules instead`);
-	let pathStart = hostStart + pathSep.index, hostPart = regex.slice(hostStart, pathStart), colonIdx = hostPart.indexOf(":"), hostOnly = colonIdx === -1 ? hostPart : hostPart.slice(0, colonIdx), hostRegex = `^${hostPart}$`, authorityRegex = `^${hostOnly}$`, pathRegex = `^${regex.slice(pathStart)}`;
+	let pathStart = hostStart + pathSep.index, hostPart = regex.slice(hostStart, pathStart), { domain: hostOnly } = splitDomainFromPortPattern(hostPart), hostRegex = `^${hostPart}$`, authorityRegex = `^${hostOnly}$`, pathRegex = `^${regex.slice(pathStart)}`;
 	for (let [label, fragment] of [
 		["host", hostRegex],
 		["host-only", authorityRegex],

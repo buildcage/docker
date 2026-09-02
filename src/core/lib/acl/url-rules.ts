@@ -34,7 +34,11 @@
  * too; see the squid config generator.
  */
 
-import { pathToRegexPartial, wildcardToRegexPartial } from "./partial-wildcard.ts";
+import {
+  pathToRegexPartial,
+  splitDomainFromPortPattern,
+  wildcardToRegexPartial,
+} from "./partial-wildcard.ts";
 
 const DEFAULT_PORT: Record<string, string> = { http: "80", https: "443" };
 
@@ -126,9 +130,10 @@ const SCHEME_SEP = /:(?:\\?\/){2}/;
  * tries it against the connection's host both bare and with the real port,
  * so a pattern with no port at all matches only the scheme's default port,
  * and one ending in an optional port group (`(:8443)?`) matches either.
- * `authorityRegex` is the same host half with anything from its own `:`
- * onward dropped, for the resolver's allowlist, which has no notion of a
- * port to match against either way.
+ * `authorityRegex` is the same host half with its port pattern dropped --
+ * from its own `:`, or the `(` opening a group right at the colon -- for
+ * the resolver's allowlist, which has no notion of a port to match against
+ * either way; see splitDomainFromPortPattern.
  *
  * @throws {Error} if the text can't be split into a host and a path, or a
  *   resulting half fails to compile as a regex on its own
@@ -156,8 +161,7 @@ function splitRawRegexUrl(
   const pathStart = hostStart + pathSep.index;
 
   const hostPart = regex.slice(hostStart, pathStart);
-  const colonIdx = hostPart.indexOf(":");
-  const hostOnly = colonIdx === -1 ? hostPart : hostPart.slice(0, colonIdx);
+  const { domain: hostOnly } = splitDomainFromPortPattern(hostPart);
 
   const hostRegex = `^${hostPart}$`;
   const authorityRegex = `^${hostOnly}$`;
