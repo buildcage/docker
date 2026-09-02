@@ -49,11 +49,20 @@ describe("host and url rule compilation", () => {
     expect(set.http[0].id).toBe("p0");
   });
 
-  it("warns and drops a ~regex rule whose host cannot be derived", () => {
+  it("splits a ~regex rule into a host and path match, with no port restriction", () => {
     const set = compileRuleSet({ urlRules: buildUrlRules("GET ~^https://a\\.com/x$") });
-    expect(set.https.length).toBe(0);
-    expect(set.warnings.length).toBe(1);
-    expect(set.warnings[0].includes("allowed_https_rules")).toBe(true);
+    expect(set.warnings.length).toBe(0);
+    expect(set.https.length).toBe(1);
+    expect(set.https[0].hostRegex).toBe("^a\\.com$");
+    expect(set.https[0].port).toBe(null);
+    expect(set.https[0].pathRegex).toBe("^/x$");
+    expect(set.https[0].methods?.join()).toBe("GET");
+  });
+
+  it("carries a literal port in a ~regex rule through to a real port restriction", () => {
+    const set = compileRuleSet({ urlRules: buildUrlRules("GET ~^https://a\\.com:8443/x$") });
+    expect(set.https[0].hostRegex).toBe("^a\\.com$");
+    expect(set.https[0].port).toBe("8443");
   });
 });
 

@@ -89,12 +89,18 @@ allowed_url_rules: |
 Methods are separated by `|` or `,`, and `*` means any method. **The method is required.** There is
 no default, so a rule always states what it permits and nobody has to guess what omitting it means.
 
-| Pattern | In a domain                 | In a path              |
-| ------- | --------------------------- | ---------------------- |
-| `**`    | crosses dots                | crosses `/`            |
-| `*`     | one or more characters      | one or more characters |
-| `?`     | one character               | one character          |
-| `~`     | raw regex for the whole URL |                        |
+| Pattern | In a domain                                                   | In a path              |
+| ------- | ------------------------------------------------------------- | ---------------------- |
+| `**`    | crosses dots                                                  | crosses `/`            |
+| `*`     | one or more characters                                        | one or more characters |
+| `?`     | one character                                                 | one character          |
+| `~`     | raw regex, split into a host half and a path half — see below |
+
+**A `~` rule is split at the first `/` after `://`, not applied to the whole URL.** Everything before
+that `/` is the host, everything from it onward is the path — so `GET ~^https://example\.com/pub/.*$`
+becomes a host match on `example\.com` and a path match on `/pub/.*$`. A port in the host part must
+be a literal number (`example\.com:8443`); a regex there is not supported, since the destination port
+cannot be matched with one.
 
 **A wildcard may sit among literal text here**, in a path segment as in a domain label:
 `abc*.amazonaws.com`, `/pkg-*/**`. The other engines require a label containing `*` to be exactly

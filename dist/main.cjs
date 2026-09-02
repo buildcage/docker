@@ -588,6 +588,43 @@ function splitUrl(url, rule) {
 		path: match[3] ?? ""
 	};
 }
+/** A literal `/`, or its escaped form `\/`. */
+const SLASH_TOKEN = /\\?\//, SCHEME_SEP = /:(?:\\?\/){2}/;
+/**
+* Split a `~` rule's raw regex into a host half and a path half: the
+* `inspect` engine matches a URL rule's host and path as two separate
+* expressions, never as one full-URL regex (see haproxy-config.ts's
+* ruleBlock), so the regex has to be cut at the first `/` after `://`.
+*
+* HAProxy's `dst_port` ACL only accepts a literal number, never a regex, so
+* a `:` in the host half is honoured only when followed by one; otherwise
+* the rule matches any port.
+*
+* @throws {Error} if the text can't be split into a host and a path, its
+*   port isn't a literal number, or either half fails to compile alone
+*/
+function splitRawRegexUrl(regex, rule) {
+	let schemeSep = SCHEME_SEP.exec(regex);
+	if (!schemeSep) throw Error(`Invalid regex in rule "${rule}": expected "://" (or an escaped equivalent like ":\\/\\/ ") separating the scheme from the host, so the host and path can be matched separately`);
+	let hostStart = schemeSep.index + schemeSep[0].length, pathSep = SLASH_TOKEN.exec(regex.slice(hostStart));
+	if (!pathSep) throw Error(`Invalid regex in rule "${rule}": expected a "/" (or "\\/") after "://" to start the path; a host-only rule belongs in allowed_https_rules instead`);
+	let pathStart = hostStart + pathSep.index, hostPart = regex.slice(hostStart, pathStart), port = null, colonIdx = hostPart.indexOf(":");
+	if (colonIdx !== -1) {
+		let portText = hostPart.slice(colonIdx + 1);
+		if (!/^\d+$/.test(portText)) throw Error(`Invalid regex in rule "${rule}": the port after ":" in the host ("${portText}") must be a literal number, since the destination port cannot be matched with a regex; write a plain number (e.g. "https://host:8443/x") or omit the port entirely to allow any port`);
+		port = portText, hostPart = hostPart.slice(0, colonIdx);
+	}
+	let authorityRegex = `^${hostPart}:${port ?? "[0-9]+"}$`, pathRegex = `^${regex.slice(pathStart)}`;
+	for (let [label, fragment] of [["host", `^${hostPart}$`], ["path", pathRegex]]) try {
+		new RegExp(fragment);
+	} catch (e) {
+		throw Error(`Invalid regex in rule "${rule}": the ${label} part "${fragment}" does not compile on its own: ${e.message}`);
+	}
+	return {
+		authorityRegex,
+		pathRegex
+	};
+}
 /**
 * Compile the URL half of a rule to a regex matching the URL squid sees.
 *
@@ -609,11 +646,12 @@ function compileUrl(url, rule) {
 		} catch (e) {
 			throw Error(`Invalid regex in rule "${rule}": ${e.message}`);
 		}
+		let { authorityRegex, pathRegex } = splitRawRegexUrl(regex, rule);
 		return {
 			scheme: "https",
 			regex,
-			authorityRegex: null,
-			pathRegex: null
+			authorityRegex,
+			pathRegex
 		};
 	}
 	let { scheme, authority, path } = splitUrl(url, rule), colonIndex = authority.lastIndexOf(":"), hasPort = colonIndex !== -1 && !authority.slice(colonIndex + 1).includes("]"), host = hasPort ? authority.slice(0, colonIndex) : authority, port = hasPort ? authority.slice(colonIndex + 1) : "";
