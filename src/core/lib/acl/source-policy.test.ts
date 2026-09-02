@@ -225,7 +225,7 @@ describe("buildSourcePolicy — regex (~) rules", () => {
   it("an anchor-less regex matches as a substring within the domain, but the missing anchors don't reach into the path", () => {
     const policy = buildSourcePolicy({
       proxyMode: "restrict",
-      httpsRulesInput: "~example",
+      httpsRulesInput: "~example(:\\d+)?", // a port pattern is always required, even here
       httpRulesInput: "",
       ipRulesInput: "",
     });
@@ -242,7 +242,7 @@ describe("buildSourcePolicy — regex (~) rules", () => {
   it("only the anchors actually present are stripped — an unanchored end still gets its own [^/]*", () => {
     const policy = buildSourcePolicy({
       proxyMode: "restrict",
-      httpsRulesInput: "~^example",
+      httpsRulesInput: "~^example(:\\d+)?", // a port pattern is always required, even here
       httpRulesInput: "",
       ipRulesInput: "",
     });
@@ -266,7 +266,7 @@ describe("buildSourcePolicy — regex (~) rules", () => {
   it("an escaped literal trailing $ is not mistaken for the end anchor (regression)", () => {
     const policy = buildSourcePolicy({
       proxyMode: "restrict",
-      httpsRulesInput: "~foo\\$",
+      httpsRulesInput: "~foo:443\\$", // a port pattern is always required, even here
       httpRulesInput: "",
       ipRulesInput: "",
     });
@@ -274,8 +274,8 @@ describe("buildSourcePolicy — regex (~) rules", () => {
     // the wrapper's own "(" — see git history for the exact failure): the
     // trailing "$" here is escaped (a literal dollar sign), not an anchor.
     const re = new RegExp(policy.rules[1].selector.identifier);
-    expect(re.test("https://foo$/")).toBeTruthy();
-    expect(!re.test("https://bar$/")).toBeTruthy();
+    expect(re.test("https://foo:443$/")).toBeTruthy();
+    expect(!re.test("https://bar:443$/")).toBeTruthy();
   });
 
   it("an escaped literal '.' followed by a real '*' quantifier is left alone (not confined)", () => {
