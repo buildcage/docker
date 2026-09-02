@@ -30,8 +30,8 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
         run: |
-          if ! echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Invalid semver format: $TAG (expected vX.Y.Z)"
+          if ! echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'; then
+            echo "::error::Invalid semver format: $TAG (expected vX.Y.Z or vX.Y.Z-prerelease)"
             exit 1
           fi
 
@@ -49,10 +49,27 @@ jobs:
           TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          PRERELEASE_FLAG=""
+          NOTES_ARGS=()
+          case "$TAG" in
+            *-*)
+              PRERELEASE_FLAG="--prerelease"
+              # GitHub's --generate-notes picks the wrong previous tag for a
+              # prerelease (skips the actual latest release, e.g. compares
+              # against v3.1.4 instead of v3.1.5 for v3.1.6-rc1) — pin it to
+              # the latest non-prerelease tag ourselves.
+              PREV_TAG=$(git tag --sort=-version:refname --list 'v*.*.*' | grep -vE '^v[0-9]+\.[0-9]+\.[0-9]+-' | head -1)
+              if [ -n "$PREV_TAG" ]; then
+                NOTES_ARGS=(--notes-start-tag "$PREV_TAG")
+              fi
+              ;;
+          esac
           gh release create "$TAG" \
             --draft \
             --title "$TAG" \
-            --generate-notes
+            --generate-notes \
+            $PRERELEASE_FLAG \
+            "${NOTES_ARGS[@]}"
 
       - name: Push tag
         env:
@@ -95,4 +112,11 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Review and publish: $RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Tick **Publish this Action to the GitHub Marketplace** on that page before publishing — the release API has no field for it, so it has to be set by hand every time." >> "$GITHUB_STEP_SUMMARY"
+          case "$TAG" in
+            *-*)
+              echo "This is a **prerelease** tag — do NOT tick **Publish this Action to the GitHub Marketplace**. Marketplace publishing is for stable releases only." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "Tick **Publish this Action to the GitHub Marketplace** on that page before publishing — the release API has no field for it, so it has to be set by hand every time." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac

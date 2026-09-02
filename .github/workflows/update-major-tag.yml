@@ -28,31 +28,42 @@ jobs:
           ref: ${{ env.TAG }}
           persist-credentials: false
 
+      - name: Guard against prerelease tags
+        id: guard
+        env:
+          IS_RELEASE_EVENT: ${{ github.event_name == 'release' }}
+          EVENT_PRERELEASE: ${{ github.event.release.prerelease }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$IS_RELEASE_EVENT" = "true" ]; then
+            IS_PRERELEASE="$EVENT_PRERELEASE"
+          else
+            IS_PRERELEASE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')
+          fi
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "::notice::$TAG is a prerelease — skipping major/minor/latest tag updates"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Extract major version
         id: version
+        if: steps.guard.outputs.skip != 'true'
         run: |
           MAJOR="${TAG%%.*}"
           echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
 
-      - name: Update major version tag
-        env:
-          MAJOR: ${{ steps.version.outputs.major }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
-          git tag -fa "$MAJOR" -m "Update $MAJOR to $TAG"
-          git push origin "$MAJOR" --force
-
       - name: Login to GHCR
+        if: steps.guard.outputs.skip != 'true'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update Docker major/minor/latest tags
+      - name: Update major/minor/latest git and Docker tags
+        if: steps.guard.outputs.skip != 'true'
         env:
           MAJOR: ${{ steps.version.outputs.major }}
           REPO: ghcr.io/${{ github.repository }}
@@ -67,6 +78,14 @@ jobs:
           LATEST_IN_MAJOR=$(echo "$TAGS" | grep -E "^v${MAJOR#v}\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
           LATEST_IN_MINOR=$(echo "$TAGS" | grep -E "^v${MINOR}\.[0-9]+$" | sort -V | tail -1)
           LATEST_OVERALL=$(echo "$TAGS" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+
+          if [ "$TAG" = "$LATEST_IN_MAJOR" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
+            git tag -fa "$MAJOR" -m "Update $MAJOR to $TAG"
+            git push origin "$MAJOR" --force
+          fi
 
           for ENGINE in universal explicit inspect; do
             SUFFIX=""

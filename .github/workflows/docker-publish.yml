@@ -66,7 +66,7 @@ jobs:
             if [ -n "$INPUT_TAG" ]; then
               TAG="$INPUT_TAG"
             else
-              TAG=$(git tag --sort=-version:refname --list 'v*.*' | head -1)
+              TAG=$(git tag --sort=-version:refname --list 'v*.*' | grep -vE '^v[0-9]+\.[0-9]+\.[0-9]+-' | head -1)
               if [ -z "$TAG" ]; then
                 echo "::error::No version tag found"
                 exit 1

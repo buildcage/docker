@@ -22,6 +22,14 @@ describe("imageTagFromRef", () => {
     expect(imageTagFromRef("v2.1.0")).toBe("2.1.0");
   });
 
+  it("strips leading 'v' from a prerelease tag", () => {
+    expect(imageTagFromRef("v3.1.6-rc1")).toBe("3.1.6-rc1");
+  });
+
+  it("appends the engine suffix after a prerelease tag", () => {
+    expect(imageTagFromRef("v3.1.6-rc1", "explicit")).toBe("3.1.6-rc1-explicit");
+  });
+
   it("strips 'v' from a major-only tag", () => {
     expect(imageTagFromRef("v2")).toBe("2");
   });
