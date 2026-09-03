@@ -51,7 +51,12 @@ frontend outbound_proxy
     # TLS variable extraction
     tcp-request content set-var(sess.sni) req_ssl_sni if is_tls
     tcp-request content set-var-fmt(sess.sni_port) %[req_ssl_sni]:%[dst_port] if is_tls
-    tcp-request content set-var(sess.target) var(sess.sni_port) if is_tls has_sni
+    # The SNI is attacker-chosen raw bytes, and HAProxy copies a %[var()] into
+    # log-format verbatim -- +E would only escape " \ ], never LF. So the copy
+    # that reaches the log is reduced to a hostname charset here; the ACL below
+    # still matches the untouched sess.sni_port.
+    tcp-request content set-var(sess.sni_log) req_ssl_sni,regsub([^A-Za-z0-9._-],_,g) if is_tls has_sni
+    tcp-request content set-var-fmt(sess.target) %[var(sess.sni_log)]:%[dst_port] if is_tls has_sni
 
     # ACL: HTTPS allowlist
     acl is_https_allowed var(sess.sni_port) -m reg -f /etc/haproxy/rules/allowed_https.lst
@@ -128,7 +133,9 @@ backend http_filter_backend
     http-request set-var-fmt(txn.host_port) %[var(txn.host_only)]:%[dst_port]
 
     # Update session target for logging (replace IP with actual hostname)
-    http-request set-var(sess.target) var(txn.host_port)
+    # Same reason as the SNI above: the Host header is attacker-chosen too.
+    http-request set-var(txn.host_log) var(txn.host_only),regsub([^A-Za-z0-9._-],_,g)
+    http-request set-var-fmt(sess.target) %[var(txn.host_log)]:%[dst_port]
 
     # HTTP allowlist check
     acl is_http_allowed var(txn.host_port) -m reg -f /etc/haproxy/rules/allowed_http.lst

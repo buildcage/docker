@@ -28,8 +28,16 @@ assert_log_contains BLOCKED "172.20.0.1:443" "missing-sni"
 assert_log_contains BLOCKED "172.20.0.1:80" "missing-host-header"
 echo ""
 
+echo "[BLOCKED] forged SNI, sanitized to a single log line:"
+assert_log_contains BLOCKED "x__-__T__buildcage__ALLOWED___HTTPS___forged.example.com:443" "not-allowed"
+echo ""
+
 echo "[AUDIT] must not exist:"
 assert_log_not_contains AUDIT
+echo ""
+
+echo "[log integrity] no forged/malformed lines from the injection attempt:"
+assert_no_forged_log_lines
 echo ""
 
 assert_results
