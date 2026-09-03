@@ -74,6 +74,15 @@ RUN echo "=== [HTTP - dns-failed] ===" && \
     echo "Testing nxdomain.wildcard.example.com (HTTP, should be blocked by dns failure)..." && \
     (wget -q -O /dev/null --timeout=5 http://nxdomain.wildcard.example.com/ && echo "✗ nxdomain.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ nxdomain.wildcard.example.com HTTP: BLOCKED (expected)"
 
+# [SSRF - allowlisted name resolving to an internal address (169.254.169.254)]
+RUN echo "=== [HTTPS - SSRF via allowlisted name] ===" && \
+    echo "Testing internal.wildcard.example.com (HTTPS, should be blocked)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://internal.wildcard.example.com/ && echo "✗ internal.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ internal.wildcard.example.com: BLOCKED (expected)"
+
+RUN echo "=== [HTTP - SSRF via allowlisted name] ===" && \
+    echo "Testing internal.wildcard.example.com (HTTP, should be blocked)..." && \
+    (wget -q -O /dev/null --timeout=5 http://internal.wildcard.example.com/ && echo "✗ internal.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ internal.wildcard.example.com HTTP: BLOCKED (expected)"
+
 # [HTTPS - missing-sni (TLS ClientHello without SNI extension)]
 RUN echo "=== [HTTPS - missing-sni] ===" && \
     echo "Testing TLS connection without SNI (should be blocked)..." && \

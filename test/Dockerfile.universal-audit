@@ -29,6 +29,15 @@ RUN echo "=== [Direct IP - audit mode] ===" && \
     echo "Testing direct IP access to 10.200.0.100 (routed through haproxy via TPROXY)..." && \
     (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✓ 10.200.0.100: OK") || (echo "✗ 10.200.0.100: FAILED" && exit 1)
 
+# [SSRF - internal address, blocked even though audit otherwise allows everything]
+RUN echo "=== [HTTPS - SSRF via internal address] ===" && \
+    echo "Testing internal.wildcard.example.com (HTTPS, should be blocked even in audit mode)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://internal.wildcard.example.com/ && echo "✗ internal.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ internal.wildcard.example.com: BLOCKED (expected)"
+
+RUN echo "=== [HTTP - SSRF via internal address] ===" && \
+    echo "Testing internal.wildcard.example.com (HTTP, should be blocked even in audit mode)..." && \
+    (wget -q -O /dev/null --timeout=5 http://internal.wildcard.example.com/ && echo "✗ internal.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ internal.wildcard.example.com HTTP: BLOCKED (expected)"
+
 # [HTTPS - dns-failed (NXDOMAIN)]
 RUN echo "=== [HTTPS - dns-failed] ===" && \
     echo "Testing nxdomain.wildcard.example.com (HTTPS, should be blocked by dns failure)..." && \
