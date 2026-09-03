@@ -105,6 +105,15 @@ What each kind of rule decides, and what stays undecrypted:
   cloud metadata. RFC1918 is deliberately exempt: a name pointing at an internal mirror is a real,
   intended setup. An address named directly in a rule is exempt too, having been asked for rather
   than arrived at.
+
+  This guard is about a _name_ landing somewhere it never should — it has nothing to do with, and
+  never restricts, a rule whose host is itself a literal address (an `https`/`http` rule that names
+  one directly, or a `Host` header the request sent as a bare IP): reaching that connection already
+  required a rule to match the address as sent, so nothing was arrived at that wasn't first asked
+  for. Direct access to a cloud metadata endpoint this way — the normal way any AWS/GCP/Azure CLI or
+  SDK reaches it — is not something this guard is meant to stop; `allowed_ip_rules` is the intended,
+  always-uninspected path for it (see below).
+
 - **The resolver never forwards a query, allowed or not.** Every name is answered locally with the
   proxy's own address, so a lookup alone, even one the build never connects on, cannot be used as an
   exfiltration channel (`SECRET-DATA.attacker.example` would otherwise reach an attacker's own
@@ -153,6 +162,13 @@ What each kind of rule decides, and what stays undecrypted:
   accept the CA fails under `audit` exactly as it would under `restrict`. What `audit` drops is the
   rule ACLs, not the interception: `set-dst` and the origin certificate check stay, because neither
   can be dropped honestly.
+
+  The internal-address guard above stays active in `audit` too, unconditionally: a name resolving
+  to cloud metadata isn't traffic `audit` needs to observe, since nothing legitimate depends on that
+  specific resolved address. A literal-IP request, such as a build calling a metadata endpoint
+  directly, is unaffected by this guard in either mode — blocking it would only hide real
+  information about what the build needs, without closing anything DNS could have redirected.
+
 - **`allow_tls_rules` and `allowed_ip_rules` stay uninspected by design.** Each is recorded with a
   byte count and nothing more, since neither carries a name the proxy can re-terminate TLS for.
 - **Query strings are kept in the log**, since that is also where an exfiltration payload would go.
