@@ -220,6 +220,13 @@ itself, which is not on the isolated network, so base image pulls are never filt
 - **Where a connection ends up is not the build's choice.** The proxy resolves the name it read from
   the SNI or the `Host` header and connects to that address, so a request that was allowed for a
   name always reaches the server that name belongs to.
+- **A resolved name may not land on an internal address.** The same guard as
+  [`inspect`](#inspect-proxy-engine)'s (see [What it actually stops](#what-it-actually-stops)):
+  loopback, link-local, CGNAT, the IETF protocol block, and the proxy's own address are all refused
+  (`internal-address` in the report). Unlike `inspect`, there's no literal-address exemption to carve
+  out here — a connection to a bare address never reaches this guard at all, since it skips DNS and
+  `do-resolve` entirely on a separate code path; `allowed_ip_rules` is the always-uninspected path for
+  a destination named directly.
 - **DNS never leaves the job.** The internal resolver has no upstream and answers every query
   locally, so a name carrying data in its labels reaches nobody. The iptables rules leave no path to
   an outside resolver either.
@@ -236,6 +243,7 @@ itself, which is not on the isolated network, so base image pulls are never filt
 | What the build does                                    | What happens                                                                                                                                         |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Sets an allowed name in the SNI while aiming elsewhere | Reaches the server the proxy resolved that name to, not the one the build chose                                                                      |
+| Allowlists a name that resolves to an internal address | Refused: the resolved address is checked and rejected if it is loopback, link-local, the proxy itself, or another never-public range, in `audit` too |
 | Uses ECH to conceal the real SNI                       | The handshake cannot start: the type 65 record it needs is never returned                                                                            |
 | Encodes data into DNS queries                          | Answered locally and never forwarded; an outside resolver is unreachable                                                                             |
 | Tunnels over ICMP, raw UDP, or QUIC                    | Dropped before the proxy; only TCP is redirected to it                                                                                               |
