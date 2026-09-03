@@ -36,6 +36,26 @@ assert_log_not_contains() {
   fi
 }
 
+assert_no_forged_log_lines() {
+  local decision_logs
+  # Restrict to actual decision lines ("buildcage [...]") -- the plausibility
+  # startup line ("buildcage haproxy starting", see s6-rc.d/haproxy/run) has
+  # no bracket after "buildcage " and would otherwise false-positive below.
+  decision_logs=$(grep 'buildcage \[' <<< "$LOGS" || true)
+  local bad_lines
+  # A well-formed buildcage line has exactly two double quotes (the
+  # host:port field) and no embedded control characters. A forged line
+  # (unsanitized attacker bytes) breaks one of those two invariants.
+  bad_lines=$(awk '{ n = gsub(/"/, "\""); if (n != 2) print; else if (/[[:cntrl:]]/) print }' <<< "$decision_logs")
+  if [ -z "$bad_lines" ]; then
+    echo "  PASS  no forged/malformed buildcage log lines"
+  else
+    echo "  FAIL  found malformed buildcage log line(s):"
+    echo "$bad_lines" | sed 's/^/    /'
+    FAILURES=$((FAILURES + 1))
+  fi
+}
+
 assert_results() {
   echo ""
   if [ "$FAILURES" -gt 0 ]; then

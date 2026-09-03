@@ -86,6 +86,15 @@ RUN echo "=== [HTTP - missing-host-header] ===" && \
     ((printf 'GET / HTTP/1.0\r\n\r\n'; sleep 1) | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
     echo "✓ missing-host-header: request sent (blocked expected in logs)"
 
+# [HTTPS - forged SNI (log-injection attempt via a crafted ClientHello)]
+# SNI = x" -\n[T] buildcage [ALLOWED] (HTTPS) "forged.example.com — an
+# attempt to break the "..." quoting and inject a fake ALLOWED line. Must be
+# BLOCKED as a single sanitized log line; see H-2 in docs/security.md.
+RUN echo "=== [HTTPS - forged SNI] ===" && \
+    echo "Testing crafted SNI log-injection payload (should be blocked)..." && \
+    (printf '\x16\x03\x01\x00\x70\x01\x00\x00\x6c\x03\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xff\x01\x00\x00\x41\x00\x00\x00\x3d\x00\x3b\x00\x00\x38\x78\x22\x20\x2d\x0a\x5b\x54\x5d\x20\x62\x75\x69\x6c\x64\x63\x61\x67\x65\x20\x5b\x41\x4c\x4c\x4f\x57\x45\x44\x5d\x20\x28\x48\x54\x54\x50\x53\x29\x20\x22\x66\x6f\x72\x67\x65\x64\x2e\x65\x78\x61\x6d\x70\x6c\x65\x2e\x63\x6f\x6d' | nc -w 5 allowed.example.com 443 > /dev/null 2>&1 || true) && \
+    echo "✓ forged-sni: request sent (blocked expected in logs)"
+
 # [npm install - allowed - registry.npmjs.org is in ALLOWED_HTTPS_RULES; no CA
 # workaround needed, unlike the explicit engine]
 COPY files/package.json files/package-lock.json /app/
