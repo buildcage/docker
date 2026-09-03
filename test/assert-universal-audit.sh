@@ -21,6 +21,11 @@ assert_log_contains BLOCKED "172.20.0.1:443" "missing-sni"
 assert_log_contains BLOCKED "172.20.0.1:80" "missing-host-header"
 echo ""
 
+echo "[BLOCKED] expected (internal-address guard, unconditional even in audit):"
+assert_log_contains BLOCKED "internal.wildcard.example.com:443" "internal-address"
+assert_log_contains BLOCKED "internal.wildcard.example.com:80" "internal-address"
+echo ""
+
 echo "[ALLOWED] must not exist:"
 assert_log_not_contains ALLOWED
 echo ""

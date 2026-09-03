@@ -91,6 +91,11 @@ frontend outbound_proxy
     tcp-request content do-resolve(sess.actual_ip,my_dns,ipv4) var(sess.sni) if is_tls has_sni
     tcp-request content set-var(sess.reason) str(dns-failed) if is_tls has_sni ! { var(sess.actual_ip) -m found }
     tcp-request content reject if is_tls has_sni ! { var(sess.actual_ip) -m found }
+    # Block the resolved address from landing on a never-public range, e.g.
+    # cloud metadata. Keep in sync with INTERNAL_RANGES in haproxy-rules.ts.
+    acl dst_internal var(sess.actual_ip) -m ip 0.0.0.0/8 127.0.0.0/8 169.254.0.0/16 100.64.0.0/10 192.0.0.0/24 ::1/128 fe80::/10 172.20.0.1
+    tcp-request content set-var(sess.reason) str(internal-address) if is_tls has_sni dst_internal
+    tcp-request content reject if is_tls has_sni dst_internal
     tcp-request content set-dst var(sess.actual_ip) if is_tls has_sni
     tcp-request content set-var(sess.decision) str(${HAPROXY_DECISION_LABEL}) if is_tls has_sni
     tcp-request content accept if is_tls has_sni
@@ -146,6 +151,11 @@ backend http_filter_backend
     http-request do-resolve(txn.actual_ip,my_dns,ipv4) var(txn.host_only)
     http-request set-var(sess.reason) str(dns-failed) if ! { var(txn.actual_ip) -m found }
     http-request deny deny_status 503 content-type "text/plain" string "DNS Resolution Failed" if ! { var(txn.actual_ip) -m found }
+
+    # Same guard as the TLS path above.
+    acl dst_internal_http var(txn.actual_ip) -m ip 0.0.0.0/8 127.0.0.0/8 169.254.0.0/16 100.64.0.0/10 192.0.0.0/24 ::1/128 fe80::/10 172.20.0.1
+    http-request set-var(sess.reason) str(internal-address) if dst_internal_http
+    http-request deny deny_status 403 content-type "text/plain" string "Blocked by egress proxy" if dst_internal_http
 
     http-request set-dst var(txn.actual_ip)
     http-request set-var(sess.decision) str(${HAPROXY_DECISION_LABEL})

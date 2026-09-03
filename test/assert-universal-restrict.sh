@@ -26,6 +26,8 @@ assert_log_contains BLOCKED "nxdomain.wildcard.example.com:443" "dns-failed"
 assert_log_contains BLOCKED "nxdomain.wildcard.example.com:80" "dns-failed"
 assert_log_contains BLOCKED "172.20.0.1:443" "missing-sni"
 assert_log_contains BLOCKED "172.20.0.1:80" "missing-host-header"
+assert_log_contains BLOCKED "internal.wildcard.example.com:443" "internal-address"
+assert_log_contains BLOCKED "internal.wildcard.example.com:80" "internal-address"
 echo ""
 
 echo "[BLOCKED] forged SNI, sanitized to a single log line:"
