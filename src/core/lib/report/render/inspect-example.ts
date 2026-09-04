@@ -198,8 +198,7 @@ export function buildInspectRestrictExample(
   md += "```yaml\n";
   md += yaml;
   md += "```\n\n";
-  md += "These rules permit exactly what this build did, so read them before using them: a URL\n";
-  md += "that carried a version or a date will not match the next run.\n\n";
+  md += "<sub>*Permits exactly what this build did; a versioned or dated URL may drift.*</sub>\n\n";
   md += "</details>\n";
   return md;
 }
