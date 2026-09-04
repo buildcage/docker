@@ -24,6 +24,26 @@ assert_log_contains() {
   fi
 }
 
+assert_log_not_matching() {
+  local marker="$1"
+  local host_port="$2"
+  local reason="${3:-}"
+  local pattern="\[$marker\].*\"$host_port\""
+  local label="[$marker] $host_port"
+  if [ -n "$reason" ]; then
+    pattern="$pattern $reason"
+    label="$label $reason"
+  fi
+  local buildcage_logs
+  buildcage_logs=$(grep buildcage <<< "$LOGS" || true)
+  if grep -q "$pattern" <<< "$buildcage_logs"; then
+    echo "  FAIL  found unexpected $label line"
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "  PASS  no $label line"
+  fi
+}
+
 assert_log_not_contains() {
   local marker="$1"
   local count

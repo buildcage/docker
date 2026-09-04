@@ -29,87 +29,87 @@ frontend outbound_proxy
     tcp-request inspect-delay 5s
 
     # Default variables
-    # sess.decision defaults to BLOCKED — any reject/deny leaves it unchanged,
+    # txn.decision defaults to BLOCKED — any reject/deny leaves it unchanged,
     # so only connections that pass all checks are overwritten to ALLOWED/AUDIT.
-    tcp-request content set-var(sess.decision) str(BLOCKED)
-    tcp-request content set-var(sess.reason) str(-)
-    tcp-request content set-var-fmt(sess.target) %[dst]:%[dst_port]
-    tcp-request content set-var(sess.rule_type) str(UNKNOWN)
+    tcp-request content set-var(txn.decision) str(BLOCKED)
+    tcp-request content set-var(txn.reason) str(-)
+    tcp-request content set-var-fmt(txn.target) %[dst]:%[dst_port]
+    tcp-request content set-var(txn.rule_type) str(UNKNOWN)
 
     # ACL: DNS-routed vs IP direct
     acl is_dns_routed dst 172.20.0.1
     # Store DNS-routed state in variable (before set-dst may modify dst)
-    tcp-request content set-var(sess.dns_routed) str(true) if is_dns_routed
+    tcp-request content set-var(txn.dns_routed) str(true) if is_dns_routed
 
     # ACL: TLS/SNI
     acl is_tls req.ssl_hello_type 1
     acl has_sni req_ssl_sni -m found
 
     # ACL: IP direct access allowlist
-    acl is_ip_match var(sess.target) -m reg -f /etc/haproxy/rules/allowed_ips.lst
+    acl is_ip_match var(txn.target) -m reg -f /etc/haproxy/rules/allowed_ips.lst
 
     # TLS variable extraction
-    tcp-request content set-var(sess.sni) req_ssl_sni if is_tls
-    tcp-request content set-var-fmt(sess.sni_port) %[req_ssl_sni]:%[dst_port] if is_tls
+    tcp-request content set-var(txn.sni) req_ssl_sni if is_tls
+    tcp-request content set-var-fmt(txn.sni_port) %[req_ssl_sni]:%[dst_port] if is_tls
     # The SNI is attacker-chosen raw bytes, and HAProxy copies a %[var()] into
     # log-format verbatim -- +E would only escape " \ ], never LF. So the copy
     # that reaches the log is reduced to a hostname charset here; the ACL below
-    # still matches the untouched sess.sni_port.
-    tcp-request content set-var(sess.sni_log) req_ssl_sni,regsub([^A-Za-z0-9._-],_,g) if is_tls has_sni
-    tcp-request content set-var-fmt(sess.target) %[var(sess.sni_log)]:%[dst_port] if is_tls has_sni
+    # still matches the untouched txn.sni_port.
+    tcp-request content set-var(txn.sni_log) req_ssl_sni,regsub([^A-Za-z0-9._-],_,g) if is_tls has_sni
+    tcp-request content set-var-fmt(txn.target) %[var(txn.sni_log)]:%[dst_port] if is_tls has_sni
 
     # ACL: HTTPS allowlist
-    acl is_https_allowed var(sess.sni_port) -m reg -f /etc/haproxy/rules/allowed_https.lst
+    acl is_https_allowed var(txn.sni_port) -m reg -f /etc/haproxy/rules/allowed_https.lst
 
     # ---------------------------------------------------------
     # 1. IP direct access (non DNS-routed)
     # ---------------------------------------------------------
-    tcp-request content set-var(sess.rule_type) str(IP) if !is_dns_routed
-    tcp-request content set-var(sess.decision) str(${HAPROXY_DECISION_LABEL}) if !is_dns_routed is_ip_match
+    tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed
+    tcp-request content set-var(txn.decision) str(${HAPROXY_DECISION_LABEL}) if !is_dns_routed is_ip_match
     tcp-request content accept if !is_dns_routed is_ip_match
 
     ${HAPROXY_AUDIT_ACCEPT}
-    tcp-request content set-var(sess.reason) str(ip-not-allowed) if !is_dns_routed !is_ip_match
+    tcp-request content set-var(txn.reason) str(ip-not-allowed) if !is_dns_routed !is_ip_match
     tcp-request content reject if !is_dns_routed !is_ip_match
 
     # ---------------------------------------------------------
     # 2. TLS without SNI
     # ---------------------------------------------------------
-    tcp-request content set-var(sess.rule_type) str(HTTPS) if is_tls
-    tcp-request content set-var(sess.reason) str(missing-sni) if is_tls !has_sni
+    tcp-request content set-var(txn.rule_type) str(HTTPS) if is_tls
+    tcp-request content set-var(txn.reason) str(missing-sni) if is_tls !has_sni
     tcp-request content reject if is_tls !has_sni
 
     # ---------------------------------------------------------
     # 3. TLS allowlist check (before DNS to avoid resolving blocked domains)
     # ---------------------------------------------------------
-    tcp-request content set-var(sess.reason) str(not-allowed) if is_tls has_sni !is_https_allowed
+    tcp-request content set-var(txn.reason) str(not-allowed) if is_tls has_sni !is_https_allowed
     tcp-request content reject if is_tls has_sni !is_https_allowed
 
     # ---------------------------------------------------------
     # 4. TLS DNS resolution, destination override & accept
     # ---------------------------------------------------------
-    tcp-request content do-resolve(sess.actual_ip,my_dns,ipv4) var(sess.sni) if is_tls has_sni
-    tcp-request content set-var(sess.reason) str(dns-failed) if is_tls has_sni ! { var(sess.actual_ip) -m found }
-    tcp-request content reject if is_tls has_sni ! { var(sess.actual_ip) -m found }
+    tcp-request content do-resolve(txn.tls_actual_ip,my_dns,ipv4) var(txn.sni) if is_tls has_sni
+    tcp-request content set-var(txn.reason) str(dns-failed) if is_tls has_sni ! { var(txn.tls_actual_ip) -m found }
+    tcp-request content reject if is_tls has_sni ! { var(txn.tls_actual_ip) -m found }
     # Block the resolved address from landing on a never-public range, e.g.
     # cloud metadata. Keep in sync with INTERNAL_RANGES in haproxy-rules.ts.
-    acl dst_internal var(sess.actual_ip) -m ip 0.0.0.0/8 127.0.0.0/8 169.254.0.0/16 100.64.0.0/10 192.0.0.0/24 ::1/128 fe80::/10 172.20.0.1
-    tcp-request content set-var(sess.reason) str(internal-address) if is_tls has_sni dst_internal
+    acl dst_internal var(txn.tls_actual_ip) -m ip 0.0.0.0/8 127.0.0.0/8 169.254.0.0/16 100.64.0.0/10 192.0.0.0/24 ::1/128 fe80::/10 172.20.0.1
+    tcp-request content set-var(txn.reason) str(internal-address) if is_tls has_sni dst_internal
     tcp-request content reject if is_tls has_sni dst_internal
-    tcp-request content set-dst var(sess.actual_ip) if is_tls has_sni
-    tcp-request content set-var(sess.decision) str(${HAPROXY_DECISION_LABEL}) if is_tls has_sni
+    tcp-request content set-dst var(txn.tls_actual_ip) if is_tls has_sni
+    tcp-request content set-var(txn.decision) str(${HAPROXY_DECISION_LABEL}) if is_tls has_sni
     tcp-request content accept if is_tls has_sni
 
     # ---------------------------------------------------------
     # 5. Non-TLS DNS-routed → HTTP backend
     # ---------------------------------------------------------
     # Routing
-    use_backend ip_passthrough if !{ var(sess.dns_routed) -m found }
+    use_backend ip_passthrough if !{ var(txn.dns_routed) -m found }
     use_backend tls_passthrough if is_tls
     default_backend http_filter_backend
 
     # Set log format
-    log-format "[%T] buildcage [%[var(sess.decision)]] (%[var(sess.rule_type)]) \"%[var(sess.target)]\" %[var(sess.reason)]"
+    log-format "[%T] buildcage [%[var(txn.decision)]] (%[var(txn.rule_type)]) \"%[var(txn.target)]\" %[var(txn.reason)]"
 
 # --- IP direct passthrough backend ---
 backend ip_passthrough
@@ -122,42 +122,42 @@ backend tls_passthrough
     server cleartext 0.0.0.0:0
 
 # --- HTTP filter backend (L7) ---
-# deny responses leave sess.decision as BLOCKED (set in frontend).
+# deny responses leave txn.decision as BLOCKED (set in frontend).
 backend http_filter_backend
     mode http
-    http-request set-var(sess.rule_type) str(HTTP)
+    http-request set-var(txn.rule_type) str(HTTP)
 
     # Host header check
     acl has_host hdr(host) -m found
     acl host_not_empty hdr_len(host) gt 0
-    http-request set-var(sess.reason) str(missing-host-header) if !has_host or !host_not_empty
+    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty
     http-request deny deny_status 400 content-type "text/plain" string "Bad Request: Missing Host Header" if !has_host or !host_not_empty
 
     # Build host:port key
     http-request set-var(txn.host_only) hdr(host),regsub(:.*$,)
     http-request set-var-fmt(txn.host_port) %[var(txn.host_only)]:%[dst_port]
 
-    # Update session target for logging (replace IP with actual hostname)
+    # Update target for logging (replace IP with actual hostname)
     # Same reason as the SNI above: the Host header is attacker-chosen too.
     http-request set-var(txn.host_log) var(txn.host_only),regsub([^A-Za-z0-9._-],_,g)
-    http-request set-var-fmt(sess.target) %[var(txn.host_log)]:%[dst_port]
+    http-request set-var-fmt(txn.target) %[var(txn.host_log)]:%[dst_port]
 
     # HTTP allowlist check
     acl is_http_allowed var(txn.host_port) -m reg -f /etc/haproxy/rules/allowed_http.lst
-    http-request set-var(sess.reason) str(not-allowed) if !is_http_allowed
+    http-request set-var(txn.reason) str(not-allowed) if !is_http_allowed
     http-request deny deny_status 403 content-type "text/plain" string "Blocked by egress proxy" if !is_http_allowed
 
     # DNS resolution & destination override
     http-request do-resolve(txn.actual_ip,my_dns,ipv4) var(txn.host_only)
-    http-request set-var(sess.reason) str(dns-failed) if ! { var(txn.actual_ip) -m found }
+    http-request set-var(txn.reason) str(dns-failed) if ! { var(txn.actual_ip) -m found }
     http-request deny deny_status 503 content-type "text/plain" string "DNS Resolution Failed" if ! { var(txn.actual_ip) -m found }
 
     # Same guard as the TLS path above.
     acl dst_internal_http var(txn.actual_ip) -m ip 0.0.0.0/8 127.0.0.0/8 169.254.0.0/16 100.64.0.0/10 192.0.0.0/24 ::1/128 fe80::/10 172.20.0.1
-    http-request set-var(sess.reason) str(internal-address) if dst_internal_http
+    http-request set-var(txn.reason) str(internal-address) if dst_internal_http
     http-request deny deny_status 403 content-type "text/plain" string "Blocked by egress proxy" if dst_internal_http
 
     http-request set-dst var(txn.actual_ip)
-    http-request set-var(sess.decision) str(${HAPROXY_DECISION_LABEL})
+    http-request set-var(txn.decision) str(${HAPROXY_DECISION_LABEL})
 
     server cleartext 0.0.0.0:0
