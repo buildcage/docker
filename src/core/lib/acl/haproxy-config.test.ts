@@ -94,7 +94,33 @@ describe("load-bearing directives", () => {
     // over HTTP/2, which every TLS client negotiates by default.
     expect(config.includes("%[capture.req.hdr(0)]%HU")).toBe(false);
     expect(config.includes("%[capture.req.hdr(0)]%[var(txn.pathq)]")).toBe(true);
-    expect(config.includes("http-request set-var(txn.pathq) pathq")).toBe(true);
+    expect(config.includes("http-request set-var(txn.pathq) 'pathq,regsub(")).toBe(true);
+  });
+
+  it("strips whitespace, quotes and control chars from the Host header and the path before logging them", () => {
+    // Both are attacker-controlled; ACL matching still runs on the untouched
+    // req.hdr(host)/path fetches, only the logged copies are sanitized. Unlike
+    // the SNI below, the Host header legitimately carries its own ":port", so
+    // it can't be reduced to a hostname charset -- only the actually unsafe
+    // characters are stripped.
+    expect(
+      config.includes(
+        `http-request capture 'req.hdr(host),regsub("[\\s\\"[:cntrl:]]",_,g)' len 100`,
+      ),
+    ).toBe(true);
+    expect(
+      config.includes(`http-request set-var(txn.pathq) 'pathq,regsub("[\\"[:cntrl:]]",_,g)'`),
+    ).toBe(true);
+  });
+
+  it("the Host-capture charset leaves a non-default port's ':' untouched", () => {
+    // Regression: an earlier version reduced the Host capture to the SNI's
+    // hostname-only charset, which also ate the ':' a Host header carries for
+    // a non-default port -- turning "allowed.example.com:9443" into
+    // "allowed.example.com_9443" in the report. This mirrors HAProxy's own
+    // regsub("[\s\"[:cntrl:]]",_,g) against a POSIX/PCRE2-equivalent pattern.
+    const stripped = "allowed.example.com:9443".replace(/[\s"\p{Cc}]/gu, "_");
+    expect(stripped).toBe("allowed.example.com:9443");
   });
 
   it("records the path after normalising it, not as it was sent", () => {
@@ -371,6 +397,12 @@ describe("passthrough", () => {
   it("routes ip rules by address and port, before anything is decrypted", () => {
     expect(config.includes("acl ip0_dst dst 10.0.0.5")).toBe(true);
     expect(config.includes("acl ip0_port dst_port 5432")).toBe(true);
+  });
+
+  it("reduces the SNI to a safe charset before logging it", () => {
+    // ACL matching still runs on the untouched req.ssl_sni; only the copy
+    // that reaches the passthrough log line is sanitized.
+    expect(config.includes("set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g)")).toBe(true);
   });
 
   it("routes tls rules by SNI, and by the port the rule names", () => {

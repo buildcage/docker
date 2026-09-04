@@ -208,8 +208,9 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
   );
   if (ipRules.length > 0 || tlsHosts.length > 0) {
     l.push(
+      // req.ssl_sni is attacker-controlled; reduced to a safe charset for logging.
       "    # Captured now, since the request buffer is gone by log time.",
-      "    tcp-request content set-var(txn.sni) req.ssl_sni",
+      "    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g)",
     );
     if (ipRules.some((rule) => rule.hostMatch === "hostPort")) {
       // dst is IP-typed; a ~ rule's own regex covers address and port
@@ -334,7 +335,11 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
       `frontend ${name}`,
       `    bind 127.0.0.1:${port} accept-proxy${bindExtra}`,
       "    mode http",
-      "    http-request capture req.hdr(host) len 100",
+      // Host is attacker-controlled too, but keeps its own ":port" (unlike
+      // SNI), so it can't be reduced to a hostname charset. Single-quoted as
+      // a whole so the word parser leaves the embedded " alone for regsub's
+      // own (config manual: "Quoting and escaping") argument quoting to handle.
+      `    http-request capture 'req.hdr(host),regsub("[\\s\\"[:cntrl:]]",_,g)' len 100`,
       "",
       "    # Decode before stripping `..`: `.` is unreserved, so `%2e%2e` is not",
       "    # a dot-dot segment until decoded, and stripping first would miss it.",
@@ -344,7 +349,9 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
       "    # pathq, not %HU: %HU is the target as sent (a path over HTTP/1.1, an",
       "    # absolute URI over HTTP/2), and pathq is not readable at log time.",
       "    # Set after normalisation, so the log shows the path the rules matched.",
-      "    http-request set-var(txn.pathq) pathq",
+      // Same idea as the Host capture above, minus \s: a raw space can't
+      // reach a path (HTTP's own request-line parsing rejects it first).
+      `    http-request set-var(txn.pathq) 'pathq,regsub("[\\"[:cntrl:]]",_,g)'`,
       "",
       "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may",
       "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a",
