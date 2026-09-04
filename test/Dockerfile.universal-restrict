@@ -106,15 +106,15 @@ RUN echo "=== [HTTPS - forged SNI] ===" && \
 
 # [HTTP keep-alive - allowed then blocked: a second request on a reused
 # HTTP/1.1 keep-alive connection must be judged on its own merits, not
-# inherit the first request's sess.decision]
+# inherit the first request's txn.decision]
 RUN echo "=== [HTTP keep-alive - allowed then blocked] ===" && \
     ((printf 'GET / HTTP/1.1\r\nHost: allowed.example.com\r\n\r\n'; sleep 1; \
       printf 'GET / HTTP/1.1\r\nHost: blocked.example.com\r\nConnection: close\r\n\r\n'; sleep 1) \
      | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
     echo "✓ keep-alive allowed-then-blocked: requests sent (second request must log BLOCKED, not ALLOWED)"
 
-# [HTTP keep-alive - blocked then allowed: sess.reason must also reset
-# per request, not just sess.decision]
+# [HTTP keep-alive - blocked then allowed: txn.reason must also reset
+# per request, not just txn.decision]
 RUN echo "=== [HTTP keep-alive - blocked then allowed] ===" && \
     ((printf 'GET / HTTP/1.1\r\nHost: blocked.example.com\r\n\r\n'; sleep 1; \
       printf 'GET / HTTP/1.1\r\nHost: allowed.example.com\r\nConnection: close\r\n\r\n'; sleep 1) \

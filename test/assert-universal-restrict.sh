@@ -34,7 +34,7 @@ echo "[BLOCKED] forged SNI, sanitized to a single log line:"
 assert_log_contains BLOCKED "x__-__T__buildcage__ALLOWED___HTTPS___forged.example.com:443" "not-allowed"
 echo ""
 
-echo "[keep-alive] sess.decision/sess.reason must not leak across requests on one connection:"
+echo "[keep-alive] txn.decision/txn.reason must not leak across requests on one connection:"
 assert_log_not_matching ALLOWED "blocked.example.com:80"
 assert_log_not_matching ALLOWED "allowed.example.com:80" "not-allowed"
 echo ""
