@@ -121,6 +121,26 @@ describe("scanHaproxyLog", () => {
     const result = await scanHaproxyLog("\n\n  \n".split("\n"), false);
     expect(result.hasNonBuildcageContent).toBe(false);
   });
+
+  // ---------------------------------------------------------------------
+  // Log injection via an unsanitized target/reason
+  // ---------------------------------------------------------------------
+  it("a quote inside the target field does not match, and counts as non-buildcage content", async () => {
+    const log =
+      '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "evil"] buildcage [ALLOWED] (HTTPS) "a.com:443" r1';
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    expect(result.passed.length).toBe(0);
+    expect(result.hasNonBuildcageContent).toBe(true);
+  });
+
+  it("a well-formed line with extra content appended after it does not match", async () => {
+    const log =
+      '[2024-01-01T00:00:00] buildcage [ALLOWED] (HTTPS) "a.com:443" r1 [2024-01-01T00:00:01] buildcage [BLOCKED] (HTTPS) "hidden.com:443" not-allowed';
+    const result = await scanHaproxyLog(log.split("\n"), false);
+    expect(result.passed.length).toBe(0);
+    expect(result.blocked.length).toBe(0);
+    expect(result.hasNonBuildcageContent).toBe(true);
+  });
 });
 
 reportResults();

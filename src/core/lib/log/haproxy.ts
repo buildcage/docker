@@ -16,8 +16,12 @@ export interface HaproxyLogScanResult {
   hasNonBuildcageContent: boolean;
 }
 
+// The quoted field and reason are restricted to the charset the generators
+// actually emit (host/IP/port, and a kebab-case reason), and the line is
+// anchored at both ends -- a forged target or reason falls to
+// hasNonBuildcageContent instead of being parsed as a decision.
 const logPattern =
-  /^\[.*?\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+\((\w+)\)\s+"([^"]+)"\s*(\S*)/;
+  /^\[[^\]]*\]\s+buildcage\s+\[(AUDIT|ALLOWED|BLOCKED)\]\s+\((\w+)\)\s+"([A-Za-z0-9._:-]+)"\s*([A-Za-z0-9-]*)\s*$/;
 
 /**
  * Single forward pass over the log: matching lines fold directly into
