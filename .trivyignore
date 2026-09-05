@@ -166,3 +166,98 @@ CVE-2026-56862
 # buildcage's proxy trust boundary.
 CVE-2026-56865
 CVE-2026-56864
+
+# CoreDNS: DoH/DoQ, forwarding-dependent TXID prediction, and acl/rewrite/
+# transfer/loop plugin bugs. buildcage's Corefile runs only view+template+
+# log+errors on plain UDP/TCP:53 and never forwards; those plugins don't run.
+CVE-2023-28452
+CVE-2024-0874
+CVE-2025-47950
+CVE-2025-68151
+CVE-2026-26017
+CVE-2026-26018
+CVE-2026-32934
+CVE-2026-32936
+CVE-2026-33190
+CVE-2026-33489
+CVE-2026-35579
+GHSA-gv9j-4w24-q7vx
+
+# libcurl: bugs requiring a malicious server. Only used for a fixed,
+# checksum-verified download, a local healthcheck (same as the c-ares entry
+# above), and git's transport to a trusted git-context source — never an
+# attacker-controlled server.
+CVE-2026-10536
+CVE-2026-11352
+CVE-2026-11564
+CVE-2026-11586
+CVE-2026-11856
+CVE-2026-12064
+CVE-2026-13608
+CVE-2026-18924
+CVE-2026-19931
+CVE-2026-80229
+CVE-2026-80230
+CVE-2026-80231
+CVE-2026-80255
+CVE-2026-80256
+CVE-2026-82208
+CVE-2026-82209
+CVE-2026-8286
+CVE-2026-8458
+CVE-2026-8924
+CVE-2026-8925
+CVE-2026-8926
+CVE-2026-8927
+CVE-2026-8932
+CVE-2026-9079
+CVE-2026-9080
+CVE-2026-9545
+CVE-2026-9546
+CVE-2026-9547
+
+# OpenSSL: QUIC/CMP/CMS/DTLS/RPK bugs and direct EVP_Cipher() misuse.
+# haproxy and git/openssh only do plain TLS 1.2/1.3 over TCP; nothing here
+# speaks QUIC/DTLS, builds a CMP/CMS message, or calls EVP_Cipher() directly.
+CVE-2026-14456
+CVE-2026-14457
+CVE-2026-18798
+CVE-2026-54874
+CVE-2026-63072
+CVE-2026-63073
+CVE-2026-63074
+CVE-2026-63075
+CVE-2026-63076
+CVE-2026-75803
+
+# libexpat: more XML DoS/memory-safety bugs, same as the CVE-2026-56409
+# block above — no untrusted XML is parsed here.
+CVE-2026-66046
+CVE-2026-76641
+CVE-2026-76956
+CVE-2026-76957
+
+# golang.org/x/crypto/ssh: bugs reachable only by a malicious SSH peer.
+# Used only by buildkitd's git-context host-key scan (verified against
+# moby/buildkit v0.32.2's util/sshutil/keyscan.go), which dials a trusted
+# destination the build definition names. A RUN step's own traffic can't
+# reach this code either — it's redirected into the HTTP/TLS-only proxy.
+CVE-2026-56854
+CVE-2026-56855
+CVE-2026-78662
+
+# google.golang.org/grpc: memory exhaustion via an unauthenticated remote peer.
+# buildkitd's control API is Unix-socket only (verified against moby/buildkit
+# v0.32.2's util/appdefaults — no tcp:// address is configured), so no
+# network peer can reach it.
+CVE-2026-84304
+
+# github.com/moby/go-archive: arbitrary file write via a malicious tar
+# archive. Only hit by buildkitd's own FROM-image layer extraction — as
+# trusted as the build definition itself, out of scope like the x/mod
+# entry above.
+CVE-2026-17106
+
+# github.com/cilium/ebpf: integer overflow parsing a crafted BTF blob.
+# buildkit-runc only loads its own bundled cgroup-device BPF programs.
+CVE-2026-10722
