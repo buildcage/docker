@@ -22352,8 +22352,8 @@ function getAllMatches(string, regex) {
 function isExist(v) {
 	return v !== void 0;
 }
-var regexName, isName, DANGEROUS_PROPERTY_NAMES, criticalProperties, init_util$1 = __esmMin((() => {
-	regexName = /* @__PURE__ */ RegExp("^[:A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD][:A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"), isName = function(string) {
+var nameStartChar, nameChar, regexName, isName, DANGEROUS_PROPERTY_NAMES, criticalProperties, init_util$1 = __esmMin((() => {
+	nameStartChar = ":A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD", nameChar = nameStartChar + "\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040", "" + nameStartChar + nameChar, regexName = /* @__PURE__ */ RegExp("^[:A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD][:A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"), isName = function(string) {
 		return regexName.exec(string) != null;
 	}, DANGEROUS_PROPERTY_NAMES = [
 		"hasOwnProperty",
@@ -23099,7 +23099,7 @@ var defaultOnDangerousProperty, defaultOptions$1, buildOptions, init_OptionsBuil
 		}
 	};
 })), nameStartChar10, nameChar10, nameStartChar11, nameChar11, buildRegexes, regexes10, regexes11, regexesAscii, getRegexes, qName, PRODUCTIONS, createValidator, init_src$3 = __esmMin((() => {
-	nameStartChar10 = ":A-Za-z_À-ÖØ-öø-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�", nameChar10 = ":A-Za-z_À-ÖØ-öø-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�\\-\\.\\d·̀-ͯ‿-⁀", nameStartChar11 = ":A-Za-z_À-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-󯿿", nameChar11 = ":A-Za-z_À-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-󯿿\\-\\.\\d·̀-ͯ҇‿-⁀", buildRegexes = (startChar, char, flags = "") => {
+	nameStartChar10 = ":A-Za-z_À-ÖØ-öø-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�", nameChar10 = nameStartChar10 + "\\-\\.\\d·̀-ͯ‿-⁀", nameStartChar11 = ":A-Za-z_À-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-󯿿", nameChar11 = nameStartChar11 + "\\-\\.\\d·̀-ͯ҇‿-⁀", buildRegexes = (startChar, char, flags = "") => {
 		let ncNamePat = `[${startChar.replace(":", "")}][${char.replace(":", "")}]*`;
 		return {
 			name: RegExp(`^[${startChar}][${char}]*$`, flags),
