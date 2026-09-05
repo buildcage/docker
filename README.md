@@ -61,7 +61,7 @@ The steps below use `inspect`. [Engines](#engines) compares the two in full.
     proxy_engine: inspect # Record the method and URL of every request
 
 - name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+  uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
   with:
     driver: remote
     endpoint: docker-container://buildcage
