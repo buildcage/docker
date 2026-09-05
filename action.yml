@@ -14,7 +14,7 @@ inputs:
     required: false
     default: "restrict"
   proxy_engine:
-    description: "Network enforcement engine: universal (network-level proxy, default, needs no CA trust; 'transparent' is accepted as an alias), inspect (terminates TLS to enforce on method and URL; see docs/inspect-engine.md) or explicit (BuildKit's native --proxy-network; deprecated, see docs/explicit-engine.md)"
+    description: "Network enforcement engine: inspect (terminates TLS to enforce on method and URL), universal (network-level proxy, default, needs no CA trust; 'transparent' is accepted as an alias) or explicit (BuildKit's native --proxy-network; deprecated, see docs/explicit-engine.md)"
     required: false
     default: "universal"
   allowed_https_rules:

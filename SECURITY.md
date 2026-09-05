@@ -2,21 +2,21 @@
 
 ## Scope
 
-I welcome reports about all three proxy engines (`universal`, the experimental `inspect`, and the
-deprecated `explicit`):
+I welcome reports about all three proxy engines (`universal`, `inspect`, and the deprecated
+`explicit`):
 
-- **Proxy bypass (`universal`)** — ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#known-limitations))
-- **Network isolation escape (`universal`)** — bypassing CNI isolation or iptables rules to reach the internet directly
-- **DNS filtering bypass (`universal`)** — bypassing the DNS redirect mechanism
-- **Rule bypass (`inspect`)** — ways to reach a destination, method or path that the rules do not permit: a request that escapes its path rule, a forged `Host` or SNI that changes where the proxy connects, or a name resolved to somewhere the rules never named
-- **Source policy bypass (`explicit`, deprecated)** — ways to make network connections from `RUN` steps that evade the BuildKit source policy _compiled by buildcage_ from your allowlist (e.g., a flaw in how buildcage translates rules into policy, or in how it injects/merges that policy via the gRPC `Solve` intercept)
-- **GitHub Actions setup** — vulnerabilities in the `setup` or `report` actions (e.g., injection, credential leak)
+- **Proxy bypass (`universal`)**: ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#universal-proxy-engine))
+- **Network isolation escape (`universal`)**: bypassing CNI isolation or iptables rules to reach the internet directly
+- **DNS filtering bypass (`universal`)**: bypassing the DNS redirect mechanism
+- **Rule bypass (`inspect`)**: ways to reach a destination, method or path that the rules do not permit: a request that escapes its path rule, a forged `Host` or SNI that changes where the proxy connects, or a name resolved to somewhere the rules never named
+- **Source policy bypass (`explicit`, deprecated)**: ways to make network connections from `RUN` steps that evade the BuildKit source policy _compiled by buildcage_ from your allowlist (e.g., a flaw in how buildcage translates rules into policy, or in how it injects/merges that policy via the gRPC `Solve` intercept)
+- **GitHub Actions setup**: vulnerabilities in the `setup` or `report` actions (e.g., injection, credential leak)
 
 The following are **out of scope** (please report to the respective projects instead):
 
-- Vulnerabilities in BuildKit, Docker, or other upstream dependencies — including BuildKit's own `--proxy-network` isolation, its MITM/TLS handling, or its source-policy evaluation engine itself. Buildcage's `explicit`-engine scope is limited to the policy it compiles and injects, not BuildKit's enforcement of that policy.
+- Vulnerabilities in BuildKit, Docker, or other upstream dependencies, including BuildKit's own `--proxy-network` isolation, its MITM/TLS handling, or its source-policy evaluation engine itself. Buildcage's `explicit`-engine scope is limited to the policy it compiles and injects, not BuildKit's enforcement of that policy.
 - Issues that require the attacker to already have privileged access to the host
-- Domain fronting via shared CDN infrastructure (documented in [Security Details](./docs/security.md#known-limitations))
+- Domain fronting via shared CDN infrastructure (documented in [Security Details](./docs/security.md#universal-proxy-engine))
 
 ## Supported Versions
 
@@ -31,7 +31,7 @@ Buildcage ships one artifact: a Docker image at `ghcr.io/buildcage/docker`, tagg
 default `universal` engine, and `vX.Y.Z-inspect` / `vX.Y.Z-explicit` for the other two engines.
 Each release is signed
 keylessly with [cosign](https://github.com/sigstore/cosign) and carries a GitHub build-provenance
-attestation, both issued via GitHub Actions OIDC at release time — there is no long-lived signing key
+attestation, both issued via GitHub Actions OIDC at release time. There is no long-lived signing key
 to leak or rotate. The `setup` action verifies this automatically, in-process, on every run (see
 [Image Provenance Verification](./docs/security.md#image-provenance-verification) for exactly how);
 to verify a release manually instead:
@@ -58,7 +58,7 @@ The Sigstore bundle for each release is also attached as a downloadable asset
   standard library is preferred where practical.
 - [Trivy](https://github.com/aquasecurity/trivy) scans every built image for known vulnerabilities
   (on each push to `main` and monthly on schedule), and Dependabot alerts are enabled on the
-  repository — both report into this repository's Security tab.
+  repository; both report into this repository's Security tab.
 
 ## Reporting a Vulnerability
 

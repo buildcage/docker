@@ -1,4 +1,4 @@
-name: Example (restrict mode)
+name: Example (universal engine, restrict mode)
 
 on:
   workflow_dispatch:
@@ -12,13 +12,16 @@ jobs:
       contents: read
 
     steps:
+      # Same build as the audit example, with the rules that run produced.
+      # universal enforces on host and port only -- as far as it can see
+      # without decrypting, and all a JVM build like this one can accept.
       - name: Start Buildcage builder
-        uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
+        uses: buildcage/docker@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
         with:
           proxy_mode: restrict
+          proxy_engine: universal
           allowed_https_rules: |
-            registry.npmjs.org:443
-            fonts.googleapis.com:443
+            repo.maven.apache.org:443
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -30,9 +33,10 @@ jobs:
         run: |
           mkdir -p /tmp/build-context
           cat <<'EOF' > /tmp/build-context/Dockerfile
-          FROM node:24-alpine
+          FROM maven:3-eclipse-temurin-21-alpine
           WORKDIR /app
-          RUN npm init -y && npm install --ignore-scripts express
+          RUN mvn -B dependency:get -Dartifact=org.apache.commons:commons-lang3:3.17.0
+          # Not on the allowlist, so the report shows it as a blocked host.
           RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
           EOF
 
@@ -43,8 +47,10 @@ jobs:
           push: false
           no-cache: true
 
+      # fail_on_blocked is false only because this example blocks on purpose;
+      # leave it at its default so a real workflow fails on a disallowed destination.
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
+        uses: buildcage/docker/report@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
         with:
           fail_on_blocked: false

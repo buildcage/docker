@@ -1,4 +1,4 @@
-name: Example (audit mode)
+name: Example (universal engine, audit mode)
 
 on:
   workflow_dispatch:
@@ -12,10 +12,15 @@ jobs:
       contents: read
 
     steps:
+      # universal reads the SNI without decrypting, so a JVM build like this
+      # one (Maven trusts only its own cacerts store) needs no injected CA.
+      # audit records every destination; "Switch to restrict mode" in the
+      # report returns them as allowed_https_rules.
       - name: Start Buildcage builder
-        uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
+        uses: buildcage/docker@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
         with:
           proxy_mode: audit
+          proxy_engine: universal
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -27,9 +32,11 @@ jobs:
         run: |
           mkdir -p /tmp/build-context
           cat <<'EOF' > /tmp/build-context/Dockerfile
-          FROM node:24-alpine
+          FROM maven:3-eclipse-temurin-21-alpine
           WORKDIR /app
-          RUN npm init -y && npm install --ignore-scripts express
+          RUN mvn -B dependency:get -Dartifact=org.apache.commons:commons-lang3:3.17.0
+          # Unneeded by the build; leave it out of the rules you paste back in.
+          RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
           EOF
 
       - name: Build test image
@@ -41,4 +48,4 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
+        uses: buildcage/docker/report@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2

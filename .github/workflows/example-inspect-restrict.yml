@@ -1,4 +1,4 @@
-name: Example (inspect engine)
+name: Example (inspect engine, restrict mode)
 
 on:
   workflow_dispatch:
@@ -12,19 +12,21 @@ jobs:
       contents: read
 
     steps:
-      # `allowed_url_rules` names a method and a path, not just a host. npm
-      # fetches package metadata and tarballs with GET, and POSTs once to the
-      # advisory endpoint; publishing to the same registry is a POST elsewhere,
-      # so these rules allow the install without allowing a publish.
+      # Same build as the audit example, with the rules that run produced. npm
+      # publish is a PUT, so it's refused: no rule here covers that method.
       - name: Start Buildcage builder
-        uses: buildcage/docker@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
+        uses: buildcage/docker@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
         with:
           proxy_mode: restrict
           proxy_engine: inspect
           allowed_url_rules: |
+            # apt, over plain HTTP
+            GET http://deb.debian.org/debian/**
+            GET http://deb.debian.org/debian-security/**
+
+            # npm install, plus its post-install audit-endpoint POST
             GET|HEAD https://registry.npmjs.org/**
             POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk
-            GET https://dl-cdn.alpinelinux.org/**
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -36,16 +38,15 @@ jobs:
         run: |
           mkdir -p /tmp/build-context
           cat <<'EOF' > /tmp/build-context/Dockerfile
-          FROM node:24-alpine
+          FROM node:24-bookworm-slim
           WORKDIR /app
-          # No NODE_USE_SYSTEM_CA needed: the runc wrapper points npm's own CA
-          # variable at a store carrying the proxy's CA.
+          # Debian's archive is plain HTTP, so apt's rules are http:// URLs.
+          RUN apt-get update && \
+              apt-get install -y --no-install-recommends curl && \
+              rm -rf /var/lib/apt/lists/*
           RUN npm init -y && npm install --ignore-scripts express
-          # apk has no CA store of its own, unlike npm: it trusts whatever the
-          # OS store trusts, which is the one the wrapper already patched.
-          RUN apk add --no-cache jq
-          # Refused by the rules above, so the report shows the full URL.
-          RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
+          # Refused: the report names the full URL, not just the host.
+          RUN curl -sS --max-time 5 -o /dev/null https://example.com/ || true
           EOF
 
       - name: Build test image
@@ -55,8 +56,10 @@ jobs:
           push: false
           no-cache: true
 
+      # fail_on_blocked is false only because this example blocks on purpose;
+      # leave it at its default so a real workflow fails on a disallowed request.
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@806c35dcae3da9f5f5914e7c6086fde53f9cb24a # v3.1.5
+        uses: buildcage/docker/report@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
         with:
           fail_on_blocked: false

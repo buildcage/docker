@@ -3,9 +3,8 @@
 > [!WARNING]
 > `explicit` is **deprecated**. It still works and existing workflows keep running, but it receives
 > no further development. If you chose it to see full URL paths in the report, use
-> [`inspect`](./inspect-engine.md) instead: it enforces on the method and the path as well, and it
+> [`inspect`](../README.md#engines) instead: it enforces on the method and the path as well, and it
 > sees every tool rather than only the ones that respect `HTTP_PROXY`/`HTTPS_PROXY`.
-> `universal` remains the default and recommended engine.
 
 `proxy_engine` selects how Buildcage intercepts and enforces traffic. It is independent of
 `proxy_mode`: either engine works with either mode, and both use the same
