@@ -17,7 +17,7 @@ jobs:
       # audit records every destination; "Switch to restrict mode" in the
       # report returns them as allowed_https_rules.
       - name: Start Buildcage builder
-        uses: buildcage/docker@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
+        uses: buildcage/docker@9db933f44e0dd4821ad7eea6f58f3b7bfd2f2db5 # v3.1.6
         with:
           proxy_mode: audit
           proxy_engine: universal
@@ -48,4 +48,4 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
+        uses: buildcage/docker/report@9db933f44e0dd4821ad7eea6f58f3b7bfd2f2db5 # v3.1.6

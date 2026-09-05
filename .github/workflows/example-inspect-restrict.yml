@@ -15,7 +15,7 @@ jobs:
       # Same build as the audit example, with the rules that run produced. npm
       # publish is a PUT, so it's refused: no rule here covers that method.
       - name: Start Buildcage builder
-        uses: buildcage/docker@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
+        uses: buildcage/docker@9db933f44e0dd4821ad7eea6f58f3b7bfd2f2db5 # v3.1.6
         with:
           proxy_mode: restrict
           proxy_engine: inspect
@@ -60,6 +60,6 @@ jobs:
       # leave it at its default so a real workflow fails on a disallowed request.
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@7bdb27a9380c8e2106d9d1222e16f1e5c1fe6264 # v3.1.6-rc2
+        uses: buildcage/docker/report@9db933f44e0dd4821ad7eea6f58f3b7bfd2f2db5 # v3.1.6
         with:
           fail_on_blocked: false
