@@ -106,12 +106,12 @@ What each kind of rule decides, and what stays undecrypted:
   intended setup. An address named directly in a rule is exempt too, having been asked for rather
   than arrived at.
 
-  This guard is about a _name_ landing somewhere it never should — it has nothing to do with, and
+  This guard is about a _name_ landing somewhere it never should. It has nothing to do with, and
   never restricts, a rule whose host is itself a literal address (an `https`/`http` rule that names
   one directly, or a `Host` header the request sent as a bare IP): reaching that connection already
   required a rule to match the address as sent, so nothing was arrived at that wasn't first asked
-  for. Direct access to a cloud metadata endpoint this way — the normal way any AWS/GCP/Azure CLI or
-  SDK reaches it — is not something this guard is meant to stop; `allowed_ip_rules` is the intended,
+  for. Direct access to a cloud metadata endpoint this way, the normal way any AWS/GCP/Azure CLI or
+  SDK reaches it, is not something this guard is meant to stop; `allowed_ip_rules` is the intended,
   always-uninspected path for it (see below).
 
 - **The resolver never forwards a query, allowed or not.** Every name is answered locally with the
@@ -166,7 +166,7 @@ What each kind of rule decides, and what stays undecrypted:
   The internal-address guard above stays active in `audit` too, unconditionally: a name resolving
   to cloud metadata isn't traffic `audit` needs to observe, since nothing legitimate depends on that
   specific resolved address. A literal-IP request, such as a build calling a metadata endpoint
-  directly, is unaffected by this guard in either mode — blocking it would only hide real
+  directly, is unaffected by this guard in either mode: blocking it would only hide real
   information about what the build needs, without closing anything DNS could have redirected.
 
 - **`allow_tls_rules` and `allowed_ip_rules` stay uninspected by design.** Each is recorded with a
@@ -224,7 +224,7 @@ itself, which is not on the isolated network, so base image pulls are never filt
   [`inspect`](#inspect-proxy-engine)'s (see [What it actually stops](#what-it-actually-stops)):
   loopback, link-local, CGNAT, the IETF protocol block, and the proxy's own address are all refused
   (`internal-address` in the report). Unlike `inspect`, there's no literal-address exemption to carve
-  out here — a connection to a bare address never reaches this guard at all, since it skips DNS and
+  out here, since a connection to a bare address never reaches this guard at all: it skips DNS and
   `do-resolve` entirely on a separate code path; `allowed_ip_rules` is the always-uninspected path for
   a destination named directly.
 - **DNS never leaves the job.** The internal resolver has no upstream and answers every query
