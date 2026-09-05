@@ -78,11 +78,10 @@ The steps below use `inspect`. [Engines](#engines) compares the two in full.
 
 The [report action](#report-action) writes every destination the build contacted to the Job Summary:
 
-<img src="assets/report-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="556">
+<img src="assets/report-inspect-audit-mode.png" alt="Outbound Traffic Report - audit mode" width="556">
 
 Its **Switch to restrict mode** section holds the allowlist, already written out from what the build
-actually did. What the engine never decrypted (`allow_tls_rules` and `allowed_ip_rules`) cannot be
-derived from traffic, so those come back exactly as the audit run was configured with them.
+actually did.
 
 ### 2. Enforce the allowlist
 
@@ -95,39 +94,29 @@ Paste that allowlist into the setup step and switch the mode:
     proxy_mode: restrict
     proxy_engine: inspect
     allowed_url_rules: |
-      GET|HEAD https://registry.npmjs.org/**
+      GET http://deb.debian.org/**
+      GET https://registry.npmjs.org/**
+      POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk
 ```
 
 Each rule names the methods it permits, so this one lets npm fetch packages without letting it
-publish any: a `POST` to the same host is refused, as is every host not listed. The report lists what
-was blocked and fails the job, and its **Communication details** section names the full URL of every
-request, allowed or refused:
+publish any: a `POST` to the same host is refused, as is every host not listed. Whatever is refused
+is listed under **Blocked Hosts** with the reason, and **Communication details** names the full URL
+of every request, allowed or refused:
 
-<img src="assets/report-restrict-mode.png" alt="Outbound Traffic Report - restrict mode" width="556">
+<img src="assets/report-inspect-restrict-mode.png" alt="Outbound Traffic Report - restrict mode" width="556">
+
+A blocked connection fails the job at the report step, so a build that starts reaching somewhere new
+doesn't pass unnoticed. Pass `fail_on_blocked: false` to that step to report without failing, or list
+destinations you expect to stay blocked in `known_blocked_rules`.
 
 Nothing else in the workflow changes. Buildcage injects a CA and the environment variables that trust
 it when a `RUN` step starts, so the build sees an ordinary HTTPS connection and the Dockerfile stays
 as it is.
 
-### 3. Allow a whole host where that is enough
+### Example workflows
 
-A host rule allows any method and any path on that host. It is shorter, it survives a service
-reorganising its URLs, and it is what the `universal` engine takes:
-
-```yaml
-allowed_https_rules: |
-  registry.npmjs.org:443
-  files.pythonhosted.org:443
-```
-
-Plain HTTP has a separate input, since some package managers still download over it:
-
-```yaml
-allowed_http_rules: deb.debian.org:80
-allowed_https_rules: registry.npmjs.org:443
-```
-
-Complete workflows, each pair building the same Dockerfile with and without rules:
+Each pair builds the same Dockerfile with and without rules:
 `inspect` on an apt and npm build ([audit](.github/workflows/example-inspect-audit.yml) ·
 [restrict](.github/workflows/example-inspect-restrict.yml)), `universal` on a Maven build
 ([audit](.github/workflows/example-universal-audit.yml) ·
@@ -141,6 +130,8 @@ Complete workflows, each pair building the same Dockerfile with and without rule
 - Private registries are ordinary hosts: add the domain like any other.
 - One registry often needs several domains. PyPI, for example, uses both `pypi.org` and
   `files.pythonhosted.org`. The audit report lists every one of them, so start from that.
+- The generated allowlist covers only what the engine decrypted. `allow_tls_rules` and
+  `allowed_ip_rules` come back exactly as the audit run was configured with them.
 - If something in the build pins a certificate or carries its own trust store (the JVM is the usual
   case), use `proxy_engine: universal` instead. See [Engines](#engines).
 
@@ -191,7 +182,8 @@ destination named, which is why it is worth running `audit` first.
 ## Rule syntax
 
 `allowed_url_rules` and `allow_tls_rules` need `proxy_engine: inspect`. The host rules work with
-either engine.
+either engine. The inputs are additive: a connection is allowed when any rule in any of them
+matches.
 
 ### URL rules: `allowed_url_rules`
 
@@ -305,30 +297,6 @@ is matched against always carries the port.
 In `allowed_url_rules` a `~` expression covers the URL, and is split into a host half and a path
 half as described above. A rule the split cannot handle, one with no `/` after `://`, is refused
 with an error naming what to write instead.
-
-### All of them together
-
-```yaml
-with:
-  proxy_mode: restrict
-  proxy_engine: inspect
-
-  allowed_url_rules: |
-    GET|HEAD https://registry.npmjs.org/**
-
-  allowed_https_rules: |
-    *.githubusercontent.com:443
-    ~^.*\.example\.com:443$
-
-  allowed_http_rules: |
-    deb.debian.org:80
-
-  allowed_ip_rules: |
-    192.168.1.1:443
-
-  allow_tls_rules: |
-    db.example.com:5432
-```
 
 ## Engines
 
