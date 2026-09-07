@@ -243,9 +243,7 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │   ├── lib/                  # write-step-summary.ts, shared by both engines' report-action.node.ts
 │   ├── universal/            # proxy_engine: universal. Dockerfile + BuildKit/haproxy/dnsmasq/
 │   │                         # s6-overlay config + scripts/report-action.node.ts (runs under Node
-│   │                         # on the runner, `docker cp`'d out by the report action). HAProxy
-│   │                         # binds *:10024, but init-iptables restricts inbound :10024 to the
-│   │                         # buildkit0 interface
+│   │                         # on the runner, `docker cp`'d out by the report action)
 │   ├── inspect/               # proxy_engine: inspect. Dockerfile + HAProxy/CoreDNS/s6-overlay
 │   │                         # config + buildcage-runc/ (Go module: wraps buildkit-runc to inject
 │   │                         # CA trust at exec time) + scripts/report-action.node.ts
