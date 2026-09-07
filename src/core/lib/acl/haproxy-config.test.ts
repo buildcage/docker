@@ -60,13 +60,17 @@ describe("load-bearing directives", () => {
   it("takes an address in the Host header as it stands, asking no resolver", () => {
     // No resolver can answer an address, so asking would fail and refuse the
     // request, leaving a rule that names an address impossible to satisfy.
-    expect(config.includes("acl host_is_address req.hdr(host),host_only -m reg ^(25[0-5]")).toBe(
-      true,
-    );
     expect(
-      config.includes("http-request set-var(txn.dst) req.hdr(host),host_only if host_is_address"),
+      config.includes("acl host_is_address req.hdr(host),host_only,regsub(\\.$,) -m reg ^(25[0-5]"),
     ).toBe(true);
-    expect(config.includes("req.hdr(host),lower,host_only unless host_is_address")).toBe(true);
+    expect(
+      config.includes(
+        "http-request set-var(txn.dst) req.hdr(host),host_only,regsub(\\.$,) if host_is_address",
+      ),
+    ).toBe(true);
+    expect(
+      config.includes("req.hdr(host),lower,host_only,regsub(\\.$,) unless host_is_address"),
+    ).toBe(true);
   });
 
   it("is strict about the octets, since what matches is never checked again", () => {
@@ -309,12 +313,22 @@ describe("rules", () => {
     expect(gen({ httpsRules: ["a.com:443"] }).includes("-m reg -i ^a\\.com$")).toBe(true);
   });
 
+  it("strips a trailing dot from the Host header before matching, resolving or verifying it", () => {
+    // "a.com." is the same DNS name as "a.com" (RFC 1035), and some tools
+    // write it that way to skip resolv.conf's search-list expansion. Without
+    // this, `Host: a.com.` would refuse an explicit allow rule for a.com.
+    const config = gen({ httpsRules: ["a.com:443"] });
+    expect(config.includes("hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$")).toBe(true);
+  });
+
   it("takes the port from the connection, not from the Host header", () => {
     // A Host header omits the port only for a default one, so a matcher built
     // from it has to accept the port being absent -- which made a rule for
     // :9443 also permit :443 on the same host. Found by the round-trip test.
     const config = gen({ urlRules: buildUrlRules("GET https://a.com:9443/private/x") });
-    expect(config.includes("acl s0_host hdr(host),host_only -m reg -i ^a\\.com$")).toBe(true);
+    expect(
+      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$"),
+    ).toBe(true);
     expect(config.includes("acl s0_port dst_port 9443")).toBe(true);
     expect(config.includes("(:9443)?")).toBe(false);
     expect(config.includes("http-request deny unless s0_host s0_port s0_path s0_method")).toBe(
@@ -324,15 +338,19 @@ describe("rules", () => {
 
   it("gives a host rule the same treatment", () => {
     const config = gen({ httpsRules: ["a.com:8443"] });
-    expect(config.includes("acl s0_host hdr(host),host_only -m reg -i ^a\\.com$")).toBe(true);
+    expect(
+      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$"),
+    ).toBe(true);
     expect(config.includes("acl s0_port dst_port 8443")).toBe(true);
   });
 
   it("matches a ~regex host rule's host and port as one expression", () => {
     const config = gen({ httpsRules: ["~^.*\\.example\\.com:(443|8443)$"] });
-    expect(config.includes("set-var-fmt(txn.host_port) %[hdr(host),host_only]:%[dst_port]")).toBe(
-      true,
-    );
+    expect(
+      config.includes(
+        "set-var-fmt(txn.host_port) %[hdr(host),host_only,regsub(\\.$,)]:%[dst_port]",
+      ),
+    ).toBe(true);
     expect(
       config.includes("acl s0_host var(txn.host_port) -m reg -i ^.*\\.example\\.com:(443|8443)$"),
     ).toBe(true);
@@ -349,7 +367,9 @@ describe("rules", () => {
 
   it("matches the host and the path separately", () => {
     const config = gen({ urlRules: buildUrlRules("GET https://a.com/pub/**") });
-    expect(config.includes("acl s0_host hdr(host),host_only -m reg -i ^a\\.com$")).toBe(true);
+    expect(
+      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$"),
+    ).toBe(true);
     expect(config.includes("acl s0_path path -m reg ^/pub/.*$")).toBe(true);
     expect(config.includes("acl s0_method method GET")).toBe(true);
     expect(config.includes("http-request deny unless s0_host s0_port s0_path s0_method")).toBe(
@@ -359,7 +379,7 @@ describe("rules", () => {
 
   it("accepts a Host header with or without the port, since only the name is compared", () => {
     const config = gen({ httpsRules: ["a.com:443"] });
-    expect(config.includes("hdr(host),host_only -m reg -i ^a\\.com$")).toBe(true);
+    expect(config.includes("hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$")).toBe(true);
     expect(config.includes("acl s0_port dst_port 443")).toBe(true);
   });
 
@@ -536,10 +556,12 @@ describe("regex url rules", () => {
     expect(result.warnings.length).toBe(0);
     const segment = frontendSegment(result.config, "https_in");
     expect(segment.includes("acl is_default_port dst_port 443")).toBe(true);
-    expect(segment.includes("set-var(txn.host_bare) hdr(host),host_only")).toBe(true);
-    expect(segment.includes("set-var-fmt(txn.host_full) %[hdr(host),host_only]:%[dst_port]")).toBe(
-      true,
-    );
+    expect(segment.includes("set-var(txn.host_bare) hdr(host),host_only,regsub(\\.$,)")).toBe(true);
+    expect(
+      segment.includes(
+        "set-var-fmt(txn.host_full) %[hdr(host),host_only,regsub(\\.$,)]:%[dst_port]",
+      ),
+    ).toBe(true);
   });
 
   it("ORs a bare (default-port-only) match with a full (real-port) match per rule", () => {
