@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 // The rootfs comes from an image the build chose, so a symlink placed at one of
@@ -150,6 +153,103 @@ func TestRemoveCAIsANoOpWhenTheBlockIsGone(t *testing.T) {
 	got, _ := os.ReadFile(path)
 	if string(got) != "REWRITTEN\n" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestRemoveCARefusesASymlink(t *testing.T) {
+	dir := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "host-secret")
+	if err := os.WriteFile(outside, []byte("SECRET"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "bundle.pem")
+	if err := os.Symlink(outside, path); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := removeCA(path); !errors.Is(err, errNotRegular) {
+		t.Fatalf("got %v, want errNotRegular", err)
+	}
+	got, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "SECRET" {
+		t.Fatalf("the symlink target was modified: %q", got)
+	}
+}
+
+func TestAppendCARefusesASymlink(t *testing.T) {
+	dir := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "host-secret")
+	if err := os.WriteFile(outside, []byte("SECRET"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "bundle.pem")
+	if err := os.Symlink(outside, path); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := appendCA(path, []byte("CA")); !errors.Is(err, errNotRegular) {
+		t.Fatalf("got %v, want errNotRegular", err)
+	}
+	got, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "SECRET" {
+		t.Fatalf("the symlink target was modified: %q", got)
+	}
+}
+
+func TestRemoveCARefusesAFIFOWithoutBlocking(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bundle.pem")
+	if err := syscall.Mkfifo(path, 0o644); err != nil {
+		t.Skipf("mkfifo unavailable: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- removeCA(path) }()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, errNotRegular) {
+			t.Fatalf("got %v, want errNotRegular", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("removeCA blocked opening a FIFO")
+	}
+}
+
+func TestAppendCARefusesAFIFOWithoutBlocking(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bundle.pem")
+	if err := syscall.Mkfifo(path, 0o644); err != nil {
+		t.Skipf("mkfifo unavailable: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- appendCA(path, []byte("CA")) }()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, errNotRegular) {
+			t.Fatalf("got %v, want errNotRegular", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("appendCA blocked opening a FIFO")
+	}
+}
+
+func TestRemoveCARefusesADirectory(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bundle.pem")
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := removeCA(path); err == nil {
+		t.Fatal("removeCA succeeded on a directory")
 	}
 }
 

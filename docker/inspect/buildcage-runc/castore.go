@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // Markers delimit what this wrapper appended, so the removal is exact. A step
@@ -28,6 +30,12 @@ var systemCertFiles = []string{
 }
 
 var errEscapesRoot = errors.New("path escapes the rootfs")
+
+// errNotRegular means appendCA/removeCA found something other than a plain
+// file at the target. The wrapper runs unsandboxed on the host, so opening
+// whatever a step swapped the path for — a symlink, a FIFO — would follow
+// attacker-controlled input outside the directory it's meant to stay in.
+var errNotRegular = errors.New("not a regular file")
 
 // resolveInRoot resolves path as the container would see it, so a symlink
 // cannot be used to reach outside.
@@ -94,16 +102,36 @@ func withinRoot(rootfs, path string) bool {
 	return path == rootfs || strings.HasPrefix(path, rootfs+string(os.PathSeparator))
 }
 
+// asNotRegular folds the open() failures O_NOFOLLOW/O_NONBLOCK produce for a
+// symlink or an unread FIFO into errNotRegular, so callers don't need to
+// distinguish rejection at open() from rejection after Stat.
+func asNotRegular(path string, err error) error {
+	if errors.Is(err, syscall.ELOOP) || errors.Is(err, syscall.ENXIO) {
+		return fmt.Errorf("%s: %w", path, errNotRegular)
+	}
+	return err
+}
+
 // appendCA adds the marked block to path, creating it when missing.
+//
+// O_NOFOLLOW/O_NONBLOCK keep the open from following a symlink or blocking on
+// a FIFO the step may have left at path since injection.
 func appendCA(path string, ca []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0o644)
+	if err != nil {
+		return asNotRegular(path, err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s: %w", path, errNotRegular)
+	}
 	block := fmt.Sprintf("\n%s\n%s\n%s\n", beginMarker, strings.TrimRight(string(ca), "\n"), endMarker)
 	_, err = f.WriteString(block)
 	return err
@@ -112,15 +140,31 @@ func appendCA(path string, ca []byte) error {
 // removeCA deletes the marked block, leaving anything else in place.
 //
 // Returns without error when the block is absent, since the step may have
-// rewritten the file itself.
+// rewritten the file itself. The find and the strip share one handle, opened
+// the same guarded way as appendCA, so they can't land on different files.
 func removeCA(path string) error {
-	content, err := os.ReadFile(path)
+	f, err := os.OpenFile(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
+		return asNotRegular(path, err)
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
 		return err
 	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s: %w", path, errNotRegular)
+	}
+
+	content := make([]byte, info.Size())
+	if _, err := io.ReadFull(f, content); err != nil {
+		return err
+	}
+
 	start := bytes.Index(content, []byte(beginMarker))
 	if start == -1 {
 		return nil
@@ -137,7 +181,13 @@ func removeCA(path string) error {
 	if end < len(content) && content[end] == '\n' {
 		end++
 	}
-	return os.WriteFile(path, append(content[:start:start], content[end:]...), 0o644)
+	stripped := append(content[:start:start], content[end:]...)
+
+	if err := f.Truncate(int64(len(stripped))); err != nil {
+		return err
+	}
+	_, err = f.WriteAt(stripped, 0)
+	return err
 }
 
 // containerPathOf converts a path already resolved inside rootfs back to how
