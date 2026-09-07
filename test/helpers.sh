@@ -56,6 +56,19 @@ assert_log_not_contains() {
   fi
 }
 
+assert_no_tcp_connect() {
+  local from_service="$1"
+  local target="$2"
+  local port="$3"
+  local label="[unreachable] $target:$port from $from_service"
+  if docker compose exec -T "$from_service" nc -w 3 -z "$target" "$port" 2>/dev/null; then
+    echo "  FAIL  $label -- connection succeeded"
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "  PASS  $label"
+  fi
+}
+
 assert_no_forged_log_lines() {
   local decision_logs
   # Restrict to actual decision lines ("buildcage [...]") -- the plausibility

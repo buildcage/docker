@@ -6,11 +6,18 @@ echo "init-iptables: configuring isolation..."
 iptables -t nat -A PREROUTING -i buildkit0 -p tcp \
   -j REDIRECT --to-ports 10024
 
+# Can't bind :10024 to 172.20.0.1 directly -- it doesn't exist until CNI
+# creates buildkit0, after this service starts. Restrict via INPUT instead.
+iptables -A INPUT -p tcp --dport 10024 -i buildkit0 -j ACCEPT
+iptables -A INPUT -p tcp --dport 10024 -j DROP
+
 iptables -A FORWARD -i buildkit0 -j DROP
 
 if [ -e /proc/net/if_inet6 ]; then
+  ip6tables -A INPUT -p tcp --dport 10024 -i buildkit0 -j ACCEPT
+  ip6tables -A INPUT -p tcp --dport 10024 -j DROP
   ip6tables -A FORWARD -i buildkit0 -j DROP
-  echo "init-iptables: REDIRECT configured, FORWARD from buildkit0 blocked (IPv4/IPv6)"
+  echo "init-iptables: REDIRECT configured, :10024 restricted to buildkit0, FORWARD from buildkit0 blocked (IPv4/IPv6)"
 else
-  echo "init-iptables: REDIRECT configured, FORWARD from buildkit0 blocked (IPv4); kernel has no IPv6 support, skipping ip6tables"
+  echo "init-iptables: REDIRECT configured, :10024 restricted to buildkit0, FORWARD from buildkit0 blocked (IPv4); kernel has no IPv6 support, skipping ip6tables"
 fi

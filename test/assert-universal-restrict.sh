@@ -47,5 +47,9 @@ echo "[log integrity] no forged/malformed lines from the injection attempt:"
 assert_no_forged_log_lines
 echo ""
 
+echo "[reachability] :10024 must not be reachable from the compose network:"
+assert_no_tcp_connect test-server builder 10024
+echo ""
+
 assert_results
 echo ""
