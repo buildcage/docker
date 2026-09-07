@@ -59,6 +59,13 @@ const DEFAULTS = {
 const TLS_STAGE_PORT = 10025;
 const PLAIN_STAGE_PORT = 10026;
 
+/**
+ * `host_only` strips the port a Host header carries; chained onto it here so
+ * every host match, resolution and certificate check also treats a trailing
+ * dot (`example.com.`, a valid FQDN form) as the same name it denotes in DNS.
+ */
+const HOST_ONLY = "host_only,regsub(\\.$,)";
+
 export interface GeneratedHaproxyConfig {
   config: string;
   warnings: string[];
@@ -83,7 +90,7 @@ function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" | "http"
   if (rules.some((r) => r.hostMatch === "hostPort")) {
     // A ~ rule's own regex covers host and port together, so hdr(host) is
     // stringified with the real port once here for every such rule to match.
-    lines.push("    http-request set-var-fmt(txn.host_port) %[hdr(host),host_only]:%[dst_port]");
+    lines.push(`    http-request set-var-fmt(txn.host_port) %[hdr(host),${HOST_ONLY}]:%[dst_port]`);
   }
   if (rules.some((r) => r.hostMatch === "hostBareFull")) {
     // A ~ URL rule's port is optional, exactly as in a literal URL: tried
@@ -91,8 +98,8 @@ function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" | "http"
     // otherwise -- see haproxy-rules.ts's HostMatch doc comment.
     lines.push(
       `    acl is_default_port dst_port ${DEFAULT_PORT[scheme]}`,
-      "    http-request set-var(txn.host_bare) hdr(host),host_only",
-      "    http-request set-var-fmt(txn.host_full) %[hdr(host),host_only]:%[dst_port]",
+      `    http-request set-var(txn.host_bare) hdr(host),${HOST_ONLY}`,
+      `    http-request set-var-fmt(txn.host_full) %[hdr(host),${HOST_ONLY}]:%[dst_port]`,
     );
   }
 
@@ -111,7 +118,7 @@ function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" | "http"
       );
     } else {
       // -i, since a name is case-insensitive and do-resolve lowercases anyway.
-      lines.push(`    acl ${rule.id}_host hdr(host),host_only -m reg -i ${rule.hostRegex}`);
+      lines.push(`    acl ${rule.id}_host hdr(host),${HOST_ONLY} -m reg -i ${rule.hostRegex}`);
       if (rule.port) {
         lines.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
       }
@@ -377,9 +384,9 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
         "    # host_only drops the port a header carries, which is not part of the",
         "    # name. An address is taken as-is: no resolver can answer one, and the",
         "    # rules above already decided, so nothing is loosened.",
-        `    acl host_is_address req.hdr(host),host_only -m reg ${HOST_IS_ADDRESS}`,
-        "    http-request set-var(txn.dst) req.hdr(host),host_only if host_is_address",
-        "    http-request do-resolve(txn.dst,buildcage,ipv4) req.hdr(host),lower,host_only " +
+        `    acl host_is_address req.hdr(host),${HOST_ONLY} -m reg ${HOST_IS_ADDRESS}`,
+        `    http-request set-var(txn.dst) req.hdr(host),${HOST_ONLY} if host_is_address`,
+        `    http-request do-resolve(txn.dst,buildcage,ipv4) req.hdr(host),lower,${HOST_ONLY} ` +
           "unless host_is_address",
         "    http-request deny deny_status 502 unless { var(txn.dst) -m found }",
         "",
@@ -415,7 +422,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
     "# certificate is verified against a name, not a name and port.",
     "backend origin_tls",
     "    mode http",
-    `    server origin 0.0.0.0 ssl verify required ca-file ${opts.systemCaFile} sni req.hdr(host),lower,host_only`,
+    `    server origin 0.0.0.0 ssl verify required ca-file ${opts.systemCaFile} sni req.hdr(host),lower,${HOST_ONLY}`,
     "",
     "backend origin_plain",
     "    mode http",
