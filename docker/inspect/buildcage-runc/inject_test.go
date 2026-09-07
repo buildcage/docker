@@ -312,6 +312,51 @@ func TestInjectWriteBackFailurePropagates(t *testing.T) {
 	}
 }
 
+func TestInjectSkipsRestoreWhenStepSwapsBundleForASymlink(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	outside := filepath.Join(t.TempDir(), "host-secret")
+	if err := os.WriteFile(outside, []byte("SECRET"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	restore, err := inject(bundle, []byte("BUILDCAGE-CA"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mount := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")
+	scratchDir, _ := mount["source"].(string)
+	target := filepath.Join(scratchDir, "ca-certificates.crt")
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, target); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := restore(); err != nil {
+		t.Fatalf("restore should skip the unrestorable file, not fail the build: %v", err)
+	}
+
+	secret, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(secret) != "SECRET" {
+		t.Fatalf("the symlink target was modified: %q", secret)
+	}
+
+	got := filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt")
+	link, err := os.Readlink(got)
+	if err != nil {
+		t.Fatalf("write-back did not mirror the step's own symlink: %v", err)
+	}
+	if link != outside {
+		t.Fatalf("got link %q, want %q", link, outside)
+	}
+}
+
 // A base image with no CA store of its own (node:*-slim before
 // ca-certificates is installed, or a scratch/distroless image) must not lose
 // every variable just because the system store is missing: all six fall back

@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -271,6 +272,10 @@ func (b *dirBind) prepare(ca []byte) error {
 
 	for _, name := range b.bundleFiles {
 		if err := appendCA(filepath.Join(b.scratchDir, name), ca); err != nil {
+			if errors.Is(err, errNotRegular) {
+				logf("cannot inject the CA into %s: %v; leaving it untouched", name, err)
+				continue
+			}
 			return err
 		}
 	}
@@ -296,6 +301,11 @@ func (b *dirBind) finish() error {
 
 	for _, name := range b.bundleFiles {
 		if err := removeCA(filepath.Join(b.scratchDir, name)); err != nil {
+			if errors.Is(err, errNotRegular) {
+				// Not the wrapper's to open; write-back below mirrors it as-is.
+				logf("cannot restore %s: %v; leaving it as the step left it", name, err)
+				continue
+			}
 			return err
 		}
 	}
