@@ -39,6 +39,21 @@ RUN echo "=== [HTTP - allowed - wildcard] ===" && \
     echo "Testing sub.wildcard.example.com (HTTP)..." && \
     (wget -q -O /dev/null --timeout=10 http://sub.wildcard.example.com/ && echo "✓ sub.wildcard.example.com HTTP: OK") || (echo "✗ sub.wildcard.example.com HTTP: FAILED" && exit 1)
 
+# [HTTPS - allowed - uppercase host (DNS names are case-insensitive)]
+RUN echo "=== [HTTPS - allowed - uppercase host] ===" && \
+    echo "Testing ALLOWED.example.com (HTTPS)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://ALLOWED.example.com/ && echo "✓ ALLOWED.example.com: OK") || (echo "✗ ALLOWED.example.com: FAILED" && exit 1)
+
+# [HTTPS - allowed - trailing dot (a trailing dot is the same DNS name)]
+RUN echo "=== [HTTPS - allowed - trailing dot] ===" && \
+    echo "Testing allowed.example.com. (HTTPS)..." && \
+    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://allowed.example.com./ && echo "✓ allowed.example.com.: OK") || (echo "✗ allowed.example.com.: FAILED" && exit 1)
+
+# [HTTP - allowed - uppercase host]
+RUN echo "=== [HTTP - allowed - uppercase host] ===" && \
+    echo "Testing ALLOWED.example.com (HTTP)..." && \
+    (wget -q -O /dev/null --timeout=10 http://ALLOWED.example.com/ && echo "✓ ALLOWED.example.com HTTP: OK") || (echo "✗ ALLOWED.example.com HTTP: FAILED" && exit 1)
+
 # [Port 8443 - allowed]
 RUN echo "=== [Port 8443 - allowed] ===" && \
     echo "Testing allowed.example.com:8443 (HTTPS)..." && \
