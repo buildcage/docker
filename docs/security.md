@@ -195,7 +195,8 @@ Every container BuildKit spawns for a `RUN` step is placed on an isolated CNI ne
 `buildkit0` bridge, 172.20.0.0/24). An iptables `PREROUTING REDIRECT` rule sends all TCP from that
 bridge to the proxy whatever its destination, so DNS-resolved and direct-IP connections both arrive
 there, and a `FORWARD` rule drops everything else, so no other protocol has a way out and
-buildkitd's own API is unreachable from a step.
+buildkitd's own API is unreachable from a step. An `INPUT` rule likewise restricts the proxy's own
+listening port to that same bridge, so nothing else on the container's network can reach it.
 
 - **HTTPS**: the SNI from the TLS ClientHello, read without terminating the connection, so the build
   validates the origin's own certificate itself. Checked against `allowed_https_rules`.
