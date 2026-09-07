@@ -13,6 +13,8 @@ assert_log_contains ALLOWED "sub.wildcard.example.com:80" "-"
 assert_log_contains ALLOWED "allowed.example.com:80" "-"
 assert_log_contains ALLOWED "allowed.example.com:8443" "-"
 assert_log_contains ALLOWED "allowed.example.com:8080" "-"
+assert_log_contains ALLOWED "ALLOWED.example.com:443" "-"
+assert_log_contains ALLOWED "ALLOWED.example.com:80" "-"
 echo ""
 
 echo "[BLOCKED] expected:"

@@ -46,20 +46,22 @@ frontend outbound_proxy
     acl has_sni req_ssl_sni -m found
 
     # ACL: IP direct access allowlist
-    acl is_ip_match var(txn.target) -m reg -f /etc/haproxy/rules/allowed_ips.lst
+    acl is_ip_match var(txn.target) -m reg -i -f /etc/haproxy/rules/allowed_ips.lst
 
     # TLS variable extraction
-    tcp-request content set-var(txn.sni) req_ssl_sni if is_tls
-    tcp-request content set-var-fmt(txn.sni_port) %[req_ssl_sni]:%[dst_port] if is_tls
+    # A trailing dot denotes the same DNS name, so it must not affect matching,
+    # resolution or logging -- strip it once here, upstream of every other use.
+    tcp-request content set-var(txn.sni) req_ssl_sni,regsub(\.$,) if is_tls
+    tcp-request content set-var-fmt(txn.sni_port) %[var(txn.sni)]:%[dst_port] if is_tls
     # The SNI is attacker-chosen raw bytes, and HAProxy copies a %[var()] into
     # log-format verbatim -- +E would only escape " \ ], never LF. So the copy
     # that reaches the log is reduced to a hostname charset here; the ACL below
     # still matches the untouched txn.sni_port.
-    tcp-request content set-var(txn.sni_log) req_ssl_sni,regsub([^A-Za-z0-9._-],_,g) if is_tls has_sni
+    tcp-request content set-var(txn.sni_log) var(txn.sni),regsub([^A-Za-z0-9._-],_,g) if is_tls has_sni
     tcp-request content set-var-fmt(txn.target) %[var(txn.sni_log)]:%[dst_port] if is_tls has_sni
 
     # ACL: HTTPS allowlist
-    acl is_https_allowed var(txn.sni_port) -m reg -f /etc/haproxy/rules/allowed_https.lst
+    acl is_https_allowed var(txn.sni_port) -m reg -i -f /etc/haproxy/rules/allowed_https.lst
 
     # ---------------------------------------------------------
     # 1. IP direct access (non DNS-routed)
@@ -134,7 +136,8 @@ backend http_filter_backend
     http-request deny deny_status 400 content-type "text/plain" string "Bad Request: Missing Host Header" if !has_host or !host_not_empty
 
     # Build host:port key
-    http-request set-var(txn.host_only) hdr(host),regsub(:.*$,)
+    # A trailing dot denotes the same DNS name (see the SNI comment above).
+    http-request set-var(txn.host_only) hdr(host),regsub(:.*$,),regsub(\.$,)
     http-request set-var-fmt(txn.host_port) %[var(txn.host_only)]:%[dst_port]
 
     # Update target for logging (replace IP with actual hostname)
@@ -143,7 +146,7 @@ backend http_filter_backend
     http-request set-var-fmt(txn.target) %[var(txn.host_log)]:%[dst_port]
 
     # HTTP allowlist check
-    acl is_http_allowed var(txn.host_port) -m reg -f /etc/haproxy/rules/allowed_http.lst
+    acl is_http_allowed var(txn.host_port) -m reg -i -f /etc/haproxy/rules/allowed_http.lst
     http-request set-var(txn.reason) str(not-allowed) if !is_http_allowed
     http-request deny deny_status 403 content-type "text/plain" string "Blocked by egress proxy" if !is_http_allowed
 
