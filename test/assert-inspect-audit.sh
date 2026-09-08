@@ -162,6 +162,24 @@ fi
 rm -rf "$SCRATCH_DIR"
 echo ""
 
+echo "[reachability] the listeners must not be reachable from the fixture network:"
+for probe in 10024 53; do
+  if docker compose exec -T test-server nc -w 3 -z builder "$probe" 2>/dev/null; then
+    fail "builder:$probe reachable from test-server"
+  else
+    pass "builder:$probe not reachable from test-server"
+  fi
+done
+# CoreDNS answers every name with the proxy address, allowed or not, so an
+# answer here means the port was reachable rather than that a rule matched.
+if docker compose exec -T test-server timeout 5 nslookup example.com builder 2>/dev/null |
+  grep -q '^Address: 172[.]20[.]0[.]1$'; then
+  fail "builder:53/udp answered a query from test-server"
+else
+  pass "builder:53/udp did not answer a query from test-server"
+fi
+echo ""
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "❌ FAILED: $FAILURES assertion(s) failed"
   exit 1

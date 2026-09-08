@@ -1,7 +1,7 @@
 #!/command/with-contenv sh
 set -e
 
-GATEWAY=${BUILDCAGE_GATEWAY:-172.20.0.1}
+GATEWAY=172.20.0.1
 
 echo "init-inspect-cfg: proxy_mode=${PROXY_MODE:-restrict}"
 
