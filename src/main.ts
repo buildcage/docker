@@ -85,7 +85,7 @@ async function main(): Promise<void> {
   // Only inspect can enforce on a method or a path, so these are compiled here
   // purely to fail on a typo at setup rather than inside the container.
   const urlRulesInput = core.getInput("allowed_url_rules");
-  const tlsRules = parseRulesOrThrow(core.getInput("allow_tls_rules"));
+  const tlsRules = parseRulesOrThrow(core.getInput("allowed_tls_rules"));
   const urlRules = buildUrlRules(urlRulesInput).map((r) => r.raw);
   checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, (message) =>
     console.log(`::warning::${message}`),
@@ -118,7 +118,7 @@ async function main(): Promise<void> {
     ALLOWED_IP_RULES: rules.ipRules.join("\n"),
     // Newline separated because a URL rule contains a space, unlike the others.
     ALLOWED_URL_RULES: urlRules.join("\n"),
-    ALLOW_TLS_RULES: tlsRules.join("\n"),
+    ALLOWED_TLS_RULES: tlsRules.join("\n"),
     KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
     BUILDCAGE_IMAGE_REF: imageRef,
   };

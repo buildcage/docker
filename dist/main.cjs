@@ -766,7 +766,7 @@ function buildUrlRules(rulesInput) {
 //#region src/lib/engine-rule-support.ts
 /**
 * Only `inspect` terminates TLS, so it's the only engine that can see an HTTP
-* method or a path — `allowed_url_rules` and `allow_tls_rules` are no-ops on
+* method or a path — `allowed_url_rules` and `allowed_tls_rules` are no-ops on
 * `universal` / `explicit`. Called once at setup, before the container starts,
 * so a mismatch is caught immediately instead of silently not enforcing.
 *
@@ -778,7 +778,7 @@ function buildUrlRules(rulesInput) {
 function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn) {
 	if (proxyEngine === "inspect") return;
 	let unsupported = [];
-	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allow_tls_rules"), unsupported.length === 0) return;
+	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allowed_tls_rules"), unsupported.length === 0) return;
 	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy_engine: ${proxyEngine} — this engine only sees the host and port, never a method or a path.`;
 	if (proxyMode === "audit") {
 		warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
@@ -7928,7 +7928,7 @@ async function main() {
 		httpsRulesInput: getInput("allowed_https_rules"),
 		httpRulesInput: getInput("allowed_http_rules"),
 		ipRulesInput: getInput("allowed_ip_rules")
-	}), knownBlockedRules = parseRulesOrThrow(getInput("known_blocked_rules")), urlRulesInput = getInput("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput("allow_tls_rules")), urlRules = buildUrlRules(urlRulesInput).map((r) => r.raw);
+	}), knownBlockedRules = parseRulesOrThrow(getInput("known_blocked_rules")), urlRulesInput = getInput("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput("allowed_tls_rules")), urlRules = buildUrlRules(urlRulesInput).map((r) => r.raw);
 	checkUrlAndTlsRuleSupport({
 		proxyEngine,
 		proxyMode,
@@ -7944,7 +7944,7 @@ async function main() {
 		ALLOWED_HTTP_RULES: rules.httpRules.join("\n"),
 		ALLOWED_IP_RULES: rules.ipRules.join("\n"),
 		ALLOWED_URL_RULES: urlRules.join("\n"),
-		ALLOW_TLS_RULES: tlsRules.join("\n"),
+		ALLOWED_TLS_RULES: tlsRules.join("\n"),
 		KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
 		BUILDCAGE_IMAGE_REF: imageRef
 	};

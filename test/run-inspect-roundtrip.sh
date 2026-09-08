@@ -45,12 +45,12 @@ build test/Dockerfile.inspect-audit
 
 RULES=$(
   COMPOSE_FILE="$BASE_COMPOSE" GITHUB_STEP_SUMMARY= node report/src/main.ts 2>&1 |
-    # Stops at the next top-level key (allow_tls_rules/allowed_ip_rules are
+    # Stops at the next top-level key (allowed_tls_rules/allowed_ip_rules are
     # now echoed into the same fenced block, see inspect-example.ts) as well
     # as the closing fence, so only the allowed_url_rules value is captured.
     awk '
       /allowed_url_rules: \|/ { capture=1; next }
-      capture && /^ *(allow_tls_rules|allowed_ip_rules): \|/ { exit }
+      capture && /^ *(allowed_tls_rules|allowed_ip_rules): \|/ { exit }
       capture && /```/ { exit }
       capture { print }
     ' | sed 's/^ *//'
@@ -73,7 +73,7 @@ sed 's/^/    /' <<< "$RULES"
   echo "    environment:"
   echo "      - ALLOWED_HTTPS_RULES="
   echo "      - ALLOWED_HTTP_RULES="
-  echo "      - ALLOW_TLS_RULES="
+  echo "      - ALLOWED_TLS_RULES="
   # One YAML scalar with escaped newlines, since a URL rule contains a space.
   # awk rather than `sed -z`, which is GNU-only and silently yields nothing on
   # a BSD sed.

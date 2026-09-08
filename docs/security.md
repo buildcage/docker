@@ -90,7 +90,7 @@ What each kind of rule decides, and what stays undecrypted:
 | `allowed_https_rules` | any method and path on the host, over TLS  | Host header          | yes       |
 | `allowed_http_rules`  | any method and path on the host, plaintext | Host header          | n/a       |
 | `allowed_url_rules`   | the named methods on matching URLs         | Host header and path | yes       |
-| `allow_tls_rules`     | TLS to the named host and port             | SNI and port         | **no**    |
+| `allowed_tls_rules`   | TLS to the named host and port             | SNI and port         | **no**    |
 | `allowed_ip_rules`    | TCP to the address and port, any protocol  | address and port     | **no**    |
 
 ### What it actually stops
@@ -170,7 +170,7 @@ What each kind of rule decides, and what stays undecrypted:
   directly, is unaffected by this guard in either mode: blocking it would only hide real
   information about what the build needs, without closing anything DNS could have redirected.
 
-- **`allow_tls_rules` and `allowed_ip_rules` stay uninspected by design.** Each is recorded with a
+- **`allowed_tls_rules` and `allowed_ip_rules` stay uninspected by design.** Each is recorded with a
   byte count and nothing more, since neither carries a name the proxy can re-terminate TLS for.
 - **Query strings are kept in the log**, since that is also where an exfiltration payload would go.
 - **UDP is dropped**, so QUIC and HTTP/3 fall back to TCP or fail. Port 53 to the gateway is the one

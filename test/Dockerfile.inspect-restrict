@@ -25,7 +25,7 @@ ENV C='curl -sS -o /dev/null -w %{http_code} --max-time 10'
 #     GET https://*.wildcard.example.com/public/**
 #   allowed_https_rules: sub.wildcard.example.com:443 absent.example.com:443
 #   allowed_http_rules:  allowed.example.com:80
-#   allow_tls_rules:     tlspass.example.com:443
+#   allowed_tls_rules:   tlspass.example.com:443
 # ---------------------------------------------------------------------------
 
 # [URL rule - path allowed]

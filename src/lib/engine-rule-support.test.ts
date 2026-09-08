@@ -58,7 +58,7 @@ describe("checkUrlAndTlsRuleSupport", () => {
         },
         vi.fn(),
       ),
-    ).toThrow(/allow_tls_rules/);
+    ).toThrow(/allowed_tls_rules/);
   });
 
   it("mentions both inputs when both are set", () => {
@@ -74,7 +74,7 @@ describe("checkUrlAndTlsRuleSupport", () => {
       );
       expect.unreachable();
     } catch (e) {
-      expect((e as Error).message).toMatch(/allowed_url_rules and allow_tls_rules/);
+      expect((e as Error).message).toMatch(/allowed_url_rules and allowed_tls_rules/);
     }
   });
 

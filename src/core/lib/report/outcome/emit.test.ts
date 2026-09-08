@@ -21,7 +21,7 @@ function parameters(overrides: Partial<GenReportParameters> = {}): GenReportPara
     allowedHttpsRules: [],
     allowedHttpRules: [],
     allowedIpRules: [],
-    allowTlsRules: [],
+    allowedTlsRules: [],
     knownBlockedRules: [],
     ...overrides,
   };

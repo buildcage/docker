@@ -57,7 +57,7 @@ qjs --std -m /opt/buildcage/scripts/gen-configs.js \
     "$HTTPS_RULES" \
     "$HTTP_RULES" \
     "$ALLOWED_IP_RULES" \
-    "$ALLOW_TLS_RULES" \
+    "$ALLOWED_TLS_RULES" \
     "$URL_RULES"
 
 echo "init-inspect-cfg: configuration generated"

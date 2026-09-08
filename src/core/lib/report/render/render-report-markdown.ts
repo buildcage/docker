@@ -46,7 +46,7 @@ export function renderReportMarkdown(
             actionRef,
             actionVersion,
             report.parameters.allowedIpRules,
-            report.parameters.allowTlsRules,
+            report.parameters.allowedTlsRules,
           )
         : buildRestrictExample(report.passed, actionRepo, actionRef, actionVersion);
   }

@@ -9,7 +9,7 @@ function params(overrides: Partial<GenReportParameters> = {}): GenReportParamete
     allowedHttpsRules: [],
     allowedHttpRules: [],
     allowedIpRules: [],
-    allowTlsRules: [],
+    allowedTlsRules: [],
     knownBlockedRules: [],
     ...overrides,
   };

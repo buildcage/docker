@@ -3,7 +3,7 @@ import type { ProxyEngine } from "../main.ts";
 
 /**
  * Only `inspect` terminates TLS, so it's the only engine that can see an HTTP
- * method or a path — `allowed_url_rules` and `allow_tls_rules` are no-ops on
+ * method or a path — `allowed_url_rules` and `allowed_tls_rules` are no-ops on
  * `universal` / `explicit`. Called once at setup, before the container starts,
  * so a mismatch is caught immediately instead of silently not enforcing.
  *
@@ -30,7 +30,7 @@ export function checkUrlAndTlsRuleSupport(
 
   const unsupported: string[] = [];
   if (urlRules.length > 0) unsupported.push("allowed_url_rules");
-  if (tlsRules.length > 0) unsupported.push("allow_tls_rules");
+  if (tlsRules.length > 0) unsupported.push("allowed_tls_rules");
   if (unsupported.length === 0) return;
 
   const list = unsupported.join(" and ");

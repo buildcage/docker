@@ -130,7 +130,7 @@ Each pair builds the same Dockerfile with and without rules:
 - Private registries are ordinary hosts: add the domain like any other.
 - One registry often needs several domains. PyPI, for example, uses both `pypi.org` and
   `files.pythonhosted.org`. The audit report lists every one of them, so start from that.
-- The generated allowlist covers only what the engine decrypted. `allow_tls_rules` and
+- The generated allowlist covers only what the engine decrypted. `allowed_tls_rules` and
   `allowed_ip_rules` come back exactly as the audit run was configured with them.
 - If something in the build pins a certificate or carries its own trust store (the JVM is the usual
   case), use `proxy_engine: universal` instead. See [Engines](#engines).
@@ -155,7 +155,7 @@ All of these are empty by default. Which ones apply depends on the engine:
 | `allowed_https_rules` |    ✅     |     ✅      | A host and port reached over HTTPS: `registry.npmjs.org:443`                        |
 | `allowed_http_rules`  |    ✅     |     ✅      | A host and port reached over plain HTTP: `deb.debian.org:80`                        |
 | `allowed_ip_rules`    |    ✅     |     ✅      | An address and port, for connections made without DNS: `192.168.1.1:443`            |
-| `allow_tls_rules`     |    ✅     |      -      | A TLS destination to pass through undecrypted, judged on SNI: `db.example.com:5432` |
+| `allowed_tls_rules`   |    ✅     |      -      | A TLS destination to pass through undecrypted, judged on SNI: `db.example.com:5432` |
 | `known_blocked_rules` |    ✅     |     ✅      | A host expected to be blocked, so it doesn't fail the [report](#report-action)      |
 
 Setting a rule the engine can't act on is caught before the build starts: `restrict` fails, since a
@@ -181,7 +181,7 @@ destination named, which is why it is worth running `audit` first.
 
 ## Rule syntax
 
-`allowed_url_rules` and `allow_tls_rules` need `proxy_engine: inspect`. The host rules work with
+`allowed_url_rules` and `allowed_tls_rules` need `proxy_engine: inspect`. The host rules work with
 either engine. The inputs are additive: a connection is allowed when any rule in any of them
 matches.
 
@@ -270,13 +270,13 @@ any domain. IPv4 only, and what a rule may hold depends on the engine:
 Either way the connection is tunnelled without inspection: once an `ip:port` pair is allowed, any
 TCP-based protocol can use that path. Prefer a domain rule where the destination has a stable name.
 
-### TLS passthrough: `allow_tls_rules`
+### TLS passthrough: `allowed_tls_rules`
 
 For TLS traffic that isn't HTTPS. The SNI and port are checked and the connection passes through
 undecrypted, so the build validates the origin's own certificate:
 
 ```yaml
-allow_tls_rules: |
+allowed_tls_rules: |
   db.example.com:5432
 ```
 
@@ -353,7 +353,7 @@ only reads its own `cacerts` file. Use `proxy_engine: universal` for those.
 **No system CA store** (`scratch`, distroless, or `debian:*-slim` before `ca-certificates` is
 installed): every variable above still gets set, but only to a dedicated file trusting the proxy's
 own CA, with no public roots. That is enough for ordinary HTTPS, since `inspect` re-signs all of it
-with the same CA. It is not enough for an `allow_tls_rules` or `allowed_ip_rules` passthrough, which
+with the same CA. It is not enough for an `allowed_tls_rules` or `allowed_ip_rules` passthrough, which
 presents its own real certificate and needs a real store already in place to verify against. This is
 decided once, from the rootfs as the step begins, so installing `ca-certificates` partway through a
 step doesn't help a passthrough connection made later in that same step:

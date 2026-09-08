@@ -139,7 +139,7 @@ jobs:
           # wouldn't prove method/path enforcement actually happened.
           allowed_https_rules: ${{ matrix.proxy_engine != 'inspect' && 'registry.npmjs.org:443' || '' }}
           # inspect only; empty is a no-op for the other engines.
-          allow_tls_rules: ${{ matrix.proxy_engine == 'inspect' && 'github.com:443' || '' }}
+          allowed_tls_rules: ${{ matrix.proxy_engine == 'inspect' && 'github.com:443' || '' }}
           allowed_url_rules: ${{ steps.url_rules.outputs.value }}
 
       - name: Set up Docker Buildx
