@@ -3,19 +3,19 @@ set -e
 
 echo "init-iptables: configuring isolation..."
 
-iptables -t nat -A PREROUTING -i buildkit0 -p tcp \
+iptables -t nat -A PREROUTING -i buildcage0 -p tcp \
   -j REDIRECT --to-ports 10024
 
-# The listeners can't bind 172.20.0.1: that address only exists once buildkit0
+# The listeners can't bind 172.20.0.1: that address only exists once buildcage0
 # is wired in, well after this service runs. Filter on INPUT instead.
 # lo carries the services' own readiness checks, and without the conntrack rule
 # the proxy's own outbound connections never see their replies.
 # Policy last, so nothing is dropped while the ACCEPTs are still going in.
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-iptables -A INPUT -i buildkit0 -p tcp --dport 10024 -j ACCEPT
-iptables -A INPUT -i buildkit0 -p udp --dport 53 -j ACCEPT
-iptables -A INPUT -i buildkit0 -p tcp --dport 53 -j ACCEPT
+iptables -A INPUT -i buildcage0 -p tcp --dport 10024 -j ACCEPT
+iptables -A INPUT -i buildcage0 -p udp --dport 53 -j ACCEPT
+iptables -A INPUT -i buildcage0 -p tcp --dport 53 -j ACCEPT
 iptables -P INPUT DROP
 
 # Nothing is routed onward, so a packet that escaped redirection goes nowhere.
@@ -26,7 +26,7 @@ iptables -P FORWARD DROP
 # ip6tables is safe. If it's present, ip6tables must succeed -- set -e keeps
 # this fail-closed rather than silently leaving IPv6 unfiltered.
 #
-# No gateway ports here: buildkit0 is IPv4-only, so nothing may reach
+# No gateway ports here: buildcage0 is IPv4-only, so nothing may reach
 # the listeners over IPv6. ICMPv6 stays open for neighbour discovery.
 if [ -e /proc/net/if_inet6 ]; then
   ip6tables -A INPUT -i lo -j ACCEPT
@@ -34,7 +34,7 @@ if [ -e /proc/net/if_inet6 ]; then
   ip6tables -A INPUT -p icmpv6 -j ACCEPT
   ip6tables -P INPUT DROP
   ip6tables -P FORWARD DROP
-  echo "init-iptables: REDIRECT configured, INPUT default-deny except lo and buildkit0 :10024/:53, no forwarding (IPv4/IPv6)"
+  echo "init-iptables: REDIRECT configured, INPUT default-deny except lo and buildcage0 :10024/:53, no forwarding (IPv4/IPv6)"
 else
-  echo "init-iptables: REDIRECT configured, INPUT default-deny except lo and buildkit0 :10024/:53, no forwarding (IPv4); kernel has no IPv6 support, skipping ip6tables"
+  echo "init-iptables: REDIRECT configured, INPUT default-deny except lo and buildcage0 :10024/:53, no forwarding (IPv4); kernel has no IPv6 support, skipping ip6tables"
 fi

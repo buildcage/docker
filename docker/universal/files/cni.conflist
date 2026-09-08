@@ -4,7 +4,7 @@
   "plugins": [
     {
       "type": "bridge",
-      "bridge": "buildkit0",
+      "bridge": "buildcage0",
       "isGateway": true,
       "ipMasq": true,
       "ipam": {

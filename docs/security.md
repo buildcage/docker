@@ -192,7 +192,7 @@ at the front of it, then checks that against the allowlist.
 <img src="../assets/diagram-architecture-universal.png" alt="Universal proxy engine architecture" width="611" height="490">
 
 Every container BuildKit spawns for a `RUN` step is placed on an isolated CNI network (the
-`buildkit0` bridge, 172.20.0.0/24). An iptables `PREROUTING REDIRECT` rule sends all TCP from that
+`buildcage0` bridge, 172.20.0.0/24). An iptables `PREROUTING REDIRECT` rule sends all TCP from that
 bridge to the proxy whatever its destination, so DNS-resolved and direct-IP connections both arrive
 there, and a `FORWARD` rule drops everything else, so no other protocol has a way out and
 buildkitd's own API is unreachable from a step. An `INPUT` rule likewise restricts the proxy's own
