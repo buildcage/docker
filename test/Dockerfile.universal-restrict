@@ -142,7 +142,7 @@ COPY files/package.json files/package-lock.json /app/
 RUN echo "=== [npm install - allowed registry] ===" && \
     cd /app && \
     (npm ci --ignore-scripts >/dev/null 2>&1 && \
-     echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
+     echo "✓ npm install: OK") || (echo "✗ npm install: FAILED" && exit 1)
 
 # Network configuration check
 RUN echo "=== Network Configuration ===" && \

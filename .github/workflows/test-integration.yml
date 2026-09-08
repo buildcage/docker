@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:
@@ -109,14 +113,14 @@ jobs:
             proxy_engine: inspect
             compose_file: compose.yaml:compose.test-inspect.yaml
             test_dockerfile: test/Dockerfile.inspect-debian
-            assert_script: ./test/assert-inspect-debian.sh
+            assert_script: ./test/assert-inspect-debian.sh audit
             builder_name: buildcage-inspect-debian-audit
           - mode: inspect-debian-restrict
             proxy_mode: restrict
             proxy_engine: inspect
             compose_file: compose.yaml:compose.test-inspect.yaml
             test_dockerfile: test/Dockerfile.inspect-debian
-            assert_script: ./test/assert-inspect-debian.sh
+            assert_script: ./test/assert-inspect-debian.sh restrict
             builder_name: buildcage-inspect-debian-restrict
 
     name: "integration: test (${{ matrix.mode }})"

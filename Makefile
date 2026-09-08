@@ -285,7 +285,7 @@ test_integration_buildkit_inspect_debian_audit: ## Run inspect-engine audit mode
 	@./test/assert-inspect-no-ca-residue.sh buildcage-test
 	@./test/assert-inspect-no-layer-bloat.sh buildcage-test
 	@node report/src/main.ts || true
-	@./test/assert-inspect-debian.sh
+	@./test/assert-inspect-debian.sh audit
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_inspect_debian_restrict
@@ -301,7 +301,7 @@ test_integration_buildkit_inspect_debian_restrict: ## Run inspect-engine restric
 	@./test/assert-inspect-no-ca-residue.sh buildcage-test
 	@./test/assert-inspect-no-layer-bloat.sh buildcage-test
 	@node report/src/main.ts || true
-	@./test/assert-inspect-debian.sh
+	@./test/assert-inspect-debian.sh restrict
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_inspect_byte_exact
