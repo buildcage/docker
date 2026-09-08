@@ -18,6 +18,21 @@ function exprLine(config: string): string {
 // and that decision has to match the rules and nothing more, or a name
 // outside them would be misreported as allowed.
 // ---------------------------------------------------------------------------
+describe("readiness", () => {
+  // s6-notifyoncheck polls this. Loopback-only, so a firewall that denies by
+  // default cannot block it, and only the catch-all block declares it, since
+  // a second block binding the same address fails to start.
+  for (const mode of ["audit", "restrict"] as const) {
+    it(`exposes a loopback health endpoint exactly once in ${mode} mode`, () => {
+      // restrict has to emit the allowlist block as well, since that is the
+      // case where declaring health twice would fail to start.
+      const config = gen({ httpsRules: ["a.example.com:443"], mode });
+      expect(config.split("\n").filter((l) => l.trim().startsWith("health ")).length).toBe(1);
+      expect(config.includes("    health 127.0.0.1:8080")).toBe(true);
+    });
+  }
+});
+
 describe("allowlist scope", () => {
   it("logs only names matching the rule as allowed, not the whole parent domain", () => {
     // `*` is one label, so the resolver must not degrade to a suffix match the

@@ -75,6 +75,7 @@ RUN apk add --no-cache \
       haproxy \
       openssl \
       iptables \
+      curl \
       quickjs-ng \
       rsync
 
