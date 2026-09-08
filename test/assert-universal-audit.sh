@@ -30,8 +30,10 @@ echo "[ALLOWED] must not exist:"
 assert_log_not_contains ALLOWED
 echo ""
 
-echo "[reachability] :10024 must not be reachable from the compose network:"
+echo "[reachability] the listeners must not be reachable from the compose network:"
 assert_no_tcp_connect test-server builder 10024
+assert_no_tcp_connect test-server builder 53
+assert_no_dns_answer test-server builder
 echo ""
 
 assert_results

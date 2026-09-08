@@ -69,6 +69,24 @@ assert_no_tcp_connect() {
   fi
 }
 
+# A UDP nc probe can't tell a DROPped packet from a closed port, since neither
+# sends anything back. Match an actual answer record instead: dnsmasq answers
+# every name with the gateway address (docker/universal/files/dnsmasq.conf).
+# BusyBox prints an answer as "Address: <ip>" and the server it asked as
+# "Address:<tab><ip>:53", so the leading "Address: " is what tells them apart.
+assert_no_dns_answer() {
+  local from_service="$1"
+  local target="$2"
+  local label="[unreachable] $target:53/udp from $from_service"
+  if docker compose exec -T "$from_service" \
+       timeout 5 nslookup example.com "$target" 2>/dev/null | grep -q "^Address: 172\.20\.0\.1$"; then
+    echo "  FAIL  $label -- the resolver answered"
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "  PASS  $label"
+  fi
+}
+
 assert_no_forged_log_lines() {
   local decision_logs
   # Restrict to actual decision lines ("buildcage [...]") -- the plausibility
