@@ -148,7 +148,7 @@ export function buildUrlRuleLines(requests: TrafficEvent[]): string[] {
  *
  * `actionRef` is the ref this action was invoked with; `actionVersion`, if
  * known, is appended as a trailing `# 3.1.4` comment. `allowedIpRules` and
- * `allowTlsRules` are not derived from `requests` -- a passthrough is never
+ * `allowedTlsRules` are not derived from `requests` -- a passthrough is never
  * decrypted, so there is nothing in the traffic to build them from -- they
  * are the same values the audit run was configured with, echoed back as-is,
  * since they apply unchanged under `restrict` (only enforcement differs).
@@ -159,10 +159,10 @@ export function buildInspectRestrictExample(
   actionRef?: string,
   actionVersion?: string,
   allowedIpRules: string[] = [],
-  allowTlsRules: string[] = [],
+  allowedTlsRules: string[] = [],
 ): string {
   const lines = buildUrlRuleLines(requests ?? []);
-  if (lines.length === 0 && allowedIpRules.length === 0 && allowTlsRules.length === 0) return "";
+  if (lines.length === 0 && allowedIpRules.length === 0 && allowedTlsRules.length === 0) return "";
 
   let yaml = "- name: Start Buildcage\n";
   yaml += `  uses: ${actionRepo}@${actionRef}${actionVersion ? ` # ${actionVersion}` : ""}\n`;
@@ -175,9 +175,9 @@ export function buildInspectRestrictExample(
     yaml += "    allowed_url_rules: |\n";
     for (const line of lines) yaml += `      ${line}\n`;
   }
-  if (allowTlsRules.length > 0) {
-    yaml += "    allow_tls_rules: |\n";
-    for (const rule of allowTlsRules) yaml += `      ${rule}\n`;
+  if (allowedTlsRules.length > 0) {
+    yaml += "    allowed_tls_rules: |\n";
+    for (const rule of allowedTlsRules) yaml += `      ${rule}\n`;
   }
   if (allowedIpRules.length > 0) {
     yaml += "    allowed_ip_rules: |\n";

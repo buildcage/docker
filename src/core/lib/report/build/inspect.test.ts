@@ -14,7 +14,7 @@ const PARAMS: GenReportParameters = {
   allowedHttpsRules: [],
   allowedHttpRules: [],
   allowedIpRules: [],
-  allowTlsRules: [],
+  allowedTlsRules: [],
   knownBlockedRules: [],
 };
 
