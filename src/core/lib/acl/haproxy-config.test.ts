@@ -29,6 +29,14 @@ const FULL = {
 describe("load-bearing directives", () => {
   const config = gen(FULL);
 
+  it("exposes readiness on a unix socket, out of reach of the firewall", () => {
+    // s6-notifyoncheck polls this; a TCP health port would depend on what
+    // init-iptables allows, and a blocked check never signals ready.
+    const health = frontendSegment(config, "health");
+    expect(health.includes("bind /var/run/haproxy-health.sock mode 666")).toBe(true);
+    expect(health.includes("monitor-uri /health")).toBe(true);
+  });
+
   it("classifies by the first bytes, so no port is declared in advance", () => {
     // This is what lets audit record everything without being configured.
     expect(config.includes("acl is_tls req.ssl_hello_type 1")).toBe(true);

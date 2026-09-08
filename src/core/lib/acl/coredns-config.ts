@@ -98,6 +98,11 @@ function proxyAnswerLines(proxyAddress: string, ttlSeconds: number): string[] {
   ];
 }
 
+// Loopback-only, so the readiness check reaching it never depends on what
+// init-iptables allows. Declared in the catch-all block alone: the plugin
+// binds a listener, and a second block asking for the same address fails.
+const HEALTH_LINE = "    health 127.0.0.1:8080";
+
 /**
  * Generate a Corefile from buildcage's rules.
  *
@@ -121,6 +126,7 @@ export function generateCorednsConfig(options: CorednsConfigOptions): GeneratedC
       "# looked up, never connected to, still shows up here, and the query",
       "# itself never reaches a real nameserver.",
       ". {",
+      HEALTH_LINE,
       ...proxyAnswerLines(proxyAddress, ttlSeconds),
       '    log . "buildcage dns allowed name={name}"',
       "    errors",
@@ -169,6 +175,7 @@ export function generateCorednsConfig(options: CorednsConfigOptions): GeneratedC
     "# query never leaves and the request still arrives somewhere its full URL",
     "# can be recorded before being denied.",
     ". {",
+    HEALTH_LINE,
     ...proxyAnswerLines(proxyAddress, ttlSeconds),
     '    log . "buildcage dns denied name={name}"',
     "    errors",

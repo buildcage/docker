@@ -185,6 +185,15 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
     "    timeout client 30s",
     "    timeout server 30s",
     "",
+    // A unix socket rather than a port, so the readiness check reaching it
+    // never depends on what init-iptables allows.
+    "# Readiness only, for s6-notifyoncheck. Not reachable from the network.",
+    "frontend health",
+    "    bind /var/run/haproxy-health.sock mode 666",
+    "    mode http",
+    "    no log",
+    "    monitor-uri /health",
+    "",
   );
 
   if (resolvers.length > 0) {
