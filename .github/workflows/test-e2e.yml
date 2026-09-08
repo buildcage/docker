@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:
@@ -149,7 +153,7 @@ jobs:
           # MITMs TLS); harmless for universal. inspect also terminates TLS
           # but needs nothing here, because its runc wrapper points
           # NODE_EXTRA_CA_CERTS at a store carrying the CA.
-          RUN npm init -y && NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --no-audit express
+          RUN npm init -y && NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --no-audit h3@2.0.0
           # Refused by the rules above, so the report shows the full URL, not
           # just the host. Engines differ in exactly how the refusal shows up
           # (a proxy-level HTTP error under inspect, a rejected connection

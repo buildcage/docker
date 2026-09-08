@@ -80,7 +80,7 @@ COPY files/package.json files/package-lock.json /app/
 RUN echo "=== [npm install - system CA trust, allowed registry] ===" && \
     cd /app && \
     (NODE_USE_SYSTEM_CA=1 npm ci --ignore-scripts --fetch-retries=0 >/dev/null 2>&1 && \
-     echo "✓ npm install express: OK") || (echo "✗ npm install express: FAILED" && exit 1)
+     echo "✓ npm install: OK") || (echo "✗ npm install: FAILED" && exit 1)
 
 # Note: unlike test/Dockerfile.universal-restrict, this Dockerfile has no missing-sni /
 # missing-host-header / dns-failed probes. Those exercise buildcage's
