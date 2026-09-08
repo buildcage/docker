@@ -107,6 +107,10 @@ jobs:
       # carry reliably, so it's built here instead. *, not **, so each rule
       # only matches its one path shape (package metadata / tarball) rather
       # than falling back to matching any path under the host.
+      #
+      # A scoped package needs its own pair: `*` does not cross a `/`, and
+      # `@hono/node-server` puts a second segment where the unscoped shape has
+      # one, both in the metadata path and before the `/-/` in the tarball.
       - name: Choose allowed_url_rules for this engine
         id: url_rules
         run: |
@@ -115,6 +119,8 @@ jobs:
               echo "value<<EOF"
               echo "GET|HEAD https://registry.npmjs.org/*"
               echo "GET|HEAD https://registry.npmjs.org/*/-/*"
+              echo "GET|HEAD https://registry.npmjs.org/@*/*"
+              echo "GET|HEAD https://registry.npmjs.org/@*/*/-/*"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           else
@@ -153,7 +159,7 @@ jobs:
           # MITMs TLS); harmless for universal. inspect also terminates TLS
           # but needs nothing here, because its runc wrapper points
           # NODE_EXTRA_CA_CERTS at a store carrying the CA.
-          RUN npm init -y && NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --no-audit h3@2.0.0
+          RUN npm init -y && NODE_USE_SYSTEM_CA=1 npm install --ignore-scripts --no-audit @hono/node-server@2.1.1
           # Refused by the rules above, so the report shows the full URL, not
           # just the host. Engines differ in exactly how the refusal shows up
           # (a proxy-level HTTP error under inspect, a rejected connection

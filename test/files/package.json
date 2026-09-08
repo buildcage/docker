@@ -1,8 +1,8 @@
 {
   "name": "buildcage-network-isolation-probe",
   "private": true,
-  "description": "Fixture installed by test/Dockerfile.* to exercise a real npm install through buildcage's network isolation. h3 is a well-known HTTP framework with no dependencies of its own: what this has to prove is that a package manager completes a real install over the proxy, which one metadata+tarball fetch shows as well as a deep tree does, without the deep tree's exposure to registry latency.",
+  "description": "Fixture installed by test/Dockerfile.* to exercise a real npm install through buildcage's network isolation. Scoped on purpose: its registry paths carry a segment the unscoped shape does not.",
   "dependencies": {
-    "h3": "2.0.0"
+    "@hono/node-server": "2.1.1"
   }
 }
