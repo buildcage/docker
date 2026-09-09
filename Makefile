@@ -31,9 +31,8 @@ test_unit_setup: ## Run setup action unit tests
 	@vp test run src/lib src/main
 
 .PHONY: test_unit_report
-# report/src has no package-local pure functions to unit-test.
 test_unit_report: ## Run report unit tests
-	@vp test run report/src --passWithNoTests
+	@vp test run report/src
 
 # qjs can't execute .ts directly, so compile fresh (vp run build:qjs-test)
 # and bind-mount the output in. qjs itself is identical across images, so one

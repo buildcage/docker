@@ -1,10 +1,11 @@
 /**
  * Generates and emits the inspect engine's outbound-traffic report.
  *
- * Baked into the image and fetched via `docker cp` by the `report` action,
- * which runs it on the runner as `node report-action.js <container-id>` (see
- * report/src/main.ts). Reads two logs: the proxy's requests and the resolver's
- * refused names, the latter being the only trace of a DNS-only exfiltration.
+ * Baked into the image and copied out of it (not out of the running
+ * container) by the `report` action, which runs it on the runner as
+ * `node report-action.js <container-id>` (see report/src/main.ts). Reads two
+ * logs: the proxy's requests and the resolver's refused names, the latter
+ * being the only trace of a DNS-only exfiltration.
  */
 import * as core from "@actions/core";
 import { createDocker } from "#core/lib/docker/client.ts";

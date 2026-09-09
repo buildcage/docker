@@ -12298,6 +12298,48 @@ function errorMessage(e) {
 	return e instanceof Error ? e.message : String(e);
 }
 //#endregion
+//#region report/src/lib/copy-from-image.ts
+const runDocker = (args) => (0, node_child_process.execFileSync)("docker", args, {
+	encoding: "utf8",
+	stdio: [
+		"ignore",
+		"pipe",
+		"pipe"
+	]
+});
+/**
+* Copies a path out of the image `containerId` was created from, so a `RUN`
+* step that escaped its sandbox and wrote into the container cannot reach the
+* runner through it. The image ID comes from the daemon's record of the
+* container, which nothing inside it can rewrite, and the scratch container is
+* never started, so what comes out is the image's own copy.
+*/
+function copyFromContainerImage(containerId, containerPath, hostPath, run = runDocker) {
+	let imageId = run([
+		"inspect",
+		containerId,
+		"--format",
+		"{{.Image}}"
+	]).trim();
+	if (!imageId) throw Error(`docker inspect reported no image for container ${containerId}`);
+	let scratchId = run(["create", imageId]).trim();
+	try {
+		run([
+			"cp",
+			`${scratchId}:${containerPath}`,
+			hostPath
+		]);
+	} finally {
+		try {
+			run([
+				"rm",
+				"-f",
+				scratchId
+			]);
+		} catch {}
+	}
+}
+//#endregion
 //#region report/src/lib/errors.ts
 /**
 * ReportError — intentional error in the report action's own logic. Invalid
@@ -12305,7 +12347,8 @@ function errorMessage(e) {
 * core/lib/acl/rules.ts).
 *
 * Codes:
-*   DOCKER_UNAVAILABLE   – docker CLI missing from PATH, or `docker ps`/`docker cp` failed
+*   DOCKER_UNAVAILABLE   – docker CLI missing from PATH, or a docker call
+*                          (`ps`, `inspect`, `create`, `cp`) failed
 *   CONTAINER_NOT_FOUND  – `docker ps --filter` didn't find exactly one
 *                          report-source container for this builder_name
 *   REPORT_SCRIPT_FAILED – report-action.js couldn't even be launched (a
@@ -70279,9 +70322,9 @@ async function main() {
 	try {
 		let reportActionPath = (0, node_path.join)(scratchDir, "report-action.js");
 		try {
-			docker.copyFromContainer(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath);
+			copyFromContainerImage(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath);
 		} catch (e) {
-			throw new ReportError(describeDockerFailure(e, { operation: "docker cp (fetching report-action.js from the container)" }), "DOCKER_UNAVAILABLE");
+			throw new ReportError(describeDockerFailure(e, { operation: "docker cp (fetching report-action.js from the builder image)" }), "DOCKER_UNAVAILABLE");
 		}
 		let trafficFile = wantsTrafficArtifact() ? (0, node_path.join)(scratchDir, "traffic.json") : void 0;
 		try {
