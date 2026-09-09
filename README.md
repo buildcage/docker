@@ -313,7 +313,9 @@ with an error naming what to write instead.
 | Traffic as a JSON artifact                    | ✅                                                          | -                                                       |
 
 Both intercept at the network level, so a tool that ignores `HTTP_PROXY` is covered either way, and
-both apply to `RUN` steps. `FROM` is buildkitd's own traffic and stays outside.
+both apply to `RUN` steps. What buildkitd fetches for itself stays outside: `FROM`, `ADD <url>`, git
+contexts, and the frontend image a `# syntax=` directive names. See
+[What buildkitd fetches itself](./docs/security.md#what-buildkitd-fetches-itself).
 
 Start with `inspect`, and fall back to `universal` when something in the build won't accept the
 injected CA; see [CA trust and compatibility](#ca-trust-and-compatibility). `universal` is the

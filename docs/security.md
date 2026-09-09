@@ -13,6 +13,7 @@ configure the action, see the [README](../README.md).
 - [Inspect Proxy Engine](#inspect-proxy-engine)
 - [Universal Proxy Engine](#universal-proxy-engine)
 - [Explicit Proxy Engine](#explicit-proxy-engine) (deprecated)
+- [What buildkitd fetches itself](#what-buildkitd-fetches-itself)
 - [Hardening](#hardening)
 - [Image Provenance Verification](#image-provenance-verification)
 
@@ -49,8 +50,9 @@ Two components, plus a wrapper around runc:
   Injection happens at exec time, never touches LLB, and so cannot affect a cache key.
 
 Like `universal`, this engine governs `RUN` step traffic only: its iptables rule redirects what
-arrives on the CNI bridge. `FROM` (`docker-image://`) is unaffected, buildkitd's own egress being
-left alone.
+arrives on the CNI bridge. buildkitd's own egress is left alone, so `FROM`, `ADD <url>`, git
+contexts and the `# syntax=` frontend are all unaffected: see
+[What buildkitd fetches itself](#what-buildkitd-fetches-itself).
 
 ### How a request is handled
 
@@ -214,8 +216,9 @@ the build's own choice of address is discarded here as well.
 Nothing in the build has to trust an injected CA or be told about a proxy, which is what lets this
 engine cover any language or package manager, a pinned certificate included, with no Dockerfile change.
 
-Like `inspect`, this engine governs `RUN` step traffic only. `FROM` is performed by buildkitd
-itself, which is not on the isolated network, so base image pulls are never filtered.
+Like `inspect`, this engine governs `RUN` step traffic only. buildkitd is not on the isolated
+network, so what it fetches for itself is never filtered: see
+[What buildkitd fetches itself](#what-buildkitd-fetches-itself).
 
 ### What it stops
 
@@ -341,7 +344,7 @@ For how the supervisor binary, gRPC interception, and policy compilation work in
 | `RUN` step, proxy-aware tool                   | Logged per-step in the report's "Communication details"                                                                           | Logged in a flat `DENIED` list (no per-step attribution; whole-second timestamps)           |
 | `RUN` step, non-cooperative tool or raw socket | Immediate "network unreachable", with **no trace anywhere**: not in the build log, the report, or provenance                      | Identical; the request never reaches the proxy, so allowed and denied are indistinguishable |
 | `ADD <url>`                                    | Not tracked by the report: the URL is developer-specified in the Dockerfile, already an intentional, reviewable part of the build | Aborts the entire build immediately at LLB load time; logged the same way as a denied `RUN` |
-| `FROM` / git contexts                          | Unaffected: buildcage's policy only ever matches `http(s)://` sources                                                             | Unaffected                                                                                  |
+| `FROM` / git contexts / `# syntax=` frontends  | Unaffected: buildcage's policy only ever matches `http(s)://` sources                                                             | Unaffected                                                                                  |
 
 The key structural difference from `universal`: there, a non-cooperative process still reaches the
 CNI bridge and is observed, blocked, and logged. Under `explicit`, each `RUN` step's network
@@ -351,6 +354,37 @@ the trade-off for full path-level visibility and BuildKit-native provenance inte
 For exactly how the `report` action extracts allowed/denied data from buildkitd's own logs, see
 [Viewing Logs](./development.md#viewing-logs) in the Development Guide.
 
+## What buildkitd fetches itself
+
+Every engine intercepts `RUN` step traffic and nothing else. buildkitd is not on the isolated
+network: it sits on the builder container's own network, so what the daemon fetches never reaches
+the proxy. None of it appears in the report, and `fail_on_blocked` never fires for it.
+
+What the daemon fetches:
+
+- **`FROM`** (`docker-image://`), including every stage's base image and any image named in
+  `COPY --from=`.
+- **`ADD <url>`**, the HTTP source. The URL is `ARG`-expanded, so a build argument can end up in it.
+- **git contexts and git sources**, whether the context itself or a `FROM`/`ADD` naming a repository.
+- **The frontend image a `# syntax=` directive names**, and whatever that frontend then asks
+  buildkitd to fetch through the gateway API. This is the broadest of the four: a frontend produces
+  the LLB the daemon runs, so it can read a step's output back and fetch on the daemon's behalf.
+
+`explicit` is the one partial exception: its BuildKit source policy matches `http(s)://` sources, so
+`ADD <url>` is enforced there (see [Coverage and Visibility](#coverage-and-visibility) above). Image
+and git sources stay unaffected on every engine.
+
+This is a scope decision, not a gap left open. All four are destinations a developer writes into the
+Dockerfile, so they are reviewable source, and they are resolved before any step runs. What Buildcage
+governs is the code that runs _inside_ a `RUN` step: a dependency's `postinstall`, a build script, a
+compiler plugin, none of which the Dockerfile author reviewed. Someone who can edit the Dockerfile
+is outside that model, as is an untrusted step elsewhere in the same job (see
+[Verification Limitations](#verification-limitations)).
+
+What covers this instead is ordinary supply chain practice: reviewing the Dockerfile, pinning base
+images by digest, and pinning the `# syntax=` frontend to a digest rather than a floating tag. See
+[Keep the rest of your supply chain practice](#keep-the-rest-of-your-supply-chain-practice) below.
+
 ## Hardening
 
 An allowlist decides which destinations a build can reach. It works on domain names, so it cannot
@@ -358,10 +392,11 @@ tell a legitimate use of an allowed destination from an abusive one. Anything le
 service you had to allow anyway still leaves. That is a structural limit, not something a better
 rule set fixes.
 
-What it does stop is narrower. Traffic to a destination that is not on the list does not go out, and
-infrastructure an attacker set up is normally not on it, because the build has no reason to reach
-it. That is also the hardest kind of leak to find afterwards, which is why closing it is worth doing
-even though the rest stays open.
+What it does stop is narrower. Traffic a `RUN` step sends to a destination that is not on the list
+does not go out, and infrastructure an attacker set up is normally not on it, because the build has
+no reason to reach it. That is also the hardest kind of leak to find afterwards, which is why
+closing it is worth doing even though the rest stays open. What buildkitd fetches for itself is
+outside this entirely, as [the previous section](#what-buildkitd-fetches-itself) describes.
 
 An attacker who sends the same data through a service the build already uses stays inside the limit
 above. The rest of this section is about making that set of services smaller. Buildcage runs against
@@ -389,10 +424,10 @@ else in this section.
 ### Keep the rest of your supply chain practice
 
 Pinning versions, lockfiles, review, least-privilege tokens, and a dependency cooldown each cover
-something an allowlist does not. Pinning base images by digest belongs here too: `FROM`
-instructions are resolved by buildkitd itself, which is not on the isolated network, so image pulls
-are never filtered (see [How it sees traffic](#how-it-sees-traffic)). Buildcage is one layer among
-them, not a replacement for any.
+something an allowlist does not. Pinning by digest belongs here too, for base images and for a
+`# syntax=` frontend alike: buildkitd resolves both itself, off the isolated network, so neither is
+filtered (see [What buildkitd fetches itself](#what-buildkitd-fetches-itself)). Buildcage is one
+layer among them, not a replacement for any.
 
 ## Image Provenance Verification
 
