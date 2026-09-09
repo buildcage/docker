@@ -296,3 +296,113 @@ func mustStatMtime(t *testing.T, path string) time.Time {
 	}
 	return info.ModTime()
 }
+
+// newCAStoreBind lays out a rootfs holding one CA bundle and prepares a
+// dirBind over its directory, the way inject does.
+func newCAStoreBind(t *testing.T) (*dirBind, string) {
+	t.Helper()
+	rootfs := t.TempDir()
+	mustMkdirAll(t, filepath.Join(rootfs, "etc/ssl/certs"))
+	mustWriteFile(t, filepath.Join(rootfs, "etc/ssl/certs/ca-certificates.crt"), "ORIGINAL-ROOTS\n")
+
+	store, _, err := findSystemStore(rootfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostDir := filepath.Dir(store)
+	scratch, err := newScratchDir("bundle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := &dirBind{
+		rootfs:       rootfs,
+		hostDir:      hostDir,
+		containerDir: containerPathOf(rootfs, hostDir),
+		scratchDir:   scratch,
+		bundleFiles:  []string{filepath.Base(store)},
+	}
+	if err := b.prepare([]byte("BUILDCAGE-CA")); err != nil {
+		t.Fatal(err)
+	}
+	return b, rootfs
+}
+
+// redirectStoreDir repoints /etc/ssl, so containerDir no longer resolves to
+// where injection left it.
+func redirectStoreDir(t *testing.T, rootfs string) {
+	t.Helper()
+	elsewhere := filepath.Join(rootfs, "elsewhere")
+	mustMkdirAll(t, filepath.Join(elsewhere, "certs"))
+	if err := os.RemoveAll(filepath.Join(rootfs, "etc/ssl")); err != nil {
+		t.Fatal(err)
+	}
+	mustSymlink(t, "/elsewhere", filepath.Join(rootfs, "etc/ssl"))
+}
+
+// countRsync counts from the call it is installed on, leaving out a bind's
+// own mirroring during prepare.
+func countRsync(t *testing.T) *int {
+	t.Helper()
+	var calls int
+	orig := runRsync
+	runRsync = func(args []string) ([]byte, error) {
+		calls++
+		return orig(args)
+	}
+	t.Cleanup(func() { runRsync = orig })
+	return &calls
+}
+
+// A destination that no longer resolves where injection left it fails the
+// step rather than being written to.
+func TestFinishRefusesARedirectedWriteBackTarget(t *testing.T) {
+	useFakeRsync(t)
+	b, rootfs := newCAStoreBind(t)
+	mustWriteFile(t, filepath.Join(b.scratchDir, "ca-certificates.crt"), "REGENERATED\n")
+	redirectStoreDir(t, rootfs)
+
+	calls := countRsync(t)
+	if err := b.finish(); err == nil {
+		t.Fatal("expected finish to refuse the redirected target")
+	}
+	if *calls != 0 {
+		t.Errorf("got %d rsync invocations, want none before the target is verified", *calls)
+	}
+}
+
+func TestFinishWritesBackWhenTheTargetStillResolves(t *testing.T) {
+	useFakeRsync(t)
+	b, rootfs := newCAStoreBind(t)
+	mustWriteFile(t, filepath.Join(b.scratchDir, "ca-certificates.crt"), "REGENERATED\n")
+
+	calls := countRsync(t)
+	if err := b.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if *calls != 2 {
+		t.Errorf("got %d rsync invocations, want 2 (dry run, then apply)", *calls)
+	}
+	got, err := os.ReadFile(filepath.Join(rootfs, "etc/ssl/certs/ca-certificates.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "REGENERATED\n" {
+		t.Errorf("write-back did not reach the real store: %q", got)
+	}
+}
+
+// An untouched store returns before the check, so a build that never writes
+// to the store cannot start failing on it.
+func TestFinishSkipsTheCheckWhenTheStoreIsUnchanged(t *testing.T) {
+	useFakeRsync(t)
+	b, rootfs := newCAStoreBind(t)
+	redirectStoreDir(t, rootfs)
+
+	calls := countRsync(t)
+	if err := b.finish(); err != nil {
+		t.Fatalf("an unchanged store must not fail: %v", err)
+	}
+	if *calls != 0 {
+		t.Errorf("got %d rsync invocations, want none for an unchanged store", *calls)
+	}
+}

@@ -231,6 +231,7 @@ func inject(bundle string, ca []byte) (func() error, error) {
 			names[i] = filepath.Base(f)
 		}
 		b := &dirBind{
+			rootfs:       s.rootfs,
 			hostDir:      hostDir,
 			containerDir: containerDir,
 			scratchDir:   scratch,

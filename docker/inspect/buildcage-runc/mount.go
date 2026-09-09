@@ -42,6 +42,7 @@ var runRsync = func(args []string) ([]byte, error) {
 // separate sources over the same destination would let the second shadow
 // the first.
 type dirBind struct {
+	rootfs       string // so finish can re-resolve containerDir
 	hostDir      string
 	containerDir string
 	scratchDir   string
@@ -290,6 +291,10 @@ func (b *dirBind) prepare(ca []byte) error {
 
 // finish diffs the scratch mirror against its post-injection baseline and
 // only touches the real rootfs directory when the step actually changed it.
+//
+// The write-back is not atomic, so a failure leaves hostDir half-written.
+// That is only safe because the error fails the step, and BuildKit then
+// releases the mutable snapshot instead of committing it.
 func (b *dirBind) finish() error {
 	current, err := captureManifest(b.scratchDir)
 	if err != nil {
@@ -316,6 +321,18 @@ func (b *dirBind) finish() error {
 	}
 	if err := restoreUnchangedMtimes(b.original, stripped, b.scratchDir); err != nil {
 		return err
+	}
+
+	// Nothing in the step can move a mounted directory or its ancestors, so
+	// this cannot legitimately differ. Checking anyway keeps the write-back's
+	// confinement to the rootfs a property of this code rather than of how
+	// runc applied the mounts.
+	resolved, err := resolveInRoot(b.rootfs, b.containerDir)
+	if err != nil {
+		return fmt.Errorf("re-resolving the write-back target %s: %w", b.containerDir, err)
+	}
+	if resolved != b.hostDir {
+		return fmt.Errorf("write-back target %s now resolves to %s, not %s", b.containerDir, resolved, b.hostDir)
 	}
 
 	return writeBack(b.scratchDir, b.hostDir)
