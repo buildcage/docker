@@ -6,7 +6,8 @@ import { ActionError } from "#core/lib/errors.ts";
  * core/lib/acl/rules.ts).
  *
  * Codes:
- *   DOCKER_UNAVAILABLE   – docker CLI missing from PATH, or `docker ps`/`docker cp` failed
+ *   DOCKER_UNAVAILABLE   – docker CLI missing from PATH, or a docker call
+ *                          (`ps`, `inspect`, `create`, `cp`) failed
  *   CONTAINER_NOT_FOUND  – `docker ps --filter` didn't find exactly one
  *                          report-source container for this builder_name
  *   REPORT_SCRIPT_FAILED – report-action.js couldn't even be launched (a

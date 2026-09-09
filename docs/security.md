@@ -554,8 +554,9 @@ Verification establishes where the image came from. Here is what it leaves uncov
   Buildcage's threat model is malicious code _inside_ a `RUN` step. An untrusted step elsewhere in
   the same job is not: running between `setup` and `report`, it can reach the proxy container
   through `docker exec`/`docker cp`, or the host filesystem directly on a passwordless-sudo runner,
-  and rewrite its traffic log or the script `report` executes. Sigstore proves the image was genuine
-  at startup, not that nothing touched it afterwards.
+  and rewrite its traffic log. Sigstore proves the image was genuine at startup, not that nothing
+  touched it afterwards. The script `report` runs is not part of that gap: it comes from the image,
+  not from the container.
 
   `report` does refuse to pass a log carrying no trace of a real proxy run, which catches wholesale
   erasure but not a format-aware forgery. The effective defense is procedural: don't place an

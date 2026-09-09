@@ -243,7 +243,7 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │   ├── lib/                  # write-step-summary.ts, shared by both engines' report-action.node.ts
 │   ├── universal/            # proxy_engine: universal. Dockerfile + BuildKit/haproxy/dnsmasq/
 │   │                         # s6-overlay config + scripts/report-action.node.ts (runs under Node
-│   │                         # on the runner, `docker cp`'d out by the report action)
+│   │                         # on the runner, copied out of the image by the report action)
 │   ├── inspect/               # proxy_engine: inspect. Dockerfile + HAProxy/CoreDNS/s6-overlay
 │   │                         # config + buildcage-runc/ (Go module: wraps buildkit-runc to inject
 │   │                         # CA trust at exec time) + scripts/report-action.node.ts
@@ -251,7 +251,7 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │                             # entrypoint/PID1, supervises buildkitd, injects the source policy
 │                             # into Solve via a gRPC proxy) + scripts/ (gen-source-policy.ts runs
 │                             # under QuickJS; report-action.node.ts runs under Node on the runner,
-│                             # `docker cp`'d out by the report action. TypeScript, rolldown-bundled
+│                             # copied out of the image by the report action. TypeScript, rolldown-bundled
 │                             # at image build time)
 ├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode} combination, plus the
 │                             # fixture containers: test-server and test-dns per engine, and

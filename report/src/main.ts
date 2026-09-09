@@ -10,6 +10,7 @@ import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
 import { REPORT_ACTION_SCRIPT_PATH, REPORT_SOURCE_LABEL } from "#core/lib/docker/report-source.ts";
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
+import { copyFromContainerImage } from "./lib/copy-from-image.ts";
 import { ReportError } from "./lib/errors.ts";
 
 // Gates the COMPOSE_PROJECT_NAME override to this repo's own CI/dev testing.
@@ -56,11 +57,11 @@ async function main(): Promise<void> {
     const reportActionPath = join(scratchDir, "report-action.js");
 
     try {
-      docker.copyFromContainer(containerId, REPORT_ACTION_SCRIPT_PATH, reportActionPath);
+      copyFromContainerImage(containerId, REPORT_ACTION_SCRIPT_PATH, reportActionPath);
     } catch (e) {
       throw new ReportError(
         describeDockerFailure(e, {
-          operation: "docker cp (fetching report-action.js from the container)",
+          operation: "docker cp (fetching report-action.js from the builder image)",
         }),
         "DOCKER_UNAVAILABLE",
       );
