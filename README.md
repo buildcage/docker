@@ -203,7 +203,8 @@ allowed_url_rules: |
 ```
 
 Methods are separated by `|` or `,`, and `*` means any method. The port may be left out when it is
-the scheme's default, and a pattern with no path allows any path on that host.
+the scheme's default, and a pattern with no path allows any path on that host. A `#` fragment is
+refused: it never travels with a request, so a rule carrying one could only match nothing.
 
 | Pattern | In a domain                                       | In a path                     |
 | ------- | ------------------------------------------------- | ----------------------------- |

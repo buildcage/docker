@@ -167,6 +167,12 @@ describe("buildUrlRules", () => {
     const rules = buildUrlRules("GET ~^https://a\\.com/x#frag$");
     expect(rules[0].raw).toBe("GET ~^https://a\\.com/x#frag$");
   });
+
+  it("refuses a fragment in a literal URL, which no request ever carries", () => {
+    // Easy to paste in from a documentation link, and it could only ever match
+    // nothing: the fragment stays in the browser.
+    expect(() => convertUrlRule("GET https://a.com/pkg#frag")).toThrow(/fragment/);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -47,6 +47,14 @@ services:
         # No port at all: matches only the scheme's default (443), not 9443
         # above -- a ~ URL rule's port is optional, unlike the other kinds.
         GET ~^https://blocked\.example\.com/defaultport/.*$
+
+        # Never requested: this is here so real HAProxy sees a path pattern
+        # carrying the characters its own config parser folds. Unescaped, the
+        # `#` would comment the line short and leave the regex as `^/frag(x`,
+        # and the `'` would open a quoted string -- either way haproxy refuses
+        # the config and this job fails, which is the point. A pattern that
+        # stayed valid when cut short would regress in silence.
+        GET ~^https://blocked\.example\.com/frag(x#y|'z)$
     volumes:
       - ./test/test-server-inspect/cert.pem:/test-fixtures/test-server-cert.pem:ro
     networks:

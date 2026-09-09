@@ -104,7 +104,7 @@ export function parseMethods(spec: string, rule: string): string[] | null {
 /**
  * Split a URL pattern into scheme, authority (host:port) and path.
  *
- * @throws {Error} if the pattern is not an http(s) URL
+ * @throws {Error} if the pattern is not an http(s) URL, or carries a fragment
  */
 function splitUrl(
   url: string,
@@ -114,6 +114,17 @@ function splitUrl(
   if (!match) {
     throw new Error(
       `Invalid URL in rule "${rule}": expected http:// or https:// followed by a host`,
+    );
+  }
+  // A fragment stays in the browser, so it is never part of the path a request
+  // carries and a rule naming one could only ever match nothing. Easy to copy
+  // in from a documentation link, so it is refused rather than left to fail
+  // silently.
+  if (url.includes("#")) {
+    throw new Error(
+      `Invalid URL in rule "${rule}": a "#" fragment is never sent with a request, so this rule ` +
+        `would match nothing. Drop it, or write the rule as a "~" regex if the "#" is meant ` +
+        `literally.`,
     );
   }
   return { scheme: match[1] as "https" | "http", authority: match[2], path: match[3] ?? "" };
