@@ -71,6 +71,24 @@ export interface GeneratedHaproxyConfig {
   warnings: string[];
 }
 
+/**
+ * Escape a rule-derived value for HAProxy's config word parser.
+ *
+ * Unquoted, the parser drops everything from a `#` to the end of the line, so a
+ * rule carrying one would silently shorten the ACL it belongs to rather than
+ * fail: `^/pkg#frag$` reaches the regex engine as `^/pkg`, allowing every path
+ * that merely starts with `/pkg`. A quote opens a quoted string and breaks the
+ * config outright.
+ *
+ * Only ` `, `#`, `\`, `'` and `"` are folded by the parser, and `\` is folded
+ * only before one of those: `\.` and `$` arrive at the regex engine as written,
+ * which is why every backslash is doubled here. One pass over the original
+ * string, so an escape this adds is never escaped again.
+ */
+export function escapeForHaproxy(value: string): string {
+  return value.replace(/[\\#'" ]/g, "\\$&");
+}
+
 /** Emit the rule ACLs and the single deny that enforces them. */
 function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" | "http"): string[] {
   const lines: string[] = [];
@@ -104,26 +122,27 @@ function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" | "http"
   }
 
   for (const rule of rules) {
+    const hostRegex = escapeForHaproxy(rule.hostRegex);
     lines.push(`    # ${rule.raw}`);
     if (rule.hostMatch === "hostPort") {
-      lines.push(`    acl ${rule.id}_host var(txn.host_port) -m reg -i ${rule.hostRegex}`);
+      lines.push(`    acl ${rule.id}_host var(txn.host_port) -m reg -i ${hostRegex}`);
     } else if (rule.hostMatch === "hostBareFull") {
       lines.push(
         `    http-request set-var(txn.${rule.id}_ok) bool(false)`,
         `    http-request set-var(txn.${rule.id}_ok) bool(true) if is_default_port ` +
-          `{ var(txn.host_bare) -m reg -i ${rule.hostRegex} }`,
+          `{ var(txn.host_bare) -m reg -i ${hostRegex} }`,
         `    http-request set-var(txn.${rule.id}_ok) bool(true) if ` +
-          `{ var(txn.host_full) -m reg -i ${rule.hostRegex} }`,
+          `{ var(txn.host_full) -m reg -i ${hostRegex} }`,
         `    acl ${rule.id}_host var(txn.${rule.id}_ok) -m bool`,
       );
     } else {
       // -i, since a name is case-insensitive and do-resolve lowercases anyway.
-      lines.push(`    acl ${rule.id}_host hdr(host),${HOST_ONLY} -m reg -i ${rule.hostRegex}`);
+      lines.push(`    acl ${rule.id}_host hdr(host),${HOST_ONLY} -m reg -i ${hostRegex}`);
       if (rule.port) {
         lines.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
       }
     }
-    lines.push(`    acl ${rule.id}_path path -m reg ${rule.pathRegex}`);
+    lines.push(`    acl ${rule.id}_path path -m reg ${escapeForHaproxy(rule.pathRegex)}`);
     if (rule.methods) {
       lines.push(`    acl ${rule.id}_method method ${rule.methods.join(" ")}`);
     }
@@ -241,7 +260,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
       l.push(`    # ${rule.raw}`);
       l.push(
         rule.hostMatch === "hostPort"
-          ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${rule.address}`
+          ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${escapeForHaproxy(rule.address)}`
           : `    acl ${rule.id}_dst dst ${rule.address}`,
       );
       if (rule.port) l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
@@ -250,8 +269,8 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
       l.push(`    # ${host.raw}`);
       l.push(
         host.hostMatch === "hostPort"
-          ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${host.hostRegex}`
-          : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${host.hostRegex}`,
+          ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${escapeForHaproxy(host.hostRegex)}`
+          : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${escapeForHaproxy(host.hostRegex)}`,
       );
       if (host.port) l.push(`    acl ${host.id}_port dst_port ${host.port}`);
     }

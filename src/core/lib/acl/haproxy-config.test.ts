@@ -318,7 +318,7 @@ describe("rules", () => {
   it("matches a host case-insensitively, as a name is", () => {
     // do-resolve already lowercases the name it looks up, so a case-sensitive
     // acl refuses `Host: Registry.NPMJS.org` despite an explicit allow rule.
-    expect(gen({ httpsRules: ["a.com:443"] }).includes("-m reg -i ^a\\.com$")).toBe(true);
+    expect(gen({ httpsRules: ["a.com:443"] }).includes("-m reg -i ^a\\\\.com$")).toBe(true);
   });
 
   it("strips a trailing dot from the Host header before matching, resolving or verifying it", () => {
@@ -326,7 +326,7 @@ describe("rules", () => {
     // write it that way to skip resolv.conf's search-list expansion. Without
     // this, `Host: a.com.` would refuse an explicit allow rule for a.com.
     const config = gen({ httpsRules: ["a.com:443"] });
-    expect(config.includes("hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$")).toBe(true);
+    expect(config.includes("hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\\\.com$")).toBe(true);
   });
 
   it("takes the port from the connection, not from the Host header", () => {
@@ -335,7 +335,7 @@ describe("rules", () => {
     // :9443 also permit :443 on the same host. Found by the round-trip test.
     const config = gen({ urlRules: buildUrlRules("GET https://a.com:9443/private/x") });
     expect(
-      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$"),
+      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\\\.com$"),
     ).toBe(true);
     expect(config.includes("acl s0_port dst_port 9443")).toBe(true);
     expect(config.includes("(:9443)?")).toBe(false);
@@ -347,7 +347,7 @@ describe("rules", () => {
   it("gives a host rule the same treatment", () => {
     const config = gen({ httpsRules: ["a.com:8443"] });
     expect(
-      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$"),
+      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\\\.com$"),
     ).toBe(true);
     expect(config.includes("acl s0_port dst_port 8443")).toBe(true);
   });
@@ -360,7 +360,9 @@ describe("rules", () => {
       ),
     ).toBe(true);
     expect(
-      config.includes("acl s0_host var(txn.host_port) -m reg -i ^.*\\.example\\.com:(443|8443)$"),
+      config.includes(
+        "acl s0_host var(txn.host_port) -m reg -i ^.*\\\\.example\\\\.com:(443|8443)$",
+      ),
     ).toBe(true);
     // The pattern's own port coverage replaces dst_port entirely.
     expect(config.includes("s0_port")).toBe(false);
@@ -376,7 +378,7 @@ describe("rules", () => {
   it("matches the host and the path separately", () => {
     const config = gen({ urlRules: buildUrlRules("GET https://a.com/pub/**") });
     expect(
-      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$"),
+      config.includes("acl s0_host hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\\\.com$"),
     ).toBe(true);
     expect(config.includes("acl s0_path path -m reg ^/pub/.*$")).toBe(true);
     expect(config.includes("acl s0_method method GET")).toBe(true);
@@ -387,7 +389,7 @@ describe("rules", () => {
 
   it("accepts a Host header with or without the port, since only the name is compared", () => {
     const config = gen({ httpsRules: ["a.com:443"] });
-    expect(config.includes("hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\.com$")).toBe(true);
+    expect(config.includes("hdr(host),host_only,regsub(\\.$,) -m reg -i ^a\\\\.com$")).toBe(true);
     expect(config.includes("acl s0_port dst_port 443")).toBe(true);
   });
 
@@ -434,7 +436,9 @@ describe("passthrough", () => {
   });
 
   it("routes tls rules by SNI, and by the port the rule names", () => {
-    expect(config.includes("acl tls0_sni req.ssl_sni -m reg -i ^db\\.example\\.com$")).toBe(true);
+    expect(config.includes("acl tls0_sni req.ssl_sni -m reg -i ^db\\\\.example\\\\.com$")).toBe(
+      true,
+    );
     // The port used to be dropped, so db.example.com:443 was permitted too.
     expect(config.includes("acl tls0_port dst_port 443")).toBe(true);
     expect(
@@ -449,7 +453,7 @@ describe("passthrough", () => {
     );
     expect(
       result.config.includes(
-        "acl tls0_sni var(txn.sni_port) -m reg -i ^.*\\.example\\.com:(5432|5433)$",
+        "acl tls0_sni var(txn.sni_port) -m reg -i ^.*\\\\.example\\\\.com:(5432|5433)$",
       ),
     ).toBe(true);
     // The pattern's own port coverage replaces dst_port entirely.
@@ -515,7 +519,7 @@ describe("passthrough", () => {
     expect(result.config.includes("set-var-fmt(txn.dst_str) %[dst]:%[dst_port]")).toBe(true);
     expect(
       result.config.includes(
-        "acl ip0_dst var(txn.dst_str) -m reg ^192\\.168\\.1\\.\\d+:(8080|8081)$",
+        "acl ip0_dst var(txn.dst_str) -m reg ^192\\\\.168\\\\.1\\\\.\\\\d+:(8080|8081)$",
       ),
     ).toBe(true);
     // The pattern's own port coverage replaces dst_port entirely.
@@ -578,12 +582,12 @@ describe("regex url rules", () => {
     expect(segment.includes("set-var(txn.s0_ok) bool(false)")).toBe(true);
     expect(
       segment.includes(
-        "set-var(txn.s0_ok) bool(true) if is_default_port { var(txn.host_bare) -m reg -i ^a\\.com$ }",
+        "set-var(txn.s0_ok) bool(true) if is_default_port { var(txn.host_bare) -m reg -i ^a\\\\.com$ }",
       ),
     ).toBe(true);
     expect(
       segment.includes(
-        "set-var(txn.s0_ok) bool(true) if { var(txn.host_full) -m reg -i ^a\\.com$ }",
+        "set-var(txn.s0_ok) bool(true) if { var(txn.host_full) -m reg -i ^a\\\\.com$ }",
       ),
     ).toBe(true);
     expect(segment.includes("acl s0_host var(txn.s0_ok) -m bool")).toBe(true);
@@ -599,7 +603,52 @@ describe("regex url rules", () => {
     });
     expect(result.warnings.length).toBe(0);
     const segment = frontendSegment(result.config, "https_in");
-    expect(segment.includes("-m reg -i ^a\\.com:(443|8443)$")).toBe(true);
+    expect(segment.includes("-m reg -i ^a\\\\.com:(443|8443)$")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Escaping for HAProxy's own config parser
+// ---------------------------------------------------------------------------
+describe("escaping rule text for the config parser", () => {
+  it("escapes a '#' in a path, which would otherwise comment the ACL short", () => {
+    // Verified against haproxy 3.2 by generating this config with the escape
+    // removed: it reports `regex '^/pkg(x' is invalid` for `^/pkg(x#y)$`, so
+    // everything from the `#` really is dropped. With a pattern that stays
+    // valid when cut short, nothing would report anything and the rule would
+    // quietly allow every path merely starting with `/pkg`.
+    const result = generateHaproxyConfig({
+      urlRules: buildUrlRules("GET ~^https://a\\.com/pkg#frag$"),
+    });
+    const segment = frontendSegment(result.config, "https_in");
+    expect(segment.includes("path -m reg ^/pkg\\#frag$")).toBe(true);
+    expect(segment.includes("path -m reg ^/pkg#frag$")).toBe(false);
+  });
+
+  it("escapes quotes, which the parser would otherwise read as opening a string", () => {
+    const result = generateHaproxyConfig({
+      urlRules: buildUrlRules(`GET ~^https://a\\.com/['"]$`),
+    });
+    const segment = frontendSegment(result.config, "https_in");
+    expect(segment.includes(`path -m reg ^/[\\'\\"]$`)).toBe(true);
+  });
+
+  it("doubles a backslash, since that is the one escape the parser folds", () => {
+    // `\.` reaches the regex engine as written, but `\\` collapses to `\`, so
+    // every backslash has to be doubled for the pair to survive together.
+    const result = generateHaproxyConfig({ httpsRules: ["a.com:443"] });
+    expect(result.config.includes("-m reg -i ^a\\\\.com$")).toBe(true);
+  });
+
+  it("escapes a '#' in an SNI rule and in a regex ip rule too", () => {
+    const result = generateHaproxyConfig({
+      tlsRules: ["~^a#b\\.com:443$"],
+      ipRules: ["~^10\\.0\\.0\\.1#x:443$"],
+    });
+    expect(result.config.includes("acl tls0_sni var(txn.sni_port) -m reg -i ^a\\#b")).toBe(true);
+    expect(
+      result.config.includes("acl ip0_dst var(txn.dst_str) -m reg ^10\\\\.0\\\\.0\\\\.1\\#x"),
+    ).toBe(true);
   });
 });
 
