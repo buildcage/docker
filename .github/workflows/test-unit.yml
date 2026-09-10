@@ -29,6 +29,9 @@ jobs:
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          # dist/** and action.yml are listed as what unit_test verifies, not
+          # as inputs to it: this job holds the only check that the committed
+          # bundles match the source.
           filters: |
             unit_test:
               - 'package.json'
@@ -40,12 +43,14 @@ jobs:
               - 'tsconfig.qjs.json'
               - 'vite.config.ts'
               - '.dockerignore'
-              - '.github/actions/setup-vp/**'
+              - '.github/actions/**'
               - '.github/workflows/test-unit.yml'
               - 'src/**'
               - 'docker/**'
               - 'report/**'
               - 'Makefile'
+              - 'dist/**'
+              - 'action.yml'
 
   unit_test:
     needs: changes
@@ -76,21 +81,7 @@ jobs:
       - name: Check (lint/format)
         run: vp check
 
-      - name: Build
-        run: vp run build
-
-      - name: Check dist is up to date
-        run: git diff --exit-code
-
-      - name: Check dist is free of the BUILDCAGE_BUILD_TEST_HOOKS test hooks
-        run: |
-          for f in dist/main.cjs dist/post.cjs report/dist/main.cjs; do
-            if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
-              echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read — rolldown's replacePlugin failed to substitute it (see rolldown.config.js), leaving a test-only hook reachable in a published action. Do not merge until this passes."
-              exit 1
-            fi
-            echo "confirmed: $f has no live BUILDCAGE_BUILD_TEST_HOOKS read — its test hooks are unreachable in this build."
-          done
+      - uses: ./.github/actions/verify-dist
 
       - name: Run unit tests
         run: make test_unit
