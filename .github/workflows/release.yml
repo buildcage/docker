@@ -12,7 +12,24 @@ on:
 permissions: {}
 
 jobs:
+  # A tag can't be moved once consumers pin to it, so the bundles are rebuilt
+  # and compared here rather than trusted from whatever PR landed them.
+  verify_dist:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-vp
+
+      - uses: ./.github/actions/verify-dist
+
   release:
+    needs: verify_dist
     runs-on: ubuntu-slim
     environment: release
     permissions:

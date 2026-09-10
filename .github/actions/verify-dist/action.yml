@@ -1,0 +1,37 @@
+name: Verify dist
+description: Rebuild the committed dist bundles and confirm they match the source
+# Callers must run actions/checkout and ./.github/actions/setup-vp first.
+
+runs:
+  using: composite
+  steps:
+    - name: Build
+      shell: bash
+      run: vp run build
+
+    - name: Check dist is up to date
+      shell: bash
+      run: git diff --exit-code
+
+    # git diff only sees tracked files, so a build that starts emitting a new
+    # chunk would pass it unnoticed.
+    - name: Check the build emitted no untracked output
+      shell: bash
+      run: |
+        UNTRACKED=$(git status --porcelain -- dist report/dist)
+        if [ -n "$UNTRACKED" ]; then
+          echo "::error::The build produced output that is not committed:"
+          echo "$UNTRACKED"
+          exit 1
+        fi
+
+    - name: Check dist is free of the BUILDCAGE_BUILD_TEST_HOOKS test hooks
+      shell: bash
+      run: |
+        for f in dist/main.cjs dist/post.cjs report/dist/main.cjs; do
+          if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
+            echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read — rolldown's replacePlugin failed to substitute it (see rolldown.config.js), leaving a test-only hook reachable in a published action. Do not merge until this passes."
+            exit 1
+          fi
+          echo "confirmed: $f has no live BUILDCAGE_BUILD_TEST_HOOKS read — its test hooks are unreachable in this build."
+        done
