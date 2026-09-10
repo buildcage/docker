@@ -63,8 +63,15 @@ describe("markdownTable", () => {
       );
     });
 
-    it("escapes backticks, asterisks and underscores", () => {
-      expect(oneCell("a`b`c*d*e_f_")).toBe("| a\\`b\\`c\\*d\\*e\\_f\\_ |");
+    it("escapes backticks", () => {
+      expect(oneCell("a`b`c")).toBe("| a\\`b\\`c |");
+    });
+
+    it("leaves emphasis markers alone, the universal engine's own filler being one", () => {
+      expect(oneCell("x__-__T__buildcage__ALLOWED___HTTPS___f.example.com:443")).toBe(
+        "| x__-__T__buildcage__ALLOWED___HTTPS___f.example.com:443 |",
+      );
+      expect(oneCell("a*b*c")).toBe("| a*b*c |");
     });
 
     it("escapes a backslash without double-escaping what follows", () => {
