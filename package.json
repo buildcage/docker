@@ -30,7 +30,7 @@
     "fast-check": "^4.9.0",
     "rolldown": "^1.2.0",
     "typescript": "^7.0.2",
-    "vite-plus": "^0.2.5"
+    "vite-plus": "^0.3.0"
   },
   "devEngines": {
     "packageManager": {
