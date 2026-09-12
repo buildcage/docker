@@ -55,7 +55,7 @@ The steps below use `inspect`. [Engines](#engines) compares the two in full.
 
 ```yaml
 - name: Start Buildcage in audit mode
-  uses: buildcage/docker@9db933f44e0dd4821ad7eea6f58f3b7bfd2f2db5 # v3.1.6
+  uses: buildcage/docker@c6565b50825fcbc6e92de3c0b2702cb894934ca2 # v3.2.0
   with:
     proxy_mode: audit # Log every destination, block nothing
     proxy_engine: inspect # Record the method and URL of every request
@@ -73,7 +73,7 @@ The steps below use `inspect`. [Engines](#engines) compares the two in full.
 
 - name: Show Buildcage report
   if: always()
-  uses: buildcage/docker/report@9db933f44e0dd4821ad7eea6f58f3b7bfd2f2db5 # v3.1.6
+  uses: buildcage/docker/report@c6565b50825fcbc6e92de3c0b2702cb894934ca2 # v3.2.0
 ```
 
 The [report action](#report-action) writes every destination the build contacted to the Job Summary:
@@ -89,7 +89,7 @@ Paste that allowlist into the setup step and switch the mode:
 
 ```yaml
 - name: Start Buildcage in restrict mode
-  uses: buildcage/docker@9db933f44e0dd4821ad7eea6f58f3b7bfd2f2db5 # v3.1.6
+  uses: buildcage/docker@c6565b50825fcbc6e92de3c0b2702cb894934ca2 # v3.2.0
   with:
     proxy_mode: restrict
     proxy_engine: inspect
@@ -399,7 +399,7 @@ optionally fails the job when blocked connections are found.
 ```yaml
 - name: Show Buildcage report
   if: always()
-  uses: buildcage/docker/report@9db933f44e0dd4821ad7eea6f58f3b7bfd2f2db5 # v3.1.6
+  uses: buildcage/docker/report@c6565b50825fcbc6e92de3c0b2702cb894934ca2 # v3.2.0
 ```
 
 Every input is optional.
