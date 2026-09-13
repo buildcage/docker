@@ -556,6 +556,20 @@ digest-match cosign performs against its target image argument.
 | `@v2` (major-floating)         | SAN matches `...@refs/tags/v2(\.\|$)`                       | `certificateIdentityURI` regexp                                        |
 | A branch name, or a local path | **Hard fail**: pin to a version tag or commit SHA           |                                                                        |
 
+The identity covers the git ref a release was built from, and nothing beyond it. Two things are
+therefore outside it:
+
+- **Which engine's image a tag names.** Every engine of one release is built by the same workflow
+  from the same ref, so their images share one identity. A `3.1.7-inspect` tag repointed at that
+  release's `universal` image verifies, and the rules only that engine can enforce then go
+  unenforced without an error.
+- **Which release a floating tag resolves to.** `@v3` accepts any `v3.x`, so a Docker tag
+  repointed at an older release in the same major line verifies as well as the newest one.
+
+Both need registry write access on this repository. A commit-SHA pin closes the second (OID 1.13
+matches the pinned commit byte for byte and no other release can satisfy it); nothing in the
+identity closes the first.
+
 For the strongest guarantee, pin to a **commit SHA**:
 
 ```yaml
@@ -600,8 +614,9 @@ Verification establishes where the image came from. Here is what it leaves uncov
   signature must cover that same digest, and the `docker pull` is digest-pinned. Content substituted
   at any point after the tag lookup therefore makes verification **fail** rather than falsely pass,
   leaving no time-of-check/time-of-use gap. What remains is the tag lookup itself: an attacker with
-  write access to the registry could repoint the tag, but only at an image genuinely signed for the
-  same pinned commit, in practice another image from that same release.
+  write access to the registry could repoint the tag at any other image the same identity covers:
+  another engine's image from the same release, or, under a floating pin, an older release in the
+  same major line. See [Identity matching by reference type](#identity-matching-by-reference-type).
 
 - **A build-time test hook exists, but not in what you run.**
   `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` produces a `dist/` where a `BUILDCAGE_LOCAL_IMAGE_REF`
