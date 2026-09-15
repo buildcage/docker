@@ -334,6 +334,9 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
     // This process parses traffic the workload controls, so it must not be root.
     "    user haproxy",
     "    group haproxy",
+    // Left to its default this follows the runner's own IPv6 route. The ipv4
+    // on each do-resolve below does not constrain the query; this does.
+    "    dns-accept-family ipv4",
     "    # normalize-uri is still marked experimental upstream.",
     "    expose-experimental-directives",
     "    tune.ssl.default-dh-param 2048",

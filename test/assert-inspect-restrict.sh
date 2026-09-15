@@ -44,6 +44,7 @@ echo "[refused] recorded with the method and the full URL, before any origin was
 assert_logged GET "https://allowed.example.com/private/secret" 403
 assert_logged POST "https://allowed.example.com/public/pkg.tgz" 403
 assert_logged GET "https://absent.example.com/" 502
+assert_logged GET "https://v6only.example.com/" 502
 assert_logged GET "https://attacker.wildcard.example.com/private/secret" 403
 assert_logged GET "https://blocked.example.com:9443/private/secret" 403
 assert_logged GET "https://blocked.example.com/public/pkg.tgz" 403
@@ -292,6 +293,7 @@ echo "[report] Blocked Hosts, including a name that never reached the proxy:"
 if grep -qF "### 🚫 Blocked Hosts" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| blocked.example.com:443 | HTTPS | not-allowed |" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| absent.example.com:443 | HTTPS | dns-failed |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| v6only.example.com:443 | HTTPS | dns-failed |" <<< "$REPORT_MARKDOWN" \
   && grep -qiF "| secret-in-a-name.attacker.example | DNS | dns-not-allowed |" <<< "$REPORT_MARKDOWN"; then
   pass "the table separates a refused request, an unresolvable name and a refused name"
 else

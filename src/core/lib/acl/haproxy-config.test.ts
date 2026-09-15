@@ -51,6 +51,15 @@ describe("load-bearing directives", () => {
     expect(config.includes("\n    group haproxy\n")).toBe(true);
   });
 
+  it("states the resolver's address family, leaving it nothing to read off the host", () => {
+    expect(config.includes("\n    dns-accept-family ipv4\n")).toBe(true);
+    // A do-resolve asking for a family the global setting never queries comes
+    // back with nothing, so the two have to agree.
+    const resolves = config.split("\n").filter((l) => l.includes("do-resolve("));
+    expect(resolves.length > 0).toBe(true);
+    expect(resolves.every((l) => l.includes(",ipv4)"))).toBe(true);
+  });
+
   it("classifies by the first bytes, so no port is declared in advance", () => {
     // This is what lets audit record everything without being configured.
     expect(config.includes("acl is_tls req.ssl_hello_type 1")).toBe(true);
