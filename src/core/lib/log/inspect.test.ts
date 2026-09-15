@@ -86,6 +86,25 @@ describe("scanInspectLog", () => {
     ]);
   });
 
+  it("counts an origin that timed out as a refusal, but not one that answered late", async () => {
+    // haproxy writes the 503 and the 504 itself here, exactly as it does for
+    // `SC`; whether the origin refused the connection or simply went quiet is
+    // all that separates the two. `cD` is the build hanging up on a response
+    // it was already receiving, which the origin did send.
+    const lines = [
+      "buildcage 1 https GET 503 0 ts=sC reason=- dst=1.1.1.1:443 https://a.com/",
+      "buildcage 2 https GET 504 0 ts=sH reason=- dst=1.1.1.1:443 https://b.com/",
+      "buildcage 3 https GET 200 56 ts=cD reason=- dst=1.1.1.1:443 https://c.com/",
+    ];
+    const events = await parse(lines);
+    expect(events.map((e) => e.reason)).toStrictEqual([
+      "origin-unreachable",
+      "origin-no-response",
+      undefined,
+    ]);
+    expect(events.map((e) => e.status)).toStrictEqual([undefined, undefined, 200]);
+  });
+
   it("keeps the generic reason for a termination state it does not know", async () => {
     const lines = ["buildcage 1 https GET 403 0 ts=P reason=- dst=1.1.1.1:443 https://a.com/"];
     expect((await parse(lines))[0].reason).toBe("not-allowed");
@@ -115,12 +134,14 @@ describe("scanInspectLog", () => {
       "buildcage 2 pass tcp 0 ts=PR reason=internal-address dst=10.0.0.5:5432 sni=db.example.com",
       "buildcage 3 pass tcp 0 ts=PR reason=- dst=10.0.0.5:5432 sni=-",
       "buildcage 4 pass tcp 0 ts=SC reason=- dst=10.0.0.5:5432 sni=-",
-      "buildcage 5 pass tcp 0 ts=SD reason=- dst=10.0.0.5:5432 sni=-",
+      "buildcage 5 pass tcp 0 ts=sC reason=- dst=10.0.0.5:5432 sni=-",
+      "buildcage 6 pass tcp 0 ts=SD reason=- dst=10.0.0.5:5432 sni=-",
     ];
     expect((await parse(lines)).map((e) => e.reason)).toStrictEqual([
       "dns-failed",
       "internal-address",
       "not-allowed",
+      "origin-unreachable",
       "origin-unreachable",
       "origin-aborted",
     ]);
