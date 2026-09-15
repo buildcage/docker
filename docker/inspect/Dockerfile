@@ -67,17 +67,26 @@ LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label — must match src/core/lib/docker/report-source.ts.
 
-# haproxy carries what this engine needs in one binary: it tells a TLS
-# handshake from a plain request by its first bytes, generates certificates for
-# an SNI, resolves names itself, and normalises a path before matching it.
 RUN apk add --no-cache \
       s6-overlay \
-      haproxy \
       openssl \
       iptables \
       curl \
       quickjs-ng \
       rsync
+
+# haproxy carries what this engine needs in one binary: it tells a TLS
+# handshake from a plain request by its first bytes, generates certificates for
+# an SNI, resolves names itself, and normalises a path before matching it.
+#
+# The BuildKit base is a release behind and carries HAProxy 3.2, whose resolver
+# defaults differ from the ones the generated config is written against. A
+# separate apk call so the extra repository is reachable for this package
+# alone. Drop it once the base's own Alpine carries 3.4 or newer; nothing here
+# tracks the URL.
+RUN apk add --no-cache \
+      --repository https://dl-cdn.alpinelinux.org/alpine/v3.24/main \
+      haproxy
 
 ENV S6_KEEP_ENV=1
 ENV S6_LOGGING=0

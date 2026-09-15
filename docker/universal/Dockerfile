@@ -49,11 +49,19 @@ LABEL org.opencontainers.image.title="buildcage" \
 
 RUN apk add --no-cache \
       s6-overlay \
-      haproxy \
       dnsmasq \
       iptables \
       curl \
       quickjs-ng
+
+# The BuildKit base is a release behind and carries HAProxy 3.2, whose resolver
+# defaults differ from the ones the generated config is written against. A
+# separate apk call so the extra repository is reachable for this package
+# alone. Drop it once the base's own Alpine carries 3.4 or newer; nothing here
+# tracks the URL.
+RUN apk add --no-cache \
+      --repository https://dl-cdn.alpinelinux.org/alpine/v3.24/main \
+      haproxy
 
 ENV S6_KEEP_ENV=1
 ENV S6_LOGGING=0
