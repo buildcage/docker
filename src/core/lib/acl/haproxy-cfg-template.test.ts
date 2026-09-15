@@ -83,13 +83,17 @@ describe("universal engine's internal-address guard stays in sync with INTERNAL_
 });
 
 /** Every resolver tuning directive in a config, without the nameserver lines
- *  and section name the two engines legitimately differ on. */
+ *  and section name the two engines legitimately differ on. dns-accept-family
+ *  is in `global` rather than here, but it decides what a resolution may
+ *  return, so it belongs in the comparison. */
 function resolverTuning(config: string): string[] {
   return config
     .split("\n")
     .map((l) => l.trim())
     .filter((l) =>
-      /^(hold|resolve_retries|timeout (retry|resolve)|accepted_payload_size)\b/.test(l),
+      /^(dns-accept-family|hold|resolve_retries|timeout (retry|resolve)|accepted_payload_size)\b/.test(
+        l,
+      ),
     )
     .sort();
 }

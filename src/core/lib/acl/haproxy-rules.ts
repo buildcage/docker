@@ -25,10 +25,10 @@ export const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`;
  * equivalent, fc00::/7 ULA) is allowed, since a name pointing at an internal
  * mirror is legitimate. An address named directly in a rule is exempt.
  *
- * do-resolve is IPv4-only today (see haproxy-config.ts), so ::1/fe80::/10
- * can't currently be produced by a resolution -- kept anyway, at zero cost,
- * for when that changes; fc00::/7 is deliberately absent rather than kept
- * the same way, since (unlike loopback/link-local) it is never-public but
+ * A resolution produces an IPv4 address only, enforced by `dns-accept-family
+ * ipv4` in the generated global section. ::1/fe80::/10 are kept anyway, at
+ * zero cost, for if that changes; fc00::/7 is deliberately absent rather than
+ * kept the same way, since (unlike loopback/link-local) it is never-public but
  * not never-legitimate.
  *
  *   0.0.0.0/8        this host          169.254.0.0/16  link-local (AWS/GCP/Azure IMDS)

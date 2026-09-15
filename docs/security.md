@@ -282,7 +282,11 @@ network, so what it fetches for itself is never filtered: see
   UDP and QUIC have no exit path at all.
 - **IPv6 is not a way around any of this.** Equivalent ip6tables rules drop forwarded IPv6, the
   resolver answers with the unspecified address (`::`) for every query, and the proxy reaches
-  allowed names over IPv4 only.
+  allowed names over IPv4 only. That last part is stated in the config (`dns-accept-family ipv4`)
+  rather than left to HAProxy's default, which decides from the runner's own IPv6 default route and
+  would make what a name resolves to differ between runners. What it costs is that an allowed name
+  with AAAA records and no A record never resolves here: it is refused on every attempt, in `audit`
+  too, reported as `dns-failed`, and no rule can clear it.
 
 ### Attempts to bypass it
 

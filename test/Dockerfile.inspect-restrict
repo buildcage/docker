@@ -228,6 +228,13 @@ RUN echo "=== [Name does not resolve] ===" && \
     echo "status=$CODE" && \
     [ "$CODE" = "502" ] || (echo "FAILED: expected 502" && exit 1)
 
+# [Name has AAAA records only]
+# Refused like an absent name, and on every attempt rather than sometimes.
+RUN echo "=== [Name has AAAA records only] ===" && \
+    CODE=$($C https://v6only.example.com/) && \
+    echo "status=$CODE" && \
+    [ "$CODE" = "502" ] || (echo "FAILED: expected 502" && exit 1)
+
 # [Name outside the allowlist is not even looked up]
 # The resolver answers it locally, so the build cannot learn its real address;
 # the request lands on the proxy and is refused there with its URL recorded.
