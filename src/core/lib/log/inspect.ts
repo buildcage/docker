@@ -72,14 +72,17 @@ function timeOf(stamp: string): number {
 }
 
 /**
- * Whether buildcage ended the exchange, rather than an origin answering.
+ * Whether the response the build saw was buildcage's own, not an origin's.
  *
  * The status cannot say: an origin answers 403 or 503 of its own accord too.
  * HAProxy's termination state can: `P` for a deny/reject, `S` for a backend
- * unreachable or unverified, `-` for a relayed response.
+ * unreachable or unverified, `s` for the same reached by timing out instead,
+ * `-` for a relayed response. A client-side timeout (`c`) is the build
+ * dropping its own connection, which the proxy never stood in the way of.
  */
 function isRefusal(terminationState: string): boolean {
-  return terminationState.startsWith("P") || terminationState.startsWith("S");
+  const cause = terminationState[0];
+  return cause === "P" || cause === "S" || cause === "s";
 }
 
 /**
