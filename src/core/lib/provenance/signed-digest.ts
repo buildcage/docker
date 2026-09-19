@@ -1,8 +1,8 @@
 import { VerifyImageError } from "./errors.ts";
 
 // Encode a string as DER UTF8String for Fulcio OID extension values.
-// sigstore-js compares the raw OCTET STRING bytes, so the DER tag (0x0C)
-// the DER tag (0x0C) and length prefix. Assumes len < 128.
+// sigstore-js compares the raw OCTET STRING bytes, so the value carries the
+// DER tag (0x0C) and length prefix. Assumes len < 128.
 export const derUtf8 = (s: string): string => String.fromCharCode(0x0c, s.length) + s;
 
 export interface DsseBundle {

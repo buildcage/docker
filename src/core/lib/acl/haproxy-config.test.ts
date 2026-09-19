@@ -169,8 +169,8 @@ describe("resolving, which only a request the rules already admitted reaches", (
   it("gates the passthrough's do-resolve on the same SNI match that admits it", () => {
     // Not just ordering: a passthrough rule has no path or method, so this
     // flag, set only when an SNI already matched, is the entire rule
-    // check do-resolve sits behind. A request no rule admits must never
-    // reach it, which is the same invariant as the host+path+method check
+    // check do-resolve sits behind. A request no rule admits must never reach
+    // it, which is the same invariant as the host+path+method check above.
     const tlsRuleSet = FULL_CONFIG.indexOf("set-var(txn.tlsrule)");
     const resolveLine = FULL_CONFIG.split("\n").find((l) =>
       l.includes("do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni"),

@@ -147,8 +147,8 @@ async function bundleFromFallbackTag(client: RegistryClient, digest: string): Pr
 }
 
 /**
- * Read a bundle out of the manifest a descriptor named.
- * layer with mediaType === BUNDLE_MEDIA_TYPE.
+ * Read a bundle out of the manifest a descriptor named: its first layer with
+ * mediaType === BUNDLE_MEDIA_TYPE.
  *
  * Every refusal is transient, a 404 included: a descriptor just named this
  * manifest, so the registry not serving it contradicts what it said.

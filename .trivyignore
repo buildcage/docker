@@ -135,7 +135,7 @@ CVE-2026-39822
 CVE-2026-42505
 
 # Go stdlib/x/net CVEs requiring a TLS/HTTP server, or parsing of untrusted XML/HTML/DNS.
-# Transparent-engine binaries (CNI plugins, buildkit-runc, buildctl) never run such code,
+# Transparent-engine binaries (CNI plugins, buildkit-runc, buildctl) never run such code;
 # HAProxy/dnsmasq (not Go) handle all untrusted RUN step traffic there. In the explicit
 # engine, buildkitd's built-in --proxy-network MITM proxy (verified against moby/buildkit
 # v0.32.0's util/network/proxyprovider/provider_linux.go) forces client-facing TLS to
@@ -161,7 +161,7 @@ CVE-2026-56862
 
 # golang.org/x/mod: GOPROXY/GOSUMDB sumdb-tile verification can be forged/bypassed,
 # compromising `go build`/`go mod tidy` supply-chain integrity. buildkitd links this
-# library but never itself runs `go mod`/`go build` against untrusted input at runtime,
+# library but never itself runs `go mod`/`go build` against untrusted input at runtime;
 # any such invocation happens inside the RUN step's own toolchain, already outside
 # buildcage's proxy trust boundary.
 CVE-2026-56865

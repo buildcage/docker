@@ -80,6 +80,7 @@ describe("passthrough", () => {
     // Not decrypting is no reason to let the client pick the destination: a
     // ClientHello carrying an allowed name could otherwise be sent anywhere,
     // turning any TLS rule into a raw tunnel to an address of the build's
+    // choosing.
     expect(
       config.includes(
         "tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.tlsrule) -m found }",

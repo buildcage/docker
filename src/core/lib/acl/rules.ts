@@ -45,7 +45,6 @@ export interface ACLRules {
 
 /**
  * Rules are kept as written (wildcard format) and validated eagerly.
- * (wildcard format), validated eagerly.
  */
 export function buildACLRules({
   httpsRulesInput,
