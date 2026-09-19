@@ -12,7 +12,7 @@ import { buildVerifyOptions } from "./verify-policy.ts";
 // buildVerifyOptions
 // ---------------------------------------------------------------------------
 
-describe("buildVerifyOptions – properties", () => {
+describe("buildVerifyOptions: properties", () => {
   // SHA pin always produces certificateOIDs; the SAN URI ends with 'v' (accepts any v-tag).
   it("40-char hex SHA always returns certificateOIDs and a compilable SAN regex", () => {
     fc.assert(

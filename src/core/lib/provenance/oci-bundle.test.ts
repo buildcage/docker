@@ -41,7 +41,7 @@ const REFERRERS_HIT = okJson({
 /** A registry with no Referrers API at all. */
 const REFERRERS_MISS = failsWith(404);
 
-describe("fetchBundle — Referrers API path", () => {
+describe("fetchBundle: Referrers API path", () => {
   const bundleObj = { mediaType: BUNDLE_TYPE, verificationMaterial: {} };
 
   it("returns bundle when found via Referrers API (3-request flow: referrers → manifest → blob)", async () => {
@@ -72,7 +72,7 @@ describe("fetchBundle — Referrers API path", () => {
   });
 });
 
-describe("fetchBundle — fallback tag path", () => {
+describe("fetchBundle: fallback tag path", () => {
   const bundleObj = { mediaType: BUNDLE_TYPE };
   const bundleBlob = { [`/blobs/${BLOB_DIGEST}`]: okJson(bundleObj) };
 
@@ -155,7 +155,7 @@ describe("fetchBundle — fallback tag path", () => {
 // a registry that answers oddly and an unverified image being pulled anyway, so
 // each case pins the code that comes back, not just that something threw.
 
-describe("fetchBundle — fallback tag refusals", () => {
+describe("fetchBundle: fallback tag refusals", () => {
   const tagIs = (response: Route) =>
     stubRegistry({ [REFERRERS_PATH]: REFERRERS_MISS, [TAG_PATH]: response });
 
@@ -192,7 +192,7 @@ describe("fetchBundle — fallback tag refusals", () => {
   });
 });
 
-describe("fetchBundle — descriptors the referrers tag index offers but cannot satisfy", () => {
+describe("fetchBundle: descriptors the referrers tag index offers but cannot satisfy", () => {
   /** Referrers miss, then a tag index holding exactly these descriptors. */
   const indexOf = (manifests: unknown[], subManifest?: Route) =>
     stubRegistry({
@@ -231,7 +231,7 @@ describe("fetchBundle — descriptors the referrers tag index offers but cannot 
   });
 });
 
-describe("fetchBundle — bundle manifest refusals", () => {
+describe("fetchBundle: bundle manifest refusals", () => {
   const manifestIs = (response: Route) =>
     stubRegistry({
       [REFERRERS_PATH]: REFERRERS_HIT,
@@ -256,7 +256,7 @@ describe("fetchBundle — bundle manifest refusals", () => {
   });
 });
 
-describe("fetchBundle — bundle blob refusals", () => {
+describe("fetchBundle: bundle blob refusals", () => {
   /** Referrers hit, bundle manifest hit, then the blob response under test. */
   const blobIs = (response: Route) =>
     stubRegistry({

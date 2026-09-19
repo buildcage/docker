@@ -58,7 +58,7 @@ function makeBundle(signedDigest: string, { payloadType, subjects }: MakeBundleO
   return { dsseEnvelope: dsse };
 }
 
-describe("assertSignedDigest — simple-signing (legacy)", () => {
+describe("assertSignedDigest: simple-signing (legacy)", () => {
   it("passes when the signed digest matches the expected digest", () => {
     expect(() => assertSignedDigest(makeBundle(DIGEST), DIGEST)).not.toThrow();
   });
@@ -122,7 +122,7 @@ describe("assertSignedDigest — simple-signing (legacy)", () => {
 
 const IN_TOTO = "application/vnd.in-toto+json";
 
-describe("assertSignedDigest — in-toto Statement v1 (cosign --new-bundle-format)", () => {
+describe("assertSignedDigest: in-toto Statement v1 (cosign --new-bundle-format)", () => {
   it("passes when subject[0].digest.sha256 matches the expected digest", () => {
     expect(() =>
       assertSignedDigest(makeBundle(DIGEST, { payloadType: IN_TOTO }), DIGEST),

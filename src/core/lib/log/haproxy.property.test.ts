@@ -13,7 +13,7 @@ import { aggregate } from "./aggregate.ts";
 // scanHaproxyLog
 // ---------------------------------------------------------------------------
 
-describe("scanHaproxyLog – properties", () => {
+describe("scanHaproxyLog: properties", () => {
   // A well-formed log line always round-trips into the right bucket:
   // BLOCKED always lands in `blocked`; ALLOWED/AUDIT lands in `passed` only
   // if it matches the decision `isAudit` selects, otherwise it's dropped.
@@ -87,7 +87,7 @@ describe("scanHaproxyLog – properties", () => {
 // aggregate
 // ---------------------------------------------------------------------------
 
-describe("aggregate – properties", () => {
+describe("aggregate: properties", () => {
   // aggregate sorts by Number(port) as a tiebreaker. When port is non-numeric,
   // Number(port) is NaN; the sort must not throw.
   it("non-numeric port values never cause aggregate to throw", () => {

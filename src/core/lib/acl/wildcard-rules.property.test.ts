@@ -12,7 +12,7 @@ import { convertRule, buildRules, parseAndValidateRules } from "./wildcard-rules
 // convertRule / wildcardToRegex
 // ---------------------------------------------------------------------------
 
-describe("convertRule – properties", () => {
+describe("convertRule: properties", () => {
   // For a plain domain (no wildcards, no regex metacharacters), the generated
   // regex must match the original pattern and must not match a subdomain prefix.
   it("exact pattern round-trips: regex matches original and rejects subdomain prefix", () => {
@@ -78,7 +78,7 @@ describe("convertRule – properties", () => {
 // buildRules
 // ---------------------------------------------------------------------------
 
-describe("buildRules – properties", () => {
+describe("buildRules: properties", () => {
   // N valid rules joined with any whitespace separator always produce length N.
   it("N valid rules joined by any whitespace always return an array of length N", () => {
     const validRule = fc
@@ -103,7 +103,7 @@ describe("buildRules – properties", () => {
 // parseAndValidateRules
 // ---------------------------------------------------------------------------
 
-describe("parseAndValidateRules – properties", () => {
+describe("parseAndValidateRules: properties", () => {
   it("returns the same tokens buildRules derives its length from, unconverted", () => {
     const validRule = fc
       .tuple(

@@ -141,7 +141,7 @@ async function drain(iterable: AsyncIterable<string>): Promise<string[]> {
 }
 
 describe("createDocker readFileLines", () => {
-  it("is lazy — nothing spawns until iteration actually starts", () => {
+  it("is lazy: nothing spawns until iteration actually starts", () => {
     const { spawnDocker, calls } = fakeSpawn();
     createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current");
     expect(calls).toStrictEqual([]);
@@ -191,7 +191,7 @@ describe("createDocker readFileLines", () => {
     // .next() runs synchronously through spawnDocker(args), so the child
     // already exists once this returns.
     const firstLine = iterator.next();
-    children[0].stdout.write("line one\nline two\n"); // never finish()'d — simulates a still-running process
+    children[0].stdout.write("line one\nline two\n"); // never finish()'d, so this simulates a still-running process
     expect((await firstLine).value).toBe("line one");
     await iterator.return?.(undefined); // what `for await...of` does on an early break
     expect(children[0].killed).toBeTruthy();

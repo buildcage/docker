@@ -95,7 +95,7 @@ describe("foldExpectedBlockedRows", () => {
   });
 });
 
-describe("foldExpectedBlockedRows — grouping key and tie-break", () => {
+describe("foldExpectedBlockedRows: grouping key and tie-break", () => {
   const anyRow = (overrides: Partial<HostTableRow> = {}): HostTableRow => ({
     host: "a.example.com",
     port: "-",
@@ -130,7 +130,7 @@ describe("foldExpectedBlockedRows — grouping key and tie-break", () => {
   });
 });
 
-describe("foldExpectedBlockedRows — two groups one rule produced", () => {
+describe("foldExpectedBlockedRows: two groups one rule produced", () => {
   // One rule can cover a refused name and a refused connection at once, which
   // is why ruleType is part of the grouping key: same rule, same count, two rows.
   it("keeps both groups when only ruleType differs", () => {
@@ -158,7 +158,7 @@ describe("foldExpectedBlockedRows — two groups one rule produced", () => {
   });
 });
 
-describe("foldExpectedBlockedRows — a tie broken the other way", () => {
+describe("foldExpectedBlockedRows: a tie broken the other way", () => {
   // The tie-break has to hold whichever order the rows arrived in, so this is
   // the mirror of the case above.
   it("keeps rules in order when they already are", () => {

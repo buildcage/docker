@@ -8,7 +8,7 @@ const REAL_DENY_LINE =
 const REAL_DENY_LINE_WITH_PATH =
   'time="2026-07-05T02:26:21Z" level=debug msg="Evaluated source policy" error="source \\"https://dl-cdn.alpinelinux.org:443/alpine/v3.20/main/aarch64/APKINDEX.tar.gz\\" denied by policy: source denied by policy" mutated=false orig="identifier:\\"https://dl-cdn.alpinelinux.org:443/alpine/v3.20/main/aarch64/APKINDEX.tar.gz\\"" ref="https://dl-cdn.alpinelinux.org:443/alpine/v3.20/main/aarch64/APKINDEX.tar.gz" updated="https://dl-cdn.alpinelinux.org:443/alpine/v3.20/main/aarch64/APKINDEX.tar.gz"';
 
-describe("scanBuildkitdLog — blocked", () => {
+describe("scanBuildkitdLog: blocked", () => {
   it("aggregates a real denial line (no explicit port in URL)", async () => {
     const result = await scanBuildkitdLog(REAL_DENY_LINE.split("\n"));
     expect(result.blocked).toStrictEqual([
@@ -64,7 +64,7 @@ describe("scanBuildkitdLog — blocked", () => {
     expect(result.blocked).toStrictEqual([]);
   });
 
-  it("ignores non-http(s) identifiers (defensive — buildcage never denies these)", async () => {
+  it("ignores non-http(s) identifiers (defensive: buildcage never denies these)", async () => {
     const line =
       'time="2026-07-05T00:00:00Z" level=debug msg="Evaluated source policy" error="source \\"docker-image://docker.io/library/alpine:latest\\" denied by policy: source denied by policy" ref="docker-image://docker.io/library/alpine:latest"';
     const result = await scanBuildkitdLog(line.split("\n"));
@@ -89,7 +89,7 @@ describe("scanBuildkitdLog — blocked", () => {
   });
 });
 
-describe("scanBuildkitdLog — denied (chronological, unaggregated)", () => {
+describe("scanBuildkitdLog: denied (chronological, unaggregated)", () => {
   it("parses a real denial line's url and timestamp, in chronological order", async () => {
     const logText = [REAL_DENY_LINE, REAL_DENY_LINE_WITH_PATH].join("\n");
     const result = await scanBuildkitdLog(logText.split("\n"));
@@ -102,7 +102,7 @@ describe("scanBuildkitdLog — denied (chronological, unaggregated)", () => {
     ]);
   });
 
-  it("does not aggregate — repeated denials for the same URL each get their own entry", async () => {
+  it("does not aggregate: repeated denials for the same URL each get their own entry", async () => {
     const logText = [REAL_DENY_LINE, REAL_DENY_LINE].join("\n");
     const result = await scanBuildkitdLog(logText.split("\n"));
     expect(result.denied.length).toBe(2);
@@ -116,7 +116,7 @@ describe("scanBuildkitdLog — denied (chronological, unaggregated)", () => {
   });
 });
 
-describe("scanBuildkitdLog — hasNonDenialContent", () => {
+describe("scanBuildkitdLog: hasNonDenialContent", () => {
   it("returns false for empty log text", async () => {
     const result = await scanBuildkitdLog("".split("\n"));
     expect(result.hasNonDenialContent).toBe(false);

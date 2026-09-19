@@ -25,7 +25,7 @@ function makeSAN(ref: string) {
 // The generated options are checked by converting certificateIdentityURI to a
 // RegExp and matching sample SAN strings, the same test cosign would apply.
 
-describe("buildVerifyOptions — version tag", () => {
+describe("buildVerifyOptions: version tag", () => {
   function getOpts(ref: string): VerifyBundleOptions {
     const opts = buildVerifyOptions({ actionRef: ref, actionRepo: REPO });
     expect(opts, `expected non-null options for ref "${ref}"`).toBeTruthy();
@@ -99,7 +99,7 @@ describe("buildVerifyOptions — version tag", () => {
   });
 });
 
-describe("buildVerifyOptions — SHA pin", () => {
+describe("buildVerifyOptions: SHA pin", () => {
   const pinSha = "a".repeat(40);
 
   it("sets certificateOIDs for OID 1.13 with DER UTF8String-encoded SHA", () => {
@@ -131,7 +131,7 @@ describe("buildVerifyOptions — SHA pin", () => {
   });
 });
 
-describe("buildVerifyOptions — unverifiable refs", () => {
+describe("buildVerifyOptions: unverifiable refs", () => {
   it("returns null for a branch ref", () => {
     expect(buildVerifyOptions({ actionRef: "main", actionRepo: REPO })).toBe(null);
   });

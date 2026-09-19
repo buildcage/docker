@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { deriveProjectName, resolveProjectName } from "./compose-project-name.ts";
 
 describe("deriveProjectName", () => {
-  it("is deterministic — same input always derives the same project name", () => {
+  it("is deterministic: same input always derives the same project name", () => {
     expect(deriveProjectName("buildcage-proxy-abcd1234")).toBe(
       deriveProjectName("buildcage-proxy-abcd1234"),
     );

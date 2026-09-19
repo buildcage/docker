@@ -14,7 +14,7 @@ const blockedRow = {
   expected: false,
 };
 
-describe("renderReportMarkdown — universal", () => {
+describe("renderReportMarkdown: universal", () => {
   const base: UniversalReportData = {
     engine: "universal",
     parameters: reportParams(),
@@ -151,7 +151,7 @@ describe("renderReportMarkdown — universal", () => {
   });
 });
 
-describe("renderReportMarkdown — explicit", () => {
+describe("renderReportMarkdown: explicit", () => {
   const base: ExplicitReportData = {
     engine: "explicit",
     parameters: reportParams(),
@@ -200,7 +200,7 @@ describe("renderReportMarkdown — explicit", () => {
   });
 });
 
-describe("renderReportMarkdown — inspect", () => {
+describe("renderReportMarkdown: inspect", () => {
   const request: TrafficEvent = {
     time: 1787471975,
     action: "allow",

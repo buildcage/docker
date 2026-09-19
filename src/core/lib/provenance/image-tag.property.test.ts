@@ -12,7 +12,7 @@ import { imageTagFromRef } from "./image-tag.ts";
 // publishes the plain tag, matching the pre-multi-engine tagging scheme.
 const suffixFor = (engine: string) => (engine === "explicit" ? "-explicit" : "");
 
-describe("imageTagFromRef – properties", () => {
+describe("imageTagFromRef: properties", () => {
   it("40-char hex SHA always produces sha-<lowercase sha>, suffixed only for explicit", () => {
     fc.assert(
       fc.property(

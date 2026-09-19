@@ -12,7 +12,7 @@ import {
 // wildcardToRegex
 // ---------------------------------------------------------------------------
 describe("wildcardToRegex", () => {
-  it("exact domain — dots escaped", () => {
+  it("exact domain: dots escaped", () => {
     expect(wildcardToRegex("example.com:443")).toBe("example\\.com:443");
   });
 
@@ -59,7 +59,7 @@ describe("convertRule", () => {
     expect(convertRule("*.example.com:8443")).toBe("^[^.]+\\.example\\.com:8443$");
   });
 
-  it("regex rule (~ prefix) — returned as-is without ~", () => {
+  it("regex rule (~ prefix): returned as-is without ~", () => {
     expect(convertRule("~^custom\\.regex:443$")).toBe("^custom\\.regex:443$");
   });
 
@@ -105,7 +105,7 @@ describe("convertRule", () => {
 // ---------------------------------------------------------------------------
 // convertRule: regex behavior (match / non-match)
 // ---------------------------------------------------------------------------
-describe("convertRule — regex behavior", () => {
+describe("convertRule: regex behavior", () => {
   it("* matches single-level subdomain only", () => {
     const re = new RegExp(convertRule("*.example.com:443"));
     expect(re.test("sub.example.com:443")).toBeTruthy();

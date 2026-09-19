@@ -75,7 +75,7 @@ describe("convertUrlRule paths", () => {
     expect(matches("https://example.com/pkg/**", "https://example.com/pkg/a/b")).toBe(true);
   });
 
-  it("is anchored — a longer path does not match a shorter rule", () => {
+  it("is anchored: a longer path does not match a shorter rule", () => {
     expect(matches("https://example.com/pkg", "https://example.com/pkg/a")).toBe(false);
   });
 
@@ -89,7 +89,7 @@ describe("convertUrlRule paths", () => {
 
   // The traversal guard lives in the generated haproxy config, not here: `*`
   // alone cannot cross a separator, but a segment that IS `..` matches it.
-  it("* alone does not stop a `..` segment — hence the global guard", () => {
+  it("* alone does not stop a `..` segment, hence the global guard", () => {
     expect(matches("https://example.com/pkg/*", "https://example.com/pkg/..")).toBe(true);
   });
 });
@@ -245,7 +245,7 @@ describe("methods", () => {
     expect(() => parseMethods("", "rule")).toThrow();
   });
 
-  it("requires a method — a bare URL is rejected", () => {
+  it("requires a method: a bare URL is rejected", () => {
     expect(() => convertUrlRule("https://a.com/x")).toThrow();
   });
 

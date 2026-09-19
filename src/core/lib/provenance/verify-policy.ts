@@ -58,5 +58,5 @@ export function buildVerifyOptions({
     };
   }
 
-  return null; // branch name, local ./setup, etc. — no verifiable release bundle
+  return null; // branch name, local ./setup, etc: no verifiable release bundle
 }

@@ -32,7 +32,7 @@ function restrict(inputs: Partial<Omit<SourcePolicyInput, "proxyMode">> = {}) {
   });
 }
 
-describe("buildSourcePolicy — rule order (last-match-wins engine semantics)", () => {
+describe("buildSourcePolicy: rule order (last-match-wins engine semantics)", () => {
   it("an allowed domain evaluates to ALLOW end-to-end", () => {
     // The catch-all is intentionally universal (^https?://.*), so it matches
     // every ALLOW-listed domain too. Under "last match wins" it has to come
@@ -59,7 +59,7 @@ describe("buildSourcePolicy — rule order (last-match-wins engine semantics)", 
   });
 });
 
-describe("buildSourcePolicy — restrict mode rule shape", () => {
+describe("buildSourcePolicy: restrict mode rule shape", () => {
   it("generates a DENY catch-all followed by an ALLOW rule per https rule", () => {
     const policy = restrict({ httpsRulesInput: "example.com:443" });
     expect(policy.version).toBe(1);
@@ -123,7 +123,7 @@ describe("buildSourcePolicy — restrict mode rule shape", () => {
   });
 });
 
-describe("buildSourcePolicy — regex (~) rules", () => {
+describe("buildSourcePolicy: regex (~) rules", () => {
   it("passes a fully-anchored regex through with just scheme + optional path added", () => {
     const policy = restrict({ httpsRulesInput: "~^custom\\.regex:443$" });
     expect(policy.rules[1].selector.identifier).toBe("^https://custom\\.regex:443(/.*)?$");
@@ -173,7 +173,7 @@ describe("buildSourcePolicy — regex (~) rules", () => {
   });
 });
 
-describe("buildSourcePolicy — audit mode", () => {
+describe("buildSourcePolicy: audit mode", () => {
   it("produces no rules at all, regardless of rule inputs", () => {
     const policy = buildSourcePolicy({
       proxyMode: "audit",

@@ -8,7 +8,7 @@ import fc from "fast-check";
 
 import { resolveBuildcageImageRef } from "./image-ref.ts";
 
-describe("resolveBuildcageImageRef – properties", () => {
+describe("resolveBuildcageImageRef: properties", () => {
   it("lowercases the repository part whatever case actionRepository arrives in", () => {
     const digest = fc.stringMatching(/^sha256:[0-9a-f]{64}$/);
     const repoName = fc
