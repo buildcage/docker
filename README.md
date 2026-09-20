@@ -289,16 +289,16 @@ runs where and what it decides. [Development Guide](./docs/development.md) has t
 ## CA trust and compatibility
 
 `proxy_engine: inspect` terminates TLS and re-signs it with a CA generated for that build, so the
-build has to trust that CA. As each `RUN` step starts, Buildcage points the variables the common
-toolchains read at a store that holds it: `NODE_EXTRA_CA_CERTS`, `DENO_CERT`, `SSL_CERT_FILE`,
-`REQUESTS_CA_BUNDLE` and `PIP_CERT`. `CURL_CA_BUNDLE` is set only in a step with no system CA store
-of its own, since curl reads that store already. A variable the base image or the Dockerfile already
-set is appended to rather than redirected, and neither the CA nor the variables are left in the
-image layers.
+build has to trust that CA. As each `RUN` step starts, Buildcage adds it to the step's own CA store
+and points the variables the common toolchains read at one that holds it: `NODE_EXTRA_CA_CERTS`,
+`DENO_CERT`, `CURL_CA_BUNDLE`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `PIP_CERT`. An image with
+no store of its own gets one written for it, so a tool that goes by its own compiled-in path rather
+than any variable, as Debian's wget and git do, still verifies. A variable the base image or the
+Dockerfile already set is appended to rather than redirected, and neither the CA nor the variables
+are left in the image layers.
 
-The full table, with what each variable points at when the step has a system CA store and when it
-has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in
-[Limitations](#limitations), below.
+The full table is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is
+in [Limitations](#limitations), below.
 
 ## Scope
 
@@ -370,25 +370,22 @@ reported as blocked; see
   undecrypted with `allowed_tls_rules`.
 - `audit` terminates TLS as well. It drops the rules, not the interception, so a tool that cannot
   accept the CA fails in `audit` exactly as it would in `restrict`.
-- An image with no system CA store (`scratch`, distroless, or `debian:*-slim` before
-  `ca-certificates` is installed) still gets every variable set, but pointed at a file trusting only
-  the proxy's own CA. That is enough for ordinary HTTPS, since `inspect` re-signs all of it with
-  that CA, but not for an `allowed_tls_rules` or `allowed_ip_rules` passthrough, which presents its
-  own real certificate. The decision is made once, from the rootfs as the step begins, so installing
-  `ca-certificates` partway through a step doesn't help a passthrough made later in the same step:
+- An image with no system CA store (`scratch`, distroless, `ubi*-micro`, or `debian:*-slim` before
+  `ca-certificates` is installed) gets one written for it holding the build's CA. That covers
+  ordinary HTTPS, since `inspect` re-signs all of it with that CA, but not an `allowed_tls_rules` or
+  `allowed_ip_rules` passthrough: that presents its own real certificate, which needs public roots
+  the image does not have. Installing `ca-certificates` brings those in, and the build's CA survives
+  the rebuild, so a passthrough later in the same step works:
 
   ```dockerfile
   RUN apt-get install -y ca-certificates && \
-      curl https://internal.example.com/pkg.tgz -o pkg.tgz   # still fails: CURL_CA_BUNDLE was already
-                                                             # fixed to the proxy-CA-only fallback
-
-  RUN apt-get install -y ca-certificates
-  RUN curl https://internal.example.com/pkg.tgz -o pkg.tgz   # this step starts with a store, so
-                                                             # CURL_CA_BUNDLE points at it instead
+      curl https://internal.example.com/pkg.tgz -o pkg.tgz   # works: the rebuilt store carries the
+                                                             # public roots and the build's CA
   ```
 
-- The CA store's directory is a mount point for the step's duration, so removing or renaming the
-  directory itself fails, while what is inside it behaves normally:
+- Where the image shipped a CA store of its own, its directory is a mount point for the step's
+  duration, so removing or renaming the directory itself fails, while what is inside it behaves
+  normally:
 
   ```dockerfile
   RUN rm -rf /etc/ssl/certs        # fails: the directory is a mount point

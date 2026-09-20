@@ -17,6 +17,7 @@ CANDIDATES=(
   "etc/ssl/ca-bundle.pem"
   "etc/pki/tls/cacert.pem"
   "etc/ssl/cert.pem"
+  "etc/pki/tls/cert.pem"
 )
 
 echo ""

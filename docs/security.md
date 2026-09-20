@@ -47,8 +47,10 @@ Two components, plus a wrapper around runc:
 - **`buildcage-runc`** wraps BuildKit's own `buildkit-runc`. For the subcommands that carry a
   bundle it makes the step trust the proxy's CA by bind-mounting a scratch copy of the CA store over
   the step's own view of it, writing back to the real one only if the step actually changed it, so a
-  step that never touches its CA store leaves no trace of the injection in the image layers.
-  Injection happens at exec time, never touches LLB, and so cannot affect a cache key.
+  step that never touches its CA store leaves no trace of the injection in the image layers. An
+  image with no store to mirror gets one written into its rootfs instead, along with the CA's anchor
+  files, all of which are taken back out once the step has exited. Injection happens at exec time,
+  never touches LLB, and so cannot affect a cache key.
 
 Like `universal`, this engine governs `RUN` step traffic only: its iptables rule redirects what
 arrives on the CNI bridge. buildkitd's own egress is left alone, so `FROM`, `ADD <url>`, git

@@ -273,7 +273,7 @@ func (b *dirBind) prepare(ca []byte) error {
 // The write-back is not atomic, so a failure leaves hostDir half-written.
 // That is only safe because the error fails the step, and BuildKit then
 // releases the mutable snapshot instead of committing it.
-func (b *dirBind) finish() error {
+func (b *dirBind) finish(removed map[string]bool) error {
 	current, err := captureManifest(b.scratchDir)
 	if err != nil {
 		return err
@@ -282,15 +282,11 @@ func (b *dirBind) finish() error {
 		return nil
 	}
 
-	for _, name := range b.bundleFiles {
-		if err := removeCA(filepath.Join(b.scratchDir, name), b.ca); err != nil {
-			if errors.Is(err, errNotRegular) {
-				// Not the wrapper's to open; write-back below mirrors it as-is.
-				logf("cannot restore %s: %v; leaving it as the step left it", name, err)
-				continue
-			}
-			return err
-		}
+	if err := stripCADir(b.scratchDir, b.ca, removed); err != nil {
+		return err
+	}
+	if err := dropLinksTo(b.rootfs, b.scratchDir, removed); err != nil {
+		return err
 	}
 
 	stripped, err := captureManifest(b.scratchDir)

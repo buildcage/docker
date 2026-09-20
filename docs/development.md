@@ -487,6 +487,15 @@ behavior, see [Inspect Proxy Engine](./security.md#inspect-proxy-engine) in Secu
   This is what keeps a step that never touches its CA store from producing a different layer than an
   unmodified build would. Either way this happens at exec time, entirely outside LLB, so it cannot
   affect a cache key: two builds that differ only in `proxy_engine` still share cache.
+
+  An image with no CA store has nothing to mirror, so the wrapper writes one at every candidate
+  path in `castore.go`'s `systemCertFiles`, plus the CA's anchor file in each distribution's anchor
+  directory, straight into the rootfs. A mirror is only needed to keep an existing file from being
+  opened for writing; a file created and removed within the step leaves the layer diff alone on its
+  own. The undo strips the CA from everything in those directories rather than only the files it
+  wrote, because `update-ca-certificates` rebuilds the bundle from the anchors and leaves links
+  beside it under names of its own choosing.
+
 - The `allowed_url_rules` compiler enumerates hosts rather than generalizing them
   (`a.example.com`/`b.example.com` never becomes `*.example.com`), because CoreDNS's own allow/deny
   view is generated from the same host patterns. Widening a host widens what's logged as allowed

@@ -217,7 +217,7 @@ func TestFinishRefusesARedirectedWriteBackTarget(t *testing.T) {
 	redirectStoreDir(t, rootfs)
 
 	calls := countRsync(t)
-	if err := b.finish(); err == nil {
+	if err := b.finish(map[string]bool{}); err == nil {
 		t.Fatal("expected finish to refuse the redirected target")
 	}
 	if *calls != 0 {
@@ -231,7 +231,7 @@ func TestFinishWritesBackWhenTheTargetStillResolves(t *testing.T) {
 	mustWriteFile(t, filepath.Join(b.scratchDir, "ca-certificates.crt"), "REGENERATED\n")
 
 	calls := countRsync(t)
-	if err := b.finish(); err != nil {
+	if err := b.finish(map[string]bool{}); err != nil {
 		t.Fatal(err)
 	}
 	if *calls != 2 {
@@ -254,7 +254,7 @@ func TestFinishSkipsTheCheckWhenTheStoreIsUnchanged(t *testing.T) {
 	redirectStoreDir(t, rootfs)
 
 	calls := countRsync(t)
-	if err := b.finish(); err != nil {
+	if err := b.finish(map[string]bool{}); err != nil {
 		t.Fatalf("an unchanged store must not fail: %v", err)
 	}
 	if *calls != 0 {
@@ -498,7 +498,7 @@ func TestFinishRefusesATargetThatNowEscapesTheRootfs(t *testing.T) {
 	mustSymlink(t, "../../../../../../etc", filepath.Join(rootfs, "etc/ssl"))
 
 	calls := countRsync(t)
-	err := b.finish()
+	err := b.finish(map[string]bool{})
 	if !errors.Is(err, errEscapesRoot) {
 		t.Fatalf("got %v, want it to name errEscapesRoot", err)
 	}
@@ -554,7 +554,7 @@ func TestFinishWritesNothingBackWhenTheStripFails(t *testing.T) {
 	useBrokenBundleFile(t, &brokenFile{failWriteAt: 2})
 	calls := countRsync(t)
 
-	if err := b.finish(); !errors.Is(err, errBrokenFile) {
+	if err := b.finish(map[string]bool{}); !errors.Is(err, errBrokenFile) {
 		t.Fatalf("got %v, want the strip's failure to fail the step", err)
 	}
 	if *calls != 0 {
@@ -697,19 +697,26 @@ func TestPrepareRefusesABundleFileItCannotStat(t *testing.T) {
 	}
 }
 
-// finish reads the directory twice as well, and the same rule applies: without
-// both manifests there is no way to tell what the step changed, so nothing is
-// written back.
-func TestFinishWritesNothingBackWhenItCannotRecordTheDirectory(t *testing.T) {
-	for _, nth := range []int{1, 2} {
-		t.Run(fmt.Sprintf("the %s manifest", map[int]string{1: "first", 2: "second"}[nth]), func(t *testing.T) {
+// finish reads the directory several times over, and a failure in any of them
+// stops the step: without both manifests there is no way to tell what the step
+// changed, and without the strip and the link sweep the certificate would be
+// written back with everything else.
+func TestFinishWritesNothingBackWhenAWalkFails(t *testing.T) {
+	walks := map[string]int{
+		"the first manifest":  1,
+		"the strip":           2,
+		"the link sweep":      3,
+		"the second manifest": 4,
+	}
+	for name, nth := range walks {
+		t.Run(name, func(t *testing.T) {
 			useFakeRsync(t)
 			b, rootfs := newCAStoreBind(t)
 			mustWriteFile(t, filepath.Join(b.scratchDir, "ca-certificates.crt"), "REGENERATED\n")
 			failWalkOn(t, b.scratchDir, nth)
 			calls := countRsync(t)
 
-			if err := b.finish(); !errors.Is(err, errBrokenWalk) {
+			if err := b.finish(map[string]bool{}); !errors.Is(err, errBrokenWalk) {
 				t.Fatalf("got %v, want the failed manifest to fail the step", err)
 			}
 			if *calls != 0 {
@@ -750,13 +757,13 @@ func TestFinishWritesNothingBackWhenItCannotResetAnMtime(t *testing.T) {
 	// recorded and the reset is attempted rather than skipped.
 	elsewhere := t.TempDir()
 	mustMkdirAll(t, filepath.Join(elsewhere, "sub"))
-	useStubWalk(t, b.scratchDir, 2, walkStep{
+	useStubWalk(t, b.scratchDir, 4, walkStep{
 		path: filepath.Join(b.scratchDir, "sub"),
 		d:    realEntry(t, elsewhere, "sub"),
 	})
 	calls := countRsync(t)
 
-	if err := b.finish(); err == nil {
+	if err := b.finish(map[string]bool{}); err == nil {
 		t.Fatal("expected the failed mtime reset to fail the step")
 	}
 	if *calls != 0 {

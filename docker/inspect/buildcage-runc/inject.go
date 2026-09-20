@@ -1,38 +1,35 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // File the container is pointed at when a variable was not already set and the
 // tool needs one of its own. Removed again when the step ends.
 const ownCAPath = "/etc/buildcage-ca.pem"
 
-// How each variable is treated when the image or Dockerfile did not set it,
-// and what it falls back to when there is no system CA store to work with.
+// How each variable is treated when the image or Dockerfile did not set it.
 //
 // The distinction between the kinds is what the variable means to the tool
-// that reads it: NODE_EXTRA_CA_CERTS and DENO_CERT are added to a built-in
-// set, so pointing them at a file holding only this CA leaves everything
-// else trusted, store or no store. The others replace the bundle outright:
-// with a store, they are pointed at it (which by then carries the CA plus
-// the real public roots); with no store there is nothing left that still
-// carries those roots, so they fall back to the same proxy-CA-only file
-// NODE_EXTRA_CA_CERTS/DENO_CERT use. That covers ordinary HTTP(S) traffic
-// (inspect re-signs all of it with this same CA) but not a passthrough
-// connection's real certificate; see README.md#limitations for exactly which
-// requests that leaves unable to verify.
+// that reads it. NODE_EXTRA_CA_CERTS and DENO_CERT are added to a built-in
+// set, so pointing them at a file holding only this CA leaves everything else
+// trusted. The others replace the bundle outright, so they are pointed at the
+// system store, which by then carries the CA alongside whatever roots the
+// image shipped. They fall back to the same CA-only file only when there is no
+// store to point at, which takes every candidate path failing to be written
+// (see ensureSystemStore). That covers ordinary HTTP(S) traffic, since inspect
+// re-signs all of it with this same CA, but not a passthrough connection's
+// real certificate; see README.md#limitations for which requests that leaves
+// unable to verify.
 type unsetBehaviour int
 
 const (
-	// The tool reads the system store on its own; with no store, falls back
-	// to proxy-CA-only trust the same way pointAtSystemStore does.
-	leaveUnset unsetBehaviour = iota
 	// Point at a file holding only this CA, added to the tool's own set.
-	pointAtOwnCA
-	// Point at the system store, which replaces the tool's bundle; with no
-	// store, falls back to the same proxy-CA-only file as pointAtOwnCA.
+	pointAtOwnCA unsetBehaviour = iota
+	// Point at the system store, which replaces the tool's bundle.
 	pointAtSystemStore
 )
 
@@ -42,12 +39,15 @@ var caVariables = []struct {
 }{
 	{"NODE_EXTRA_CA_CERTS", pointAtOwnCA},
 	{"DENO_CERT", pointAtOwnCA},
-	{"CURL_CA_BUNDLE", leaveUnset},
+	// curl finds the store on its own, so this only decides what it reads
+	// when there is none: the CA-only file rather than nothing.
+	{"CURL_CA_BUNDLE", pointAtSystemStore},
 	{"REQUESTS_CA_BUNDLE", pointAtSystemStore},
 	{"PIP_CERT", pointAtSystemStore},
 	// OpenSSL's own override, replacing rather than adding to the default
-	// search path: also read by Go's crypto/x509 on Unix, Ruby, wget, and
-	// Rust's rustls-native-certs.
+	// search path: also read by Go's crypto/x509 on Unix, Ruby, and Rust's
+	// rustls-native-certs. Not by GnuTLS, so Debian's wget goes by the store
+	// at its own compiled-in path instead.
 	{"SSL_CERT_FILE", pointAtSystemStore},
 }
 
@@ -68,7 +68,9 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 	// Every bundle the CA has to go into, keyed by resolved path so a file
 	// named by two variables is only written once.
 	plan := caPlan{targets: map[string]bool{}, env: map[string]string{}}
-	if store.found {
+	// Only a store the image shipped: one this wrapper wrote already holds
+	// the certificate.
+	if store.shipped {
 		plan.targets[store.hostPath] = true
 	}
 
@@ -111,12 +113,8 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 			continue
 		}
 		switch variable.whenUnset {
-		case leaveUnset:
-			if !store.found {
-				setOwnCA(variable.name)
-			}
 		case pointAtSystemStore:
-			if store.found {
+			if store.available() {
 				plan.env[variable.name] = store.containerPath
 			} else {
 				setOwnCA(variable.name)
@@ -129,20 +127,30 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 }
 
 // injection is what a completed inject leaves to be undone once the step has
-// exited: the mirrored directories to reconcile, and the proxy-CA-only file to
-// remove if one was written.
+// exited: the mirrored directories to reconcile, the proxy-CA-only file to
+// remove if one was written, and whatever the injection had to create in the
+// rootfs to give the step a store.
 type injection struct {
 	binds        []*dirBind
+	rootfs       string
+	ca           []byte
 	createdOwnCA string
+	created      createdPaths
 }
 
 // finish diffs each mirrored directory against its pre-step state and writes
 // back only what changed. A non-nil error means the write-back itself failed
 // and the build must not proceed with a possibly half-written layer.
 func (in *injection) finish() error {
+	// What the injection wrote goes first, so the links a rebuilt bundle left
+	// beside itself resolve to something already gone by the time the
+	// mirrors are reconciled.
+	removed := map[string]bool{}
+	in.undoCreated(removed)
+
 	var firstErr error
 	for _, b := range in.binds {
-		if err := b.finish(); err != nil {
+		if err := b.finish(removed); err != nil {
 			logf("CA write-back failed for %s: %v", b.containerDir, err)
 			if firstErr == nil {
 				firstErr = err
@@ -158,6 +166,36 @@ func (in *injection) finish() error {
 	return firstErr
 }
 
+// undoCreated takes back the store and the anchors the injection wrote. A
+// step that installed the distribution's own ca-certificates over them leaves
+// a real bundle behind, which is the step's to keep: only the certificate
+// goes, and whatever held nothing else with it.
+func (in *injection) undoCreated(removed map[string]bool) {
+	report := func(path string, err error) {
+		if err != nil {
+			logf("cannot take %s back out: %v", path, err)
+		}
+	}
+	dirs := in.created.fileDirs()
+	for _, dir := range dirs {
+		report(dir, stripCADir(dir, in.ca, removed))
+	}
+	// A second pass, so every directory has given up its certificates before
+	// any link into one of them is judged.
+	for _, dir := range dirs {
+		report(dir, dropLinksTo(in.rootfs, dir, removed))
+	}
+	for _, dir := range in.created.removalOrder() {
+		err := os.Remove(dir)
+		// Gone, or holding something the step put there: either way the
+		// injection has nothing left of its own here.
+		if os.IsNotExist(err) || errors.Is(err, syscall.ENOTEMPTY) {
+			err = nil
+		}
+		report(dir, err)
+	}
+}
+
 // inject makes the step trust the proxy's CA, returning what finishes the
 // injection once the step has exited.
 func inject(bundle string, ca []byte) (*injection, error) {
@@ -166,13 +204,10 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		return nil, err
 	}
 
-	// A store's absence is not fatal: the store itself is simply not an
-	// append target, and every otherwise-unset variable falls back to the
-	// proxy-CA-only file instead (see the unsetBehaviour comment above).
-	store, storeErr := findSystemStore(s.rootfs)
-	if !store.found {
-		logf("no system CA store in %s (%v); falling back to proxy-CA-only trust", s.rootfs, storeErr)
-	}
+	store, created := ensureSystemStore(s.rootfs, ca)
+	anchors := placeAnchors(s.rootfs, ca)
+	created.files = append(created.files, anchors.files...)
+	created.dirs = append(created.dirs, anchors.dirs...)
 
 	plan := planCATrust(s, ca, store)
 
@@ -203,7 +238,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 			containerDir: containerDir,
 			scratchDir:   scratch,
 			bundleFiles:  names,
-			custom:       !(store.found && hostDir == store.dir()),
+			custom:       !(store.shipped && hostDir == store.dir()),
 		}
 		if err := b.prepare(ca); err != nil {
 			logf("cannot prepare CA injection for %s: %v", containerDir, err)
@@ -219,5 +254,11 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("cannot update the process spec: %v", err)
 	}
 
-	return &injection{binds: binds, createdOwnCA: plan.createdOwnCA}, nil
+	return &injection{
+		binds:        binds,
+		rootfs:       s.rootfs,
+		ca:           ca,
+		createdOwnCA: plan.createdOwnCA,
+		created:      created,
+	}, nil
 }

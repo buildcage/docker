@@ -429,18 +429,33 @@ Job Summary is the exception: it replaces credential query parameters, see
 `proxy_engine: inspect` terminates TLS and re-signs it with a CA generated for the build, so the
 build has to trust that CA. The wrapper around runc sets these variables as each `RUN` step starts.
 If a variable is already set, by the base image or by the Dockerfile, Buildcage appends the CA to
-whatever file it already points at rather than redirecting the variable elsewhere. Otherwise, where
-it points depends on whether the step has a system CA store:
+whatever file it already points at rather than redirecting the variable elsewhere. Otherwise:
 
-| Variable              | Read by                                                                         | If unset, with a store                           | If unset, with no store     |
-| --------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------- |
-| `NODE_EXTRA_CA_CERTS` | Node.js                                                                         | Additive: pointed at a file holding only this CA | same, store or no store     |
-| `DENO_CERT`           | Deno                                                                            | Additive: pointed at a file holding only this CA | same, store or no store     |
-| `CURL_CA_BUNDLE`      | curl                                                                            | Left unset; curl already reads the system store  | proxy-CA-only fallback file |
-| `REQUESTS_CA_BUNDLE`  | Python `requests`                                                               | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
-| `PIP_CERT`            | pip                                                                             | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
-| `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go, Ruby, wget, Rust's `rustls-native-certs`) | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
+| Variable              | Read by                                                                                                                              | If unset                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `NODE_EXTRA_CA_CERTS` | Node.js                                                                                                                              | Additive: pointed at a file holding only this CA |
+| `DENO_CERT`           | Deno                                                                                                                                 | Additive: pointed at a file holding only this CA |
+| `CURL_CA_BUNDLE`      | curl                                                                                                                                 | Replaces the bundle: pointed at the system store |
+| `REQUESTS_CA_BUNDLE`  | Python `requests`                                                                                                                    | Replaces the bundle: pointed at the system store |
+| `PIP_CERT`            | pip                                                                                                                                  | Replaces the bundle: pointed at the system store |
+| `SSL_CERT_FILE`       | OpenSSL, and anything linked against it (Go, Ruby, Rust's `rustls-native-certs`). Not GnuTLS, so Debian's wget and git never read it | Replaces the bundle: pointed at the system store |
 
-Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
-so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
-reach, and what a step can't do to its CA store while it is mounted.
+### Steps with no CA store of their own
+
+An image that ships no CA store (`scratch`, distroless, `ubi*-micro`, or `debian:*-slim` before
+`ca-certificates` is installed) gets one written for it as the step starts, holding the build's CA,
+at every path a distribution is known to use. Which path a given tool reads was decided when it was
+compiled, and plenty of tools read one without consulting any of the variables above: Debian's wget
+and git are GnuTLS-linked and do exactly that.
+
+The CA also goes into each distribution's anchor directory
+(`/usr/local/share/ca-certificates`, `/etc/pki/ca-trust/source/anchors`, `/etc/pki/trust/anchors`).
+That is what keeps a step that installs `ca-certificates` partway through from losing the CA when
+`update-ca-certificates` rebuilds the bundle, and on RHEL it is how GnuTLS sees the CA at all, since
+p11-kit reads the directory rather than a bundle.
+
+Neither the CA nor these variables are left in the image layers: the files, the directories written
+for them, and anything a rebuilt bundle left pointing at them are removed when the step ends, and a
+bundle the step turned into a real store of its own keeps everything except the CA. Injection
+happens at exec time, so it cannot affect a cache key. [Limitations](../README.md#limitations)
+covers what this can't reach, and what a step can't do to its CA store while it is mounted.

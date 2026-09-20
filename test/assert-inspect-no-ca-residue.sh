@@ -34,14 +34,36 @@ if [ -z "$CA_LINE" ]; then
   fail "could not read the injected CA out of $BUILDER, so this cannot be checked"
 elif docker run --rm -e CA_LINE="$CA_LINE" "$IMAGE" sh -c '
   for f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt \
-           /etc/ssl/ca-bundle.pem /etc/pki/tls/cacert.pem /etc/ssl/cert.pem; do
+           /etc/ssl/ca-bundle.pem /etc/pki/tls/cacert.pem /etc/ssl/cert.pem \
+           /etc/pki/tls/cert.pem /usr/local/share/ca-certificates/buildcage.crt \
+           /etc/pki/ca-trust/source/anchors/buildcage.crt \
+           /etc/pki/trust/anchors/buildcage.crt; do
     [ -f "$f" ] && grep -qF "$CA_LINE" "$f" && exit 0
   done
   exit 1
 '; then
-  fail "the buildcage CA is still present in a system CA bundle"
+  fail "the buildcage CA is still present in a CA bundle or anchor directory"
 else
-  pass "no buildcage CA in any system CA bundle"
+  pass "no buildcage CA in any CA bundle or anchor directory"
+fi
+
+# A step with no CA store of its own gets one written for it at every candidate
+# path. Emptied of the CA it held nothing else, so it goes, and an empty file
+# left at one of those paths is an undo that stopped halfway. Neither test
+# fixture's base image ships /etc/pki at all, so a directory there is the same
+# signal for the directories the injection creates.
+if docker run --rm "$IMAGE" sh -c '
+  for f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt \
+           /etc/ssl/ca-bundle.pem /etc/pki/tls/cacert.pem /etc/ssl/cert.pem \
+           /etc/pki/tls/cert.pem; do
+    [ -f "$f" ] && [ ! -s "$f" ] && exit 0
+  done
+  [ -d /etc/pki ] && exit 0
+  exit 1
+'; then
+  fail "the written CA store was not fully taken back out"
+else
+  pass "nothing left of a written CA store"
 fi
 
 # The CA-trust variables inject.go sets only ever reach the transient RUN-step
