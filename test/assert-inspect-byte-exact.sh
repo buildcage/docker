@@ -34,16 +34,21 @@ layers_of() {
     | grep -o '"blobs/sha256/[a-f0-9]*"' | tr -d '"'
 }
 
+# The step's own record of what it did, which is not a property of the image
+# the build produces. apt/dpkg/ldconfig write real wall-clock content into
+# these regardless of SOURCE_DATE_EPOCH, which only pins layer timestamps; and
+# a step that rebuilds its CA store logs one more certificate than an unproxied
+# build of the same Dockerfile, since the injected one is in the store while the
+# rebuild runs. Left out of both comparisons: the size in the listing is part of
+# the same content.
+NONDETERMINISTIC='var/log/apt/[^ ]*|var/log/dpkg\.log|var/cache/ldconfig/aux-cache'
+
 # path/type/mode/owner/size/symlink-target/mtime in one line each, from the
 # same tar binary for both images in this run, so the two sides are always
 # comparable even though bsdtar and GNU tar format columns differently.
 listing_of() {
-  tar -tvf "$1" 2>/dev/null | sort
+  tar -tvf "$1" 2>/dev/null | grep -vE " (${NONDETERMINISTIC})$" | sort
 }
-
-# apt/dpkg/ldconfig write real wall-clock content into these regardless of
-# SOURCE_DATE_EPOCH, which only pins layer timestamps, not file content.
-NONDETERMINISTIC_PATHS='^(var/log/apt/[^ ]*|var/log/dpkg\.log|var/cache/ldconfig/aux-cache) '
 
 # tar -tv has no content hash, only size, so regular files are separately
 # extracted and hashed.
@@ -53,7 +58,7 @@ content_hashes_of() {
   tar -xf "$layer" -C "$dir" 2>/dev/null || true
   find "$dir" -type f 2>/dev/null | while IFS= read -r f; do
     printf '%s %s\n' "${f#"$dir"/}" "$(sha256_of "$f")"
-  done | grep -vE "$NONDETERMINISTIC_PATHS" | sort
+  done | grep -vE "^(${NONDETERMINISTIC}) " | sort
 }
 
 DIR_A="$WORKDIR/a"

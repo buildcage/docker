@@ -456,6 +456,8 @@ p11-kit reads the directory rather than a bundle.
 
 Neither the CA nor these variables are left in the image layers: the files, the directories written
 for them, and anything a rebuilt bundle left pointing at them are removed when the step ends, and a
-bundle the step turned into a real store of its own keeps everything except the CA. Injection
-happens at exec time, so it cannot affect a cache key. [Limitations](../README.md#limitations)
+bundle the step turned into a real store of its own keeps everything except the CA. An anchor
+directory is the one thing that can stay, and only when the step installed the package that ships
+it, which would have created the directory anyway. Injection happens at exec time, so it cannot
+affect a cache key. [Limitations](../README.md#limitations)
 covers what this can't reach, and what a step can't do to its CA store while it is mounted.

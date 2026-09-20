@@ -185,7 +185,11 @@ func (in *injection) undoCreated(removed map[string]bool) {
 	for _, dir := range dirs {
 		report(dir, dropLinksTo(in.rootfs, dir, removed))
 	}
+	adopted := adoptedAnchorDirs(in.rootfs)
 	for _, dir := range in.created.removalOrder() {
+		if adopted[dir] {
+			continue
+		}
 		err := os.Remove(dir)
 		// Gone, or holding something the step put there: either way the
 		// injection has nothing left of its own here.

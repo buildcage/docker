@@ -384,26 +384,58 @@ func TestInjectPlacesTheAnchorInEveryKnownDirectory(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			for _, dir := range anchorDirs {
-				anchor := filepath.Join(rootfs, strings.TrimPrefix(dir, "/"), anchorName)
-				written, err := os.ReadFile(anchor)
+			for _, anchor := range anchorDirs {
+				path := filepath.Join(rootfs, strings.TrimPrefix(anchor.dir, "/"), anchorName)
+				written, err := os.ReadFile(path)
 				if err != nil {
-					t.Errorf("%s: %v", dir, err)
+					t.Errorf("%s: %v", anchor.dir, err)
 					continue
 				}
 				if string(written) != string(testCA) {
-					t.Errorf("%s = %q, want the CA", dir, written)
+					t.Errorf("%s = %q, want the CA", anchor.dir, written)
 				}
 			}
 
 			restore.finish()
-			for _, dir := range anchorDirs {
-				path := filepath.Join(rootfs, strings.TrimPrefix(dir, "/"))
+			for _, anchor := range anchorDirs {
+				path := filepath.Join(rootfs, strings.TrimPrefix(anchor.dir, "/"))
 				if _, err := os.Stat(path); !os.IsNotExist(err) {
-					t.Errorf("%s still present after restore: %v", dir, err)
+					t.Errorf("%s still present after restore: %v", anchor.dir, err)
 				}
 			}
 		})
+	}
+}
+
+// An anchor directory is created only because the package that ships it is not
+// installed yet. A step that installs it during the step takes the directory
+// over, and the undo has to leave it, or the image ends up missing a directory
+// an ordinary build of the same Dockerfile has.
+func TestInjectLeavesAnAnchorDirectoryTheStepTookOver(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The rest of what `apt-get install ca-certificates` unpacks. The anchor
+	// directory it ships is already there, put down by the injection.
+	mustMkdirAll(t, filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].owner, "/")))
+
+	restore.finish()
+
+	kept := filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].dir, "/"))
+	if _, err := os.Stat(kept); err != nil {
+		t.Errorf("%s was taken from the package that owns it: %v", anchorDirs[0].dir, err)
+	}
+	if entries, err := os.ReadDir(kept); err != nil || len(entries) != 0 {
+		t.Errorf("%s = %v (%v), want it left empty", anchorDirs[0].dir, entries, err)
+	}
+	// The other distributions' tooling is still absent, so theirs go.
+	for _, anchor := range anchorDirs[1:] {
+		path := filepath.Join(rootfs, strings.TrimPrefix(anchor.dir, "/"))
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("%s still present after restore: %v", anchor.dir, err)
+		}
 	}
 }
 
@@ -413,7 +445,7 @@ func TestInjectPlacesTheAnchorInEveryKnownDirectory(t *testing.T) {
 func rebuildFromAnchor(t *testing.T, storeDir string) {
 	t.Helper()
 	mustWriteFile(t, filepath.Join(storeDir, "ca-certificates.crt"), "REAL-ROOTS\n"+string(testCA))
-	mustSymlink(t, filepath.Join(anchorDirs[0], anchorName), filepath.Join(storeDir, "buildcage.pem"))
+	mustSymlink(t, filepath.Join(anchorDirs[0].dir, anchorName), filepath.Join(storeDir, "buildcage.pem"))
 	mustSymlink(t, "buildcage.pem", filepath.Join(storeDir, "20538016.0"))
 }
 
@@ -495,7 +527,7 @@ func TestInjectSurvivesTheStepRemovingAnAnchorDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.RemoveAll(filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0], "/"))); err != nil {
+	if err := os.RemoveAll(filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].dir, "/"))); err != nil {
 		t.Fatal(err)
 	}
 

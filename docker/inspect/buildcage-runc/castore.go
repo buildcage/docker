@@ -573,10 +573,18 @@ func findSystemStore(rootfs string) (systemStore, error) {
 // ca-certificates` halfway through a step from undoing the injection for
 // everything after it. On RHEL it is the primary route: p11-kit reads the
 // directory itself, so GnuTLS trusts the certificate with no bundle involved.
-var anchorDirs = []string{
-	"/usr/local/share/ca-certificates", // Debian, Ubuntu, Alpine
-	"/etc/pki/ca-trust/source/anchors", // RHEL, Fedora
-	"/etc/pki/trust/anchors",           // SUSE
+//
+// A directory is only created here because the package that ships it is not
+// installed, and a step is free to install it. owner is another directory the
+// same package ships, and nothing else does, so its presence at the end says
+// the anchor directory now belongs to the package rather than to this wrapper.
+var anchorDirs = []struct{ dir, owner string }{
+	// Debian, Ubuntu, Alpine
+	{"/usr/local/share/ca-certificates", "/usr/share/ca-certificates"},
+	// RHEL, Fedora
+	{"/etc/pki/ca-trust/source/anchors", "/etc/pki/ca-trust/extracted"},
+	// SUSE
+	{"/etc/pki/trust/anchors", "/var/lib/ca-certificates"},
 }
 
 // What the certificate is called in each of them. Debian's
@@ -628,14 +636,33 @@ func (c createdPaths) fileDirs() []string {
 // to rebuild, and the anchor is what survives that.
 func placeAnchors(rootfs string, ca []byte) createdPaths {
 	var created createdPaths
-	for _, dir := range anchorDirs {
-		resolved, dirs, err := createCA(rootfs, filepath.Join(dir, anchorName), ca)
+	for _, anchor := range anchorDirs {
+		resolved, dirs, err := createCA(rootfs, filepath.Join(anchor.dir, anchorName), ca)
 		created.add(resolved, dirs)
 		if err != nil {
-			logf("cannot write the anchor in %s: %v", dir, err)
+			logf("cannot write the anchor in %s: %v", anchor.dir, err)
 		}
 	}
 	return created
+}
+
+// adoptedAnchorDirs is the anchor directories whose own package is installed by
+// the time the step ends, which the undo leaves behind: taking one away would
+// leave the image short a directory an unproxied build of the same Dockerfile
+// has.
+func adoptedAnchorDirs(rootfs string) map[string]bool {
+	adopted := map[string]bool{}
+	for _, anchor := range anchorDirs {
+		// A path that will not resolve inside the rootfs is not there, which
+		// is the same answer as not finding it.
+		owner, _ := resolveInRoot(rootfs, anchor.owner)
+		if _, err := os.Stat(owner); err != nil {
+			continue
+		}
+		dir, _ := resolveInRoot(rootfs, anchor.dir)
+		adopted[dir] = true
+	}
+	return adopted
 }
 
 // ensureSystemStore returns the bundle the step's tools already read, or
