@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // File the container is pointed at when a variable was not already set and the
@@ -46,8 +48,9 @@ var caVariables = []struct {
 	{"REQUESTS_CA_BUNDLE", pointAtSystemStore},
 	{"PIP_CERT", pointAtSystemStore},
 	// OpenSSL's own override, replacing rather than adding to the default
-	// search path: also read by Go's crypto/x509 on Unix, Ruby, wget, and
-	// Rust's rustls-native-certs.
+	// search path: also read by Go's crypto/x509 on Unix, Ruby, and Rust's
+	// rustls-native-certs. Not by GnuTLS, so Debian's wget and git go by the
+	// store at their own compiled-in path instead.
 	{"SSL_CERT_FILE", pointAtSystemStore},
 }
 
@@ -129,20 +132,33 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 }
 
 // injection is what a completed inject leaves to be undone once the step has
-// exited: the mirrored directories to reconcile, and the proxy-CA-only file to
-// remove if one was written.
+// exited: the mirrored directories to reconcile, the proxy-CA-only file to
+// remove if one was written, and the anchors written into the rootfs.
 type injection struct {
 	binds        []*dirBind
+	rootfs       string
+	ca           []byte
 	createdOwnCA string
+	created      createdPaths
 }
 
 // finish diffs each mirrored directory against its pre-step state and writes
 // back only what changed. A non-nil error means the write-back itself failed
 // and the build must not proceed with a possibly half-written layer.
 func (in *injection) finish() error {
+	// The anchors go first, so a link a rebuilt bundle left pointing at one
+	// resolves to something already gone by the time the mirrors are
+	// reconciled.
+	removed := map[string]bool{}
+	mirrored := map[string]bool{}
+	for _, b := range in.binds {
+		mirrored[b.hostDir] = true
+	}
+	in.undoCreated(removed, mirrored)
+
 	var firstErr error
 	for _, b := range in.binds {
-		if err := b.finish(); err != nil {
+		if err := b.finish(removed); err != nil {
 			logf("CA write-back failed for %s: %v", b.containerDir, err)
 			if firstErr == nil {
 				firstErr = err
@@ -156,6 +172,48 @@ func (in *injection) finish() error {
 		}
 	}
 	return firstErr
+}
+
+// undoCreated takes back the anchors, and whatever the step's own
+// ca-certificates tooling made of them. A bundle it rebuilt is the step's to
+// keep: only the certificate goes, and whatever held nothing else with it.
+func (in *injection) undoCreated(removed, mirrored map[string]bool) {
+	report := func(path string, err error) {
+		if err != nil {
+			logf("cannot take %s back out: %v", path, err)
+		}
+	}
+	for _, path := range in.created.files {
+		gone, err := stripCAFile(path, in.ca)
+		if gone {
+			removed[path] = true
+		}
+		report(path, err)
+	}
+	for _, dir := range storeDirs(in.rootfs) {
+		if mirrored[dir] {
+			continue
+		}
+		if err := stripCADir(dir, in.ca, removed); err != nil {
+			report(dir, err)
+			continue
+		}
+		report(dir, dropLinksTo(in.rootfs, dir, removed))
+	}
+
+	adopted := adoptedAnchorDirs(in.rootfs)
+	for _, dir := range in.created.removalOrder() {
+		if adopted[dir] {
+			continue
+		}
+		err := os.Remove(dir)
+		// Gone, or holding something the step put there: either way the
+		// injection has nothing left of its own here.
+		if os.IsNotExist(err) || errors.Is(err, syscall.ENOTEMPTY) {
+			err = nil
+		}
+		report(dir, err)
+	}
 }
 
 // inject makes the step trust the proxy's CA, returning what finishes the
@@ -174,6 +232,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("no system CA store in %s (%v); falling back to proxy-CA-only trust", s.rootfs, storeErr)
 	}
 
+	created := placeAnchors(s.rootfs, ca)
 	plan := planCATrust(s, ca, store)
 
 	var binds []*dirBind
@@ -219,5 +278,11 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("cannot update the process spec: %v", err)
 	}
 
-	return &injection{binds: binds, createdOwnCA: plan.createdOwnCA}, nil
+	return &injection{
+		binds:        binds,
+		rootfs:       s.rootfs,
+		ca:           ca,
+		createdOwnCA: plan.createdOwnCA,
+		created:      created,
+	}, nil
 }

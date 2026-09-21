@@ -691,3 +691,16 @@ func TestCloseGapsReportsAFailedReadOrWrite(t *testing.T) {
 		})
 	}
 }
+
+// A path under something that is not a directory cannot be resolved, and is
+// refused rather than guessed at: the rootfs comes from an image the build
+// chose.
+func TestResolveInRootRefusesAPathUnderARegularFile(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "etc"))
+	mustWriteFile(t, filepath.Join(root, "etc", "ssl"), "not a directory")
+
+	if _, err := resolveInRoot(root, "/etc/ssl/certs/ca-certificates.crt"); err == nil {
+		t.Fatal("expected resolveInRoot to refuse the path")
+	}
+}

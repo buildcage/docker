@@ -632,3 +632,347 @@ func TestInjectReportsASpecItCannotSave(t *testing.T) {
 		t.Errorf("the failure is not in the log:\n%s", out.String())
 	}
 }
+
+// The anchor goes in whether or not the image shipped a store: the bundle is
+// the step's to rebuild, and the anchor is what a rebuild takes the
+// certificate back from. On RHEL it is also how GnuTLS sees the certificate at
+// all, since p11-kit reads the directory rather than any bundle.
+func TestInjectPlacesTheAnchorInEveryKnownDirectory(t *testing.T) {
+	useFakeRsync(t)
+	for name, newFixture := range map[string]func(*testing.T, []string) (string, string){
+		"with a store":    newBundle,
+		"without a store": newBundleNoStore,
+	} {
+		t.Run(name, func(t *testing.T) {
+			bundle, rootfs := newFixture(t, []string{"PATH=/usr/bin"})
+
+			restore, err := inject(bundle, testCA)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for _, anchor := range anchorDirs {
+				path := filepath.Join(rootfs, strings.TrimPrefix(anchor.dir, "/"), anchorName)
+				written, err := os.ReadFile(path)
+				if err != nil {
+					t.Errorf("%s: %v", anchor.dir, err)
+					continue
+				}
+				if string(written) != string(testCA) {
+					t.Errorf("%s = %q, want the CA", anchor.dir, written)
+				}
+			}
+
+			restore.finish()
+			for _, anchor := range anchorDirs {
+				path := filepath.Join(rootfs, strings.TrimPrefix(anchor.dir, "/"))
+				if _, err := os.Stat(path); !os.IsNotExist(err) {
+					t.Errorf("%s still present after restore: %v", anchor.dir, err)
+				}
+			}
+		})
+	}
+}
+
+// rebuildFromAnchor is what update-ca-certificates leaves behind: the bundle
+// concatenated afresh from the anchors, and two links beside it, one named
+// after the anchor and one after its hash.
+func rebuildFromAnchor(t *testing.T, storeDir string) {
+	t.Helper()
+	mustWriteFile(t, filepath.Join(storeDir, "ca-certificates.crt"), "REAL-ROOTS\n"+string(testCA))
+	mustSymlink(t, filepath.Join(anchorDirs[0].dir, anchorName), filepath.Join(storeDir, "buildcage.pem"))
+	mustSymlink(t, "buildcage.pem", filepath.Join(storeDir, "20538016.0"))
+}
+
+// assertOnlyRealRoots is the state the store has to be left in either way: the
+// step's own roots, and nothing of the injection.
+func assertOnlyRealRoots(t *testing.T, storeDir string) {
+	t.Helper()
+	got, err := os.ReadFile(filepath.Join(storeDir, "ca-certificates.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "REAL-ROOTS\n" {
+		t.Errorf("bundle = %q, want the step's own roots alone", got)
+	}
+	for _, left := range []string{"buildcage.pem", "20538016.0"} {
+		if _, err := os.Lstat(filepath.Join(storeDir, left)); !os.IsNotExist(err) {
+			t.Errorf("%s still present after restore: %v", left, err)
+		}
+	}
+}
+
+// A step that reruns update-ca-certificates rebuilds the bundle from the
+// anchors, so the certificate comes back without any of the text it was
+// written with, and with two links pointing at the anchor. All of it has to go,
+// whether the bundle is one the image shipped or one the step installed.
+func TestInjectTakesBackWhatARebuiltBundleLeftBehind(t *testing.T) {
+	useFakeRsync(t)
+	t.Run("in a store the step installed", func(t *testing.T) {
+		bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+		restore, err := inject(bundle, testCA)
+		if err != nil {
+			t.Fatal(err)
+		}
+		storeDir := filepath.Join(rootfs, "etc", "ssl", "certs")
+		mustMkdirAll(t, storeDir)
+		rebuildFromAnchor(t, storeDir)
+
+		restore.finish()
+		assertOnlyRealRoots(t, storeDir)
+	})
+
+	t.Run("in a store the image shipped", func(t *testing.T) {
+		bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+		restore, err := inject(bundle, testCA)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mount := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")
+		scratchDir, _ := mount["source"].(string)
+		rebuildFromAnchor(t, scratchDir)
+
+		restore.finish()
+		assertOnlyRealRoots(t, filepath.Join(rootfs, "etc", "ssl", "certs"))
+	})
+}
+
+// A link the image itself shipped broken is the image's own, however much it
+// looks like something the undo left behind.
+func TestInjectLeavesALinkItDidNotBreakAlone(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storeDir := filepath.Join(rootfs, "etc", "ssl", "certs")
+	mustMkdirAll(t, storeDir)
+	mustWriteFile(t, filepath.Join(storeDir, "ca-certificates.crt"), "REAL-ROOTS\n"+string(testCA))
+	dangling := filepath.Join(storeDir, "shipped-broken.pem")
+	mustSymlink(t, "/gone-before-any-of-this", dangling)
+
+	restore.finish()
+
+	if _, err := os.Lstat(dangling); err != nil {
+		t.Fatalf("the image's own link did not survive: %v", err)
+	}
+}
+
+// An anchor directory is created only because the package that ships it is not
+// installed yet. A step that installs it takes the directory over, and the undo
+// has to leave it, or the image ends up missing a directory an unproxied build
+// of the same Dockerfile has.
+func TestInjectLeavesAnAnchorDirectoryTheStepTookOver(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The rest of what `apt-get install ca-certificates` unpacks. The anchor
+	// directory it ships is already there, put down by the injection.
+	mustMkdirAll(t, filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].owner, "/")))
+
+	restore.finish()
+
+	kept := filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].dir, "/"))
+	if _, err := os.Stat(kept); err != nil {
+		t.Errorf("%s was taken from the package that owns it: %v", anchorDirs[0].dir, err)
+	}
+	if entries, err := os.ReadDir(kept); err != nil || len(entries) != 0 {
+		t.Errorf("%s = %v (%v), want it left empty", anchorDirs[0].dir, entries, err)
+	}
+	// The other distributions' packaging is still absent, so theirs go.
+	for _, anchor := range anchorDirs[1:] {
+		path := filepath.Join(rootfs, strings.TrimPrefix(anchor.dir, "/"))
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("%s still present after restore: %v", anchor.dir, err)
+		}
+	}
+}
+
+// A step is free to take away the whole directory the anchor was written into,
+// which leaves the undo nothing to look through rather than something to fail
+// over.
+func TestInjectSurvivesTheStepRemovingAnAnchorDirectory(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].dir, "/"))); err != nil {
+		t.Fatal(err)
+	}
+
+	restore.finish()
+}
+
+// An anchor swapped for something the undo has no business opening is left as
+// the step left it, and does not stop the rest of the undo.
+func TestInjectLeavesWhatItCannotOpenAlone(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	anchor := filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].dir, "/"), anchorName)
+	if err := os.Remove(anchor); err != nil {
+		t.Fatal(err)
+	}
+	mustSymlink(t, "/somewhere-else", anchor)
+
+	restore.finish()
+
+	target, err := os.Readlink(anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target != "/somewhere-else" {
+		t.Fatalf("got %q, want the step's own link", target)
+	}
+}
+
+// Whatever stops the undo from taking the certificate back out of a file it
+// wrote leaves that file as it is and says so, rather than passing in silence.
+func TestInjectReportsAFailurePartwayThroughTheUndo(t *testing.T) {
+	for name, broken := range map[string]*brokenFile{
+		"reading it":            {failStat: true},
+		"rewriting it":          {failWriteAt: 1},
+		"finding it not a file": {notRegular: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			useTempLog(t)
+			bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+			restore, err := inject(bundle, testCA)
+			if err != nil {
+				t.Fatal(err)
+			}
+			anchor := filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].dir, "/"), anchorName)
+			// Something after the certificate, so the strip has bytes to move.
+			mustAppendFile(t, anchor, "STEP-ADDED\n")
+			useBrokenBundleFile(t, broken)
+
+			restore.finish()
+
+			if !strings.Contains(ownLog.String(), anchor) {
+				t.Fatalf("the failure was not reported: %q", ownLog.String())
+			}
+		})
+	}
+}
+
+// A store directory holding a directory of its own is not descended into: a
+// sweep of one that is mirrored would otherwise reach the rootfs copy.
+func TestInjectDoesNotDescendIntoTheStoreDirectory(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storeDir := filepath.Join(rootfs, "etc", "ssl", "certs")
+	mustMkdirAll(t, storeDir)
+	mustWriteFile(t, filepath.Join(storeDir, "ca-certificates.crt"), "REAL-ROOTS\n"+string(testCA))
+	below := filepath.Join(storeDir, "sub")
+	mustMkdirAll(t, below)
+	mustWriteFile(t, filepath.Join(below, "copy.pem"), string(testCA))
+	mustSymlink(t, filepath.Join(anchorDirs[0].dir, anchorName), filepath.Join(below, "buildcage.pem"))
+
+	restore.finish()
+
+	for _, left := range []string{"copy.pem", "buildcage.pem"} {
+		if _, err := os.Lstat(filepath.Join(below, left)); err != nil {
+			t.Errorf("sub/%s was reached by the sweep: %v", left, err)
+		}
+	}
+}
+
+// Failing to look through what the injection wrote says so in the build log
+// rather than passing silently.
+func TestInjectReportsWhatItCouldNotTakeBack(t *testing.T) {
+	useTempLog(t)
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storeDir := filepath.Join(rootfs, "etc", "ssl", "certs")
+	mustMkdirAll(t, storeDir)
+	mustWriteFile(t, filepath.Join(storeDir, "ca-certificates.crt"), "REAL-ROOTS\n"+string(testCA))
+	failWalkOn(t, storeDir, 1)
+
+	restore.finish()
+
+	if !strings.Contains(ownLog.String(), storeDir) {
+		t.Fatalf("the failure was not reported: %q", ownLog.String())
+	}
+}
+
+// A link the undo cannot remove is reported rather than left to look like it
+// was dealt with.
+func TestInjectReportsALinkItCannotRemove(t *testing.T) {
+	skipIfRoot(t)
+	useTempLog(t)
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storeDir := filepath.Join(rootfs, "etc", "ssl", "certs")
+	mustMkdirAll(t, storeDir)
+	rebuildFromAnchor(t, storeDir)
+	// Readable and traversable, so the strip gets that far, but nothing in it
+	// can be unlinked.
+	if err := os.Chmod(storeDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(storeDir, 0o755) })
+
+	restore.finish()
+
+	if !strings.Contains(ownLog.String(), "buildcage.pem") {
+		t.Fatalf("the failure was not reported: %q", ownLog.String())
+	}
+}
+
+// A copy of the certificate the step's own tooling left in the store directory
+// held nothing else, so it goes with the certificate.
+func TestInjectRemovesACopyOfTheCertificateTheStepLeftBehind(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storeDir := filepath.Join(rootfs, "etc", "ssl", "certs")
+	mustMkdirAll(t, storeDir)
+	mustWriteFile(t, filepath.Join(storeDir, "ca-certificates.crt"), "REAL-ROOTS\n"+string(testCA))
+	copied := filepath.Join(storeDir, "buildcage.pem")
+	mustWriteFile(t, copied, string(testCA))
+
+	restore.finish()
+
+	if _, err := os.Stat(copied); !os.IsNotExist(err) {
+		t.Fatalf("%s still present after restore: %v", copied, err)
+	}
+}
+
+// Something already standing where an anchor would go is the image's own, and
+// is left as it is rather than written over.
+func TestInjectLeavesAnAnchorPathThatIsAlreadyTaken(t *testing.T) {
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	taken := filepath.Join(rootfs, strings.TrimPrefix(anchorDirs[0].dir, "/"), anchorName)
+	mustMkdirAll(t, filepath.Dir(taken))
+	mustWriteFile(t, taken, "THE IMAGE'S OWN\n")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restore.finish()
+
+	got, err := os.ReadFile(taken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "THE IMAGE'S OWN\n" {
+		t.Fatalf("got %q, want the image's own file", got)
+	}
+}

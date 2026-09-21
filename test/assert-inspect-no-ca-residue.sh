@@ -34,14 +34,26 @@ if [ -z "$CA_LINE" ]; then
   fail "could not read the injected CA out of $BUILDER, so this cannot be checked"
 elif docker run --rm -e CA_LINE="$CA_LINE" "$IMAGE" sh -c '
   for f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt \
-           /etc/ssl/ca-bundle.pem /etc/pki/tls/cacert.pem /etc/ssl/cert.pem; do
+           /etc/ssl/ca-bundle.pem /etc/pki/tls/cacert.pem /etc/ssl/cert.pem \
+           /usr/local/share/ca-certificates/buildcage.crt \
+           /etc/pki/ca-trust/source/anchors/buildcage.crt \
+           /etc/pki/trust/anchors/buildcage.crt; do
     [ -f "$f" ] && grep -qF "$CA_LINE" "$f" && exit 0
   done
   exit 1
 '; then
-  fail "the buildcage CA is still present in a system CA bundle"
+  fail "the buildcage CA is still present in a CA bundle or anchor directory"
 else
-  pass "no buildcage CA in any system CA bundle"
+  pass "no buildcage CA in any CA bundle or anchor directory"
+fi
+
+# The anchor directories are created when the image has none, and go again with
+# whatever was written for them. Neither test fixture's base image ships
+# /etc/pki at all, so anything left there is the injection's.
+if docker run --rm "$IMAGE" sh -c 'test -d /etc/pki'; then
+  fail "an anchor directory the injection created is still in the built image"
+else
+  pass "no anchor directory left in the built image"
 fi
 
 # The CA-trust variables inject.go sets only ever reach the transient RUN-step

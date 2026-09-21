@@ -432,15 +432,27 @@ If a variable is already set, by the base image or by the Dockerfile, Buildcage 
 whatever file it already points at rather than redirecting the variable elsewhere. Otherwise, where
 it points depends on whether the step has a system CA store:
 
-| Variable              | Read by                                                                         | If unset, with a store                           | If unset, with no store     |
-| --------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------- |
-| `NODE_EXTRA_CA_CERTS` | Node.js                                                                         | Additive: pointed at a file holding only this CA | same, store or no store     |
-| `DENO_CERT`           | Deno                                                                            | Additive: pointed at a file holding only this CA | same, store or no store     |
-| `CURL_CA_BUNDLE`      | curl                                                                            | Left unset; curl already reads the system store  | proxy-CA-only fallback file |
-| `REQUESTS_CA_BUNDLE`  | Python `requests`                                                               | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
-| `PIP_CERT`            | pip                                                                             | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
-| `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go, Ruby, wget, Rust's `rustls-native-certs`) | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
+| Variable              | Read by                                                                                                                              | If unset, with a store                           | If unset, with no store     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ | --------------------------- |
+| `NODE_EXTRA_CA_CERTS` | Node.js                                                                                                                              | Additive: pointed at a file holding only this CA | same, store or no store     |
+| `DENO_CERT`           | Deno                                                                                                                                 | Additive: pointed at a file holding only this CA | same, store or no store     |
+| `CURL_CA_BUNDLE`      | curl                                                                                                                                 | Left unset; curl already reads the system store  | proxy-CA-only fallback file |
+| `REQUESTS_CA_BUNDLE`  | Python `requests`                                                                                                                    | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
+| `PIP_CERT`            | pip                                                                                                                                  | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
+| `SSL_CERT_FILE`       | OpenSSL, and anything linked against it (Go, Ruby, Rust's `rustls-native-certs`). Not GnuTLS, so Debian's wget and git never read it | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
 
-Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
-so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
-reach, and what a step can't do to its CA store while it is mounted.
+### The anchor
+
+The CA also goes into each distribution's anchor directory
+(`/usr/local/share/ca-certificates`, `/etc/pki/ca-trust/source/anchors`, `/etc/pki/trust/anchors`),
+whose directory is created when the image has none. A step that installs `ca-certificates`, or
+otherwise reruns `update-ca-certificates`, rebuilds its bundle from those directories, and without
+the anchor the CA would be gone from it for the rest of the step. On RHEL the anchor is also how
+GnuTLS sees the CA at all, since p11-kit reads the directory rather than a bundle.
+
+Neither the CA nor these variables are left in the image layers. The anchor goes when the step ends,
+along with the copies and links a rebuild left beside the bundle, and so does any directory written
+for it, unless the step installed the package that ships that directory and would have created it
+anyway. Injection happens at exec time, so it cannot affect a cache key.
+[Limitations](../README.md#limitations) covers what this can't reach, and what a step can't do to
+its CA store while it is mounted.

@@ -294,7 +294,9 @@ toolchains read at a store that holds it: `NODE_EXTRA_CA_CERTS`, `DENO_CERT`, `S
 `REQUESTS_CA_BUNDLE` and `PIP_CERT`. `CURL_CA_BUNDLE` is set only in a step with no system CA store
 of its own, since curl reads that store already. A variable the base image or the Dockerfile already
 set is appended to rather than redirected, and neither the CA nor the variables are left in the
-image layers.
+image layers. The CA is also left in the distribution's own anchor directory, so a step that
+installs `ca-certificates` partway through keeps trusting it once `update-ca-certificates` has
+rebuilt the bundle from scratch.
 
 The full table, with what each variable points at when the step has a system CA store and when it
 has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in

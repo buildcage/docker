@@ -487,6 +487,14 @@ behavior, see [Inspect Proxy Engine](./security.md#inspect-proxy-engine) in Secu
   This is what keeps a step that never touches its CA store from producing a different layer than an
   unmodified build would. Either way this happens at exec time, entirely outside LLB, so it cannot
   affect a cache key: two builds that differ only in `proxy_engine` still share cache.
+
+  The CA is also written into each distribution's anchor directory, which the step's own
+  `update-ca-certificates` rebuilds its bundle from. Without it, a step that installs
+  `ca-certificates` part-way through loses the CA for everything after that point. Undoing that
+  reaches further than the files it wrote: a rebuild leaves a copy of each anchor beside the bundle
+  under a name of its own, so the undo strips the certificate from everything in the store directory
+  and drops the links left pointing at what it removed.
+
 - The `allowed_url_rules` compiler enumerates hosts rather than generalizing them
   (`a.example.com`/`b.example.com` never becomes `*.example.com`), because CoreDNS's own allow/deny
   view is generated from the same host patterns. Widening a host widens what's logged as allowed
