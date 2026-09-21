@@ -37,10 +37,10 @@ layers_of() {
 # The step's own record of what it did, which is not a property of the image
 # the build produces. apt/dpkg/ldconfig write real wall-clock content into
 # these regardless of SOURCE_DATE_EPOCH, which only pins layer timestamps; and
-# a step that rebuilds its CA store logs one more certificate than an unproxied
-# build of the same Dockerfile, since the injected one is in the store while the
-# rebuild runs. Left out of both comparisons: the size in the listing is part of
-# the same content.
+# a step that starts without a CA store and installs one logs what its own
+# update-ca-certificates made of the store written for it, which an unproxied
+# build of the same Dockerfile has nothing to say about. Left out of both
+# comparisons: the size in the listing is part of the same content.
 NONDETERMINISTIC='var/log/apt/[^ ]*|var/log/dpkg\.log|var/cache/ldconfig/aux-cache'
 
 # path/type/mode/owner/size/symlink-target/mtime in one line each, from the
