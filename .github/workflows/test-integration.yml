@@ -60,7 +60,7 @@ jobs:
   test:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.test == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
 
@@ -204,7 +204,7 @@ jobs:
   test_listener_scope:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.test == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     name: "integration: test (listener scope, both engines)"
@@ -251,7 +251,7 @@ jobs:
   # whenever the matrix changes.
   integration-tests-passed:
     name: Integration tests passed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs:
       [
         changes,
