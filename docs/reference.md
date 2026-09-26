@@ -28,7 +28,7 @@ and links here for the details.
 | `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA left in the image into a warning. See [CA residue](#ca-residue). |
 
 ```yaml
-- uses: buildcage/docker@e97cf73f1ca5094c62968f6e8617bde0948deb3d # v4.0.0
+- uses: buildcage/docker@50b861fa913fd9c701b0062526494a182b2e8882 # v4.0.1
   with:
     builder_name: buildcage
     proxy_mode: restrict
