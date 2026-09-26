@@ -1,0 +1,6 @@
+# golang.org/x/crypto/openpgp: deprecated and unsafe by design, so every
+# x/crypto version is affected and no fix will come. buildcage-runc imports
+# only x/crypto/pbkdf2 (through go-pkcs12); openpgp is never compiled in.
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "buildcage-runc never imports golang.org/x/crypto/openpgp; only x/crypto/pbkdf2 is used."

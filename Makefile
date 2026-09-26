@@ -58,6 +58,11 @@ help:
 # renovate: datasource=go depName=github.com/moby/profiles/seccomp
 MOBY_PROFILES_SECCOMP_VERSION ?= v0.2.3
 
+# renovate: datasource=docker depName=eclipse-temurin
+TEST_TEMURIN_PKCS12_IMAGE ?= eclipse-temurin:21@sha256:4d06038800655fe1211760cd561de70ef2ed7a47f5d69255e9834414602b7026
+# renovate: datasource=docker depName=eclipse-temurin
+TEST_TEMURIN_JKS_IMAGE ?= eclipse-temurin:17@sha256:b64592d40959b4d13b218f6b06b9ab219ff8aa3dad61efd3b5f519ba4d72ef92
+
 .PHONY: seccomp_profile
 seccomp_profile: ## Regenerate the builder's seccomp profile from moby/profiles
 	@node docker/seccomp/gen-profile.mjs $(MOBY_PROFILES_SECCOMP_VERSION)
@@ -321,7 +326,7 @@ test_integration_buildkit_inspect_java_audit: ## Run inspect-engine tests agains
 	@echo "Running inspect-engine audit mode tests (Java base images)..."
 	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
 	  $(MAKE) setup_buildkit_inspect_audit
-	@for base in eclipse-temurin:21 eclipse-temurin:17; do \
+	@for base in $(TEST_TEMURIN_PKCS12_IMAGE) $(TEST_TEMURIN_JKS_IMAGE); do \
 	  echo "=== Java base image: $$base ==="; \
 	  docker buildx build --no-cache \
 	    --builder $(BUILDER_NAME) \
