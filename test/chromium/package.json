@@ -1,0 +1,7 @@
+{
+  "name": "buildcage-test-chromium",
+  "private": true,
+  "dependencies": {
+    "puppeteer-core": "25.12.0"
+  }
+}
