@@ -226,7 +226,8 @@ Three mechanisms make that enforceable:
   or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`), each
   bare DER a trust store splits the bundle into (Mono's
   `cert-sync` writes one per certificate), and the EFI signature database RHEL's `update-ca-trust`
-  writes. A copy it finds but cannot remove fails the build: one
+  writes. A copy it finds but cannot remove fails the build, or only warns under
+  `fail_on_ca_residue: false`, which leaves it in the image: one
   inside any other binary, the PEM re-wrapped (escaped into JSON, indented in YAML, on one line or
   in lines of 48 characters or more), a certificate the proxy issued (saved from a server trust-on-first-use), or a PKCS#12 trust store
   holding such a certificate that opens with no password or `changeit`. A copy it cannot read stays

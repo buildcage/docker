@@ -43,6 +43,7 @@ beforeEach(() => {
   mocks.readEngineInputs.mockReturnValue({ proxyEngine: "universal" });
   mocks.readRuleInputs.mockReturnValue({
     proxyMode: "restrict",
+    failOnCaResidue: true,
     httpsRules: ["example.com:443"],
     httpRules: [],
     ipRules: [],
@@ -131,6 +132,7 @@ describe("runSetupStep", () => {
   it("checks known_blocked_rules URL lines against the engine, host lines excluded", async () => {
     mocks.readRuleInputs.mockReturnValue({
       proxyMode: "restrict",
+      failOnCaResidue: true,
       httpsRules: [],
       httpRules: [],
       ipRules: [],
@@ -153,6 +155,7 @@ describe("runSetupStep", () => {
   it("checks allowed_ip_rules against the engine before the builder starts", async () => {
     mocks.readRuleInputs.mockReturnValue({
       proxyMode: "restrict",
+      failOnCaResidue: true,
       httpsRules: [],
       httpRules: [],
       ipRules: ["10.0.0.0/8:443"],
@@ -203,6 +206,7 @@ describe("runSetupStep", () => {
   it("hands the builder the rules that were read, not the job environment's", async () => {
     mocks.readRuleInputs.mockReturnValue({
       proxyMode: "audit",
+      failOnCaResidue: false,
       httpsRules: ["example.com:443", "*.npmjs.org:443"],
       httpRules: ["deb.debian.org:80"],
       ipRules: ["10.0.0.0/8"],
@@ -223,6 +227,7 @@ describe("runSetupStep", () => {
       ALLOWED_URL_RULES: "GET https://example.com/ok",
       ALLOWED_TLS_RULES: "example.com",
       KNOWN_BLOCKED_RULES: "blocked.example:443",
+      FAIL_ON_CA_RESIDUE: "false",
     });
   });
 

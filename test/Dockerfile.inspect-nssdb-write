@@ -1,7 +1,8 @@
 # The wrapper binds a database holding only the proxy CA over the step's own
 # NSS database (see Dockerfile.inspect-chromium). A step that writes to it
 # changes a file buildcage replaced, whose change has nowhere true to go back
-# to, so the build must fail and say why rather than commit or drop the write.
+# to, so the build must fail and say why rather than commit or drop the write,
+# unless fail_on_ca_residue is false, when it warns and drops it.
 #
 # FROM is deliberately not governed by this engine
 # (see docs/security.md#what-buildkitd-fetches-itself), so this pull

@@ -65,4 +65,10 @@ else
   fail "the build log does not name /root/.local/share/pki/nssdb as changed"
 fi
 
+if grep -q "hint: .*fail_on_ca_residue: false" <<<"$OUT"; then
+  pass "the failure points at fail_on_ca_residue"
+else
+  fail "the build log does not point at fail_on_ca_residue"
+fi
+
 assert_results

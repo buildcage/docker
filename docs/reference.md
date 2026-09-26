@@ -20,11 +20,12 @@ and links here for the details.
 
 `buildcage/docker` starts the builder. Every input is optional.
 
-| Input          | Default     | Description                                                           |
-| -------------- | ----------- | --------------------------------------------------------------------- |
-| `builder_name` | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it. |
-| `proxy_mode`   | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).       |
-| `proxy_engine` | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).        |
+| Input                | Default     | Description                                                                                                     |
+| -------------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it.                                           |
+| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                 |
+| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                  |
+| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA left in the image into a warning. See [CA residue](#ca-residue). |
 
 ```yaml
 - uses: buildcage/docker@e97cf73f1ca5094c62968f6e8617bde0948deb3d # v4.0.0
@@ -648,3 +649,21 @@ database is covered for the step with one holding only this CA, owned by the ste
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
 reach, and what a step can't do to its CA store while it is mounted.
+
+### CA residue
+
+Before a step's layer is committed, the wrapper takes the CA back out of every copy of it the step
+left, and reads the layer back to confirm none is left. Two things fail the build by default, each
+naming the file and pointing at `fail_on_ca_residue`:
+
+- a copy of the CA it finds but cannot take out, such as one inside a binary, an uncompressed
+  archive or a re-wrapped PEM (see [Limitations](../README.md#limitations)), and
+- a write to the NSS database it bound over Chromium's for the step, which has nowhere to go back to.
+
+With `fail_on_ca_residue: false` both only warn, in the step's output in the build log, and the
+build carries on: the copy stays in the image, and the write to the NSS database is discarded. A
+failure that leaves the layer in a state nothing vouches for, such as a store write-back that broke
+off part-way, fails the build either way.
+
+The CA is valid for two days and unique to the run, so a copy that stays in an image trusts only a
+proxy that no longer exists. What it still gives away is that the image was built behind this one.

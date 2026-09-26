@@ -33,6 +33,10 @@ import (
 // difference fails the build rather than passing silently.
 var errUnstrippableCA = errors.New("the certificate is in a format this cannot strip")
 
+// errCALeftInLayer means the reading back found a copy the sweep did not take
+// out.
+var errCALeftInLayer = errors.New("the certificate is still in the step's layer")
+
 // readMountInfo is a var so tests can hand the parser lines captured from a
 // real build rather than the test process's own mount table.
 var readMountInfo = func() ([]byte, error) { return os.ReadFile("/proc/self/mountinfo") }
@@ -210,10 +214,15 @@ func sweepDir(listing, root string, ca []byte, marks caMarks) (int, error) {
 	if err != nil {
 		return files, err
 	}
+	// Before the unstrippable copies are reported, so a build that carries on
+	// past them (fail_on_ca_residue: false) still loses the links it removed.
+	if err := dropRemovedLinks(listing, root, removed); err != nil {
+		return files, err
+	}
 	if len(unstrippable) > 0 {
 		return files, fmt.Errorf("%w: %s", errUnstrippableCA, strings.Join(unstrippable, " "))
 	}
-	return files, dropRemovedLinks(listing, root, removed)
+	return files, nil
 }
 
 // dropRemovedLinks takes out the symlinks left pointing at something the sweep
@@ -346,7 +355,7 @@ func stripLayer(rootfs, upper string, ca []byte) error {
 		return err
 	}
 	if len(left) > 0 {
-		return fmt.Errorf("the certificate is still in the step's layer: %s", strings.Join(left, " "))
+		return fmt.Errorf("%w: %s", errCALeftInLayer, strings.Join(left, " "))
 	}
 	return nil
 }

@@ -30,6 +30,9 @@ func TestMain(m *testing.M) {
 	// Nor does an injection test find a real template on the machine running
 	// it; the ones about the NSS database hand it one through useNSSTemplate.
 	nssTemplateDir = filepath.Join(dir, "no-nssdb")
+	// Whatever the machine running the tests has in its environment; a test
+	// about the other setting takes it through useWarnOnCAResidue.
+	failOnCAResidue = true
 	code := m.Run()
 	_ = os.RemoveAll(dir)
 	os.Exit(code)

@@ -11,11 +11,13 @@ import { ActionError } from "#core/lib/errors.ts";
  *   BUILDER_NOT_READY:    the builder container started but never became usable
  *   INVALID_PROXY_ENGINE: proxy_engine input isn't "universal" or "inspect"
  *   INVALID_PROXY_MODE:   proxy_mode input isn't "audit" or "restrict"
+ *   INVALID_FAIL_ON_CA_RESIDUE: fail_on_ca_residue input isn't a boolean
  */
 export type SetupErrorCode =
   | "DOCKER_UNAVAILABLE"
   | "BUILDER_NOT_READY"
   | "INVALID_PROXY_ENGINE"
-  | "INVALID_PROXY_MODE";
+  | "INVALID_PROXY_MODE"
+  | "INVALID_FAIL_ON_CA_RESIDUE";
 
 export class SetupError extends ActionError<SetupErrorCode> {}

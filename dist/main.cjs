@@ -1046,8 +1046,23 @@ function resolveProxyMode(input) {
 	if (!PROXY_MODES.includes(trimmed)) throw new SetupError(`Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`, "INVALID_PROXY_MODE");
 	return trimmed;
 }
+const TRUE_INPUTS = [
+	"true",
+	"True",
+	"TRUE"
+], FALSE_INPUTS = [
+	"false",
+	"False",
+	"FALSE"
+];
+function resolveFailOnCaResidue(input) {
+	let trimmed = input?.trim() ?? "";
+	if (trimmed === "" || TRUE_INPUTS.includes(trimmed)) return !0;
+	if (FALSE_INPUTS.includes(trimmed)) return !1;
+	throw new SetupError(`Invalid fail_on_ca_residue: ${JSON.stringify(input)}. Must be true or false.`, "INVALID_FAIL_ON_CA_RESIDUE");
+}
 function readRuleInputs(getInput$1 = getInput) {
-	let proxyMode = resolveProxyMode(getInput$1("proxy_mode")), rules = buildACLRules({
+	let proxyMode = resolveProxyMode(getInput$1("proxy_mode")), failOnCaResidue = resolveFailOnCaResidue(getInput$1("fail_on_ca_residue")), rules = buildACLRules({
 		httpsRulesInput: getInput$1("allowed_https_rules"),
 		httpRulesInput: getInput$1("allowed_http_rules"),
 		ipRulesInput: getInput$1("allowed_ip_rules")
@@ -1060,6 +1075,7 @@ function readRuleInputs(getInput$1 = getInput) {
 	let urlRules = compiledUrlRules.map((r) => r.raw);
 	return {
 		proxyMode,
+		failOnCaResidue,
 		httpsRules: rules.httpsRules,
 		httpRules: rules.httpRules,
 		ipRules: rules.ipRules,
@@ -1116,12 +1132,13 @@ function listHostIpv4Addresses({ networkInterfaces: list = node_os.networkInterf
 }
 //#endregion
 //#region src/lib/compose-env.ts
-function buildComposeEnv({ builderName, proxyMode, proxyEngine, imageRef, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules }, env, hostAddresses = listHostIpv4Addresses) {
+function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue, imageRef, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules }, env, hostAddresses = listHostIpv4Addresses) {
 	return {
 		...env,
 		BUILDER_NAME: builderName,
 		PROXY_MODE: proxyMode,
 		PROXY_ENGINE: proxyEngine,
+		FAIL_ON_CA_RESIDUE: String(failOnCaResidue),
 		ALLOWED_HTTPS_RULES: httpsRules.join("\n"),
 		ALLOWED_HTTP_RULES: httpRules.join("\n"),
 		ALLOWED_IP_RULES: ipRules.join("\n"),
@@ -8053,7 +8070,7 @@ async function runSetupStep(env, overrides = {}) {
 		log
 	});
 	log(`buildcage: image: ${imageRef}`);
-	let { proxyMode, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readRuleInputs();
+	let { proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readRuleInputs();
 	checkUrlAndTlsRuleSupport({
 		proxyEngine,
 		proxyMode,
@@ -8074,6 +8091,7 @@ async function runSetupStep(env, overrides = {}) {
 		builderName,
 		proxyMode,
 		proxyEngine,
+		failOnCaResidue,
 		imageRef,
 		httpsRules,
 		httpRules,

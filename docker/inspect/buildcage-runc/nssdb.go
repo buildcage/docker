@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -35,6 +36,9 @@ var nssTemplateDir = "/opt/buildcage/nssdb"
 // the default since M146, is used otherwise.
 // https://chromium.googlesource.com/chromium/src/+/main/docs/linux/cert_management.md
 var nssDBPaths = []string{".pki/nssdb", ".local/share/pki/nssdb"}
+
+// errNSSDBChanged means the step wrote to the database bound over its own.
+var errNSSDBChanged = errors.New("the step changed the NSS database")
 
 // maxPasswdBytes bounds how much of the step's /etc/passwd is read to find its
 // home directory. A real one is a few KB.
@@ -221,8 +225,8 @@ func (b *nssBind) finish() error {
 		return err
 	}
 	if !manifestsEqual(current, b.baseline) {
-		return fmt.Errorf("the step changed the NSS database at %s, which the inspect engine replaces for the step with one trusting only its proxy CA; "+
-			"a step that writes to it is not supported (see README.md#limitations)", b.containerDir)
+		return fmt.Errorf("%w at %s, which the inspect engine replaces for the step with one trusting only its proxy CA; "+
+			"the write is discarded (see README.md#limitations)", errNSSDBChanged, b.containerDir)
 	}
 	return nil
 }

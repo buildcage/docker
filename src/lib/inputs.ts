@@ -54,8 +54,35 @@ export function resolveProxyMode(input: string | undefined): ProxyMode {
   return trimmed as ProxyMode;
 }
 
+/** The spellings @actions/core's own getBooleanInput accepts. */
+const TRUE_INPUTS = ["true", "True", "TRUE"];
+const FALSE_INPUTS = ["false", "False", "FALSE"];
+
+/**
+ * Unset is true, the safe side: the dev and test invocations run this from
+ * source rather than through action.yml's own default. Anything else that is
+ * not a boolean is refused rather than guessed at, since reading a typo as
+ * false would let a copy of the CA into the image without a word.
+ */
+export function resolveFailOnCaResidue(input: string | undefined): boolean {
+  const trimmed = input?.trim() ?? "";
+  if (trimmed === "" || TRUE_INPUTS.includes(trimmed)) {
+    return true;
+  }
+  if (FALSE_INPUTS.includes(trimmed)) {
+    return false;
+  }
+  throw new SetupError(
+    `Invalid fail_on_ca_residue: ${JSON.stringify(input)}. Must be true or false.`,
+    "INVALID_FAIL_ON_CA_RESIDUE",
+  );
+}
+
 export interface ParsedRuleInputs {
   proxyMode: ProxyMode;
+  /** Whether a copy of the inspect engine's CA left in a layer fails the build
+   *  (see docker/inspect/buildcage-runc) rather than only warning. */
+  failOnCaResidue: boolean;
   httpsRules: string[];
   httpRules: string[];
   ipRules: string[];
@@ -76,11 +103,13 @@ export interface ParsedRuleInputs {
  *
  * The statement order decides which malformed-rule error surfaces first.
  *
- * @throws {SetupError} if proxy_mode is neither mode
+ * @throws {SetupError} if proxy_mode is neither mode, or fail_on_ca_residue
+ *   is not a boolean
  * @throws {InvalidRulesError} if any rule is malformed
  */
 export function readRuleInputs(getInput: GetInput = core.getInput): ParsedRuleInputs {
   const proxyMode = resolveProxyMode(getInput("proxy_mode"));
+  const failOnCaResidue = resolveFailOnCaResidue(getInput("fail_on_ca_residue"));
   const rules = buildACLRules({
     httpsRulesInput: getInput("allowed_https_rules"),
     httpRulesInput: getInput("allowed_http_rules"),
@@ -95,6 +124,7 @@ export function readRuleInputs(getInput: GetInput = core.getInput): ParsedRuleIn
 
   return {
     proxyMode,
+    failOnCaResidue,
     httpsRules: rules.httpsRules,
     httpRules: rules.httpRules,
     ipRules: rules.ipRules,

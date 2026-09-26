@@ -182,7 +182,7 @@ func (in *injection) finish(committing bool) error {
 	}
 	if in.nss != nil {
 		// Logged once, by run, as the error that fails the step.
-		if err := in.nss.finish(); err != nil && firstErr == nil {
+		if err := tolerateResidue(in.nss.finish()); err != nil && firstErr == nil {
 			firstErr = err
 		}
 		in.nss.cleanup()
@@ -205,7 +205,7 @@ func (in *injection) finish(committing bool) error {
 		return firstErr
 	}
 	// After the write-back, whose own result lands in the layer.
-	if err := stripLayer(in.rootfs, in.upper, in.ca); err != nil {
+	if err := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca)); err != nil {
 		return err
 	}
 	// After the sweep, which has by now emptied and removed the anchor files,

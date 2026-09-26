@@ -407,7 +407,8 @@ reported as blocked; see
   the image kept in that database, a private CA or a client certificate, and only on an
   `allowed_tls_rules` or `allowed_ip_rules` passthrough, which presents the origin's own certificate.
   A step that writes to the database (`certutil -A`, `pk12util -i`) fails the build: the write has
-  nowhere to go back to. Such a build needs `proxy_engine: universal`. Which of the two paths is
+  nowhere to go back to. With `fail_on_ca_residue: false` it only warns and the write is discarded;
+  a build that needs the write to stay needs `proxy_engine: universal`. Which of the two paths is
   covered is decided as the step begins, so a step that creates `~/.pki/nssdb` itself leaves the
   Chromium it then runs reading that one instead.
 - A `RUN` step that copies the system CA bundle into a binary or an uncompressed archive
@@ -420,7 +421,9 @@ reported as blocked; see
   RUN go build                                                      # fine
   ```
 
-- A copy of the CA left in a step's layer is removed, or fails the build if it cannot be. A copy
+- A copy of the CA left in a step's layer is removed, or fails the build if it cannot be, unless
+  `fail_on_ca_residue: false` turns that into a warning and leaves the copy in the image (see
+  [CA residue](./docs/reference.md#ca-residue)). A copy
   that cannot be read, in a compressed archive or a keystore encrypted under a password other than
   none or `changeit` or naming more than a million key-derivation iterations, is not found and stays
   in the image, as is one hex-dumped or re-encoded as base64 outside a PEM block in lines shorter
