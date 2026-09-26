@@ -1,5 +1,8 @@
 [dns]
 nameservers = ["198.19.255.1"]
+# "." empties the search list; [] would keep the one Docker copied from the
+# runner, so a failed lookup would be retried under *.internal.cloudapp.net.
+searchDomains = ["."]
 
 [worker.oci]
 enabled = true

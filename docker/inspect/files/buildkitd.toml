@@ -2,9 +2,9 @@
 # The steps' resolver, not buildkitd's own: the daemon keeps using the builder
 # container's resolv.conf, so `FROM` still reaches a real registry.
 nameservers = ["198.19.255.1"]
-# Without this, the host's own search domain leaks into every RUN step's
-# resolv.conf and doubles each lookup.
-options = ["ndots:0"]
+# "." empties the search list; [] would keep the one Docker copied from the
+# runner, so a failed lookup would be retried under *.internal.cloudapp.net.
+searchDomains = ["."]
 
 [worker.oci]
 enabled = true
