@@ -7,7 +7,7 @@
 # FROM is deliberately not governed by this engine
 # (see docs/security.md#what-buildkitd-fetches-itself), so this pull
 # succeeds whatever the rules say.
-FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241
+FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 SHELL ["/bin/sh", "-c"]
 
