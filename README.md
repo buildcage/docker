@@ -133,8 +133,8 @@ to be set explicitly.
 `inspect` terminates TLS and re-signs it with a CA generated for that build. Rules match on method
 and URL, so `GET|HEAD https://registry.npmjs.org/**` allows a fetch while refusing a publish on the
 same host, and the report names every request with its URL. The build has to trust that CA:
-Buildcage adds it to the system store, to the CA-trust variables, and to a JVM already in the base
-image, so most toolchains need nothing extra (see
+Buildcage adds it to the system store, to the CA-trust variables, to a JVM already in the base
+image, and to Chromium's NSS database, so most toolchains need nothing extra (see
 [CA trust and compatibility](#ca-trust-and-compatibility)).
 
 `universal` reads only the SNI. Rules match on host and port, so `registry.npmjs.org:443` is the
@@ -321,6 +321,10 @@ has rebuilt the bundle from scratch. A JVM already in the base image reads none 
 only its own keystore, so the CA is added there too, to `$JAVA_HOME/lib/security/cacerts` in
 whichever shape it ships (JKS or PKCS#12), for the step and taken back out before the layer is
 committed, letting `mvn`, `gradle` and `java` reach the proxy without `proxy_engine: universal`.
+Chromium, including the `chrome-headless-shell` that Puppeteer, Playwright and Remotion download,
+reads neither the system store nor any variable, only its compiled-in root store and the NSS
+database in `$HOME`. For each step, Buildcage covers that database with one holding only the CA,
+owned by the step's user, and takes it away again when the step ends.
 
 The full table, with what each variable points at when the step has a system CA store and when it
 has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in
@@ -397,6 +401,15 @@ reported as blocked; see
   a JVM already in the base image is handled: the CA is added to its `$JAVA_HOME/lib/security/cacerts`
   for the step and removed before the layer is committed. A keystore sealed with a password other
   than the JDK default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it.
+- Chromium's NSS database (`~/.pki/nssdb`, or `~/.local/share/pki/nssdb` when that is absent) is
+  replaced for each step, not added to. Public sites still verify against Chromium's compiled-in
+  root store, and everything else `inspect` re-signs with its own CA, so what is lost is only what
+  the image kept in that database, a private CA or a client certificate, and only on an
+  `allowed_tls_rules` or `allowed_ip_rules` passthrough, which presents the origin's own certificate.
+  A step that writes to the database (`certutil -A`, `pk12util -i`) fails the build: the write has
+  nowhere to go back to. Such a build needs `proxy_engine: universal`. Which of the two paths is
+  covered is decided as the step begins, so a step that creates `~/.pki/nssdb` itself leaves the
+  Chromium it then runs reading that one instead.
 - A `RUN` step that copies the system CA bundle into a binary or an uncompressed archive
   (`go:embed`, `include_str!`, `tar cf`) fails: the copy carries the build's CA, which cannot be cut
   out of a binary without corrupting it. Copy the bundle in an earlier `RUN` step instead:

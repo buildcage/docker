@@ -453,7 +453,14 @@ func entryFor(entries []fileEntry, rel string) (fileEntry, bool) {
 }
 
 func (b *dirBind) cleanup() {
-	if err := os.RemoveAll(b.scratchDir); err != nil {
-		logf("cannot remove %s: %v", b.scratchDir, err)
+	removeScratchDir(b.scratchDir)
+}
+
+// removeScratchDir removes a mirror once the step is done with it. A failure
+// leaves a directory behind on the builder, which is worth a log line but not
+// worth failing a step that otherwise succeeded.
+func removeScratchDir(dir string) {
+	if err := os.RemoveAll(dir); err != nil {
+		logf("cannot remove %s: %v", dir, err)
 	}
 }

@@ -639,6 +639,12 @@ store:
 | `PIP_CERT`            | pip                                                                       | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
 | `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go, Ruby, Rust's `rustls-native-certs`) | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
 
+Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`:
+`~/.pki/nssdb` when that exists, even empty, and `~/.local/share/pki/nssdb` otherwise. That
+database is covered for the step with one holding only this CA, owned by the step's user, and
+`HOME` is taken from the step's environment or, when that leaves it empty, from the image's
+`/etc/passwd`, as runc does.
+
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
 reach, and what a step can't do to its CA store while it is mounted.

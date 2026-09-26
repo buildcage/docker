@@ -340,6 +340,28 @@ test_integration_buildkit_inspect_java_audit: ## Run inspect-engine tests agains
 	@NO_APP_STORE_COPIES=1 ./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
+# Chromium reads only its own root store and the NSS database in $HOME, which
+# the wrapper binds a database holding only the proxy CA over. The build's own
+# steps fail unless chrome-headless-shell trusts the CA as root with no
+# database, over an image's own, and as a user of its own; the assertions
+# check none of it reached the image, and that a step writing to the database
+# fails the build. Chrome for Testing ships chrome-headless-shell for x86-64
+# only, so this builds for linux/amd64 whatever TEST_PLATFORM says.
+.PHONY: test_integration_buildkit_inspect_chromium_audit
+test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests against chrome-headless-shell (NSS database injection)
+	@echo "Running inspect-engine audit mode tests (chrome-headless-shell)..."
+	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	  $(MAKE) setup_buildkit_inspect_audit
+	@docker buildx build --no-cache \
+	  --builder $(BUILDER_NAME) \
+	  --platform linux/amd64 \
+	  --progress=plain -f test/Dockerfile.inspect-chromium test/ \
+	  --load -t $(TEST_IMAGE)
+	@NO_APP_STORE_COPIES=1 ./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
+	@BUILDER_NAME=$(BUILDER_NAME) TEST_PLATFORM=linux/amd64 \
+	  ./test/assert-inspect-chromium.sh $(TEST_IMAGE)
+	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+
 # Each case hides a copy of the CA the sweep finds but cannot remove, and must
 # fail the build naming the file. The control writes an unrelated encrypted
 # keystore and must build. The resealed case must build with the CA taken out
