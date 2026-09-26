@@ -1,0 +1,11 @@
+# Writing to the bound NSS database fails the build, or only warns under
+# fail_on_ca_residue: false.
+#
+# FROM is deliberately not governed by this engine
+# (see docs/security.md#what-buildkitd-fetches-itself), so this pull
+# succeeds whatever the rules say.
+FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+
+SHELL ["/bin/sh", "-c"]
+
+RUN touch /root/.pki/nssdb/written-by-the-step

@@ -387,8 +387,8 @@ If you encounter issues, try reproducing the problem locally to get detailed log
    ships its own trust store rather than reading the CA-trust environment variables Buildcage sets.
    A JVM already in the base image is handled (`buildcage-runc` injects into its
    `$JAVA_HOME/lib/security/cacerts`, JKS or PKCS#12); a keystore sealed with a password other than
-   the JDK default still needs `universal`. See
-   [Limitations](../README.md#limitations).
+   the JDK default still needs `universal`. Chromium is handled by covering its NSS database; a
+   step that writes to it fails with "changed the NSS database". See [Limitations](../README.md#limitations).
 
 4. **The setup step fails with "never became ready"**: the builder came up but `buildctl debug
 workers` never succeeded inside it. The step prints the container log; locally:

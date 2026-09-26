@@ -20,11 +20,12 @@ and links here for the details.
 
 `buildcage/docker` starts the builder. Every input is optional.
 
-| Input          | Default     | Description                                                           |
-| -------------- | ----------- | --------------------------------------------------------------------- |
-| `builder_name` | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it. |
-| `proxy_mode`   | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).       |
-| `proxy_engine` | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).        |
+| Input                | Default     | Description                                                                                                     |
+| -------------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it.                                           |
+| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                 |
+| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                  |
+| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA left in the image into a warning. See [CA residue](#ca-residue). |
 
 ```yaml
 - uses: buildcage/docker@e97cf73f1ca5094c62968f6e8617bde0948deb3d # v4.0.0
@@ -639,6 +640,25 @@ store:
 | `PIP_CERT`            | pip                                                                       | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
 | `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go, Ruby, Rust's `rustls-native-certs`) | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
 
+Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
+Every Chromium version reads `~/.pki/nssdb` when it exists, so that path is covered for the step
+with a database holding only this CA, owned by the step's user. `HOME` comes from the step's
+environment, or from the image's `/etc/passwd` when that is empty, as runc does.
+
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
 reach, and what a step can't do to its CA store while it is mounted.
+
+### CA residue
+
+Two things fail the build by default, naming the file and pointing at `fail_on_ca_residue`:
+
+- a copy of the CA the wrapper finds in the step's layer but cannot take out, such as one inside a
+  binary, an uncompressed archive or a re-wrapped PEM (see [Limitations](../README.md#limitations))
+- a write to the NSS database bound over Chromium's for the step
+
+With `fail_on_ca_residue: false` both only warn: the copy stays in the image, and the write is
+discarded. A layer the wrapper could not read back or restore fails the build either way.
+
+The CA is valid for two days and unique to the run, so a copy left in an image trusts only a proxy
+that no longer exists. It still shows the image was built behind Buildcage.

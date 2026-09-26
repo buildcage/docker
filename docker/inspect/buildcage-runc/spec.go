@@ -63,6 +63,27 @@ func loadSpec(bundle string) (*spec, error) {
 	return s, nil
 }
 
+// processUser reads the numeric uid and gid BuildKit resolved USER into; a spec
+// naming none runs as root.
+func (s *spec) processUser() (uid, gid int) {
+	proc, _ := s.raw["process"].(map[string]any)
+	user, _ := proc["user"].(map[string]any)
+	return specInt(user["uid"]), specInt(user["gid"])
+}
+
+// specInt reads a number loadSpec kept as json.Number, or 0 when there is none.
+func specInt(v any) int {
+	n, ok := v.(json.Number)
+	if !ok {
+		return 0
+	}
+	i, err := n.Int64()
+	if err != nil {
+		return 0
+	}
+	return int(i)
+}
+
 // setEnv adds variables to the process spec in memory; call save to persist.
 func (s *spec) setEnv(extra map[string]string) {
 	if len(extra) == 0 {

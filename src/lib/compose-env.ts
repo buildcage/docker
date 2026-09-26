@@ -5,6 +5,7 @@ export interface ComposeEnvOptions {
   builderName: string;
   proxyMode: string;
   proxyEngine: ProxyEngine;
+  failOnCaResidue: boolean;
   imageRef: string;
   httpsRules: string[];
   httpRules: string[];
@@ -27,6 +28,7 @@ export function buildComposeEnv(
     builderName,
     proxyMode,
     proxyEngine,
+    failOnCaResidue,
     imageRef,
     httpsRules,
     httpRules,
@@ -43,6 +45,8 @@ export function buildComposeEnv(
     BUILDER_NAME: builderName,
     PROXY_MODE: proxyMode,
     PROXY_ENGINE: proxyEngine,
+    // Read by buildcage-runc in each RUN step; universal has no CA to leave.
+    FAIL_ON_CA_RESIDUE: String(failOnCaResidue),
     ALLOWED_HTTPS_RULES: httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: httpRules.join("\n"),
     ALLOWED_IP_RULES: ipRules.join("\n"),

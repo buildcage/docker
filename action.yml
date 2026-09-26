@@ -37,6 +37,10 @@ inputs:
     description: "TLS destinations passed through undecrypted, judged on SNI alone, separated by whitespace. Port required. Requires proxy_engine: inspect. e.g., 'db.example.com:5432'"
     required: false
     default: ""
+  fail_on_ca_residue:
+    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when it leaves a copy of the proxy CA in its layer that cannot be removed, or writes to Chromium's NSS database. With false, the copy stays in the image and the write is discarded."
+    required: false
+    default: "true"
   known_blocked_rules:
     description: "Domains expected to be blocked intentionally (wildcard or ~regex), separated by whitespace. A rule that names no port matches any port, a refused name having none. Blocked connections matching these rules don't fail the report step even when fail_on_blocked is true; only unmatched (unexpected) blocked connections do. e.g., 'known-noisy.example.com:443'"
     required: false

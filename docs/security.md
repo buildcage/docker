@@ -215,13 +215,17 @@ Three mechanisms make that enforceable:
   distribution's anchor directory, so a step that installs `ca-certificates` part-way through keeps
   trusting it once the bundle is rebuilt, and adds it, the same mirrored way, to the keystore a JVM
   already in the base image reads (`$JAVA_HOME/lib/security/cacerts`, in either the JKS or PKCS#12
-  shape it ships), which no CA-trust variable would reach. Injection happens at exec time, never touches LLB, and so
+  shape it ships), which no CA-trust variable would reach. Chromium reads neither, only the NSS
+  database in `$HOME`, so the wrapper binds over `~/.pki/nssdb` a copy of a database holding only
+  the CA, made by `certutil` in the proxy container from the CA certificate alone. The step's own
+  database is never parsed, and a step that changes the copy fails the build. Injection happens at exec time, never touches LLB, and so
   cannot affect a cache key. Before the step's layer is committed, the wrapper reads that layer back
   and takes the certificate, and the anchor, out of every text file carrying it as PEM, every JKS
   or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`), each
   bare DER a trust store splits the bundle into (Mono's
   `cert-sync` writes one per certificate), and the EFI signature database RHEL's `update-ca-trust`
-  writes. A copy it finds but cannot remove fails the build: one
+  writes. A copy it finds but cannot remove fails the build, or only warns under
+  `fail_on_ca_residue: false`, which leaves it in the image: one
   inside any other binary, the PEM re-wrapped (escaped into JSON, indented in YAML, on one line or
   in lines of 48 characters or more), a certificate the proxy issued (saved from a server trust-on-first-use), or a PKCS#12 trust store
   holding such a certificate that opens with no password or `changeit`. A copy it cannot read stays
@@ -303,6 +307,7 @@ TLS is terminated, so a tool that pins a certificate, or ships a bundled trust s
 the system update, will not work. The JVM (Java, Kotlin, Scala) reads only its own keystore rather
 than the CA-trust variables; a JVM already in the base image is handled by injecting into that
 keystore, but one sealed with a password other than the JDK default falls back to `universal`.
+Chromium's NSS database is covered with one trusting the CA; a step that writes to it fails.
 See [Limitations](../README.md#limitations) for the rest of the
 compatibility picture.
 

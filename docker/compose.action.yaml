@@ -38,6 +38,8 @@ services:
       # Runner addresses the engine refuses as a resolved destination.
       - HOST_ADDRESSES=${HOST_ADDRESSES:-}
       - PROXY_ENGINE=${PROXY_ENGINE:-inspect}
+      # inspect only: whether a copy of the CA left in a layer fails the build.
+      - FAIL_ON_CA_RESIDUE=${FAIL_ON_CA_RESIDUE:-true}
     # `--wait` would otherwise return on "running" alone, which says nothing
     # about buildkitd. buildctl works in both engines. No restart policy
     # goes with it: a container that stopped itself has to stay stopped for the

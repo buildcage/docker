@@ -40,9 +40,10 @@ var anchorDirs = []struct{ dir, owner string }{
 // the directory.
 const anchorName = "buildcage.crt"
 
-// createdDirs is the directories the injection made to reach an anchor, so the
-// undo takes back exactly what it added. The anchor files themselves are not
-// tracked: they carry only the CA, so the layer sweep empties and removes them.
+// createdDirs is the directories the injection made to reach an anchor or to
+// bind Chromium's NSS database over, so the undo takes back exactly what it
+// added. The anchor files themselves are not tracked: they carry only the CA,
+// so the layer sweep empties and removes them.
 type createdDirs struct {
 	dirs []string
 }
@@ -126,10 +127,10 @@ func adoptedAnchorDirs(rootfs string) map[string]bool {
 	return adopted
 }
 
-// removeCreatedDirs takes back the directories placeAnchors made, deepest
-// first, leaving one the step's own package has since adopted. It runs after
-// the layer sweep, so an anchor file is already gone and the directory that
-// held it is empty.
+// removeCreatedDirs takes back the directories placeAnchors and placeNSSDB
+// made, deepest first, leaving one the step has since put something in. It
+// runs after the layer sweep, so an anchor file is already gone and the
+// directory that held it is empty.
 func removeCreatedDirs(rootfs string, created createdDirs) {
 	adopted := adoptedAnchorDirs(rootfs)
 	for _, dir := range created.removalOrder() {
@@ -142,7 +143,7 @@ func removeCreatedDirs(rootfs string, created createdDirs) {
 		// resolveInRoot confines the target, and a mismatch reveals the swap.
 		resolved, err := resolveInRoot(rootfs, containerPathOf(rootfs, dir))
 		if err != nil || resolved != dir {
-			logf("not taking the anchor directory %s back out: it no longer resolves there (%v)", dir, err)
+			logf("not taking the created directory %s back out: it no longer resolves there (%v)", dir, err)
 			continue
 		}
 		err = os.Remove(resolved)
@@ -152,7 +153,7 @@ func removeCreatedDirs(rootfs string, created createdDirs) {
 			continue
 		}
 		if err != nil {
-			logf("cannot take the anchor directory %s back out: %v", dir, err)
+			logf("cannot take the created directory %s back out: %v", dir, err)
 		}
 	}
 }

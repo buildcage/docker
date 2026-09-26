@@ -96,6 +96,9 @@ jobs:
           - mode: inspect-hidden-ca
             target: test_integration_buildkit_inspect_hidden_ca
             test_compose_file: compose.test-inspect.yaml
+          - mode: inspect-chromium-audit
+            target: test_integration_buildkit_inspect_chromium_audit
+            test_compose_file: compose.test-inspect.yaml
 
     name: "integration: test (${{ matrix.mode }})"
 

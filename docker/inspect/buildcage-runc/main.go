@@ -150,6 +150,9 @@ func run(args []string) int {
 		if err := injected.finish(code == 0); err != nil {
 			logf("taking the CA back out failed, failing the build: %v", err)
 			dumpOwnLog(os.Stderr)
+			if isCAResidue(err) {
+				fmt.Fprintf(os.Stderr, "buildcage: hint: %s\n", residueHint)
+			}
 			if code == 0 {
 				code = 1
 			}

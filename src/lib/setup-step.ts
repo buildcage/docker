@@ -157,8 +157,16 @@ export async function runSetupStep(
 
   // Read after the image, not alongside the engine, so a run with both
   // problems reports the image error (see inputs.ts).
-  const { proxyMode, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } =
-    readRuleInputs();
+  const {
+    proxyMode,
+    failOnCaResidue,
+    httpsRules,
+    httpRules,
+    ipRules,
+    urlRules,
+    tlsRules,
+    knownBlockedRules,
+  } = readRuleInputs();
   // Before the builder starts, so a rule the engine cannot enforce is reported
   // once, up front, rather than silently not enforced.
   checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn);
@@ -191,6 +199,7 @@ export async function runSetupStep(
       builderName,
       proxyMode,
       proxyEngine,
+      failOnCaResidue,
       imageRef,
       httpsRules,
       httpRules,

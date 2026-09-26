@@ -133,8 +133,8 @@ to be set explicitly.
 `inspect` terminates TLS and re-signs it with a CA generated for that build. Rules match on method
 and URL, so `GET|HEAD https://registry.npmjs.org/**` allows a fetch while refusing a publish on the
 same host, and the report names every request with its URL. The build has to trust that CA:
-Buildcage adds it to the system store, to the CA-trust variables, and to a JVM already in the base
-image, so most toolchains need nothing extra (see
+Buildcage adds it to the system store, to the CA-trust variables, to a JVM already in the base
+image, and to Chromium's NSS database, so most toolchains need nothing extra (see
 [CA trust and compatibility](#ca-trust-and-compatibility)).
 
 `universal` reads only the SNI. Rules match on host and port, so `registry.npmjs.org:443` is the
@@ -321,6 +321,9 @@ has rebuilt the bundle from scratch. A JVM already in the base image reads none 
 only its own keystore, so the CA is added there too, to `$JAVA_HOME/lib/security/cacerts` in
 whichever shape it ships (JKS or PKCS#12), for the step and taken back out before the layer is
 committed, letting `mvn`, `gradle` and `java` reach the proxy without `proxy_engine: universal`.
+Chromium, including the `chrome-headless-shell` that Puppeteer, Playwright and Remotion download,
+reads only its compiled-in root store and the NSS database in `$HOME`, so for each step `~/.pki/nssdb`
+is covered with a database holding only the CA.
 
 The full table, with what each variable points at when the step has a system CA store and when it
 has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in
@@ -397,6 +400,12 @@ reported as blocked; see
   a JVM already in the base image is handled: the CA is added to its `$JAVA_HOME/lib/security/cacerts`
   for the step and removed before the layer is committed. A keystore sealed with a password other
   than the JDK default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it.
+- Chromium's NSS database is replaced for each step, not added to: `~/.pki/nssdb` is covered, and
+  Chromium then ignores `~/.local/share/pki/nssdb`. What is lost is a private CA or client
+  certificate kept there, and only on an `allowed_tls_rules` or `allowed_ip_rules` passthrough.
+  A step that writes to the database (`certutil -A`, `pk12util -i`) or removes `~/.pki` fails the
+  build. With `fail_on_ca_residue: false` a write only warns and is discarded; a build that needs
+  it kept needs `proxy_engine: universal`.
 - A `RUN` step that copies the system CA bundle into a binary or an uncompressed archive
   (`go:embed`, `include_str!`, `tar cf`) fails: the copy carries the build's CA, which cannot be cut
   out of a binary without corrupting it. Copy the bundle in an earlier `RUN` step instead:
@@ -407,8 +416,9 @@ reported as blocked; see
   RUN go build                                                      # fine
   ```
 
-- A copy of the CA left in a step's layer is removed, or fails the build if it cannot be. A copy
-  that cannot be read, in a compressed archive or a keystore encrypted under a password other than
+- A copy of the CA left in a step's layer is removed, or fails the build if it cannot be
+  (`fail_on_ca_residue: false` makes that a warning, see
+  [CA residue](./docs/reference.md#ca-residue)). A copy that cannot be read, in a compressed archive or a keystore encrypted under a password other than
   none or `changeit` or naming more than a million key-derivation iterations, is not found and stays
   in the image, as is one hex-dumped or re-encoded as base64 outside a PEM block in lines shorter
   than 48 characters. See

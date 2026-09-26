@@ -27,6 +27,10 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	logFile = filepath.Join(dir, "runc.log")
+	// Tests that need a template use useNSSTemplate.
+	nssTemplateDir = filepath.Join(dir, "no-nssdb")
+	// Not whatever the test machine's environment says.
+	failOnCAResidue = true
 	code := m.Run()
 	_ = os.RemoveAll(dir)
 	os.Exit(code)

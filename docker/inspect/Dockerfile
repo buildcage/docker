@@ -66,14 +66,16 @@ FROM moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3
 
 LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
       org.opencontainers.image.description="Secure Docker build environment enforcing on method, URL and path" \
-      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-2.0-or-later AND ISC" \
+      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-2.0-or-later AND ISC AND MPL-2.0" \
       org.opencontainers.image.source="https://github.com/buildcage/docker" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/core/lib/docker/report-source.ts.
 
+# nss-tools provides certutil for init-inspect-cfg's NSS database.
 RUN apk add --no-cache \
       s6-overlay \
       openssl \
+      nss-tools \
       iptables \
       curl \
       quickjs-ng \

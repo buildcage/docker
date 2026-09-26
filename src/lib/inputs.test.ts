@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { readBuilderName, readEngineInputs, readRuleInputs, resolveProxyMode } from "./inputs.ts";
+import {
+  readBuilderName,
+  readEngineInputs,
+  readRuleInputs,
+  resolveFailOnCaResidue,
+  resolveProxyMode,
+} from "./inputs.ts";
 import { DEFAULT_BUILDER_NAME } from "#core/lib/docker/report-source.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
@@ -49,7 +55,28 @@ describe("readEngineInputs", () => {
   });
 });
 
+describe("resolveFailOnCaResidue", () => {
+  it.each(["", "   ", undefined, "true", "True", "TRUE"])("reads %j as true", (input) => {
+    expect(resolveFailOnCaResidue(input)).toBe(true);
+  });
+
+  it.each(["false", "False", "FALSE", " false "])("reads %j as false", (input) => {
+    expect(resolveFailOnCaResidue(input)).toBe(false);
+  });
+
+  // A typo read as false would let a copy of the CA into the image unannounced.
+  it.each(["no", "0", "flase"])("refuses %j", (input) => {
+    expect(() => resolveFailOnCaResidue(input)).toThrow(
+      expect.objectContaining({ code: "INVALID_FAIL_ON_CA_RESIDUE" }),
+    );
+  });
+});
+
 describe("readRuleInputs", () => {
+  it("reads fail_on_ca_residue", () => {
+    expect(readRuleInputs(inputs({ fail_on_ca_residue: "false" })).failOnCaResidue).toBe(false);
+  });
+
   it("defaults proxy_mode to restrict", () => {
     expect(readRuleInputs(inputs()).proxyMode).toBe("restrict");
   });
@@ -67,6 +94,7 @@ describe("readRuleInputs", () => {
   it("returns empty rule lists when nothing is set", () => {
     expect(readRuleInputs(inputs())).toStrictEqual({
       proxyMode: "restrict",
+      failOnCaResidue: true,
       httpsRules: [],
       httpRules: [],
       ipRules: [],

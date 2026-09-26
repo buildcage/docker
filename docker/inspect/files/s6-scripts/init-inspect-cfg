@@ -19,6 +19,14 @@ if [ ! -f /etc/haproxy/ca.pem ]; then
     cat /tmp/ca.crt /tmp/ca.key > /etc/haproxy/ca.pem
     cp /tmp/ca.crt /opt/buildcage/ca.pem
 
+    # Chromium trusts only its built-in roots and the NSS database in $HOME, so
+    # this CA-only database is mounted over the workload's own. NSS_TRUST_TYPE=NSS
+    # keeps the trust where older NSS (Debian 12, Ubuntu 24.04) can read it.
+    rm -rf /opt/buildcage/nssdb
+    mkdir -p /opt/buildcage/nssdb
+    NSS_TRUST_TYPE=NSS certutil -N -d sql:/opt/buildcage/nssdb --empty-password
+    NSS_TRUST_TYPE=NSS certutil -A -d sql:/opt/buildcage/nssdb -n "buildcage proxy CA" -t "C,," -i /tmp/ca.crt
+
     # The default certificate is the template every generated one is based on,
     # so it has to be a server certificate signed by the CA. Pointing it at the
     # CA itself makes the first handshake for each name fail.
