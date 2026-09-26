@@ -71,6 +71,10 @@ LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/core/lib/docker/report-source.ts.
 
+# libexpat 2.8.4-r0, which the base's git pulls in, carries CVE-2026-93990;
+# its Alpine branch already ships the fix. Drop this once the base does too.
+RUN apk upgrade --no-cache libexpat
+
 # nss-tools provides certutil for init-inspect-cfg's NSS database.
 RUN apk add --no-cache \
       s6-overlay \
