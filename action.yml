@@ -38,7 +38,7 @@ inputs:
     required: false
     default: ""
   fail_on_ca_residue:
-    description: "proxy_engine: inspect only. Whether a RUN step that leaves a copy of the proxy CA in its layer where it cannot be removed, or that writes to the NSS database Chromium reads, fails the build (true, default) or only warns (false). With false, that copy stays in the image, and the step's writes to the NSS database are discarded."
+    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when it leaves a copy of the proxy CA in its layer that cannot be removed, or writes to Chromium's NSS database. With false, the copy stays in the image and the write is discarded."
     required: false
     default: "true"
   known_blocked_rules:

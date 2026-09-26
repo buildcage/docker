@@ -216,11 +216,9 @@ Three mechanisms make that enforceable:
   trusting it once the bundle is rebuilt, and adds it, the same mirrored way, to the keystore a JVM
   already in the base image reads (`$JAVA_HOME/lib/security/cacerts`, in either the JKS or PKCS#12
   shape it ships), which no CA-trust variable would reach. Chromium reads neither, only the NSS
-  database in `$HOME`, so the wrapper binds a copy of a database holding only the CA over the one
-  Chromium would read. That database is made by `certutil` in the proxy container from the CA
-  certificate alone, when the CA is generated: the step's own database, SQLite the build controls,
-  is never parsed, only covered, and a step that changes the copy fails the build rather than have
-  the change written back. Injection happens at exec time, never touches LLB, and so
+  database in `$HOME`, so the wrapper binds over `~/.pki/nssdb` a copy of a database holding only
+  the CA, made by `certutil` in the proxy container from the CA certificate alone. The step's own
+  database is never parsed, and a step that changes the copy fails the build. Injection happens at exec time, never touches LLB, and so
   cannot affect a cache key. Before the step's layer is committed, the wrapper reads that layer back
   and takes the certificate, and the anchor, out of every text file carrying it as PEM, every JKS
   or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`), each

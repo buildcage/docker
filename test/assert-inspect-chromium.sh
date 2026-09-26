@@ -2,12 +2,9 @@
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 
-# Dockerfile.inspect-chromium's own RUN steps already fail the build unless
-# Chromium trusted the proxy CA, so this checks what the build committed: the
-# database the wrapper bound over each step's own never reached a layer, the
-# directories it created to bind it were taken back, and the image's own
-# database is what the image put there. Then a step that writes to the bound
-# database must fail the build, naming it.
+# The build's own steps check Chromium trusted the proxy CA; this checks the
+# committed image carries none of the bound database, and that a step writing
+# to it fails the build.
 
 IMAGE="${1:-buildcage-test}"
 BUILDER="${BUILDER_NAME:-buildcage}"
@@ -17,18 +14,15 @@ echo ""
 echo "=== Chromium's NSS Database ($IMAGE) ==="
 echo ""
 
-# The step made it, empty, and nothing else wrote to it.
-if docker run --rm --user root "$IMAGE" sh -c '[ -d /root/.pki/nssdb ] && [ -z "$(ls -A /root/.pki/nssdb)" ]'; then
-  pass "the image's own legacy database is still the empty directory the step made"
+if docker run --rm --user root "$IMAGE" sh -c '[ -d /root/.local/share/pki/nssdb ] && [ -z "$(ls -A /root/.local/share/pki/nssdb)" ]'; then
+  pass "the image's own XDG database is still the empty directory the step made"
 else
-  fail "/root/.pki/nssdb is missing or holds something in the built image"
+  fail "/root/.local/share/pki/nssdb is missing or holds something in the built image"
 fi
 
-# Neither home had an XDG data directory before the wrapper made one to bind
-# the database over, so anything there is the wrapper's.
-for dir in /root/.local /home/app/.local; do
+for dir in /root/.pki /home/app/.pki /home/app/.local; do
   if docker run --rm --user root "$IMAGE" sh -c "test -e $dir"; then
-    fail "$dir, created to bind the database over, is in the built image"
+    fail "$dir is in the built image"
   else
     pass "no $dir in the built image"
   fi
@@ -59,10 +53,10 @@ else
   pass "the build failed"
 fi
 
-if grep -q "changed the NSS database at /root/.local/share/pki/nssdb" <<<"$OUT"; then
+if grep -q "changed the NSS database at /root/.pki/nssdb" <<<"$OUT"; then
   pass "the failure names the database the step wrote to"
 else
-  fail "the build log does not name /root/.local/share/pki/nssdb as changed"
+  fail "the build log does not name /root/.pki/nssdb as changed"
 fi
 
 if grep -q "hint: .*fail_on_ca_residue: false" <<<"$OUT"; then

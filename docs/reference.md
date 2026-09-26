@@ -640,11 +640,10 @@ store:
 | `PIP_CERT`            | pip                                                                       | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
 | `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go, Ruby, Rust's `rustls-native-certs`) | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
 
-Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`:
-`~/.pki/nssdb` when that exists, even empty, and `~/.local/share/pki/nssdb` otherwise. That
-database is covered for the step with one holding only this CA, owned by the step's user, and
-`HOME` is taken from the step's environment or, when that leaves it empty, from the image's
-`/etc/passwd`, as runc does.
+Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
+Every Chromium version reads `~/.pki/nssdb` when it exists, so that path is covered for the step
+with a database holding only this CA, owned by the step's user. `HOME` comes from the step's
+environment, or from the image's `/etc/passwd` when that is empty, as runc does.
 
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
@@ -652,18 +651,14 @@ reach, and what a step can't do to its CA store while it is mounted.
 
 ### CA residue
 
-Before a step's layer is committed, the wrapper takes the CA back out of every copy of it the step
-left, and reads the layer back to confirm none is left. Two things fail the build by default, each
-naming the file and pointing at `fail_on_ca_residue`:
+Two things fail the build by default, naming the file and pointing at `fail_on_ca_residue`:
 
-- a copy of the CA it finds but cannot take out, such as one inside a binary, an uncompressed
-  archive or a re-wrapped PEM (see [Limitations](../README.md#limitations)), and
-- a write to the NSS database it bound over Chromium's for the step, which has nowhere to go back to.
+- a copy of the CA the wrapper finds in the step's layer but cannot take out, such as one inside a
+  binary, an uncompressed archive or a re-wrapped PEM (see [Limitations](../README.md#limitations))
+- a write to the NSS database bound over Chromium's for the step
 
-With `fail_on_ca_residue: false` both only warn, in the step's output in the build log, and the
-build carries on: the copy stays in the image, and the write to the NSS database is discarded. A
-failure that leaves the layer in a state nothing vouches for, such as a store write-back that broke
-off part-way, fails the build either way.
+With `fail_on_ca_residue: false` both only warn: the copy stays in the image, and the write is
+discarded. A layer the wrapper could not read back or restore fails the build either way.
 
-The CA is valid for two days and unique to the run, so a copy that stays in an image trusts only a
-proxy that no longer exists. What it still gives away is that the image was built behind this one.
+The CA is valid for two days and unique to the run, so a copy left in an image trusts only a proxy
+that no longer exists. It still shows the image was built behind Buildcage.

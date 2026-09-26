@@ -10,15 +10,12 @@ import (
 	"testing"
 )
 
-// The template certutil makes, as far as the wrapper cares: a few files it
-// copies without reading.
 var testNSSTemplate = map[string]string{
 	"cert9.db":   "CERT9-WITH-THE-PROXY-CA",
 	"key4.db":    "KEY4-EMPTY",
 	"pkcs11.txt": "library=\nname=NSS Internal PKCS #11 Module\n",
 }
 
-// useNSSTemplate gives placeNSSDB a template database to copy.
 func useNSSTemplate(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
@@ -39,9 +36,8 @@ func stepUser() (uid, gid int) {
 	return os.Getuid(), os.Getgid()
 }
 
-// newNSSBundle is a bundle whose process runs as uid:gid with env, over a
-// rootfs holding only /etc and the given home directory, and whose overlay
-// upper directory is the rootfs itself so finish reads the layer back.
+// newNSSBundle's overlay upper directory is the rootfs itself, so finish reads
+// the layer back.
 func newNSSBundle(t *testing.T, env []string, uid, gid int, home string) (bundle, rootfs string) {
 	t.Helper()
 	bundle, rootfs = newBundleNoStore(t, env)
@@ -55,7 +51,6 @@ func newNSSBundle(t *testing.T, env []string, uid, gid int, home string) (bundle
 	return bundle, rootfs
 }
 
-// setSpecField rewrites one top-level object of the bundle's config.json.
 func setSpecField(t *testing.T, bundle, key string, edit func(map[string]any)) {
 	t.Helper()
 	path := filepath.Join(bundle, "config.json")
@@ -80,8 +75,7 @@ func setSpecField(t *testing.T, bundle, key string, edit func(map[string]any)) {
 	mustWriteFile(t, path, string(out))
 }
 
-// nssMountSource returns the scratch directory bound at dest, failing the test
-// when there is none.
+// nssMountSource fails the test when nothing is bound at dest.
 func nssMountSource(t *testing.T, bundle, dest string) string {
 	t.Helper()
 	source, _ := findMount(t, loadMounts(t, bundle), dest)["source"].(string)
@@ -107,10 +101,7 @@ func mustOwner(t *testing.T, path string) (uid, gid int, mode os.FileMode) {
 	return int(st.Uid), int(st.Gid), info.Mode().Perm()
 }
 
-// A home with no database gets the template at the XDG path Chromium would
-// create, writable by the step's user, and the directories created to hold it
-// are taken back once the step ends.
-func TestNSSDBIsBoundAtTheXDGPathAndTakenBack(t *testing.T) {
+func TestNSSDBIsBoundAtTheLegacyPathAndTakenBack(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
@@ -121,7 +112,7 @@ func TestNSSDBIsBoundAtTheXDGPathAndTakenBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scratch := nssMountSource(t, bundle, "/home/app/.local/share/pki/nssdb")
+	scratch := nssMountSource(t, bundle, "/home/app/.pki/nssdb")
 	for name, want := range testNSSTemplate {
 		path := filepath.Join(scratch, name)
 		got, err := os.ReadFile(path)
@@ -138,7 +129,7 @@ func TestNSSDBIsBoundAtTheXDGPathAndTakenBack(t *testing.T) {
 	if u, g, mode := mustOwner(t, scratch); u != uid || g != gid || mode != 0o700 {
 		t.Fatalf("the database directory is %d:%d %o, want %d:%d 700", u, g, mode, uid, gid)
 	}
-	for _, dir := range []string{".local", ".local/share", ".local/share/pki", ".local/share/pki/nssdb"} {
+	for _, dir := range []string{".pki", ".pki/nssdb"} {
 		if u, g, mode := mustOwner(t, filepath.Join(rootfs, "home/app", dir)); u != uid || g != gid || mode != 0o700 {
 			t.Fatalf("~/%s was created %d:%d %o, want %d:%d 700", dir, u, g, mode, uid, gid)
 		}
@@ -147,16 +138,14 @@ func TestNSSDBIsBoundAtTheXDGPathAndTakenBack(t *testing.T) {
 	if err := in.finish(true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Lstat(filepath.Join(rootfs, "home/app/.local")); !os.IsNotExist(err) {
-		t.Fatal("~/.local was left behind")
+	if _, err := os.Lstat(filepath.Join(rootfs, "home/app/.pki")); !os.IsNotExist(err) {
+		t.Fatal("~/.pki was left behind")
 	}
 	if _, err := os.Stat(scratch); !os.IsNotExist(err) {
 		t.Fatal("the scratch database was left behind")
 	}
 }
 
-// A directory the step put something of its own into stays; only the ones left
-// empty go.
 func TestNSSDBLeavesADirectoryTheStepUsed(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
@@ -168,22 +157,20 @@ func TestNSSDBLeavesADirectoryTheStepUsed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustWriteFile(t, filepath.Join(rootfs, "root/.local/share/app.db"), "the step's own")
+	mustWriteFile(t, filepath.Join(rootfs, "root/.pki/app.db"), "the step's own")
 
 	if err := in.finish(true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(rootfs, "root/.local/share/app.db")); err != nil {
+	if _, err := os.Stat(filepath.Join(rootfs, "root/.pki/app.db")); err != nil {
 		t.Fatal("the step's own file went with the created directories")
 	}
-	if _, err := os.Lstat(filepath.Join(rootfs, "root/.local/share/pki")); !os.IsNotExist(err) {
-		t.Fatal("~/.local/share/pki was left behind")
+	if _, err := os.Lstat(filepath.Join(rootfs, "root/.pki/nssdb")); !os.IsNotExist(err) {
+		t.Fatal("~/.pki/nssdb was left behind")
 	}
 }
 
-// The legacy path wins whenever it is there, even empty and even beside an XDG
-// one, and what the image kept in it is covered rather than touched.
-func TestNSSDBCoversTheLegacyPathFirst(t *testing.T) {
+func TestNSSDBCoversAnExistingDatabase(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
@@ -212,35 +199,36 @@ func TestNSSDBCoversTheLegacyPathFirst(t *testing.T) {
 	}
 }
 
-// An XDG database already in the image is covered where it is, creating nothing.
-func TestNSSDBCoversAnExistingXDGDatabase(t *testing.T) {
+// Chromium prefers the legacy path once it exists, so an XDG database is left
+// in place and shadowed.
+func TestNSSDBLeavesAnXDGDatabaseAlone(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
 	uid, gid := stepUser()
 	bundle, rootfs := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
-	mustMkdirAll(t, filepath.Join(rootfs, "root/.local/share/pki/nssdb"))
+	xdg := filepath.Join(rootfs, "root/.local/share/pki/nssdb")
+	mustMkdirAll(t, xdg)
+	mustWriteFile(t, filepath.Join(xdg, "cert9.db"), "THE IMAGE'S OWN")
 
 	in, err := inject(bundle, testCA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nssMountSource(t, bundle, "/root/.local/share/pki/nssdb")
-	for _, dir := range in.created.dirs {
-		if strings.Contains(dir, "pki/nssdb") || strings.HasSuffix(dir, "/root/.local") {
-			t.Fatalf("created %s for a database that was already there", dir)
-		}
-	}
+	nssMountSource(t, bundle, "/root/.pki/nssdb")
+	assertNoMountAt(t, bundle, "/root/.local/share/pki/nssdb")
 	if err := in.finish(true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(rootfs, "root/.local/share/pki/nssdb")); err != nil {
-		t.Fatal("the image's own database directory was taken away")
+	got, err := os.ReadFile(filepath.Join(xdg, "cert9.db"))
+	if err != nil || string(got) != "THE IMAGE'S OWN" {
+		t.Fatalf("the image's own database changed: %q, %v", got, err)
+	}
+	if _, err := os.Lstat(filepath.Join(rootfs, "root/.pki")); !os.IsNotExist(err) {
+		t.Fatal("~/.pki was left behind")
 	}
 }
 
-// A step that changes the database fails the build: there is nowhere true to
-// write the change back to.
 func TestNSSDBChangedByTheStepFailsTheStep(t *testing.T) {
 	for name, change := range map[string]func(t *testing.T, scratch string){
 		"a file rewritten": func(t *testing.T, scratch string) {
@@ -266,11 +254,11 @@ func TestNSSDBChangedByTheStepFailsTheStep(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			scratch := nssMountSource(t, bundle, "/root/.local/share/pki/nssdb")
+			scratch := nssMountSource(t, bundle, "/root/.pki/nssdb")
 			change(t, scratch)
 
 			err = in.finish(true)
-			if err == nil || !strings.Contains(err.Error(), "changed the NSS database at /root/.local/share/pki/nssdb") {
+			if err == nil || !strings.Contains(err.Error(), "changed the NSS database at /root/.pki/nssdb") {
 				t.Fatalf("got %v, want the change to fail the step", err)
 			}
 			if _, err := os.Stat(scratch); !os.IsNotExist(err) {
@@ -280,8 +268,37 @@ func TestNSSDBChangedByTheStepFailsTheStep(t *testing.T) {
 	}
 }
 
-// With HOME left empty, runc takes it from the image's /etc/passwd, and so
-// does the wrapper.
+func TestNSSDBChownOrChmodDoesNotFailTheStep(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	useNSSTemplate(t)
+	uid, gid := stepUser()
+	bundle, _ := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+
+	in, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratch := nssMountSource(t, bundle, "/root/.pki/nssdb")
+	err = filepath.WalkDir(scratch, func(path string, _ fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if os.Geteuid() == 0 {
+			if err := os.Chown(path, 0, 0); err != nil {
+				return err
+			}
+		}
+		return os.Chmod(path, 0o755)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := in.finish(true); err != nil {
+		t.Fatalf("got %v from an unchanged database", err)
+	}
+}
+
 func TestNSSDBFindsTheHomeInPasswd(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
@@ -296,7 +313,7 @@ func TestNSSDBFindsTheHomeInPasswd(t *testing.T) {
 	if _, err := inject(bundle, testCA); err != nil {
 		t.Fatal(err)
 	}
-	nssMountSource(t, bundle, "/home/app/.local/share/pki/nssdb")
+	nssMountSource(t, bundle, "/home/app/.pki/nssdb")
 }
 
 func itoa(i int) string {
@@ -304,8 +321,6 @@ func itoa(i int) string {
 	return string(b)
 }
 
-// Every case that leaves the database alone: nothing is bound, and nothing is
-// created in the rootfs.
 func TestNSSDBIsLeftAloneWhenItCannotBePlaced(t *testing.T) {
 	for name, tc := range map[string]struct {
 		env      []string
@@ -336,7 +351,7 @@ func TestNSSDBIsLeftAloneWhenItCannotBePlaced(t *testing.T) {
 			}
 			mustSymlink(t, "../../../../..", filepath.Join(rootfs, "etc"))
 		}},
-		"a legacy parent that is a file": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
+		"a ~/.pki that is a file": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
 			mustWriteFile(t, filepath.Join(rootfs, "root/.pki"), "")
 		}},
 		"a database that cannot be read back": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, _, _ string) {
@@ -353,7 +368,7 @@ func TestNSSDBIsLeftAloneWhenItCannotBePlaced(t *testing.T) {
 			mountAt(t, bundle, "/root")
 		}},
 		"a mount inside the database": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, bundle, _ string) {
-			mountAt(t, bundle, "/root/.local/share/pki/nssdb/cache")
+			mountAt(t, bundle, "/root/.pki/nssdb/cache")
 		}},
 		"no scratch directory": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, _, _ string) {
 			scratchRoot = "/dev/null/scratch"
@@ -433,7 +448,6 @@ func mountAt(t *testing.T, bundle, dest string) {
 	mustWriteFile(t, path, string(out))
 }
 
-// listTree is every path under root, relative to it.
 func listTree(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	paths := map[string]bool{}
@@ -451,7 +465,6 @@ func listTree(t *testing.T, root string) map[string]bool {
 	return paths
 }
 
-// A template that cannot be read is no template.
 func TestReadNSSTemplateReportsAFileItCannotRead(t *testing.T) {
 	skipIfRoot(t)
 	useNSSTemplate(t)
@@ -463,8 +476,7 @@ func TestReadNSSTemplateReportsAFileItCannotRead(t *testing.T) {
 	}
 }
 
-// A step user the wrapper cannot hand the database to leaves it unbound rather
-// than bound read-only, which Chromium would ignore just the same.
+// Chromium would ignore a database bound read-only, so it is not bound at all.
 func TestNSSDBIsLeftAloneWhenItCannotBeHandedToTheStepUser(t *testing.T) {
 	skipIfRoot(t)
 	useTempLog(t)
@@ -481,7 +493,6 @@ func TestNSSDBIsLeftAloneWhenItCannotBeHandedToTheStepUser(t *testing.T) {
 	}
 }
 
-// A HOME whose directories cannot be created leaves the database unbound.
 func TestNSSDBIsLeftAloneWhenTheDirectoriesCannotBeCreated(t *testing.T) {
 	skipIfRoot(t)
 	useTempLog(t)
@@ -498,10 +509,9 @@ func TestNSSDBIsLeftAloneWhenTheDirectoriesCannotBeCreated(t *testing.T) {
 	if in.nss != nil {
 		t.Fatal("a database was bound over a directory that could not be created")
 	}
-	assertNoMountAt(t, bundle, "/root/.local/share/pki/nssdb")
+	assertNoMountAt(t, bundle, "/root/.pki/nssdb")
 }
 
-// A database the wrapper cannot read back is reported, as a change would be.
 func TestNSSDBFinishReportsADatabaseItCannotRead(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
@@ -519,7 +529,6 @@ func TestNSSDBFinishReportsADatabaseItCannotRead(t *testing.T) {
 	}
 }
 
-// processUser reads what BuildKit wrote, and a spec naming nobody runs as root.
 func TestProcessUser(t *testing.T) {
 	for name, tc := range map[string]struct {
 		process  map[string]any
@@ -547,8 +556,7 @@ func TestProcessUser(t *testing.T) {
 	}
 }
 
-// failWalkUnder fails every walk of a directory under root, which is where
-// the scratch directories whose names a test cannot know in advance are made.
+// failWalkUnder is for scratch directories, whose names a test cannot know.
 func failWalkUnder(t *testing.T, root string) {
 	t.Helper()
 	old := walkDir
@@ -561,7 +569,6 @@ func failWalkUnder(t *testing.T, root string) {
 	t.Cleanup(func() { walkDir = old })
 }
 
-// A directory that is gone by the time it is handed over stops the handover.
 func TestOwnDirsReportsADirectoryItCannotHandOver(t *testing.T) {
 	uid, gid := stepUser()
 	if err := ownDirs([]string{filepath.Join(t.TempDir(), "gone")}, uid, gid); err == nil {
@@ -569,9 +576,7 @@ func TestOwnDirsReportsADirectoryItCannotHandOver(t *testing.T) {
 	}
 }
 
-// A legacy database whose presence cannot be told is not guessed at: taking
-// the XDG path could leave Chromium reading the legacy one after all.
-func TestNSSDBIsLeftAloneWhenTheLegacyPathCannotBeRead(t *testing.T) {
+func TestNSSDBIsLeftAloneWhenItsParentCannotBeRead(t *testing.T) {
 	skipIfRoot(t)
 	useTempLog(t)
 	useFakeRsync(t)

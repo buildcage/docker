@@ -1,14 +1,8 @@
-# Chromium on Linux trusts the Chrome Root Store compiled into it and the NSS
-# database in $HOME, and reads neither the system CA store nor any variable, so
-# none of the other injections reach it. The wrapper binds a database holding
-# only the proxy CA over the one Chromium would read (nssdb.go). Each step below
-# loads a page through the proxy in chrome-headless-shell, the minimal build
-# Puppeteer, Playwright and Remotion download, and fails the build unless the
-# handshake verifies. assert-inspect-chromium.sh then checks the committed image
-# carries none of it.
-#
-# Chrome for Testing publishes chrome-headless-shell for x86-64 Linux only, so
-# the Makefile builds this for linux/amd64 whatever TEST_PLATFORM says.
+# Each step loads a page through the proxy in chrome-headless-shell, the build
+# Puppeteer, Playwright and Remotion download, and fails unless it trusts the
+# proxy CA through the NSS database the wrapper binds (nssdb.go).
+# Chrome for Testing ships it for x86-64 only, so the Makefile builds this for
+# linux/amd64.
 #
 # FROM is deliberately not governed by this engine
 # (see docs/security.md#what-buildkitd-fetches-itself), so this pull
@@ -21,11 +15,8 @@ ARG PUPPETEER_VERSION=25.12.0
 ARG CHROME_VERSION=154.0.8037.57
 ENV CHROME_HEADLESS_SHELL=/opt/chrome/chrome-headless-shell/linux-${CHROME_VERSION}/chrome-headless-shell-linux64/chrome-headless-shell
 
-# The shared libraries chrome-headless-shell links against, over the plain-HTTP
-# Debian archive, and unzip for @puppeteer/browsers to unpack it with. libnss3
-# is the library alone: no certutil, and no database. Debian 12's is 3.87, older
-# than the certutil that makes the proxy's database, which is the pairing that
-# has to work.
+# Debian, because chrome-headless-shell needs glibc. Its NSS 3.87 is older than
+# the proxy's certutil, which is the pairing that has to work.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends unzip \
       libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libdbus-1-3 \
@@ -34,40 +25,31 @@ RUN apt-get update && \
       libxrandr2 && \
     rm -rf /var/lib/apt/lists/*
 
-# Both over HTTPS, which Node trusts through NODE_EXTRA_CA_CERTS.
 WORKDIR /opt/check
 COPY chromium-check.js ./
 RUN npm install --no-audit --no-fund "puppeteer-core@${PUPPETEER_VERSION}" && \
     npx --no-install browsers install "chrome-headless-shell@${CHROME_VERSION}" --path /opt/chrome && \
     test -x "$CHROME_HEADLESS_SHELL"
 
-# The check is only worth something if it can fail: pointed at a home the
-# wrapper did not bind a database into, the same browser must refuse the
-# proxy's certificate. The home is removed again within the step, database
-# Chromium made for it included.
+# A home the wrapper did not cover must be refused, so the check can fail.
 RUN echo "=== [control: a home the wrapper did not cover] ===" && \
     mkdir -p /tmp/control && \
     HOME=/tmp/control node chromium-check.js https://allowed.example.com/public/chromium untrusted && \
     rm -rf /tmp/control && \
     echo "OK: refused without the database"
 
-# No database at all: Chromium would create the XDG one, so that is where the
-# wrapper binds it, creating the directories and taking them back afterwards.
 RUN echo "=== [root, no database] ===" && \
     node chromium-check.js https://allowed.example.com/public/chromium && \
     echo "OK: trusted the proxy CA"
 
-# An image that already has a database, here the legacy one, which Chromium
-# prefers even empty. The wrapper covers it rather than the XDG path, and
-# assert-inspect-chromium.sh checks it is still empty in the built image.
-RUN mkdir -p /root/.pki/nssdb
-RUN echo "=== [root, the image's own legacy database] ===" && \
+# Chromium would read an XDG database when ~/.pki/nssdb is absent; the wrapper
+# creates the legacy one, which Chromium prefers, and leaves this one alone.
+RUN mkdir -p /root/.local/share/pki/nssdb
+RUN echo "=== [root, the image's own XDG database] ===" && \
     node chromium-check.js https://allowed.example.com/public/chromium && \
     echo "OK: trusted the proxy CA"
 
-# A user of its own. Nothing sets HOME, so runc takes it from /etc/passwd, and
-# the database has to be the user's to write: Chromium ignores one it cannot
-# open read-write.
+# HOME comes from /etc/passwd, and the database must be this user's to write.
 RUN useradd -m app
 USER app
 RUN echo "=== [a user of its own, HOME from /etc/passwd] ===" && \

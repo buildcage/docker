@@ -80,7 +80,7 @@ func TestNSSDBChangeOnlyWarnsWhenAskedTo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scratch := nssMountSource(t, bundle, "/root/.local/share/pki/nssdb")
+	scratch := nssMountSource(t, bundle, "/root/.pki/nssdb")
 	mustWriteFile(t, filepath.Join(scratch, "cert9.db"), "WITH A CA OF THE STEP'S OWN")
 
 	readStderr := captureStderr(t)
@@ -89,7 +89,7 @@ func TestNSSDBChangeOnlyWarnsWhenAskedTo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("got %v, want only a warning", err)
 	}
-	if !strings.Contains(stderr, "changed the NSS database at /root/.local/share/pki/nssdb") {
+	if !strings.Contains(stderr, "changed the NSS database at /root/.pki/nssdb") {
 		t.Errorf("the warning does not name the database:\n%s", stderr)
 	}
 	if _, err := os.Stat(scratch); !os.IsNotExist(err) {

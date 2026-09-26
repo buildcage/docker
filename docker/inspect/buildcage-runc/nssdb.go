@@ -1,20 +1,9 @@
 package main
 
-// Chromium does not read the system CA store on Linux. It trusts the Chrome
-// Root Store compiled into the binary, plus whatever the user added to the NSS
-// shared database in their home directory, and nothing else: no bundle, no
-// environment variable, and in chrome-headless-shell no enterprise policy
-// either. So the only way to have it trust the proxy's CA is that database.
-//
-// The database is SQLite, which the step controls, so it is never opened here.
-// Instead a database holding only the proxy's CA, made once by the proxy's own
-// certutil when the CA was generated, is copied to a scratch directory and
-// bound over wherever Chromium would look. Whatever the step's image kept there
-// is covered, not merged into: see README.md#limitations for the one case that
-// loses anything by it. Nothing reaches the rootfs, so there is nothing to take
-// back out of the layer either, as long as the step left the copy alone. A step
-// that did change it wrote to a file buildcage had replaced, and that change
-// has nowhere true to be written back to, so the build fails instead.
+// On Linux, Chromium trusts only its compiled-in root store and the NSS
+// database in $HOME. The step's own database is SQLite it controls, so it is
+// never opened: a copy of a template holding only the proxy CA is bound over
+// it instead, and a step that changes that copy fails the build.
 
 import (
 	"bufio"
@@ -23,39 +12,32 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
 
-// nssTemplateDir is a var, not a const, so tests can point it at a database of
-// their own instead of the real host path.
+// A var so tests can point it elsewhere.
 var nssTemplateDir = "/opt/buildcage/nssdb"
 
-// Where Chromium looks for the database, relative to $HOME, in the order it
-// looks: the legacy path wins whenever it exists, even empty, and the XDG one,
-// the default since M146, is used otherwise.
+// The legacy path, relative to $HOME: Chromium before M146 reads only this one,
+// and later versions still prefer it to the XDG path whenever it exists.
 // https://chromium.googlesource.com/chromium/src/+/main/docs/linux/cert_management.md
-var nssDBPaths = []string{".pki/nssdb", ".local/share/pki/nssdb"}
+const nssDBPath = ".pki/nssdb"
 
-// errNSSDBChanged means the step wrote to the database bound over its own.
 var errNSSDBChanged = errors.New("the step changed the NSS database")
 
-// maxPasswdBytes bounds how much of the step's /etc/passwd is read to find its
-// home directory. A real one is a few KB.
+// A real /etc/passwd is a few KB.
 const maxPasswdBytes = 1 << 20
 
-// nssBind is the scratch database bound over the step's own, kept to be
-// compared against what it held when the step started.
 type nssBind struct {
 	containerDir string
 	scratchDir   string
 	baseline     []fileEntry
 }
 
-// placeNSSDB binds a copy of the template over the database Chromium would read
-// for the step's user, returning it along with the directories created to have
-// somewhere to bind it. It returns a nil bind, having logged why, when the step
-// has no home to find it in or the template cannot be placed.
+// placeNSSDB returns a nil bind, having logged why, when the database cannot be
+// placed. created holds the directories made to bind it over.
 func placeNSSDB(s *spec, bundle string) (*nssBind, createdDirs) {
 	var created createdDirs
 	template, err := readNSSTemplate()
@@ -103,7 +85,7 @@ func placeNSSDB(s *spec, bundle string) (*nssBind, createdDirs) {
 		return nil, created
 	}
 
-	// Last, so a database that could not be prepared leaves nothing behind.
+	// Last, so a failure above leaves nothing behind.
 	if !exists {
 		dirs, err := mkdirAllTracking(hostDir)
 		created.add(dirs)
@@ -121,49 +103,35 @@ func placeNSSDB(s *spec, bundle string) (*nssBind, createdDirs) {
 	return b, created
 }
 
-// chooseNSSDB returns the database directory Chromium would read under home,
-// and whether it is already there. A path that exists but is not a directory
-// is Chromium's choice too, and there is no binding a directory over it.
 func chooseNSSDB(rootfs, home string) (hostDir string, exists bool, err error) {
-	for _, rel := range nssDBPaths {
-		resolved, err := resolveInRoot(rootfs, filepath.Join(home, rel))
-		if err != nil {
-			return "", false, err
-		}
-		// resolveInRoot has already read every component but a missing one,
-		// and resolved every symlink among them, so all this can still find
-		// out is that the path is not there.
-		info, err := os.Stat(resolved)
-		if err != nil {
-			continue
-		}
-		if !info.IsDir() {
-			return "", false, fmt.Errorf("%s is not a directory", containerPathOf(rootfs, resolved))
-		}
-		return resolved, true, nil
+	resolved, err := resolveInRoot(rootfs, filepath.Join(home, nssDBPath))
+	if err != nil {
+		return "", false, err
 	}
-	// Neither is there: Chromium would create the XDG one, so that is where
-	// the template goes.
-	resolved, err := resolveInRoot(rootfs, filepath.Join(home, nssDBPaths[len(nssDBPaths)-1]))
-	return resolved, false, err
+	// resolveInRoot has read every component, so this can only fail on a
+	// missing one.
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return resolved, false, nil
+	}
+	if !info.IsDir() {
+		return "", false, fmt.Errorf("%s is not a directory", containerPathOf(rootfs, resolved))
+	}
+	return resolved, true, nil
 }
 
-// ownDirs gives the directories created on the step's behalf to the step's
-// user, 0700 as Chromium makes them, since the step would have made them
-// itself had it run without the proxy.
+// ownDirs makes the directories the step user's, 0700 as Chromium makes them.
 func ownDirs(dirs []string, uid, gid int) error {
 	for _, dir := range dirs {
 		if err := os.Chown(dir, uid, gid); err != nil {
 			return err
 		}
-		// Cannot fail once the chown has not: whoever may give a file away owns
-		// it, and so may change its mode.
+		// Cannot fail once the chown has succeeded.
 		_ = os.Chmod(dir, 0o700)
 	}
 	return nil
 }
 
-// readNSSTemplate reads every file of the template database, by name.
 func readNSSTemplate() (map[string][]byte, error) {
 	entries, err := os.ReadDir(nssTemplateDir)
 	if err != nil {
@@ -186,17 +154,13 @@ func readNSSTemplate() (map[string][]byte, error) {
 	return files, nil
 }
 
-// prepare writes the template into the scratch directory, owned by the step's
-// user and writable by it: NSS opens the database read-write, and Chromium,
-// failing that, does not fall back to reading it but ignores it altogether.
-// MkdirTemp has already made the directory 0700 and WriteFile makes each file
-// 0600, so the owner is all that is left to change.
+// prepare hands the copy to the step's user: Chromium ignores a database it
+// cannot open read-write.
 func (b *nssBind) prepare(template map[string][]byte, uid, gid int) error {
 	paths := []string{b.scratchDir}
 	for name, content := range template {
 		path := filepath.Join(b.scratchDir, name)
-		// Untested by design: a new file in a directory this process has just
-		// made for itself, under a name ReadDir returned once.
+		// Untested by design: a new file in a directory this process just made.
 		//coverage:ignore start
 		if err := os.WriteFile(path, content, 0o600); err != nil {
 			return err
@@ -217,27 +181,30 @@ func (b *nssBind) prepare(template map[string][]byte, uid, gid int) error {
 	return nil
 }
 
-// finish fails when the step changed the database. Reading it does not: NSS
-// leaves every file byte for byte as it found it, journal included.
+// finish fails when the step changed the database's content. Chromium reading
+// it leaves every file as it was. Ownership and mode are not compared, so a
+// chown -R or chmod -R over $HOME does not count as a change.
 func (b *nssBind) finish() error {
 	current, err := captureManifest(b.scratchDir)
 	if err != nil {
 		return err
 	}
-	if !manifestsEqual(current, b.baseline) {
+	if !slices.EqualFunc(current, b.baseline, sameNSSContent) {
 		return fmt.Errorf("%w at %s, which the inspect engine replaces for the step with one trusting only its proxy CA; "+
 			"the write is discarded (see README.md#limitations)", errNSSDBChanged, b.containerDir)
 	}
 	return nil
 }
 
+func sameNSSContent(a, b fileEntry) bool {
+	return a.path == b.path && a.mode.Type() == b.mode.Type() && a.symlinkTo == b.symlinkTo && a.sha256 == b.sha256
+}
+
 func (b *nssBind) cleanup() {
 	removeScratchDir(b.scratchDir)
 }
 
-// homeOf is the HOME the step's process will run with. runc fills it in from
-// the image's /etc/passwd when the spec leaves it empty, falling back to /, and
-// this follows the same lookup.
+// homeOf follows runc: an empty HOME comes from /etc/passwd, falling back to /.
 func homeOf(s *spec, uid int) string {
 	if home := s.env["HOME"]; home != "" {
 		return home

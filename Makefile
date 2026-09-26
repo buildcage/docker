@@ -340,13 +340,7 @@ test_integration_buildkit_inspect_java_audit: ## Run inspect-engine tests agains
 	@NO_APP_STORE_COPIES=1 ./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
-# Chromium reads only its own root store and the NSS database in $HOME, which
-# the wrapper binds a database holding only the proxy CA over. The build's own
-# steps fail unless chrome-headless-shell trusts the CA as root with no
-# database, over an image's own, and as a user of its own; the assertions
-# check none of it reached the image, and that a step writing to the database
-# fails the build. Chrome for Testing ships chrome-headless-shell for x86-64
-# only, so this builds for linux/amd64 whatever TEST_PLATFORM says.
+# chrome-headless-shell ships for x86-64 only, so this ignores TEST_PLATFORM.
 .PHONY: test_integration_buildkit_inspect_chromium_audit
 test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests against chrome-headless-shell (NSS database injection)
 	@echo "Running inspect-engine audit mode tests (chrome-headless-shell)..."
@@ -363,10 +357,10 @@ test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests ag
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
 # Each case hides a copy of the CA the sweep finds but cannot remove, and must
-# fail the build naming the file and pointing at fail_on_ca_residue. Set to
-# false, the same copy, and a write to the NSS database, only warn. The control writes an unrelated encrypted
-# keystore and must build. The resealed case must build with the CA taken out
-# and the keystore still sealed under changeit.
+# fail the build naming the file and pointing at fail_on_ca_residue. With it
+# false, the same copy and a write to the NSS database only warn. The control
+# writes an unrelated encrypted keystore and must build. The resealed case
+# must build with the CA taken out and the keystore still sealed under changeit.
 .PHONY: test_integration_buildkit_inspect_hidden_ca
 test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that hides a copy of the CA the sweep cannot remove
 	@echo "Running inspect-engine hidden CA copy tests..."
@@ -443,7 +437,7 @@ test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that
 	  --progress=plain -f test/Dockerfile.inspect-nssdb-write test/ \
 	  > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1 \
 	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: the write to the NSS database failed the build"; exit 1; }
-	@grep -q "buildcage: warning: .*changed the NSS database at /root/.local/share/pki/nssdb" $(SCRATCH_PREFIX)-hidden-ca.log \
+	@grep -q "buildcage: warning: .*changed the NSS database at /root/.pki/nssdb" $(SCRATCH_PREFIX)-hidden-ca.log \
 	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: no warning names the NSS database"; exit 1; }
 	@echo "PASS: the build carried on past the write to the NSS database, warning about it"
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
