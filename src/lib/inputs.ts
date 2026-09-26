@@ -59,10 +59,9 @@ const TRUE_INPUTS = ["true", "True", "TRUE"];
 const FALSE_INPUTS = ["false", "False", "FALSE"];
 
 /**
- * Unset is true, the safe side: the dev and test invocations run this from
- * source rather than through action.yml's own default. Anything else that is
- * not a boolean is refused rather than guessed at, since reading a typo as
- * false would let a copy of the CA into the image without a word.
+ * Unset is true because dev and test runs bypass action.yml's default. Any
+ * other non-boolean is refused: a typo read as false would silently leave the
+ * CA in the image.
  */
 export function resolveFailOnCaResidue(input: string | undefined): boolean {
   const trimmed = input?.trim() ?? "";
@@ -80,8 +79,7 @@ export function resolveFailOnCaResidue(input: string | undefined): boolean {
 
 export interface ParsedRuleInputs {
   proxyMode: ProxyMode;
-  /** Whether a copy of the inspect engine's CA left in a layer fails the build
-   *  (see docker/inspect/buildcage-runc) rather than only warning. */
+  /** Whether CA residue in a layer fails the build rather than only warning. */
   failOnCaResidue: boolean;
   httpsRules: string[];
   httpRules: string[];

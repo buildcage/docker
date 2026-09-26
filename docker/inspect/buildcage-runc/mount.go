@@ -456,9 +456,8 @@ func (b *dirBind) cleanup() {
 	removeScratchDir(b.scratchDir)
 }
 
-// removeScratchDir removes a mirror once the step is done with it. A failure
-// leaves a directory behind on the builder, which is worth a log line but not
-// worth failing a step that otherwise succeeded.
+// removeScratchDir only logs a failure: it leaves a directory on the builder,
+// which is no reason to fail the step.
 func removeScratchDir(dir string) {
 	if err := os.RemoveAll(dir); err != nil {
 		logf("cannot remove %s: %v", dir, err)

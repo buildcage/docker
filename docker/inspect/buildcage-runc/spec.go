@@ -63,9 +63,8 @@ func loadSpec(bundle string) (*spec, error) {
 	return s, nil
 }
 
-// processUser is the uid and gid the step's process runs as. BuildKit has
-// already resolved the Dockerfile's USER into numbers by the time it writes the
-// spec; a spec that names none runs as root.
+// processUser reads the numeric uid and gid BuildKit resolved USER into; a spec
+// naming none runs as root.
 func (s *spec) processUser() (uid, gid int) {
 	proc, _ := s.raw["process"].(map[string]any)
 	user, _ := proc["user"].(map[string]any)

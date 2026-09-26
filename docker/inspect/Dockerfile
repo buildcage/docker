@@ -71,8 +71,7 @@ LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/core/lib/docker/report-source.ts.
 
-# nss-tools is for certutil, which init-inspect-cfg makes Chromium's NSS
-# database with.
+# nss-tools provides certutil for init-inspect-cfg's NSS database.
 RUN apk add --no-cache \
       s6-overlay \
       openssl \

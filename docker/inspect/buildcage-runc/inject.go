@@ -277,8 +277,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		}
 	}
 
-	// Chromium reads neither the store nor any variable, only an NSS database of
-	// its own (see nssdb.go).
+	// Chromium reads neither the store nor any variable (see nssdb.go).
 	nss, nssCreated := placeNSSDB(s, bundle)
 	created.add(nssCreated.dirs)
 

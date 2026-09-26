@@ -27,11 +27,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	logFile = filepath.Join(dir, "runc.log")
-	// Nor does an injection test find a real template on the machine running
-	// it; the ones about the NSS database hand it one through useNSSTemplate.
+	// Tests that need a template use useNSSTemplate.
 	nssTemplateDir = filepath.Join(dir, "no-nssdb")
-	// Whatever the machine running the tests has in its environment; a test
-	// about the other setting takes it through useWarnOnCAResidue.
+	// Not whatever the test machine's environment says.
 	failOnCAResidue = true
 	code := m.Run()
 	_ = os.RemoveAll(dir)

@@ -19,15 +19,9 @@ if [ ! -f /etc/haproxy/ca.pem ]; then
     cat /tmp/ca.crt /tmp/ca.key > /etc/haproxy/ca.pem
     cp /tmp/ca.crt /opt/buildcage/ca.pem
 
-    # Chromium on Linux trusts its own compiled-in root store and the NSS
-    # database in the user's home, and nothing else. This is a database holding
-    # only the CA, trusted to issue server certificates, for the caller to put
-    # in place of the workload's own; made here, from the certificate alone, so
-    # nothing the workload controls is ever parsed to make it. NSS_TRUST_TYPE=NSS
-    # keeps the trust in the NSS-specific object every NSS reads: left to
-    # itself, a certutil from NSS 3.11x or later writes a PKCS#11 3.2 trust
-    # object instead, which an older NSS (Ubuntu 24.04's 3.98, Debian 12's 3.87)
-    # does not recognise, leaving the CA untrusted.
+    # Chromium trusts only its built-in roots and the NSS database in $HOME, so
+    # this CA-only database is mounted over the workload's own. NSS_TRUST_TYPE=NSS
+    # keeps the trust where older NSS (Debian 12, Ubuntu 24.04) can read it.
     rm -rf /opt/buildcage/nssdb
     mkdir -p /opt/buildcage/nssdb
     NSS_TRUST_TYPE=NSS certutil -N -d sql:/opt/buildcage/nssdb --empty-password

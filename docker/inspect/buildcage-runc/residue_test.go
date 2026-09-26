@@ -48,7 +48,6 @@ func TestFinishOnlyWarnsAboutACopyItCannotStripWhenAskedTo(t *testing.T) {
 	}
 }
 
-// A copy the reading back finds is residue too.
 func TestStripLayerLeftoverIsResidue(t *testing.T) {
 	err := stripLayerWithALeftover(t)
 	if !errors.Is(err, errCALeftInLayer) || !isCAResidue(err) {
@@ -67,7 +66,6 @@ func stripLayerWithALeftover(t *testing.T) error {
 	return stripLayer(rootfs, upperDirOf(rootfs), testCA)
 }
 
-// A write to the NSS database is discarded with a warning.
 func TestNSSDBChangeOnlyWarnsWhenAskedTo(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
@@ -123,7 +121,6 @@ func TestMirrorWritesBackAroundACopyItCannotStripWhenAskedTo(t *testing.T) {
 	}
 }
 
-// Anything else still fails the build, whatever the setting says.
 func TestTolerateResidueLeavesOtherFailuresAlone(t *testing.T) {
 	useWarnOnCAResidue(t)
 	if err := tolerateResidue(errBrokenWalk); !errors.Is(err, errBrokenWalk) {
@@ -134,7 +131,6 @@ func TestTolerateResidueLeavesOtherFailuresAlone(t *testing.T) {
 	}
 }
 
-// A step failed over residue says how to let the build carry on instead.
 func TestRunHintsAtFailOnCAResidue(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
@@ -156,8 +152,6 @@ func TestRunHintsAtFailOnCAResidue(t *testing.T) {
 	}
 }
 
-// A step failed over anything else is not pointed at a setting that would not
-// help it.
 func TestRunDoesNotHintAtFailOnCAResidueForOtherFailures(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
