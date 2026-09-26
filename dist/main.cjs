@@ -1328,7 +1328,7 @@ function readGhcrBasicAuth(_env = process.env, _readFileSync = node_fs.readFileS
 	}
 }
 //#endregion
-//#region node_modules/.pnpm/@sigstore+protobuf-specs@0.5.1/node_modules/@sigstore/protobuf-specs/dist/__generated__/envelope.js
+//#region node_modules/.pnpm/@sigstore+protobuf-specs@0.5.2/node_modules/@sigstore/protobuf-specs/dist/__generated__/envelope.js
 var require_envelope = __commonJSMin(((exports) => {
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Signature = exports.Envelope = void 0, exports.Envelope = {
 		fromJSON(object) {
@@ -2886,7 +2886,7 @@ var require_envelope = __commonJSMin(((exports) => {
 		for (let a = 0; a < acc.length; a++) for (let v = 0; v < values.length; v++) {
 			if (out.length >= max) return out;
 			let expansion = acc[a] + pre + values[v];
-			if (!(dropEmpties && !expansion)) {
+			if (!dropEmpties || expansion) {
 				if (length + expansion.length > maxLength) return out;
 				out.push(expansion), length += expansion.length;
 			}
@@ -2951,7 +2951,7 @@ var require_envelope = __commonJSMin(((exports) => {
 					let expanded = expand_(n[j], max, maxLength, !1);
 					for (let k = 0; k < expanded.length; k++) {
 						let v = expanded[k];
-						if (!(dropsEmpties && !v)) {
+						if (!dropsEmpties || v) {
 							if (values.length >= max || valuesLength + v.length > maxLength) break outer;
 							values.push(v), valuesLength += v.length;
 						}
