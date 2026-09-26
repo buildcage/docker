@@ -87,11 +87,6 @@ jobs:
             # npm registry: dev deps bundled into the qjs scripts
             GET|HEAD https://registry.npmjs.org/**
 
-          known_blocked_rules: |
-            # The runner appends its DNS search domain to every lookup, so each
-            # allowed host is first queried as <host>.<random>.<region>.internal.
-            **.internal.cloudapp.net
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
