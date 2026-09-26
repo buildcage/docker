@@ -37,7 +37,8 @@
       "customType": "regex",
       "managerFilePatterns": ["/^Makefile$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nMOBY_PROFILES_SECCOMP_VERSION \\?= (?<currentValue>v[\\d.]+)"
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nMOBY_PROFILES_SECCOMP_VERSION \\?= (?<currentValue>v[\\d.]+)",
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nTEST_[A-Z0-9_]+_IMAGE \\?= [^:\\s]+:(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]+)"
       ]
     },
     {
@@ -69,6 +70,13 @@
       "allowedVersions": "/-buildcage\\.\\d+$/",
       "ignoreUnstable": false,
       "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "eclipse-temurin 17 is the JKS case of the Java tests, so it stays on 17.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["eclipse-temurin"],
+      "matchCurrentValue": "/^17$/",
+      "allowedVersions": "<18"
     },
     {
       "description": "Overridden by the replace above. An upstream release arrives as a new fork tag instead.",
