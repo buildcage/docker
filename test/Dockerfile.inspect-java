@@ -10,7 +10,7 @@
 # PKCS#12 (eclipse-temurin:21) and JKS (eclipse-temurin:17). FROM is deliberately
 # not governed by this engine (see docs/security.md#what-buildkitd-fetches-itself),
 # so the base pulls whatever the rules say.
-ARG BASE=eclipse-temurin:21
+ARG BASE=eclipse-temurin:21@sha256:4d06038800655fe1211760cd561de70ef2ed7a47f5d69255e9834414602b7026
 FROM ${BASE}
 
 SHELL ["/bin/sh", "-c"]

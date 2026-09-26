@@ -11,7 +11,7 @@
 # FROM is deliberately not governed by this engine
 # (see docs/security.md#what-buildkitd-fetches-itself), so this pull succeeds
 # whatever the rules say.
-FROM maven:3-eclipse-temurin-21
+FROM maven:3-eclipse-temurin-21@sha256:aabe2f8902f17a63be0d223846322678a2d3e62d18ca0aef5648bcb02f6bfe4b
 
 SHELL ["/bin/sh", "-c"]
 

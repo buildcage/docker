@@ -321,7 +321,8 @@ test_integration_buildkit_inspect_java_audit: ## Run inspect-engine tests agains
 	@echo "Running inspect-engine audit mode tests (Java base images)..."
 	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
 	  $(MAKE) setup_buildkit_inspect_audit
-	@for base in eclipse-temurin:21 eclipse-temurin:17; do \
+	@for base in eclipse-temurin:21@sha256:4d06038800655fe1211760cd561de70ef2ed7a47f5d69255e9834414602b7026 \
+	    eclipse-temurin:17@sha256:b64592d40959b4d13b218f6b06b9ab219ff8aa3dad61efd3b5f519ba4d72ef92; do \
 	  echo "=== Java base image: $$base ==="; \
 	  docker buildx build --no-cache \
 	    --builder $(BUILDER_NAME) \

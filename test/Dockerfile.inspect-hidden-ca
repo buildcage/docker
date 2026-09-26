@@ -7,7 +7,7 @@
 # CASE=resealed copies cacerts, CA included, into a new PKCS#12 under changeit;
 # the sweep takes the CA out and reseals it, so it must build. CASE=control
 # writes an unrelated encrypted keystore and must build.
-ARG BASE=eclipse-temurin:21
+ARG BASE=eclipse-temurin:21@sha256:4d06038800655fe1211760cd561de70ef2ed7a47f5d69255e9834414602b7026
 FROM ${BASE}
 ARG CASE
 
