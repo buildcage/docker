@@ -432,6 +432,26 @@ reported as blocked; see
                                                              # CURL_CA_BUNDLE points at it instead
   ```
 
+- A task runner that starts each command with a filtered environment drops the CA variables before
+  the command sees them. vite-plus does this for a cached `vp run` task, which keeps `NODE_OPTIONS`
+  but not `NODE_EXTRA_CA_CERTS`, so Node inside it fails with `SELF_SIGNED_CERT_IN_CHAIN`. In an
+  image with a system CA store, which holds the CA already, have Node read that store. As an `ARG`
+  the flag reaches every later `RUN` in the stage without staying in the image, unless an
+  `ENV NODE_OPTIONS` overrides it:
+
+  ```dockerfile
+  ARG NODE_OPTIONS=--use-system-ca   # Node 22.15+ (23.9+ on 23.x); older Node refuses to start
+  RUN vp run build
+  ```
+
+  Otherwise pass the variable through on the task itself, as `untrackedEnv` rather than `env`, which
+  would put its value in the cache key. A task with `cache: false` keeps the whole environment.
+
+  ```ts
+  // vite.config.ts
+  build: { command: "vp build", untrackedEnv: ["NODE_EXTRA_CA_CERTS"] },
+  ```
+
 - The CA store's directory is a mount point for the step's duration, so removing or renaming the
   directory itself fails, while what is inside it behaves normally:
 
