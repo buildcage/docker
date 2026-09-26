@@ -186,8 +186,9 @@ func (b *nssBind) prepare(template map[string][]byte, uid, gid int) error {
 // chown -R or chmod -R over $HOME does not count as a change.
 func (b *nssBind) finish() error {
 	current, err := captureManifest(b.scratchDir)
+	// Only the step can have made its own copy unreadable.
 	if err != nil {
-		return err
+		return fmt.Errorf("%w at %s: it can no longer be read back: %v", errNSSDBChanged, b.containerDir, err)
 	}
 	if !slices.EqualFunc(current, b.baseline, sameNSSContent) {
 		return fmt.Errorf("%w at %s, which the inspect engine replaces for the step with one trusting only its proxy CA; "+

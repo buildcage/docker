@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -524,8 +525,8 @@ func TestNSSDBFinishReportsADatabaseItCannotRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	failWalkOn(t, in.nss.scratchDir, 1)
-	if err := in.finish(true); err == nil {
-		t.Fatal("expected a database that cannot be read back to fail the step")
+	if err := in.finish(true); !errors.Is(err, errNSSDBChanged) {
+		t.Fatalf("expected a database that cannot be read back to count as changed, got %v", err)
 	}
 }
 
