@@ -22,9 +22,12 @@ ARG CHROME_VERSION=154.0.8037.57
 ENV CHROME_HEADLESS_SHELL=/opt/chrome/chrome-headless-shell/linux-${CHROME_VERSION}/chrome-headless-shell-linux64/chrome-headless-shell
 
 # The shared libraries chrome-headless-shell links against, over the plain-HTTP
-# Debian archive. libnss3 is the library alone: no certutil, and no database.
+# Debian archive, and unzip for @puppeteer/browsers to unpack it with. libnss3
+# is the library alone: no certutil, and no database. Debian 12's is 3.87, older
+# than the certutil that makes the proxy's database, which is the pairing that
+# has to work.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+    apt-get install -y --no-install-recommends unzip \
       libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libdbus-1-3 \
       libexpat1 libgbm1 libglib2.0-0 libnspr4 libnss3 libudev1 libx11-6 \
       libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 \

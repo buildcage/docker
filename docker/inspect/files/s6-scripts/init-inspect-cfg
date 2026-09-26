@@ -23,11 +23,15 @@ if [ ! -f /etc/haproxy/ca.pem ]; then
     # database in the user's home, and nothing else. This is a database holding
     # only the CA, trusted to issue server certificates, for the caller to put
     # in place of the workload's own; made here, from the certificate alone, so
-    # nothing the workload controls is ever parsed to make it.
+    # nothing the workload controls is ever parsed to make it. NSS_TRUST_TYPE=NSS
+    # keeps the trust in the NSS-specific object every NSS reads: left to
+    # itself, a certutil from NSS 3.11x or later writes a PKCS#11 3.2 trust
+    # object instead, which an older NSS (Ubuntu 24.04's 3.98, Debian 12's 3.87)
+    # does not recognise, leaving the CA untrusted.
     rm -rf /opt/buildcage/nssdb
     mkdir -p /opt/buildcage/nssdb
-    certutil -N -d sql:/opt/buildcage/nssdb --empty-password
-    certutil -A -d sql:/opt/buildcage/nssdb -n "buildcage proxy CA" -t "C,," -i /tmp/ca.crt
+    NSS_TRUST_TYPE=NSS certutil -N -d sql:/opt/buildcage/nssdb --empty-password
+    NSS_TRUST_TYPE=NSS certutil -A -d sql:/opt/buildcage/nssdb -n "buildcage proxy CA" -t "C,," -i /tmp/ca.crt
 
     # The default certificate is the template every generated one is based on,
     # so it has to be a server certificate signed by the CA. Pointing it at the
