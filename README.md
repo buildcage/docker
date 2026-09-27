@@ -404,9 +404,11 @@ reported as blocked; see
   than the JDK default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it.
 - Chromium trusts the CA through a slot added to the NSS database it reads: `~/.pki/nssdb` when it
   exists, else `~/.local/share/pki/nssdb`, else a new `~/.pki/nssdb`, which Chromium then fills and
-  the image keeps, as it would under a Chromium before M146. A database the step's user cannot
-  write, such as root's used after `USER`, cannot take the slot, since Chromium would not open it
-  either. It is covered for the step with one holding only the CA instead: a private CA or client
+  the image keeps, as it would under a Chromium before M146. A new database belongs to the home's
+  owner, so a step user whose home is someone else's, such as `www-data` with `/var/www`, gets one
+  Chromium will not open, and Chromium does not trust the CA. An existing database the step's user
+  cannot write, such as root's used after `USER`, cannot take the slot, since Chromium would not
+  open it either. It is covered for the step with one holding only the CA instead: a private CA or client
   certificate kept there is lost, though only on an `allowed_tls_rules` or `allowed_ip_rules`
   passthrough, and a step that writes to it fails the build. With `fail_on_ca_residue: false` that
   write only warns and is discarded.

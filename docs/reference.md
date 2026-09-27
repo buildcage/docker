@@ -643,7 +643,7 @@ store:
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
 Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read
 `~/.local/share/pki/nssdb` when it does not, so the database is the first of those that exists, or
-a new `~/.pki/nssdb` when neither does. Its directory is mirrored for the step, the way a CA store
+a new `~/.pki/nssdb`, owned by the home's owner, when neither does. Its directory is mirrored for the step, the way a CA store
 is, and the mirror's `pkcs11.txt` gains a second, read-only softoken slot on a database holding only
 this CA, bound at `/dev/buildcage-nssdb`. NSS loads every module `pkcs11.txt` names, so Chromium
 trusts the CA through that slot while the step's own certificates, keys and writes stay in its own

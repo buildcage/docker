@@ -45,6 +45,10 @@ func newNSSBundle(t *testing.T, env []string, uid, gid int, home string) (bundle
 	bundle, rootfs = newBundleNoStore(t, env)
 	if home != "" {
 		mustMkdirAll(t, filepath.Join(rootfs, home))
+		// The home is the step user's, as in an image.
+		if os.Geteuid() == 0 {
+			giveToStepUser(t, filepath.Join(rootfs, home), uid, gid)
+		}
 	}
 	setSpecField(t, bundle, "process", func(proc map[string]any) {
 		proc["user"] = map[string]any{"uid": uid, "gid": gid}
@@ -528,13 +532,47 @@ func TestReadNSSTemplateReportsAFileItCannotRead(t *testing.T) {
 	}
 }
 
-// Chromium would ignore a database bound read-only, so it is not bound at all.
-func TestNSSDBIsLeftAloneWhenItCannotBeHandedToTheStepUser(t *testing.T) {
+// A step user who could not create a database in their home gets one they
+// cannot write either, which Chromium ignores as it would without the proxy.
+func TestNSSDBSlotCreatesTheDatabaseForTheHomesOwner(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	useNSSTemplate(t)
+	stepUID, stepGID := 0, 0
+	if os.Geteuid() == 0 {
+		stepUID, stepGID = stepUser()
+	}
+	bundle, rootfs := newNSSBundle(t, []string{"HOME=/var/www"}, stepUID, stepGID, "/var/www")
+	homeUID, homeGID := os.Getuid(), os.Getgid()
+	if err := os.Chown(filepath.Join(rootfs, "var/www"), homeUID, homeGID); err != nil {
+		t.Fatal(err)
+	}
+
+	in, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mirror := slotAt(t, in, bundle, "/var/www/.pki/nssdb")
+	for _, path := range []string{
+		mirror,
+		filepath.Join(mirror, "pkcs11.txt"),
+		filepath.Join(rootfs, "var/www/.pki"),
+		filepath.Join(rootfs, "var/www/.pki/nssdb"),
+	} {
+		if u, g, _ := mustOwner(t, path); u != homeUID || g != homeGID {
+			t.Fatalf("%s is %d:%d, want the home's %d:%d", path, u, g, homeUID, homeGID)
+		}
+	}
+}
+
+// Chromium would ignore a cover bound read-only, so it is not bound at all.
+func TestNSSDBIsLeftAloneWhenTheCoverCannotBeHandedToTheStepUser(t *testing.T) {
 	skipIfRoot(t)
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
 	bundle, _ := newNSSBundle(t, []string{"HOME=/root"}, 0, 0, "/root")
+	mountAt(t, bundle, nssCADBDir)
 
 	in, err := inject(bundle, testCA)
 	if err != nil {

@@ -98,7 +98,8 @@ func placeNSSDB(s *spec, bundle string, ca []byte) (*dirBind, *nssBind, createdD
 		logf("HOME=%s could not be resolved inside the rootfs (%v); not injecting into Chromium's NSS database", home, err)
 		return nil, nil, created
 	}
-	if info, err := os.Stat(resolvedHome); err != nil || !info.IsDir() {
+	homeInfo, err := os.Stat(resolvedHome)
+	if err != nil || !homeInfo.IsDir() {
 		logf("HOME=%s is not a directory in the rootfs; not injecting into Chromium's NSS database", home)
 		return nil, nil, created
 	}
@@ -106,7 +107,7 @@ func placeNSSDB(s *spec, bundle string, ca []byte) (*dirBind, *nssBind, createdD
 	hostDir, exists, err := chooseStepNSSDB(s.rootfs, home)
 	if err == nil {
 		var b *dirBind
-		b, created, err = slotNSSDB(s, bundle, ca, template, hostDir, exists)
+		b, created, err = slotNSSDB(s, bundle, ca, template, hostDir, exists, homeInfo)
 		if err == nil {
 			return b, nil, created
 		}
@@ -134,8 +135,9 @@ func chooseStepNSSDB(rootfs, home string) (hostDir string, exists bool, err erro
 
 // slotNSSDB mirrors the step's database directory, appends the slot to the
 // mirror's pkcs11.txt and binds both it and the CA-only database. It changes
-// neither the spec nor the rootfs unless it succeeds.
-func slotNSSDB(s *spec, bundle string, ca []byte, template map[string][]byte, hostDir string, exists bool) (*dirBind, createdDirs, error) {
+// neither the spec nor the rootfs unless it succeeds. A database it creates
+// belongs to the home's owner, as the rest of the home does.
+func slotNSSDB(s *spec, bundle string, ca []byte, template map[string][]byte, hostDir string, exists bool, home fs.FileInfo) (*dirBind, createdDirs, error) {
 	var created createdDirs
 	uid, gid := s.processUser()
 	containerDir := containerPathOf(s.rootfs, hostDir)
@@ -152,6 +154,8 @@ func slotNSSDB(s *spec, bundle string, ca []byte, template map[string][]byte, ho
 		if err := checkMirrorable(hostDir, maxCustomDirBytes, maxCustomDirFiles); err != nil {
 			return nil, created, err
 		}
+	} else {
+		uid, gid = ownerOf(home)
 	}
 
 	base, err := newScratchDir(bundle)
@@ -185,7 +189,7 @@ func slotNSSDB(s *spec, bundle string, ca []byte, template map[string][]byte, ho
 		dirs, err := mkdirAllTracking(hostDir)
 		created.add(dirs)
 		if err == nil {
-			err = ownDirs(dirs, uid, gid)
+			err = ownDirs(append(dirs, b.scratchDir), uid, gid)
 		}
 		if err != nil {
 			b.cleanup()
@@ -199,8 +203,7 @@ func slotNSSDB(s *spec, bundle string, ca []byte, template map[string][]byte, ho
 }
 
 // prepareNSS fills the mirror: the step's database when it has one, and the
-// slot appended to its pkcs11.txt. A new directory is the step user's, 0700 as
-// Chromium makes it.
+// slot appended to its pkcs11.txt.
 func (b *dirBind) prepareNSS(exists bool, uid, gid int) error {
 	// Untested by design: a new directory under one this process just made.
 	//coverage:ignore start
@@ -212,8 +215,6 @@ func (b *dirBind) prepareNSS(exists bool, uid, gid int) error {
 		if err := mirrorDir(b.hostDir, b.scratchDir); err != nil {
 			return fmt.Errorf("mirroring %s: %w", b.hostDir, err)
 		}
-	} else if err := ownDirs([]string{b.scratchDir}, uid, gid); err != nil {
-		return err
 	}
 	original, err := captureManifest(b.scratchDir)
 	if err != nil {
@@ -469,7 +470,15 @@ func chooseNSSDB(rootfs, path string) (hostDir string, exists bool, err error) {
 	return resolved, true, nil
 }
 
-// ownDirs makes the directories the step user's, 0700 as Chromium makes them.
+func ownerOf(info fs.FileInfo) (uid, gid int) {
+	var st syscall.Stat_t
+	if p, ok := info.Sys().(*syscall.Stat_t); ok {
+		st = *p
+	}
+	return int(st.Uid), int(st.Gid)
+}
+
+// ownDirs gives the directories to uid and gid, 0700 as Chromium makes them.
 func ownDirs(dirs []string, uid, gid int) error {
 	for _, dir := range dirs {
 		if err := os.Chown(dir, uid, gid); err != nil {
