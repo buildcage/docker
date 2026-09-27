@@ -23,8 +23,7 @@ const REFERRERS_PATH = `/referrers/${DIGEST}`;
 /** The `sha256-<hex>` tag the fallback path looks the bundle up under. */
 const TAG_PATH = `/manifests/${DIGEST.replace(":", "-")}`;
 
-const bundle = (_fetch: FetchLike) =>
-  fetchBundle("ghcr.io", "buildcage/docker", DIGEST, "token", _fetch);
+const bundle = (_fetch: FetchLike) => fetchBundle("ghcr.io", "owner/repo", DIGEST, "token", _fetch);
 
 /** What the Referrers API answers when it does hold the bundle manifest. */
 const REFERRERS_HIT = okJson({

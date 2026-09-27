@@ -3,7 +3,7 @@ import { truncateForStepSummary } from "./truncate-communication-details.ts";
 import { COMMUNICATION_DETAILS_OPEN, wrapCommunicationDetails } from "./communication-section.ts";
 
 const HEADER = "## Outbound Traffic Report (restrict mode)\n\n### ✅ Allowed Hosts\n\n";
-const FOOTER = "\n*Reported by [buildcage/docker](https://github.com/buildcage/docker)*\n";
+const FOOTER = "\n*Reported by [owner/repo](https://github.com/owner/repo)*\n";
 
 /**
  * A limit small enough that a few hundred lines exceed it, so a test that is

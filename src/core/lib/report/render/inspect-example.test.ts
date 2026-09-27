@@ -27,7 +27,7 @@ function req(method: string, url: string): TrafficEvent {
  * Does the generated rule set actually permit this request?
  *
  * Compiles the rules the same way the engine does, so a generated rule that
- * does not cover its own request fails here rather than in a build. A rule's
+ * does not cover its own request fails here rather than in a build or step. A rule's
  * authorityRegex always names the port, so the request's is filled in from its
  * scheme before matching.
  */
@@ -94,10 +94,10 @@ describe("what the rules permit", () => {
 });
 
 // ---------------------------------------------------------------------------
-// The method, the Host header and the path are the build's to choose, so none
+// The method, the Host header and the path are the build's or step's to choose, so none
 // of them may reach a rule as a pattern.
 // ---------------------------------------------------------------------------
-describe("what the build can write into a rule", () => {
+describe("what the build or step can write into a rule", () => {
   const legit = req("GET", "https://registry.npmjs.org/express");
 
   it("writes no rule from a request that names a wildcard", () => {
@@ -298,23 +298,23 @@ describe("buildInspectRestrictExample", () => {
   const requests = [req("GET", "https://a.example.com/pkg/x")];
 
   it("uses a literal block, since rules are separated by newlines", () => {
-    const md = buildInspectRestrictExample(requests, "buildcage/docker", "v2");
+    const md = buildInspectRestrictExample(requests, "owner/repo", "v2");
     expect(md.includes("allowed_url_rules: |\n")).toBe(true);
     expect(md.includes("proxy_engine")).toBe(false);
   });
 
   it("renders nothing when nothing was observed and no tls/ip rules were configured", () => {
-    expect(buildInspectRestrictExample([], "buildcage/docker", "v2")).toBe("");
-    expect(buildInspectRestrictExample(null, "buildcage/docker", "v2")).toBe("");
+    expect(buildInspectRestrictExample([], "owner/repo", "v2")).toBe("");
+    expect(buildInspectRestrictExample(null, "owner/repo", "v2")).toBe("");
   });
 
   it("echoes allowed_tls_rules and allowed_ip_rules as configured, not derived from traffic", () => {
-    const md = buildInspectRestrictExample(requests, "buildcage/docker", "v2", {
+    const md = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       allowedIpRules: ["10.0.0.5:5432"],
     });
     expect(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/.test(md)).toBe(true);
 
-    const md2 = buildInspectRestrictExample(requests, "buildcage/docker", "v2", {
+    const md2 = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       allowedTlsRules: ["db.internal.example.com:8443"],
     });
     expect(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/.test(md2)).toBe(true);
@@ -328,7 +328,7 @@ describe("buildInspectRestrictExample", () => {
         req("*", "https://github.com/**"),
         req("PUT", "https://*.s3.amazonaws.com/**?token=SECRET"),
       ],
-      "buildcage/docker",
+      "owner/repo",
       "v2",
     );
     const [snippet, rest] = md.split("```\n\n");
@@ -341,19 +341,31 @@ describe("buildInspectRestrictExample", () => {
 
   it("caps the list, pointing at Communication details for the rest", () => {
     const many = Array.from({ length: 25 }, (_, i) => req("GET", `https://a.example.com/${i}/*`));
-    const md = buildInspectRestrictExample(many, "buildcage/docker", "v2");
+    const md = buildInspectRestrictExample(many, "owner/repo", "v2");
     expect(md.match(/\| GET \| /g)).toHaveLength(20);
     expect(md).toContain("…and 5 more, listed in Communication details.");
     expect(md.includes("allowed_url_rules")).toBe(false);
   });
 
   it("still renders a section for tls/ip rules alone, with no observed traffic", () => {
-    const md = buildInspectRestrictExample([], "buildcage/docker", "v2", {
+    const md = buildInspectRestrictExample([], "owner/repo", "v2", {
       allowedIpRules: ["10.0.0.5:5432"],
       allowedTlsRules: ["db.internal.example.com:8443"],
     });
     expect(md.includes("allowed_url_rules")).toBe(false);
     expect(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/.test(md)).toBe(true);
     expect(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/.test(md)).toBe(true);
+  });
+
+  it("includes a run: block when a runCommand is given, same as build-example.ts", () => {
+    const md = buildInspectRestrictExample(requests, "owner/repo", "v2", {
+      runCommand: "npm install",
+    });
+    expect(md.includes("          run: |\n            npm install\n")).toBe(true);
+  });
+
+  it("omits the run: block when no runCommand is given", () => {
+    const md = buildInspectRestrictExample(requests, "owner/repo", "v2");
+    expect(md.includes("run: |")).toBe(false);
   });
 });

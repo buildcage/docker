@@ -18,6 +18,38 @@ export function usesLine(actionRepo: string, actionRef?: string, actionVersion?:
   return `  uses: ${actionRepo}@${actionRef}${actionVersion ? ` # ${actionVersion}` : ""}\n`;
 }
 
+/** What each action fills into the head of its snippet's step. */
+export interface ExampleStepOptions {
+  /** The step's `name:`. Defaults to "Start Buildcage". */
+  stepName?: string;
+  /** Version to annotate the `uses:` line with, if known, as `# 3.1.4`. */
+  actionVersion?: string;
+  /** The `run:` input, for an action whose step runs the command itself: the
+   *  snippet must then repeat it to stay copy-pasteable on its own. */
+  runCommand?: string;
+}
+
+/** The step's `name:`, `uses:` and `with:` lines, then `run:` when given. */
+export function exampleStepHead(
+  actionRepo: string,
+  actionRef: string | undefined,
+  { stepName = "Start Buildcage", actionVersion, runCommand }: ExampleStepOptions = {},
+): string {
+  let yaml = `- name: ${stepName}\n`;
+  yaml += usesLine(actionRepo, actionRef, actionVersion);
+  yaml += "  with:\n";
+  if (runCommand) {
+    yaml += "    run: |\n";
+    // GitHub Actions' `run: |` block scalar always keeps one trailing
+    // newline (YAML's default "clip" chomping), which would otherwise
+    // split into a spurious blank line at the end.
+    for (const line of runCommand.replace(/\r?\n$/, "").split(/\r?\n/)) {
+      yaml += `      ${line}\n`;
+    }
+  }
+  return yaml;
+}
+
 export interface RestrictExampleBlockOptions {
   /** Markdown rendered right under the snippet, ahead of the footnote. */
   appendix?: string;

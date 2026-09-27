@@ -4,9 +4,9 @@ import { resolveBuildcageImageRef } from "./image-ref.ts";
 describe("resolveBuildcageImageRef", () => {
   it("pins the image by digest rather than by tag", () => {
     const digest = "sha256:" + "a".repeat(64);
-    expect(
-      resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "buildcage/docker" }),
-    ).toBe(`ghcr.io/buildcage/docker@${digest}`);
+    expect(resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "owner/repo" })).toBe(
+      `ghcr.io/owner/repo@${digest}`,
+    );
   });
 
   it("lowercases the repository, since GitHub preserves owner/repo case but GHCR does not accept it", () => {

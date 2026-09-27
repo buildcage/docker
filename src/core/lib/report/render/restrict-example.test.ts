@@ -4,7 +4,7 @@
  * frame, so no renderer's tests have to.
  */
 import { describe, it, expect } from "vitest";
-import { restrictExampleBlock, usesLine } from "./restrict-example.ts";
+import { exampleStepHead, restrictExampleBlock, usesLine } from "./restrict-example.ts";
 
 const REPO = "owner/repo";
 
@@ -20,6 +20,23 @@ describe("usesLine", () => {
     expect(usesLine(REPO, "v2", "3.1.4")).toBe(`  uses: ${REPO}@v2 # 3.1.4\n`);
     expect(usesLine(REPO, "v2", undefined)).toBe(`  uses: ${REPO}@v2\n`);
     expect(usesLine(REPO, "v2", "")).toBe(`  uses: ${REPO}@v2\n`);
+  });
+});
+
+describe("exampleStepHead", () => {
+  it("names the step Start Buildcage unless told otherwise", () => {
+    expect(exampleStepHead(REPO, "v2")).toBe(
+      `- name: Start Buildcage\n  uses: ${REPO}@v2\n  with:\n`,
+    );
+    expect(exampleStepHead(REPO, "v2", { stepName: "Start isolated-run" })).toBe(
+      `- name: Start isolated-run\n  uses: ${REPO}@v2\n  with:\n`,
+    );
+  });
+
+  it("repeats a run command under run: |, one line each, with no trailing blank line", () => {
+    expect(exampleStepHead(REPO, "v2", { runCommand: "npm ci\nnpm test\n" })).toBe(
+      `- name: Start Buildcage\n  uses: ${REPO}@v2\n  with:\n    run: |\n      npm ci\n      npm test\n`,
+    );
   });
 });
 

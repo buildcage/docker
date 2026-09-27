@@ -15,13 +15,17 @@
  * honest answer, since clustering would invent permissions nobody observed. The
  * rule still constrains the method, which no host-level rule can.
  *
- * The method, the `Host` header and the path are the build's to choose, so a
+ * The method, the `Host` header and the path are the build's or step's to choose, so a
  * request whose method, host or path a rule would read as a pattern is left
  * out of the rules and listed beside them instead.
  */
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
-import { restrictExampleBlock, usesLine } from "./restrict-example.ts";
+import {
+  exampleStepHead,
+  restrictExampleBlock,
+  type ExampleStepOptions,
+} from "./restrict-example.ts";
 import { markdownTable } from "./markdown-table.ts";
 import { DEFAULT_PORT, splitHostPort } from "#core/lib/log/authority.ts";
 
@@ -76,7 +80,7 @@ function parseRequest(request: TrafficEvent): ParsedRequest | LeftOutRequest | n
   if (part) return { method: request.method, url: `${scheme}://${authority}${path}`, part };
 
   // The port the request was sent to, which is what a rule's port is matched
-  // against. The one in the `Host` header is the build's to write.
+  // against. The one in the `Host` header is the build's or step's to write.
   const port = String(request.port);
   // Drop a port the scheme already implies, so the common case reads plainly.
   const origin =
@@ -102,7 +106,7 @@ function commonPrefixSegments(paths: string[]): string[] {
  * The path patterns covering one group of observed paths.
  *
  * Usually one. A second is needed when the shared prefix is itself one of the
- * observed paths: `/express/**` does not match `/express`, so a build that
+ * observed paths: `/express/**` does not match `/express`, so a build or step that
  * fetched both a package's metadata and its tarball needs both spelled out.
  */
 export function pathPatternsFor(paths: Iterable<string>): string[] {
@@ -153,10 +157,10 @@ function partitionRequests(requests: TrafficEvent[]): {
 } {
   const writable: ParsedRequest[] = [];
   const leftOut = new Map<string, LeftOutRequest>();
-  // Only what the build actually reached: a refused request is not a rule to
+  // Only what the build or step actually reached: a refused request is not a rule to
   // reproduce, and a passthrough or a name lookup has no URL to write one from.
   // One that failed at the origin is kept: the rules did permit it and the
-  // build will ask again, so leaving it out would write an allowlist that
+  // build or step will ask again, so leaving it out would write an allowlist that
   // breaks the next run.
   for (const request of requests) {
     if (request.action === "block") continue;
@@ -200,7 +204,7 @@ function ruleLinesFrom(requests: ParsedRequest[]): string[] {
     .map(({ origin, pattern, methods }) => `${sortMethods(methods).join("|")} ${origin}${pattern}`);
 }
 
-/** Enough to show what was left out, and few enough that a build sending
+/** Enough to show what was left out, and few enough that a build or step sending
  *  thousands can't crowd the rest of the summary out. */
 const LEFT_OUT_LIMIT = 20;
 
@@ -225,9 +229,7 @@ function leftOutSection(leftOut: LeftOutRequest[]): string {
   return md;
 }
 
-export interface BuildInspectRestrictExampleOptions {
-  /** Version to annotate the `uses:` line with, if known, as `# 3.1.4`. */
-  actionVersion?: string;
+export interface BuildInspectRestrictExampleOptions extends ExampleStepOptions {
   /** Not derived from `requests`: a passthrough is never decrypted, so there
    *  is nothing in the traffic to build these from. They are the same values
    *  the audit run was configured with, echoed back as-is,
@@ -247,11 +249,7 @@ export function buildInspectRestrictExample(
   requests: TrafficEvent[] | null | undefined,
   actionRepo: string,
   actionRef?: string,
-  {
-    actionVersion,
-    allowedIpRules = [],
-    allowedTlsRules = [],
-  }: BuildInspectRestrictExampleOptions = {},
+  { allowedIpRules = [], allowedTlsRules = [], ...step }: BuildInspectRestrictExampleOptions = {},
 ): string {
   const { writable, leftOut } = partitionRequests(requests ?? []);
   const lines = ruleLinesFrom(writable);
@@ -264,9 +262,7 @@ export function buildInspectRestrictExample(
     return "";
   }
 
-  let yaml = "- name: Start Buildcage\n";
-  yaml += usesLine(actionRepo, actionRef, actionVersion);
-  yaml += "  with:\n";
+  let yaml = exampleStepHead(actionRepo, actionRef, step);
   yaml += "    proxy_mode: restrict\n";
   // A literal block, not a folded one: a URL rule contains a space, so the
   // rules are separated by newlines and folding would join them into one.

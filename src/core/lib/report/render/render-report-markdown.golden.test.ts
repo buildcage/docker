@@ -200,7 +200,7 @@ describe("renderReportMarkdown golden files", () => {
       expectMatchesGolden(
         // A fixed actionVersion keeps the restrict-mode example's `uses:` line
         // from drifting with the repo's own version.
-        renderReportMarkdown(report, "buildcage/docker", "v2", { actionVersion: "2.1.0" }),
+        renderReportMarkdown(report, "owner/repo", "v2", { actionVersion: "2.1.0" }),
         new URL(`./__fixtures__/${name}.md`, import.meta.url),
       );
     });

@@ -28,7 +28,7 @@ describe("readLocalImageOverride", () => {
 
     expect(
       await readLocalImageOverride({ BUILDCAGE_LOCAL_IMAGE_REF: "local:dev" }, log),
-    ).toStrictEqual({ imageRef: "local:dev", pullPolicy: "never" });
+    ).toStrictEqual({ imageRef: "local:dev", pullPolicy: "never", composeFile: undefined });
     // Skipping provenance verification is the one thing a reader of the log
     // must not have to infer.
     expect(log.mock.calls[0][0]).toContain("skipping image provenance verification");

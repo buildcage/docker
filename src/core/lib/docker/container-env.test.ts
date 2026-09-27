@@ -31,8 +31,8 @@ describe("parseDockerInspectEnv", () => {
 describe("parseDockerInspectLabels", () => {
   it("parses a JSON object into a map", () => {
     expect(
-      parseDockerInspectLabels('{"org.opencontainers.image.version":"3.1.4","foo":"bar"}'),
-    ).toStrictEqual({ "org.opencontainers.image.version": "3.1.4", foo: "bar" });
+      parseDockerInspectLabels('{"org.opencontainers.image.version":"3.1.4-proxy","foo":"bar"}'),
+    ).toStrictEqual({ "org.opencontainers.image.version": "3.1.4-proxy", foo: "bar" });
   });
 
   it("returns an empty object for the literal 'null' (a container with no labels)", () => {

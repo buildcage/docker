@@ -7,8 +7,8 @@
  * than degrade.
  *
  * Everything in a report except Communication details is small and fixed in
- * size; only that section scales with how much traffic a build made, so it
- * is the only part ever cut here.
+ * size; only that section scales with how much traffic a build or step
+ * made, so it is the only part ever cut here.
  */
 
 import {

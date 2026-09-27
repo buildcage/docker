@@ -34,6 +34,6 @@
 
 </details>
 
-*Reported by [buildcage/docker](https://github.com/buildcage/docker)*
+*Reported by [owner/repo](https://github.com/owner/repo)*
 
 <hr>
