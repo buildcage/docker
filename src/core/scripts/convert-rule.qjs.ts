@@ -8,6 +8,7 @@
  */
 /* v8 ignore file */
 import * as std from "qjs:std";
+
 import { buildRules } from "../lib/acl/wildcard-rules.js";
 
 const input = std.in.readAsString();

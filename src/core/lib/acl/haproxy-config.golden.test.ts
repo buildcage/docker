@@ -11,9 +11,10 @@
  * bundle by rolldown.scripts.config.js's *.golden.test.ts exclude.
  */
 import { describe, it } from "vitest";
+
+import { expectMatchesGolden } from "../test/golden.node.ts";
 import { generateHaproxyConfig, type HaproxyConfigOptions } from "./haproxy-config.ts";
 import { buildUrlRules } from "./url-rules.ts";
-import { expectMatchesGolden } from "../test/golden.node.ts";
 
 const PROXY = "198.19.255.1";
 

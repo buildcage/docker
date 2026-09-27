@@ -1,15 +1,16 @@
 import { execFileSync } from "node:child_process";
 
 import { capturedStderr, describeDockerFailure } from "#core/lib/actions/docker-error.ts";
+import { withLogGroup } from "#core/lib/actions/log.ts";
 import { buildComposeLogsArgs } from "#core/lib/docker/args.ts";
 import type { RunDocker } from "#core/lib/docker/client.ts";
-import { withLogGroup } from "#core/lib/actions/log.ts";
 import {
   buildDockerInspectStateArgs,
   parseContainerState,
   describeContainerStartFailure,
   type ContainerState,
 } from "#core/lib/docker/health.ts";
+
 import { SetupError } from "./errors.ts";
 
 /** Lines of container log printed when the builder fails to come up. */

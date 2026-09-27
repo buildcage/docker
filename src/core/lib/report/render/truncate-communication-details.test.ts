@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { truncateForStepSummary } from "./truncate-communication-details.ts";
+
 import { COMMUNICATION_DETAILS_OPEN, wrapCommunicationDetails } from "./communication-section.ts";
+import { truncateForStepSummary } from "./truncate-communication-details.ts";
 
 const HEADER = "## Outbound Traffic Report (restrict mode)\n\n### ✅ Allowed Hosts\n\n";
 const FOOTER = "\n*Reported by [owner/repo](https://github.com/owner/repo)*\n";

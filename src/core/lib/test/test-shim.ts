@@ -10,8 +10,8 @@
  * static imports before their own body runs.
  */
 import "./qjs-event-polyfill.ts";
-import * as chai from "chai";
 import { JestChaiExpect } from "@vitest/expect";
+import * as chai from "chai";
 
 const isNode = typeof (globalThis as { process?: unknown }).process !== "undefined";
 

@@ -7,16 +7,16 @@
  *   - an unverifiable ref (branch, local ./setup) returns null
  */
 
-import { fetchManifestDigest, fetchRegistryToken, fetchImageConfigLabels } from "./oci-registry.ts";
-import { fetchBundle } from "./oci-bundle.ts";
-import { readGhcrBasicAuth } from "./docker-credentials.ts";
-import { verifyBundle } from "./sigstore.ts";
-import type { DsseBundle } from "./signed-digest.ts";
-import { imageTagFromRef } from "./image-tag.ts";
-import { checkImageEngine } from "./engine-label.ts";
-import { buildVerifyOptions, type VerifyImageIdentity } from "./verify-policy.ts";
-import { ProvenanceError, VerifyImageError } from "./errors.ts";
 import { errorMessage } from "../errors.ts";
+import { readGhcrBasicAuth } from "./docker-credentials.ts";
+import { checkImageEngine } from "./engine-label.ts";
+import { ProvenanceError, VerifyImageError } from "./errors.ts";
+import { imageTagFromRef } from "./image-tag.ts";
+import { fetchBundle } from "./oci-bundle.ts";
+import { fetchManifestDigest, fetchRegistryToken, fetchImageConfigLabels } from "./oci-registry.ts";
+import type { DsseBundle } from "./signed-digest.ts";
+import { verifyBundle } from "./sigstore.ts";
+import { buildVerifyOptions, type VerifyImageIdentity } from "./verify-policy.ts";
 
 const REGISTRY = "ghcr.io";
 

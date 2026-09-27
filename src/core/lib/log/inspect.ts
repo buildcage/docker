@@ -19,11 +19,12 @@
  * https line carries an SNI, since only that stage terminates TLS.
  */
 
-import type { TrafficAction, TrafficEvent } from "./traffic-event.ts";
 import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
+
 import { splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
+import type { TrafficAction, TrafficEvent } from "./traffic-event.ts";
 
 export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 

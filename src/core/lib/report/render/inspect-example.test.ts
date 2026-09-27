@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
+
+import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
+import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
+
 import {
   buildUrlRuleLines,
   pathPatternsFor,
   buildInspectRestrictExample,
 } from "./inspect-example.ts";
-import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
-import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
 function req(method: string, url: string): TrafficEvent {
   const [, scheme, authority] = /^(https?):\/\/([^/?#]+)/.exec(url) ?? ["", "https", "h"];

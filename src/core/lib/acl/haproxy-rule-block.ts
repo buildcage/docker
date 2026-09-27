@@ -1,6 +1,6 @@
-import { DEFAULT_PORT } from "./url-rules.ts";
-import type { CompiledRule } from "./haproxy-rules.ts";
 import { escapeForHaproxy, hostMatcher, pathMatcher } from "./haproxy-matchers.ts";
+import type { CompiledRule } from "./haproxy-rules.ts";
+import { DEFAULT_PORT } from "./url-rules.ts";
 
 /**
  * Whether this scheme's block refuses every request outright.

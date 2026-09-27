@@ -8,8 +8,8 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { toProvenanceError, requireDigest } from "./verify-image.ts";
 import { ProvenanceError, VerifyImageError } from "./errors.ts";
+import { toProvenanceError, requireDigest } from "./verify-image.ts";
 
 describe("toProvenanceError", () => {
   it("carries the original VerifyImageError's code and message through", () => {

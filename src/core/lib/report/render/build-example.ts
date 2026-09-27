@@ -1,4 +1,5 @@
 import type { AggregatedEntry } from "#core/lib/log/aggregate.ts";
+
 import {
   exampleStepHead,
   restrictExampleBlock,

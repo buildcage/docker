@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { exitOnFatalError } from "./fatal.ts";
 import { ActionError } from "#core/lib/errors.ts";
+
+import { exitOnFatalError } from "./fatal.ts";
 
 class TestError extends ActionError<"SOME_CODE"> {}
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { runReportScript } from "./run-report-script.ts";
 import { ReportError } from "./errors.ts";
+import { runReportScript } from "./run-report-script.ts";
 
 const SCRIPT = "/tmp/buildcage-report-abc/report-action.js";
 const CONTAINER_ID = "builder123";

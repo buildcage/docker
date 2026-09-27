@@ -11,9 +11,9 @@
  */
 import { readProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
-import { runReportAction } from "#report/action-main.ts";
-import { buildInspectReportData } from "#core/lib/report/build/inspect.ts";
 import { errorMessage } from "#core/lib/errors.ts";
+import { buildInspectReportData } from "#core/lib/report/build/inspect.ts";
+import { runReportAction } from "#report/action-main.ts";
 
 const PROXY_LOG_DIR = "/var/log/haproxy";
 const RESOLVER_LOG_DIR = "/var/log/coredns";

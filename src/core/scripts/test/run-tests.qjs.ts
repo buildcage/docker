@@ -1,3 +1,4 @@
+import * as os from "qjs:os";
 /**
  * Runs every *.test.js file found (non-recursively) in each given
  * directory, in a single qjs process. qjs itself only accepts one file
@@ -6,7 +7,6 @@
  * Usage: qjs --std -m run-tests.qjs.js <dir> [<dir> ...]
  */
 import * as std from "qjs:std";
-import * as os from "qjs:os";
 
 const dirs = scriptArgs.slice(1);
 if (dirs.length === 0) {

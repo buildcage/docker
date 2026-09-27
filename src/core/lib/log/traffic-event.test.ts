@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { connectedHosts, isRedundantDns, type TrafficEvent } from "./traffic-event.ts";
 
 function event(

@@ -1,6 +1,6 @@
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
-import { compileRuleSet, type RuleInputs } from "./haproxy-rules.ts";
 import { ruleBlock } from "./haproxy-rule-block.ts";
+import { compileRuleSet, type RuleInputs } from "./haproxy-rules.ts";
 import { buildUrlRules } from "./url-rules.ts";
 
 /** One scheme's rule ACLs and its deny, as the generated config carries them. */

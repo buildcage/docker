@@ -6,6 +6,7 @@
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const sigstore = vi.hoisted(() => ({
@@ -36,9 +37,9 @@ vi.mock("@sigstore/verify", () => ({
   },
 }));
 
-import { verifyBundle, type VerifyBundleOptions } from "./sigstore.ts";
 import { VerifyImageError } from "./errors.ts";
 import type { DsseBundle } from "./signed-digest.ts";
+import { verifyBundle, type VerifyBundleOptions } from "./sigstore.ts";
 
 const DIGEST = "sha256:" + "a".repeat(64);
 

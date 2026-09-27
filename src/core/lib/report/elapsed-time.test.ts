@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { formatElapsedVariable, formatElapsedFixed } from "./elapsed-time.ts";
 
 describe("formatElapsedVariable", () => {

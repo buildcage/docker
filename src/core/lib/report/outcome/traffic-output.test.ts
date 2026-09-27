@@ -1,9 +1,12 @@
-import { describe, it, expect } from "vitest";
 import { readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildTrafficRecords, writeTrafficFile } from "./traffic-output.ts";
+
+import { describe, it, expect } from "vitest";
+
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
+
+import { buildTrafficRecords, writeTrafficFile } from "./traffic-output.ts";
 
 const t = 1787471975;
 const EVENTS: TrafficEvent[] = [

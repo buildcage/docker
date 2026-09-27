@@ -1,8 +1,8 @@
+import fc from "fast-check";
 /**
  * Property-based tests for core/lib/acl/wildcard-rules.ts.
  */
 import { describe, it, expect } from "vitest";
-import fc from "fast-check";
 
 import { convertRule, buildRules, parseAndValidateRules } from "./wildcard-rules.ts";
 

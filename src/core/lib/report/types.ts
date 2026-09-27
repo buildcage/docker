@@ -1,6 +1,6 @@
 import type { AggregatedEntry } from "../log/aggregate.ts";
-import type { AnnotatedBlockedRow } from "./build/aggregate.ts";
 import type { TrafficEvent } from "../log/traffic-event.ts";
+import type { AnnotatedBlockedRow } from "./build/aggregate.ts";
 
 /** Echoed back verbatim rather than re-derived: only the container's own
  *  env (or, for run, its own action input) reflects what was configured. */

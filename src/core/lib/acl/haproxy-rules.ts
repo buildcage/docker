@@ -4,8 +4,8 @@
  * into config text, and this module knows nothing about that text.
  */
 
-import type { UrlRule } from "./url-rules.ts";
 import { anchorRawRegex, domainToRegexPartial, splitRawRegexHost } from "./partial-wildcard.ts";
+import type { UrlRule } from "./url-rules.ts";
 
 /** An IPv4 address or CIDR block, which is what HAProxy's `dst` acl accepts. */
 export const IPV4_OR_CIDR = /^\d{1,3}(?:\.\d{1,3}){3}(?:\/\d{1,2})?$/;

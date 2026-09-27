@@ -13,28 +13,29 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { SetupError } from "./errors.ts";
-import { annotate } from "#core/lib/actions/annotation.ts";
-import { readBuilderName, readEngineInputs, readRuleInputs } from "./inputs.ts";
-import {
-  checkIpRuleSupport,
-  checkKnownBlockedUrlRuleSupport,
-  checkUrlAndTlsRuleSupport,
-} from "./engine-rule-support.ts";
 import { isKnownBlockedUrlRule } from "#core/lib/acl/wildcard-rules.ts";
-import { buildComposeEnv } from "./compose-env.ts";
+import { annotate } from "#core/lib/actions/annotation.ts";
+import { describeDockerFailure } from "#core/lib/actions/docker-error.ts";
+import { logRules, withLogGroup } from "#core/lib/actions/log.ts";
+import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
+import { deriveProjectName } from "#core/lib/docker/compose-project-name.ts";
+import { resolveBuildcageImageRef } from "#core/lib/provenance/image-ref.ts";
 import {
   verifyImageDigestOrThrow,
   type VerifyImageDigestOptions,
   type ResolvedImage,
 } from "#core/lib/provenance/verify-image.ts";
-import { resolveBuildcageImageRef } from "#core/lib/provenance/image-ref.ts";
-import { describeDockerFailure } from "#core/lib/actions/docker-error.ts";
-import { logRules, withLogGroup } from "#core/lib/actions/log.ts";
-import { deriveProjectName } from "#core/lib/docker/compose-project-name.ts";
-import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
-import { readLocalImageOverride } from "./local-image.ts";
+
 import { builderStartError } from "./builder-diagnostics.ts";
+import { buildComposeEnv } from "./compose-env.ts";
+import {
+  checkIpRuleSupport,
+  checkKnownBlockedUrlRuleSupport,
+  checkUrlAndTlsRuleSupport,
+} from "./engine-rule-support.ts";
+import { SetupError } from "./errors.ts";
+import { readBuilderName, readEngineInputs, readRuleInputs } from "./inputs.ts";
+import { readLocalImageOverride } from "./local-image.ts";
 
 // Resolved from the bundle's own location: dist/main.cjs sits one directory
 // above docker/.

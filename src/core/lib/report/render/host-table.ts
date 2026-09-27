@@ -1,5 +1,6 @@
-import { markdownTable, type ColumnFormat } from "./markdown-table.ts";
 import type { AggregatedEntry } from "#core/lib/log/aggregate.ts";
+
+import { markdownTable, type ColumnFormat } from "./markdown-table.ts";
 
 /**
  * A row of a host table, at whatever stage it reaches the renderer: an

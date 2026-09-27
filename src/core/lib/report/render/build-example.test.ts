@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { buildRestrictExample } from "./build-example.ts";
 import { restrictExampleBlock } from "./restrict-example.ts";
 

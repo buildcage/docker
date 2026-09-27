@@ -5,8 +5,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { assertSignedDigest } from "./signed-digest.ts";
+
 import { VerifyImageError } from "./errors.ts";
+import { assertSignedDigest } from "./signed-digest.ts";
 
 const DIGEST = "sha256:abc123";
 

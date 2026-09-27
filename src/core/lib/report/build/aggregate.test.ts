@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { annotateKnownBlocked } from "./aggregate.ts";
+
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
+
+import { annotateKnownBlocked } from "./aggregate.ts";
 
 describe("annotateKnownBlocked", () => {
   const block = (overrides: Partial<TrafficEvent> = {}): TrafficEvent => ({

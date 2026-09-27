@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 import { errorMessage } from "#core/lib/errors.ts";
+
 import { ReportError } from "./errors.ts";
 
 /** Narrowed to what this module needs, so a test can assert on argv and env. */

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { parseDroppedLogs, readProxyDroppedLogs } from "./proxy-dropped-logs.ts";
+
 import type { Docker } from "./client.ts";
+import { parseDroppedLogs, readProxyDroppedLogs } from "./proxy-dropped-logs.ts";
 
 /** What haproxy 3.4's exporter serves for `?scope=global`, trimmed to the
  *  counter and its neighbours. */

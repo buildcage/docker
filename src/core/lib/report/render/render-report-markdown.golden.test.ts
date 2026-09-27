@@ -10,16 +10,18 @@
  * vitest-only (see test/golden.node.ts).
  */
 import { describe, it } from "vitest";
-import { renderReportMarkdown } from "./render-report-markdown.ts";
+
+import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
+import { expectMatchesGolden } from "#core/lib/test/golden.node.ts";
+import { expectedRows, reportParams } from "#core/lib/test/report-data.node.ts";
+
 import type {
   GenReportParameters,
   ReportData,
   UniversalReportData,
   InspectReportData,
 } from "../types.ts";
-import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
-import { expectMatchesGolden } from "#core/lib/test/golden.node.ts";
-import { expectedRows, reportParams } from "#core/lib/test/report-data.node.ts";
+import { renderReportMarkdown } from "./render-report-markdown.ts";
 
 /** Every golden document describes a run with one allowed rule. */
 const params = (overrides: Partial<GenReportParameters> = {}) =>

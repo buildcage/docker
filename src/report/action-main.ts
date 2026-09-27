@@ -17,12 +17,13 @@ import { writeStepSummary } from "#core/lib/actions/write-step-summary.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
-import { buildReportParameters } from "./parameters.ts";
-import { emitReportOutcomes } from "./emit.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
 import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
 import { truncateForStepSummary } from "#core/lib/report/render/truncate-communication-details.ts";
 import type { GenReportParameters, ReportData } from "#core/lib/report/types.ts";
+
+import { emitReportOutcomes } from "./emit.ts";
+import { buildReportParameters } from "./parameters.ts";
 
 /** Used when the script is run outside the action, as the tests and the
  *  Makefile's report targets do. */

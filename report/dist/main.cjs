@@ -28,7 +28,7 @@ let node_url = require("node:url"), node_fs = require("node:fs");
 node_fs = __toESM(node_fs, 1);
 let node_os = require("node:os");
 node_os = __toESM(node_os, 1);
-let node_path = require("node:path"), node_crypto = require("node:crypto"), node_child_process = require("node:child_process"), node_events = require("node:events"), node_readline = require("node:readline"), os = require("os");
+let node_path = require("node:path"), node_child_process = require("node:child_process"), node_events = require("node:events"), node_readline = require("node:readline"), node_crypto = require("node:crypto"), os = require("os");
 os = __toESM(os, 1);
 let crypto = require("crypto");
 crypto = __toESM(crypto, 1);
@@ -101,14 +101,6 @@ function exitOnFatalError(context) {
 	return (err) => {
 		err instanceof ActionError ? annotate.error(err.message) : annotate.error(`Unexpected error in ${context}: ${errorMessage(err)}`), process.exit(1);
 	};
-}
-//#endregion
-//#region src/core/lib/docker/compose-project-name.ts
-function deriveProjectName(containerName) {
-	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
-}
-function resolveProjectName(builderName, composeProjectNameOverride) {
-	return composeProjectNameOverride || deriveProjectName(builderName);
 }
 //#endregion
 //#region src/core/lib/docker/args.ts
@@ -233,6 +225,14 @@ function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand
 			]);
 		}
 	};
+}
+//#endregion
+//#region src/core/lib/docker/compose-project-name.ts
+function deriveProjectName(containerName) {
+	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
+}
+function resolveProjectName(builderName, composeProjectNameOverride) {
+	return composeProjectNameOverride || deriveProjectName(builderName);
 }
 function capturedStderr(e) {
 	let err = e && typeof e == "object" ? e : {};
