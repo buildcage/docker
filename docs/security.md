@@ -241,17 +241,19 @@ Three mechanisms make that enforceable:
   BuildKit falls back to another snapshotter, the wrapper warns in each step's output that it is
   leaving the layer unread, and only the store directory's own undo applies.
 
-The CA and its key are generated fresh each time the builder container starts. The CA is valid for
-two days, so a copy that escapes cleanup soon stops being trusted. Its private key never leaves the
-container: HAProxy signs each per-SNI certificate with it, and only the certificate is published to
-the steps. The post step's `docker compose down` removes the container, and the key with it.
-
 A wide host rule paired with a narrow path or method does not narrow the DNS side. DNS has no notion
 of a path, so a name under an allowed `*.example.com` is logged as allowed the moment it is looked
 up, before any path is known. The request that follows is still refused and still never reaches an
 origin; only the log line reflects the host-only nature of that decision. See
 [Rule syntax](./reference.md#rule-syntax) for how to write a host pattern that doesn't widen this
 more than intended.
+
+#### The CA and its private key
+
+The CA and its key are generated fresh each time the builder container starts. The CA is valid for
+two days, so a copy that escapes cleanup soon stops being trusted. Its private key never leaves the
+container: HAProxy signs each per-SNI certificate with it, and only the certificate is published to
+the steps. The post step's `docker compose down` removes the container, and the key with it.
 
 ## Attempts to get around it
 

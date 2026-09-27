@@ -130,12 +130,12 @@ Each pair builds the same Dockerfile with and without rules:
 `proxy_engine` sets how closely a build's traffic is read. `inspect` is the default; `universal` has
 to be set explicitly.
 
-`inspect` terminates TLS and re-signs it with a CA generated for that build. Rules match on method
-and URL, so `GET|HEAD https://registry.npmjs.org/**` allows a fetch while refusing a publish on the
-same host, and the report names every request with its URL. The build has to trust that CA:
-Buildcage adds it to the system store, to the CA-trust variables, to a JVM already in the base
-image, and to Chromium's NSS database, so most toolchains need nothing extra (see
-[CA trust and compatibility](#ca-trust-and-compatibility)).
+`inspect` terminates TLS and re-signs it with a CA generated each time the builder starts. Rules
+match on method and URL, so `GET|HEAD https://registry.npmjs.org/**` allows a fetch while refusing a
+publish on the same host, and the report names every request with its URL. The build has to trust
+that CA: Buildcage adds it to the system store, to the CA-trust variables, to a JVM already in the
+base image, and to Chromium's NSS database, so most toolchains need nothing extra (see [CA trust and
+compatibility](#ca-trust-and-compatibility)).
 
 `universal` reads only the SNI. Rules match on host and port, so `registry.npmjs.org:443` is the
 most one can say, the report shows host and port, and the build's own TLS is left untouched.
@@ -308,24 +308,25 @@ runs where and what it decides.
 
 ## CA trust and compatibility
 
-`proxy_engine: inspect` terminates TLS and re-signs it with a CA generated for that build, so the
-build has to trust that CA. As each `RUN` step starts, Buildcage points the variables the common
-toolchains read at a store that holds it: `NODE_EXTRA_CA_CERTS`, `DENO_CERT`, `SSL_CERT_FILE`,
-`REQUESTS_CA_BUNDLE` and `PIP_CERT`. `CURL_CA_BUNDLE` is set only in a step with no system CA store
-of its own, since curl reads that store already. A variable the base image or the Dockerfile already
-set is appended to rather than redirected, and neither the CA nor the variables are left in the
-image layers, except a copy a step hides where it cannot be read (see
-[Limitations](#limitations)). The CA is also left in the distribution's own anchor directory, so a
-step that installs `ca-certificates` partway through keeps trusting it once `update-ca-certificates`
-has rebuilt the bundle from scratch. A JVM already in the base image reads none of those variables and
-only its own keystore, so the CA is added there too, to `$JAVA_HOME/lib/security/cacerts` in
-whichever shape it ships (JKS or PKCS#12), for the step and taken back out before the layer is
-committed, letting `mvn`, `gradle` and `java` reach the proxy without `proxy_engine: universal`.
-Chromium, including the `chrome-headless-shell` that Puppeteer, Playwright and Remotion download,
-reads only its compiled-in root store and the NSS database in `$HOME`, so for each step that
-database's `pkcs11.txt` gains a read-only slot on a database holding only the CA, taken back out
-before the layer is committed. The database itself stays the step's own, with whatever the step
-writes to it.
+`proxy_engine: inspect` terminates TLS and re-signs it with a CA generated each time the builder
+starts, whose private key never leaves the builder container
+([details](docs/security.md#the-ca-and-its-private-key)), so the build has to trust that CA. As each
+`RUN` step starts, Buildcage points the variables the common toolchains read at a store that holds
+it: `NODE_EXTRA_CA_CERTS`, `DENO_CERT`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `PIP_CERT`.
+`CURL_CA_BUNDLE` is set only in a step with no system CA store of its own, since curl reads that
+store already. A variable the base image or the Dockerfile already set is appended to rather than
+redirected, and neither the CA nor the variables are left in the image layers, except a copy a step
+hides where it cannot be read (see [Limitations](#limitations)). The CA is also left in the
+distribution's own anchor directory, so a step that installs `ca-certificates` partway through keeps
+trusting it once `update-ca-certificates` has rebuilt the bundle from scratch. A JVM already in the
+base image reads none of those variables and only its own keystore, so the CA is added there too, to
+`$JAVA_HOME/lib/security/cacerts` in whichever shape it ships (JKS or PKCS#12), for the step and
+taken back out before the layer is committed, letting `mvn`, `gradle` and `java` reach the proxy
+without `proxy_engine: universal`. Chromium, including the `chrome-headless-shell` that Puppeteer,
+Playwright and Remotion download, reads only its compiled-in root store and the NSS database in
+`$HOME`, so for each step that database's `pkcs11.txt` gains a read-only slot on a database holding
+only the CA, taken back out before the layer is committed. The database itself stays the step's own,
+with whatever the step writes to it.
 
 The full table, with what each variable points at when the step has a system CA store and when it
 has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in
