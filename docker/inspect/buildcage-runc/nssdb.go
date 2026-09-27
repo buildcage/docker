@@ -281,7 +281,8 @@ func appendNSSSlot(path string, uid, gid int) ([]byte, error) {
 // removeNSSSlot takes back what appendNSSSlot added. NSS rewrites pkcs11.txt
 // only by copying the entries it keeps byte for byte, so the slot is found
 // where it was left unless the step itself took it out, in which case the file
-// is written back as the step left it. A pkcs11.txt the step replaced with
+// is written back as the step left it. The separator goes too only when nothing
+// follows the slot: an entry after it would otherwise run into the one before. A pkcs11.txt the step replaced with
 // something other than a file carries no slot. One the injection created is
 // removed once it holds nothing else.
 func removeNSSSlot(path string, appended []byte, created bool) error {
@@ -308,7 +309,7 @@ func removeNSSSlot(path string, appended []byte, created bool) error {
 		return err
 	}
 	cut, i := appended, bytes.LastIndex(content, appended)
-	if i < 0 {
+	if i < 0 || i+len(cut) < len(content) {
 		cut, i = nssSlot, bytes.LastIndex(content, nssSlot)
 	}
 	if i < 0 {

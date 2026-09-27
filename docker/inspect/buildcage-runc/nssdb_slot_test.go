@@ -141,18 +141,27 @@ func TestNSSDBSlotIsAppendedAsAnEntryOfItsOwn(t *testing.T) {
 
 // What modutil does: NSS copies the entries it keeps byte for byte and
 // appends the new one.
+// The separator the injection added stays, so the module does not run into
+// the entry before it.
 func TestNSSDBSlotLeavesAModuleTheStepAdded(t *testing.T) {
-	original := "library=\nname=internal\n\n"
-	in, _, rootfs, mirror := injectSlot(t, ptr(original))
-	module := "library=/usr/lib/opensc-pkcs11.so\nname=OpenSC\n\n"
-	mustAppendFile(t, filepath.Join(mirror, "pkcs11.txt"), module)
+	for name, tc := range map[string]struct{ original, separator string }{
+		"ending in a blank line": {"library=\nname=internal\n\n", ""},
+		"ending in a newline":    {"library=\nname=internal\n", "\n"},
+		"ending mid-line":        {"library=\nname=internal", "\n\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			in, _, rootfs, mirror := injectSlot(t, ptr(tc.original))
+			module := "library=/usr/lib/opensc-pkcs11.so\nname=OpenSC\n\n"
+			mustAppendFile(t, filepath.Join(mirror, "pkcs11.txt"), module)
 
-	if err := in.finish(true); err != nil {
-		t.Fatal(err)
-	}
-	got := mustRead(t, filepath.Join(rootfs, "root", nssDBPath, "pkcs11.txt"))
-	if got != original+module {
-		t.Fatalf("pkcs11.txt was written back as %q, want %q", got, original+module)
+			if err := in.finish(true); err != nil {
+				t.Fatal(err)
+			}
+			want := tc.original + tc.separator + module
+			if got := mustRead(t, filepath.Join(rootfs, "root", nssDBPath, "pkcs11.txt")); got != want {
+				t.Fatalf("pkcs11.txt was written back as %q, want %q", got, want)
+			}
+		})
 	}
 }
 
