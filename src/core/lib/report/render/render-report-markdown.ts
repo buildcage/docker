@@ -8,17 +8,13 @@ import type { ExampleStepOptions } from "./restrict-example.ts";
 import type { ReportData } from "../types.ts";
 
 export interface RenderReportMarkdownOptions extends ExampleStepOptions {
-  /** Full heading text, e.g. "Outbound Traffic Report — npm install".
-   *  Defaults to a bare "Outbound Traffic Report". A caller may fold an
-   *  untrusted input (isolated-run's `label`) into it; the heading escapes it
-   *  (see below), so callers pass it through raw. */
+  /** Heading text. May carry untrusted input: the heading escapes it. */
   title?: string;
 }
 
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
  *  duplicated per engine. actionRepo/actionRef are real values, not
- *  placeholders: this runs on the runner, with process.env available. The
- *  ExampleStepOptions are passed on to the audit-mode restrict example. */
+ *  placeholders: this runs on the runner, with process.env available. */
 export function renderReportMarkdown(
   report: ReportData,
   actionRepo: string,
@@ -32,8 +28,7 @@ export function renderReportMarkdown(
   // restrict is what a real run normally uses day to day, so its heading
   // stays bare; audit is the occasional, deliberately different mode and
   // says so, the same way the heading below calls out "Audited" vs "Allowed".
-  // escapeCell because title may carry an untrusted input: unescaped, it could
-  // inject Markdown or a newline into the heading.
+  // escapeCell keeps an untrusted title from injecting Markdown or a newline.
   let markdown = `## ${escapeCell(title)}${isAudit ? " (audit mode)" : ""}\n\n`;
 
   // The tables would otherwise read as the whole story.

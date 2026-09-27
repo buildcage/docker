@@ -4,10 +4,9 @@
  * named rather than addressed, so its destination says nothing about which
  * name.
  *
- * Whatever hands out that gateway has to use this value. The inspect image's
- * haproxy config generator echoes it as GATEWAY= and cannot import this, so the
- * test beside this holds the two in sync; each action checks its own network
- * (a CNI config, a veth link) with a test of its own outside core.
+ * init-inspect-cfg echoes it as GATEWAY= and cannot import it, so the test
+ * beside this keeps the two in sync. Each action tests its own network's
+ * gateway outside core.
  *
  * It sits at the far end of 198.18.0.0/15, the RFC 2544 benchmarking block:
  * outside Docker's default address pools, so no network Docker allocates can
