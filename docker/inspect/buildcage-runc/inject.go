@@ -278,7 +278,10 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	}
 
 	// Chromium reads neither the store nor any variable (see nssdb.go).
-	nss, nssCreated := placeNSSDB(s, bundle)
+	nssMirror, nss, nssCreated := placeNSSDB(s, bundle, ca)
+	if nssMirror != nil {
+		binds = append(binds, nssMirror)
+	}
 	created.add(nssCreated.dirs)
 
 	s.setEnv(plan.env)

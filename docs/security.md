@@ -216,9 +216,12 @@ Three mechanisms make that enforceable:
   trusting it once the bundle is rebuilt, and adds it, the same mirrored way, to the keystore a JVM
   already in the base image reads (`$JAVA_HOME/lib/security/cacerts`, in either the JKS or PKCS#12
   shape it ships), which no CA-trust variable would reach. Chromium reads neither, only the NSS
-  database in `$HOME`, so the wrapper binds over `~/.pki/nssdb` a copy of a database holding only
-  the CA, made by `certutil` in the proxy container from the CA certificate alone. The step's own
-  database is never parsed, and a step that changes the copy fails the build. Injection happens at exec time, never touches LLB, and so
+  database in `$HOME`, so the wrapper appends to that database's `pkcs11.txt`, in a mirror like the
+  CA store's, a read-only slot on a database holding only the CA, made by `certutil` in the proxy
+  container from the CA certificate alone. The wrapper never parses the step's own database: it only
+  copies its files, and takes out of `pkcs11.txt` exactly the bytes it appended. A database the
+  step's user cannot write is covered with the CA-only one instead, and a step that changes that
+  fails the build. Injection happens at exec time, never touches LLB, and so
   cannot affect a cache key. Before the step's layer is committed, the wrapper reads that layer back
   and takes the certificate, and the anchor, out of every text file carrying it as PEM, every JKS
   or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`), each
@@ -307,7 +310,8 @@ TLS is terminated, so a tool that pins a certificate, or ships a bundled trust s
 the system update, will not work. The JVM (Java, Kotlin, Scala) reads only its own keystore rather
 than the CA-trust variables; a JVM already in the base image is handled by injecting into that
 keystore, but one sealed with a password other than the JDK default falls back to `universal`.
-Chromium's NSS database is covered with one trusting the CA; a step that writes to it fails.
+Chromium's NSS database is given a read-only slot trusting the CA; one the step's user cannot
+write is covered instead, and a step that writes to that fails.
 See [Limitations](../README.md#limitations) for the rest of the
 compatibility picture.
 

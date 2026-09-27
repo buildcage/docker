@@ -70,6 +70,14 @@ type dirBind struct {
 	// by its path relative to scratchDir. The inject/strip round trip re-encodes
 	// a keystore, so one the step never changed is restored from these instead.
 	keystoreOriginals map[string][]byte
+
+	// Set for Chromium's NSS database (nssdb.go): what was appended to the
+	// mirror's pkcs11.txt, whether the directory had one before, and the
+	// scratch directory holding both the mirror and the CA-only database
+	// bound beside it.
+	nssAppended []byte
+	nssHadTxt   bool
+	nssBase     string
 }
 
 // groupTargetsByBind groups the CA targets by the directory whose mirror carries
@@ -358,6 +366,12 @@ func (b *dirBind) finish() error {
 		return err
 	}
 
+	if b.nssAppended != nil {
+		if err := removeNSSSlot(filepath.Join(b.scratchDir, "pkcs11.txt"), b.nssAppended, !b.nssHadTxt); err != nil {
+			return err
+		}
+	}
+
 	// The whole mirror, not only the files the CA was added to. With a store,
 	// the step's writes land here rather than in the overlay's upper
 	// directory, so a copy the step left beside the bundle is not in the layer
@@ -454,6 +468,9 @@ func entryFor(entries []fileEntry, rel string) (fileEntry, bool) {
 
 func (b *dirBind) cleanup() {
 	removeScratchDir(b.scratchDir)
+	if b.nssBase != "" {
+		removeScratchDir(b.nssBase)
+	}
 }
 
 // removeScratchDir only logs a failure: it leaves a directory on the builder,

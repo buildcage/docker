@@ -3,8 +3,9 @@ set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 
 # The build's own steps check Chromium trusted the proxy CA; this checks the
-# committed image carries none of the bound database, and that a step writing
-# to it fails the build.
+# committed image carries none of what the wrapper added to the databases, that
+# what the steps wrote to them is there, and that a step writing to a covered
+# database fails the build.
 
 IMAGE="${1:-buildcage-test}"
 BUILDER="${BUILDER_NAME:-buildcage}"
@@ -14,13 +15,26 @@ echo ""
 echo "=== Chromium's NSS Database ($IMAGE) ==="
 echo ""
 
-if docker run --rm --user root "$IMAGE" sh -c '[ -d /root/.local/share/pki/nssdb ] && [ -z "$(ls -A /root/.local/share/pki/nssdb)" ]'; then
-  pass "the image's own XDG database is still the empty directory the step made"
+for db in /root/.pki/nssdb /home/app/.local/share/pki/nssdb; do
+  if docker run --rm --user root "$IMAGE" sh -c "certutil -L -d sql:$db -n own-ca >/dev/null"; then
+    pass "$db still trusts the CA a step added to it"
+  else
+    fail "$db lost the CA a step added to it"
+  fi
+  if docker run --rm --user root "$IMAGE" sh -c "grep -q buildcage $db/pkcs11.txt"; then
+    fail "$db/pkcs11.txt still names the proxy CA's slot"
+  else
+    pass "$db/pkcs11.txt no longer names the proxy CA's slot"
+  fi
+done
+
+if docker run --rm --user root "$IMAGE" sh -c 'grep -q own-module /root/.pki/nssdb/pkcs11.txt'; then
+  pass "the module a step added with modutil is still in /root/.pki/nssdb/pkcs11.txt"
 else
-  fail "/root/.local/share/pki/nssdb is missing or holds something in the built image"
+  fail "the module a step added with modutil is gone from /root/.pki/nssdb/pkcs11.txt"
 fi
 
-for dir in /root/.pki /home/app/.pki /home/app/.local; do
+for dir in /home/app/.pki /dev/buildcage-nssdb /tmp/control; do
   if docker run --rm --user root "$IMAGE" sh -c "test -e $dir"; then
     fail "$dir is in the built image"
   else
@@ -28,10 +42,10 @@ for dir in /root/.pki /home/app/.pki /home/app/.local; do
   fi
 done
 
-if docker run --rm --user root "$IMAGE" sh -c 'test -e /tmp/control'; then
-  fail "the control step's home is in the built image"
+if docker run --rm --user root "$IMAGE" sh -c '[ "$(ls -A /home/reader/.pki/nssdb)" = "$(printf "cert9.db\nkey4.db\npkcs11.txt")" ]'; then
+  pass "the covered database is as the image left it"
 else
-  pass "the control step left nothing behind"
+  fail "the covered database changed in the built image"
 fi
 
 echo ""
@@ -53,10 +67,10 @@ else
   pass "the build failed"
 fi
 
-if grep -q "changed the NSS database at /root/.pki/nssdb" <<<"$OUT"; then
+if grep -q "changed the NSS database at /home/app/.pki/nssdb" <<<"$OUT"; then
   pass "the failure names the database the step wrote to"
 else
-  fail "the build log does not name /root/.pki/nssdb as changed"
+  fail "the build log does not name /home/app/.pki/nssdb as changed"
 fi
 
 if grep -q "hint: .*fail_on_ca_residue: false" <<<"$OUT"; then

@@ -641,8 +641,15 @@ store:
 | `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go, Ruby, Rust's `rustls-native-certs`) | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
 
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
-Every Chromium version reads `~/.pki/nssdb` when it exists, so that path is covered for the step
-with a database holding only this CA, owned by the step's user. `HOME` comes from the step's
+Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read
+`~/.local/share/pki/nssdb` when it does not, so the database is the first of those that exists, or a
+new `~/.pki/nssdb`, owned by the home's owner, when neither does. Its directory is mirrored for the
+step, the way a CA store is, and the mirror's `pkcs11.txt` gains a second, read-only softoken slot
+on a database holding only this CA, bound at `/dev/buildcage-nssdb`. NSS loads every module
+`pkcs11.txt` names, so Chromium trusts the CA through that slot while the step's own certificates,
+keys and writes stay in its own database. After the step, the slot's bytes are taken back out of
+`pkcs11.txt` and whatever the step changed is written back. A database the step's user cannot write
+is covered for the step with one holding only this CA instead. `HOME` comes from the step's
 environment, or from the image's `/etc/passwd` when that is empty, as runc does.
 
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
@@ -655,7 +662,8 @@ Two things fail the build by default, naming the file and pointing at `fail_on_c
 
 - a copy of the CA the wrapper finds in the step's layer but cannot take out, such as one inside a
   binary, an uncompressed archive or a re-wrapped PEM (see [Limitations](../README.md#limitations))
-- a write to the NSS database bound over Chromium's for the step
+- a write to an NSS database covered for the step because its user cannot write it (see
+  [Limitations](../README.md#limitations))
 
 With `fail_on_ca_residue: false` both only warn: the copy stays in the image, and the write is
 discarded. A layer the wrapper could not read back or restore fails the build either way.

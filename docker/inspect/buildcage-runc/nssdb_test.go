@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -44,6 +45,10 @@ func newNSSBundle(t *testing.T, env []string, uid, gid int, home string) (bundle
 	bundle, rootfs = newBundleNoStore(t, env)
 	if home != "" {
 		mustMkdirAll(t, filepath.Join(rootfs, home))
+		// The home is the step user's, as in an image.
+		if os.Geteuid() == 0 {
+			giveToStepUser(t, filepath.Join(rootfs, home), uid, gid)
+		}
 	}
 	setSpecField(t, bundle, "process", func(proc map[string]any) {
 		proc["user"] = map[string]any{"uid": uid, "gid": gid}
@@ -102,17 +107,35 @@ func mustOwner(t *testing.T, path string) (uid, gid int, mode os.FileMode) {
 	return int(st.Uid), int(st.Gid), info.Mode().Perm()
 }
 
-func TestNSSDBIsBoundAtTheLegacyPathAndTakenBack(t *testing.T) {
+// unwritableNSSDB gives the step a legacy database its user cannot write,
+// which is covered rather than given the slot.
+func unwritableNSSDB(t *testing.T, rootfs, home string) string {
+	t.Helper()
+	dir := filepath.Join(rootfs, home, nssDBPath)
+	mustMkdirAll(t, dir)
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	return dir
+}
+
+func TestNSSDBCoversADatabaseTheStepUserCannotWrite(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
 	uid, gid := stepUser()
 	bundle, rootfs := newNSSBundle(t, []string{"HOME=/home/app"}, uid, gid, "/home/app")
+	legacy := unwritableNSSDB(t, rootfs, "/home/app")
 
 	in, err := inject(bundle, testCA)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if in.nss == nil {
+		t.Fatal("the database was not covered")
+	}
+	assertNoMountAt(t, bundle, nssCADBDir)
 	scratch := nssMountSource(t, bundle, "/home/app/.pki/nssdb")
 	for name, want := range testNSSTemplate {
 		path := filepath.Join(scratch, name)
@@ -130,17 +153,12 @@ func TestNSSDBIsBoundAtTheLegacyPathAndTakenBack(t *testing.T) {
 	if u, g, mode := mustOwner(t, scratch); u != uid || g != gid || mode != 0o700 {
 		t.Fatalf("the database directory is %d:%d %o, want %d:%d 700", u, g, mode, uid, gid)
 	}
-	for _, dir := range []string{".pki", ".pki/nssdb"} {
-		if u, g, mode := mustOwner(t, filepath.Join(rootfs, "home/app", dir)); u != uid || g != gid || mode != 0o700 {
-			t.Fatalf("~/%s was created %d:%d %o, want %d:%d 700", dir, u, g, mode, uid, gid)
-		}
-	}
 
 	if err := in.finish(true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Lstat(filepath.Join(rootfs, "home/app/.pki")); !os.IsNotExist(err) {
-		t.Fatal("~/.pki was left behind")
+	if _, err := os.Stat(legacy); err != nil {
+		t.Fatal("the step's own database directory went")
 	}
 	if _, err := os.Stat(scratch); !os.IsNotExist(err) {
 		t.Fatal("the scratch database was left behind")
@@ -171,7 +189,39 @@ func TestNSSDBLeavesADirectoryTheStepUsed(t *testing.T) {
 	}
 }
 
-func TestNSSDBCoversAnExistingDatabase(t *testing.T) {
+// giveToStepUser hands a database the test made to the step's user, as the
+// step that made it in a real image would have left it.
+func giveToStepUser(t *testing.T, dir string, uid, gid int) {
+	t.Helper()
+	err := filepath.WalkDir(dir, func(path string, _ fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.Lchown(path, uid, gid)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// slotAt fails the test unless the step's own database at dest was given the
+// slot, and returns the mirror bound there.
+func slotAt(t *testing.T, in *injection, bundle, dest string) string {
+	t.Helper()
+	for _, b := range in.binds {
+		if b.nssBase != "" && b.containerDir == dest {
+			ca := findMount(t, loadMounts(t, bundle), nssCADBDir)
+			if opts, _ := ca["options"].([]any); !slices.Contains(opts, any("ro")) {
+				t.Fatalf("the CA database is bound with %v, not read-only", opts)
+			}
+			return nssMountSource(t, bundle, dest)
+		}
+	}
+	t.Fatalf("no slot was added to the database at %s", dest)
+	return ""
+}
+
+func TestNSSDBPrefersTheLegacyDatabaseToTheXDGOne(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
@@ -180,13 +230,14 @@ func TestNSSDBCoversAnExistingDatabase(t *testing.T) {
 	legacy := filepath.Join(rootfs, "root/.pki/nssdb")
 	mustMkdirAll(t, legacy)
 	mustWriteFile(t, filepath.Join(legacy, "cert9.db"), "THE IMAGE'S OWN")
+	giveToStepUser(t, legacy, uid, gid)
 	mustMkdirAll(t, filepath.Join(rootfs, "root/.local/share/pki/nssdb"))
 
 	in, err := inject(bundle, testCA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nssMountSource(t, bundle, "/root/.pki/nssdb")
+	slotAt(t, in, bundle, "/root/.pki/nssdb")
 	assertNoMountAt(t, bundle, "/root/.local/share/pki/nssdb")
 	if err := in.finish(true); err != nil {
 		t.Fatal(err)
@@ -195,14 +246,14 @@ func TestNSSDBCoversAnExistingDatabase(t *testing.T) {
 	if err != nil || string(got) != "THE IMAGE'S OWN" {
 		t.Fatalf("the image's own database changed: %q, %v", got, err)
 	}
-	if _, err := os.Stat(filepath.Join(rootfs, "root/.local/share/pki/nssdb")); err != nil {
-		t.Fatal("an XDG database the image already had was taken away")
+	if _, err := os.Stat(filepath.Join(legacy, "pkcs11.txt")); !os.IsNotExist(err) {
+		t.Fatal("an unchanged database was left a pkcs11.txt")
 	}
 }
 
-// Chromium prefers the legacy path once it exists, so an XDG database is left
-// in place and shadowed.
-func TestNSSDBLeavesAnXDGDatabaseAlone(t *testing.T) {
+// Chromium M146 and later read the XDG database when there is no legacy one,
+// and one there says the image's Chromium is one of those.
+func TestNSSDBUsesAnXDGDatabaseWhenThereIsNoLegacyOne(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
@@ -211,13 +262,14 @@ func TestNSSDBLeavesAnXDGDatabaseAlone(t *testing.T) {
 	xdg := filepath.Join(rootfs, "root/.local/share/pki/nssdb")
 	mustMkdirAll(t, xdg)
 	mustWriteFile(t, filepath.Join(xdg, "cert9.db"), "THE IMAGE'S OWN")
+	giveToStepUser(t, xdg, uid, gid)
 
 	in, err := inject(bundle, testCA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nssMountSource(t, bundle, "/root/.pki/nssdb")
-	assertNoMountAt(t, bundle, "/root/.local/share/pki/nssdb")
+	slotAt(t, in, bundle, "/root/.local/share/pki/nssdb")
+	assertNoMountAt(t, bundle, "/root/.pki/nssdb")
 	if err := in.finish(true); err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +278,7 @@ func TestNSSDBLeavesAnXDGDatabaseAlone(t *testing.T) {
 		t.Fatalf("the image's own database changed: %q, %v", got, err)
 	}
 	if _, err := os.Lstat(filepath.Join(rootfs, "root/.pki")); !os.IsNotExist(err) {
-		t.Fatal("~/.pki was left behind")
+		t.Fatal("~/.pki was created")
 	}
 }
 
@@ -249,7 +301,8 @@ func TestNSSDBChangedByTheStepFailsTheStep(t *testing.T) {
 			useFakeRsync(t)
 			useNSSTemplate(t)
 			uid, gid := stepUser()
-			bundle, _ := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+			bundle, rootfs := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+			unwritableNSSDB(t, rootfs, "/root")
 
 			in, err := inject(bundle, testCA)
 			if err != nil {
@@ -274,7 +327,8 @@ func TestNSSDBChownOrChmodDoesNotFailTheStep(t *testing.T) {
 	useFakeRsync(t)
 	useNSSTemplate(t)
 	uid, gid := stepUser()
-	bundle, _ := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+	bundle, rootfs := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+	unwritableNSSDB(t, rootfs, "/root")
 
 	in, err := inject(bundle, testCA)
 	if err != nil {
@@ -399,6 +453,7 @@ func TestNSSDBIsLeftAloneWhenItCannotBePlaced(t *testing.T) {
 			if in.nss != nil {
 				t.Fatalf("a database was bound at %s", in.nss.containerDir)
 			}
+			assertNoSlot(t, in)
 			for _, m := range loadMounts(t, bundle) {
 				if dest, _ := m["destination"].(string); m["type"] == "bind" && strings.Contains(dest, "pki") {
 					t.Fatalf("a mount was added at %s", dest)
@@ -477,13 +532,46 @@ func TestReadNSSTemplateReportsAFileItCannotRead(t *testing.T) {
 	}
 }
 
-// Chromium would ignore a database bound read-only, so it is not bound at all.
-func TestNSSDBIsLeftAloneWhenItCannotBeHandedToTheStepUser(t *testing.T) {
+// A new database is the home's, not a step user's who could not have made it.
+func TestNSSDBSlotCreatesTheDatabaseForTheHomesOwner(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	useNSSTemplate(t)
+	stepUID, stepGID := 0, 0
+	if os.Geteuid() == 0 {
+		stepUID, stepGID = stepUser()
+	}
+	bundle, rootfs := newNSSBundle(t, []string{"HOME=/var/www"}, stepUID, stepGID, "/var/www")
+	homeUID, homeGID := os.Getuid(), os.Getgid()
+	if err := os.Chown(filepath.Join(rootfs, "var/www"), homeUID, homeGID); err != nil {
+		t.Fatal(err)
+	}
+
+	in, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mirror := slotAt(t, in, bundle, "/var/www/.pki/nssdb")
+	for _, path := range []string{
+		mirror,
+		filepath.Join(mirror, "pkcs11.txt"),
+		filepath.Join(rootfs, "var/www/.pki"),
+		filepath.Join(rootfs, "var/www/.pki/nssdb"),
+	} {
+		if u, g, _ := mustOwner(t, path); u != homeUID || g != homeGID {
+			t.Fatalf("%s is %d:%d, want the home's %d:%d", path, u, g, homeUID, homeGID)
+		}
+	}
+}
+
+// Chromium would ignore a cover its user cannot write, so none is bound.
+func TestNSSDBIsLeftAloneWhenTheCoverCannotBeHandedToTheStepUser(t *testing.T) {
 	skipIfRoot(t)
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
 	bundle, _ := newNSSBundle(t, []string{"HOME=/root"}, 0, 0, "/root")
+	mountAt(t, bundle, nssCADBDir)
 
 	in, err := inject(bundle, testCA)
 	if err != nil {
@@ -492,6 +580,7 @@ func TestNSSDBIsLeftAloneWhenItCannotBeHandedToTheStepUser(t *testing.T) {
 	if in.nss != nil {
 		t.Fatal("a database was bound that the step's user could not write")
 	}
+	assertNoSlot(t, in)
 }
 
 func TestNSSDBIsLeftAloneWhenTheDirectoriesCannotBeCreated(t *testing.T) {
@@ -510,6 +599,7 @@ func TestNSSDBIsLeftAloneWhenTheDirectoriesCannotBeCreated(t *testing.T) {
 	if in.nss != nil {
 		t.Fatal("a database was bound over a directory that could not be created")
 	}
+	assertNoSlot(t, in)
 	assertNoMountAt(t, bundle, "/root/.pki/nssdb")
 }
 
@@ -518,7 +608,8 @@ func TestNSSDBFinishReportsADatabaseItCannotRead(t *testing.T) {
 	useFakeRsync(t)
 	useNSSTemplate(t)
 	uid, gid := stepUser()
-	bundle, _ := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+	bundle, rootfs := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+	unwritableNSSDB(t, rootfs, "/root")
 
 	in, err := inject(bundle, testCA)
 	if err != nil {
@@ -577,6 +668,15 @@ func TestOwnDirsReportsADirectoryItCannotHandOver(t *testing.T) {
 	}
 }
 
+func assertNoSlot(t *testing.T, in *injection) {
+	t.Helper()
+	for _, b := range in.binds {
+		if b.nssBase != "" {
+			t.Fatalf("a slot was added to the database at %s", b.containerDir)
+		}
+	}
+}
+
 func TestNSSDBIsLeftAloneWhenItsParentCannotBeRead(t *testing.T) {
 	skipIfRoot(t)
 	useTempLog(t)
@@ -598,4 +698,5 @@ func TestNSSDBIsLeftAloneWhenItsParentCannotBeRead(t *testing.T) {
 	if in.nss != nil {
 		t.Fatalf("a database was bound at %s", in.nss.containerDir)
 	}
+	assertNoSlot(t, in)
 }
