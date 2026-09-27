@@ -1,5 +1,5 @@
-import { splitKnownBlockedLines, splitRuleTokens } from "../acl/wildcard-rules.ts";
-import type { GenReportParameters } from "./types.ts";
+import { splitKnownBlockedLines, splitRuleTokens } from "#core/lib/acl/wildcard-rules.ts";
+import type { GenReportParameters } from "#core/lib/report/types.ts";
 
 /** Builds GenReportParameters from a container's own env, as read via
  *  docker inspect. */

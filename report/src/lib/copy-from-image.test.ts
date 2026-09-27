@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { copyFromContainerImage } from "./copy-from-image.ts";
 import { ReportError } from "./errors.ts";
-import { REPORT_ACTION_SCRIPT_PATH } from "#core/lib/docker/report-source.ts";
+import { REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
 
 const BUILDER_ID = "builder123";
 const IMAGE_ID = "sha256:feedface";

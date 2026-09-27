@@ -10,7 +10,7 @@
  */
 import * as core from "@actions/core";
 
-import { DEFAULT_BUILDER_NAME } from "#core/lib/docker/report-source.ts";
+import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
 /** Narrowed to what this module needs, so a test can pass a plain lookup. */
 export type GetInput = (name: string) => string;

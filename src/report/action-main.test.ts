@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { runReportAction, type ReportActionSpec } from "./action-main.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
-import type { InspectReportData, UniversalReportData } from "./types.ts";
+import type { InspectReportData, UniversalReportData } from "#core/lib/report/types.ts";
 import { reportParams } from "#core/lib/test/report-data.node.ts";
 
 function fakeDocker(overrides: Partial<Docker> = {}): Docker {

@@ -321,6 +321,7 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 ├── src/                      # Setup action source (ESM): verify provenance, resolve the image
 │   │                         # ref, compose up. src/main.ts is only the entry guard
 │   ├── lib/                  # The setup action's own modules; setup-step.ts is the step itself
+│   ├── report/               # Report code only this action needs (#report/*)
 │   └── core/                 # Code shared across both actions
 │       ├── lib/              # acl/ (rule parsing and the proxy config generators) is built for
 │       │                     # both runtimes, and so is anything it imports — errors.ts today.

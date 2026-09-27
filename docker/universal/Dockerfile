@@ -45,6 +45,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
 COPY rolldown.scripts.config.js ./
 COPY src/core/ ./src/core/
+COPY src/report/ ./src/report/
 COPY docker/universal/scripts/ ./docker/universal/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:scripts
@@ -57,7 +58,7 @@ LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later" \
       org.opencontainers.image.source="https://github.com/buildcage/docker" \
       io.github.buildcage.report-source="true"
-# report finds this container by this label; must match src/core/lib/docker/report-source.ts.
+# report finds this container by this label; must match src/report/report-source.ts.
 
 RUN apk add --no-cache \
       s6-overlay \

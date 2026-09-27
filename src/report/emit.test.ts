@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { emitReportOutcomes } from "./emit.ts";
-import { annotateKnownBlocked } from "../build/aggregate.ts";
-import type { UniversalReportData } from "../types.ts";
+import { annotateKnownBlocked } from "#core/lib/report/build/aggregate.ts";
+import type { UniversalReportData } from "#core/lib/report/types.ts";
 import { reportParams } from "#core/lib/test/report-data.node.ts";
 
 let prevExitCode: number | string | null | undefined;

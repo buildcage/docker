@@ -7,7 +7,7 @@ import {
   resolveFailOnCaResidue,
   resolveProxyMode,
 } from "./inputs.ts";
-import { DEFAULT_BUILDER_NAME } from "#core/lib/docker/report-source.ts";
+import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
 function inputs(values: Record<string, string> = {}): (name: string) => string {
