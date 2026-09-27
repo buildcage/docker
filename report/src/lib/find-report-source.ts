@@ -1,6 +1,6 @@
 import { describeDockerFailure } from "#core/lib/actions/docker-error.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
-import { REPORT_SOURCE_LABEL } from "#core/lib/docker/report-source.ts";
+import { REPORT_SOURCE_LABEL } from "../../../src/report/report-source.ts";
 import { ReportError } from "./errors.ts";
 
 /**

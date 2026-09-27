@@ -5,7 +5,7 @@
  * (not out of the running container) by the `report` action and run on the
  * runner as `node report-action.js <container-id>`, so `report` itself never
  * needs to know an engine's log paths or env var names. The five steps that
- * takes are the same for all three; what differs is which logs are read and
+ * takes are the same for both; what differs is which logs are read and
  * what extra data is fetched, which is what `ReportActionSpec` carries.
  *
  * Lives under src/ rather than beside those scripts so that vite.config.ts's
@@ -16,13 +16,13 @@ import * as core from "@actions/core";
 import { writeStepSummary } from "#core/lib/actions/write-step-summary.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
-import { readActionVersion } from "./action-version.ts";
+import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildReportParameters } from "./parameters.ts";
-import { emitReportOutcomes } from "./outcome/emit.ts";
-import { buildTrafficRecords, writeTrafficFile } from "./outcome/traffic-output.ts";
-import { renderReportMarkdown } from "./render/render-report-markdown.ts";
-import { truncateForStepSummary } from "./render/truncate-communication-details.ts";
-import type { GenReportParameters, ReportData } from "./types.ts";
+import { emitReportOutcomes } from "./emit.ts";
+import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
+import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
+import { truncateForStepSummary } from "#core/lib/report/render/truncate-communication-details.ts";
+import type { GenReportParameters, ReportData } from "#core/lib/report/types.ts";
 
 /** Used when the script is run outside the action, as the tests and the
  *  Makefile's report targets do. */

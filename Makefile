@@ -85,7 +85,7 @@ test_unit_setup: ## Run setup action unit tests
 
 .PHONY: test_unit_report
 test_unit_report: ## Run report unit tests
-	@vp test run report/src
+	@vp test run report/src src/report
 
 # Unfiltered, so this always covers whatever test.include matches. One run,
 # because each overwrites the coverage report: splitting it the way the targets

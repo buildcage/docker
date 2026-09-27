@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { errorMessage } from "#core/lib/errors.ts";
-import { DEFAULT_BUILDER_NAME } from "#core/lib/docker/report-source.ts";
+import { DEFAULT_BUILDER_NAME } from "../../../src/report/report-source.ts";
 import type { Warn } from "./inputs.ts";
 
 /** Fixed so a workflow can name it, suffixed per builder against collisions. */

@@ -1,7 +1,7 @@
 import { createAnnotation } from "#core/lib/actions/annotation.ts";
-import { describeReportOutcomes } from "./report-outcomes.ts";
-import { applyOutcomeAnnotations } from "./annotate.ts";
-import type { ReportData } from "../types.ts";
+import { describeReportOutcomes } from "#core/lib/report/outcome/report-outcomes.ts";
+import { applyOutcomeAnnotations } from "#core/lib/report/outcome/annotate.ts";
+import type { ReportData } from "#core/lib/report/types.ts";
 
 export interface EmitReportOutcomesOptions {
   failOnBlocked: boolean;

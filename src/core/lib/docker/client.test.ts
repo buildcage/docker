@@ -2,7 +2,10 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { describe, it, expect } from "vitest";
 import { createDocker, parseContainerIds, type SpawnCommand } from "./client.ts";
-import { REPORT_ACTION_SCRIPT_PATH } from "./report-source.ts";
+
+// Arbitrary in-container path: copyFromContainer doesn't care what it
+// points to, only that it forwards the argument verbatim to `docker cp`.
+const SOME_CONTAINER_PATH = "/opt/buildcage/scripts/some-script.js";
 
 describe("parseContainerIds", () => {
   it("splits one ID per line", () => {
@@ -44,14 +47,8 @@ describe("createDocker", () => {
 
   it("copyFromContainer runs a docker cp with containerId:containerPath -> hostPath", () => {
     const { run, calls } = fakeRun([""]);
-    createDocker(run).copyFromContainer(
-      "abc123",
-      REPORT_ACTION_SCRIPT_PATH,
-      "/tmp/report-action.js",
-    );
-    expect(calls).toStrictEqual([
-      ["cp", `abc123:${REPORT_ACTION_SCRIPT_PATH}`, "/tmp/report-action.js"],
-    ]);
+    createDocker(run).copyFromContainer("abc123", SOME_CONTAINER_PATH, "/tmp/some-script.js");
+    expect(calls).toStrictEqual([["cp", `abc123:${SOME_CONTAINER_PATH}`, "/tmp/some-script.js"]]);
   });
 
   it("readEnv runs docker inspect and parses the Env JSON array", () => {
@@ -62,9 +59,9 @@ describe("createDocker", () => {
   });
 
   it("readLabels runs docker inspect and parses the Labels JSON object", () => {
-    const { run, calls } = fakeRun(['{"org.opencontainers.image.version":"3.1.4"}']);
+    const { run, calls } = fakeRun(['{"org.opencontainers.image.version":"3.1.4-proxy"}']);
     const labels = createDocker(run).readLabels("abc123");
-    expect(labels).toStrictEqual({ "org.opencontainers.image.version": "3.1.4" });
+    expect(labels).toStrictEqual({ "org.opencontainers.image.version": "3.1.4-proxy" });
     expect(calls).toStrictEqual([["inspect", "abc123", "--format", "{{json .Config.Labels}}"]]);
   });
 

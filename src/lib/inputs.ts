@@ -17,7 +17,7 @@ import {
   parseKnownBlockedRulesOrThrow,
   parseRulesOrThrow,
 } from "#core/lib/acl/rules.ts";
-import { DEFAULT_BUILDER_NAME } from "#core/lib/docker/report-source.ts";
+import { DEFAULT_BUILDER_NAME } from "../report/report-source.ts";
 import { resolveProxyEngine, type ProxyEngine } from "./engine.ts";
 import { SetupError } from "./errors.ts";
 

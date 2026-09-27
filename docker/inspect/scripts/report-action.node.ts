@@ -7,11 +7,11 @@
  * logs: the proxy's requests and the resolver's refused names, the latter
  * being the only trace of a DNS-only exfiltration.
  *
- * Everything but those two log paths is core/lib/report/action-main.ts.
+ * Everything but those two log paths is src/report/action-main.ts.
  */
 import { readProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
-import { runReportAction } from "#core/lib/report/action-main.ts";
+import { runReportAction } from "../../../src/report/action-main.ts";
 import { buildInspectReportData } from "#core/lib/report/build/inspect.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 

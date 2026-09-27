@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { findReportSourceContainer } from "./find-report-source.ts";
 import { ReportError } from "./errors.ts";
-import { REPORT_SOURCE_LABEL } from "#core/lib/docker/report-source.ts";
+import { REPORT_SOURCE_LABEL } from "../../../src/report/report-source.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
 
 const PROJECT = "buildcage-0123456789ab";

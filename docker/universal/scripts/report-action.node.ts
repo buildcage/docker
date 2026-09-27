@@ -9,11 +9,11 @@
  * Reads two logs: the proxy's decisions and the resolver's, the latter being
  * the only trace of a name looked up but never connected to.
  *
- * Everything but those two log paths is core/lib/report/action-main.ts.
+ * Everything but those two log paths is src/report/action-main.ts.
  */
 import { readProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
-import { runReportAction } from "#core/lib/report/action-main.ts";
+import { runReportAction } from "../../../src/report/action-main.ts";
 import { buildUniversalReportData } from "#core/lib/report/build/universal.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 
