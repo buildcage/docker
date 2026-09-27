@@ -45,9 +45,10 @@ export interface ReportDataCommon {
   logLooksPlausible: boolean;
 
   /** Every connection and refused name, oldest first. Nothing is attributable
-   *  to a RUN step: the proxy log carries no vertex identifier, so one timeline
-   *  is the only structure available, and the more useful one: a refusal reads
-   *  in the context of what the build was doing when it happened. */
+   *  to one RUN step or one command: the proxy log carries no identifier for
+   *  either, so one timeline is the only structure available, and the more
+   *  useful one: a refusal reads in the context of what the build or step was
+   *  doing when it happened. */
   timeline: TrafficEvent[];
 
   /** Seconds since the epoch the proxy itself started, so the report can show

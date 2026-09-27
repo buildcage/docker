@@ -4,25 +4,26 @@ import { buildRestrictExample } from "./build-example.ts";
 import { renderInspectDetails } from "./inspect-details.ts";
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
+import type { ExampleStepOptions } from "./restrict-example.ts";
 import type { ReportData } from "../types.ts";
 
-export interface RenderReportMarkdownOptions {
+export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /** Full heading text, e.g. "Outbound Traffic Report — npm install".
-   *  Defaults to a bare "Outbound Traffic Report", which is what both
-   *  engines' report scripts use. */
+   *  Defaults to a bare "Outbound Traffic Report". A caller may fold an
+   *  untrusted input (isolated-run's `label`) into it; the heading escapes it
+   *  (see below), so callers pass it through raw. */
   title?: string;
-  /** Version to annotate the restrict-mode example's `uses:` line with. */
-  actionVersion?: string;
 }
 
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
  *  duplicated per engine. actionRepo/actionRef are real values, not
- *  placeholders: this runs on the runner, with process.env available. */
+ *  placeholders: this runs on the runner, with process.env available. The
+ *  ExampleStepOptions are passed on to the audit-mode restrict example. */
 export function renderReportMarkdown(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
-  { title = "Outbound Traffic Report", actionVersion }: RenderReportMarkdownOptions = {},
+  { title = "Outbound Traffic Report", ...step }: RenderReportMarkdownOptions = {},
 ): string {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
@@ -31,9 +32,8 @@ export function renderReportMarkdown(
   // restrict is what a real run normally uses day to day, so its heading
   // stays bare; audit is the occasional, deliberately different mode and
   // says so, the same way the heading below calls out "Audited" vs "Allowed".
-  // escapeCell as defense in depth: the report scripts only ever pass the
-  // bare default title, but the renderer must not depend on that to keep
-  // Markdown out of the heading.
+  // escapeCell because title may carry an untrusted input: unescaped, it could
+  // inject Markdown or a newline into the heading.
   let markdown = `## ${escapeCell(title)}${isAudit ? " (audit mode)" : ""}\n\n`;
 
   // The tables would otherwise read as the whole story.
@@ -51,16 +51,16 @@ export function renderReportMarkdown(
     markdown += `### ${heading}\n\n` + renderHostTable(report.passed) + "\n";
   }
   if (isAudit) {
-    // inspect saw the method and the path of every request, so its example can
-    // be that much narrower than one built from hosts alone.
+    // inspect saw the method and the path of every request, so its example
+    // can be that much narrower than one built from hosts alone.
     markdown +=
       report.engine === "inspect"
         ? buildInspectRestrictExample(report.timeline, actionRepo, actionRef, {
-            actionVersion,
+            ...step,
             allowedIpRules: report.parameters.allowedIpRules,
             allowedTlsRules: report.parameters.allowedTlsRules,
           })
-        : buildRestrictExample(report.passed, actionRepo, actionRef, actionVersion);
+        : buildRestrictExample(report.passed, actionRepo, actionRef, step);
   }
   if (report.blocked.length > 0) {
     if (report.passed.length > 0) markdown += "\n";
@@ -86,8 +86,8 @@ export function renderReportMarkdown(
     report.failed.length === 0 &&
     report.timeline.length === 0
   ) {
-    // Otherwise a no-traffic build leaves nothing between the heading and the
-    // footer, indistinguishable from a report that failed to generate. A build
+    // Otherwise a no-traffic run leaves nothing between the heading and the
+    // footer, indistinguishable from a report that failed to generate. A run
     // that only looked names up has empty tables but a non-empty timeline, so
     // its discovery lookups still show in Communication details below.
     markdown += "_(no communication)_\n\n";
@@ -95,7 +95,8 @@ export function renderReportMarkdown(
 
   markdown += renderInspectDetails(report.timeline, report.startedAt);
   if (report.engine === "universal") {
-    // Only the universal engine identifies a host this way.
+    // Only the universal engine identifies a host this way (see
+    // docs/security.md); inspect terminates TLS instead.
     markdown +=
       "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
   }

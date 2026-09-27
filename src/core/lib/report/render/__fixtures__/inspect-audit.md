@@ -12,7 +12,7 @@
 
 ```yaml
       - name: Start Buildcage
-        uses: buildcage/docker@v2 # 2.1.0
+        uses: owner/repo@v2 # 2.1.0
         with:
           proxy_mode: restrict
           allowed_url_rules: |
@@ -50,6 +50,6 @@
 
 </details>
 
-*Reported by [buildcage/docker](https://github.com/buildcage/docker)*
+*Reported by [owner/repo](https://github.com/owner/repo)*
 
 <hr>

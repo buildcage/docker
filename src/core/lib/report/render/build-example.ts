@@ -1,5 +1,9 @@
 import type { AggregatedEntry } from "#core/lib/log/aggregate.ts";
-import { restrictExampleBlock, usesLine } from "./restrict-example.ts";
+import {
+  exampleStepHead,
+  restrictExampleBlock,
+  type ExampleStepOptions,
+} from "./restrict-example.ts";
 
 const ruleTypeToParam: Record<string, string> = {
   HTTPS: "allowed_https_rules",
@@ -11,15 +15,14 @@ export type AuditedRow = Pick<AggregatedEntry, "host" | "port" | "ruleType">;
 
 /**
  * actionRef is the ref (tag or commit SHA) this action was invoked with.
- * setup's action.yml lives at the repo root (not a subdirectory), so the
- * example's `uses:` never has an action-name path segment. actionVersion,
- * if known, is appended as a trailing `# 3.1.4` comment.
+ * Both actions' action.yml lives at the repo root, not in a subdirectory, so
+ * the example's `uses:` never has an action-name path segment.
  */
 export function buildRestrictExample(
   auditedRows: AuditedRow[] | null | undefined,
   actionRepo: string,
   actionRef?: string,
-  actionVersion?: string,
+  step: ExampleStepOptions = {},
 ): string {
   if (!auditedRows || auditedRows.length === 0) return "";
 
@@ -33,10 +36,7 @@ export function buildRestrictExample(
 
   if (groups.size === 0) return "";
 
-  let yaml = "";
-  yaml += "- name: Start Buildcage\n";
-  yaml += usesLine(actionRepo, actionRef, actionVersion);
-  yaml += "  with:\n";
+  let yaml = exampleStepHead(actionRepo, actionRef, step);
   yaml += "    proxy_mode: restrict\n";
   // universal is no longer the default engine, so the snippet must name it to
   // reproduce this run; pasted without it, restrict would fall back to inspect.

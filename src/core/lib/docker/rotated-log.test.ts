@@ -34,8 +34,8 @@ describe("parseLogSegments", () => {
     expect(parseLogSegments("lock\nstate\n")).toStrictEqual([]);
   });
 
-  // n100 (see the haproxy-log/coredns-log run scripts) means a build can
-  // genuinely produce more than 10 archives, so the fixed-width TAI64N sort is
+  // n100 (see the haproxy-log/coredns-log run scripts) means a build or step
+  // can genuinely produce more than 10 archives, so the fixed-width TAI64N sort is
   // exercised past double digits rather than just at 2.
   it("keeps chronological order past double-digit archive counts", () => {
     const inOrder = Array.from({ length: 15 }, (_, i) => `@${i.toString(16).padStart(24, "0")}.s`);

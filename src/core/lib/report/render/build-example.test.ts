@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { buildRestrictExample } from "./build-example.ts";
 import { restrictExampleBlock } from "./restrict-example.ts";
 
-const REPO = "buildcage/docker";
-const REF = "v2";
+const REPO = "owner/repo";
+const REF = "v1";
 
 describe("buildRestrictExample", () => {
   it("empty array → empty string", () => {
@@ -58,6 +58,88 @@ describe("buildRestrictExample", () => {
           "      10.0.0.1:8080",
         ].join("\n") + "\n",
       ),
+    );
+  });
+
+  it("includes the run command when provided", () => {
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 5 }];
+    expect(buildRestrictExample(rows, REPO, REF, { runCommand: "npm install" })).toBe(
+      restrictExampleBlock(
+        [
+          "- name: Start Buildcage",
+          `  uses: ${REPO}@${REF}`,
+          "  with:",
+          "    run: |",
+          "      npm install",
+          "    proxy_mode: restrict",
+          "    proxy_engine: universal",
+          "    allowed_https_rules: >-",
+          "      registry.npmjs.org:443",
+        ].join("\n") + "\n",
+      ),
+    );
+  });
+
+  it("preserves multi-line run commands, indented under run: |", () => {
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
+    expect(buildRestrictExample(rows, REPO, REF, { runCommand: "npm ci\nnpm test" })).toBe(
+      restrictExampleBlock(
+        [
+          "- name: Start Buildcage",
+          `  uses: ${REPO}@${REF}`,
+          "  with:",
+          "    run: |",
+          "      npm ci",
+          "      npm test",
+          "    proxy_mode: restrict",
+          "    proxy_engine: universal",
+          "    allowed_https_rules: >-",
+          "      registry.npmjs.org:443",
+        ].join("\n") + "\n",
+      ),
+    );
+  });
+
+  it("strips the trailing newline GitHub Actions adds to `run: |` block scalars", () => {
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
+    expect(buildRestrictExample(rows, REPO, REF, { runCommand: "npm ci\nnpm test\n" })).toBe(
+      restrictExampleBlock(
+        [
+          "- name: Start Buildcage",
+          `  uses: ${REPO}@${REF}`,
+          "  with:",
+          "    run: |",
+          "      npm ci",
+          "      npm test",
+          "    proxy_mode: restrict",
+          "    proxy_engine: universal",
+          "    allowed_https_rules: >-",
+          "      registry.npmjs.org:443",
+        ].join("\n") + "\n",
+      ),
+    );
+  });
+
+  it("without a runCommand, omits the run: block", () => {
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
+    expect(buildRestrictExample(rows, REPO, REF)).toBe(
+      restrictExampleBlock(
+        [
+          "- name: Start Buildcage",
+          `  uses: ${REPO}@${REF}`,
+          "  with:",
+          "    proxy_mode: restrict",
+          "    proxy_engine: universal",
+          "    allowed_https_rules: >-",
+          "      registry.npmjs.org:443",
+        ].join("\n") + "\n",
+      ),
+    );
+  });
+  it("names the step as the caller asks", () => {
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
+    expect(buildRestrictExample(rows, REPO, REF, { stepName: "Start isolated-run" })).toMatch(
+      /^ {6}- name: Start isolated-run$/m,
     );
   });
 });

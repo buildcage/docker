@@ -5,8 +5,8 @@
  * s6-log rotates `current` once it crosses its configured size, moving the
  * old content into a new `@<timestamp>.<letter>` file in the same
  * directory (see the haproxy-log/coredns-log `run` scripts). Reading only
- * `current` silently drops everything before the last rotation once a build
- * produces enough log traffic to cross that threshold.
+ * `current` silently drops everything before the last rotation once a build or
+ * step produces enough log traffic to cross that threshold.
  */
 import type { Docker } from "./client.ts";
 
