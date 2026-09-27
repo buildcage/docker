@@ -71,6 +71,18 @@ func (s *spec) processUser() (uid, gid int) {
 	return specInt(user["uid"]), specInt(user["gid"])
 }
 
+// processGroups reads the supplementary gids BuildKit resolved for the user.
+func (s *spec) processGroups() []int {
+	proc, _ := s.raw["process"].(map[string]any)
+	user, _ := proc["user"].(map[string]any)
+	extra, _ := user["additionalGids"].([]any)
+	groups := make([]int, 0, len(extra))
+	for _, g := range extra {
+		groups = append(groups, specInt(g))
+	}
+	return groups
+}
+
 // specInt reads a number loadSpec kept as json.Number, or 0 when there is none.
 func specInt(v any) int {
 	n, ok := v.(json.Number)
@@ -138,6 +150,20 @@ func (s *spec) mountConflicts(dest string) bool {
 	return false
 }
 
+// mountedWithin reports whether a mount already in the spec sits at or below
+// dest. Unlike mountConflicts it allows one above, such as the /dev tmpfs.
+func (s *spec) mountedWithin(dest string) bool {
+	mounts, _ := s.raw["mounts"].([]any)
+	for _, m := range mounts {
+		entry, _ := m.(map[string]any)
+		existing, _ := entry["destination"].(string)
+		if existing != "" && pathWithin(filepath.Clean(existing), dest) {
+			return true
+		}
+	}
+	return false
+}
+
 // pathWithin reports whether the clean path p is dir or lies under it.
 func pathWithin(p, dir string) bool {
 	return p == dir || strings.HasPrefix(p, strings.TrimSuffix(dir, "/")+"/")
@@ -150,5 +176,15 @@ func (s *spec) addBindMount(dest, src string) {
 		"type":        "bind",
 		"source":      src,
 		"options":     []any{"rbind", "rw"},
+	})
+}
+
+func (s *spec) addReadOnlyBindMount(dest, src string) {
+	mounts, _ := s.raw["mounts"].([]any)
+	s.raw["mounts"] = append(mounts, map[string]any{
+		"destination": dest,
+		"type":        "bind",
+		"source":      src,
+		"options":     []any{"rbind", "ro", "nosuid", "nodev", "noexec"},
 	})
 }

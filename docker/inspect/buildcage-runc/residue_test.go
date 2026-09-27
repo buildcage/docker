@@ -72,7 +72,8 @@ func TestNSSDBChangeOnlyWarnsWhenAskedTo(t *testing.T) {
 	useNSSTemplate(t)
 	useWarnOnCAResidue(t)
 	uid, gid := stepUser()
-	bundle, _ := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+	bundle, rootfs := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
+	unwritableNSSDB(t, rootfs, "/root")
 
 	in, err := inject(bundle, testCA)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 var failOnCAResidue = os.Getenv("FAIL_ON_CA_RESIDUE") != "false"
 
 const residueHint = "to let the build carry on with only a warning, set fail_on_ca_residue: false on the setup action " +
-	"(the copy then stays in the image, and a write to the NSS database is discarded)"
+	"(the copy then stays in the image, and a write to a covered NSS database is discarded)"
 
 // isCAResidue is what fail_on_ca_residue governs. Anything else, such as a
 // failed write-back or an unreadable layer, leaves the layer unverified and

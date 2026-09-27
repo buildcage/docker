@@ -322,8 +322,10 @@ only its own keystore, so the CA is added there too, to `$JAVA_HOME/lib/security
 whichever shape it ships (JKS or PKCS#12), for the step and taken back out before the layer is
 committed, letting `mvn`, `gradle` and `java` reach the proxy without `proxy_engine: universal`.
 Chromium, including the `chrome-headless-shell` that Puppeteer, Playwright and Remotion download,
-reads only its compiled-in root store and the NSS database in `$HOME`, so for each step `~/.pki/nssdb`
-is covered with a database holding only the CA.
+reads only its compiled-in root store and the NSS database in `$HOME`, so for each step that
+database's `pkcs11.txt` gains a read-only slot on a database holding only the CA, taken back out
+before the layer is committed. The database itself stays the step's own, with whatever the step
+writes to it.
 
 The full table, with what each variable points at when the step has a system CA store and when it
 has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in
@@ -400,12 +402,18 @@ reported as blocked; see
   a JVM already in the base image is handled: the CA is added to its `$JAVA_HOME/lib/security/cacerts`
   for the step and removed before the layer is committed. A keystore sealed with a password other
   than the JDK default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it.
-- Chromium's NSS database is replaced for each step, not added to: `~/.pki/nssdb` is covered, and
-  Chromium then ignores `~/.local/share/pki/nssdb`. What is lost is a private CA or client
-  certificate kept there, and only on an `allowed_tls_rules` or `allowed_ip_rules` passthrough.
-  A step that writes to the database (`certutil -A`, `pk12util -i`) or removes `~/.pki` fails the
-  build. With `fail_on_ca_residue: false` a write only warns and is discarded; a build that needs
-  it kept needs `proxy_engine: universal`.
+- Chromium trusts the CA through a slot added to the NSS database it reads: `~/.pki/nssdb` when it
+  exists, else `~/.local/share/pki/nssdb`, else a new `~/.pki/nssdb`, which Chromium then fills and
+  the image keeps, as it would under a Chromium before M146. A database the step's user cannot
+  write, such as root's used after `USER`, cannot take the slot, since Chromium would not open it
+  either. It is covered for the step with one holding only the CA instead: a private CA or client
+  certificate kept there is lost, though only on an `allowed_tls_rules` or `allowed_ip_rules`
+  passthrough, and a step that writes to it fails the build. With `fail_on_ca_residue: false` that
+  write only warns and is discarded.
+- A step that changes the CA's own trust in the NSS database (`certutil -M`), or exports it and
+  imports it back, copies the CA into the step's database, which fails the build as a copy the
+  wrapper cannot take out. A step cannot remove the database's directory (`rm -rf ~/.pki`) either,
+  since the step sees it as a mount point.
 - A `RUN` step that copies the system CA bundle into a binary or an uncompressed archive
   (`go:embed`, `include_str!`, `tar cf`) fails: the copy carries the build's CA, which cannot be cut
   out of a binary without corrupting it. Copy the bundle in an earlier `RUN` step instead:

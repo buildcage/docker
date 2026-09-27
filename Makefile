@@ -363,7 +363,7 @@ test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests ag
 
 # Each case hides a copy of the CA the sweep finds but cannot remove, and must
 # fail the build naming the file and pointing at fail_on_ca_residue. With it
-# false, the same copy and a write to the NSS database only warn. The control
+# false, the same copy and a write to a covered NSS database only warn. The control
 # writes an unrelated encrypted keystore and must build. The resealed case
 # must build with the CA taken out and the keystore still sealed under changeit.
 .PHONY: test_integration_buildkit_inspect_hidden_ca
@@ -442,7 +442,7 @@ test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that
 	  --progress=plain -f test/Dockerfile.inspect-nssdb-write test/ \
 	  > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1 \
 	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: the write to the NSS database failed the build"; exit 1; }
-	@grep -q "buildcage: warning: .*changed the NSS database at /root/.pki/nssdb" $(SCRATCH_PREFIX)-hidden-ca.log \
+	@grep -q "buildcage: warning: .*changed the NSS database at /home/app/.pki/nssdb" $(SCRATCH_PREFIX)-hidden-ca.log \
 	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: no warning names the NSS database"; exit 1; }
 	@echo "PASS: the build carried on past the write to the NSS database, warning about it"
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
