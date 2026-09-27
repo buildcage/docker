@@ -642,15 +642,15 @@ store:
 
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
 Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read
-`~/.local/share/pki/nssdb` when it does not, so the database is the first of those that exists, or
-a new `~/.pki/nssdb`, owned by the home's owner, when neither does. Its directory is mirrored for the step, the way a CA store
-is, and the mirror's `pkcs11.txt` gains a second, read-only softoken slot on a database holding only
-this CA, bound at `/dev/buildcage-nssdb`. NSS loads every module `pkcs11.txt` names, so Chromium
-trusts the CA through that slot while the step's own certificates, keys and writes stay in its own
-database. After the step, the slot's bytes are taken back out of `pkcs11.txt` and whatever the step
-changed is written back. A database the step's user cannot write is covered for the step with one
-holding only this CA instead. `HOME` comes from the step's environment, or from the image's
-`/etc/passwd` when that is empty, as runc does.
+`~/.local/share/pki/nssdb` when it does not, so the database is the first of those that exists, or a
+new `~/.pki/nssdb`, owned by the home's owner, when neither does. Its directory is mirrored for the
+step, the way a CA store is, and the mirror's `pkcs11.txt` gains a second, read-only softoken slot
+on a database holding only this CA, bound at `/dev/buildcage-nssdb`. NSS loads every module
+`pkcs11.txt` names, so Chromium trusts the CA through that slot while the step's own certificates,
+keys and writes stay in its own database. After the step, the slot's bytes are taken back out of
+`pkcs11.txt` and whatever the step changed is written back. A database the step's user cannot write
+is covered for the step with one holding only this CA instead. `HOME` comes from the step's
+environment, or from the image's `/etc/passwd` when that is empty, as runc does.
 
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't

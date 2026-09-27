@@ -532,8 +532,7 @@ func TestReadNSSTemplateReportsAFileItCannotRead(t *testing.T) {
 	}
 }
 
-// A step user who could not create a database in their home gets one they
-// cannot write either, which Chromium ignores as it would without the proxy.
+// A new database is the home's, not a step user's who could not have made it.
 func TestNSSDBSlotCreatesTheDatabaseForTheHomesOwner(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
@@ -565,7 +564,7 @@ func TestNSSDBSlotCreatesTheDatabaseForTheHomesOwner(t *testing.T) {
 	}
 }
 
-// Chromium would ignore a cover bound read-only, so it is not bound at all.
+// Chromium would ignore a cover its user cannot write, so none is bound.
 func TestNSSDBIsLeftAloneWhenTheCoverCannotBeHandedToTheStepUser(t *testing.T) {
 	skipIfRoot(t)
 	useTempLog(t)

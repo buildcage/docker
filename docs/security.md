@@ -218,10 +218,10 @@ Three mechanisms make that enforceable:
   shape it ships), which no CA-trust variable would reach. Chromium reads neither, only the NSS
   database in `$HOME`, so the wrapper appends to that database's `pkcs11.txt`, in a mirror like the
   CA store's, a read-only slot on a database holding only the CA, made by `certutil` in the proxy
-  container from the CA certificate alone. The wrapper never opens the step's own database: it
-  copies its files, and takes out of `pkcs11.txt`, which is text, exactly the bytes it appended. A
-  database the step's user cannot write is covered with the CA-only one instead, and a step that
-  changes that fails the build. Injection happens at exec time, never touches LLB, and so
+  container from the CA certificate alone. The wrapper never parses the step's own database: it only
+  copies its files, and takes out of `pkcs11.txt` exactly the bytes it appended. A database the
+  step's user cannot write is covered with the CA-only one instead, and a step that changes that
+  fails the build. Injection happens at exec time, never touches LLB, and so
   cannot affect a cache key. Before the step's layer is committed, the wrapper reads that layer back
   and takes the certificate, and the anchor, out of every text file carrying it as PEM, every JKS
   or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`), each

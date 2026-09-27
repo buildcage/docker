@@ -405,13 +405,12 @@ reported as blocked; see
 - Chromium trusts the CA through a slot added to the NSS database it reads: `~/.pki/nssdb` when it
   exists, else `~/.local/share/pki/nssdb`, else a new `~/.pki/nssdb`, which Chromium then fills and
   the image keeps, as it would under a Chromium before M146. A new database belongs to the home's
-  owner, so a step user whose home is someone else's, such as `www-data` with `/var/www`, gets one
-  Chromium will not open, and Chromium does not trust the CA. An existing database the step's user
-  cannot write, such as root's used after `USER`, cannot take the slot, since Chromium would not
-  open it either. It is covered for the step with one holding only the CA instead: a private CA or client
-  certificate kept there is lost, though only on an `allowed_tls_rules` or `allowed_ip_rules`
-  passthrough, and a step that writes to it fails the build. With `fail_on_ca_residue: false` that
-  write only warns and is discarded.
+  owner, so under someone else's home, such as `www-data`'s `/var/www`, Chromium does not open it
+  and does not trust the CA. An existing database the step's user cannot write, such as root's used
+  after `USER`, cannot take the slot, since Chromium would not open it either. It is covered for the
+  step with one holding only the CA instead: a private CA or client certificate kept there is lost,
+  though only on an `allowed_tls_rules` or `allowed_ip_rules` passthrough, and a step that writes to
+  it fails the build. With `fail_on_ca_residue: false` that write only warns and is discarded.
 - A step that changes the CA's own trust in the NSS database (`certutil -M`), or exports it and
   imports it back, copies the CA into the step's database, which fails the build as a copy the
   wrapper cannot take out. A step cannot remove the database's directory (`rm -rf ~/.pki`) either,

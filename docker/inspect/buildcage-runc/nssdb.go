@@ -50,9 +50,9 @@ const nssXDGDBPath = ".local/share/pki/nssdb"
 const nssCADBDir = "/dev/buildcage-nssdb"
 
 // nssSlot is what pkcs11.txt gains. library= must name the softoken: left
-// empty, the entry gives Chromium no second slot. The trailing
-// blank line ends the entry, so a module the step adds after it with modutil
-// stays an entry of its own rather than running into this one.
+// empty, the entry gives Chromium no second slot. The trailing blank line ends
+// the entry, so a module the step adds after it with modutil stays an entry of
+// its own.
 var nssSlot = []byte("library=libsoftokn3.so\n" +
 	"name=\"buildcage proxy CA\"\n" +
 	"parameters=\"configdir='sql:" + nssCADBDir + "' flags=readOnly\"\n" +
@@ -282,8 +282,8 @@ func appendNSSSlot(path string, uid, gid int) ([]byte, error) {
 // only by copying the entries it keeps byte for byte, so the slot is found
 // where it was left unless the step itself took it out, in which case the file
 // is written back as the step left it. A pkcs11.txt the step replaced with
-// something other than a file carries no slot. One the injection created and
-// that holds nothing else goes.
+// something other than a file carries no slot. One the injection created is
+// removed once it holds nothing else.
 func removeNSSSlot(path string, appended []byte, created bool) error {
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
