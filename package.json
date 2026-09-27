@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "imports": {
-    "#core/*": "./src/core/*"
+    "#core/*": "./src/core/*",
+    "#report/*": "./src/report/*"
   },
   "scripts": {
     "build": "rolldown -c && node licenses/gen-license-file.mjs",

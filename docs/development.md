@@ -323,7 +323,8 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │   ├── lib/                  # The setup action's own modules; setup-step.ts is the step itself
 │   ├── report/               # Report code this repo alone needs: the setup <-> report contract
 │   │                         # and the report-action script's body. Imported by lib/, report/src/
-│   │                         # and docker/*/scripts/; imports only core/, never those three
+│   │                         # and docker/*/scripts/ as #report/*; imports only core/, never
+│   │                         # those three
 │   └── core/                 # Code shared across both actions
 │       ├── lib/              # acl/ (rule parsing and the proxy config generators) is built for
 │       │                     # both runtimes, and so is anything it imports — errors.ts today.

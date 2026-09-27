@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { runReportStep, type ReportStepDeps } from "./report-step.ts";
-import { REPORT_ACTION_SCRIPT_PATH } from "../../../src/report/report-source.ts";
+import { REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
 import { ReportError } from "./errors.ts";
 
 // Every collaborator is tested in its own file; what is left to check here is

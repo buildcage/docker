@@ -13,7 +13,7 @@
  */
 import { readProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
-import { runReportAction } from "../../../src/report/action-main.ts";
+import { runReportAction } from "#report/action-main.ts";
 import { buildUniversalReportData } from "#core/lib/report/build/universal.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 
