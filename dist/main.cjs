@@ -12,19 +12,18 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 //#endregion
 let node_url = require("node:url"), node_child_process = require("node:child_process"), node_path = require("node:path");
 node_path = __toESM(node_path, 1);
-let os = require("os");
+let node_fs = require("node:fs"), node_crypto = require("node:crypto"), node_os = require("node:os");
+node_os = __toESM(node_os, 1);
+let node_fs_promises = require("node:fs/promises"), os = require("os");
 os = __toESM(os, 1);
-let fs = require("fs");
-fs = __toESM(fs, 1);
 let path = require("path");
 path = __toESM(path, 1);
+let fs = require("fs");
+fs = __toESM(fs, 1);
 let events = require("events");
 events = __toESM(events, 1);
-let node_crypto = require("node:crypto"), child_process = require("child_process");
+let child_process = require("child_process");
 child_process = __toESM(child_process, 1), require("timers");
-let node_os = require("node:os");
-node_os = __toESM(node_os, 1);
-let node_fs = require("node:fs"), node_fs_promises = require("node:fs/promises");
 //#region src/core/lib/errors.ts
 var ActionError = class extends Error {
 	code;
@@ -66,267 +65,12 @@ function exitOnFatalError(context) {
 	};
 }
 //#endregion
-//#region src/lib/errors.ts
-var SetupError = class extends ActionError {}, __awaiter$6 = function(thisArg, _arguments, P, generator) {
-	function adopt(value) {
-		return value instanceof P ? value : new P(function(resolve) {
-			resolve(value);
-		});
-	}
-	return new (P ||= Promise)(function(resolve, reject) {
-		function fulfilled(value) {
-			try {
-				step(generator.next(value));
-			} catch (e) {
-				reject(e);
-			}
-		}
-		function rejected(value) {
-			try {
-				step(generator.throw(value));
-			} catch (e) {
-				reject(e);
-			}
-		}
-		function step(result) {
-			result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
-		}
-		step((generator = generator.apply(thisArg, _arguments || [])).next());
-	});
-};
-const { access, appendFile, writeFile } = fs.promises, SUMMARY_ENV_VAR = "GITHUB_STEP_SUMMARY";
-new class {
-	constructor() {
-		this._buffer = "";
-	}
-	filePath() {
-		return __awaiter$6(this, void 0, void 0, function* () {
-			if (this._filePath) return this._filePath;
-			let pathFromEnv = process.env[SUMMARY_ENV_VAR];
-			if (!pathFromEnv) throw Error(`Unable to find environment variable for $${SUMMARY_ENV_VAR}. Check if your runtime environment supports job summaries.`);
-			try {
-				yield access(pathFromEnv, fs.constants.R_OK | fs.constants.W_OK);
-			} catch {
-				throw Error(`Unable to access summary file: '${pathFromEnv}'. Check if the file has correct read/write permissions.`);
-			}
-			return this._filePath = pathFromEnv, this._filePath;
-		});
-	}
-	wrap(tag, content, attrs = {}) {
-		let htmlAttrs = Object.entries(attrs).map(([key, value]) => ` ${key}="${value}"`).join("");
-		return content ? `<${tag}${htmlAttrs}>${content}</${tag}>` : `<${tag}${htmlAttrs}>`;
-	}
-	write(options) {
-		return __awaiter$6(this, void 0, void 0, function* () {
-			let overwrite = !!options?.overwrite, filePath = yield this.filePath();
-			return yield (overwrite ? writeFile : appendFile)(filePath, this._buffer, { encoding: "utf8" }), this.emptyBuffer();
-		});
-	}
-	clear() {
-		return __awaiter$6(this, void 0, void 0, function* () {
-			return this.emptyBuffer().write({ overwrite: !0 });
-		});
-	}
-	stringify() {
-		return this._buffer;
-	}
-	isEmptyBuffer() {
-		return this._buffer.length === 0;
-	}
-	emptyBuffer() {
-		return this._buffer = "", this;
-	}
-	addRaw(text, addEOL = !1) {
-		return this._buffer += text, addEOL ? this.addEOL() : this;
-	}
-	addEOL() {
-		return this.addRaw(os.EOL);
-	}
-	addCodeBlock(code, lang) {
-		let attrs = Object.assign({}, lang && { lang }), element = this.wrap("pre", this.wrap("code", code), attrs);
-		return this.addRaw(element).addEOL();
-	}
-	addList(items, ordered = !1) {
-		let tag = ordered ? "ol" : "ul", listItems = items.map((item) => this.wrap("li", item)).join(""), element = this.wrap(tag, listItems);
-		return this.addRaw(element).addEOL();
-	}
-	addTable(rows) {
-		let tableBody = rows.map((row) => {
-			let cells = row.map((cell) => {
-				if (typeof cell == "string") return this.wrap("td", cell);
-				let { header, data, colspan, rowspan } = cell, tag = header ? "th" : "td", attrs = Object.assign(Object.assign({}, colspan && { colspan }), rowspan && { rowspan });
-				return this.wrap(tag, data, attrs);
-			}).join("");
-			return this.wrap("tr", cells);
-		}).join(""), element = this.wrap("table", tableBody);
-		return this.addRaw(element).addEOL();
-	}
-	addDetails(label, content) {
-		let element = this.wrap("details", this.wrap("summary", label) + content);
-		return this.addRaw(element).addEOL();
-	}
-	addImage(src, alt, options) {
-		let { width, height } = options || {}, attrs = Object.assign(Object.assign({}, width && { width }), height && { height }), element = this.wrap("img", null, Object.assign({
-			src,
-			alt
-		}, attrs));
-		return this.addRaw(element).addEOL();
-	}
-	addHeading(text, level) {
-		let tag = `h${level}`, allowedTag = [
-			"h1",
-			"h2",
-			"h3",
-			"h4",
-			"h5",
-			"h6"
-		].includes(tag) ? tag : "h1", element = this.wrap(allowedTag, text);
-		return this.addRaw(element).addEOL();
-	}
-	addSeparator() {
-		let element = this.wrap("hr", null);
-		return this.addRaw(element).addEOL();
-	}
-	addBreak() {
-		let element = this.wrap("br", null);
-		return this.addRaw(element).addEOL();
-	}
-	addQuote(text, cite) {
-		let attrs = Object.assign({}, cite && { cite }), element = this.wrap("blockquote", text, attrs);
-		return this.addRaw(element).addEOL();
-	}
-	addLink(text, href) {
-		let element = this.wrap("a", text, { href });
-		return this.addRaw(element).addEOL();
-	}
-}();
-const { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm: rm$1, rmdir, stat, symlink, unlink } = fs.promises;
-process.platform, fs.constants.O_RDONLY, process.platform, events.EventEmitter, events.EventEmitter, os.default.platform(), os.default.arch();
-var ExitCode;
-(function(ExitCode) {
-	ExitCode[ExitCode.Success = 0] = "Success", ExitCode[ExitCode.Failure = 1] = "Failure";
-})(ExitCode ||= {});
-function getInput(name, options) {
-	let val = process.env[`INPUT_${name.replace(/ /g, "_").toUpperCase()}`] || "";
-	if (options && options.required && !val) throw Error(`Input required and not supplied: ${name}`);
-	return options && options.trimWhitespace === !1 ? val : val.trim();
+//#region src/core/lib/line-comments.ts
+function stripLineComment(line) {
+	return line.replace(/(^|\s)#.*$/, "$1");
 }
-//#endregion
-//#region src/core/lib/acl/coredns-config.ts
-function escapeForCel(regex) {
-	return regex.replace(/\\/g, "\\\\");
-}
-function nameMatches(regex) {
-	return `      expr name() matches '(?i)${regex}'`;
-}
-function proxyAnswerLines(proxyAddress, ttlSeconds) {
-	return [
-		"    template IN A {",
-		`      answer "{{ .Name }} ${ttlSeconds} IN A ${proxyAddress}"`,
-		"    }",
-		"    template IN AAAA {",
-		"    }",
-		"    template IN ANY {",
-		"    }"
-	];
-}
-function reverseZoneLines(proxyAddress, ttlSeconds) {
-	let soa = `{{ .Zone }} ${ttlSeconds} IN SOA ns.buildcage.invalid. hostmaster.buildcage.invalid. 1 ${ttlSeconds} ${ttlSeconds} ${ttlSeconds} ${ttlSeconds}`;
-	return [
-		"# Reverse lookups: answered NXDOMAIN rather than left unhandled, which",
-		"# would be SERVFAIL and cost musl a five-second timeout each time. Only a",
-		"# reversed address is treated this way; anything else",
-		"# under these zones misses the view and falls through to the blocks below.",
-		"in-addr.arpa ip6.arpa {",
-		"    view reverse {",
-		nameMatches("^(([0-9]{1,3}[.]){1,4}in-addr[.]arpa|([0-9a-fA-F][.]){1,32}ip6[.]arpa)[.]$"),
-		"    }",
-		"    template IN PTR {",
-		"      rcode NXDOMAIN",
-		`      authority "${soa}"`,
-		"    }",
-		...proxyAnswerLines(proxyAddress, ttlSeconds),
-		"    log . \"buildcage dns reverse name={name}\"",
-		"    errors",
-		"}",
-		""
-	];
-}
-const SERVICE_PREFIX_REGEX = "_[a-z0-9-]{1,15}[.]_(tcp|udp|sctp)[.]", DISCOVERY_TYPES = [
-	"SRV",
-	"TXT",
-	"TLSA",
-	"URI"
-];
-function discoveryZoneLines(proxyAddress, ttlSeconds, parentRegex) {
-	let parent = parentRegex === void 0 ? ".+" : `(${escapeForCel(parentRegex)})`;
-	return [
-		"# Service-discovery names under an allowed host: answered NODATA and logged",
-		"# under a verb of their own. No rule can permit one, so a denied row for it",
-		"# could never be taken away. A service name under any other host misses the",
-		"# view and is denied below, as the host itself would be. Both expressions",
-		"# have to hold: a type not defined at a service name is judged below like",
-		"# any other lookup rather than exempted on a guess.",
-		". {",
-		"    view discovery {",
-		nameMatches(`^${SERVICE_PREFIX_REGEX}${parent}[.]$`),
-		`      expr type() in [${DISCOVERY_TYPES.map((t) => `'${t}'`).join(", ")}]`,
-		"    }",
-		...proxyAnswerLines(proxyAddress, ttlSeconds),
-		"    log . \"buildcage dns discovery name={name} type={type}\"",
-		"    errors",
-		"}",
-		""
-	];
-}
-function serviceZoneLines(proxyAddress, ttlSeconds) {
-	return [
-		"# Every other service name: refused like any other name, but recorded apart",
-		"# so the report can say the remedy is the host below it rather than the name",
-		"# itself, which no rule can make resolve.",
-		". {",
-		"    view service {",
-		nameMatches(`^${SERVICE_PREFIX_REGEX}.+[.]$`),
-		"    }",
-		...proxyAnswerLines(proxyAddress, ttlSeconds),
-		"    log . \"buildcage dns service-denied name={name} type={type}\"",
-		"    errors",
-		"}",
-		""
-	];
-}
-const HEALTH_LINE = "    health 127.0.0.1:8080";
-function generateCorednsConfig(rules, options) {
-	let { proxyAddress, ttlSeconds = 60, mode = "restrict" } = options, warnings = [], hostRegexes = rules.resolverHosts;
-	if (mode === "audit") return {
-		config: [
-			"# Generated by buildcage. Do not edit.",
-			"",
-			...reverseZoneLines(proxyAddress, ttlSeconds),
-			...discoveryZoneLines(proxyAddress, ttlSeconds, void 0),
-			"# audit enforces nothing, so every name is logged as allowed. It is still",
-			"# answered locally with the proxy's own address, so a name that was only",
-			"# looked up, never connected to, still shows up here, and the query",
-			"# itself never reaches a real nameserver.",
-			". {",
-			HEALTH_LINE,
-			...proxyAnswerLines(proxyAddress, ttlSeconds),
-			"    log . \"buildcage dns allowed name={name}\"",
-			"    errors",
-			"}",
-			""
-		].join("\n"),
-		warnings
-	};
-	let lines = ["# Generated by buildcage. Do not edit.", ""];
-	if (lines.push(...reverseZoneLines(proxyAddress, ttlSeconds)), hostRegexes.length > 0) {
-		let alternation = hostRegexes.map((r) => `(${r})`).join("|");
-		lines.push(...discoveryZoneLines(proxyAddress, ttlSeconds, alternation)), lines.push("# Allowlisted names are logged as allowed, but answered exactly like a", "# denied one, with the proxy's own address: real resolution happens once", "# a request has already passed HAProxy's own host+path+method check, not", "# here. The expression is the same host pattern the proxy rules are built", "# from, so the two cannot drift apart.", ". {", "    view allowlist {", nameMatches(`^(${escapeForCel(alternation)})[.]$`), "    }", ...proxyAnswerLines(proxyAddress, ttlSeconds), "    log . \"buildcage dns allowed name={name}\"", "    errors", "}", "");
-	}
-	return lines.push(...serviceZoneLines(proxyAddress, ttlSeconds)), lines.push("# Everything else resolves to the proxy and is answered locally, so the", "# query never leaves and the request still arrives somewhere its full URL", "# can be recorded before being denied.", ". {", HEALTH_LINE, ...proxyAnswerLines(proxyAddress, ttlSeconds), "    log . \"buildcage dns denied name={name}\"", "    errors", "}", ""), {
-		config: lines.join("\n"),
-		warnings
-	};
+function rejectGluedHash(rule) {
+	if (rule.includes("#")) throw Error(`Invalid rule ${JSON.stringify(rule)}: a "#" starts a comment only with a space before it, and "#" is never part of a host or URL, so a rule cannot contain one.`);
 }
 //#endregion
 //#region src/core/lib/acl/partial-wildcard.ts
@@ -455,240 +199,6 @@ function splitRawRegexHost(pattern) {
 	return { host };
 }
 //#endregion
-//#region src/core/lib/acl/haproxy-rules.ts
-const IPV4_OR_CIDR = /^\d{1,3}(?:\.\d{1,3}){3}(?:\/\d{1,2})?$/, OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`, INTERNAL_RANGES = [
-	"0.0.0.0/8",
-	"127.0.0.0/8",
-	"169.254.0.0/16",
-	"100.64.0.0/10",
-	"192.0.0.0/24",
-	"168.63.129.16/32",
-	"::1/128",
-	"fe80::/10"
-];
-function splitHostRule(pattern) {
-	let colonIndex = pattern.lastIndexOf(":");
-	if (colonIndex === -1) throw Error(`Invalid rule "${pattern}": missing port`);
-	let port = pattern.slice(colonIndex + 1);
-	if (!/^(?:\d+|\*)$/.test(port)) throw Error(`Invalid port in rule "${pattern}": "${port}"`);
-	let host = pattern.slice(0, colonIndex);
-	if (host.includes(":")) throw Error(`Invalid host in rule "${pattern}": "${host}" holds a ":", so the one this rule was split at is not its port separator. An IPv6 address is not supported here.`);
-	return {
-		host,
-		port
-	};
-}
-function hostOnlyRegexOfRule(pattern) {
-	return pattern.startsWith("~") ? splitRawRegexHost(pattern).host : domainToRegexPartial(splitHostRule(pattern).host);
-}
-function hostOnlyRegexOfUrlRule(rule) {
-	let authority = rule.authorityRegex.slice(1, -1);
-	return rule.isRegex ? authority : authority.slice(0, authority.lastIndexOf(":"));
-}
-function urlRuleToMatcher(rule) {
-	let hostOnly = hostOnlyRegexOfUrlRule(rule), port = rule.authorityRegex.slice(1, -1).slice(hostOnly.length + 1);
-	return {
-		hostRegex: `^${hostOnly}$`,
-		port: port === "[0-9]+" ? null : port
-	};
-}
-function hostRuleToMatcher(pattern) {
-	if (pattern.startsWith("~")) return splitRawRegexHost(pattern), {
-		hostMatch: "hostPort",
-		hostRegex: anchorRawRegex(pattern.slice(1)),
-		port: null
-	};
-	let { port } = splitHostRule(pattern);
-	return {
-		hostMatch: "wildcard",
-		hostRegex: `^${hostOnlyRegexOfRule(pattern)}$`,
-		port: port === "*" ? null : port
-	};
-}
-function compileSchemeRules(hostRules, urlRules, scheme) {
-	let out = [];
-	for (let pattern of hostRules ?? []) out.push({
-		id: "",
-		...hostRuleToMatcher(pattern),
-		pathRegex: "^/",
-		methods: null,
-		raw: pattern
-	});
-	for (let rule of urlRules ?? []) if (rule.schemes.includes(scheme)) {
-		if (rule.isRegex) {
-			out.push({
-				id: "",
-				hostMatch: "hostBareFull",
-				hostRegex: rule.hostRegex,
-				port: null,
-				pathRegex: rule.pathRegex,
-				methods: rule.methods,
-				raw: rule.raw
-			});
-			continue;
-		}
-		out.push({
-			id: "",
-			hostMatch: "wildcard",
-			...urlRuleToMatcher(rule),
-			pathRegex: rule.pathRegex,
-			methods: rule.methods,
-			raw: rule.raw
-		});
-	}
-	return out.forEach((rule, i) => {
-		rule.id = `${scheme === "https" ? "s" : "p"}${i}`;
-	}), out;
-}
-function compileIpRules(rules, warnings) {
-	let out = [];
-	return (rules ?? []).forEach((rule, index) => {
-		if (rule.startsWith("~")) {
-			splitRawRegexHost(rule), out.push({
-				id: `ip${index}`,
-				address: anchorRawRegex(rule.slice(1)),
-				hostMatch: "hostPort",
-				port: null,
-				raw: rule
-			});
-			return;
-		}
-		let colonIndex = rule.lastIndexOf(":");
-		if (colonIndex === -1) {
-			warnings.push(`IP rule ${JSON.stringify(rule)} has no port. It is ignored.`);
-			return;
-		}
-		let address = rule.slice(0, colonIndex), port = rule.slice(colonIndex + 1);
-		if (!IPV4_OR_CIDR.test(address)) {
-			warnings.push(`IP rule ${JSON.stringify(rule)} is not an address or CIDR block, which is all that can be tunnelled without inspection. It is ignored.`);
-			return;
-		}
-		out.push({
-			id: `ip${index}`,
-			address,
-			hostMatch: "wildcard",
-			port: port === "*" ? null : port,
-			raw: rule
-		});
-	}), out;
-}
-function compileRuleSet(inputs) {
-	let warnings = [];
-	return {
-		https: compileSchemeRules(inputs.httpsRules, inputs.urlRules, "https"),
-		http: compileSchemeRules(inputs.httpRules, inputs.urlRules, "http"),
-		ip: compileIpRules(inputs.ipRules, warnings),
-		tls: (inputs.tlsRules ?? []).map((pattern, index) => ({
-			id: `tls${index}`,
-			...hostRuleToMatcher(pattern),
-			raw: pattern
-		})),
-		resolverHosts: resolverHosts(inputs),
-		warnings
-	};
-}
-function resolverHosts(inputs) {
-	let hosts = [], add = (regex) => {
-		hosts.includes(regex) || hosts.push(regex);
-	};
-	for (let pattern of inputs.httpsRules ?? []) add(hostOnlyRegexOfRule(pattern));
-	for (let pattern of inputs.httpRules ?? []) add(hostOnlyRegexOfRule(pattern));
-	for (let pattern of inputs.tlsRules ?? []) add(hostOnlyRegexOfRule(pattern));
-	for (let rule of inputs.urlRules ?? []) add(hostOnlyRegexOfUrlRule(rule));
-	return hosts;
-}
-//#endregion
-//#region src/core/lib/acl/haproxy-sections.ts
-const PREAMBLE = "# Generated by buildcage. Do not edit.((global(    log stdout len 16384 format raw local0(    nbthread 1(    user haproxy(    group haproxy(    dns-accept-family ipv4(    # normalize-uri is still marked experimental upstream.(    expose-experimental-directives(    tune.ssl.default-dh-param 2048((defaults(    log global(    timeout connect 5s(    timeout client 30s(    timeout server 30s((# Readiness for s6-notifyoncheck, and the dropped-log count for the report.(# Not reachable from the network.(frontend health(    bind /var/run/haproxy-health.sock mode 666(    mode http(    no log(    monitor-uri /health(    http-request use-service prometheus-exporter if { path /metrics }(".split("(");
-function resolversSection(resolvers, useResolvConf) {
-	return [
-		"# Real resolution happens once a request has already passed the rule",
-		"# ACLs below; the build's own resolver (CoreDNS) never gives out a real",
-		"# answer, so this is the only place a name becomes an address.",
-		"resolvers buildcage",
-		...useResolvConf ? ["    parse-resolv-conf"] : resolvers.map((addr, i) => `    nameserver ns${i + 1} ${addr}:53`),
-		"    hold valid 60s",
-		"    resolve_retries 4",
-		"    timeout retry 1s",
-		"    accepted_payload_size 8192",
-		""
-	];
-}
-function originBackends(systemCaFile) {
-	return [
-		"# The only place a request reaches the origin, so where its certificate is",
-		"# checked; a refused request never gets here. The SNI is the port-free",
-		"# txn.host the rules judged, since a certificate is verified against a name,",
-		"# not a name and port.",
-		"backend origin_tls",
-		"    mode http",
-		`    server origin 0.0.0.0 ssl verify required ca-file ${systemCaFile} sni var(txn.host)`,
-		"",
-		"backend origin_plain",
-		"    mode http",
-		"    server origin 0.0.0.0",
-		""
-	];
-}
-function escapeForHaproxy(value) {
-	return value.replace(/[\\#'" ]/g, "\\$&");
-}
-const LITERAL_BODY = /^(?:[A-Za-z0-9_~:@%\-/]|\\\.)*$/;
-function unescape(body) {
-	return body.replace(/\\\./g, ".");
-}
-function hostMatcher(hostRegex) {
-	let body = /^\^(.+)\$$/.exec(hostRegex)?.[1];
-	return body !== void 0 && LITERAL_BODY.test(body) ? {
-		op: "-m str",
-		pattern: unescape(body).toLowerCase()
-	} : {
-		op: "-m reg -i",
-		pattern: hostRegex
-	};
-}
-function pathMatcher(pathRegex) {
-	let asRegex = {
-		op: "-m reg",
-		pattern: pathRegex
-	}, body = pathRegex.slice(1), op = "-m beg";
-	return body.endsWith("$") && (body = body.slice(0, -1), op = "-m str", body.endsWith(".*") && (body = body.slice(0, -2), op = "-m beg")), !body.startsWith("/") || !LITERAL_BODY.test(body) ? asRegex : {
-		op,
-		pattern: unescape(body)
-	};
-}
-//#endregion
-//#region src/core/lib/acl/haproxy-internal-dst.ts
-function internalDstAcl(name, opts) {
-	return [`    acl ${name} var(txn.dst) -m ip ${opts.internalAddrs.join(" ")}`, ...opts.hostAddressFile ? [`    acl ${name} var(txn.dst) -m ip -f ${opts.hostAddressFile}`] : []];
-}
-//#endregion
-//#region src/core/lib/acl/haproxy-detect-frontend.ts
-function detectFrontend(spec) {
-	let { listenPort, tlsStagePort, plainStagePort, ipRules, tlsHosts, hasResolver, proxyAddress } = spec, excludeDnsRouted = ipRules.length > 0 && proxyAddress !== void 0, notDnsRouted = excludeDnsRouted ? " !dns_routed" : "", hasPassthrough = ipRules.length > 0 || tlsHosts.length > 0, l = [];
-	if (l.push("# One listener for everything redirected here. The first bytes say whether", "# this is a handshake or a plain request, so no port has to be declared as", "# one or the other in advance.", "frontend detect", `    bind *:${listenPort}`, "    mode tcp", "    tcp-request inspect-delay 5s", ""), hasPassthrough) {
-		l.push("    # Passed through untouched: judged before anything is decrypted."), ipRules.some((rule) => rule.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]"), tlsHosts.some((host) => host.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]"), excludeDnsRouted && l.push("    # dst is the proxy only when the name went through this container's DNS.", `    acl dns_routed dst ${proxyAddress}`);
-		for (let rule of ipRules) l.push(`    # ${rule.raw}`), l.push(rule.hostMatch === "hostPort" ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${escapeForHaproxy(rule.address)}` : `    acl ${rule.id}_dst dst ${rule.address}`), rule.port && l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
-		for (let host of tlsHosts) l.push(`    # ${host.raw}`), l.push(host.hostMatch === "hostPort" ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${escapeForHaproxy(host.hostRegex)}` : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${escapeForHaproxy(host.hostRegex)}`), host.port && l.push(`    acl ${host.id}_port dst_port ${host.port}`);
-		let tlsConds = tlsHosts.map((h) => `${h.id}_sni${h.port ? ` ${h.id}_port` : ""}`), conds = [...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""}${notDnsRouted}`), ...tlsConds];
-		if (l.push("", ...conds.map((cond) => `    tcp-request content set-var(txn.pass) int(1) if ${cond}`), ...tlsConds.map((cond) => `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${cond}`), "    tcp-request content set-var(txn.proto) str(tls) if { req.ssl_hello_type 1 }", "    tcp-request content set-var(txn.proto) str(tcp) unless { req.ssl_hello_type 1 }"), tlsHosts.length > 0 && hasResolver) {
-			l.push("");
-			for (let host of tlsHosts) l.push(`    tcp-request content set-var(txn.tlsrule) int(1) if ${host.id}_sni${host.port ? ` ${host.id}_port` : ""}`);
-			l.push("    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.tlsrule) -m found }", "    tcp-request content set-var(txn.reason) str(dns-failed) if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content reject if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content set-dst var(txn.dst) if { var(txn.dst) -m found }", ...internalDstAcl("pass_dst_internal", spec), "    tcp-request content set-var(txn.reason) str(internal-address) if { var(txn.tlsrule) -m found } pass_dst_internal", "    tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal");
-		}
-		l.push("", "    tcp-request content set-log-level silent unless { var(txn.pass) -m found }", "    log-format \"buildcage %[date(0,ms)] pass %[var(txn.proto)] %B ts=%ts reason=%[var(txn.reason)] dst=%[dst]:%[dst_port] sni=%[var(txn.sni)]\"", "");
-	}
-	return l.push("    # `accept` ends content-rule evaluation, so it comes after every rule", "    # that needs the request buffer (the SNI capture and resolution above).", "    tcp-request content accept if { req.ssl_hello_type 1 } || { req.len gt 0 }", ""), hasPassthrough && l.push("    use_backend passthrough if { var(txn.pass) -m found }", ""), l.push("    acl is_tls req.ssl_hello_type 1", "    use_backend to_tls if is_tls", "    default_backend to_plain", "", "backend passthrough", "    mode tcp", "    server origin 0.0.0.0", "", "backend to_tls", "    mode tcp", `    server s 127.0.0.1:${tlsStagePort} send-proxy-v2`, "", "backend to_plain", "    mode tcp", `    server s 127.0.0.1:${plainStagePort} send-proxy-v2`, ""), l;
-}
-//#endregion
-//#region src/core/lib/line-comments.ts
-function stripLineComment(line) {
-	return line.replace(/(^|\s)#.*$/, "$1");
-}
-function rejectGluedHash(rule) {
-	if (rule.includes("#")) throw Error(`Invalid rule ${JSON.stringify(rule)}: a "#" starts a comment only with a space before it, and "#" is never part of a host or URL, so a rule cannot contain one.`);
-}
-//#endregion
 //#region src/core/lib/acl/url-rules.ts
 const DEFAULT_PORT = {
 	https: "443",
@@ -810,129 +320,6 @@ function buildUrlRules(rulesInput) {
 	return splitUrlRuleLines(rulesInput).map(convertUrlRule);
 }
 //#endregion
-//#region src/core/lib/acl/haproxy-rule-block.ts
-function deniesEverything(rules, mode) {
-	return mode !== "audit" && rules.length === 0;
-}
-function ruleBlock(rules, mode, scheme) {
-	let lines = [];
-	if (mode === "audit") return lines.push("    # audit records without enforcing, so nothing is refused here.", ""), lines;
-	if (deniesEverything(rules, mode)) return lines.push("    # No rules for this scheme, so nothing is permitted.", "    http-request deny", ""), lines;
-	rules.some((r) => r.hostMatch === "hostPort") && lines.push("    http-request set-var-fmt(txn.host_port) %[var(txn.host)]:%[dst_port]"), rules.some((r) => r.hostMatch === "hostBareFull") && lines.push(`    acl is_default_port dst_port ${DEFAULT_PORT[scheme]}`, "    http-request set-var-fmt(txn.host_full) %[var(txn.host)]:%[dst_port]");
-	let aclForHost = new Map(), hostAclOf = new Map();
-	for (let rule of rules) {
-		let hostRegex = escapeForHaproxy(rule.hostRegex);
-		if (lines.push(`    # ${rule.raw}`), rule.hostMatch === "hostPort") lines.push(`    acl ${rule.id}_host var(txn.host_port) -m reg -i ${hostRegex}`);
-		else if (rule.hostMatch === "hostBareFull") lines.push(`    http-request set-var(txn.${rule.id}_ok) bool(false)`, `    http-request set-var(txn.${rule.id}_ok) bool(true) if is_default_port { var(txn.host) -m reg -i ${hostRegex} }`, `    http-request set-var(txn.${rule.id}_ok) bool(true) if { var(txn.host_full) -m reg -i ${hostRegex} }`, `    acl ${rule.id}_host var(txn.${rule.id}_ok) -m bool`);
-		else {
-			let host = hostMatcher(rule.hostRegex), shared = aclForHost.get(`${host.op} ${host.pattern}`);
-			shared === void 0 && (aclForHost.set(`${host.op} ${host.pattern}`, `${rule.id}_host`), lines.push(`    acl ${rule.id}_host var(txn.host) ${host.op} ${escapeForHaproxy(host.pattern)}`)), hostAclOf.set(rule.id, shared ?? `${rule.id}_host`), rule.port && lines.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
-		}
-		let path = pathMatcher(rule.pathRegex);
-		lines.push(`    acl ${rule.id}_path path ${path.op} ${escapeForHaproxy(path.pattern)}`), rule.methods && lines.push(`    acl ${rule.id}_method method ${rule.methods.join(" ")}`);
-	}
-	lines.push("");
-	let clauses = rules.map((r) => `${hostAclOf.get(r.id) ?? `${r.id}_host`}${r.port ? ` ${r.id}_port` : ""} ${r.id}_path${r.methods ? ` ${r.id}_method` : ""}`);
-	lines.push("    http-request set-var(txn.allowed) bool(false)");
-	for (let clause of clauses) lines.push(`    http-request set-var(txn.allowed) bool(true) if !{ var(txn.allowed) -m bool } ${clause}`);
-	return lines.push("    http-request deny unless { var(txn.allowed) -m bool }"), lines.push(""), lines;
-}
-//#endregion
-//#region src/core/lib/acl/haproxy-inspect-stage.ts
-function sniField(scheme) {
-	return scheme === "https" ? " sni=%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]" : "";
-}
-function addressRules(rules) {
-	let isAddress = new RegExp(HOST_IS_ADDRESS);
-	return rules.filter((rule) => {
-		if (rule.hostMatch !== "wildcard") return !1;
-		let { op, pattern } = hostMatcher(rule.hostRegex);
-		return op === "-m str" && isAddress.test(pattern);
-	});
-}
-function internalGuard(rules) {
-	let named = addressRules(rules);
-	if (named.length === 0) return [
-		"    http-request set-var(txn.reason) str(internal-address) if dst_internal",
-		"    http-request deny deny_status 403 if dst_internal",
-		""
-	];
-	let lines = ["    # An address a rule names as its host is exempt where that rule matches."];
-	for (let rule of named) {
-		let path = pathMatcher(rule.pathRegex), conds = [
-			`{ var(txn.host) -m str ${hostMatcher(rule.hostRegex).pattern} }`,
-			...rule.port ? [`{ dst_port ${rule.port} }`] : [],
-			`{ path ${path.op} ${escapeForHaproxy(path.pattern)} }`,
-			...rule.methods ? [`{ method ${rule.methods.join(" ")} }`] : []
-		];
-		lines.push(`    # ${rule.raw}`, `    http-request set-var(txn.named_address) bool(true) if ${conds.join(" ")}`);
-	}
-	return lines.push("    acl named_address var(txn.named_address) -m bool", "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address", "    http-request deny deny_status 403 if dst_internal !named_address", ""), lines;
-}
-function inspectStage({ name, port, bindExtra, scheme, rules, backend }, ctx) {
-	let { mode, hasResolver } = ctx, l = [];
-	return l.push(`frontend ${name}`, `    bind 127.0.0.1:${port} accept-proxy${bindExtra}`, "    mode http", "    http-request set-var(txn.host_log) 'req.hdr(host),regsub(\"[\\s\\\"[:cntrl:]]\",_,g)'", "", "    # Decode before stripping `..`: `.` is unreserved, so `%2e%2e` is not", "    # a dot-dot segment until decoded, and stripping first would miss it.", "    http-request normalize-uri percent-decode-unreserved", "    http-request normalize-uri path-strip-dotdot", "", "    # pathq, not %HU: %HU is the target as sent (a path over HTTP/1.1, an", "    # absolute URI over HTTP/2), and pathq is not readable at log time.", "    # Set after normalization, so the log shows the path the rules matched.", "    http-request set-var(txn.pathq) 'pathq,regsub(\"[\\\"[:cntrl:]]\",_,g)'", "", "    # A request with no Host names nothing: the rules match on it, the", "    # origin is resolved from it, and the log's URL is built from it. Named", "    # here rather than left to the log's own empty fields, which a Host the", "    # client chose can imitate. Refused in `audit` too, as the same check", "    # in the universal engine is: there is nothing to connect to either way.", "    # Ahead of the path denies below, so that a request carrying neither a", "    # Host nor a legal path is named by the one the report can act on: the", "    # other leaves a row named for the `-` the log prints in its place.", "    acl has_host hdr(host) -m found", "    acl host_not_empty hdr_len(host) gt 0", "    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty", "    http-request deny deny_status 400 if !has_host or !host_not_empty", "", "    # The one Host every later step reads. An acl on req.hdr(host) scans", "    # every value while a fetch takes the last, so reading the header twice", "    # could judge one value and connect to another.", "    http-request set-var(txn.host) req.hdr(host),lower,host_only,regsub(\\.$,)", "", "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may", "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a", "    # valid path char at all. None is stripped, so each is refused. A lone", "    # encoded separator stays legal (e.g. npm's `/@scope%2fpackage`).", "    # `;` (or `%3b`) ends a segment too: Tomcat and Jetty drop what follows", "    # as a path parameter, so they read `..;/` as `../`.", "    # `\\\\` is one literal backslash: HAProxy's parser takes the pair as one.", "    http-request deny deny_status 403 if { path -m reg -i (^|/|%2f|%5c)\\.\\.($|/|;|%2f|%5c|%3b) }", "    http-request deny deny_status 403 if { path -m sub \\\\ }", "", `    log-format "buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${sniField(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`, ""), l.push(...ruleBlock(rules, mode, scheme)), hasResolver && !deniesEverything(rules, mode) && l.push("    # Connect to the address this proxy resolves the Host to, discarding", "    # the client's address, so a forged Host or doctored /etc/hosts cannot", "    # choose the target.", "    # txn.host has already dropped the port a header carries, which is not", "    # part of the name. An address is taken as-is: no resolver can answer", "    # one, and the rules above already decided, so nothing is loosened.", `    acl host_is_address var(txn.host) -m reg ${HOST_IS_ADDRESS}`, "    http-request set-var(txn.dst) var(txn.host) if host_is_address", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address", "    # A fresh attempt, not a replay: nothing cached the failure.", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address or { var(txn.dst) -m found }", "    http-request set-var(txn.reason) str(dns-failed) unless { var(txn.dst) -m found }", "    http-request deny deny_status 502 unless { var(txn.dst) -m found }", "", "    # Set before the internal-destination check below, not after: %[dst] in", "    # the log-format is this, and a refusal must show the address that", "    # tripped it, not whatever the client's own (fake, unresolved) address", "    # was: CoreDNS never hands out a real one; see coredns-config.ts.", "    http-request set-dst var(txn.dst)", "", "    # A resolved destination may not be internal; see INTERNAL_RANGES.", ...internalDstAcl("dst_internal", ctx), ...internalGuard(rules)), l.push(`    default_backend ${backend}`, ""), l;
-}
-//#endregion
-//#region src/core/lib/acl/haproxy-config.ts
-const DEFAULTS = {
-	listenPort: 10024,
-	caSignFile: "/etc/haproxy/ca.pem",
-	defaultCertFile: "/etc/haproxy/default.pem",
-	systemCaFile: "/etc/ssl/certs/ca-certificates.crt"
-}, TLS_STAGE_PORT = 10025, PLAIN_STAGE_PORT = 10026;
-function generateHaproxyConfig(options = {}) {
-	let opts = {
-		...DEFAULTS,
-		...options
-	}, mode = opts.mode ?? "restrict", { https: httpsRules, http: httpRules, ip: ipRules, tls: tlsHosts, warnings } = compileRuleSet(options), resolvers = opts.resolverAddress ?? [], useResolvConf = resolvers.length === 0 && opts.useResolvConf === !0, hasResolver = resolvers.length > 0 || useResolvConf;
-	if (hasResolver && !opts.proxyAddress) throw Error("proxyAddress is required whenever a resolver is configured");
-	let shared = {
-		hasResolver,
-		internalAddrs: [...INTERNAL_RANGES, ...opts.proxyAddress ? [opts.proxyAddress] : []],
-		hostAddressFile: opts.hostAddressFile
-	};
-	return {
-		config: [
-			...PREAMBLE,
-			...hasResolver ? resolversSection(resolvers, useResolvConf) : [],
-			...detectFrontend({
-				listenPort: opts.listenPort,
-				tlsStagePort: TLS_STAGE_PORT,
-				plainStagePort: PLAIN_STAGE_PORT,
-				ipRules,
-				tlsHosts,
-				proxyAddress: opts.proxyAddress,
-				...shared
-			}),
-			...inspectStage({
-				name: "https_in",
-				port: TLS_STAGE_PORT,
-				bindExtra: ` ssl crt ${opts.defaultCertFile} generate-certificates ca-sign-file ${opts.caSignFile}`,
-				scheme: "https",
-				rules: httpsRules,
-				backend: "origin_tls"
-			}, {
-				mode,
-				...shared
-			}),
-			...inspectStage({
-				name: "http_in",
-				port: PLAIN_STAGE_PORT,
-				bindExtra: "",
-				scheme: "http",
-				rules: httpRules,
-				backend: "origin_plain"
-			}, {
-				mode,
-				...shared
-			}),
-			...originBackends(opts.systemCaFile)
-		].join("\n"),
-		warnings
-	};
-}
-//#endregion
 //#region src/core/lib/acl/wildcard-rules.ts
 function splitRuleTokens(rulesInput) {
 	let tokens = rulesInput?.split(/\r?\n/).map(stripLineComment).join(" ").trim().split(/\s+/).filter(Boolean) ?? [];
@@ -978,181 +365,118 @@ function wildcardToRegex(pattern) {
 	let [domain, port] = pattern.split(":"), portRegex = port === "*" ? "\\d+" : port;
 	return `${domainToRegex(domain)}:${portRegex}`;
 }
+function capturedStderr(e) {
+	let err = e && typeof e == "object" ? e : {};
+	return typeof err.stderr == "string" ? err.stderr.trim() : "";
+}
+function describeDockerFailure(e, { operation = "docker", env = process.env, exists = node_fs.existsSync } = {}) {
+	let err = e && typeof e == "object" ? e : {}, slimNote = isLikelySlimRunner(env, exists) ? " Detected a container-based GitHub-hosted runner image (e.g. \"ubuntu-slim\"): these ship a Docker client with no daemon and are not supported for this action." : "", whatHappened;
+	if (err.code === "ENOENT") whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
+	else {
+		let captured = capturedStderr(e);
+		whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
+	}
+	return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner, on Docker Engine 25.0 or later with Compose v2.20.2 or later. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action. Use "ubuntu-latest", or another runner with a full Docker install, instead. See README.md and docs/security.md for details.`;
+}
+function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
+	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
+}
 //#endregion
-//#region src/core/lib/acl/rules.ts
-var InvalidRulesError = class extends ActionError {};
-function parseRulesOrThrow(rulesInput) {
+//#region src/core/lib/actions/log.ts
+function logRules(label, rules) {
+	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
+	for (let r of rules) console.log(`  ${r}`);
+}
+function withLogGroup(title, fn) {
+	console.log(`::group::${title}`);
 	try {
-		return parseAndValidateRules(rulesInput);
-	} catch (e) {
-		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+		return fn();
+	} finally {
+		console.log("::endgroup::");
 	}
 }
-function parseKnownBlockedRulesOrThrow(rulesInput) {
+function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
+	return [
+		"compose",
+		"-f",
+		composeFile,
+		"-p",
+		projectName,
+		"up",
+		"-d",
+		"--pull",
+		pullPolicy,
+		"--no-build",
+		"--wait",
+		"--wait-timeout",
+		"180",
+		"--quiet-pull"
+	];
+}
+function buildComposeLogsArgs({ composeFile, projectName, tail }) {
+	return [
+		"compose",
+		"-f",
+		composeFile,
+		"-p",
+		projectName,
+		"logs",
+		"--no-color",
+		"--tail",
+		String(tail)
+	];
+}
+function buildComposeDownArgs({ composeFile, projectName }) {
+	return [
+		"compose",
+		"-f",
+		composeFile,
+		"-p",
+		projectName,
+		"down"
+	];
+}
+//#endregion
+//#region src/core/lib/docker/compose-project-name.ts
+function deriveProjectName(containerName) {
+	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
+}
+//#endregion
+//#region src/core/lib/provenance/image-ref.ts
+function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
+	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
+}
+//#endregion
+//#region src/core/lib/provenance/docker-credentials.ts
+function readGhcrBasicAuth(_env = process.env, _readFileSync = node_fs.readFileSync) {
 	try {
-		return parseAndValidateKnownBlockedRules(rulesInput);
-	} catch (e) {
-		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+		let configDir = _env.DOCKER_CONFIG ?? node_path.default.join(node_os.default.homedir(), ".docker"), config = JSON.parse(_readFileSync(node_path.default.join(configDir, "config.json"), "utf8"));
+		for (let [key, value] of Object.entries(config.auths ?? {})) if (key.replace(/^https?:\/\//, "").replace(/\/$/, "") === "ghcr.io" && typeof value.auth == "string" && value.auth) return value.auth;
+		return null;
+	} catch {
+		return null;
 	}
-}
-function buildUrlRulesOrThrow(rulesInput) {
-	try {
-		return buildUrlRules(rulesInput);
-	} catch (e) {
-		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
-	}
-}
-function checkRulesCompileOrThrow(inputs) {
-	try {
-		generateHaproxyConfig(inputs), generateCorednsConfig(compileRuleSet(inputs), { proxyAddress: "192.0.2.1" });
-	} catch (e) {
-		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
-	}
-}
-const IP_RULE_HOST = /^[0-9.*?/]+$/;
-function parseIpRulesOrThrow(rulesInput) {
-	let rules = parseRulesOrThrow(rulesInput);
-	for (let rule of rules) if (!rule.startsWith("~") && !IP_RULE_HOST.test(rule.slice(0, rule.lastIndexOf(":")))) throw new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against the address a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
-	return rules;
-}
-function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
-	return {
-		httpsRules: parseRulesOrThrow(httpsRulesInput),
-		httpRules: parseRulesOrThrow(httpRulesInput),
-		ipRules: parseIpRulesOrThrow(ipRulesInput)
-	};
-}
-//#endregion
-//#region src/lib/engine.ts
-const ENGINES = ["universal", "inspect"];
-function resolveProxyEngine(input) {
-	let trimmed = input?.trim() || "inspect";
-	if (trimmed === "explicit") throw new SetupError("proxy_engine: explicit has been removed. Use proxy_engine: universal (network-level SNI/Host inspection) or inspect (TLS-terminating URL enforcement).", "INVALID_PROXY_ENGINE");
-	if (trimmed === "transparent") throw new SetupError("proxy_engine: transparent has been renamed. Use proxy_engine: universal.", "INVALID_PROXY_ENGINE");
-	if (!ENGINES.includes(trimmed)) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`, "INVALID_PROXY_ENGINE");
-	return trimmed;
-}
-//#endregion
-//#region src/lib/inputs.ts
-function readBuilderName(getInput$2 = getInput) {
-	return getInput$2("builder_name") || "buildcage";
-}
-function readEngineInputs(getInput$3 = getInput) {
-	return { proxyEngine: resolveProxyEngine(getInput$3("proxy_engine")) };
-}
-const PROXY_MODES = ["audit", "restrict"];
-function resolveProxyMode(input) {
-	let trimmed = input?.trim() || "restrict";
-	if (!PROXY_MODES.includes(trimmed)) throw new SetupError(`Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`, "INVALID_PROXY_MODE");
-	return trimmed;
-}
-const TRUE_INPUTS = [
-	"true",
-	"True",
-	"TRUE"
-], FALSE_INPUTS = [
-	"false",
-	"False",
-	"FALSE"
-];
-function resolveFailOnCaResidue(input) {
-	let trimmed = input?.trim() ?? "";
-	if (trimmed === "" || TRUE_INPUTS.includes(trimmed)) return !0;
-	if (FALSE_INPUTS.includes(trimmed)) return !1;
-	throw new SetupError(`Invalid fail_on_ca_residue: ${JSON.stringify(input)}. Must be true or false.`, "INVALID_FAIL_ON_CA_RESIDUE");
-}
-function readRuleInputs(getInput$1 = getInput) {
-	let proxyMode = resolveProxyMode(getInput$1("proxy_mode")), failOnCaResidue = resolveFailOnCaResidue(getInput$1("fail_on_ca_residue")), rules = buildACLRules({
-		httpsRulesInput: getInput$1("allowed_https_rules"),
-		httpRulesInput: getInput$1("allowed_http_rules"),
-		ipRulesInput: getInput$1("allowed_ip_rules")
-	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$1("known_blocked_rules")), urlRulesInput = getInput$1("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$1("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
-	checkRulesCompileOrThrow({
-		...rules,
-		tlsRules,
-		urlRules: compiledUrlRules
-	});
-	let urlRules = compiledUrlRules.map((r) => r.raw);
-	return {
-		proxyMode,
-		failOnCaResidue,
-		httpsRules: rules.httpsRules,
-		httpRules: rules.httpRules,
-		ipRules: rules.ipRules,
-		urlRules,
-		tlsRules,
-		knownBlockedRules
-	};
-}
-//#endregion
-//#region src/lib/engine-rule-support.ts
-function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn) {
-	if (proxyEngine === "inspect") return;
-	let unsupported = [];
-	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allowed_tls_rules"), unsupported.length === 0) return;
-	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy_engine: ${proxyEngine}, which only sees the host and port, never a method or a path.`;
-	if (proxyMode === "audit") {
-		warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
-		return;
-	}
-	throw new SetupError(`${reason} In restrict mode that means ${list} would not actually be enforced, so the build would look protected but isn't. Switch to proxy_engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
-}
-function checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedUrlRules }, warn) {
-	if (proxyEngine === "inspect" || knownBlockedUrlRules.length === 0) return;
-	let reason = `known_blocked_rules contains URL rules (a method and a URL) that need proxy_engine: inspect, which alone sees a method or a path; proxy_engine: ${proxyEngine} sees only the host and port, so these rules match no blocked connection and acknowledge nothing.`;
-	if (proxyMode === "audit") {
-		warn(`${reason} They are ignored for this run. Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`);
-		return;
-	}
-	throw new SetupError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`, "INVALID_PROXY_ENGINE");
-}
-function unsupportedIpRules(proxyEngine, ipRules) {
-	return ipRules.filter((rule) => {
-		if (rule.startsWith("~")) return !1;
-		let address = rule.slice(0, rule.lastIndexOf(":"));
-		return proxyEngine === "inspect" ? !IPV4_OR_CIDR.test(address) : address.includes("/");
-	});
-}
-function checkIpRuleSupport({ proxyEngine, proxyMode, ipRules }, warn) {
-	let unsupported = unsupportedIpRules(proxyEngine, ipRules);
-	if (unsupported.length === 0) return;
-	let list = unsupported.map((rule) => JSON.stringify(rule)).join(", "), remedy = proxyEngine === "inspect" ? "proxy_engine: inspect matches an IP rule as an address or a CIDR block, not a wildcard. Write a CIDR block instead (192.168.1.0/24:443 for 192.168.1.*:443), or a \"~\" regex." : "proxy_engine: universal matches an IP rule as text, which a CIDR block never equals. Write a wildcard instead (192.168.1.*:443 for 192.168.1.0/24:443), or a \"~\" regex.";
-	if (proxyMode === "audit") {
-		warn(`allowed_ip_rules ${list} can never match. ${remedy} They are ignored for this run.`);
-		return;
-	}
-	throw new SetupError(`allowed_ip_rules ${list} can never match, so the connections they name would be blocked. ` + remedy, "INVALID_PROXY_ENGINE");
-}
-//#endregion
-//#region src/lib/host-addresses.ts
-function listHostIpv4Addresses({ networkInterfaces: list = node_os.networkInterfaces } = {}) {
-	let found = new Set();
-	for (let infos of Object.values(list())) for (let info of infos ?? []) (info.family === "IPv4" || info.family === 4) && (info.internal || found.add(info.address));
-	return [...found].sort();
-}
-//#endregion
-//#region src/lib/compose-env.ts
-function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue, imageRef, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules }, env, hostAddresses = listHostIpv4Addresses) {
-	return {
-		...env,
-		BUILDER_NAME: builderName,
-		PROXY_MODE: proxyMode,
-		PROXY_ENGINE: proxyEngine,
-		FAIL_ON_CA_RESIDUE: String(failOnCaResidue),
-		ALLOWED_HTTPS_RULES: httpsRules.join("\n"),
-		ALLOWED_HTTP_RULES: httpRules.join("\n"),
-		ALLOWED_IP_RULES: ipRules.join("\n"),
-		ALLOWED_URL_RULES: urlRules.join("\n"),
-		ALLOWED_TLS_RULES: tlsRules.join("\n"),
-		KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
-		BUILDCAGE_IMAGE_REF: imageRef,
-		EXTERNAL_RESOLVER: "",
-		HOST_ADDRESSES: hostAddresses().join(" ")
-	};
 }
 //#endregion
 //#region src/core/lib/provenance/errors.ts
 var VerifyImageError = class extends ActionError {}, ProvenanceError = class extends ActionError {};
+function engineTagSuffix(proxyEngine) {
+	return `-${proxyEngine}`;
+}
+function imageTagFromRef(actionRef, proxyEngine = "inspect") {
+	if (!actionRef) return "";
+	let base;
+	return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, `${base}${engineTagSuffix(proxyEngine)}`;
+}
+//#endregion
+//#region src/core/lib/provenance/engine-label.ts
+const IMAGE_VERSION_LABEL = "org.opencontainers.image.version", RELEASE_VERSION = /^\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/;
+function checkImageEngine({ labels, proxyEngine, imageTag }) {
+	let label = labels[IMAGE_VERSION_LABEL];
+	if (!label) throw new VerifyImageError(`Image ${imageTag} carries no ${IMAGE_VERSION_LABEL} label, so the proxy engine it was published for cannot be confirmed.`, "VERIFY_FAILED");
+	let suffix = engineTagSuffix(proxyEngine);
+	if (!(label.endsWith(suffix) && RELEASE_VERSION.test(label.slice(0, label.length - suffix.length)))) throw new VerifyImageError(`Image ${imageTag} was not published for proxy engine ${proxyEngine} (${IMAGE_VERSION_LABEL}: ${label}), so the rules this run was given would not be enforced.`, "VERIFY_FAILED");
+}
 //#endregion
 //#region src/core/lib/provenance/oci-registry.ts
 const MANIFEST_MEDIA_TYPES = ["application/vnd.oci.image.manifest.v1+json", "application/vnd.docker.distribution.manifest.v2+json"], INDEX_MEDIA_TYPES = ["application/vnd.oci.image.index.v1+json", "application/vnd.docker.distribution.manifest.list.v2+json"];
@@ -1315,17 +639,6 @@ async function bundleBlob(client, blobDigest) {
 		onFailure: "NOT_FOUND",
 		absentOn404: !1
 	});
-}
-//#endregion
-//#region src/core/lib/provenance/docker-credentials.ts
-function readGhcrBasicAuth(_env = process.env, _readFileSync = node_fs.readFileSync) {
-	try {
-		let configDir = _env.DOCKER_CONFIG ?? node_path.default.join(node_os.default.homedir(), ".docker"), config = JSON.parse(_readFileSync(node_path.default.join(configDir, "config.json"), "utf8"));
-		for (let [key, value] of Object.entries(config.auths ?? {})) if (key.replace(/^https?:\/\//, "").replace(/\/$/, "") === "ghcr.io" && typeof value.auth == "string" && value.auth) return value.auth;
-		return null;
-	} catch {
-		return null;
-	}
 }
 //#endregion
 //#region node_modules/.pnpm/@sigstore+protobuf-specs@0.5.2/node_modules/@sigstore/protobuf-specs/dist/__generated__/envelope.js
@@ -4674,7 +3987,7 @@ var require_envelope = __commonJSMin(((exports) => {
 		return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
 	};
 })), require_supports_color = __commonJSMin(((exports, module) => {
-	let os$1 = require("os"), tty$1 = require("tty"), hasFlag = require_has_flag(), { env } = process, forceColor;
+	let os$2 = require("os"), tty$1 = require("tty"), hasFlag = require_has_flag(), { env } = process, forceColor;
 	hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never") ? forceColor = 0 : (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) && (forceColor = 1), "FORCE_COLOR" in env && (forceColor = env.FORCE_COLOR === "true" ? 1 : env.FORCE_COLOR === "false" ? 0 : env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3));
 	function translateLevel(level) {
 		return level !== 0 && {
@@ -4692,7 +4005,7 @@ var require_envelope = __commonJSMin(((exports) => {
 		let min = forceColor || 0;
 		if (env.TERM === "dumb") return min;
 		if (process.platform === "win32") {
-			let osRelease = os$1.release().split(".");
+			let osRelease = os$2.release().split(".");
 			return Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586 ? Number(osRelease[2]) >= 14931 ? 3 : 2 : 1;
 		}
 		if ("CI" in env) return [
@@ -7777,23 +7090,6 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 	}
 	assertSignedDigest(bundleJson, expectedDigest);
 }
-function engineTagSuffix(proxyEngine) {
-	return `-${proxyEngine}`;
-}
-function imageTagFromRef(actionRef, proxyEngine = "inspect") {
-	if (!actionRef) return "";
-	let base;
-	return base = /^[0-9a-f]{40}$/i.test(actionRef) ? `sha-${actionRef.toLowerCase()}` : actionRef.startsWith("v") ? actionRef.slice(1) : actionRef, `${base}${engineTagSuffix(proxyEngine)}`;
-}
-//#endregion
-//#region src/core/lib/provenance/engine-label.ts
-const IMAGE_VERSION_LABEL = "org.opencontainers.image.version", RELEASE_VERSION = /^\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/;
-function checkImageEngine({ labels, proxyEngine, imageTag }) {
-	let label = labels[IMAGE_VERSION_LABEL];
-	if (!label) throw new VerifyImageError(`Image ${imageTag} carries no ${IMAGE_VERSION_LABEL} label, so the proxy engine it was published for cannot be confirmed.`, "VERIFY_FAILED");
-	let suffix = engineTagSuffix(proxyEngine);
-	if (!(label.endsWith(suffix) && RELEASE_VERSION.test(label.slice(0, label.length - suffix.length)))) throw new VerifyImageError(`Image ${imageTag} was not published for proxy engine ${proxyEngine} (${IMAGE_VERSION_LABEL}: ${label}), so the rules this run was given would not be enforced.`, "VERIFY_FAILED");
-}
 //#endregion
 //#region src/core/lib/provenance/verify-policy.ts
 const RELEASE_REF = /^v\d+(\.\d+(\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?)?)?$/, escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -7849,92 +7145,6 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine }) 
 	return requireDigest(digest, actionRef);
 }
 //#endregion
-//#region src/core/lib/provenance/image-ref.ts
-function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
-	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
-}
-function capturedStderr(e) {
-	let err = e && typeof e == "object" ? e : {};
-	return typeof err.stderr == "string" ? err.stderr.trim() : "";
-}
-function describeDockerFailure(e, { operation = "docker", env = process.env, exists = node_fs.existsSync } = {}) {
-	let err = e && typeof e == "object" ? e : {}, slimNote = isLikelySlimRunner(env, exists) ? " Detected a container-based GitHub-hosted runner image (e.g. \"ubuntu-slim\"): these ship a Docker client with no daemon and are not supported for this action." : "", whatHappened;
-	if (err.code === "ENOENT") whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
-	else {
-		let captured = capturedStderr(e);
-		whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
-	}
-	return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner, on Docker Engine 25.0 or later with Compose v2.20.2 or later. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action. Use "ubuntu-latest", or another runner with a full Docker install, instead. See README.md and docs/security.md for details.`;
-}
-function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
-	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
-}
-//#endregion
-//#region src/core/lib/actions/log.ts
-function logRules(label, rules) {
-	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
-	for (let r of rules) console.log(`  ${r}`);
-}
-function withLogGroup(title, fn) {
-	console.log(`::group::${title}`);
-	try {
-		return fn();
-	} finally {
-		console.log("::endgroup::");
-	}
-}
-//#endregion
-//#region src/core/lib/docker/compose-project-name.ts
-function deriveProjectName(containerName) {
-	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
-}
-function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
-	return [
-		"compose",
-		"-f",
-		composeFile,
-		"-p",
-		projectName,
-		"up",
-		"-d",
-		"--pull",
-		pullPolicy,
-		"--no-build",
-		"--wait",
-		"--wait-timeout",
-		"180",
-		"--quiet-pull"
-	];
-}
-function buildComposeLogsArgs({ composeFile, projectName, tail }) {
-	return [
-		"compose",
-		"-f",
-		composeFile,
-		"-p",
-		projectName,
-		"logs",
-		"--no-color",
-		"--tail",
-		String(tail)
-	];
-}
-function buildComposeDownArgs({ composeFile, projectName }) {
-	return [
-		"compose",
-		"-f",
-		composeFile,
-		"-p",
-		projectName,
-		"down"
-	];
-}
-//#endregion
-//#region src/lib/local-image.ts
-async function readLocalImageOverride(env, log = console.log) {
-	return null;
-}
-//#endregion
 //#region src/core/lib/docker/health.ts
 function buildDockerInspectStateArgs(containerName) {
 	return [
@@ -7967,6 +7177,9 @@ function describeContainerStartFailure(state, { role, containerName }) {
 	let subject = `Buildcage's ${role} container (${containerName})`, probe = state.lastHealthOutput ? ` Last health check output: ${JSON.stringify(state.lastHealthOutput)}.` : "", evidence = " Its log is printed above.";
 	return state.status === "running" ? isContainerReady(state) ? `${subject} is running, but \`docker compose up\` failed. See the Docker output above.${probe}` : `${subject} started but never became ready.${probe}${evidence}` : `${subject} stopped${state.exitCode === null ? "" : ` with code ${state.exitCode}`} instead of starting up.${probe}${evidence}`;
 }
+//#endregion
+//#region src/lib/errors.ts
+var SetupError = class extends ActionError {};
 //#endregion
 //#region src/lib/builder-diagnostics.ts
 const captureDockerViaExec = (args, env) => (0, node_child_process.execFileSync)("docker", args, {
@@ -8017,6 +7230,795 @@ function printBuilderLog({ composeFile, projectName, composeEnv }, { printDocker
 			console.log("The builder container's log could not be read.");
 		}
 	});
+}
+//#endregion
+//#region src/lib/host-addresses.ts
+function listHostIpv4Addresses({ networkInterfaces: list = node_os.networkInterfaces } = {}) {
+	let found = new Set();
+	for (let infos of Object.values(list())) for (let info of infos ?? []) (info.family === "IPv4" || info.family === 4) && (info.internal || found.add(info.address));
+	return [...found].sort();
+}
+//#endregion
+//#region src/lib/compose-env.ts
+function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue, imageRef, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules }, env, hostAddresses = listHostIpv4Addresses) {
+	return {
+		...env,
+		BUILDER_NAME: builderName,
+		PROXY_MODE: proxyMode,
+		PROXY_ENGINE: proxyEngine,
+		FAIL_ON_CA_RESIDUE: String(failOnCaResidue),
+		ALLOWED_HTTPS_RULES: httpsRules.join("\n"),
+		ALLOWED_HTTP_RULES: httpRules.join("\n"),
+		ALLOWED_IP_RULES: ipRules.join("\n"),
+		ALLOWED_URL_RULES: urlRules.join("\n"),
+		ALLOWED_TLS_RULES: tlsRules.join("\n"),
+		KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
+		BUILDCAGE_IMAGE_REF: imageRef,
+		EXTERNAL_RESOLVER: "",
+		HOST_ADDRESSES: hostAddresses().join(" ")
+	};
+}
+//#endregion
+//#region src/core/lib/acl/haproxy-rules.ts
+const IPV4_OR_CIDR = /^\d{1,3}(?:\.\d{1,3}){3}(?:\/\d{1,2})?$/, OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`, INTERNAL_RANGES = [
+	"0.0.0.0/8",
+	"127.0.0.0/8",
+	"169.254.0.0/16",
+	"100.64.0.0/10",
+	"192.0.0.0/24",
+	"168.63.129.16/32",
+	"::1/128",
+	"fe80::/10"
+];
+function splitHostRule(pattern) {
+	let colonIndex = pattern.lastIndexOf(":");
+	if (colonIndex === -1) throw Error(`Invalid rule "${pattern}": missing port`);
+	let port = pattern.slice(colonIndex + 1);
+	if (!/^(?:\d+|\*)$/.test(port)) throw Error(`Invalid port in rule "${pattern}": "${port}"`);
+	let host = pattern.slice(0, colonIndex);
+	if (host.includes(":")) throw Error(`Invalid host in rule "${pattern}": "${host}" holds a ":", so the one this rule was split at is not its port separator. An IPv6 address is not supported here.`);
+	return {
+		host,
+		port
+	};
+}
+function hostOnlyRegexOfRule(pattern) {
+	return pattern.startsWith("~") ? splitRawRegexHost(pattern).host : domainToRegexPartial(splitHostRule(pattern).host);
+}
+function hostOnlyRegexOfUrlRule(rule) {
+	let authority = rule.authorityRegex.slice(1, -1);
+	return rule.isRegex ? authority : authority.slice(0, authority.lastIndexOf(":"));
+}
+function urlRuleToMatcher(rule) {
+	let hostOnly = hostOnlyRegexOfUrlRule(rule), port = rule.authorityRegex.slice(1, -1).slice(hostOnly.length + 1);
+	return {
+		hostRegex: `^${hostOnly}$`,
+		port: port === "[0-9]+" ? null : port
+	};
+}
+function hostRuleToMatcher(pattern) {
+	if (pattern.startsWith("~")) return splitRawRegexHost(pattern), {
+		hostMatch: "hostPort",
+		hostRegex: anchorRawRegex(pattern.slice(1)),
+		port: null
+	};
+	let { port } = splitHostRule(pattern);
+	return {
+		hostMatch: "wildcard",
+		hostRegex: `^${hostOnlyRegexOfRule(pattern)}$`,
+		port: port === "*" ? null : port
+	};
+}
+function compileSchemeRules(hostRules, urlRules, scheme) {
+	let out = [];
+	for (let pattern of hostRules ?? []) out.push({
+		id: "",
+		...hostRuleToMatcher(pattern),
+		pathRegex: "^/",
+		methods: null,
+		raw: pattern
+	});
+	for (let rule of urlRules ?? []) if (rule.schemes.includes(scheme)) {
+		if (rule.isRegex) {
+			out.push({
+				id: "",
+				hostMatch: "hostBareFull",
+				hostRegex: rule.hostRegex,
+				port: null,
+				pathRegex: rule.pathRegex,
+				methods: rule.methods,
+				raw: rule.raw
+			});
+			continue;
+		}
+		out.push({
+			id: "",
+			hostMatch: "wildcard",
+			...urlRuleToMatcher(rule),
+			pathRegex: rule.pathRegex,
+			methods: rule.methods,
+			raw: rule.raw
+		});
+	}
+	return out.forEach((rule, i) => {
+		rule.id = `${scheme === "https" ? "s" : "p"}${i}`;
+	}), out;
+}
+function compileIpRules(rules, warnings) {
+	let out = [];
+	return (rules ?? []).forEach((rule, index) => {
+		if (rule.startsWith("~")) {
+			splitRawRegexHost(rule), out.push({
+				id: `ip${index}`,
+				address: anchorRawRegex(rule.slice(1)),
+				hostMatch: "hostPort",
+				port: null,
+				raw: rule
+			});
+			return;
+		}
+		let colonIndex = rule.lastIndexOf(":");
+		if (colonIndex === -1) {
+			warnings.push(`IP rule ${JSON.stringify(rule)} has no port. It is ignored.`);
+			return;
+		}
+		let address = rule.slice(0, colonIndex), port = rule.slice(colonIndex + 1);
+		if (!IPV4_OR_CIDR.test(address)) {
+			warnings.push(`IP rule ${JSON.stringify(rule)} is not an address or CIDR block, which is all that can be tunnelled without inspection. It is ignored.`);
+			return;
+		}
+		out.push({
+			id: `ip${index}`,
+			address,
+			hostMatch: "wildcard",
+			port: port === "*" ? null : port,
+			raw: rule
+		});
+	}), out;
+}
+function compileRuleSet(inputs) {
+	let warnings = [];
+	return {
+		https: compileSchemeRules(inputs.httpsRules, inputs.urlRules, "https"),
+		http: compileSchemeRules(inputs.httpRules, inputs.urlRules, "http"),
+		ip: compileIpRules(inputs.ipRules, warnings),
+		tls: (inputs.tlsRules ?? []).map((pattern, index) => ({
+			id: `tls${index}`,
+			...hostRuleToMatcher(pattern),
+			raw: pattern
+		})),
+		resolverHosts: resolverHosts(inputs),
+		warnings
+	};
+}
+function resolverHosts(inputs) {
+	let hosts = [], add = (regex) => {
+		hosts.includes(regex) || hosts.push(regex);
+	};
+	for (let pattern of inputs.httpsRules ?? []) add(hostOnlyRegexOfRule(pattern));
+	for (let pattern of inputs.httpRules ?? []) add(hostOnlyRegexOfRule(pattern));
+	for (let pattern of inputs.tlsRules ?? []) add(hostOnlyRegexOfRule(pattern));
+	for (let rule of inputs.urlRules ?? []) add(hostOnlyRegexOfUrlRule(rule));
+	return hosts;
+}
+//#endregion
+//#region src/lib/engine-rule-support.ts
+function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn) {
+	if (proxyEngine === "inspect") return;
+	let unsupported = [];
+	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allowed_tls_rules"), unsupported.length === 0) return;
+	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy_engine: ${proxyEngine}, which only sees the host and port, never a method or a path.`;
+	if (proxyMode === "audit") {
+		warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
+		return;
+	}
+	throw new SetupError(`${reason} In restrict mode that means ${list} would not actually be enforced, so the build would look protected but isn't. Switch to proxy_engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
+}
+function checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedUrlRules }, warn) {
+	if (proxyEngine === "inspect" || knownBlockedUrlRules.length === 0) return;
+	let reason = `known_blocked_rules contains URL rules (a method and a URL) that need proxy_engine: inspect, which alone sees a method or a path; proxy_engine: ${proxyEngine} sees only the host and port, so these rules match no blocked connection and acknowledge nothing.`;
+	if (proxyMode === "audit") {
+		warn(`${reason} They are ignored for this run. Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`);
+		return;
+	}
+	throw new SetupError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`, "INVALID_PROXY_ENGINE");
+}
+function unsupportedIpRules(proxyEngine, ipRules) {
+	return ipRules.filter((rule) => {
+		if (rule.startsWith("~")) return !1;
+		let address = rule.slice(0, rule.lastIndexOf(":"));
+		return proxyEngine === "inspect" ? !IPV4_OR_CIDR.test(address) : address.includes("/");
+	});
+}
+function checkIpRuleSupport({ proxyEngine, proxyMode, ipRules }, warn) {
+	let unsupported = unsupportedIpRules(proxyEngine, ipRules);
+	if (unsupported.length === 0) return;
+	let list = unsupported.map((rule) => JSON.stringify(rule)).join(", "), remedy = proxyEngine === "inspect" ? "proxy_engine: inspect matches an IP rule as an address or a CIDR block, not a wildcard. Write a CIDR block instead (192.168.1.0/24:443 for 192.168.1.*:443), or a \"~\" regex." : "proxy_engine: universal matches an IP rule as text, which a CIDR block never equals. Write a wildcard instead (192.168.1.*:443 for 192.168.1.0/24:443), or a \"~\" regex.";
+	if (proxyMode === "audit") {
+		warn(`allowed_ip_rules ${list} can never match. ${remedy} They are ignored for this run.`);
+		return;
+	}
+	throw new SetupError(`allowed_ip_rules ${list} can never match, so the connections they name would be blocked. ` + remedy, "INVALID_PROXY_ENGINE");
+}
+//#endregion
+//#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/summary.js
+var __awaiter$6 = function(thisArg, _arguments, P, generator) {
+	function adopt(value) {
+		return value instanceof P ? value : new P(function(resolve) {
+			resolve(value);
+		});
+	}
+	return new (P ||= Promise)(function(resolve, reject) {
+		function fulfilled(value) {
+			try {
+				step(generator.next(value));
+			} catch (e) {
+				reject(e);
+			}
+		}
+		function rejected(value) {
+			try {
+				step(generator.throw(value));
+			} catch (e) {
+				reject(e);
+			}
+		}
+		function step(result) {
+			result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+		}
+		step((generator = generator.apply(thisArg, _arguments || [])).next());
+	});
+};
+const { access, appendFile, writeFile } = fs.promises, SUMMARY_ENV_VAR = "GITHUB_STEP_SUMMARY";
+new class {
+	constructor() {
+		this._buffer = "";
+	}
+	filePath() {
+		return __awaiter$6(this, void 0, void 0, function* () {
+			if (this._filePath) return this._filePath;
+			let pathFromEnv = process.env[SUMMARY_ENV_VAR];
+			if (!pathFromEnv) throw Error(`Unable to find environment variable for $${SUMMARY_ENV_VAR}. Check if your runtime environment supports job summaries.`);
+			try {
+				yield access(pathFromEnv, fs.constants.R_OK | fs.constants.W_OK);
+			} catch {
+				throw Error(`Unable to access summary file: '${pathFromEnv}'. Check if the file has correct read/write permissions.`);
+			}
+			return this._filePath = pathFromEnv, this._filePath;
+		});
+	}
+	wrap(tag, content, attrs = {}) {
+		let htmlAttrs = Object.entries(attrs).map(([key, value]) => ` ${key}="${value}"`).join("");
+		return content ? `<${tag}${htmlAttrs}>${content}</${tag}>` : `<${tag}${htmlAttrs}>`;
+	}
+	write(options) {
+		return __awaiter$6(this, void 0, void 0, function* () {
+			let overwrite = !!options?.overwrite, filePath = yield this.filePath();
+			return yield (overwrite ? writeFile : appendFile)(filePath, this._buffer, { encoding: "utf8" }), this.emptyBuffer();
+		});
+	}
+	clear() {
+		return __awaiter$6(this, void 0, void 0, function* () {
+			return this.emptyBuffer().write({ overwrite: !0 });
+		});
+	}
+	stringify() {
+		return this._buffer;
+	}
+	isEmptyBuffer() {
+		return this._buffer.length === 0;
+	}
+	emptyBuffer() {
+		return this._buffer = "", this;
+	}
+	addRaw(text, addEOL = !1) {
+		return this._buffer += text, addEOL ? this.addEOL() : this;
+	}
+	addEOL() {
+		return this.addRaw(os.EOL);
+	}
+	addCodeBlock(code, lang) {
+		let attrs = Object.assign({}, lang && { lang }), element = this.wrap("pre", this.wrap("code", code), attrs);
+		return this.addRaw(element).addEOL();
+	}
+	addList(items, ordered = !1) {
+		let tag = ordered ? "ol" : "ul", listItems = items.map((item) => this.wrap("li", item)).join(""), element = this.wrap(tag, listItems);
+		return this.addRaw(element).addEOL();
+	}
+	addTable(rows) {
+		let tableBody = rows.map((row) => {
+			let cells = row.map((cell) => {
+				if (typeof cell == "string") return this.wrap("td", cell);
+				let { header, data, colspan, rowspan } = cell, tag = header ? "th" : "td", attrs = Object.assign(Object.assign({}, colspan && { colspan }), rowspan && { rowspan });
+				return this.wrap(tag, data, attrs);
+			}).join("");
+			return this.wrap("tr", cells);
+		}).join(""), element = this.wrap("table", tableBody);
+		return this.addRaw(element).addEOL();
+	}
+	addDetails(label, content) {
+		let element = this.wrap("details", this.wrap("summary", label) + content);
+		return this.addRaw(element).addEOL();
+	}
+	addImage(src, alt, options) {
+		let { width, height } = options || {}, attrs = Object.assign(Object.assign({}, width && { width }), height && { height }), element = this.wrap("img", null, Object.assign({
+			src,
+			alt
+		}, attrs));
+		return this.addRaw(element).addEOL();
+	}
+	addHeading(text, level) {
+		let tag = `h${level}`, allowedTag = [
+			"h1",
+			"h2",
+			"h3",
+			"h4",
+			"h5",
+			"h6"
+		].includes(tag) ? tag : "h1", element = this.wrap(allowedTag, text);
+		return this.addRaw(element).addEOL();
+	}
+	addSeparator() {
+		let element = this.wrap("hr", null);
+		return this.addRaw(element).addEOL();
+	}
+	addBreak() {
+		let element = this.wrap("br", null);
+		return this.addRaw(element).addEOL();
+	}
+	addQuote(text, cite) {
+		let attrs = Object.assign({}, cite && { cite }), element = this.wrap("blockquote", text, attrs);
+		return this.addRaw(element).addEOL();
+	}
+	addLink(text, href) {
+		let element = this.wrap("a", text, { href });
+		return this.addRaw(element).addEOL();
+	}
+}();
+const { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs.promises;
+process.platform, fs.constants.O_RDONLY, process.platform, events.EventEmitter, events.EventEmitter, os.default.platform(), os.default.arch();
+var ExitCode;
+(function(ExitCode) {
+	ExitCode[ExitCode.Success = 0] = "Success", ExitCode[ExitCode.Failure = 1] = "Failure";
+})(ExitCode ||= {});
+function getInput(name, options) {
+	let val = process.env[`INPUT_${name.replace(/ /g, "_").toUpperCase()}`] || "";
+	if (options && options.required && !val) throw Error(`Input required and not supplied: ${name}`);
+	return options && options.trimWhitespace === !1 ? val : val.trim();
+}
+//#endregion
+//#region src/core/lib/acl/coredns-config.ts
+function escapeForCel(regex) {
+	return regex.replace(/\\/g, "\\\\");
+}
+function nameMatches(regex) {
+	return `      expr name() matches '(?i)${regex}'`;
+}
+function proxyAnswerLines(proxyAddress, ttlSeconds) {
+	return [
+		"    template IN A {",
+		`      answer "{{ .Name }} ${ttlSeconds} IN A ${proxyAddress}"`,
+		"    }",
+		"    template IN AAAA {",
+		"    }",
+		"    template IN ANY {",
+		"    }"
+	];
+}
+function reverseZoneLines(proxyAddress, ttlSeconds) {
+	let soa = `{{ .Zone }} ${ttlSeconds} IN SOA ns.buildcage.invalid. hostmaster.buildcage.invalid. 1 ${ttlSeconds} ${ttlSeconds} ${ttlSeconds} ${ttlSeconds}`;
+	return [
+		"# Reverse lookups: answered NXDOMAIN rather than left unhandled, which",
+		"# would be SERVFAIL and cost musl a five-second timeout each time. Only a",
+		"# reversed address is treated this way; anything else",
+		"# under these zones misses the view and falls through to the blocks below.",
+		"in-addr.arpa ip6.arpa {",
+		"    view reverse {",
+		nameMatches("^(([0-9]{1,3}[.]){1,4}in-addr[.]arpa|([0-9a-fA-F][.]){1,32}ip6[.]arpa)[.]$"),
+		"    }",
+		"    template IN PTR {",
+		"      rcode NXDOMAIN",
+		`      authority "${soa}"`,
+		"    }",
+		...proxyAnswerLines(proxyAddress, ttlSeconds),
+		"    log . \"buildcage dns reverse name={name}\"",
+		"    errors",
+		"}",
+		""
+	];
+}
+const SERVICE_PREFIX_REGEX = "_[a-z0-9-]{1,15}[.]_(tcp|udp|sctp)[.]", DISCOVERY_TYPES = [
+	"SRV",
+	"TXT",
+	"TLSA",
+	"URI"
+];
+function discoveryZoneLines(proxyAddress, ttlSeconds, parentRegex) {
+	let parent = parentRegex === void 0 ? ".+" : `(${escapeForCel(parentRegex)})`;
+	return [
+		"# Service-discovery names under an allowed host: answered NODATA and logged",
+		"# under a verb of their own. No rule can permit one, so a denied row for it",
+		"# could never be taken away. A service name under any other host misses the",
+		"# view and is denied below, as the host itself would be. Both expressions",
+		"# have to hold: a type not defined at a service name is judged below like",
+		"# any other lookup rather than exempted on a guess.",
+		". {",
+		"    view discovery {",
+		nameMatches(`^${SERVICE_PREFIX_REGEX}${parent}[.]$`),
+		`      expr type() in [${DISCOVERY_TYPES.map((t) => `'${t}'`).join(", ")}]`,
+		"    }",
+		...proxyAnswerLines(proxyAddress, ttlSeconds),
+		"    log . \"buildcage dns discovery name={name} type={type}\"",
+		"    errors",
+		"}",
+		""
+	];
+}
+function serviceZoneLines(proxyAddress, ttlSeconds) {
+	return [
+		"# Every other service name: refused like any other name, but recorded apart",
+		"# so the report can say the remedy is the host below it rather than the name",
+		"# itself, which no rule can make resolve.",
+		". {",
+		"    view service {",
+		nameMatches(`^${SERVICE_PREFIX_REGEX}.+[.]$`),
+		"    }",
+		...proxyAnswerLines(proxyAddress, ttlSeconds),
+		"    log . \"buildcage dns service-denied name={name} type={type}\"",
+		"    errors",
+		"}",
+		""
+	];
+}
+const HEALTH_LINE = "    health 127.0.0.1:8080";
+function generateCorednsConfig(rules, options) {
+	let { proxyAddress, ttlSeconds = 60, mode = "restrict" } = options, warnings = [], hostRegexes = rules.resolverHosts;
+	if (mode === "audit") return {
+		config: [
+			"# Generated by buildcage. Do not edit.",
+			"",
+			...reverseZoneLines(proxyAddress, ttlSeconds),
+			...discoveryZoneLines(proxyAddress, ttlSeconds, void 0),
+			"# audit enforces nothing, so every name is logged as allowed. It is still",
+			"# answered locally with the proxy's own address, so a name that was only",
+			"# looked up, never connected to, still shows up here, and the query",
+			"# itself never reaches a real nameserver.",
+			". {",
+			HEALTH_LINE,
+			...proxyAnswerLines(proxyAddress, ttlSeconds),
+			"    log . \"buildcage dns allowed name={name}\"",
+			"    errors",
+			"}",
+			""
+		].join("\n"),
+		warnings
+	};
+	let lines = ["# Generated by buildcage. Do not edit.", ""];
+	if (lines.push(...reverseZoneLines(proxyAddress, ttlSeconds)), hostRegexes.length > 0) {
+		let alternation = hostRegexes.map((r) => `(${r})`).join("|");
+		lines.push(...discoveryZoneLines(proxyAddress, ttlSeconds, alternation)), lines.push("# Allowlisted names are logged as allowed, but answered exactly like a", "# denied one, with the proxy's own address: real resolution happens once", "# a request has already passed HAProxy's own host+path+method check, not", "# here. The expression is the same host pattern the proxy rules are built", "# from, so the two cannot drift apart.", ". {", "    view allowlist {", nameMatches(`^(${escapeForCel(alternation)})[.]$`), "    }", ...proxyAnswerLines(proxyAddress, ttlSeconds), "    log . \"buildcage dns allowed name={name}\"", "    errors", "}", "");
+	}
+	return lines.push(...serviceZoneLines(proxyAddress, ttlSeconds)), lines.push("# Everything else resolves to the proxy and is answered locally, so the", "# query never leaves and the request still arrives somewhere its full URL", "# can be recorded before being denied.", ". {", HEALTH_LINE, ...proxyAnswerLines(proxyAddress, ttlSeconds), "    log . \"buildcage dns denied name={name}\"", "    errors", "}", ""), {
+		config: lines.join("\n"),
+		warnings
+	};
+}
+//#endregion
+//#region src/core/lib/acl/haproxy-internal-dst.ts
+function internalDstAcl(name, opts) {
+	return [`    acl ${name} var(txn.dst) -m ip ${opts.internalAddrs.join(" ")}`, ...opts.hostAddressFile ? [`    acl ${name} var(txn.dst) -m ip -f ${opts.hostAddressFile}`] : []];
+}
+function escapeForHaproxy(value) {
+	return value.replace(/[\\#'" ]/g, "\\$&");
+}
+const LITERAL_BODY = /^(?:[A-Za-z0-9_~:@%\-/]|\\\.)*$/;
+function unescape(body) {
+	return body.replace(/\\\./g, ".");
+}
+function hostMatcher(hostRegex) {
+	let body = /^\^(.+)\$$/.exec(hostRegex)?.[1];
+	return body !== void 0 && LITERAL_BODY.test(body) ? {
+		op: "-m str",
+		pattern: unescape(body).toLowerCase()
+	} : {
+		op: "-m reg -i",
+		pattern: hostRegex
+	};
+}
+function pathMatcher(pathRegex) {
+	let asRegex = {
+		op: "-m reg",
+		pattern: pathRegex
+	}, body = pathRegex.slice(1), op = "-m beg";
+	return body.endsWith("$") && (body = body.slice(0, -1), op = "-m str", body.endsWith(".*") && (body = body.slice(0, -2), op = "-m beg")), !body.startsWith("/") || !LITERAL_BODY.test(body) ? asRegex : {
+		op,
+		pattern: unescape(body)
+	};
+}
+//#endregion
+//#region src/core/lib/acl/haproxy-detect-frontend.ts
+function detectFrontend(spec) {
+	let { listenPort, tlsStagePort, plainStagePort, ipRules, tlsHosts, hasResolver, proxyAddress } = spec, excludeDnsRouted = ipRules.length > 0 && proxyAddress !== void 0, notDnsRouted = excludeDnsRouted ? " !dns_routed" : "", hasPassthrough = ipRules.length > 0 || tlsHosts.length > 0, l = [];
+	if (l.push("# One listener for everything redirected here. The first bytes say whether", "# this is a handshake or a plain request, so no port has to be declared as", "# one or the other in advance.", "frontend detect", `    bind *:${listenPort}`, "    mode tcp", "    tcp-request inspect-delay 5s", ""), hasPassthrough) {
+		l.push("    # Passed through untouched: judged before anything is decrypted."), ipRules.some((rule) => rule.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]"), tlsHosts.some((host) => host.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]"), excludeDnsRouted && l.push("    # dst is the proxy only when the name went through this container's DNS.", `    acl dns_routed dst ${proxyAddress}`);
+		for (let rule of ipRules) l.push(`    # ${rule.raw}`), l.push(rule.hostMatch === "hostPort" ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${escapeForHaproxy(rule.address)}` : `    acl ${rule.id}_dst dst ${rule.address}`), rule.port && l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
+		for (let host of tlsHosts) l.push(`    # ${host.raw}`), l.push(host.hostMatch === "hostPort" ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${escapeForHaproxy(host.hostRegex)}` : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${escapeForHaproxy(host.hostRegex)}`), host.port && l.push(`    acl ${host.id}_port dst_port ${host.port}`);
+		let tlsConds = tlsHosts.map((h) => `${h.id}_sni${h.port ? ` ${h.id}_port` : ""}`), conds = [...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""}${notDnsRouted}`), ...tlsConds];
+		if (l.push("", ...conds.map((cond) => `    tcp-request content set-var(txn.pass) int(1) if ${cond}`), ...tlsConds.map((cond) => `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${cond}`), "    tcp-request content set-var(txn.proto) str(tls) if { req.ssl_hello_type 1 }", "    tcp-request content set-var(txn.proto) str(tcp) unless { req.ssl_hello_type 1 }"), tlsHosts.length > 0 && hasResolver) {
+			l.push("");
+			for (let host of tlsHosts) l.push(`    tcp-request content set-var(txn.tlsrule) int(1) if ${host.id}_sni${host.port ? ` ${host.id}_port` : ""}`);
+			l.push("    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.tlsrule) -m found }", "    tcp-request content set-var(txn.reason) str(dns-failed) if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content reject if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content set-dst var(txn.dst) if { var(txn.dst) -m found }", ...internalDstAcl("pass_dst_internal", spec), "    tcp-request content set-var(txn.reason) str(internal-address) if { var(txn.tlsrule) -m found } pass_dst_internal", "    tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal");
+		}
+		l.push("", "    tcp-request content set-log-level silent unless { var(txn.pass) -m found }", "    log-format \"buildcage %[date(0,ms)] pass %[var(txn.proto)] %B ts=%ts reason=%[var(txn.reason)] dst=%[dst]:%[dst_port] sni=%[var(txn.sni)]\"", "");
+	}
+	return l.push("    # `accept` ends content-rule evaluation, so it comes after every rule", "    # that needs the request buffer (the SNI capture and resolution above).", "    tcp-request content accept if { req.ssl_hello_type 1 } || { req.len gt 0 }", ""), hasPassthrough && l.push("    use_backend passthrough if { var(txn.pass) -m found }", ""), l.push("    acl is_tls req.ssl_hello_type 1", "    use_backend to_tls if is_tls", "    default_backend to_plain", "", "backend passthrough", "    mode tcp", "    server origin 0.0.0.0", "", "backend to_tls", "    mode tcp", `    server s 127.0.0.1:${tlsStagePort} send-proxy-v2`, "", "backend to_plain", "    mode tcp", `    server s 127.0.0.1:${plainStagePort} send-proxy-v2`, ""), l;
+}
+//#endregion
+//#region src/core/lib/acl/haproxy-rule-block.ts
+function deniesEverything(rules, mode) {
+	return mode !== "audit" && rules.length === 0;
+}
+function ruleBlock(rules, mode, scheme) {
+	let lines = [];
+	if (mode === "audit") return lines.push("    # audit records without enforcing, so nothing is refused here.", ""), lines;
+	if (deniesEverything(rules, mode)) return lines.push("    # No rules for this scheme, so nothing is permitted.", "    http-request deny", ""), lines;
+	rules.some((r) => r.hostMatch === "hostPort") && lines.push("    http-request set-var-fmt(txn.host_port) %[var(txn.host)]:%[dst_port]"), rules.some((r) => r.hostMatch === "hostBareFull") && lines.push(`    acl is_default_port dst_port ${DEFAULT_PORT[scheme]}`, "    http-request set-var-fmt(txn.host_full) %[var(txn.host)]:%[dst_port]");
+	let aclForHost = new Map(), hostAclOf = new Map();
+	for (let rule of rules) {
+		let hostRegex = escapeForHaproxy(rule.hostRegex);
+		if (lines.push(`    # ${rule.raw}`), rule.hostMatch === "hostPort") lines.push(`    acl ${rule.id}_host var(txn.host_port) -m reg -i ${hostRegex}`);
+		else if (rule.hostMatch === "hostBareFull") lines.push(`    http-request set-var(txn.${rule.id}_ok) bool(false)`, `    http-request set-var(txn.${rule.id}_ok) bool(true) if is_default_port { var(txn.host) -m reg -i ${hostRegex} }`, `    http-request set-var(txn.${rule.id}_ok) bool(true) if { var(txn.host_full) -m reg -i ${hostRegex} }`, `    acl ${rule.id}_host var(txn.${rule.id}_ok) -m bool`);
+		else {
+			let host = hostMatcher(rule.hostRegex), shared = aclForHost.get(`${host.op} ${host.pattern}`);
+			shared === void 0 && (aclForHost.set(`${host.op} ${host.pattern}`, `${rule.id}_host`), lines.push(`    acl ${rule.id}_host var(txn.host) ${host.op} ${escapeForHaproxy(host.pattern)}`)), hostAclOf.set(rule.id, shared ?? `${rule.id}_host`), rule.port && lines.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
+		}
+		let path = pathMatcher(rule.pathRegex);
+		lines.push(`    acl ${rule.id}_path path ${path.op} ${escapeForHaproxy(path.pattern)}`), rule.methods && lines.push(`    acl ${rule.id}_method method ${rule.methods.join(" ")}`);
+	}
+	lines.push("");
+	let clauses = rules.map((r) => `${hostAclOf.get(r.id) ?? `${r.id}_host`}${r.port ? ` ${r.id}_port` : ""} ${r.id}_path${r.methods ? ` ${r.id}_method` : ""}`);
+	lines.push("    http-request set-var(txn.allowed) bool(false)");
+	for (let clause of clauses) lines.push(`    http-request set-var(txn.allowed) bool(true) if !{ var(txn.allowed) -m bool } ${clause}`);
+	return lines.push("    http-request deny unless { var(txn.allowed) -m bool }"), lines.push(""), lines;
+}
+//#endregion
+//#region src/core/lib/acl/haproxy-inspect-stage.ts
+function sniField(scheme) {
+	return scheme === "https" ? " sni=%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]" : "";
+}
+function addressRules(rules) {
+	let isAddress = new RegExp(HOST_IS_ADDRESS);
+	return rules.filter((rule) => {
+		if (rule.hostMatch !== "wildcard") return !1;
+		let { op, pattern } = hostMatcher(rule.hostRegex);
+		return op === "-m str" && isAddress.test(pattern);
+	});
+}
+function internalGuard(rules) {
+	let named = addressRules(rules);
+	if (named.length === 0) return [
+		"    http-request set-var(txn.reason) str(internal-address) if dst_internal",
+		"    http-request deny deny_status 403 if dst_internal",
+		""
+	];
+	let lines = ["    # An address a rule names as its host is exempt where that rule matches."];
+	for (let rule of named) {
+		let path = pathMatcher(rule.pathRegex), conds = [
+			`{ var(txn.host) -m str ${hostMatcher(rule.hostRegex).pattern} }`,
+			...rule.port ? [`{ dst_port ${rule.port} }`] : [],
+			`{ path ${path.op} ${escapeForHaproxy(path.pattern)} }`,
+			...rule.methods ? [`{ method ${rule.methods.join(" ")} }`] : []
+		];
+		lines.push(`    # ${rule.raw}`, `    http-request set-var(txn.named_address) bool(true) if ${conds.join(" ")}`);
+	}
+	return lines.push("    acl named_address var(txn.named_address) -m bool", "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address", "    http-request deny deny_status 403 if dst_internal !named_address", ""), lines;
+}
+function inspectStage({ name, port, bindExtra, scheme, rules, backend }, ctx) {
+	let { mode, hasResolver } = ctx, l = [];
+	return l.push(`frontend ${name}`, `    bind 127.0.0.1:${port} accept-proxy${bindExtra}`, "    mode http", "    http-request set-var(txn.host_log) 'req.hdr(host),regsub(\"[\\s\\\"[:cntrl:]]\",_,g)'", "", "    # Decode before stripping `..`: `.` is unreserved, so `%2e%2e` is not", "    # a dot-dot segment until decoded, and stripping first would miss it.", "    http-request normalize-uri percent-decode-unreserved", "    http-request normalize-uri path-strip-dotdot", "", "    # pathq, not %HU: %HU is the target as sent (a path over HTTP/1.1, an", "    # absolute URI over HTTP/2), and pathq is not readable at log time.", "    # Set after normalization, so the log shows the path the rules matched.", "    http-request set-var(txn.pathq) 'pathq,regsub(\"[\\\"[:cntrl:]]\",_,g)'", "", "    # A request with no Host names nothing: the rules match on it, the", "    # origin is resolved from it, and the log's URL is built from it. Named", "    # here rather than left to the log's own empty fields, which a Host the", "    # client chose can imitate. Refused in `audit` too, as the same check", "    # in the universal engine is: there is nothing to connect to either way.", "    # Ahead of the path denies below, so that a request carrying neither a", "    # Host nor a legal path is named by the one the report can act on: the", "    # other leaves a row named for the `-` the log prints in its place.", "    acl has_host hdr(host) -m found", "    acl host_not_empty hdr_len(host) gt 0", "    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty", "    http-request deny deny_status 400 if !has_host or !host_not_empty", "", "    # The one Host every later step reads. An acl on req.hdr(host) scans", "    # every value while a fetch takes the last, so reading the header twice", "    # could judge one value and connect to another.", "    http-request set-var(txn.host) req.hdr(host),lower,host_only,regsub(\\.$,)", "", "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may", "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a", "    # valid path char at all. None is stripped, so each is refused. A lone", "    # encoded separator stays legal (e.g. npm's `/@scope%2fpackage`).", "    # `;` (or `%3b`) ends a segment too: Tomcat and Jetty drop what follows", "    # as a path parameter, so they read `..;/` as `../`.", "    # `\\\\` is one literal backslash: HAProxy's parser takes the pair as one.", "    http-request deny deny_status 403 if { path -m reg -i (^|/|%2f|%5c)\\.\\.($|/|;|%2f|%5c|%3b) }", "    http-request deny deny_status 403 if { path -m sub \\\\ }", "", `    log-format "buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${sniField(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`, ""), l.push(...ruleBlock(rules, mode, scheme)), hasResolver && !deniesEverything(rules, mode) && l.push("    # Connect to the address this proxy resolves the Host to, discarding", "    # the client's address, so a forged Host or doctored /etc/hosts cannot", "    # choose the target.", "    # txn.host has already dropped the port a header carries, which is not", "    # part of the name. An address is taken as-is: no resolver can answer", "    # one, and the rules above already decided, so nothing is loosened.", `    acl host_is_address var(txn.host) -m reg ${HOST_IS_ADDRESS}`, "    http-request set-var(txn.dst) var(txn.host) if host_is_address", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address", "    # A fresh attempt, not a replay: nothing cached the failure.", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address or { var(txn.dst) -m found }", "    http-request set-var(txn.reason) str(dns-failed) unless { var(txn.dst) -m found }", "    http-request deny deny_status 502 unless { var(txn.dst) -m found }", "", "    # Set before the internal-destination check below, not after: %[dst] in", "    # the log-format is this, and a refusal must show the address that", "    # tripped it, not whatever the client's own (fake, unresolved) address", "    # was: CoreDNS never hands out a real one; see coredns-config.ts.", "    http-request set-dst var(txn.dst)", "", "    # A resolved destination may not be internal; see INTERNAL_RANGES.", ...internalDstAcl("dst_internal", ctx), ...internalGuard(rules)), l.push(`    default_backend ${backend}`, ""), l;
+}
+//#endregion
+//#region src/core/lib/acl/haproxy-sections.ts
+const PREAMBLE = "# Generated by buildcage. Do not edit.((global(    log stdout len 16384 format raw local0(    nbthread 1(    user haproxy(    group haproxy(    dns-accept-family ipv4(    # normalize-uri is still marked experimental upstream.(    expose-experimental-directives(    tune.ssl.default-dh-param 2048((defaults(    log global(    timeout connect 5s(    timeout client 30s(    timeout server 30s((# Readiness for s6-notifyoncheck, and the dropped-log count for the report.(# Not reachable from the network.(frontend health(    bind /var/run/haproxy-health.sock mode 666(    mode http(    no log(    monitor-uri /health(    http-request use-service prometheus-exporter if { path /metrics }(".split("(");
+function resolversSection(resolvers, useResolvConf) {
+	return [
+		"# Real resolution happens once a request has already passed the rule",
+		"# ACLs below; the build's own resolver (CoreDNS) never gives out a real",
+		"# answer, so this is the only place a name becomes an address.",
+		"resolvers buildcage",
+		...useResolvConf ? ["    parse-resolv-conf"] : resolvers.map((addr, i) => `    nameserver ns${i + 1} ${addr}:53`),
+		"    hold valid 60s",
+		"    resolve_retries 4",
+		"    timeout retry 1s",
+		"    accepted_payload_size 8192",
+		""
+	];
+}
+function originBackends(systemCaFile) {
+	return [
+		"# The only place a request reaches the origin, so where its certificate is",
+		"# checked; a refused request never gets here. The SNI is the port-free",
+		"# txn.host the rules judged, since a certificate is verified against a name,",
+		"# not a name and port.",
+		"backend origin_tls",
+		"    mode http",
+		`    server origin 0.0.0.0 ssl verify required ca-file ${systemCaFile} sni var(txn.host)`,
+		"",
+		"backend origin_plain",
+		"    mode http",
+		"    server origin 0.0.0.0",
+		""
+	];
+}
+//#endregion
+//#region src/core/lib/acl/haproxy-config.ts
+const DEFAULTS = {
+	listenPort: 10024,
+	caSignFile: "/etc/haproxy/ca.pem",
+	defaultCertFile: "/etc/haproxy/default.pem",
+	systemCaFile: "/etc/ssl/certs/ca-certificates.crt"
+}, TLS_STAGE_PORT = 10025, PLAIN_STAGE_PORT = 10026;
+function generateHaproxyConfig(options = {}) {
+	let opts = {
+		...DEFAULTS,
+		...options
+	}, mode = opts.mode ?? "restrict", { https: httpsRules, http: httpRules, ip: ipRules, tls: tlsHosts, warnings } = compileRuleSet(options), resolvers = opts.resolverAddress ?? [], useResolvConf = resolvers.length === 0 && opts.useResolvConf === !0, hasResolver = resolvers.length > 0 || useResolvConf;
+	if (hasResolver && !opts.proxyAddress) throw Error("proxyAddress is required whenever a resolver is configured");
+	let shared = {
+		hasResolver,
+		internalAddrs: [...INTERNAL_RANGES, ...opts.proxyAddress ? [opts.proxyAddress] : []],
+		hostAddressFile: opts.hostAddressFile
+	};
+	return {
+		config: [
+			...PREAMBLE,
+			...hasResolver ? resolversSection(resolvers, useResolvConf) : [],
+			...detectFrontend({
+				listenPort: opts.listenPort,
+				tlsStagePort: TLS_STAGE_PORT,
+				plainStagePort: PLAIN_STAGE_PORT,
+				ipRules,
+				tlsHosts,
+				proxyAddress: opts.proxyAddress,
+				...shared
+			}),
+			...inspectStage({
+				name: "https_in",
+				port: TLS_STAGE_PORT,
+				bindExtra: ` ssl crt ${opts.defaultCertFile} generate-certificates ca-sign-file ${opts.caSignFile}`,
+				scheme: "https",
+				rules: httpsRules,
+				backend: "origin_tls"
+			}, {
+				mode,
+				...shared
+			}),
+			...inspectStage({
+				name: "http_in",
+				port: PLAIN_STAGE_PORT,
+				bindExtra: "",
+				scheme: "http",
+				rules: httpRules,
+				backend: "origin_plain"
+			}, {
+				mode,
+				...shared
+			}),
+			...originBackends(opts.systemCaFile)
+		].join("\n"),
+		warnings
+	};
+}
+//#endregion
+//#region src/core/lib/acl/rules.ts
+var InvalidRulesError = class extends ActionError {};
+function parseRulesOrThrow(rulesInput) {
+	try {
+		return parseAndValidateRules(rulesInput);
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+	}
+}
+function parseKnownBlockedRulesOrThrow(rulesInput) {
+	try {
+		return parseAndValidateKnownBlockedRules(rulesInput);
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+	}
+}
+function buildUrlRulesOrThrow(rulesInput) {
+	try {
+		return buildUrlRules(rulesInput);
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+	}
+}
+function checkRulesCompileOrThrow(inputs) {
+	try {
+		generateHaproxyConfig(inputs), generateCorednsConfig(compileRuleSet(inputs), { proxyAddress: "192.0.2.1" });
+	} catch (e) {
+		throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
+	}
+}
+const IP_RULE_HOST = /^[0-9.*?/]+$/;
+function parseIpRulesOrThrow(rulesInput) {
+	let rules = parseRulesOrThrow(rulesInput);
+	for (let rule of rules) if (!rule.startsWith("~") && !IP_RULE_HOST.test(rule.slice(0, rule.lastIndexOf(":")))) throw new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against the address a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
+	return rules;
+}
+function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
+	return {
+		httpsRules: parseRulesOrThrow(httpsRulesInput),
+		httpRules: parseRulesOrThrow(httpRulesInput),
+		ipRules: parseIpRulesOrThrow(ipRulesInput)
+	};
+}
+//#endregion
+//#region src/lib/engine.ts
+const ENGINES = ["universal", "inspect"];
+function resolveProxyEngine(input) {
+	let trimmed = input?.trim() || "inspect";
+	if (trimmed === "explicit") throw new SetupError("proxy_engine: explicit has been removed. Use proxy_engine: universal (network-level SNI/Host inspection) or inspect (TLS-terminating URL enforcement).", "INVALID_PROXY_ENGINE");
+	if (trimmed === "transparent") throw new SetupError("proxy_engine: transparent has been renamed. Use proxy_engine: universal.", "INVALID_PROXY_ENGINE");
+	if (!ENGINES.includes(trimmed)) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`, "INVALID_PROXY_ENGINE");
+	return trimmed;
+}
+//#endregion
+//#region src/lib/inputs.ts
+function readBuilderName(getInput$2 = getInput) {
+	return getInput$2("builder_name") || "buildcage";
+}
+function readEngineInputs(getInput$3 = getInput) {
+	return { proxyEngine: resolveProxyEngine(getInput$3("proxy_engine")) };
+}
+const PROXY_MODES = ["audit", "restrict"];
+function resolveProxyMode(input) {
+	let trimmed = input?.trim() || "restrict";
+	if (!PROXY_MODES.includes(trimmed)) throw new SetupError(`Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`, "INVALID_PROXY_MODE");
+	return trimmed;
+}
+const TRUE_INPUTS = [
+	"true",
+	"True",
+	"TRUE"
+], FALSE_INPUTS = [
+	"false",
+	"False",
+	"FALSE"
+];
+function resolveFailOnCaResidue(input) {
+	let trimmed = input?.trim() ?? "";
+	if (trimmed === "" || TRUE_INPUTS.includes(trimmed)) return !0;
+	if (FALSE_INPUTS.includes(trimmed)) return !1;
+	throw new SetupError(`Invalid fail_on_ca_residue: ${JSON.stringify(input)}. Must be true or false.`, "INVALID_FAIL_ON_CA_RESIDUE");
+}
+function readRuleInputs(getInput$1 = getInput) {
+	let proxyMode = resolveProxyMode(getInput$1("proxy_mode")), failOnCaResidue = resolveFailOnCaResidue(getInput$1("fail_on_ca_residue")), rules = buildACLRules({
+		httpsRulesInput: getInput$1("allowed_https_rules"),
+		httpRulesInput: getInput$1("allowed_http_rules"),
+		ipRulesInput: getInput$1("allowed_ip_rules")
+	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$1("known_blocked_rules")), urlRulesInput = getInput$1("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$1("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
+	checkRulesCompileOrThrow({
+		...rules,
+		tlsRules,
+		urlRules: compiledUrlRules
+	});
+	let urlRules = compiledUrlRules.map((r) => r.raw);
+	return {
+		proxyMode,
+		failOnCaResidue,
+		httpsRules: rules.httpsRules,
+		httpRules: rules.httpRules,
+		ipRules: rules.ipRules,
+		urlRules,
+		tlsRules,
+		knownBlockedRules
+	};
+}
+//#endregion
+//#region src/lib/local-image.ts
+async function readLocalImageOverride(env, log = console.log) {
+	return null;
 }
 //#endregion
 //#region src/lib/setup-step.ts

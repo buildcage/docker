@@ -4,10 +4,11 @@
  * all, so a silently reordered view block matters as much as a wrong one.
  */
 import { describe, it } from "vitest";
+
+import { expectMatchesGolden } from "../test/golden.node.ts";
 import { generateCorednsConfig, type CorednsConfigOptions } from "./coredns-config.ts";
 import { compileRuleSet, type RuleInputs } from "./haproxy-rules.ts";
 import { buildUrlRules } from "./url-rules.ts";
-import { expectMatchesGolden } from "../test/golden.node.ts";
 
 const PROXY = "198.19.255.1";
 

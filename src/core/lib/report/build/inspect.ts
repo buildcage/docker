@@ -1,6 +1,7 @@
 import { scanInspectLog, scanInspectDnsLog } from "#core/lib/log/inspect.ts";
-import { reduceTimeline } from "./aggregate.ts";
+
 import type { GenReportParameters, InspectReportData } from "../types.ts";
+import { reduceTimeline } from "./aggregate.ts";
 
 /**
  * Build the report data from the proxy and resolver logs. Pure: the caller

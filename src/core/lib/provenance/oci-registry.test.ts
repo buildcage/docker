@@ -7,13 +7,6 @@ import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 
 import {
-  fetchManifestDigest,
-  fetchRegistryToken,
-  fetchImageConfigLabels,
-  type FetchLike,
-  type FetchLikeResponse,
-} from "./oci-registry.ts";
-import {
   expectVerifyError,
   failsWith,
   networkFailure,
@@ -21,6 +14,14 @@ import {
   okJson,
   stubRegistry,
 } from "#core/lib/test/registry-stub.ts";
+
+import {
+  fetchManifestDigest,
+  fetchRegistryToken,
+  fetchImageConfigLabels,
+  type FetchLike,
+  type FetchLikeResponse,
+} from "./oci-registry.ts";
 
 const DIGEST = "sha256:" + "a".repeat(64);
 

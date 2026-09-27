@@ -54,6 +54,7 @@ export default defineConfig({
     },
   },
   fmt: {
+    sortImports: true,
     ignorePatterns: [...generatedOutputs, ...fixtures, ...vendored, "MAINTAINERS.md"],
   },
   staged: {

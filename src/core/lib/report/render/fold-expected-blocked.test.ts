@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
 import type { HostTableRow } from "./host-table.ts";
 

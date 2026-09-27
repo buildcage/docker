@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { bundleFromJSON } from "@sigstore/bundle";
 import { getTrustedRoot } from "@sigstore/tuf";
 import {
@@ -10,8 +11,9 @@ import {
   type ObjectIdentifierValuePair,
   type VerificationPolicy,
 } from "@sigstore/verify";
-import { VerifyImageError } from "./errors.ts";
+
 import { errorMessage } from "../errors.ts";
+import { VerifyImageError } from "./errors.ts";
 import { assertSignedDigest, type DsseBundle } from "./signed-digest.ts";
 
 export interface VerifyBundleOptions {

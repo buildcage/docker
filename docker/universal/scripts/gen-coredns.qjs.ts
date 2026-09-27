@@ -13,6 +13,7 @@
  * Host rules are whitespace separated; `universal` has no url or tls rules.
  */
 import * as std from "qjs:std";
+
 import { generateCorednsConfig } from "#core/lib/acl/coredns-config.js";
 import { compileRuleSet } from "#core/lib/acl/haproxy-rules.js";
 import { splitRuleTokens } from "#core/lib/acl/wildcard-rules.js";

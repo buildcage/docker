@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
+
+import { readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
 function inputs(values: Record<string, string> = {}): (name: string) => string {

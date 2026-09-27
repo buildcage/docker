@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { runSetupStep, COMPOSE_FILE, type SetupStepDeps } from "./setup-step.ts";
 import { SetupError } from "./errors.ts";
+import { runSetupStep, COMPOSE_FILE, type SetupStepDeps } from "./setup-step.ts";
 
 // Every collaborator is tested in its own file; what is left to check here is
 // the order they run in, what each one is handed, and which of them still run

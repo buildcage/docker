@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { buildInspectReportData } from "./inspect.ts";
+
 import { reportParams } from "#core/lib/test/report-data.node.ts";
+
+import { buildInspectReportData } from "./inspect.ts";
 
 const START = "buildcage haproxy starting 1787471970000";
 const ALLOWED =

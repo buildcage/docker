@@ -4,6 +4,7 @@
  * frame, so no renderer's tests have to.
  */
 import { describe, it, expect } from "vitest";
+
 import { exampleStepHead, restrictExampleBlock, usesLine } from "./restrict-example.ts";
 
 const REPO = "owner/repo";

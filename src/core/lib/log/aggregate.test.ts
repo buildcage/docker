@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { aggregate, createIncrementalAggregator, type LogEntry } from "./aggregate.ts";
 
 describe("aggregate", () => {

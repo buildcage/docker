@@ -1,6 +1,7 @@
 import { IPV4_OR_CIDR } from "#core/lib/acl/haproxy-rules.ts";
-import { SetupError } from "./errors.ts";
+
 import type { ProxyEngine } from "./engine.ts";
+import { SetupError } from "./errors.ts";
 
 /**
  * Only `inspect` terminates TLS, so it's the only engine that can see an HTTP

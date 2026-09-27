@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import { readActionVersion } from "./action-version.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
+
+import { readActionVersion } from "./action-version.ts";
 
 function dockerReturning(labels: Record<string, string> | Error): Docker {
   return {

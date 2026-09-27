@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { scanHaproxyLog } from "./haproxy.ts";
 
 /** A decision line in the format the log-format template emits. */

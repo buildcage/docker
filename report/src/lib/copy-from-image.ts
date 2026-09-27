@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 
 import { describeDockerFailure } from "#core/lib/actions/docker-error.ts";
 import type { RunDocker } from "#core/lib/docker/client.ts";
+
 import { ReportError } from "./errors.ts";
 
 // stderr is piped, not inherited, so describeDockerFailure can quote it.

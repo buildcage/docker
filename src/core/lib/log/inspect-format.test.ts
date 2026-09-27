@@ -2,6 +2,7 @@
 // holding the two together: a field moved on one side and not the other leaves
 // a report that says the build reached nothing at all.
 import { describe, it, expect } from "vitest";
+
 import { generateHaproxyConfig } from "../acl/haproxy-config.ts";
 import { scanInspectLog } from "./inspect.ts";
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { parseLogSegments, readRotatedLog } from "./rotated-log.ts";
+
 import type { Docker } from "./client.ts";
+import { parseLogSegments, readRotatedLog } from "./rotated-log.ts";
 
 describe("parseLogSegments", () => {
   it("keeps only s6-log segment names, archives before current", () => {

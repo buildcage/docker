@@ -1,7 +1,7 @@
-import { HOST_IS_ADDRESS, type CompiledRule } from "./haproxy-rules.ts";
+import { internalDstAcl, type InternalDstOptions } from "./haproxy-internal-dst.ts";
 import { escapeForHaproxy, HOST_ONLY, hostMatcher, pathMatcher } from "./haproxy-matchers.ts";
 import { deniesEverything, ruleBlock } from "./haproxy-rule-block.ts";
-import { internalDstAcl, type InternalDstOptions } from "./haproxy-internal-dst.ts";
+import { HOST_IS_ADDRESS, type CompiledRule } from "./haproxy-rules.ts";
 
 /** One inspected frontend; the pair differs only in these. */
 export interface InspectStageSpec {

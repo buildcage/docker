@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { renderHostTable } from "./host-table.ts";
 
 describe("renderHostTable", () => {

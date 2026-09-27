@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { expect } from "vitest";
 
 const updating = process.env.UPDATE_GOLDEN === "1";

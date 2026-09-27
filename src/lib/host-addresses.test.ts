@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
 import type { networkInterfaces } from "node:os";
+
+import { describe, it, expect } from "vitest";
 
 import { listHostIpv4Addresses } from "./host-addresses.ts";
 

@@ -1,8 +1,8 @@
 // haproxy.cfg.template isn't generated from INTERNAL_RANGES, so nothing
 // keeps the two lists in sync automatically. This catches drift.
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
-import { INTERNAL_RANGES } from "./haproxy-rules.ts";
 import { generateHaproxyConfig } from "./haproxy-config.ts";
+import { INTERNAL_RANGES } from "./haproxy-rules.ts";
 
 const isNode = typeof (globalThis as { process?: unknown }).process !== "undefined";
 

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
 import * as core from "@actions/core";
+import { describe, it, expect, vi } from "vitest";
+
 import { writeStepSummary } from "./write-step-summary.ts";
 
 describe("writeStepSummary", () => {

@@ -1,6 +1,6 @@
-import type { CompiledIpRule, CompiledTlsRule } from "./haproxy-rules.ts";
-import { escapeForHaproxy } from "./haproxy-matchers.ts";
 import { internalDstAcl, type InternalDstOptions } from "./haproxy-internal-dst.ts";
+import { escapeForHaproxy } from "./haproxy-matchers.ts";
+import type { CompiledIpRule, CompiledTlsRule } from "./haproxy-rules.ts";
 
 export interface DetectFrontendSpec extends InternalDstOptions {
   listenPort: number;

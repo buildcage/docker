@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 
-import { describeReportOutcomes } from "./report-outcomes.ts";
-import { reportParams } from "#core/lib/test/report-data.node.ts";
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
+import { reportParams } from "#core/lib/test/report-data.node.ts";
+
 import type { InspectReportData, UniversalReportData } from "../types.ts";
+import { describeReportOutcomes } from "./report-outcomes.ts";
 
 function universal(overrides: Partial<UniversalReportData> = {}): UniversalReportData {
   return {

@@ -20,14 +20,15 @@
  * out of the rules and listed beside them instead.
  */
 
+import { DEFAULT_PORT, splitHostPort } from "#core/lib/log/authority.ts";
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
+
+import { markdownTable } from "./markdown-table.ts";
 import {
   exampleStepHead,
   restrictExampleBlock,
   type ExampleStepOptions,
 } from "./restrict-example.ts";
-import { markdownTable } from "./markdown-table.ts";
-import { DEFAULT_PORT, splitHostPort } from "#core/lib/log/authority.ts";
 
 /** Conventional ordering, so a rule reads the way a person would write it. */
 const METHOD_ORDER = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];

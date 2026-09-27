@@ -16,8 +16,9 @@
  * container's own /etc/resolv.conf.
  */
 import * as std from "qjs:std";
-import { generateHaproxyConfig } from "#core/lib/acl/haproxy-config.js";
+
 import { generateCorednsConfig } from "#core/lib/acl/coredns-config.js";
+import { generateHaproxyConfig } from "#core/lib/acl/haproxy-config.js";
 import { compileRuleSet } from "#core/lib/acl/haproxy-rules.js";
 import { buildUrlRules } from "#core/lib/acl/url-rules.js";
 import { splitRuleTokens } from "#core/lib/acl/wildcard-rules.js";

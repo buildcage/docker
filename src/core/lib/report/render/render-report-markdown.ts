@@ -1,11 +1,11 @@
-import { renderHostTable } from "./host-table.ts";
-import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
+import type { ReportData } from "../types.ts";
 import { buildRestrictExample } from "./build-example.ts";
+import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
+import { renderHostTable } from "./host-table.ts";
 import { renderInspectDetails } from "./inspect-details.ts";
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
 import type { ExampleStepOptions } from "./restrict-example.ts";
-import type { ReportData } from "../types.ts";
 
 export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /** Heading text. May carry untrusted input: the heading escapes it. */

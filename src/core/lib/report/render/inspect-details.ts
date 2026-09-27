@@ -4,6 +4,7 @@ import {
   isRedundantDns,
   type TrafficEvent,
 } from "#core/lib/log/traffic-event.ts";
+
 import { formatElapsedVariable } from "../elapsed-time.ts";
 import { wrapCommunicationDetails } from "./communication-section.ts";
 

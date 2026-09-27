@@ -1,12 +1,14 @@
-import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { runReportAction, type ReportActionSpec } from "./action-main.ts";
+import { describe, it, expect, vi } from "vitest";
+
 import type { Docker } from "#core/lib/docker/client.ts";
 import type { InspectReportData, UniversalReportData } from "#core/lib/report/types.ts";
 import { reportParams } from "#core/lib/test/report-data.node.ts";
+
+import { runReportAction, type ReportActionSpec } from "./action-main.ts";
 
 function fakeDocker(overrides: Partial<Docker> = {}): Docker {
   return {

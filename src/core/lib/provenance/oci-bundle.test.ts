@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 
-import { fetchBundle } from "./oci-bundle.ts";
 import {
   expectVerifyError,
   failsWith,
@@ -9,6 +8,8 @@ import {
   stubRegistry,
   type Route,
 } from "#core/lib/test/registry-stub.ts";
+
+import { fetchBundle } from "./oci-bundle.ts";
 import type { FetchLike } from "./oci-registry.ts";
 
 const BUNDLE_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json";

@@ -4,8 +4,8 @@
  * All errors are thrown as VerifyImageError (see errors.ts).
  */
 
-import { VerifyImageError } from "./errors.ts";
 import { errorMessage } from "../errors.ts";
+import { VerifyImageError } from "./errors.ts";
 
 /** Appended to every 401/403 message: the status alone reads as a bug in the
  *  action, when by far the likeliest cause is an unauthenticated runner. */

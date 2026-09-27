@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { scanInspectLog, scanInspectDnsLog, hasProxyStarted } from "./inspect.ts";
 import type { TrafficEvent } from "./traffic-event.ts";
 

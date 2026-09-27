@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { applyOutcomeAnnotations, type OutcomeEmission } from "./annotate.ts";
+
 import type { Annotation } from "#core/lib/actions/annotation.ts";
+
+import { applyOutcomeAnnotations, type OutcomeEmission } from "./annotate.ts";
 
 function recorder(): { annotation: Annotation; calls: [keyof Annotation, string][] } {
   const calls: [keyof Annotation, string][] = [];

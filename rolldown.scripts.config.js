@@ -1,4 +1,5 @@
 import { globSync } from "node:fs";
+
 import { defineConfig } from "rolldown";
 
 // Small standalone scripts baked into the built Docker images, as opposed

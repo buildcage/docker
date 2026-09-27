@@ -1,7 +1,8 @@
+import { clientEndedNoise } from "#core/lib/log/traffic-event.ts";
+
+import type { ReportData } from "../types.ts";
 import type { OutcomeEmission } from "./annotate.ts";
 import { describeBlockedOutcome } from "./blocked-outcome.ts";
-import { clientEndedNoise } from "#core/lib/log/traffic-event.ts";
-import type { ReportData } from "../types.ts";
 
 export interface DescribeReportOutcomesOptions {
   failOnBlocked: boolean;

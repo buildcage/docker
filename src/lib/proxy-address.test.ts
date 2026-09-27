@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
+
 import { describe, it, expect } from "vitest";
+
 import { PROXY_ADDRESS } from "#core/lib/log/proxy-address.ts";
 
 describe("PROXY_ADDRESS", () => {

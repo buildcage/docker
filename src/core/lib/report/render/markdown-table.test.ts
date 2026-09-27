@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { markdownTable } from "./markdown-table.ts";
 
 describe("markdownTable", () => {

@@ -12,10 +12,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
-import { createDocker } from "#core/lib/docker/client.ts";
-import { REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
 import { annotate } from "#core/lib/actions/annotation.ts";
+import { createDocker } from "#core/lib/docker/client.ts";
+import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
+import { REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
+
 import { copyFromContainerImage } from "./copy-from-image.ts";
 import { findReportSourceContainer } from "./find-report-source.ts";
 import { readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";

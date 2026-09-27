@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+
 import { logRules, withLogGroup, withLogGroupAsync, wrapLogGroup } from "./log.ts";
 
 describe("logRules", () => {

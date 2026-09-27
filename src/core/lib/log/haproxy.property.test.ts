@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
 import fc from "fast-check";
+import { describe, it, expect } from "vitest";
 
-import { scanHaproxyLog } from "./haproxy.ts";
 import { aggregate } from "./aggregate.ts";
+import { scanHaproxyLog } from "./haproxy.ts";
 
 describe("scanHaproxyLog: properties", () => {
   // A well-formed line always becomes exactly one event with the right action:

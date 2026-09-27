@@ -8,8 +8,10 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { formatElapsedFixed } from "../elapsed-time.ts";
+
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
+
+import { formatElapsedFixed } from "../elapsed-time.ts";
 
 /**
  * One event, as it appears in the JSON: the same event the report renders,

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import {
   COMMUNICATION_DETAILS_CLOSE,
   COMMUNICATION_DETAILS_OPEN,

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { renderInspectDetails } from "./inspect-details.ts";
+
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
+
+import { renderInspectDetails } from "./inspect-details.ts";
 
 const t = 1787471975;
 const TIMELINE: TrafficEvent[] = [

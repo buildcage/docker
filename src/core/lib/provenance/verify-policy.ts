@@ -1,5 +1,5 @@
-import type { VerifyBundleOptions } from "./sigstore.ts";
 import { derUtf8 } from "./signed-digest.ts";
+import type { VerifyBundleOptions } from "./sigstore.ts";
 
 const EXPECTED_ISSUER = "https://token.actions.githubusercontent.com";
 const RELEASE_WORKFLOW = ".github/workflows/docker-publish.yml";

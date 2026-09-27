@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 
+import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
+
 import {
   readBuilderName,
   readEngineInputs,
@@ -7,7 +9,6 @@ import {
   resolveFailOnCaResidue,
   resolveProxyMode,
 } from "./inputs.ts";
-import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
 function inputs(values: Record<string, string> = {}): (name: string) => string {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { buildVerifyOptions } from "./verify-policy.ts";
 import type { VerifyBundleOptions } from "./sigstore.ts";
+import { buildVerifyOptions } from "./verify-policy.ts";
 
 // ── Constants mirrored from verify-policy.ts ──────────────────────────────────
 
