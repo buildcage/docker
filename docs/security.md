@@ -248,6 +248,13 @@ origin; only the log line reflects the host-only nature of that decision. See
 [Rule syntax](./reference.md#rule-syntax) for how to write a host pattern that doesn't widen this
 more than intended.
 
+#### The CA and its private key
+
+The CA and its key are generated fresh each time the builder container starts. The CA is valid for
+two days, so a copy that escapes cleanup soon stops being trusted. Its private key never leaves the
+container: HAProxy signs each per-SNI certificate with it, and only the certificate is published to
+the steps. The post step's `docker compose down` removes the container, and the key with it.
+
 ## Attempts to get around it
 
 | What the build does                                                                                | What happens                                                                                                                                                 |
