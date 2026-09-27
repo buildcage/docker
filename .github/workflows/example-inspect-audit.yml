@@ -15,7 +15,7 @@ jobs:
       # inspect decrypts, so it logs each request's method and full URL, and
       # the report's "Switch to restrict mode" section returns allowed_url_rules.
       - name: Start Buildcage builder
-        uses: buildcage/docker@394573f1a2982a2d65eebc19a58f5f2e11621d93 # v4.0.2
+        uses: buildcage/docker@ecedf92e65a9cef8c91249e890a13d02ecfaf7a6 # v4.0.3
         with:
           proxy_mode: audit
           proxy_engine: inspect
@@ -48,4 +48,4 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@394573f1a2982a2d65eebc19a58f5f2e11621d93 # v4.0.2
+        uses: buildcage/docker/report@ecedf92e65a9cef8c91249e890a13d02ecfaf7a6 # v4.0.3
