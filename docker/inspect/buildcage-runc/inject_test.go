@@ -781,7 +781,8 @@ func TestInjectLeavesAnExistingOwnCAPathAlone(t *testing.T) {
 // exists to refuse.
 func TestInjectLeavesAnUnresolvableVariableAlone(t *testing.T) {
 	useFakeRsync(t)
-	bundle, _ := newBundle(t, []string{"DENO_CERT=../../../../etc/passwd"})
+	bundle, rootfs := newBundle(t, []string{"DENO_CERT=/custom/roots.pem"})
+	mustSymlink(t, "../../../../outside", filepath.Join(rootfs, "custom"))
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
@@ -789,7 +790,7 @@ func TestInjectLeavesAnUnresolvableVariableAlone(t *testing.T) {
 	}
 	defer restore.finish()
 
-	if got := loadEnv(t, bundle)["DENO_CERT"]; got != "../../../../etc/passwd" {
+	if got := loadEnv(t, bundle)["DENO_CERT"]; got != "/custom/roots.pem" {
 		t.Errorf("DENO_CERT = %q, want it left alone", got)
 	}
 	if mounts := loadMounts(t, bundle); len(mounts) != 1 {
