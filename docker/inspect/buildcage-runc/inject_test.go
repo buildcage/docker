@@ -339,6 +339,29 @@ func TestInjectFallsBackWhenTheAncestorCannotBeBound(t *testing.T) {
 	}
 }
 
+// Without an outer directory that cannot be bound, the groups under it still
+// fold together: here /etc conflicts with a BuildKit mount, and /etc/ssl takes
+// the store in rather than losing to it.
+func TestInjectFoldsWhatIsLeftUnderAnAncestorItCannotBind(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"SSL_CERT_FILE=/etc/corp.pem", "NODE_EXTRA_CA_CERTS=/etc/ssl/corp.pem"})
+	mountAt(t, bundle, "/etc/hosts")
+	mustWriteFile(t, filepath.Join(rootfs, "etc", "corp.pem"), "ETC\n")
+	mustWriteFile(t, filepath.Join(rootfs, "etc", "ssl", "corp.pem"), "SSL\n")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = restore.finish() }()
+
+	mounts := loadMounts(t, bundle)
+	if hasMount(mounts, "/etc") || hasMount(mounts, "/etc/ssl/certs") {
+		t.Errorf("got mounts %v, want only /etc/ssl bound", mounts)
+	}
+	mirrorHolds(t, mounts, "/etc/ssl", "corp.pem", "certs/ca-certificates.crt")
+}
+
 // A relative value is read by the tool from its working directory, which is
 // the step's WORKDIR unless the step changes it.
 func TestInjectResolvesARelativeVariableFromTheWorkingDirectory(t *testing.T) {

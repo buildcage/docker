@@ -249,30 +249,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 
 	plan := planCATrust(s, ca, store)
 
-	var binds []*dirBind
-	groups := groupTargetsByBind(plan.targets, store)
-	merged, parts := mergeNestedGroups(groups)
-	for _, hostDir := range bindDirsInOrder(merged, store) {
-		if b := prepareBind(s, bundle, hostDir, merged[hostDir], ca, bindLimit(hostDir, parts[hostDir], store), false); b != nil {
-			binds = append(binds, b)
-			continue
-		}
-		if len(parts[hostDir]) < 2 {
-			continue
-		}
-		// The directories folded into this one are bound on their own instead,
-		// the store first, so only this one's own targets go without the CA.
-		logf("binding the CA targets under %s separately", containerPathOf(s.rootfs, hostDir))
-		separate := map[string][]string{}
-		for _, dir := range parts[hostDir] {
-			separate[dir] = groups[dir]
-		}
-		for _, dir := range bindDirsInOrder(separate, store) {
-			if b := prepareBind(s, bundle, dir, groups[dir], ca, bindLimit(dir, nil, store), false); b != nil {
-				binds = append(binds, b)
-			}
-		}
-	}
+	binds := bindTargets(s, bundle, groupTargetsByBind(plan.targets, store), ca, store)
 
 	// A JVM already in the base image reads only its own keystores, neither the
 	// system store nor the CA-trust variables, so the CA goes into each too (see
@@ -310,6 +287,32 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	}
 
 	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, nss: nss, createdOwnCA: plan.createdOwnCA, created: created, upper: upper}, nil
+}
+
+// bindTargets binds each group of CA targets, nested groups folded into the
+// outermost. An outer directory that cannot be bound is dropped, its own
+// targets going without the CA, and the groups folded into it are bound the
+// same way without it.
+func bindTargets(s *spec, bundle string, groups map[string][]string, ca []byte, store systemStore) []*dirBind {
+	var binds []*dirBind
+	merged, parts := mergeNestedGroups(groups)
+	for _, hostDir := range bindDirsInOrder(merged, store) {
+		if b := prepareBind(s, bundle, hostDir, merged[hostDir], ca, bindLimit(hostDir, parts[hostDir], store), false); b != nil {
+			binds = append(binds, b)
+			continue
+		}
+		inner := map[string][]string{}
+		for _, dir := range parts[hostDir] {
+			if dir != hostDir {
+				inner[dir] = groups[dir]
+			}
+		}
+		if len(inner) > 0 {
+			logf("binding the CA targets under %s without it", containerPathOf(s.rootfs, hostDir))
+			binds = append(binds, bindTargets(s, bundle, inner, ca, store)...)
+		}
+	}
+	return binds
 }
 
 // bindLimit is what prepare holds hostDir to: nothing for the store directory
