@@ -215,10 +215,14 @@ describe("runReportAction and the blocked outcome", () => {
 
 describe("runReportAction's fail_on_blocked fallback", () => {
   /** Runs without deps.failOnBlocked, so the action input is consulted. */
-  async function runReadingInput(value?: string): Promise<number | string | undefined> {
+  async function runReadingInput(
+    value?: string,
+  ): Promise<{ exitCode: number | string | undefined; lines: string[] }> {
     const previousInput = process.env.INPUT_FAIL_ON_BLOCKED;
     const previousExit = process.exitCode;
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    // core.warning writes here rather than through console.log.
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     try {
       if (value === undefined) delete process.env.INPUT_FAIL_ON_BLOCKED;
       else process.env.INPUT_FAIL_ON_BLOCKED = value;
@@ -228,24 +232,40 @@ describe("runReportAction's fail_on_blocked fallback", () => {
         docker: fakeDocker(),
         env: {},
       });
-      return process.exitCode;
+      return { exitCode: process.exitCode, lines: stdout.mock.calls.map((c) => String(c[0])) };
     } finally {
       log.mockRestore();
+      stdout.mockRestore();
       process.exitCode = previousExit;
       if (previousInput === undefined) delete process.env.INPUT_FAIL_ON_BLOCKED;
       else process.env.INPUT_FAIL_ON_BLOCKED = previousInput;
     }
   }
 
-  it("reads the input when the action supplied one", async () => {
-    expect(await runReadingInput("false")).toBe(0);
-    expect(await runReadingInput("true")).toBe(1);
+  it.each([
+    { value: "false", exitCode: 0 },
+    { value: "False", exitCode: 0 },
+    { value: "FALSE", exitCode: 0 },
+    { value: "true", exitCode: 1 },
+    { value: "True", exitCode: 1 },
+    { value: "TRUE", exitCode: 1 },
+  ])("reads $value as the action supplied it", async ({ value, exitCode }) => {
+    expect((await runReadingInput(value)).exitCode).toBe(exitCode);
   });
 
   // The integration scripts and the Makefile's report targets run the script
-  // without action.yml's defaults, so getBooleanInput throws on the unset
-  // input rather than returning one.
+  // without action.yml's defaults.
   it("falls back to action.yml's own default when the input is absent", async () => {
-    expect(await runReadingInput()).toBe(1);
+    const { exitCode, lines } = await runReadingInput();
+    expect(exitCode).toBe(1);
+    expect(lines.some((l) => l.startsWith("::warning::"))).toBe(false);
+  });
+
+  it.each(["no", "0", "off"])("fails closed on %o, with a warning", async (value) => {
+    const { exitCode, lines } = await runReadingInput(value);
+    expect(exitCode).toBe(1);
+    expect(lines).toContain(
+      `::warning::fail_on_blocked must be true or false, not "${value}". Reading it as true.\n`,
+    );
   });
 });

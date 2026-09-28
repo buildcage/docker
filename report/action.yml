@@ -22,7 +22,7 @@ inputs:
   traffic_artifact_retention_days:
     description: >-
       How long to keep that artifact, in days. Empty uses the repository's own default, and a value
-      above the repository maximum is refused by GitHub.
+      above the repository maximum is lowered to it, with a warning.
     required: false
     default: ""
 
