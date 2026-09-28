@@ -97,8 +97,8 @@ make test_integration_buildkit_listener_scope
 
 `make help` lists every target. `make test_integration_buildkit` runs all of them, and CI runs each
 in its own job (`.github/workflows/test-integration.yml`), with a check that none is left out. The
-one difference is the architecture they build for: `TEST_PLATFORM` is `linux/arm64` for the development
-machines, and CI overrides it with the runner's own.
+one difference is the architecture they build for: `TEST_PLATFORM` is `linux/arm64` for the
+development machines, and CI overrides it with the runner's own.
 
 ### Unit test coverage
 

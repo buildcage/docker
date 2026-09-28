@@ -211,7 +211,7 @@ report_buildkit: ## Show the buildcage report for the currently running builder
 
 .PHONY: test_integration_buildkit
 # Read from the definitions below, so a new target needs no second list.
-INTEGRATION_TARGETS := $(shell sed -nE 's/^(test_integration_buildkit_[a-z_]+):.*/\1/p' $(firstword $(MAKEFILE_LIST)))
+INTEGRATION_TARGETS := $(shell sed -nE 's/^(test_integration_buildkit_[a-z0-9_]+):.*/\1/p' $(firstword $(MAKEFILE_LIST)))
 test_integration_buildkit: $(INTEGRATION_TARGETS) ## Run all buildkit integration tests
 
 # The target that verifies post.ts removed the builder. The targets below run

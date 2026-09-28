@@ -267,9 +267,12 @@ jobs:
 
       - name: Compare the Makefile's integration targets with this workflow's
         run: |
-          diff \
+          if ! diff \
             <(make -s --eval 'print_targets: ; @printf "%s\n" $(INTEGRATION_TARGETS)' print_targets | sort) \
-            <(grep -oE 'test_integration_buildkit_[a-z_]+' .github/workflows/test-integration.yml | sort -u)
+            <(grep -oE '(target:|make) test_integration_buildkit_[a-z0-9_]+' .github/workflows/test-integration.yml | awk '{print $2}' | sort -u); then
+            echo "::error::< lines are Makefile targets no job runs; > lines are jobs with no Makefile target."
+            exit 1
+          fi
 
   # Single, stably-named required status check for branch protection: the
   # `test` job's own name varies per matrix entry (test (universal-audit),
