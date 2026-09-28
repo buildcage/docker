@@ -426,8 +426,9 @@ reported as blocked; see
   RUN go build                                                      # fine
   ```
 
-- A copy of the CA left in a step's layer is removed, or fails the build if it cannot be
-  (`fail_on_ca_residue: false` makes that a warning, see
+- A copy of the CA left in a step's layer is removed, or fails the build if it cannot be, as in a
+  JKS keystore sealed with a password other than `changeit` (`fail_on_ca_residue: false` makes
+  that a warning, see
   [CA residue](./docs/reference.md#ca-residue)). A copy that cannot be read, in a compressed archive or a keystore encrypted under a password other than
   none or `changeit` or naming more than a million key-derivation iterations, is not found and stays
   in the image, as is one hex-dumped or re-encoded as base64 outside a PEM block in lines shorter
