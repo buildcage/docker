@@ -8,7 +8,7 @@ echo ""
 echo "=== Inspect Proxy Engine Assertions (audit) ==="
 echo ""
 
-echo "[audit records everything, with no rules configured]:"
+echo "[audit records everything, whatever the rules allow]:"
 assert_logged GET "https://allowed.example.com/public/pkg.tgz" 200
 assert_logged POST "https://api.example.com/v1/thing" 200
 assert_logged GET "https://allowed.example.com:9443/private/secret" 200
@@ -22,6 +22,14 @@ if grep -qE "^buildcage [0-9]+ https? [A-Z]+ (403|502) " <<< "$LOGS"; then
   grep -E "(403|502) " <<< "$LOGS" || true
 else
   pass "no request was refused"
+fi
+echo ""
+
+echo "[a rule naming an address exempts it from the internal-address guard in audit too]:"
+if docker compose exec builder grep -qF "set-var(txn.named_address) bool(true)" /etc/haproxy/haproxy.cfg; then
+  pass "GET http://10.200.0.100/pub-by-addr/** carried its exemption into haproxy.cfg"
+else
+  fail "no address exemption in haproxy.cfg, so audit refuses what restrict allows"
 fi
 echo ""
 

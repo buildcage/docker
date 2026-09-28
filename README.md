@@ -169,7 +169,8 @@ If you forget a domain the build needs, `restrict` blocks it and the report step
 destination named, which is why it is worth running `audit` first.
 
 `audit` also lets a connection made straight to an address through. Under `universal` that includes
-cloud metadata (`169.254.169.254`) and the runner's own addresses; `inspect` still refuses those.
+cloud metadata (`169.254.169.254`) and the runner's own addresses; `inspect` still refuses those
+unless a rule names the address as its host.
 
 ### Rules for the `inspect` engine
 

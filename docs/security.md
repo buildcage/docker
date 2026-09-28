@@ -142,7 +142,7 @@ Two consequences worth knowing:
   addresses rather than the real host's.
 
 This guard is about a _name_ landing somewhere it never should. A rule whose host is a literal
-address, such as `169.254.169.254:80`, is exempt for the requests that rule itself allows. A
+address, such as `169.254.169.254:80`, exempts the requests it matches, in `audit` too. A
 wildcard or regex that merely admits the address, `**:80` or `~^.*:80$`, is not. Reaching a cloud
 metadata endpoint directly, the way any AWS or GCP SDK does, is not what this is meant to stop, and
 `allowed_ip_rules` is the intended path for it.

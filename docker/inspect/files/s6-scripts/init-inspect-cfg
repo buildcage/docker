@@ -65,17 +65,6 @@ mkdir -p /etc/haproxy/rules
 } | sort -u > "$HOST_ADDR_FILE"
 echo "init-inspect-cfg: guarded runner addresses=$(tr '\n' ' ' < "$HOST_ADDR_FILE")"
 
-# audit has no allowlist to pass on; the generators decide what the mode means.
-if [ "$PROXY_MODE" = "audit" ]; then
-    HTTPS_RULES=""
-    HTTP_RULES=""
-    URL_RULES=""
-else
-    HTTPS_RULES="$ALLOWED_HTTPS_RULES"
-    HTTP_RULES="$ALLOWED_HTTP_RULES"
-    URL_RULES="$ALLOWED_URL_RULES"
-fi
-
 # Only the integration tests name an upstream; when it is unset, HAProxy reads
 # the container's own /etc/resolv.conf, so a name resolves against the runner's
 # own DNS rather than a hardcoded public one. Each entry is substituted into
@@ -95,6 +84,8 @@ else
     echo "init-inspect-cfg: resolver=$UPSTREAM_RESOLVERS"
 fi
 
+# The rules go through in audit too. They allow nothing there, but one that
+# names an address still exempts that address from the internal-address guard.
 qjs --std -m /opt/buildcage/scripts/gen-configs.js \
     /etc/haproxy/haproxy.cfg \
     /etc/coredns/Corefile \
@@ -102,10 +93,10 @@ qjs --std -m /opt/buildcage/scripts/gen-configs.js \
     "$HOST_ADDR_FILE" \
     "$UPSTREAM_RESOLVERS" \
     "${PROXY_MODE:-restrict}" \
-    "$HTTPS_RULES" \
-    "$HTTP_RULES" \
+    "$ALLOWED_HTTPS_RULES" \
+    "$ALLOWED_HTTP_RULES" \
     "$ALLOWED_IP_RULES" \
     "$ALLOWED_TLS_RULES" \
-    "$URL_RULES"
+    "$ALLOWED_URL_RULES"
 
 echo "init-inspect-cfg: configuration generated"
