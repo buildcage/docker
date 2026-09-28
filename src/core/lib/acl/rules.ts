@@ -2,6 +2,7 @@ import { ActionError, errorMessage } from "../errors.ts";
 import { generateCorednsConfig } from "./coredns-config.ts";
 import { generateHaproxyConfig } from "./haproxy-config.ts";
 import { compileRuleSet, type RuleInputs } from "./haproxy-rules.ts";
+import { IPV4_OR_CIDR, OCTET_RE } from "./ipv4.ts";
 import { buildUrlRules, type UrlRule } from "./url-rules.ts";
 import { parseAndValidateKnownBlockedRules, parseAndValidateRules } from "./wildcard-rules.ts";
 
@@ -69,6 +70,12 @@ export function checkRulesCompileOrThrow(inputs: RuleInputs): void {
  */
 const IP_RULE_HOST = /^[0-9.*?/]+$/;
 
+/** A wildcard octet stands for any value, so only the literal ones are checked. */
+function isIpRuleAddress(host: string): boolean {
+  if (!/[*?]/.test(host)) return IPV4_OR_CIDR.test(host);
+  return host.split(".").every((octet) => /[*?]/.test(octet) || OCTET_RE.test(octet));
+}
+
 /**
  * parseRulesOrThrow for `allowed_ip_rules`, which also refuses a rule that
  * names a host rather than an address.
@@ -77,11 +84,19 @@ export function parseIpRulesOrThrow(rulesInput: string | undefined): string[] {
   const rules = parseRulesOrThrow(rulesInput);
   for (const rule of rules) {
     if (rule.startsWith("~")) continue;
-    if (!IP_RULE_HOST.test(rule.slice(0, rule.lastIndexOf(":")))) {
+    const host = rule.slice(0, rule.lastIndexOf(":"));
+    if (!IP_RULE_HOST.test(host)) {
       throw new InvalidRulesError(
         `IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against ` +
           `the address a connection goes to; allow a name with allowed_https_rules or ` +
           `allowed_http_rules instead.`,
+        "INVALID_RULES",
+      );
+    }
+    if (!isIpRuleAddress(host)) {
+      throw new InvalidRulesError(
+        `IP rule "${rule}" is not an IPv4 address: write each octet as a decimal from 0 to 255 ` +
+          `without a leading zero (10.0.0.1, not 010.0.0.1), and a CIDR prefix from 0 to 32.`,
         "INVALID_RULES",
       );
     }

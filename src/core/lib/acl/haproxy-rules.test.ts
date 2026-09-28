@@ -118,6 +118,14 @@ describe("ip rule compilation", () => {
     expect(compileRuleSet({ ipRules: ["10.0.0.0/24:5432"] }).ip[0].address).toBe("10.0.0.0/24");
   });
 
+  for (const rule of ["010.0.0.0/8:5432", "999.1.1.1:443", "10.0.0.0/33:443"]) {
+    it(`warns and drops ${rule}, which HAProxy would misread or reject`, () => {
+      const set = compileRuleSet({ ipRules: [rule] });
+      expect(set.ip.length).toBe(0);
+      expect(set.warnings.length).toBe(1);
+    });
+  }
+
   it("matches a ~regex ip rule's address and port as one expression", () => {
     const [rule] = compileRuleSet({ ipRules: ["~^192\\.168\\.1\\.\\d+:(8080|8081)$"] }).ip;
     expect(rule.hostMatch).toBe("hostPort");

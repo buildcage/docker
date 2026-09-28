@@ -73,8 +73,8 @@ function rejectGluedHash(rule) {
 	if (rule.includes("#")) throw Error(`Invalid rule ${JSON.stringify(rule)}: a "#" starts a comment only with a space before it, and "#" is never part of a host or URL, so a rule cannot contain one.`);
 }
 //#endregion
-//#region src/core/lib/acl/partial-wildcard.ts
-const REGEX_META = /[.+^$()[\]{}|\\]/g, DOMAIN = {
+//#region src/core/lib/acl/ipv4.ts
+const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[12]?[0-9])", IPV4 = `${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}`, OCTET_RE = RegExp(`^${OCTET}$`), IPV4_OR_CIDR = RegExp(`^${IPV4}(?:/${PREFIX})?$`), IPV4_CIDR = RegExp(`^${IPV4}/${PREFIX}$`), REGEX_META = /[.+^$()[\]{}|\\]/g, DOMAIN = {
 	across: ".+",
 	within: "[^.]+",
 	single: "[^.]"
@@ -351,9 +351,12 @@ function parseAndValidateKnownBlockedRules(rulesInput) {
 function convertRule(rule) {
 	return rule.startsWith("~") ? (splitRawRegexHost(rule), anchorRawRegex(rule.slice(1))) : `^${wildcardToRegex(rule)}$`;
 }
-const IPV4_CIDR = /^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/;
 function domainToRegex(domain) {
-	return IPV4_CIDR.test(domain) ? domain.replace(/\./g, "\\.") : domain.split(".").map((part) => {
+	if (/^[\d.]+\/\d+$/.test(domain)) {
+		if (!IPV4_CIDR.test(domain)) throw Error(`Invalid CIDR block "${domain}": each octet is a decimal from 0 to 255 without a leading zero, and the prefix is 0 to 32`);
+		return domain.replace(/\./g, "\\.");
+	}
+	return domain.split(".").map((part) => {
 		if (checkHostLabel(part, domain), part === "**") return ".+";
 		if (part === "*") return "[^.]+";
 		if (part.includes("*")) throw Error(`Invalid wildcard in "${domain}": part "${part}" mixes "*" with other characters`);
@@ -7260,7 +7263,7 @@ function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue,
 }
 //#endregion
 //#region src/core/lib/acl/haproxy-rules.ts
-const IPV4_OR_CIDR = /^\d{1,3}(?:\.\d{1,3}){3}(?:\/\d{1,2})?$/, OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`, INTERNAL_RANGES = [
+const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`, INTERNAL_RANGES = [
 	"0.0.0.0/8",
 	"127.0.0.0/8",
 	"169.254.0.0/16",
@@ -7941,9 +7944,17 @@ function checkRulesCompileOrThrow(inputs) {
 	}
 }
 const IP_RULE_HOST = /^[0-9.*?/]+$/;
+function isIpRuleAddress(host) {
+	return /[*?]/.test(host) ? host.split(".").every((octet) => /[*?]/.test(octet) || OCTET_RE.test(octet)) : IPV4_OR_CIDR.test(host);
+}
 function parseIpRulesOrThrow(rulesInput) {
 	let rules = parseRulesOrThrow(rulesInput);
-	for (let rule of rules) if (!rule.startsWith("~") && !IP_RULE_HOST.test(rule.slice(0, rule.lastIndexOf(":")))) throw new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against the address a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
+	for (let rule of rules) {
+		if (rule.startsWith("~")) continue;
+		let host = rule.slice(0, rule.lastIndexOf(":"));
+		if (!IP_RULE_HOST.test(host)) throw new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against the address a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
+		if (!isIpRuleAddress(host)) throw new InvalidRulesError(`IP rule "${rule}" is not an IPv4 address: write each octet as a decimal from 0 to 255 without a leading zero (10.0.0.1, not 010.0.0.1), and a CIDR prefix from 0 to 32.`, "INVALID_RULES");
+	}
 	return rules;
 }
 function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
