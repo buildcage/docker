@@ -88,6 +88,21 @@ describe("describeReportOutcomes", () => {
     );
   });
 
+  it("warns for universal too, whose HTTP stage logs a connection that sent no request", () => {
+    const unnamed: TrafficEvent = {
+      time: 1787471975,
+      action: "incomplete",
+      protocol: "http",
+      host: "(unknown)",
+      port: 25,
+      reason: "client-aborted",
+    };
+    const outcomes = describeReportOutcomes(universal({ timeline: [unnamed] }), options);
+    expect(outcomes.length).toBe(2);
+    expect(outcomes[1].level).toBe("warning");
+    expect(outcomes[1].shouldFail).toBe(false);
+  });
+
   it("counts a client-ended close to a host that completed nothing, as it shows it", () => {
     // Nothing else reached the host, so the close is kept and summarised.
     const clientAborted: TrafficEvent = { ...incomplete, reason: "client-aborted" };

@@ -21,19 +21,18 @@ const SAMPLES: Record<string, string> = {
   "%[var(txn.target)]": "github.com:443",
   "%[var(txn.reason)]": "-",
   "%[dst]": "198.19.255.1",
-  "%[dst_port]": "22",
+  "%[dst_port]": "80",
   "%B": "708",
+  "%ts": "--",
 };
 
 const TOKEN = /%(?:\[[^\]]*\]|[A-Za-z]+)/g;
 
-/** The one `<directive> "..."` line in the template, unquoted. */
-function format(directive: string): string {
-  const lines = TEMPLATE.split("\n").filter((l) => l.trim().startsWith(`${directive} "`));
-  expect(lines.length).toBe(1);
-  const [line] = lines;
-  return line.slice(line.indexOf('"') + 1, line.lastIndexOf('"')).replaceAll('\\"', '"');
-}
+/** The log-format strings in the template, unquoted, in config order. */
+const FORMATS = TEMPLATE.split("\n")
+  .filter((l) => l.trim().startsWith('log-format "'))
+  .map((l) => l.slice(l.indexOf('"') + 1, l.lastIndexOf('"')).replaceAll('\\"', '"'));
+const [OUTBOUND, HTTP_IN] = FORMATS;
 
 function render(fmt: string, overrides: Record<string, string> = {}): string {
   return fmt.replace(TOKEN, (token) => {
@@ -43,9 +42,21 @@ function render(fmt: string, overrides: Record<string, string> = {}): string {
   });
 }
 
+/** What http_in prints where no request parsed: no rule set a variable. */
+const NO_REQUEST = {
+  "%[var(txn.decision)]": "-",
+  "%[var(txn.target)]": "-",
+  "%[var(txn.reason)]": "-",
+  "%B": "0",
+};
+
 describe("the universal template's log formats and this parser describe the same line", () => {
+  it("has one format for outbound_proxy and one for http_in", () => {
+    expect(FORMATS.length).toBe(2);
+  });
+
   it("reads every field of a decision line back out of where it was written", async () => {
-    const { events, unparsed } = await scanHaproxyLog([render(format("log-format"))], false);
+    const { events, unparsed } = await scanHaproxyLog([render(OUTBOUND)], false);
     expect(unparsed).toBe(0);
     expect(events).toStrictEqual([
       {
@@ -59,14 +70,46 @@ describe("the universal template's log formats and this parser describe the same
     ]);
   });
 
-  // HAProxy writes this one for bytes it could not read as HTTP, before any
-  // txn variable is set: ssh or git:// to a name, say.
-  it("reads the error line as a refusal of an unnamed host, in either mode", async () => {
+  it("reads a request http_in decided the same way", async () => {
+    const line = render(HTTP_IN, {
+      "%[var(txn.decision)]": "BLOCKED",
+      "%[var(txn.target)]": "evil.example.com:80",
+      "%[var(txn.reason)]": "not-allowed",
+      "%B": "0",
+      "%ts": "PR",
+    });
+    const { events, unparsed } = await scanHaproxyLog([line], false);
+    expect(unparsed).toBe(0);
+    expect(events).toStrictEqual([
+      {
+        time: 1787471975.123,
+        action: "block",
+        protocol: "http",
+        host: "evil.example.com",
+        port: 80,
+        reason: "not-allowed",
+      },
+    ]);
+  });
+
+  it("names no host for a request with no Host, whose target is the address", async () => {
+    const line = render(HTTP_IN, {
+      "%[var(txn.decision)]": "BLOCKED",
+      "%[var(txn.target)]": "198.19.255.1:80",
+      "%[var(txn.reason)]": "missing-host-header",
+      "%B": "0",
+      "%ts": "PR",
+    });
+    const [e] = (await scanHaproxyLog([line], false)).events;
+    expect(e.host).toBe("(unknown)");
+    expect(e.reason).toBe("missing-host-header");
+  });
+
+  // ssh or git:// to a name: bytes haproxy would not read as a request.
+  it("reads bytes refused as no request as a refusal, in either mode", async () => {
     for (const isAudit of [false, true]) {
-      const { events, unparsed } = await scanHaproxyLog(
-        [render(format("error-log-format"), { "%B": "0" })],
-        isAudit,
-      );
+      const line = render(HTTP_IN, { ...NO_REQUEST, "%ts": "PR", "%[dst_port]": "22" });
+      const { events, unparsed } = await scanHaproxyLog([line], isAudit);
       expect(unparsed).toBe(0);
       expect(events).toStrictEqual([
         {
@@ -79,6 +122,17 @@ describe("the universal template's log formats and this parser describe the same
         },
       ]);
     }
+  });
+
+  // A client that waits for the server to speak first, or opens a connection
+  // and never uses it.
+  it("reads a connection the client ended before any request as undecided", async () => {
+    const line = render(HTTP_IN, { ...NO_REQUEST, "%ts": "CR", "%[dst_port]": "25" });
+    const [e] = (await scanHaproxyLog([line], false)).events;
+    expect(e.action).toBe("incomplete");
+    expect(e.reason).toBe("client-aborted");
+    expect(e.host).toBe("(unknown)");
+    expect(e.port).toBe(25);
   });
 
   it("refuses to render a field it has never been shown", () => {

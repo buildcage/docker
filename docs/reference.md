@@ -426,11 +426,13 @@ resolve.
 
 ## Requests that never arrived whole
 
-Under `inspect`, a connection can end before a whole request has arrived. What the report does with
-one turns on who ended it: a client that walks away decided nothing, while bytes Buildcage refused to
-read as a request are a refusal like any other.
+A connection can end before a whole request has arrived. What the report does with one turns on who
+ended it: a client that walks away decided nothing, while bytes Buildcage refused to read as a
+request are a refusal like any other.
 
-Whichever it was, the host is the name from the handshake's SNI. Without one, the address the
+Under `universal`, only a plaintext connection made through a name gets this far, and nothing names
+it before its request does, so its host reads `(unknown)`. Under `inspect`, the host is the name
+from the handshake's SNI. Without one, the address the
 connection was sent to stands in, and the row's rule type reads `IP`: an address the build wrote out
 itself is one only `allowed_ip_rules` could have passed through. The exception is Buildcage's own
 address, where every name-based connection lands because the resolver answers each name with it.
@@ -500,10 +502,10 @@ name from the SNI or an address; a row reading `(unknown)` names nothing a rule 
 against, so the passthrough rule is the only way to clear that one.
 
 Under `universal`, a connection made through a name that is not a TLS handshake is read as HTTP in
-the same way, so ssh or `git://` to a name is refused as `bad-request`, in `audit` too. Its host
-reads `(unknown)`, as a `missing-host-header` row's does: all the log has is the proxy's own
-address. `universal` has no `allowed_tls_rules` and matches `allowed_ip_rules` against the address
-only, so the build has to connect to the address itself, with an `allowed_ip_rules` entry for it.
+the same way, so ssh or `git://` to a name is refused as `bad-request`, in `audit` too, and a client
+waiting for the server to speak first (SMTP, FTP) ends as one nobody decided. `universal` has no
+`allowed_tls_rules` and matches `allowed_ip_rules` against the address only, so for either the build
+has to connect to the address itself, with an `allowed_ip_rules` entry for it.
 
 ## Connections that failed
 

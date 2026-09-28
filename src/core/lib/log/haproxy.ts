@@ -2,6 +2,7 @@
 import { splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
+import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
 import type { TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 
 export interface HaproxyLogScan {
@@ -23,9 +24,16 @@ export interface HaproxyLogScan {
 // The quoted target and the reason are restricted to the charset the config
 // actually emits (host/IP/port, and a kebab-case reason), and the line is
 // anchored at both ends, so a forged target or reason is never read as a
-// decision. The last field is %B, a byte count (`-` if the field is empty).
+// decision. The next field is %B, a byte count (`-` if the field is empty).
+// http_in appends its termination state and destination, which only a line
+// with no request in it needs.
 const DECISION =
-  /^buildcage (\d+) \[(AUDIT|ALLOWED|BLOCKED)\] \((\w+)\) "([A-Za-z0-9._:-]+)" ([A-Za-z0-9-]+) (\d+|-)$/;
+  /^buildcage (\d+) \[(AUDIT|ALLOWED|BLOCKED)\] \((\w+)\) "([A-Za-z0-9._:-]+)" ([A-Za-z0-9-]+) (\d+|-)(?: ts=[A-Za-z-]{2} dst=[0-9.]+:\d+)?$/;
+
+/** http_in's line for a connection no request parsed on: no rule ran, so every
+ *  field a rule sets is empty. */
+const NO_REQUEST =
+  /^buildcage (\d+) \[-\] \(HTTP\) "-" - (?:\d+|-) ts=([A-Za-z-]{2}) dst=([0-9.]+):(\d+)$/;
 
 /** Every line the proxy writes opens with this; used to count unparsed ones. */
 const LINE_PREFIX = "buildcage ";
@@ -50,6 +58,12 @@ const PROTOCOL: Record<string, TrafficProtocol> = {
  */
 const FAILURE_REASONS = new Set(["dns-failed"]);
 
+/** A line that names no host falls back to the address the connection was sent
+ *  to, and every name resolves to the proxy's own, which names nothing. */
+function hostOf(address: string): string {
+  return address === PROXY_ADDRESS ? UNKNOWN_HOST : address;
+}
+
 /**
  * Single forward pass over the log, producing the timeline the report builds
  * its tables and Communication details from. `isAudit` picks which decision
@@ -73,10 +87,7 @@ export async function scanHaproxyLog(
       const [, ms, decision, ruleType, target, reason, bytes] = m;
       if (decision !== passedDecision && decision !== "BLOCKED") continue;
       const { host: address, port } = splitHostPort(target);
-      // A line that names no host falls back to the address the connection
-      // was sent to, and every name resolves to the proxy's own: a request
-      // with no Host, or bytes that were never a request (error-log-format).
-      const host = address === PROXY_ADDRESS ? UNKNOWN_HOST : address;
+      const host = hostOf(address);
       const failed = decision === "BLOCKED" && FAILURE_REASONS.has(reason);
       const refused = decision === "BLOCKED" && !failed;
       const event: TrafficEvent = {
@@ -91,6 +102,22 @@ export async function scanHaproxyLog(
       if (refused || failed) event.reason = reason;
       else if (bytes !== "-") event.bytes = Number(bytes);
       events.push(event);
+      continue;
+    }
+    const none = NO_REQUEST.exec(line);
+    if (none) {
+      headIntact ??= false;
+      const [, ms, terminationState, address, port] = none;
+      const ended = incompleteReason(terminationState, BAD_REQUEST_METHOD);
+      events.push({
+        time: Number(ms) / 1000,
+        // Blocked in audit too: bytes that are no request have nothing to pass on.
+        action: ended === undefined ? "block" : "incomplete",
+        protocol: "http",
+        host: hostOf(address),
+        port: Number(port),
+        reason: ended ?? "bad-request",
+      });
       continue;
     }
     const trimmed = line.trim();

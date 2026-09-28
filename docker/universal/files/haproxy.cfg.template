@@ -133,20 +133,18 @@ frontend outbound_proxy
     tcp-request content accept if is_tls has_sni
 
     # ---------------------------------------------------------
-    # 5. Non-TLS DNS-routed → HTTP backend
+    # 5. Non-TLS DNS-routed → HTTP frontend
     # ---------------------------------------------------------
+    # http_in logs these itself, request by request.
+    tcp-request content set-log-level silent if { var(txn.dns_routed) -m found } !is_tls
     use_backend ip_passthrough if !{ var(txn.dns_routed) -m found }
     use_backend tls_passthrough if is_tls
-    default_backend http_filter_backend
+    default_backend http_relay
 
     # %[date(0,ms)] leads so the report can order the timeline and time each
     # line against the startup marker; %B is the only per-connection detail a
     # passthrough has, seeing no method, URL or status. See log/haproxy.ts.
     log-format "buildcage %[date(0,ms)] [%[var(txn.decision)]] (%[var(txn.rule_type)]) \"%[var(txn.target)]\" %[var(txn.reason)] %B"
-    # Bytes http_filter_backend cannot parse as HTTP (ssh or git:// to a name)
-    # are logged before any txn variable is set, so every field above would be
-    # empty. Blocked in audit too: there is no request to pass on.
-    error-log-format "buildcage %[date(0,ms)] [BLOCKED] (HTTP) \"%[dst]:%[dst_port]\" bad-request %B"
 
 # --- IP direct passthrough backend ---
 backend ip_passthrough
@@ -158,11 +156,31 @@ backend tls_passthrough
     mode tcp
     server cleartext 0.0.0.0:0
 
-# --- HTTP filter backend (L7) ---
-# deny responses leave txn.decision as BLOCKED (set in frontend).
+# --- HTTP frontend (L7) ---
+# Reached through a relay, as inspect's http_in is, rather than by switching
+# outbound_proxy to HTTP: a connection that ends before a request parses is
+# then logged here with its termination state, instead of as a session error
+# that says neither who ended it nor why.
+backend http_relay
+    mode tcp
+    server http_in 127.0.0.1:10026 send-proxy-v2
+
+frontend http_in
+    bind 127.0.0.1:10026 accept-proxy
+    mode http
+    # accept-proxy restores the build's own dst, so the target starts out as
+    # the address the connection was sent to, as it does in outbound_proxy.
+    http-request set-var(txn.decision) str(BLOCKED)
+    http-request set-var(txn.reason) str(-)
+    http-request set-var-fmt(txn.target) %[dst]:%[dst_port]
+    # Where no request parsed, no rule above ran and the fields read `[-] (HTTP)
+    # "-" -`. %ts then says who ended the connection; see log/haproxy.ts.
+    log-format "buildcage %[date(0,ms)] [%[var(txn.decision)]] (HTTP) \"%[var(txn.target)]\" %[var(txn.reason)] %B ts=%ts dst=%[dst]:%[dst_port]"
+    default_backend http_filter_backend
+
+# deny responses leave txn.decision as BLOCKED (set in http_in).
 backend http_filter_backend
     mode http
-    http-request set-var(txn.rule_type) str(HTTP)
 
     acl has_host hdr(host) -m found
     acl host_not_empty hdr_len(host) gt 0

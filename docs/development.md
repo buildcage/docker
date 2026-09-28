@@ -232,17 +232,20 @@ docker compose logs -f builder
 ```
 buildcage 1787471970500 [ALLOWED] (HTTPS) "github.com:443" - 1024
 buildcage 1787471971200 [BLOCKED] (HTTPS) "malicious.com:443" not-allowed 0
-buildcage 1787471972000 [AUDIT] (HTTP) "npmjs.org:80" - 812
-buildcage 1787471973000 [BLOCKED] (HTTP) "198.19.255.1:22" bad-request 0
+buildcage 1787471972000 [AUDIT] (HTTP) "npmjs.org:80" - 812 ts=-- dst=104.16.0.35:80
+buildcage 1787471973000 [-] (HTTP) "-" - 0 ts=PR dst=198.19.255.1:22
 ```
 
 Fields: `buildcage <epoch-ms> [status] (rule) "domain:port" reason bytes`. The
 millisecond epoch orders the timeline and times each line against the startup
-marker; `bytes` is `%B`, the only per-connection detail a passthrough sees. The
-last line comes from `error-log-format`, for bytes that could not be parsed as
-HTTP and so set no variable the other lines are built from. It names the address
-and port the connection was sent to, and the report reads the proxy's own
-address as the host `(unknown)`.
+marker; `bytes` is `%B`, the only per-connection detail a passthrough sees.
+
+A plaintext connection made through a name is relayed to a second frontend,
+`http_in`, which appends haproxy's termination state and the destination. Where
+no request parsed, no rule ran and the fields read `[-] (HTTP) "-" -`; the
+termination state then says who ended it: `PR` is bytes refused as no request
+(`bad-request`), `CR` and `cR` the client closing or timing out (neither
+decided). The report reads the proxy's own address as the host `(unknown)`.
 
 `universal` also reads the resolver's log (`/var/log/coredns`), since a name CoreDNS refused never
 reaches HAProxy at all: it is the only trace of a name looked up but never connected to.

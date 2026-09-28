@@ -91,12 +91,13 @@ describe("scanHaproxyLog", () => {
     expect(events[0].protocol).toBe("tcp");
   });
 
-  it("names no host for bytes sent to the proxy's own address that were never a request", async () => {
+  /** http_in's line for a connection no request parsed on. */
+  const noRequest = (ts: string, dst = "198.19.255.1:22") =>
+    `buildcage 1787471970000 [-] (HTTP) "-" - 0 ts=${ts} dst=${dst}`;
+
+  it("reads bytes the HTTP stage refused as no request as a refusal, in audit too", async () => {
     for (const isAudit of [false, true]) {
-      const { events, unparsed } = await scanHaproxyLog(
-        [line("BLOCKED", "HTTP", "198.19.255.1:22", "bad-request")],
-        isAudit,
-      );
+      const { events, unparsed } = await scanHaproxyLog([noRequest("PR")], isAudit);
       expect(unparsed).toBe(0);
       expect(events).toStrictEqual([
         {
@@ -111,13 +112,36 @@ describe("scanHaproxyLog", () => {
     }
   });
 
-  it("names no host for a request with no Host either", async () => {
+  it("leaves a connection the client ended before a request undecided", async () => {
     const { events } = await scanHaproxyLog(
-      [line("BLOCKED", "HTTP", "198.19.255.1:80", "missing-host-header")],
+      [noRequest("CR"), noRequest("cR"), noRequest("RR")],
       false,
     );
-    expect(events[0].host).toBe("(unknown)");
-    expect(events[0].port).toBe(80);
+    expect(events.map((e) => `${e.action} ${e.reason}`)).toStrictEqual([
+      "incomplete client-aborted",
+      "incomplete client-timeout",
+      "incomplete no-request",
+    ]);
+  });
+
+  it("keeps an address other than the proxy's own as the host", async () => {
+    const [e] = (await scanHaproxyLog([noRequest("PR", "10.0.0.9:25")], false)).events;
+    expect(e.host).toBe("10.0.0.9");
+    expect(e.port).toBe(25);
+  });
+
+  it("reads a decided line from the HTTP stage, ignoring what it appends", async () => {
+    const { events, unparsed } = await scanHaproxyLog(
+      [
+        `${line("BLOCKED", "HTTP", "198.19.255.1:80", "missing-host-header")} ts=PR dst=198.19.255.1:80`,
+        `${line("ALLOWED", "HTTP", "a.com:80", "-", 12)} ts=-- dst=198.19.255.1:80`,
+      ],
+      false,
+    );
+    expect(unparsed).toBe(0);
+    expect(
+      events.map((e) => `${e.action} ${e.host}:${e.port} ${e.reason ?? e.bytes}`),
+    ).toStrictEqual(["block (unknown):80 missing-host-header", "allow a.com:80 12"]);
   });
 
   it("keeps an address the build wrote out itself as the host", async () => {
@@ -128,9 +152,9 @@ describe("scanHaproxyLog", () => {
     expect(events[0].host).toBe("198.19.255.10");
   });
 
-  it("counts a line whose every field is empty as unparsed", async () => {
-    // What the proxy wrote for bytes it could not read as a request before it
-    // had an error-log-format; no destination or reason survives in it.
+  it("counts a line whose every field is empty but carries no state as unparsed", async () => {
+    // Nothing says who ended it or where it was going, so it is not read as
+    // anything at all.
     const { events, unparsed } = await scanHaproxyLog(
       ['buildcage 1790532433493 [-] (-) "-" - 0'],
       false,
