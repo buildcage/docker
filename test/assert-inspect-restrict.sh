@@ -214,6 +214,23 @@ else
 fi
 echo ""
 
+echo "[SNI holding a colon] never passed through, whatever a ~ rule's port pattern matches:"
+if grep -qE "^buildcage [0-9]+ pass .* sni=tlsany" <<< "$LOGS"; then
+  fail "an SNI holding a colon was passed through"
+else
+  pass "no passthrough was recorded for it"
+fi
+echo ""
+
+echo "[Host holding a colon] refused before any rule or resolution:"
+if grep -qE "^buildcage [0-9]+ http GET 400 [0-9]+ ts=PR reason=invalid-host tlserr=\S+ dst=\S+ host=anyport\.example\.com:x\.evil\.example\.net:80 /public/x$" <<< "$LOGS"; then
+  pass "refused as invalid-host"
+else
+  fail "no invalid-host refusal recorded"
+  grep -E "anyport" <<< "$LOGS" || true
+fi
+echo ""
+
 echo "[Regex IP rule] a ~regex allowed_ip_rules entry passes through, on its own port:"
 if grep -qE "^buildcage [0-9]+ pass tcp [0-9]+ ts=\S+ reason=\S+ dst=10\.200\.0\.100:9080 sni=-$" <<< "$LOGS"; then
   pass "recorded as an undecrypted tcp passthrough, on the rule's own port"

@@ -14,6 +14,12 @@
 export const HOST_ONLY = "host_only,regsub(\\.$,)";
 
 /**
+ * What an SNI or Host must consist of before a rule may match it. A `:` would
+ * let a `~` rule's port pattern match a name the resolver then looks up.
+ */
+export const HOSTNAME_CHARSET = "^[A-Za-z0-9._-]+$";
+
+/**
  * Escape a rule-derived value for HAProxy's config word parser.
  *
  * Unquoted, the parser drops everything from a `#` to the end of the line, so a

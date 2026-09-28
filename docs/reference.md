@@ -343,7 +343,9 @@ allowed_url_rules: |
 ```
 
 Leave the port out and the rule matches the scheme's default port only, 443 for `https` and 80 for
-`http`; there is no implicit any-port, so write `example\.com:.*` to allow more.
+`http`; there is no implicit any-port, so write `example\.com:\d+` to allow more. An SNI or `Host`
+with anything but letters, digits, `.`, `_` and `-` in it never reaches a rule, even in `audit`
+(see [security.md](security.md#the-proxy-chooses-the-destination-not-the-build)).
 
 A top-level `|` is not supported in either a host rule or a URL rule. The anchors would bind to one
 branch each, and a URL rule's two halves are compiled separately, so a choice spanning them has no

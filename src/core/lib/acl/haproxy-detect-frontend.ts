@@ -1,5 +1,5 @@
 import { internalDstAcl, type InternalDstOptions } from "./haproxy-internal-dst.ts";
-import { escapeForHaproxy } from "./haproxy-matchers.ts";
+import { escapeForHaproxy, HOSTNAME_CHARSET } from "./haproxy-matchers.ts";
 import type { CompiledIpRule, CompiledTlsRule } from "./haproxy-rules.ts";
 
 export interface DetectFrontendSpec extends InternalDstOptions {
@@ -15,6 +15,14 @@ export interface DetectFrontendSpec extends InternalDstOptions {
    * through a name, so no IP rule may pass it through; see detectFrontend.
    */
   proxyAddress?: string;
+}
+
+/**
+ * A tls rule's full condition. An SNI that is not a hostname never passes
+ * through: it goes on to the inspected path, where its Host is judged.
+ */
+function tlsCond(host: CompiledTlsRule): string {
+  return `${host.id}_sni${host.port ? ` ${host.id}_port` : ""} sni_is_name`;
 }
 
 /**
@@ -67,6 +75,9 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
       );
       if (rule.port) l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
     }
+    if (tlsHosts.length > 0) {
+      l.push(`    acl sni_is_name req.ssl_sni -m reg ${HOSTNAME_CHARSET}`);
+    }
     for (const host of tlsHosts) {
       l.push(`    # ${host.raw}`);
       l.push(
@@ -76,7 +87,7 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
       );
       if (host.port) l.push(`    acl ${host.id}_port dst_port ${host.port}`);
     }
-    const tlsConds = tlsHosts.map((h) => `${h.id}_sni${h.port ? ` ${h.id}_port` : ""}`);
+    const tlsConds = tlsHosts.map(tlsCond);
     const conds = [
       ...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""}${notDnsRouted}`),
       ...tlsConds,
@@ -114,9 +125,7 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
         // do-resolve/set-dst that overwrites the connection's destination
         // before the inspected path ever sees it, even though txn.pass
         // (gated on sni+port together) correctly never fires for it.
-        l.push(
-          `    tcp-request content set-var(txn.tlsrule) int(1) if ${host.id}_sni${host.port ? ` ${host.id}_port` : ""}`,
-        );
+        l.push(`    tcp-request content set-var(txn.tlsrule) int(1) if ${tlsCond(host)}`);
       }
       l.push(
         "    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower " +

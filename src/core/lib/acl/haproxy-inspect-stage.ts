@@ -1,5 +1,11 @@
 import { internalDstAcl, type InternalDstOptions } from "./haproxy-internal-dst.ts";
-import { escapeForHaproxy, HOST_ONLY, hostMatcher, pathMatcher } from "./haproxy-matchers.ts";
+import {
+  escapeForHaproxy,
+  HOST_ONLY,
+  HOSTNAME_CHARSET,
+  hostMatcher,
+  pathMatcher,
+} from "./haproxy-matchers.ts";
 import { deniesEverything, ruleBlock } from "./haproxy-rule-block.ts";
 import { HOST_IS_ADDRESS, type CompiledRule } from "./haproxy-rules.ts";
 
@@ -125,6 +131,11 @@ export function inspectStage(
     "    # every value while a fetch takes the last, so reading the header twice",
     "    # could judge one value and connect to another.",
     `    http-request set-var(txn.host) req.hdr(host),lower,${HOST_ONLY}`,
+    "    # A `:` left in the name could let a `~` rule's port pattern match it.",
+    "    # Refused in `audit` too.",
+    `    acl host_is_name var(txn.host) -m reg ${HOSTNAME_CHARSET}`,
+    "    http-request set-var(txn.reason) str(invalid-host) if !host_is_name",
+    "    http-request deny deny_status 400 if !host_is_name",
     "",
     "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may",
     "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a",

@@ -88,7 +88,10 @@ A rule matches on the name the request carried, the SNI or the `Host` header. On
 the proxy resolves that name itself and rewrites the destination to the result (`do-resolve` and
 `set-dst`), so the address the build chose is discarded. A forged `Host`, a doctored `/etc/hosts`,
 or an SNI naming one host while the connection aims at another all reach the server the name belongs
-to: destination spoofing is removed rather than detected.
+to: destination spoofing is removed rather than detected. A name with anything but letters, digits,
+`.`, `_` and `-` in it never reaches a rule, in `audit` too: `universal` refuses such an SNI
+(`invalid-sni`), and `inspect` never passes one through and refuses such a `Host` (`invalid-host`).
+A `:` in the name could otherwise let a `~` rule's port pattern match a name the proxy then looks up.
 
 That order is an invariant, not an optimisation. Reversed, resolution would become the exfiltration
 channel the resolver below exists to prevent, so a name a request would be refused for never
