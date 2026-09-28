@@ -34,6 +34,41 @@ func TestGroupTargetsByBind(t *testing.T) {
 	}
 }
 
+// A group under another is folded into the outermost one; siblings, and a
+// directory that only shares a prefix, are not.
+func TestMergeNestedGroups(t *testing.T) {
+	groups := map[string][]string{
+		"/r/etc/ssl":       {"corp.pem"},
+		"/r/etc/ssl/certs": {"ca-certificates.crt"},
+		"/r/opt/a":         {"ca.pem"},
+		"/r/opt/a/b":       {"ca.pem"},
+		"/r/opt/a/b/c":     {"ca.pem"},
+		"/r/opt/ab":        {"ca.pem"},
+	}
+	merged, parts := mergeNestedGroups(groups)
+
+	want := map[string][]string{
+		"/r/etc/ssl": {"certs/ca-certificates.crt", "corp.pem"},
+		"/r/opt/a":   {"b/c/ca.pem", "b/ca.pem", "ca.pem"},
+		"/r/opt/ab":  {"ca.pem"},
+	}
+	if len(merged) != len(want) {
+		t.Fatalf("got %v, want %v", merged, want)
+	}
+	for dir, names := range want {
+		got := merged[dir]
+		slices.Sort(got)
+		if !slices.Equal(got, names) {
+			t.Errorf("%s = %v, want %v", dir, got, names)
+		}
+	}
+	got := parts["/r/opt/a"]
+	slices.Sort(got)
+	if want := []string{"/r/opt/a", "/r/opt/a/b", "/r/opt/a/b/c"}; !slices.Equal(got, want) {
+		t.Errorf("parts of /r/opt/a = %v, want %v", got, want)
+	}
+}
+
 // The store is prepared first so a nesting target never displaces it, and the
 // rest follow in a fixed order rather than map order, so which of two nesting
 // directories wins does not change from run to run.
@@ -349,7 +384,7 @@ func TestPrepareRefusesACustomDirOverTheLimits(t *testing.T) {
 				containerDir: "/custom",
 				scratchDir:   scratch,
 				bundleFiles:  []string{"roots.pem"},
-				custom:       true,
+				limit:        customDirLimit,
 			}
 			if err := b.prepare(testCA); err == nil {
 				t.Fatal("expected prepare to refuse the directory")
@@ -524,7 +559,7 @@ func TestPrepareReportsADirectoryItCannotMeasure(t *testing.T) {
 		containerDir: "/not-there",
 		scratchDir:   scratch,
 		bundleFiles:  []string{"roots.pem"},
-		custom:       true,
+		limit:        customDirLimit,
 	}
 
 	if err := b.prepare(testCA); err == nil {

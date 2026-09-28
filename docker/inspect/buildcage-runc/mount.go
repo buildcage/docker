@@ -37,6 +37,18 @@ const (
 
 var errTooLargeToMirror = errors.New("too large to mirror")
 
+// mirrorLimit bounds a directory prepare mirrors. The zero value checks
+// nothing, for the store directory, which findSystemStore already measured.
+type mirrorLimit struct {
+	bytes int64
+	files int
+}
+
+var (
+	customDirLimit = mirrorLimit{maxCustomDirBytes, maxCustomDirFiles}
+	storeDirLimit  = mirrorLimit{maxStoreDirBytes, maxStoreDirFiles}
+)
+
 // runRsync is the only place this file spawns a process, so tests can
 // replace it to exercise the decision logic without rsync installed.
 var runRsync = func(args []string) ([]byte, error) {
@@ -59,7 +71,7 @@ type dirBind struct {
 	containerDir string
 	scratchDir   string
 	bundleFiles  []string
-	custom       bool
+	limit        mirrorLimit
 	keystore     bool   // bundleFiles are JVM keystores, not PEM bundles
 	ca           []byte // kept so finish can find it again by content
 
@@ -96,6 +108,32 @@ func groupTargetsByBind(targets map[string]bool, store systemStore) map[string][
 		groups[dir] = append(groups[dir], filepath.Base(target))
 	}
 	return groups
+}
+
+// mergeNestedGroups folds each group whose directory is under another group's
+// into the outermost one, with names relative to it, and returns which of the
+// original directories each merged one took in. Two nested binds cannot both be
+// made: the outer one conflicts with the mount the inner one adds, which would
+// leave the outer targets without the CA.
+func mergeNestedGroups(groups map[string][]string) (map[string][]string, map[string][]string) {
+	merged := make(map[string][]string, len(groups))
+	parts := make(map[string][]string, len(groups))
+	for dir, names := range groups {
+		outer := dir
+		for other := range groups {
+			if len(other) < len(outer) && withinDir(dir, other) {
+				outer = other
+			}
+		}
+		for _, name := range names {
+			if outer != dir {
+				name = filepath.Join(strings.TrimPrefix(dir, outer+"/"), name)
+			}
+			merged[outer] = append(merged[outer], name)
+		}
+		parts[outer] = append(parts[outer], dir)
+	}
+	return merged, parts
 }
 
 // bindDirsInOrder prepares the store first, then the rest sorted, so which of
@@ -297,9 +335,8 @@ func restoreUnchangedMtimes(original, current []fileEntry, scratchDir string) er
 
 func (b *dirBind) prepare(ca []byte) error {
 	b.ca = ca
-	// The store directory was checked against its own limits when it was found.
-	if b.custom {
-		if err := checkMirrorable(b.hostDir, maxCustomDirBytes, maxCustomDirFiles); err != nil {
+	if b.limit != (mirrorLimit{}) {
+		if err := checkMirrorable(b.hostDir, b.limit.bytes, b.limit.files); err != nil {
 			return err
 		}
 	}

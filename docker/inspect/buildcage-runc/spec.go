@@ -71,6 +71,16 @@ func (s *spec) processUser() (uid, gid int) {
 	return specInt(user["uid"]), specInt(user["gid"])
 }
 
+// processCwd reads the directory BuildKit starts the step in, its WORKDIR, or
+// / when the spec names none or a relative one.
+func (s *spec) processCwd() string {
+	proc, _ := s.raw["process"].(map[string]any)
+	if cwd, _ := proc["cwd"].(string); filepath.IsAbs(cwd) {
+		return cwd
+	}
+	return "/"
+}
+
 // processGroups reads the supplementary gids BuildKit resolved for the user.
 func (s *spec) processGroups() []int {
 	proc, _ := s.raw["process"].(map[string]any)

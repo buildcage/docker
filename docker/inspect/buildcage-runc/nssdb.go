@@ -167,7 +167,7 @@ func slotNSSDB(s *spec, bundle string, ca []byte, template map[string][]byte, ho
 		hostDir:      hostDir,
 		containerDir: containerDir,
 		scratchDir:   filepath.Join(base, "db"),
-		custom:       true,
+		limit:        customDirLimit,
 		ca:           ca,
 		nssBase:      base,
 	}
