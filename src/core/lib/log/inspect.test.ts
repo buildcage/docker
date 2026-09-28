@@ -394,6 +394,73 @@ describe("scanInspectDnsLog", () => {
   });
 });
 
+describe("a resolver line whose name CoreDNS escaped", () => {
+  // CoreDNS writes a name in presentation format: a space in a label becomes
+  // `\ `, which a name read up to the first space would lose, taking the
+  // refusal and fail_on_blocked with it.
+  const at = (rest: string) => `2026-08-23 16:45:00.000000000  [INFO] buildcage dns ${rest}`;
+
+  it("reads a refused name with an escaped space as written", async () => {
+    const { events, unparsed } = await scanInspectDnsLog([
+      at(String.raw`denied name=secret\ data.evil.com.`),
+    ]);
+    expect(unparsed).toBe(0);
+    expect(events.length).toBe(1);
+    expect(events[0].host).toBe(String.raw`secret\ data.evil.com`);
+    expect(events[0].action).toBe("block");
+  });
+
+  it("dedupes an escaped name like any other", async () => {
+    const { events } = await scanInspectDnsLog([
+      at(String.raw`allowed name=a\ b.example.com.`),
+      at(String.raw`denied name=a\ b.example.com.`),
+    ]);
+    expect(events.length).toBe(1);
+    expect(events[0].action).toBe("allow");
+  });
+
+  it("splits the type from an escaped discovery or service name", async () => {
+    // The escape keeps a planted ` type=` inside the name.
+    const { events, unparsed } = await scanInspectDnsLog([
+      at(String.raw`discovery name=_a._tcp.x\ type=A.com. type=SRV`),
+      at(String.raw`service-denied name=_b._tcp.y\ z.com. type=TXT`),
+    ]);
+    expect(unparsed).toBe(0);
+    expect(events.map((e) => [e.host, e.queryType])).toStrictEqual([
+      [String.raw`_a._tcp.x\ type=A.com`, "SRV"],
+      [String.raw`_b._tcp.y\ z.com`, "TXT"],
+    ]);
+  });
+
+  it("keeps every other escape as written", async () => {
+    const names = [String.raw`q\"x.com`, String.raw`a\.b.com`, String.raw`c\010d.com`, "e\\\\"];
+    const { events } = await scanInspectDnsLog(names.map((n) => at(`denied name=${n}.`)));
+    expect(events.map((e) => e.host)).toStrictEqual(names);
+  });
+
+  it("counts a decision line it cannot read", async () => {
+    // CoreDNS never writes a bare space or a lone trailing backslash, so
+    // either means the line is not what it seems.
+    const { events, unparsed } = await scanInspectDnsLog([
+      at("denied name=bad com."),
+      at("service-denied name=_a._tcp.x com. type=SRV"),
+      at("denied name=bad\\"),
+    ]);
+    expect(events.length).toBe(0);
+    expect(unparsed).toBe(3);
+  });
+
+  it("does not count a reverse lookup or coredns' own output", async () => {
+    const { unparsed } = await scanInspectDnsLog([
+      "2026-08-23 16:44:58.000000000  buildcage coredns starting",
+      at("reverse name=1.255.19.198.in-addr.arpa."),
+      at(String.raw`reverse name=a\ b.in-addr.arpa.`),
+      "2026-08-23 16:45:00.000000000  [INFO] CoreDNS-1.14.7",
+    ]);
+    expect(unparsed).toBe(0);
+  });
+});
+
 describe("lines and stamps the inspect logs can carry", () => {
   it("skips a blank line in the proxy log", async () => {
     expect((await scanInspectLog(["", "   "])).events.length).toBe(0);

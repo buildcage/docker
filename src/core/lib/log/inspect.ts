@@ -44,13 +44,27 @@ const REQUEST =
   /^buildcage (\d+) (https?) (\S+) (-?\d+) (\d+) ts=(\S*) reason=(\S+) tlserr=(\S+) dst=(\S+):(\d+) (?:sni=(\S+) )?host=(\S+) (\S+)$/;
 const PASSTHROUGH =
   /^buildcage (\d+) pass (tls|tcp) (\d+) ts=(\S*) reason=(\S+) dst=(\S+):(\d+) sni=(\S+)$/;
-const DNS = /^(\S+ \S+)\s+.*buildcage dns (allowed|denied) name=(\S+?)\.?$/;
+// CoreDNS writes a name in presentation format, escaping a space in a label as
+// `\ `, so a name runs to the first space no backslash precedes. The escapes
+// stay as written: the Corefile's views and known_blocked_rules both match
+// that same text, and unescaping `\010` would put a control byte in the report.
+const DNS_NAME = String.raw`((?:[^\s\\]|\\.)+?)`;
+const DNS = new RegExp(
+  String.raw`^(\S+ \S+)\s+.*buildcage dns (allowed|denied) name=${DNS_NAME}\.?$`,
+);
 // A `_service._proto.<host>` name is answered NODATA whatever the rules say,
 // so no rule decided it.
-const DNS_DISCOVERY = /^(\S+ \S+)\s+.*buildcage dns discovery name=(\S+?)\.? type=(\S+)$/;
+const DNS_DISCOVERY = new RegExp(
+  String.raw`^(\S+ \S+)\s+.*buildcage dns discovery name=${DNS_NAME}\.? type=(\S+)$`,
+);
 // Kept apart from a plain denial so the report can name the host below the
 // name as the remedy. Only the Corefile decides which names are service names.
-const DNS_SERVICE_DENIED = /^(\S+ \S+)\s+.*buildcage dns service-denied name=(\S+?)\.? type=(\S+)$/;
+const DNS_SERVICE_DENIED = new RegExp(
+  String.raw`^(\S+ \S+)\s+.*buildcage dns service-denied name=${DNS_NAME}\.? type=(\S+)$`,
+);
+/** A line CoreDNS wrote for one of our rules. Reverse lookups are left out, as
+ *  they are never meant to become events. */
+const DNS_LINE = /^\S+ \S+\s+.*buildcage dns (?!reverse )/;
 /** Echoed before CoreDNS starts, so it is always the log's first line (see
  *  docker/inspect/files/s6-rc.d/coredns/run). s6-log stamps this log, hence
  *  the suffix test. */
@@ -357,6 +371,9 @@ export interface InspectDnsLogScan {
   /** True iff the log's first non-blank line is the startup marker. See
    *  scanInspectDnsLog. */
   headIntact: boolean;
+  /** Lines written for one of our rules yet matching no format above. Each
+   *  may be a refusal the report cannot account for. */
+  unparsed: number;
 }
 
 /** What one pass over the proxy log yields. */
@@ -451,6 +468,7 @@ export async function scanInspectDnsLog(
   const discovery = new Map<string, { time: number; host: string; queryType: string }>();
   const service = new Map<string, { time: number; host: string; queryType: string }>();
   let headIntact: boolean | undefined;
+  let unparsed = 0;
   for await (const line of lines) {
     const trimmed = line.trim();
     if (trimmed !== "") headIntact ??= trimmed.endsWith(DNS_START_MARKER);
@@ -472,7 +490,10 @@ export async function scanInspectDnsLog(
       continue;
     }
     const refused = DNS_SERVICE_DENIED.exec(trimmed);
-    if (!refused) continue;
+    if (!refused) {
+      if (DNS_LINE.test(trimmed)) unparsed++;
+      continue;
+    }
     if (!service.has(refused[2])) {
       service.set(refused[2], {
         time: timeOf(refused[1]),
@@ -505,5 +526,5 @@ export async function scanInspectDnsLog(
       reason: "dns-service-not-allowed",
     });
   }
-  return { events, headIntact: headIntact ?? false };
+  return { events, headIntact: headIntact ?? false, unparsed };
 }

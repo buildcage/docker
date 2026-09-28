@@ -325,6 +325,16 @@ describe("buildInspectReportData", () => {
     expect(r.passed.length).toBe(1);
   });
 
+  it("fails closed on a resolver line it cannot read", async () => {
+    // A refused name reaches no proxy, so the resolver log is its only trace.
+    const dns = [
+      DNS_START,
+      "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=bad com.",
+    ];
+    const r = await buildInspectReportData([START], dns, reportParams(), 0);
+    expect(r.logLooksPlausible).toBe(false);
+  });
+
   it("fails closed when the resolver log lost its beginning, even with the proxy log whole", async () => {
     // A refused name reaches no proxy, so the resolver log is its only trace.
     const dns = [
