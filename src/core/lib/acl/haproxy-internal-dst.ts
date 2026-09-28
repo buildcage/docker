@@ -1,5 +1,5 @@
 export interface InternalDstOptions {
-  /** INTERNAL_RANGES plus the proxy's own gateway; see haproxy-config.ts. */
+  /** INTERNAL_RANGES plus the proxy's own network; see haproxy-config.ts. */
   internalAddrs: string[];
   /** The runner's own addresses, ORed into the same acl. */
   hostAddressFile?: string;
