@@ -1,6 +1,5 @@
-// The universal template writes these lines and this parser reads them, with
-// nothing else holding the two together. haproxy-cfg-template.test.ts reads the
-// same file but also runs under qjs, so the check lives here instead.
+// Nothing else ties the universal template's log formats to this parser. Kept
+// out of haproxy-cfg-template.test.ts, which also runs under qjs.
 import { readFileSync } from "node:fs";
 
 import { describe, it, expect } from "vitest";
@@ -124,8 +123,7 @@ describe("the universal template's log formats and this parser describe the same
     }
   });
 
-  // A client that waits for the server to speak first, or opens a connection
-  // and never uses it.
+  // A client waiting for the server to speak first, or one that never sends.
   it("reads a connection the client ended before any request as undecided", async () => {
     const line = render(HTTP_IN, { ...NO_REQUEST, "%ts": "CR", "%[dst_port]": "25" });
     const [e] = (await scanHaproxyLog([line], false)).events;

@@ -68,7 +68,7 @@ describe("describeReportOutcomes", () => {
     expect(rest).toStrictEqual([]);
   });
 
-  it("says nothing more for an engine that reports no timeline", () => {
+  it("says nothing more for an empty timeline", () => {
     expect(describeReportOutcomes(universal({ blockedCount: 1 }), options).length).toBe(1);
   });
 
@@ -176,7 +176,7 @@ describe("describeReportOutcomes", () => {
     expect(levels).toStrictEqual(["none", "warning", "notice"]);
   });
 
-  it("notices them for universal too, which has no timeline to count", () => {
+  it("notices them for universal too", () => {
     const [, notice] = describeReportOutcomes(universal({ failed: failedRows }), options);
     expect(notice.level).toBe("notice");
     expect(notice.message.startsWith("2 connection(s) failed after buildcage proxy")).toBe(true);

@@ -501,11 +501,11 @@ undecrypted instead of being read as a request. `known_blocked_rules` can mark a
 name from the SNI or an address; a row reading `(unknown)` names nothing a rule can be written
 against, so the passthrough rule is the only way to clear that one.
 
-Under `universal`, a connection made through a name that is not a TLS handshake is read as HTTP in
-the same way, so ssh or `git://` to a name is refused as `bad-request`, in `audit` too, and a client
-waiting for the server to speak first (SMTP, FTP) ends as one nobody decided. `universal` has no
-`allowed_tls_rules` and matches `allowed_ip_rules` against the address only, so for either the build
-has to connect to the address itself, with an `allowed_ip_rules` entry for it.
+Under `universal`, a connection through a name that is not a TLS handshake is also read as HTTP. ssh
+or `git://` to a name is refused as `bad-request`, in `audit` too, and a client waiting for the
+server to speak first (SMTP, FTP) ends as one nobody decided. No rule on the name clears either:
+`universal` has no `allowed_tls_rules`, so the build has to connect to the address, under an
+`allowed_ip_rules` entry.
 
 ## Connections that failed
 

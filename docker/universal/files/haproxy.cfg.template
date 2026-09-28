@@ -157,10 +157,8 @@ backend tls_passthrough
     server cleartext 0.0.0.0:0
 
 # --- HTTP frontend (L7) ---
-# Reached through a relay, as inspect's http_in is, rather than by switching
-# outbound_proxy to HTTP: a connection that ends before a request parses is
-# then logged here with its termination state, instead of as a session error
-# that says neither who ended it nor why.
+# A frontend of its own, so a connection that ends before its request is still
+# logged with its termination state.
 backend http_relay
     mode tcp
     server http_in 127.0.0.1:10026 send-proxy-v2
@@ -168,13 +166,11 @@ backend http_relay
 frontend http_in
     bind 127.0.0.1:10026 accept-proxy
     mode http
-    # accept-proxy restores the build's own dst, so the target starts out as
-    # the address the connection was sent to, as it does in outbound_proxy.
+    # accept-proxy keeps the build's dst, which names a request with no Host.
     http-request set-var(txn.decision) str(BLOCKED)
     http-request set-var(txn.reason) str(-)
     http-request set-var-fmt(txn.target) %[dst]:%[dst_port]
-    # Where no request parsed, no rule above ran and the fields read `[-] (HTTP)
-    # "-" -`. %ts then says who ended the connection; see log/haproxy.ts.
+    # With no request parsed, no rule runs; %ts then says who ended it.
     log-format "buildcage %[date(0,ms)] [%[var(txn.decision)]] (HTTP) \"%[var(txn.target)]\" %[var(txn.reason)] %B ts=%ts dst=%[dst]:%[dst_port]"
     default_backend http_filter_backend
 

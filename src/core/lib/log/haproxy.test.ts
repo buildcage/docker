@@ -153,8 +153,7 @@ describe("scanHaproxyLog", () => {
   });
 
   it("counts a line whose every field is empty but carries no state as unparsed", async () => {
-    // Nothing says who ended it or where it was going, so it is not read as
-    // anything at all.
+    // No state or destination to read it by.
     const { events, unparsed } = await scanHaproxyLog(
       ['buildcage 1790532433493 [-] (-) "-" - 0'],
       false,

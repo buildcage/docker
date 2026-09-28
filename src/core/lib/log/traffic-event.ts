@@ -78,8 +78,7 @@ const CLIENT_ENDED_REASONS = new Set(["client-aborted", "client-timeout"]);
  * that cannot trust the CA does (a container missing `ca-certificates`). The
  * raw traffic artifact keeps them all either way.
  *
- * `(unknown)` is never one host, so nothing done under it proves a close to it
- * is noise.
+ * `(unknown)` is no single host, so it proves nothing about a close.
  */
 export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent) => boolean {
   const completed = new Set<string>();

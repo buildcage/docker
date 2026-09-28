@@ -25,13 +25,11 @@ export interface HaproxyLogScan {
 // actually emits (host/IP/port, and a kebab-case reason), and the line is
 // anchored at both ends, so a forged target or reason is never read as a
 // decision. The next field is %B, a byte count (`-` if the field is empty).
-// http_in appends its termination state and destination, which only a line
-// with no request in it needs.
+// http_in appends its termination state and destination.
 const DECISION =
   /^buildcage (\d+) \[(AUDIT|ALLOWED|BLOCKED)\] \((\w+)\) "([A-Za-z0-9._:-]+)" ([A-Za-z0-9-]+) (\d+|-)(?: ts=[A-Za-z-]{2} dst=[0-9.]+:\d+)?$/;
 
-/** http_in's line for a connection no request parsed on: no rule ran, so every
- *  field a rule sets is empty. */
+/** http_in's line where no request parsed, so no rule set a field. */
 const NO_REQUEST =
   /^buildcage (\d+) \[-\] \(HTTP\) "-" - (?:\d+|-) ts=([A-Za-z-]{2}) dst=([0-9.]+):(\d+)$/;
 
@@ -58,8 +56,7 @@ const PROTOCOL: Record<string, TrafficProtocol> = {
  */
 const FAILURE_REASONS = new Set(["dns-failed"]);
 
-/** A line that names no host falls back to the address the connection was sent
- *  to, and every name resolves to the proxy's own, which names nothing. */
+/** Every name resolves to the proxy's own address, so that one names no host. */
 function hostOf(address: string): string {
   return address === PROXY_ADDRESS ? UNKNOWN_HOST : address;
 }
