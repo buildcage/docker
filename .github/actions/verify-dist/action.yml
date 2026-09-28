@@ -25,15 +25,14 @@ runs:
           exit 1
         fi
 
-    # Matching the bare variable names rather than one spelling of the gate
-    # also catches a gate that replacePlugin never saw, such as a destructured
-    # read of process.env.
+    # Match the names, not one spelling of the gate: replacePlugin leaves other
+    # spellings, such as a destructured read of process.env, in place.
     - name: Check dist is free of the test hooks
       shell: bash
       run: |
         for f in dist/main.cjs dist/post.cjs report/dist/main.cjs; do
           if grep -noE 'BUILDCAGE_(BUILD_TEST_HOOKS|LOCAL_IMAGE_REF|TEST_COMPOSE_FILE)' "$f"; then
-            echo "::error::$f still references a test-hook variable. A normal build must leave the test hooks out entirely (see rolldown.config.js)."
+            echo "::error::$f references a test-hook variable; a normal build must not contain the test hooks (see rolldown.config.js)."
             exit 1
           fi
           echo "confirmed: $f references no test-hook variable."
