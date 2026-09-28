@@ -38,7 +38,7 @@ inputs:
     required: false
     default: ""
   fail_on_ca_residue:
-    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when it leaves a copy of the proxy CA in its layer that cannot be removed, or writes to a Chromium NSS database covered for the step because its user cannot write it. With false, the copy stays in the image and the write is discarded."
+    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when it leaves a copy of the proxy CA in its layer that cannot be removed, has a layer that cannot be checked for one (a builder not using BuildKit's overlayfs snapshotter), or writes to a Chromium NSS database covered for the step because its user cannot write it. With false, the copy stays in the image and the write is discarded."
     required: false
     default: "true"
   known_blocked_rules:

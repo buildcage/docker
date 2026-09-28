@@ -167,7 +167,8 @@ type injection struct {
 //
 // The layer is read back whatever the step exited with: BuildKit commits it
 // for a non-zero exit the LLB's ValidExitCodes allows, and keeps a failed
-// step's layer for debugging.
+// step's layer for debugging. A layer that cannot be read back counts as
+// residue.
 func (in *injection) finish() error {
 	var firstErr error
 	for _, b := range in.binds {
@@ -237,7 +238,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	if upper != "" {
 		created = placeAnchors(s.rootfs, ca)
 	} else {
-		logf("the step's layer is not an overlay upper directory; not placing anchors")
+		logf("no overlay upper directory found for the step's layer; not placing anchors")
 	}
 
 	plan := planCATrust(s, ca, store)

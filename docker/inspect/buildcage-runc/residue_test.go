@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +74,42 @@ func TestFinishOnlyWarnsAboutAKeystoreItCannotResealWhenAskedTo(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "cannot strip: /truststore.jks") {
 		t.Errorf("the warning does not name the keystore:\n%s", stderr)
+	}
+}
+
+// A layer that cannot be read back fails the build, or only warns when asked
+// to.
+func TestFinishOnlyWarnsAboutAnUnreadLayerWhenAskedTo(t *testing.T) {
+	for _, fail := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
+			useTempLog(t)
+			useFakeRsync(t)
+			old := failOnCAResidue
+			failOnCAResidue = fail
+			t.Cleanup(func() { failOnCAResidue = old })
+			bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+			useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
+
+			in, err := inject(bundle, testCA)
+			if err != nil {
+				t.Fatal(err)
+			}
+			readStderr := captureStderr(t)
+			err = in.finish()
+			stderr := readStderr()
+			if fail {
+				if !errors.Is(err, errLayerUnread) {
+					t.Fatalf("got %v, want the unread layer to fail the step", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("got %v, want only a warning", err)
+			}
+			if !strings.Contains(stderr, "buildcage: warning:") || !strings.Contains(stderr, "could not be checked") {
+				t.Errorf("no warning about the unread layer:\n%s", stderr)
+			}
+		})
 	}
 }
 
@@ -177,6 +214,27 @@ func TestRunHintsAtFailOnCAResidue(t *testing.T) {
 		t.Errorf("run exited %d, want 1", code)
 	}
 	if !strings.Contains(stderr, "buildcage: hint:") || !strings.Contains(stderr, "fail_on_ca_residue: false") {
+		t.Errorf("no hint at fail_on_ca_residue:\n%s", stderr)
+	}
+}
+
+// So does a step whose layer could not be read back.
+func TestRunHintsAtFailOnCAResidueForAnUnreadLayer(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	useTempCAFile(t, string(testCA))
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
+	useFakeRunc(t, "exit 0")
+
+	readStderr := captureStderr(t)
+	code := run([]string{"run", "--bundle", bundle, "id"})
+	stderr := readStderr()
+
+	if code != 1 {
+		t.Errorf("run exited %d, want 1", code)
+	}
+	if !strings.Contains(stderr, "buildcage: hint:") {
 		t.Errorf("no hint at fail_on_ca_residue:\n%s", stderr)
 	}
 }

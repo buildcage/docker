@@ -675,16 +675,19 @@ reach, and what a step can't do to its CA store while it is mounted.
 
 ### CA residue
 
-Two things fail the build by default, naming the file and pointing at `fail_on_ca_residue`:
+Three things fail the build by default, pointing at `fail_on_ca_residue`:
 
 - a copy of the CA the wrapper finds in the step's layer but cannot take out, such as one inside a
   binary, an uncompressed archive, a re-wrapped PEM or a JKS keystore sealed with a password other
   than `changeit` (see [Limitations](../README.md#limitations))
 - a write to an NSS database covered for the step because its user cannot write it (see
   [Limitations](../README.md#limitations))
+- a step whose layer the wrapper cannot check, because BuildKit is not using its `overlayfs`
+  snapshotter (see [Security Details](./security.md#inspect-proxy-engine))
 
-With `fail_on_ca_residue: false` both only warn: the copy stays in the image, and the write is
-discarded. A layer the wrapper could not read back or restore fails the build either way.
+With `fail_on_ca_residue: false` all three only warn: the copy stays in the image, the write is
+discarded, and the unchecked layer is committed as it is. An error reading the layer back or
+restoring it fails the build either way.
 
 The CA is valid for two days and unique to the run, so a copy left in an image trusts only a proxy
 that no longer exists. It still shows the image was built behind Buildcage.

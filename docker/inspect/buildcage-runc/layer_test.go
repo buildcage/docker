@@ -612,14 +612,14 @@ func TestStripLayerSweepsAndThenChecksItself(t *testing.T) {
 }
 
 // Without a layer to read back there is nothing to check a removal against, so
-// the sweep is skipped and the engine behaves as it did before.
-func TestStripLayerSkipsWhatIsNotAnOverlay(t *testing.T) {
+// the sweep is skipped and the layer is reported as unchecked.
+func TestStripLayerReportsWhatIsNotAnOverlay(t *testing.T) {
 	rootfs := t.TempDir()
 	mustWriteFile(t, filepath.Join(rootfs, "bundle.pem"), string(testCA))
 	useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
 
-	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA); err != nil {
-		t.Fatal(err)
+	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA); !errors.Is(err, errLayerUnread) {
+		t.Fatalf("got %v, want the layer reported as unread", err)
 	}
 	got, err := os.ReadFile(filepath.Join(rootfs, "bundle.pem"))
 	if err != nil {

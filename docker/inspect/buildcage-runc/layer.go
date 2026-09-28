@@ -37,6 +37,11 @@ var errUnstrippableCA = errors.New("the certificate is in a format this cannot s
 // out.
 var errCALeftInLayer = errors.New("the certificate is still in the step's layer")
 
+// errLayerUnread means no overlay upper directory was found for the step's
+// layer, usually because BuildKit is not using its overlayfs snapshotter, so
+// nothing could say whether it holds a copy. The log says why.
+var errLayerUnread = errors.New("no overlay upper directory was found for the step's layer, so it could not be checked for copies of the proxy CA")
+
 // readMountInfo is a var so tests can hand the parser lines captured from a
 // real build rather than the test process's own mount table.
 var readMountInfo = func() ([]byte, error) { return os.ReadFile("/proc/self/mountinfo") }
@@ -333,12 +338,7 @@ func stripCA(path string, ca []byte, marks caMarks) (bool, error) {
 // report no layer and let the anchors' scattered copies through unswept.
 func stripLayer(rootfs, upper string, ca []byte) error {
 	if upper == "" {
-		// Nothing to read the removal back from. The mirrors' own undo is
-		// unaffected, so this is the behaviour the engine had before.
-		logf("the step's layer is not an overlay upper directory; leaving it unswept")
-		// Also to stderr, which is the step's output in the build log.
-		fmt.Fprintln(os.Stderr, "buildcage: this step's layer is not an overlay upper directory that can be read back, so it is not checked for copies of the proxy CA")
-		return nil
+		return errLayerUnread
 	}
 
 	marks := caMarksOf(ca)
