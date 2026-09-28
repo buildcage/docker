@@ -22,8 +22,9 @@
 import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
 
 import { splitHostPort } from "./authority.ts";
-import { PROXY_ADDRESS } from "./proxy-address.ts";
+import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
+import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
 import type { TrafficAction, TrafficEvent } from "./traffic-event.ts";
 
 export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
@@ -168,50 +169,11 @@ function reasonFor(
 }
 
 /**
- * What haproxy logs where the method would be when the bytes it read parsed as
- * no request at all. A client cannot send it: a method is an HTTP token, and
- * `<` and `>` are not token characters, so this is the proxy's own word rather
- * than anything the build chose.
- */
-const BAD_REQUEST_METHOD = "<BADREQ>";
-
-/**
  * The refusals this proxy made over a request that named no host. The host
  * field is the `Host` the log prints as `-`, so the connection is named by its
  * handshake instead; see hostBeforeRequest.
  */
 const REQUESTLESS_REASONS = new Set(["bad-request", "missing-host-header"]);
-
-/**
- * What ended a connection before a whole request had arrived, or undefined when
- * one arrived or this proxy is the one that ended it.
- *
- * Phase `R` is the proxy still reading the request line and headers, and the
- * inspected stage resolves the Host and connects only once one has parsed, so
- * nothing left this proxy. `C` is the client closing and `c` its own timeout
- * expiring, neither of which a rule had a say in. `P` is this proxy answering,
- * which is a decision however little of the request it had, so reasonFor names
- * it instead. Anything else in that phase is haproxy's own doing, an internal
- * error or a resource it ran out of, and no request arrived then either.
- *
- * A later phase (`CD` and the like) means the rules had already decided on a
- * request, so those stay ordinary exchanges, unless the method says otherwise:
- * a queue, a connection or a transfer cannot be reached without a request, and
- * `<BADREQ>` says none parsed. Nothing in the log makes the two agree, so a
- * line whose own fields contradict each other is counted here rather than
- * believed, or `--` would reach a host table as something allowed.
- */
-function incompleteReason(terminationState: string, method: string): string | undefined {
-  const cause = terminationState[0];
-  // This proxy answering is a decision however little of the request it had.
-  if (cause === "P") return undefined;
-  if (terminationState[1] !== "R") {
-    return method === BAD_REQUEST_METHOD ? "no-request" : undefined;
-  }
-  if (cause === "C") return "client-aborted";
-  if (cause === "c") return "client-timeout";
-  return "no-request";
-}
 
 /**
  * The failures that are not this proxy's own: an origin that answered nothing
@@ -262,9 +224,6 @@ function urlOf(scheme: string, authority: string, target: string): string | unde
 function authorityOf(host: string, port: string, scheme: "http" | "https"): string {
   return port === DEFAULT_PORT[scheme] ? host : `${host}:${port}`;
 }
-
-/** Stands in for a host the log has no way to name; see hostBeforeRequest. */
-const UNKNOWN_HOST = "(unknown)";
 
 /**
  * The host of a connection that never delivered a whole request: its SNI, the

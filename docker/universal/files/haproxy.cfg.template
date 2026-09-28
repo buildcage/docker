@@ -133,11 +133,13 @@ frontend outbound_proxy
     tcp-request content accept if is_tls has_sni
 
     # ---------------------------------------------------------
-    # 5. Non-TLS DNS-routed → HTTP backend
+    # 5. Non-TLS DNS-routed → HTTP frontend
     # ---------------------------------------------------------
+    # http_in logs these itself, request by request.
+    tcp-request content set-log-level silent if { var(txn.dns_routed) -m found } !is_tls
     use_backend ip_passthrough if !{ var(txn.dns_routed) -m found }
     use_backend tls_passthrough if is_tls
-    default_backend http_filter_backend
+    default_backend http_relay
 
     # %[date(0,ms)] leads so the report can order the timeline and time each
     # line against the startup marker; %B is the only per-connection detail a
@@ -154,11 +156,27 @@ backend tls_passthrough
     mode tcp
     server cleartext 0.0.0.0:0
 
-# --- HTTP filter backend (L7) ---
-# deny responses leave txn.decision as BLOCKED (set in frontend).
+# --- HTTP frontend (L7) ---
+# A frontend of its own, so a connection that ends before its request is still
+# logged with its termination state.
+backend http_relay
+    mode tcp
+    server http_in 127.0.0.1:10026 send-proxy-v2
+
+frontend http_in
+    bind 127.0.0.1:10026 accept-proxy
+    mode http
+    # accept-proxy keeps the build's dst, which names a request with no Host.
+    http-request set-var(txn.decision) str(BLOCKED)
+    http-request set-var(txn.reason) str(-)
+    http-request set-var-fmt(txn.target) %[dst]:%[dst_port]
+    # With no request parsed, no rule runs; %ts then says who ended it.
+    log-format "buildcage %[date(0,ms)] [%[var(txn.decision)]] (HTTP) \"%[var(txn.target)]\" %[var(txn.reason)] %B ts=%ts dst=%[dst]:%[dst_port]"
+    default_backend http_filter_backend
+
+# deny responses leave txn.decision as BLOCKED (set in http_in).
 backend http_filter_backend
     mode http
-    http-request set-var(txn.rule_type) str(HTTP)
 
     acl has_host hdr(host) -m found
     acl host_not_empty hdr_len(host) gt 0

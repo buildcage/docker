@@ -68,7 +68,7 @@ describe("describeReportOutcomes", () => {
     expect(rest).toStrictEqual([]);
   });
 
-  it("says nothing more for an engine that reports no timeline", () => {
+  it("says nothing more for an empty timeline", () => {
     expect(describeReportOutcomes(universal({ blockedCount: 1 }), options).length).toBe(1);
   });
 
@@ -86,6 +86,21 @@ describe("describeReportOutcomes", () => {
     expect(outcomes[1].message.startsWith("2 request(s) buildcage proxy could not act on")).toBe(
       true,
     );
+  });
+
+  it("warns for universal too, whose HTTP stage logs a connection that sent no request", () => {
+    const unnamed: TrafficEvent = {
+      time: 1787471975,
+      action: "incomplete",
+      protocol: "http",
+      host: "(unknown)",
+      port: 25,
+      reason: "client-aborted",
+    };
+    const outcomes = describeReportOutcomes(universal({ timeline: [unnamed] }), options);
+    expect(outcomes.length).toBe(2);
+    expect(outcomes[1].level).toBe("warning");
+    expect(outcomes[1].shouldFail).toBe(false);
   });
 
   it("counts a client-ended close to a host that completed nothing, as it shows it", () => {
@@ -161,7 +176,7 @@ describe("describeReportOutcomes", () => {
     expect(levels).toStrictEqual(["none", "warning", "notice"]);
   });
 
-  it("notices them for universal too, which has no timeline to count", () => {
+  it("notices them for universal too", () => {
     const [, notice] = describeReportOutcomes(universal({ failed: failedRows }), options);
     expect(notice.level).toBe("notice");
     expect(notice.message.startsWith("2 connection(s) failed after buildcage proxy")).toBe(true);

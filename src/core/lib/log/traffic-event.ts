@@ -3,6 +3,8 @@
  * the log parser (inspect.ts) and consumed by the report layer.
  */
 
+import { UNKNOWN_HOST } from "./proxy-address.ts";
+
 /**
  * What a rule decided, or would have decided had one been enforced.
  *
@@ -75,11 +77,13 @@ const CLIENT_ENDED_REASONS = new Set(["client-aborted", "client-timeout"]);
  * closes, since then every attempt to it ended before a request, as a client
  * that cannot trust the CA does (a container missing `ca-certificates`). The
  * raw traffic artifact keeps them all either way.
+ *
+ * `(unknown)` is no single host, so it proves nothing about a close.
  */
 export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent) => boolean {
   const completed = new Set<string>();
   for (const event of timeline) {
-    if (event.protocol !== "dns" && event.action !== "incomplete") {
+    if (event.protocol !== "dns" && event.action !== "incomplete" && event.host !== UNKNOWN_HOST) {
       completed.add(event.host.toLowerCase());
     }
   }

@@ -47,9 +47,7 @@ export function describeReportOutcomes(
  *
  * Neither host table holds them and `fail_on_blocked` does not either, so the
  * collapsed Communication details section is their only trace and a reader who
- * never opens it would not know a request had gone nowhere. Only `inspect`
- * produces them, and only `inspect` has that section, so the message can name
- * it.
+ * never opens it would not know a request had gone nowhere.
  *
  * The wording avoids "incomplete", which the report already uses for a log
  * whose beginning is gone (see describeBlockedOutcome) and under the same ⚠️:
@@ -61,7 +59,6 @@ function describeUndecidedRequests(
   report: ReportData,
   engineLabel: "sandbox" | "proxy",
 ): OutcomeEmission | undefined {
-  if (report.engine !== "inspect") return undefined;
   // The keepalive noise clientEndedNoise hides from Communication details is out
   // of the count too, so the two stay in step.
   const isNoise = clientEndedNoise(report.timeline);

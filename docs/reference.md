@@ -426,11 +426,13 @@ resolve.
 
 ## Requests that never arrived whole
 
-Under `inspect`, a connection can end before a whole request has arrived. What the report does with
-one turns on who ended it: a client that walks away decided nothing, while bytes Buildcage refused to
-read as a request are a refusal like any other.
+A connection can end before a whole request has arrived. What the report does with one turns on who
+ended it: a client that walks away decided nothing, while bytes Buildcage refused to read as a
+request are a refusal like any other.
 
-Whichever it was, the host is the name from the handshake's SNI. Without one, the address the
+Under `universal`, only a plaintext connection made through a name gets this far, and nothing names
+it before its request does, so its host reads `(unknown)`. Under `inspect`, the host is the name
+from the handshake's SNI. Without one, the address the
 connection was sent to stands in, and the row's rule type reads `IP`: an address the build wrote out
 itself is one only `allowed_ip_rules` could have passed through. The exception is Buildcage's own
 address, where every name-based connection lands because the resolver answers each name with it.
@@ -498,6 +500,12 @@ What clears one is a rule, though not a host rule. For traffic that is not HTTP,
 undecrypted instead of being read as a request. `known_blocked_rules` can mark a row whose host is a
 name from the SNI or an address; a row reading `(unknown)` names nothing a rule can be written
 against, so the passthrough rule is the only way to clear that one.
+
+Under `universal`, a connection through a name that is not a TLS handshake is also read as HTTP. ssh
+or `git://` to a name is refused as `bad-request`, in `audit` too, and a client waiting for the
+server to speak first (SMTP, FTP) ends as one nobody decided. No rule on the name clears either:
+`universal` has no `allowed_tls_rules`, so the build has to connect to the address, under an
+`allowed_ip_rules` entry.
 
 ## Connections that failed
 

@@ -242,6 +242,32 @@ describe("renderInspectDetails", () => {
     }
   });
 
+  it("keeps a client-ended connection to (unknown), which is never one host", () => {
+    // A refusal elsewhere under (unknown) proves nothing about this close.
+    const rendered = renderInspectDetails(
+      [
+        {
+          time: t,
+          action: "block",
+          protocol: "http",
+          host: "(unknown)",
+          port: 22,
+          reason: "bad-request",
+        },
+        {
+          time: t,
+          action: "incomplete",
+          protocol: "http",
+          host: "(unknown)",
+          port: 25,
+          reason: "client-aborted",
+        },
+      ],
+      t,
+    );
+    expect(rendered.includes("HTTP (unknown):25 -> client-aborted")).toBe(true);
+  });
+
   it("hides a client-ended connection to a host that also completed one", () => {
     // A keepalive pool cleaning up after its work is noise, not a failure.
     for (const reason of ["client-aborted", "client-timeout"]) {
