@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -102,8 +103,13 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 		if value, set := s.env[variable.name]; set && value != "" {
 			// Already pointed somewhere: add to that file rather than
 			// redirecting the variable, which would discard whatever the
-			// author put there.
-			resolved, err := resolveInRoot(s.rootfs, value)
+			// author put there. A relative value is read from the step's
+			// working directory, the best guess at where the tool starts.
+			path := value
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(s.processCwd(), path)
+			}
+			resolved, err := resolveInRoot(s.rootfs, path)
 			if err != nil {
 				logf("%s=%s could not be resolved inside the rootfs (%v); leaving it alone",
 					variable.name, value, err)
@@ -243,15 +249,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 
 	plan := planCATrust(s, ca, store)
 
-	var binds []*dirBind
-	groups := groupTargetsByBind(plan.targets, store)
-	for _, hostDir := range bindDirsInOrder(groups, store) {
-		names := groups[hostDir]
-		custom := !(store.found && hostDir == store.dir())
-		if b := prepareBind(s, bundle, hostDir, names, ca, custom, false); b != nil {
-			binds = append(binds, b)
-		}
-	}
+	binds := bindTargets(s, bundle, groupTargetsByBind(plan.targets, store), ca, store)
 
 	// A JVM already in the base image reads only its own keystores, neither the
 	// system store nor the CA-trust variables, so the CA goes into each too (see
@@ -271,7 +269,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 				rel := filepath.Join(strings.TrimPrefix(containerDir, covering.containerDir), name)
 				covering.coverKeystore(rel, ca)
 			}
-		} else if b := prepareBind(s, bundle, hostDir, names, ca, true, true); b != nil {
+		} else if b := prepareBind(s, bundle, hostDir, names, ca, customDirLimit, true); b != nil {
 			binds = append(binds, b)
 		}
 	}
@@ -291,6 +289,48 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, nss: nss, createdOwnCA: plan.createdOwnCA, created: created, upper: upper}, nil
 }
 
+// bindTargets binds each group of CA targets, nested groups folded into the
+// outermost. An outer directory that cannot be bound is dropped, its own
+// targets going without the CA, and the groups folded into it are bound the
+// same way without it.
+func bindTargets(s *spec, bundle string, groups map[string][]string, ca []byte, store systemStore) []*dirBind {
+	var binds []*dirBind
+	merged, parts := mergeNestedGroups(groups)
+	for _, hostDir := range bindDirsInOrder(merged, store) {
+		if b := prepareBind(s, bundle, hostDir, merged[hostDir], ca, bindLimit(hostDir, parts[hostDir], store), false); b != nil {
+			binds = append(binds, b)
+			continue
+		}
+		inner := map[string][]string{}
+		for _, dir := range parts[hostDir] {
+			if dir != hostDir {
+				inner[dir] = groups[dir]
+			}
+		}
+		if len(inner) > 0 {
+			logf("binding the CA targets under %s without it", containerPathOf(s.rootfs, hostDir))
+			binds = append(binds, bindTargets(s, bundle, inner, ca, store)...)
+		}
+	}
+	return binds
+}
+
+// bindLimit is what prepare holds hostDir to: nothing for the store directory
+// alone, the store's limits for a directory the store was folded into, and the
+// custom ones otherwise.
+func bindLimit(hostDir string, parts []string, store systemStore) mirrorLimit {
+	if !store.found {
+		return customDirLimit
+	}
+	if hostDir == store.dir() {
+		return mirrorLimit{}
+	}
+	if slices.Contains(parts, store.dir()) {
+		return storeDirLimit
+	}
+	return customDirLimit
+}
+
 // bindCovering returns the bind whose mirrored directory contains containerDir,
 // or nil. A JVM keystore that resolves inside a directory a store bind already
 // mirrors is folded into that bind rather than bound separately, which the
@@ -308,7 +348,7 @@ func bindCovering(binds []*dirBind, containerDir string) *dirBind {
 // bundle, or a JVM keystore when keystore is set), binds the mirror over the
 // step's view of the directory, and returns what finish reconciles. It returns
 // nil, having logged why, when the directory cannot be bound.
-func prepareBind(s *spec, bundle, hostDir string, names []string, ca []byte, custom, keystore bool) *dirBind {
+func prepareBind(s *spec, bundle, hostDir string, names []string, ca []byte, limit mirrorLimit, keystore bool) *dirBind {
 	containerDir := containerPathOf(s.rootfs, hostDir)
 	if containerDir == "/" {
 		logf("refusing to bind the container root; skipping CA injection for %v", names)
@@ -329,7 +369,7 @@ func prepareBind(s *spec, bundle, hostDir string, names []string, ca []byte, cus
 		containerDir: containerDir,
 		scratchDir:   scratch,
 		bundleFiles:  names,
-		custom:       custom,
+		limit:        limit,
 		keystore:     keystore,
 	}
 	if err := b.prepare(ca); err != nil {

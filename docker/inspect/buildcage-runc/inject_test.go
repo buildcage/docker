@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -221,6 +222,170 @@ func TestInjectFoldsATargetNestedUnderTheStore(t *testing.T) {
 		if !strings.Contains(string(got), string(testCA)) {
 			t.Errorf("%s did not get the CA in the store mirror: %q", rel, got)
 		}
+	}
+}
+
+// mirrorHolds checks that each named file in the mirror bound at dest carries
+// the CA.
+func mirrorHolds(t *testing.T, mounts []map[string]any, dest string, names ...string) {
+	t.Helper()
+	scratchDir, _ := findMount(t, mounts, dest)["source"].(string)
+	for _, name := range names {
+		got, err := os.ReadFile(filepath.Join(scratchDir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(got), string(testCA)) {
+			t.Errorf("%s under %s did not get the CA: %q", name, dest, got)
+		}
+	}
+}
+
+// hasMount reports whether a mount in the spec sits at dest.
+func hasMount(mounts []map[string]any, dest string) bool {
+	return slices.ContainsFunc(mounts, func(m map[string]any) bool { return m["destination"] == dest })
+}
+
+// A variable pointing above the store directory takes the store into its own
+// bind: a separate store bind under it would conflict with it, leaving the
+// variable's file without the CA.
+func TestInjectFoldsTheStoreIntoAnAncestorTarget(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"SSL_CERT_FILE=/etc/ssl/corp.pem"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	mustWriteFile(t, filepath.Join(rootfs, "etc", "ssl", "corp.pem"), "CORP\n")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mounts := loadMounts(t, bundle)
+	if hasMount(mounts, "/etc/ssl/certs") {
+		t.Error("the store got a bind of its own under the variable's")
+	}
+	mirrorHolds(t, mounts, "/etc/ssl", "corp.pem", "certs/ca-certificates.crt")
+	if env := loadEnv(t, bundle); env["SSL_CERT_FILE"] != "/etc/ssl/corp.pem" {
+		t.Errorf("SSL_CERT_FILE was redirected to %q", env["SSL_CERT_FILE"])
+	}
+
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{
+		"etc/ssl/corp.pem":                  "CORP\n",
+		"etc/ssl/certs/ca-certificates.crt": "ORIGINAL-ROOTS\n",
+	} {
+		if got, _ := os.ReadFile(filepath.Join(rootfs, path)); string(got) != want {
+			t.Errorf("%s = %q, want it untouched", path, got)
+		}
+	}
+}
+
+// Two variables whose files nest share the outer one's bind the same way.
+func TestInjectFoldsNestedCustomTargets(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"DENO_CERT=/opt/a/ca.pem", "NODE_EXTRA_CA_CERTS=/opt/a/b/ca.pem"})
+	mustMkdirAll(t, filepath.Join(rootfs, "opt", "a", "b"))
+	mustWriteFile(t, filepath.Join(rootfs, "opt", "a", "ca.pem"), "A\n")
+	mustWriteFile(t, filepath.Join(rootfs, "opt", "a", "b", "ca.pem"), "B\n")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = restore.finish() }()
+
+	mounts := loadMounts(t, bundle)
+	if hasMount(mounts, "/opt/a/b") {
+		t.Error("the inner target got a bind of its own under the outer one's")
+	}
+	mirrorHolds(t, mounts, "/opt/a", "ca.pem", "b/ca.pem")
+}
+
+// An outer directory that cannot be bound leaves the ones folded into it bound
+// as before, so the store keeps the CA even when the variable's file cannot.
+func TestInjectFallsBackWhenTheAncestorCannotBeBound(t *testing.T) {
+	cases := map[string]struct {
+		value string
+		lay   func(t *testing.T, rootfs string)
+	}{
+		"the container root": {"/corp.pem", func(t *testing.T, rootfs string) {
+			mustWriteFile(t, filepath.Join(rootfs, "corp.pem"), "CORP\n")
+		}},
+		"over the store's limits": {"/etc/ssl/corp.pem", func(t *testing.T, rootfs string) {
+			mustWriteFile(t, filepath.Join(rootfs, "etc", "ssl", "corp.pem"), "CORP\n")
+			mustSparseFile(t, filepath.Join(rootfs, "etc", "ssl", "huge"), maxStoreDirBytes+1)
+		}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			useFakeRsync(t)
+			bundle, rootfs := newBundle(t, []string{"SSL_CERT_FILE=" + c.value})
+			c.lay(t, rootfs)
+
+			restore, err := inject(bundle, testCA)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = restore.finish() }()
+
+			mounts := loadMounts(t, bundle)
+			mirrorHolds(t, mounts, "/etc/ssl/certs", "ca-certificates.crt")
+			if dir := filepath.Dir(c.value); dir != "/" && hasMount(mounts, dir) {
+				t.Errorf("%s was bound over the limits", dir)
+			}
+		})
+	}
+}
+
+// Without an outer directory that cannot be bound, the groups under it still
+// fold together: here /etc conflicts with a BuildKit mount, and /etc/ssl takes
+// the store in rather than losing to it.
+func TestInjectFoldsWhatIsLeftUnderAnAncestorItCannotBind(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"SSL_CERT_FILE=/etc/corp.pem", "NODE_EXTRA_CA_CERTS=/etc/ssl/corp.pem"})
+	mountAt(t, bundle, "/etc/hosts")
+	mustWriteFile(t, filepath.Join(rootfs, "etc", "corp.pem"), "ETC\n")
+	mustWriteFile(t, filepath.Join(rootfs, "etc", "ssl", "corp.pem"), "SSL\n")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = restore.finish() }()
+
+	mounts := loadMounts(t, bundle)
+	if hasMount(mounts, "/etc") || hasMount(mounts, "/etc/ssl/certs") {
+		t.Errorf("got mounts %v, want only /etc/ssl bound", mounts)
+	}
+	mirrorHolds(t, mounts, "/etc/ssl", "corp.pem", "certs/ca-certificates.crt")
+}
+
+// A relative value is read by the tool from its working directory, which is
+// the step's WORKDIR unless the step changes it.
+func TestInjectResolvesARelativeVariableFromTheWorkingDirectory(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"SSL_CERT_FILE=certs/ca.pem"})
+	setSpecField(t, bundle, "process", func(proc map[string]any) { proc["cwd"] = "/app" })
+	mustMkdirAll(t, filepath.Join(rootfs, "app", "certs"))
+	mustWriteFile(t, filepath.Join(rootfs, "app", "certs", "ca.pem"), "APP\n")
+	mustMkdirAll(t, filepath.Join(rootfs, "certs"))
+	mustWriteFile(t, filepath.Join(rootfs, "certs", "ca.pem"), "ROOT\n")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = restore.finish() }()
+
+	mounts := loadMounts(t, bundle)
+	mirrorHolds(t, mounts, "/app/certs", "ca.pem")
+	if hasMount(mounts, "/certs") {
+		t.Error("the value was resolved from / rather than the working directory")
+	}
+	if env := loadEnv(t, bundle); env["SSL_CERT_FILE"] != "certs/ca.pem" {
+		t.Errorf("SSL_CERT_FILE was rewritten to %q", env["SSL_CERT_FILE"])
 	}
 }
 
@@ -616,7 +781,8 @@ func TestInjectLeavesAnExistingOwnCAPathAlone(t *testing.T) {
 // exists to refuse.
 func TestInjectLeavesAnUnresolvableVariableAlone(t *testing.T) {
 	useFakeRsync(t)
-	bundle, _ := newBundle(t, []string{"DENO_CERT=../../../../etc/passwd"})
+	bundle, rootfs := newBundle(t, []string{"DENO_CERT=/custom/roots.pem"})
+	mustSymlink(t, "../../../../outside", filepath.Join(rootfs, "custom"))
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
@@ -624,7 +790,7 @@ func TestInjectLeavesAnUnresolvableVariableAlone(t *testing.T) {
 	}
 	defer restore.finish()
 
-	if got := loadEnv(t, bundle)["DENO_CERT"]; got != "../../../../etc/passwd" {
+	if got := loadEnv(t, bundle)["DENO_CERT"]; got != "/custom/roots.pem" {
 		t.Errorf("DENO_CERT = %q, want it left alone", got)
 	}
 	if mounts := loadMounts(t, bundle); len(mounts) != 1 {

@@ -169,3 +169,22 @@ func TestSetEnvLeavesTheSpecAloneWithNothingToAdd(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessCwd(t *testing.T) {
+	cases := map[string]struct {
+		process map[string]any
+		want    string
+	}{
+		"no cwd":   {map[string]any{}, "/"},
+		"relative": {map[string]any{"cwd": "app"}, "/"},
+		"absolute": {map[string]any{"cwd": "/app"}, "/app"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := &spec{raw: map[string]any{"process": c.process}}
+			if got := s.processCwd(); got != c.want {
+				t.Errorf("got %q, want %q", got, c.want)
+			}
+		})
+	}
+}

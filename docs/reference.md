@@ -645,7 +645,7 @@ starts, so the build has to trust that CA. The CA is valid for two days from whe
 and carries a random `serialNumber` in its subject, so no two runs share one. The wrapper around
 runc sets these variables as each `RUN` step starts. If a variable is already set, by the base image
 or by the Dockerfile, Buildcage appends the CA to whatever file it already points at rather than
-redirecting the variable elsewhere. Otherwise, where it points depends on whether the step has a
+redirecting the variable elsewhere, reading a relative path from the step's `WORKDIR`. Otherwise, where it points depends on whether the step has a
 system CA store:
 
 | Variable              | Read by                                                                   | If unset, with a store                           | If unset, with no store     |
