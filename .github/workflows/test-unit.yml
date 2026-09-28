@@ -49,6 +49,7 @@ jobs:
               - 'src/**'
               - 'docker/**'
               - 'report/**'
+              - 'test/covfilter/**'
               - 'licenses/**'
               - 'Makefile'
               - 'dist/**'

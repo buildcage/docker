@@ -31,12 +31,19 @@ jobs:
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
+            # Keep in step with what the engine Dockerfiles COPY.
             docker: &docker
               - 'src/**'
               - 'docker/**'
               - 'compose.yaml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'rolldown.scripts.config.js'
+              - '.dockerignore'
             workflow: &workflow
               - '.github/workflows/test-integration.yml'
+              - '.github/actions/setup-vp/**'
               # Every job below is a make target.
               - 'Makefile'
 
