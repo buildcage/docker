@@ -127,7 +127,7 @@ function hasTopLevelAlternation(regex) {
 	}
 	return !1;
 }
-const HOST_LITERAL_ILLEGAL = /\\[[\]]/, COREFILE_UNSAFE = /['`]|\{[$%]/, RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9]|\\k<)/;
+const HOST_LITERAL_ILLEGAL = /\\[[\]]/, COREFILE_UNSAFE = /['`]|\{[$%]/, RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9])/;
 function checkResolverRegexSyntax(text, label, rule) {
 	let inClass = !1;
 	for (let i = 0; i < text.length; i++) {
@@ -139,8 +139,18 @@ function checkResolverRegexSyntax(text, label, rule) {
 		c === "\\" ? i++ : inClass ? c === "]" && (inClass = !1) : c === "[" && (inClass = !0);
 	}
 }
+const PORTABLE_ESCAPE = /^(?:[dDwWsSbBnrtf]|[1-9](?!\d))/;
+function checkEscapes(text, label, rule) {
+	for (let i = 0; i < text.length; i++) {
+		if (text[i] !== "\\") continue;
+		let rest = text.slice(++i);
+		if (PORTABLE_ESCAPE.test(rest)) continue;
+		let escape = /^(?:\d+|[A-Za-z])/.exec(rest);
+		if (escape) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${escape[0]}". The proxy's PCRE2 reads it differently from setup, so a backslash may precede only punctuation, one of \\d \\D \\w \\W \\s \\S \\b \\B \\n \\r \\t \\f, or a single backreference digit`);
+	}
+}
 function checkRawRegexHalf(text, label, rule, hostHalf) {
-	if (hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
+	if (checkEscapes(text, label, rule), hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
 	if (hostHalf && HOST_LITERAL_ILLEGAL.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a character no hostname can, so the ":" this rule was split at is not its port separator. An IPv6 address is not supported here, in a "~" rule any more than in a literal one`);
 	if (hostHalf && COREFILE_UNSAFE.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a "'", a backtick, "{$" or "{%". No hostname contains one, and the resolver's config cannot quote it`);
 }

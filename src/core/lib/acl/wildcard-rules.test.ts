@@ -93,6 +93,10 @@ describe("convertRule", () => {
     expect(() => convertRule("~a\\.com|b\\.com:443")).toThrow(/top-level "\|"/);
   });
 
+  it("refuses an escape that could hide a top-level alternation from the check", () => {
+    expect(() => convertRule("~^x\\.good\\.com:443\\Q[\\E|:443]?")).toThrow(/uses "\\Q"/);
+  });
+
   it("refuses an IPv6 authority, whose colons are not the port separator", () => {
     expect(() => convertRule("~^\\[::1\\]:443$")).toThrow(/IPv6/);
   });

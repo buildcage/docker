@@ -177,8 +177,9 @@ const COREFILE_UNSAFE = /['`]|\{[$%]/;
 /**
  * Lookaround and backreferences, which RE2 lacks: a host half also goes into
  * the resolver's allowlist, where they would stop the resolver from starting.
+ * checkEscapes has already refused a named one (`\k<n>`).
  */
-const RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9]|\\k<)/;
+const RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9])/;
 
 function checkResolverRegexSyntax(text: string, label: string, rule: string): void {
   let inClass = false;
@@ -205,10 +206,38 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
 }
 
 /**
+ * The letter and digit escapes that JavaScript, which these checks parse
+ * with, and PCRE2, which the proxy matches with, read alike. PCRE2 reads
+ * `\Q[\E` as a literal `[` and `\c[` as one character, where JavaScript sees
+ * a class opening, so a `|` that looks enclosed here is top-level in the
+ * proxy. A backreference has to be one digit: the two read `\12` by
+ * different rules.
+ */
+const PORTABLE_ESCAPE = /^(?:[dDwWsSbBnrtf]|[1-9](?!\d))/;
+
+function checkEscapes(text: string, label: string, rule: string): void {
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== "\\") continue;
+    const rest = text.slice(++i);
+    if (PORTABLE_ESCAPE.test(rest)) continue;
+    const escape = /^(?:\d+|[A-Za-z])/.exec(rest);
+    if (escape) {
+      throw new Error(
+        `Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${escape[0]}". The ` +
+          `proxy's PCRE2 reads it differently from setup, so a backslash may precede only ` +
+          `punctuation, one of \\d \\D \\w \\W \\s \\S \\b \\B \\n \\r \\t \\f, or a single ` +
+          `backreference digit`,
+      );
+    }
+  }
+}
+
+/**
  * Check part of a `~` rule against what the rule syntax can represent.
  *
- * @throws {Error} if the text carries a top-level `|`, or a host half holds
- *   a character no hostname can, or text the resolver's config cannot quote
+ * @throws {Error} if the text uses an escape outside PORTABLE_ESCAPES, carries
+ *   a top-level `|`, or a host half holds a character no hostname can, or text
+ *   the resolver's config cannot quote
  */
 export function checkRawRegexHalf(
   text: string,
@@ -216,6 +245,7 @@ export function checkRawRegexHalf(
   rule: string,
   hostHalf: boolean,
 ): void {
+  checkEscapes(text, label, rule);
   if (hostHalf) checkResolverRegexSyntax(text, label, rule);
   if (hasTopLevelAlternation(text)) {
     throw new Error(
