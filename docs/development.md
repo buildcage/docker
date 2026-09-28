@@ -241,11 +241,10 @@ millisecond epoch orders the timeline and times each line against the startup
 marker; `bytes` is `%B`, the only per-connection detail a passthrough sees.
 
 A plaintext connection made through a name is relayed to a second frontend,
-`http_in`, which appends haproxy's termination state and the destination. Where
-no request parsed, no rule ran and the fields read `[-] (HTTP) "-" -`; the
-termination state then says who ended it: `PR` is bytes refused as no request
-(`bad-request`), `CR` and `cR` the client closing or timing out (neither
-decided). The report reads the proxy's own address as the host `(unknown)`.
+`http_in`, whose lines also carry `ts`, HAProxy's termination state, and `dst`.
+Where no request parsed, no rule ran and the fields read `[-] (HTTP) "-" -`.
+What the report makes of those is in
+[Requests that never arrived whole](./reference.md#requests-that-never-arrived-whole).
 
 `universal` also reads the resolver's log (`/var/log/coredns`), since a name CoreDNS refused never
 reaches HAProxy at all: it is the only trace of a name looked up but never connected to.
