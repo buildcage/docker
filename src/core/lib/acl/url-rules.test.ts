@@ -141,6 +141,13 @@ describe("convertUrlRule regex escape hatch", () => {
     expect(() => convertUrlRule("GET ~^a|https://b\\.com/y$")).toThrow(/expression/);
   });
 
+  it("refuses an escape that could hide a top-level alternation, in either half", () => {
+    expect(() => convertUrlRule("GET ~https://x\\.com(:443)?\\Q[\\E|.*]?/.*")).toThrow(
+      /uses "\\Q"/,
+    );
+    expect(() => convertUrlRule("GET ~https://x\\.com/a\\Q[\\E|.*]")).toThrow(/uses "\\Q"/);
+  });
+
   // The group keeps the "|" off the top level of the whole expression, so only
   // the per-half check sees it.
   it("rejects a group straddling the cut, whose halves are no longer a host and a path", () => {

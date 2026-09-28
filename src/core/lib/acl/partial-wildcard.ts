@@ -175,10 +175,11 @@ const HOST_LITERAL_ILLEGAL = /\\[[\]]/;
 const COREFILE_UNSAFE = /['`]|\{[$%]/;
 
 /**
- * Lookaround and backreferences, which RE2 lacks: a host half also goes into
- * the resolver's allowlist, where they would stop the resolver from starting.
+ * Lookaround, which RE2 lacks: a host half also goes into the resolver's
+ * allowlist, where it would stop the resolver from starting. Backreferences,
+ * RE2's other gap, are escapes checkEscapes has already refused.
  */
-const RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9]|\\k<)/;
+const RE2_UNSUPPORTED = /^\(\?<?[=!]/;
 
 function checkResolverRegexSyntax(text: string, label: string, rule: string): void {
   let inClass = false;
@@ -189,8 +190,7 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
       if (unsupported) {
         throw new Error(
           `Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". ` +
-            `Lookaround and backreferences are not supported in a host pattern, which the ` +
-            `resolver matches with RE2`,
+            `Lookaround is not supported in a host pattern, which the resolver matches with RE2`,
         );
       }
     }
@@ -205,10 +205,33 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
 }
 
 /**
+ * The letter escapes that JavaScript, which these checks parse with, and
+ * PCRE2, which the proxy matches with, read alike. PCRE2 reads `\Q[\E` as a
+ * literal `[` and `\c[` as one character, where JavaScript sees a class
+ * opening, so a `|` that looks enclosed here is top-level in the proxy.
+ */
+const PORTABLE_ESCAPES = "dDwWsSbBnrtf";
+
+function checkEscapes(text: string, label: string, rule: string): void {
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== "\\") continue;
+    const next = text[++i];
+    if (next !== undefined && /[A-Za-z0-9]/.test(next) && !PORTABLE_ESCAPES.includes(next)) {
+      throw new Error(
+        `Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${next}". The proxy's ` +
+          `PCRE2 reads it differently from setup, so a backslash may precede only punctuation or ` +
+          `one of \\d \\D \\w \\W \\s \\S \\b \\B \\n \\r \\t \\f`,
+      );
+    }
+  }
+}
+
+/**
  * Check part of a `~` rule against what the rule syntax can represent.
  *
- * @throws {Error} if the text carries a top-level `|`, or a host half holds
- *   a character no hostname can, or text the resolver's config cannot quote
+ * @throws {Error} if the text uses an escape outside PORTABLE_ESCAPES, carries
+ *   a top-level `|`, or a host half holds a character no hostname can, or text
+ *   the resolver's config cannot quote
  */
 export function checkRawRegexHalf(
   text: string,
@@ -216,6 +239,7 @@ export function checkRawRegexHalf(
   rule: string,
   hostHalf: boolean,
 ): void {
+  checkEscapes(text, label, rule);
   if (hostHalf) checkResolverRegexSyntax(text, label, rule);
   if (hasTopLevelAlternation(text)) {
     throw new Error(

@@ -127,20 +127,27 @@ function hasTopLevelAlternation(regex) {
 	}
 	return !1;
 }
-const HOST_LITERAL_ILLEGAL = /\\[[\]]/, COREFILE_UNSAFE = /['`]|\{[$%]/, RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9]|\\k<)/;
+const HOST_LITERAL_ILLEGAL = /\\[[\]]/, COREFILE_UNSAFE = /['`]|\{[$%]/, RE2_UNSUPPORTED = /^\(\?<?[=!]/;
 function checkResolverRegexSyntax(text, label, rule) {
 	let inClass = !1;
 	for (let i = 0; i < text.length; i++) {
 		let c = text[i];
 		if (!inClass) {
 			let unsupported = RE2_UNSUPPORTED.exec(text.slice(i));
-			if (unsupported) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". Lookaround and backreferences are not supported in a host pattern, which the resolver matches with RE2`);
+			if (unsupported) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". Lookaround is not supported in a host pattern, which the resolver matches with RE2`);
 		}
 		c === "\\" ? i++ : inClass ? c === "]" && (inClass = !1) : c === "[" && (inClass = !0);
 	}
 }
+function checkEscapes(text, label, rule) {
+	for (let i = 0; i < text.length; i++) {
+		if (text[i] !== "\\") continue;
+		let next = text[++i];
+		if (next !== void 0 && /[A-Za-z0-9]/.test(next) && !"dDwWsSbBnrtf".includes(next)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${next}". The proxy's PCRE2 reads it differently from setup, so a backslash may precede only punctuation or one of \\d \\D \\w \\W \\s \\S \\b \\B \\n \\r \\t \\f`);
+	}
+}
 function checkRawRegexHalf(text, label, rule, hostHalf) {
-	if (hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
+	if (checkEscapes(text, label, rule), hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
 	if (hostHalf && HOST_LITERAL_ILLEGAL.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a character no hostname can, so the ":" this rule was split at is not its port separator. An IPv6 address is not supported here, in a "~" rule any more than in a literal one`);
 	if (hostHalf && COREFILE_UNSAFE.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a "'", a backtick, "{$" or "{%". No hostname contains one, and the resolver's config cannot quote it`);
 }
