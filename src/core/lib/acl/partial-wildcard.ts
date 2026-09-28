@@ -206,11 +206,10 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
 }
 
 /**
- * The letter and digit escapes that JavaScript, which these checks parse
- * with, and PCRE2, which the proxy matches with, read alike. PCRE2 reads
- * `\Q[\E` as a literal `[` and `\c[` as one character, where JavaScript sees
- * a class opening, so a `|` that looks enclosed here is top-level in the
- * proxy. A backreference has to be one digit: the two read `\12` by
+ * Letter and digit escapes that JavaScript (these checks) and PCRE2 (the
+ * proxy) read alike. Others can hide a top-level `|`: PCRE2 reads `\Q[\E` as
+ * a literal `[` and `\c[` as one character, where JavaScript sees a class
+ * opening. A backreference is one digit, since the two read `\12` by
  * different rules.
  */
 const PORTABLE_ESCAPE = /^(?:[dDwWsSbBnrtf]|[1-9](?!\d))/;
@@ -235,9 +234,9 @@ function checkEscapes(text: string, label: string, rule: string): void {
 /**
  * Check part of a `~` rule against what the rule syntax can represent.
  *
- * @throws {Error} if the text uses an escape outside PORTABLE_ESCAPES, carries
- *   a top-level `|`, or a host half holds a character no hostname can, or text
- *   the resolver's config cannot quote
+ * @throws {Error} if the text uses an escape outside PORTABLE_ESCAPE, carries a
+ *   top-level `|`, or a host half holds a character no hostname can or text the
+ *   resolver's config cannot quote
  */
 export function checkRawRegexHalf(
   text: string,

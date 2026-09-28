@@ -84,8 +84,8 @@ else
     echo "init-inspect-cfg: resolver=$UPSTREAM_RESOLVERS"
 fi
 
-# The rules go through in audit too. They allow nothing there, but one that
-# names an address still exempts that address from the internal-address guard.
+# Passed in audit too: they allow nothing there, but a rule naming an address
+# still exempts it from the internal-address guard.
 qjs --std -m /opt/buildcage/scripts/gen-configs.js \
     /etc/haproxy/haproxy.cfg \
     /etc/coredns/Corefile \

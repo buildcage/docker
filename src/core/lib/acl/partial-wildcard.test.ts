@@ -206,9 +206,7 @@ describe("checkRawRegexHalf", () => {
     expect(() => check("a\\.com|b\\.com:443", false)).toThrow(/top-level "\|"/);
   });
 
-  it("refuses an escape PCRE2 reads differently, which could hide a top-level alternation", () => {
-    // PCRE2 reads `\Q[\E` as a literal `[` and `\c[` as one character, so
-    // the "|" after either is top-level there though it looks enclosed here.
+  it("refuses an escape PCRE2 may read differently from JavaScript", () => {
     for (const text of [
       "x\\.com:443\\Q[\\E|:443]?",
       "x\\.com:443\\c[|:443]?",
