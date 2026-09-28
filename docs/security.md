@@ -522,7 +522,8 @@ Verification establishes where the image came from. Here is what it leaves uncov
   `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` produces a `dist/` where a `BUILDCAGE_LOCAL_IMAGE_REF`
   override can point the action at an unpublished image, used only by this repo's own CI and local
   development. Tree-shaking drops that module out of every normal build, and a CI check inspects the
-  published `dist/` to confirm it never reads the flag, so no `env:` a consumer sets can reach it.
+  published `dist/` to confirm it names none of the test-hook variables, so no `env:` a consumer
+  sets can reach it.
   See [development.md](./development.md#local-development).
 
 Tampering with the container after startup is a separate question, and is covered under

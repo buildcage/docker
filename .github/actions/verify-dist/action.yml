@@ -25,13 +25,16 @@ runs:
           exit 1
         fi
 
-    - name: Check dist is free of the BUILDCAGE_BUILD_TEST_HOOKS test hooks
+    # Matching the bare variable names rather than one spelling of the gate
+    # also catches a gate that replacePlugin never saw, such as a destructured
+    # read of process.env.
+    - name: Check dist is free of the test hooks
       shell: bash
       run: |
         for f in dist/main.cjs dist/post.cjs report/dist/main.cjs; do
-          if grep -q 'process\.env\.BUILDCAGE_BUILD_TEST_HOOKS' "$f"; then
-            echo "::error::$f still contains a live process.env.BUILDCAGE_BUILD_TEST_HOOKS read — rolldown's replacePlugin failed to substitute it (see rolldown.config.js), leaving a test-only hook reachable in a published action. Do not merge until this passes."
+          if grep -noE 'BUILDCAGE_(BUILD_TEST_HOOKS|LOCAL_IMAGE_REF|TEST_COMPOSE_FILE)' "$f"; then
+            echo "::error::$f still references a test-hook variable. A normal build must leave the test hooks out entirely (see rolldown.config.js)."
             exit 1
           fi
-          echo "confirmed: $f has no live BUILDCAGE_BUILD_TEST_HOOKS read — its test hooks are unreachable in this build."
+          echo "confirmed: $f references no test-hook variable."
         done
