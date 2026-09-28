@@ -15,9 +15,9 @@
 export const PROXY_ADDRESS = "198.19.255.1";
 
 /**
- * The network PROXY_ADDRESS gateways, which the build or step itself is also
- * on. The internal-address guard refuses all of it, so a name cannot resolve
- * to another step's listener and have the proxy connect there.
+ * The network PROXY_ADDRESS shares with the build's steps. The
+ * internal-address guard refuses all of it, so a name resolving to a step
+ * cannot make the proxy connect there.
  */
 export const PROXY_SUBNET = "198.19.255.0/24";
 

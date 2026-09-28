@@ -282,7 +282,7 @@ describe("the internal-address guard", () => {
     expect(acl.trim().endsWith("198.19.255.1")).toBe(true);
   });
 
-  it("includes the proxy's whole network, so a name cannot reach a step beside the build", () => {
+  it("includes the proxy's whole network, where the build's steps also sit", () => {
     const acl = FULL_CONFIG.split("\n").find((l) => l.includes("acl dst_internal"))!;
     expect(acl.split(" ").includes("198.19.255.0/24")).toBe(true);
   });

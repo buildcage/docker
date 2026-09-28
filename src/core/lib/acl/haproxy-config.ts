@@ -111,8 +111,8 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
   const shared = {
     hasResolver,
     // The proxy's own address and network, not the upstream(s) a name is
-    // resolved against: a name resolving back to the gateway or to a step
-    // beside it is as internal as any other.
+    // resolved against: a name resolving to the gateway or to a step is as
+    // internal as any other.
     internalAddrs: [
       ...INTERNAL_RANGES,
       PROXY_SUBNET,

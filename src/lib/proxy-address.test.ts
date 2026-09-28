@@ -17,7 +17,7 @@ describe("PROXY_ADDRESS", () => {
 });
 
 describe("PROXY_SUBNET", () => {
-  it("is the network both engines' build networks hand out addresses from", () => {
+  it("is the subnet both engines' cni.conflist hands out", () => {
     // The internal-address guard refuses PROXY_SUBNET; a build network outside
     // it would leave the steps on it reachable by name.
     for (const engine of ["inspect", "universal"]) {
