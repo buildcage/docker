@@ -395,9 +395,6 @@ describe("scanInspectDnsLog", () => {
 });
 
 describe("a resolver line whose name CoreDNS escaped", () => {
-  // CoreDNS writes a name in presentation format: a space in a label becomes
-  // `\ `, which a name read up to the first space would lose, taking the
-  // refusal and fail_on_blocked with it.
   const at = (rest: string) => `2026-08-23 16:45:00.000000000  [INFO] buildcage dns ${rest}`;
 
   it("reads a refused name with an escaped space as written", async () => {
@@ -439,8 +436,7 @@ describe("a resolver line whose name CoreDNS escaped", () => {
   });
 
   it("counts a decision line it cannot read", async () => {
-    // CoreDNS never writes a bare space or a lone trailing backslash, so
-    // either means the line is not what it seems.
+    // CoreDNS writes neither a bare space nor a lone trailing backslash.
     const { events, unparsed } = await scanInspectDnsLog([
       at("denied name=bad com."),
       at("service-denied name=_a._tcp.x com. type=SRV"),

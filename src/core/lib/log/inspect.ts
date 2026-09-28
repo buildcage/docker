@@ -44,10 +44,8 @@ const REQUEST =
   /^buildcage (\d+) (https?) (\S+) (-?\d+) (\d+) ts=(\S*) reason=(\S+) tlserr=(\S+) dst=(\S+):(\d+) (?:sni=(\S+) )?host=(\S+) (\S+)$/;
 const PASSTHROUGH =
   /^buildcage (\d+) pass (tls|tcp) (\d+) ts=(\S*) reason=(\S+) dst=(\S+):(\d+) sni=(\S+)$/;
-// CoreDNS writes a name in presentation format, escaping a space in a label as
-// `\ `, so a name runs to the first space no backslash precedes. The escapes
-// stay as written: the Corefile's views and known_blocked_rules both match
-// that same text, and unescaping `\010` would put a control byte in the report.
+// CoreDNS escapes a space in a label as `\ `. Names stay escaped, as the
+// Corefile and known_blocked_rules match that same text.
 const DNS_NAME = String.raw`((?:[^\s\\]|\\.)+?)`;
 const DNS = new RegExp(
   String.raw`^(\S+ \S+)\s+.*buildcage dns (allowed|denied) name=${DNS_NAME}\.?$`,
@@ -62,8 +60,7 @@ const DNS_DISCOVERY = new RegExp(
 const DNS_SERVICE_DENIED = new RegExp(
   String.raw`^(\S+ \S+)\s+.*buildcage dns service-denied name=${DNS_NAME}\.? type=(\S+)$`,
 );
-/** A line CoreDNS wrote for one of our rules. Reverse lookups are left out, as
- *  they are never meant to become events. */
+/** Any line of ours but a reverse lookup, which never becomes an event. */
 const DNS_LINE = /^\S+ \S+\s+.*buildcage dns (?!reverse )/;
 /** Echoed before CoreDNS starts, so it is always the log's first line (see
  *  docker/inspect/files/s6-rc.d/coredns/run). s6-log stamps this log, hence

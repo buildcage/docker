@@ -65,8 +65,7 @@ describe("annotateKnownBlocked", () => {
   });
 
   it("matches a refused name in the escaped form the resolver logged", () => {
-    // The Corefile's own rules see the same text, so a wildcard covers a
-    // label with an escaped space as it would any other.
+    // The Corefile matches the same escaped text.
     const dns = block({
       host: String.raw`secret\ data.evil.com`,
       port: undefined,
