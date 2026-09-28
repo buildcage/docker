@@ -282,6 +282,11 @@ describe("the internal-address guard", () => {
     expect(acl.trim().endsWith("198.19.255.1")).toBe(true);
   });
 
+  it("includes the proxy's whole network, so a name cannot reach a step beside the build", () => {
+    const acl = FULL_CONFIG.split("\n").find((l) => l.includes("acl dst_internal"))!;
+    expect(acl.split(" ").includes("198.19.255.0/24")).toBe(true);
+  });
+
   it("extends the internal set with the runner's own addresses, as a second acl of the same name", () => {
     // RFC1918 is allowed on purpose for an internal mirror, so without this an
     // allowlisted name resolving to the runner reaches its published ports.

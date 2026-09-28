@@ -14,6 +14,13 @@
  */
 export const PROXY_ADDRESS = "198.19.255.1";
 
+/**
+ * The network PROXY_ADDRESS gateways, which the build or step itself is also
+ * on. The internal-address guard refuses all of it, so a name cannot resolve
+ * to another step's listener and have the proxy connect there.
+ */
+export const PROXY_SUBNET = "198.19.255.0/24";
+
 /** Stands in for the host of a connection sent to PROXY_ADDRESS whose name the
  *  log does not carry. */
 export const UNKNOWN_HOST = "(unknown)";

@@ -1,14 +1,12 @@
 // haproxy.cfg.template isn't generated from INTERNAL_RANGES, so nothing
 // keeps the two lists in sync automatically. This catches drift.
+import { PROXY_ADDRESS, PROXY_SUBNET } from "../log/proxy-address.ts";
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { generateHaproxyConfig } from "./haproxy-config.ts";
 import { HOSTNAME_CHARSET } from "./haproxy-matchers.ts";
 import { INTERNAL_RANGES } from "./haproxy-rules.ts";
 
 const isNode = typeof (globalThis as { process?: unknown }).process !== "undefined";
-
-/** The proxy's own address in the universal engine's CNI network (198.19.255.0/24). */
-const PROXY_GATEWAY = "198.19.255.1";
 
 async function readUniversalTemplate(): Promise<string> {
   if (isNode) {
@@ -63,9 +61,9 @@ const TEMPLATE = await readUniversalTemplate();
 
 describe("universal engine's internal-address guard stays in sync with INTERNAL_RANGES", () => {
   for (const aclName of ["dst_internal", "dst_internal_http"]) {
-    it(`${aclName}'s address list is exactly INTERNAL_RANGES plus the proxy gateway`, () => {
+    it(`${aclName}'s address list is exactly INTERNAL_RANGES plus the proxy's network`, () => {
       const addrs = extractGuardAddresses(TEMPLATE, aclName);
-      const expected = [...INTERNAL_RANGES, PROXY_GATEWAY].slice().sort();
+      const expected = [...INTERNAL_RANGES, PROXY_SUBNET].slice().sort();
       expect(addrs.slice().sort()).toStrictEqual(expected);
     });
 
@@ -106,7 +104,7 @@ describe("universal engine's resolver is tuned like the inspect engine's", () =>
     // the resolvers section is gated on an upstream alone.
     const generated = generateHaproxyConfig({
       resolverAddress: ["1.1.1.1"],
-      proxyAddress: PROXY_GATEWAY,
+      proxyAddress: PROXY_ADDRESS,
     }).config;
     expect(resolverTuning(TEMPLATE)).toStrictEqual(resolverTuning(generated));
   });
@@ -190,7 +188,7 @@ describe("universal engine counts the log lines it drops like the inspect engine
       const end = lines.indexOf("", start);
       return lines.slice(start, end).filter((l) => !l.startsWith("#"));
     };
-    const generated = generateHaproxyConfig({ proxyAddress: PROXY_GATEWAY }).config;
+    const generated = generateHaproxyConfig({ proxyAddress: PROXY_ADDRESS }).config;
     expect(health(TEMPLATE)).toStrictEqual(health(generated));
     expect(
       health(TEMPLATE).includes(

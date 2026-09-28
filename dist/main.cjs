@@ -7886,7 +7886,11 @@ function generateHaproxyConfig(options = {}) {
 	if (hasResolver && !opts.proxyAddress) throw Error("proxyAddress is required whenever a resolver is configured");
 	let shared = {
 		hasResolver,
-		internalAddrs: [...INTERNAL_RANGES, ...opts.proxyAddress ? [opts.proxyAddress] : []],
+		internalAddrs: [
+			...INTERNAL_RANGES,
+			"198.19.255.0/24",
+			...opts.proxyAddress ? [opts.proxyAddress] : []
+		],
 		hostAddressFile: opts.hostAddressFile
 	};
 	return {
