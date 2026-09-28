@@ -13,3 +13,7 @@
  * overlap it, and unused by real networks, which it would shadow otherwise.
  */
 export const PROXY_ADDRESS = "198.19.255.1";
+
+/** Stands in for the host of a connection sent to PROXY_ADDRESS whose name the
+ *  log does not carry. */
+export const UNKNOWN_HOST = "(unknown)";

@@ -143,6 +143,10 @@ frontend outbound_proxy
     # line against the startup marker; %B is the only per-connection detail a
     # passthrough has, seeing no method, URL or status. See log/haproxy.ts.
     log-format "buildcage %[date(0,ms)] [%[var(txn.decision)]] (%[var(txn.rule_type)]) \"%[var(txn.target)]\" %[var(txn.reason)] %B"
+    # Bytes http_filter_backend cannot parse as HTTP (ssh or git:// to a name)
+    # are logged before any txn variable is set, so every field above would be
+    # empty. Blocked in audit too: there is no request to pass on.
+    error-log-format "buildcage %[date(0,ms)] [BLOCKED] (HTTP) \"%[dst]:%[dst_port]\" bad-request %B"
 
 # --- IP direct passthrough backend ---
 backend ip_passthrough

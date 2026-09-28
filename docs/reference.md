@@ -499,6 +499,12 @@ undecrypted instead of being read as a request. `known_blocked_rules` can mark a
 name from the SNI or an address; a row reading `(unknown)` names nothing a rule can be written
 against, so the passthrough rule is the only way to clear that one.
 
+Under `universal`, a connection made through a name that is not a TLS handshake is read as HTTP in
+the same way, so ssh or `git://` to a name is refused as `bad-request`, in `audit` too. Its host
+reads `(unknown)`, as a `missing-host-header` row's does: all the log has is the proxy's own
+address. `universal` has no `allowed_tls_rules` and matches `allowed_ip_rules` against the address
+only, so the build has to connect to the address itself, with an `allowed_ip_rules` entry for it.
+
 ## Connections that failed
 
 A request no rule refused can still come to nothing: the origin answers nothing usable, breaks off

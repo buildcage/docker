@@ -1,5 +1,6 @@
 /** Log parsing library for HAProxy's buildcage decision log. */
 import { splitHostPort } from "./authority.ts";
+import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import type { TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 
@@ -34,8 +35,7 @@ const START = new RegExp(`^${PROXY_START_MARKER} (\\d+)$`);
 
 /** The proxy's rule kinds mapped to the protocol the timeline records. universal
  *  never terminates TLS, so an HTTPS connection is a passthrough it sees only
- *  the SNI of. Anything else, including the UNKNOWN of a connection refused
- *  before its kind was decided, is a bare TCP connection. */
+ *  the SNI of. Anything else is a bare TCP connection. */
 const PROTOCOL: Record<string, TrafficProtocol> = {
   HTTPS: "https",
   HTTP: "http",
@@ -72,7 +72,11 @@ export async function scanHaproxyLog(
       headIntact ??= false;
       const [, ms, decision, ruleType, target, reason, bytes] = m;
       if (decision !== passedDecision && decision !== "BLOCKED") continue;
-      const { host, port } = splitHostPort(target);
+      const { host: address, port } = splitHostPort(target);
+      // A line that names no host falls back to the address the connection
+      // was sent to, and every name resolves to the proxy's own: a request
+      // with no Host, or bytes that were never a request (error-log-format).
+      const host = address === PROXY_ADDRESS ? UNKNOWN_HOST : address;
       const failed = decision === "BLOCKED" && FAILURE_REASONS.has(reason);
       const refused = decision === "BLOCKED" && !failed;
       const event: TrafficEvent = {

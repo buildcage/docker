@@ -81,12 +81,62 @@ describe("scanHaproxyLog", () => {
     expect(events[0].bytes).toBeUndefined();
   });
 
-  it("maps an UNKNOWN rule kind to a tcp connection", async () => {
+  it("maps a rule kind it does not know to a tcp connection", async () => {
+    // The template overwrites its UNKNOWN default on every path that logs, so
+    // this guards the fallback rather than a line the proxy writes.
     const { events } = await scanHaproxyLog(
       [line("BLOCKED", "UNKNOWN", "10.0.0.9:1234", "-")],
       false,
     );
     expect(events[0].protocol).toBe("tcp");
+  });
+
+  it("names no host for bytes sent to the proxy's own address that were never a request", async () => {
+    for (const isAudit of [false, true]) {
+      const { events, unparsed } = await scanHaproxyLog(
+        [line("BLOCKED", "HTTP", "198.19.255.1:22", "bad-request")],
+        isAudit,
+      );
+      expect(unparsed).toBe(0);
+      expect(events).toStrictEqual([
+        {
+          time: 1787471970,
+          action: "block",
+          protocol: "http",
+          host: "(unknown)",
+          port: 22,
+          reason: "bad-request",
+        },
+      ]);
+    }
+  });
+
+  it("names no host for a request with no Host either", async () => {
+    const { events } = await scanHaproxyLog(
+      [line("BLOCKED", "HTTP", "198.19.255.1:80", "missing-host-header")],
+      false,
+    );
+    expect(events[0].host).toBe("(unknown)");
+    expect(events[0].port).toBe(80);
+  });
+
+  it("keeps an address the build wrote out itself as the host", async () => {
+    const { events } = await scanHaproxyLog(
+      [line("BLOCKED", "IP", "198.19.255.10:22", "ip-not-allowed")],
+      false,
+    );
+    expect(events[0].host).toBe("198.19.255.10");
+  });
+
+  it("counts a line whose every field is empty as unparsed", async () => {
+    // What the proxy wrote for bytes it could not read as a request before it
+    // had an error-log-format; no destination or reason survives in it.
+    const { events, unparsed } = await scanHaproxyLog(
+      ['buildcage 1790532433493 [-] (-) "-" - 0'],
+      false,
+    );
+    expect(events).toStrictEqual([]);
+    expect(unparsed).toBe(1);
   });
 
   it("reads a target with no port as a portless event", async () => {

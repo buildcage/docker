@@ -22,7 +22,7 @@
 import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
 
 import { splitHostPort } from "./authority.ts";
-import { PROXY_ADDRESS } from "./proxy-address.ts";
+import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import type { TrafficAction, TrafficEvent } from "./traffic-event.ts";
 
@@ -262,9 +262,6 @@ function urlOf(scheme: string, authority: string, target: string): string | unde
 function authorityOf(host: string, port: string, scheme: "http" | "https"): string {
   return port === DEFAULT_PORT[scheme] ? host : `${host}:${port}`;
 }
-
-/** Stands in for a host the log has no way to name; see hostBeforeRequest. */
-const UNKNOWN_HOST = "(unknown)";
 
 /**
  * The host of a connection that never delivered a whole request: its SNI, the
