@@ -196,6 +196,30 @@ func TestRunFailsAStepWhoseWriteBackFailed(t *testing.T) {
 	}
 }
 
+// A step that exits non-zero can still be committed, when the LLB's
+// ValidExitCodes allows the code, so its layer is swept like any other.
+func TestRunSweepsAStepThatExitedNonZero(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	useTempCAFile(t, string(testCA))
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	useFakeRunc(t, "exit 3")
+	// Standing for a copy the step made: the fake runc writes nothing itself.
+	copied := filepath.Join(rootfs, "ca.pem")
+	mustWriteFile(t, copied, string(testCA))
+
+	if code := run([]string{"run", "--bundle", bundle, "id"}); code != 3 {
+		t.Errorf("run exited %d, want 3", code)
+	}
+	if _, err := os.Stat(copied); !os.IsNotExist(err) {
+		t.Error("the copy of the CA in the layer was left behind")
+	}
+	if _, err := os.Lstat(filepath.Join(rootfs, "etc", "pki")); !os.IsNotExist(err) {
+		t.Error("the anchor directories were left behind")
+	}
+}
+
 // The CA is put in place by the proxy before any step runs. Without it there is
 // nothing to trust and nothing to undo, so the step runs untouched rather than
 // being held up.

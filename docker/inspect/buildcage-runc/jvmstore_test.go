@@ -229,7 +229,7 @@ func TestInjectAddsCAToTheJVMKeystore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
 	scratch, _ := mount["source"].(string)
@@ -264,7 +264,7 @@ func TestInjectAddsCAToBothJVMKeystores(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
 	scratch, _ := mount["source"].(string)
@@ -291,7 +291,7 @@ func TestInjectLeavesAnUntouchedKeystoreAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -326,7 +326,7 @@ func TestInjectWritesBackWhenTheStepChangesTheKeystore(t *testing.T) {
 		trustedEntry(2, injectedAlias, testDER))
 	mustWriteFile(t, filepath.Join(scratch, "cacerts"), string(stepStore))
 
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -366,7 +366,7 @@ func TestInjectRestoresAnUntouchedKeystoreBesideAChange(t *testing.T) {
 	scratch, _ := mount["source"].(string)
 	mustWriteFile(t, filepath.Join(scratch, "other"), "AFTER\n")
 
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -402,7 +402,7 @@ func TestInjectDoesNotRestoreADeletedKeystore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(rootfs, "opt/java/lib/security/cacerts")); !os.IsNotExist(err) {
@@ -433,7 +433,7 @@ func TestInjectFailsWhenItCannotRestoreAKeystore(t *testing.T) {
 	scratch, _ := mount["source"].(string)
 	mustWriteFile(t, filepath.Join(scratch, "other"), "AFTER\n")
 
-	if err := restore.finish(true); !errors.Is(err, errBrokenFile) {
+	if err := restore.finish(); !errors.Is(err, errBrokenFile) {
 		t.Fatalf("got %v, want the restore failure to fail the step", err)
 	}
 }
@@ -451,7 +451,7 @@ func TestInjectSkipsAnUninjectableKeystore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
 	scratch, _ := mount["source"].(string)
@@ -530,7 +530,7 @@ func TestInjectCoversAKeystoreInsideTheStoreDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	// One bind covers the store directory; the keystore is not bound separately.
 	for _, m := range loadMounts(t, bundle) {

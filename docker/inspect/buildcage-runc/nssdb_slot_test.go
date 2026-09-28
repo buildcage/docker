@@ -77,7 +77,7 @@ func TestNSSDBSlotGoesIntoANewDatabaseAndComesBackOut(t *testing.T) {
 		}
 	}
 
-	if err := in.finish(true); err != nil {
+	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Lstat(filepath.Join(rootfs, "root/.pki")); !os.IsNotExist(err) {
@@ -96,7 +96,7 @@ func TestNSSDBSlotKeepsADatabaseTheStepCreated(t *testing.T) {
 	in, _, rootfs, mirror := injectSlot(t, nil)
 	mustWriteFile(t, filepath.Join(mirror, "cert9.db"), "CREATED BY CHROMIUM")
 
-	if err := in.finish(true); err != nil {
+	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
 	legacy := filepath.Join(rootfs, "root", nssDBPath)
@@ -125,7 +125,7 @@ func TestNSSDBSlotIsAppendedAsAnEntryOfItsOwn(t *testing.T) {
 
 			// A change elsewhere, so the mirror is written back.
 			mustWriteFile(t, filepath.Join(mirror, "cert9.db"), "CHANGED BY THE STEP")
-			if err := in.finish(true); err != nil {
+			if err := in.finish(); err != nil {
 				t.Fatal(err)
 			}
 			legacy := filepath.Join(rootfs, "root", nssDBPath)
@@ -154,7 +154,7 @@ func TestNSSDBSlotLeavesAModuleTheStepAdded(t *testing.T) {
 			module := "library=/usr/lib/opensc-pkcs11.so\nname=OpenSC\n\n"
 			mustAppendFile(t, filepath.Join(mirror, "pkcs11.txt"), module)
 
-			if err := in.finish(true); err != nil {
+			if err := in.finish(); err != nil {
 				t.Fatal(err)
 			}
 			want := tc.original + tc.separator + module
@@ -175,7 +175,7 @@ func TestNSSDBSlotTheStepRewroteIsStillTakenOut(t *testing.T) {
 			in, _, rootfs, mirror := injectSlot(t, ptr("library=\nname=internal\n"))
 			mustWriteFile(t, filepath.Join(mirror, "pkcs11.txt"), tc.rewrite)
 
-			if err := in.finish(true); err != nil {
+			if err := in.finish(); err != nil {
 				t.Fatal(err)
 			}
 			if got := mustRead(t, filepath.Join(rootfs, "root", nssDBPath, "pkcs11.txt")); got != tc.want {
@@ -201,7 +201,7 @@ func TestNSSDBSlotLeavesAPkcs11TxtThatIsNoLongerAFile(t *testing.T) {
 			}
 			replace(t, path)
 
-			if err := in.finish(true); err != nil {
+			if err := in.finish(); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := os.Stat(filepath.Join(rootfs, "root", nssDBPath, "cert9.db")); err != nil {
@@ -215,7 +215,7 @@ func TestNSSDBSlotRefusesAPkcs11TxtTooLargeToRead(t *testing.T) {
 	in, _, _, mirror := injectSlot(t, ptr("library=\n"))
 	mustSparseFile(t, filepath.Join(mirror, "pkcs11.txt"), maxPKCS11TxtBytes+1)
 
-	if err := in.finish(true); err == nil || !strings.Contains(err.Error(), "too large") {
+	if err := in.finish(); err == nil || !strings.Contains(err.Error(), "too large") {
 		t.Fatalf("got %v, want a pkcs11.txt too large to read to fail the step", err)
 	}
 }
@@ -226,7 +226,7 @@ func TestNSSDBSlotFailsOnTheCACopiedIntoTheStepsDatabase(t *testing.T) {
 	in, _, _, mirror := injectSlot(t, ptr("library=\n"))
 	mustWriteFile(t, filepath.Join(mirror, "cert9.db"), "SQLite\x00"+string(certificateDERs(testCA)[0]))
 
-	if err := in.finish(true); !errors.Is(err, errUnstrippableCA) {
+	if err := in.finish(); !errors.Is(err, errUnstrippableCA) {
 		t.Fatalf("got %v, want the copy to fail the step as residue", err)
 	}
 }

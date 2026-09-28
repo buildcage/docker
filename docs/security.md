@@ -243,7 +243,10 @@ Three mechanisms make that enforceable:
   touched the CA. Reading the layer back needs BuildKit's `overlayfs` snapshotter, which the builder
   started by this action gets. On a builder whose data root cannot hold an overlay upper directory,
   BuildKit falls back to another snapshotter, the wrapper warns in each step's output that it is
-  leaving the layer unread, and only the store directory's own undo applies.
+  leaving the layer unread, and only the store directory's own undo applies. The layer is read back
+  whatever the step exited with. The wrapper fails a step through its exit code, 1 or the step's own
+  non-zero one, so an LLB whose `ValidExitCodes` accepts that code lets the failure through; the
+  Dockerfile frontend never sets `ValidExitCodes`.
 
 A wide host rule paired with a narrow path or method does not narrow the DNS side. DNS has no notion
 of a path, so a name under an allowed `*.example.com` is logged as allowed the moment it is looked

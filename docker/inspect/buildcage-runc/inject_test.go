@@ -98,7 +98,7 @@ func TestInjectSetsEachUnsetVariableAccordingToItsKind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	env := loadEnv(t, bundle)
 
@@ -160,7 +160,7 @@ func TestInjectAppendsToAnAlreadySetVariableInstead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	env := loadEnv(t, bundle)
 	if env["DENO_CERT"] != "/custom/roots.pem" {
@@ -200,7 +200,7 @@ func TestInjectFoldsATargetNestedUnderTheStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	mounts := loadMounts(t, bundle)
 	for _, m := range mounts {
@@ -236,7 +236,7 @@ func TestInjectLeavesAVariableUnderAMissingDirectoryAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	for _, m := range loadMounts(t, bundle) {
 		if m["destination"] == "/not-there" {
@@ -257,7 +257,7 @@ func TestInjectLeavesAVariableNamingADirectoryAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	for _, m := range loadMounts(t, bundle) {
 		entries, err := os.ReadDir(m["source"].(string))
@@ -286,7 +286,7 @@ func TestInjectFinishLeavesAnUntouchedStoreAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -319,7 +319,7 @@ func TestInjectWritesBackWhenTheStepChangesTheStore(t *testing.T) {
 
 	calls := countRsync(t)
 
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatal(err)
 	}
 	if *calls != 2 {
@@ -352,8 +352,34 @@ func TestInjectWriteBackFailurePropagates(t *testing.T) {
 
 	failRsyncOn(t, 2) // the apply, right after a successful dry run
 
-	if err := restore.finish(true); err == nil {
+	if err := restore.finish(); err == nil {
 		t.Fatal("expected the write-back failure to propagate")
+	}
+}
+
+// The write-back's failure is the one returned, but a copy the sweep could not
+// strip still reaches the log.
+func TestInjectWriteBackFailureKeepsTheSweepFailureInTheLog(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mount := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")
+	scratchDir, _ := mount["source"].(string)
+	mustWriteFile(t, filepath.Join(scratchDir, "ca-certificates.crt"), "REGENERATED\n")
+	mustWriteFile(t, filepath.Join(rootfs, "cacerts.bin"), "EFI-VAR\x00"+string(testDER))
+	failRsyncOn(t, 2)
+
+	if err := restore.finish(); err == nil || isCAResidue(err) {
+		t.Fatalf("got %v, want the write-back failure", err)
+	}
+	if !strings.Contains(ownLog.String(), "cannot strip: /cacerts.bin") {
+		t.Errorf("the sweep failure is not in the log:\n%s", ownLog.String())
 	}
 }
 
@@ -376,7 +402,7 @@ func TestInjectSkipsRestoreWhenStepSwapsBundleForASymlink(t *testing.T) {
 	}
 	mustSymlink(t, outside, target)
 
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatalf("restore should skip the unrestorable file, not fail the build: %v", err)
 	}
 
@@ -432,7 +458,7 @@ func TestInjectWithoutSystemStoreFallsBackToOwnCAForEveryVariable(t *testing.T) 
 		t.Fatalf("own CA file = %q", own)
 	}
 
-	restore.finish(true)
+	restore.finish()
 	if _, err := os.Stat(filepath.Join(rootfs, strings.TrimPrefix(ownCAPath, "/"))); !os.IsNotExist(err) {
 		t.Fatalf("own CA file still present after restore: %v", err)
 	}
@@ -466,7 +492,7 @@ func TestInjectSkipsADirectoryAMountAlreadyCovers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	for _, m := range loadMounts(t, bundle) {
 		if m["destination"] == "/etc/ssl/certs" {
@@ -493,7 +519,7 @@ func TestInjectRefusesToBindTheContainerRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	if mounts := loadMounts(t, bundle); len(mounts) != 0 {
 		t.Fatalf("expected no mounts, got %v", mounts)
@@ -513,7 +539,7 @@ func TestInjectSkipsADirectoryPrepareRefuses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	for _, m := range loadMounts(t, bundle) {
 		if m["destination"] == "/big" {
@@ -538,7 +564,7 @@ func TestInjectFallsBackWhenTheStoreCannotBeMirrored(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	if mounts := loadMounts(t, bundle); len(mounts) != 0 {
 		t.Errorf("mounted %v, want nothing mirrored", mounts)
@@ -569,7 +595,7 @@ func TestInjectLeavesAnExistingOwnCAPathAlone(t *testing.T) {
 		}
 	}
 
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(existing)
@@ -592,7 +618,7 @@ func TestInjectLeavesAnUnresolvableVariableAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	if got := loadEnv(t, bundle)["DENO_CERT"]; got != "../../../../etc/passwd" {
 		t.Errorf("DENO_CERT = %q, want it left alone", got)
@@ -616,7 +642,7 @@ func TestInjectCarriesOnWhenItCannotPlaceItsOwnCAFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	env := loadEnv(t, bundle)
 	for _, variable := range caVariables {
@@ -644,7 +670,7 @@ func TestInjectCarriesOnWhenItCannotWriteItsOwnCAFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	if got := loadEnv(t, bundle)["NODE_EXTRA_CA_CERTS"]; got != "" {
 		t.Errorf("NODE_EXTRA_CA_CERTS = %q, want it left unset", got)
@@ -677,7 +703,7 @@ func TestInjectFinishReportsAnOwnCAFileItCannotRemove(t *testing.T) {
 	}
 	mustMkdirAll(t, filepath.Join(ownCA, "in-the-way"))
 
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatalf("a leftover own-CA file must not fail the step: %v", err)
 	}
 	var out strings.Builder
@@ -712,7 +738,7 @@ func TestInjectFinishRefusesAnOwnCAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	}
 	mustSymlink(t, outside, etc)
 
-	if err := restore.finish(true); err != nil {
+	if err := restore.finish(); err != nil {
 		t.Fatalf("the mismatch must not fail the step: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(outside, filepath.Base(ownCAPath))); err != nil {
@@ -747,7 +773,7 @@ func TestInjectSkipsADirectoryItCannotGetAScratchDirFor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	if mounts := loadMounts(t, bundle); len(mounts) != 0 {
 		t.Fatalf("expected no mounts, got %v", mounts)
@@ -775,7 +801,7 @@ func TestInjectReportsASpecItCannotSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer restore.finish(true)
+	defer restore.finish()
 
 	var out strings.Builder
 	dumpOwnLog(&out)
@@ -805,7 +831,7 @@ func TestInjectPlacesAnchorsAndFinishTakesThemBack(t *testing.T) {
 		}
 	}
 
-	if err := in.finish(true); err != nil {
+	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
 	for _, anchor := range anchorDirs {
@@ -818,8 +844,7 @@ func TestInjectPlacesAnchorsAndFinishTakesThemBack(t *testing.T) {
 	}
 }
 
-// A sweep that fails stops finish before it takes the created directories back,
-// because the build is failing and the snapshot will be released anyway.
+// A sweep that fails still leaves finish to take the created directories back.
 func TestFinishReportsAFailedLayerSweep(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
@@ -833,7 +858,10 @@ func TestFinishReportsAFailedLayerSweep(t *testing.T) {
 	// A container the sweep cannot rewrite, left in the layer by the step.
 	mustWriteFile(t, filepath.Join(rootfs, "cacerts.bin"), "EFI-VAR\x00"+string(testDER))
 
-	if err := in.finish(true); err == nil {
+	if err := in.finish(); err == nil {
 		t.Fatal("expected the failed sweep to fail the step")
+	}
+	if _, err := os.Lstat(filepath.Join(rootfs, "etc", "pki")); !os.IsNotExist(err) {
+		t.Error("the anchor directories were left behind")
 	}
 }
