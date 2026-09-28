@@ -660,7 +660,7 @@ system CA store:
 | `npm_config_cafile`   | npm, in any case (`NPM_CONFIG_CAFILE`)                                    | Left unset                                       | Left unset                  |
 | `AWS_CA_BUNDLE`       | AWS CLI and SDKs                                                          | Left unset                                       | Left unset                  |
 | `CARGO_HTTP_CAINFO`   | Cargo                                                                     | Left unset                                       | Left unset                  |
-| `BUNDLE_SSL_CA_CERT`  | Bundler                                                                   | Left unset                                       | Left unset                  |
+| `BUNDLE_SSL_CA_CERT`  | Bundler, when it names a file rather than a directory                     | Left unset                                       | Left unset                  |
 
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
 Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read
