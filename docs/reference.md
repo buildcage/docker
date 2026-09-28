@@ -317,14 +317,14 @@ as it does in a wildcard rule. The host part may not contain `'`, a backtick, `{
 name does, and the resolver's configuration has no way to quote them.
 
 The host part of a pattern also decides which names the build's resolver answers as allowed, and
-the resolver matches it with RE2. Lookaround (`(?=`, `(?!`, `(?<=`, `(?<!`) is therefore refused
-there, in a URL rule's host half as well.
+the resolver matches it with RE2. Lookaround (`(?=`, `(?!`, `(?<=`, `(?<!`) and backreferences are
+therefore refused there, in a URL rule's host half as well.
 
 Setup checks a pattern with JavaScript's regular expressions, but the proxy runs it with PCRE2. A
-backslash may precede punctuation, as in `\.`, or one of `\d \D \w \W \s \S \b \B \n \r \t \f`,
-which both read alike. Any other letter or digit after a backslash is refused, backreferences
-included. Other syntax only JavaScript accepts, such as `[\d-z]`, passes setup and then stops the
-proxy from starting.
+backslash may precede punctuation, as in `\.`, one of `\d \D \w \W \s \S \b \B \n \r \t \f`, or a
+single-digit backreference such as `\1`, all of which the two read alike. Any other letter or digit
+after a backslash is refused. Other syntax only JavaScript accepts, such as `[\d-z]`, passes setup
+and then stops the proxy from starting.
 
 In `allowed_url_rules` a `~` expression covers the URL, and is split at the first `/` after `://`:
 everything before that `/` is matched against the host, everything from it onward against the path.

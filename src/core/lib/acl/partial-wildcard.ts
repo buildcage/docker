@@ -175,11 +175,11 @@ const HOST_LITERAL_ILLEGAL = /\\[[\]]/;
 const COREFILE_UNSAFE = /['`]|\{[$%]/;
 
 /**
- * Lookaround, which RE2 lacks: a host half also goes into the resolver's
- * allowlist, where it would stop the resolver from starting. Backreferences,
- * RE2's other gap, are escapes checkEscapes has already refused.
+ * Lookaround and backreferences, which RE2 lacks: a host half also goes into
+ * the resolver's allowlist, where they would stop the resolver from starting.
+ * checkEscapes has already refused a named one (`\k<n>`).
  */
-const RE2_UNSUPPORTED = /^\(\?<?[=!]/;
+const RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9])/;
 
 function checkResolverRegexSyntax(text: string, label: string, rule: string): void {
   let inClass = false;
@@ -190,7 +190,8 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
       if (unsupported) {
         throw new Error(
           `Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". ` +
-            `Lookaround is not supported in a host pattern, which the resolver matches with RE2`,
+            `Lookaround and backreferences are not supported in a host pattern, which the ` +
+            `resolver matches with RE2`,
         );
       }
     }
@@ -205,22 +206,27 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
 }
 
 /**
- * The letter escapes that JavaScript, which these checks parse with, and
- * PCRE2, which the proxy matches with, read alike. PCRE2 reads `\Q[\E` as a
- * literal `[` and `\c[` as one character, where JavaScript sees a class
- * opening, so a `|` that looks enclosed here is top-level in the proxy.
+ * The letter and digit escapes that JavaScript, which these checks parse
+ * with, and PCRE2, which the proxy matches with, read alike. PCRE2 reads
+ * `\Q[\E` as a literal `[` and `\c[` as one character, where JavaScript sees
+ * a class opening, so a `|` that looks enclosed here is top-level in the
+ * proxy. A backreference has to be one digit: the two read `\12` by
+ * different rules.
  */
-const PORTABLE_ESCAPES = "dDwWsSbBnrtf";
+const PORTABLE_ESCAPE = /^(?:[dDwWsSbBnrtf]|[1-9](?!\d))/;
 
 function checkEscapes(text: string, label: string, rule: string): void {
   for (let i = 0; i < text.length; i++) {
     if (text[i] !== "\\") continue;
-    const next = text[++i];
-    if (next !== undefined && /[A-Za-z0-9]/.test(next) && !PORTABLE_ESCAPES.includes(next)) {
+    const rest = text.slice(++i);
+    if (PORTABLE_ESCAPE.test(rest)) continue;
+    const escape = /^(?:\d+|[A-Za-z])/.exec(rest);
+    if (escape) {
       throw new Error(
-        `Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${next}". The proxy's ` +
-          `PCRE2 reads it differently from setup, so a backslash may precede only punctuation or ` +
-          `one of \\d \\D \\w \\W \\s \\S \\b \\B \\n \\r \\t \\f`,
+        `Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${escape[0]}". The ` +
+          `proxy's PCRE2 reads it differently from setup, so a backslash may precede only ` +
+          `punctuation, one of \\d \\D \\w \\W \\s \\S \\b \\B \\n \\r \\t \\f, or a single ` +
+          `backreference digit`,
       );
     }
   }

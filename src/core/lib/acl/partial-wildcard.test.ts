@@ -166,12 +166,13 @@ describe("checkRawRegexHalf: resolver regex syntax", () => {
   const check = (text: string, hostHalf: boolean) =>
     checkRawRegexHalf(text, "host half", `~${text}`, hostHalf);
 
-  it("refuses lookaround in a host half, which RE2 lacks", () => {
+  it("refuses lookaround and backreferences in a host half, which RE2 lacks", () => {
     for (const text of [
       "(?!evil)[a-z]+\\.com",
       "(?=a)[a-z]+\\.com",
       "(?<=a)b\\.com",
       "(?<!a)b\\.com",
+      "(a)\\1\\.com",
     ]) {
       expect(() => check(text, true)).toThrow(/RE2/);
     }
@@ -213,15 +214,21 @@ describe("checkRawRegexHalf", () => {
       "x\\.com:443\\c[|:443]?",
       "x\\x5b\\.com:443",
       "x\\K\\.com:443",
-      "(a)\\1\\.com:443",
       "(?<n>a)\\k<n>\\.com:443",
+      "/(a)\\12",
+      "/a\\0",
     ]) {
-      expect(() => check(text, false)).toThrow(/uses "\\[A-Za-z0-9]"/);
+      expect(() => check(text, false)).toThrow(/uses "\\([A-Za-z]|\d+)"/);
     }
   });
 
   it("keeps the escapes both engines read alike, and any escaped punctuation", () => {
-    for (const text of ["\\d+\\.com:443", "a\\s?\\b\\-b\\.com:443", "a\\\\Q\\.com:443"]) {
+    for (const text of [
+      "\\d+\\.com:443",
+      "a\\s?\\b\\-b\\.com:443",
+      "a\\\\Q\\.com:443",
+      "/(a)\\1",
+    ]) {
       expect(() => check(text, false)).not.toThrow();
     }
   });
