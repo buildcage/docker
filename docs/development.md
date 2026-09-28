@@ -173,9 +173,8 @@ The override logic lives in its own module (`src/core/lib/provenance/local-image
 only via a dynamic `import()` gated by that build-time flag. Without the flag (i.e. every
 normal/committed build), rolldown's own module-graph tree-shaking excludes that entire file from
 the bundle. It is physically absent, not just unreachable. A CI check (`unit_test` job)
-additionally confirms a normal build never contains a live runtime read of
-`BUILDCAGE_BUILD_TEST_HOOKS` in `dist`, guarding against a future refactor silently breaking
-that guarantee.
+additionally confirms a normal build's `dist` never mentions `BUILDCAGE_BUILD_TEST_HOOKS`,
+`BUILDCAGE_LOCAL_IMAGE_REF` or `BUILDCAGE_TEST_COMPOSE_FILE`.
 
 To exercise it locally:
 
