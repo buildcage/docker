@@ -284,6 +284,7 @@ func TestInjectAddsCAToBothJVMKeystores(t *testing.T) {
 func TestInjectLeavesAnUntouchedKeystoreAlone(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 	original := keystore(2, trustedEntry(2, "digicert", otherDER))
 	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts", original)
 
@@ -309,6 +310,7 @@ func TestInjectLeavesAnUntouchedKeystoreAlone(t *testing.T) {
 func TestInjectWritesBackWhenTheStepChangesTheKeystore(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
 		keystore(2, trustedEntry(2, "digicert", otherDER)))
 
@@ -349,6 +351,7 @@ func TestInjectWritesBackWhenTheStepChangesTheKeystore(t *testing.T) {
 func TestInjectRestoresAnUntouchedKeystoreBesideAChange(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 	// A real CA, since injecting into a PKCS#12 parses it, unlike the JKS tests'
 	// stand-in bytes.
 	ca := certPEM(testCert(t, "buildcage"))
@@ -387,6 +390,7 @@ func TestInjectRestoresAnUntouchedKeystoreBesideAChange(t *testing.T) {
 func TestInjectDoesNotRestoreADeletedKeystore(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 	ca := certPEM(testCert(t, "buildcage"))
 	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
 		keytoolStore(t, "keytool-alias", testCert(t, "digicert")))

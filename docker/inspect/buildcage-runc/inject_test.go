@@ -281,6 +281,7 @@ func TestInjectLeavesAVariableNamingADirectoryAlone(t *testing.T) {
 func TestInjectFinishLeavesAnUntouchedStoreAlone(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
@@ -307,6 +308,7 @@ func TestInjectFinishLeavesAnUntouchedStoreAlone(t *testing.T) {
 func TestInjectWritesBackWhenTheStepChangesTheStore(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
@@ -386,6 +388,7 @@ func TestInjectWriteBackFailureKeepsTheSweepFailureInTheLog(t *testing.T) {
 func TestInjectSkipsRestoreWhenStepSwapsBundleForASymlink(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 	outside := filepath.Join(t.TempDir(), "host-secret")
 	mustWriteFile(t, outside, "SECRET")
 
@@ -580,6 +583,7 @@ func TestInjectFallsBackWhenTheStoreCannotBeMirrored(t *testing.T) {
 func TestInjectLeavesAnExistingOwnCAPathAlone(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 	existing := filepath.Join(rootfs, strings.TrimPrefix(ownCAPath, "/"))
 	mustWriteFile(t, existing, "THE IMAGE PUT THIS HERE")
 
@@ -689,6 +693,7 @@ func TestInjectFinishReportsAnOwnCAFileItCannotRemove(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
@@ -720,6 +725,7 @@ func TestInjectFinishReportsAnOwnCAFileItCannotRemove(t *testing.T) {
 func TestInjectFinishRefusesAnOwnCAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	useTempLog(t)
 	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
