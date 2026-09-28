@@ -25,7 +25,7 @@ export async function buildUniversalReportData(
   // concurrently rather than paying their combined latency serially.
   const [
     { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed },
-    { events: dnsEvents, headIntact: dnsHeadIntact },
+    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed },
   ] = await Promise.all([
     scanHaproxyLog(proxyLines, isAudit),
     scanInspectDnsLog(dnsLines, isAudit),
@@ -40,7 +40,8 @@ export async function buildUniversalReportData(
     // A decision line this cannot read, or one the proxy dropped, may well have
     // been a refusal, and either log losing its beginning loses evidence the
     // other cannot vouch for.
-    logLooksPlausible: proxyHeadIntact && dnsHeadIntact && unparsed === 0 && droppedLogs === 0,
+    logLooksPlausible:
+      proxyHeadIntact && dnsHeadIntact && unparsed === 0 && dnsUnparsed === 0 && droppedLogs === 0,
     startedAt,
     timeline,
   };

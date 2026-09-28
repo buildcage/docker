@@ -153,6 +153,17 @@ describe("buildUniversalReportData", () => {
     expect(result.logLooksPlausible).toBe(false);
   });
 
+  it("logLooksPlausible is false when a resolver decision line could not be read", async () => {
+    // A refused name reaches no proxy, so an unreadable line is a refusal lost.
+    const result = await buildUniversalReportData(
+      [HAPROXY_START],
+      [DNS_START, dnsLine("denied", "bad com")],
+      reportParams(),
+      0,
+    );
+    expect(result.logLooksPlausible).toBe(false);
+  });
+
   it("logLooksPlausible is false when a proxy decision line could not be read", async () => {
     const result = await buildUniversalReportData(
       [HAPROXY_START, `buildcage 1787471971000 [BLOCKED] (HTTPS) "bad.com:4`],

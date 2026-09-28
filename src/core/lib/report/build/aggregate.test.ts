@@ -64,6 +64,16 @@ describe("annotateKnownBlocked", () => {
     ).toBe(true);
   });
 
+  it("matches a refused name in the escaped form the resolver logged", () => {
+    // The Corefile matches the same escaped text.
+    const dns = block({
+      host: String.raw`secret\ data.evil.com`,
+      port: undefined,
+      protocol: "dns",
+    });
+    expect(annotateKnownBlocked([dns], ["*.evil.com"])[0].expected).toBe(true);
+  });
+
   it("still lets a port-less rule match a connection that has one", () => {
     // It reads as ":*", so a connection on any port is covered too.
     expect(annotateKnownBlocked([block()], ["evil.example.com"])[0].expected).toBe(true);

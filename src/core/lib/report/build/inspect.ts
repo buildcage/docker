@@ -23,7 +23,7 @@ export async function buildInspectReportData(
   // combined latency serially.
   const [
     { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed },
-    { events: dnsEvents, headIntact: dnsHeadIntact },
+    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed },
   ] = await Promise.all([
     scanInspectLog(proxyLines, isAudit),
     scanInspectDnsLog(dnsLines, isAudit),
@@ -37,7 +37,8 @@ export async function buildInspectReportData(
     ...reduceTimeline(timeline, parameters.knownBlockedRules),
     // Either log losing its beginning loses evidence the other cannot vouch
     // for, and an unreadable or dropped line is the same gap mid-log.
-    logLooksPlausible: proxyHeadIntact && dnsHeadIntact && unparsed === 0 && droppedLogs === 0,
+    logLooksPlausible:
+      proxyHeadIntact && dnsHeadIntact && unparsed === 0 && dnsUnparsed === 0 && droppedLogs === 0,
     startedAt,
     timeline,
   };
