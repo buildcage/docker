@@ -238,7 +238,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	if upper != "" {
 		created = placeAnchors(s.rootfs, ca)
 	} else {
-		logf("the step's layer is not an overlay upper directory; not placing anchors")
+		logf("no overlay upper directory found for the step's layer; not placing anchors")
 	}
 
 	plan := planCATrust(s, ca, store)

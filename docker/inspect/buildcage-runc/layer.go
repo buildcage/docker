@@ -37,9 +37,10 @@ var errUnstrippableCA = errors.New("the certificate is in a format this cannot s
 // out.
 var errCALeftInLayer = errors.New("the certificate is still in the step's layer")
 
-// errLayerUnread means the step's layer is not an overlay upper directory, so
-// nothing could say whether it holds a copy.
-var errLayerUnread = errors.New("the step's layer is not an overlay upper directory, so it could not be checked for copies of the proxy CA")
+// errLayerUnread means no overlay upper directory was found for the step's
+// layer, usually because BuildKit is not using its overlayfs snapshotter, so
+// nothing could say whether it holds a copy. The log says why.
+var errLayerUnread = errors.New("no overlay upper directory was found for the step's layer, so it could not be checked for copies of the proxy CA")
 
 // readMountInfo is a var so tests can hand the parser lines captured from a
 // real build rather than the test process's own mount table.
