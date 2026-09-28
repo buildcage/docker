@@ -154,7 +154,7 @@ func TestNSSDBCoversADatabaseTheStepUserCannotWrite(t *testing.T) {
 		t.Fatalf("the database directory is %d:%d %o, want %d:%d 700", u, g, mode, uid, gid)
 	}
 
-	if err := in.finish(true); err != nil {
+	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(legacy); err != nil {
@@ -178,7 +178,7 @@ func TestNSSDBLeavesADirectoryTheStepUsed(t *testing.T) {
 	}
 	mustWriteFile(t, filepath.Join(rootfs, "root/.pki/app.db"), "the step's own")
 
-	if err := in.finish(true); err != nil {
+	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(rootfs, "root/.pki/app.db")); err != nil {
@@ -239,7 +239,7 @@ func TestNSSDBPrefersTheLegacyDatabaseToTheXDGOne(t *testing.T) {
 	}
 	slotAt(t, in, bundle, "/root/.pki/nssdb")
 	assertNoMountAt(t, bundle, "/root/.local/share/pki/nssdb")
-	if err := in.finish(true); err != nil {
+	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(filepath.Join(legacy, "cert9.db"))
@@ -270,7 +270,7 @@ func TestNSSDBUsesAnXDGDatabaseWhenThereIsNoLegacyOne(t *testing.T) {
 	}
 	slotAt(t, in, bundle, "/root/.local/share/pki/nssdb")
 	assertNoMountAt(t, bundle, "/root/.pki/nssdb")
-	if err := in.finish(true); err != nil {
+	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(filepath.Join(xdg, "cert9.db"))
@@ -311,7 +311,7 @@ func TestNSSDBChangedByTheStepFailsTheStep(t *testing.T) {
 			scratch := nssMountSource(t, bundle, "/root/.pki/nssdb")
 			change(t, scratch)
 
-			err = in.finish(true)
+			err = in.finish()
 			if err == nil || !strings.Contains(err.Error(), "changed the NSS database at /root/.pki/nssdb") {
 				t.Fatalf("got %v, want the change to fail the step", err)
 			}
@@ -349,7 +349,7 @@ func TestNSSDBChownOrChmodDoesNotFailTheStep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := in.finish(true); err != nil {
+	if err := in.finish(); err != nil {
 		t.Fatalf("got %v from an unchanged database", err)
 	}
 }
@@ -616,7 +616,7 @@ func TestNSSDBFinishReportsADatabaseItCannotRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	failWalkOn(t, in.nss.scratchDir, 1)
-	if err := in.finish(true); !errors.Is(err, errNSSDBChanged) {
+	if err := in.finish(); !errors.Is(err, errNSSDBChanged) {
 		t.Fatalf("expected a database that cannot be read back to count as changed, got %v", err)
 	}
 }

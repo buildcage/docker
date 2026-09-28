@@ -165,11 +165,10 @@ type injection struct {
 // the step's layer holds a copy. A non-nil error means the layer may still
 // carry one, and the build must not proceed with it.
 //
-// committing says whether there is a layer to read back at all. A step that
-// exited non-zero has already failed the build, and BuildKit releases its
-// mutable snapshot rather than committing it, so sweeping that snapshot would
-// only slow a failed build down over a layer nothing will see.
-func (in *injection) finish(committing bool) error {
+// The layer is read back whatever the step exited with: BuildKit commits it
+// for a non-zero exit the LLB's ValidExitCodes allows, and keeps a failed
+// step's layer for debugging.
+func (in *injection) finish() error {
 	var firstErr error
 	for _, b := range in.binds {
 		if err := b.finish(); err != nil {
@@ -199,19 +198,15 @@ func (in *injection) finish(committing bool) error {
 			logf("cannot remove %s: %v", ownCAPath, err)
 		}
 	}
-	if firstErr != nil || !committing {
-		// Either way the snapshot is about to be released rather than
-		// committed, so there is nothing for a sweep of it to establish.
-		return firstErr
-	}
 	// After the write-back, whose own result lands in the layer.
-	if err := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca)); err != nil {
-		return err
-	}
+	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca))
 	// After the sweep, which has by now emptied and removed the anchor files,
 	// so a directory the injection created is empty and can go.
 	removeCreatedDirs(in.rootfs, in.created)
-	return nil
+	if firstErr != nil {
+		return firstErr
+	}
+	return sweepErr
 }
 
 // inject makes the step trust the proxy's CA, returning what finishes the

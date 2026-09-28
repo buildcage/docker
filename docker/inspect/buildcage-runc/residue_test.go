@@ -32,7 +32,7 @@ func TestFinishOnlyWarnsAboutACopyItCannotStripWhenAskedTo(t *testing.T) {
 	mustWriteFile(t, filepath.Join(rootfs, "cacerts.bin"), "EFI-VAR\x00"+string(testDER))
 
 	readStderr := captureStderr(t)
-	err = in.finish(true)
+	err = in.finish()
 	stderr := readStderr()
 	if err != nil {
 		t.Fatalf("got %v, want only a warning", err)
@@ -66,7 +66,7 @@ func TestFinishOnlyWarnsAboutAKeystoreItCannotResealWhenAskedTo(t *testing.T) {
 	mustWriteFile(t, filepath.Join(rootfs, "truststore.jks"), string(sealed))
 
 	readStderr := captureStderr(t)
-	err = in.finish(true)
+	err = in.finish()
 	stderr := readStderr()
 	if err != nil {
 		t.Fatalf("got %v, want only a warning", err)
@@ -111,7 +111,7 @@ func TestNSSDBChangeOnlyWarnsWhenAskedTo(t *testing.T) {
 	mustWriteFile(t, filepath.Join(scratch, "cert9.db"), "WITH A CA OF THE STEP'S OWN")
 
 	readStderr := captureStderr(t)
-	err = in.finish(true)
+	err = in.finish()
 	stderr := readStderr()
 	if err != nil {
 		t.Fatalf("got %v, want only a warning", err)
@@ -140,7 +140,7 @@ func TestMirrorWritesBackAroundACopyItCannotStripWhenAskedTo(t *testing.T) {
 	mustWriteFile(t, filepath.Join(scratch, "store.bin"), "EFI-VAR\x00"+string(testDER))
 
 	readStderr := captureStderr(t)
-	err = in.finish(true)
+	err = in.finish()
 	readStderr()
 	if err != nil {
 		t.Fatalf("got %v, want only a warning", err)
