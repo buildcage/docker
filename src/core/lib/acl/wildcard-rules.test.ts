@@ -54,6 +54,12 @@ describe("wildcardToRegex", () => {
   it("keeps an IPv4 CIDR block, which only an IP rule gives meaning", () => {
     expect(wildcardToRegex("10.0.0.0/8:443")).toBe("10\\.0\\.0\\.0/8:443");
     expect(() => wildcardToRegex("example.com/8:443")).toThrow(/no hostname can/);
+    expect(wildcardToRegex("0.0.0.0/0:443")).toBe("0\\.0\\.0\\.0/0:443");
+  });
+
+  it("rejects a CIDR block HAProxy would misread or reject", () => {
+    expect(() => wildcardToRegex("010.0.0.0/8:443")).toThrow(/Invalid CIDR block/);
+    expect(() => wildcardToRegex("10.0.0.0/33:443")).toThrow(/Invalid CIDR block/);
   });
 
   it("wildcard port *", () => {

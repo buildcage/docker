@@ -4,18 +4,17 @@
  * into config text, and this module knows nothing about that text.
  */
 
+import { IPV4_OR_CIDR, OCTET } from "./ipv4.ts";
 import { anchorRawRegex, domainToRegexPartial, splitRawRegexHost } from "./partial-wildcard.ts";
 import type { UrlRule } from "./url-rules.ts";
 
-/** An IPv4 address or CIDR block, which is what HAProxy's `dst` acl accepts. */
-export const IPV4_OR_CIDR = /^\d{1,3}(?:\.\d{1,3}){3}(?:\/\d{1,2})?$/;
+export { IPV4_OR_CIDR };
 
 /**
  * A dotted quad matched against a Host header. Strict about octets: whatever
  * matches is used as the destination unresolved, so nothing that is not an
  * address may pass.
  */
-const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
 export const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`;
 
 /**

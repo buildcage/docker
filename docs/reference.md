@@ -247,7 +247,9 @@ Because a URL rule matches nothing on an engine that never sees a method or a pa
 ### IP addresses: `allowed_ip_rules`
 
 Connections made straight to an address never go through DNS, so they are allowed separately from
-any domain. IPv4 only, and what a rule may hold depends on the engine:
+any domain. IPv4 only, in decimal without leading zeros (`10.0.0.1`, not `010.0.0.1`, which HAProxy
+reads as octal) and with a prefix length of 0 to 32; setup refuses anything else. What a rule may
+hold depends on the engine:
 
 | Engine      | A rule can be                                               | It cannot be       |
 | ----------- | ----------------------------------------------------------- | ------------------ |
