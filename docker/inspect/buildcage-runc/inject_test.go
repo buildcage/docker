@@ -187,8 +187,7 @@ func TestInjectAppendsToAnAlreadySetVariableInstead(t *testing.T) {
 	}
 }
 
-// The variables that only replace a tool's bundle when set get the CA in the
-// file they name, the same as the others.
+// An append-only variable that is set gets the CA in the file it names.
 func TestInjectAppendsToAnAppendOnlyVariable(t *testing.T) {
 	for _, name := range []string{"GIT_SSL_CAINFO", "npm_config_cafile", "AWS_CA_BUNDLE", "CARGO_HTTP_CAINFO", "BUNDLE_SSL_CA_CERT"} {
 		t.Run(name, func(t *testing.T) {
@@ -211,8 +210,7 @@ func TestInjectAppendsToAnAppendOnlyVariable(t *testing.T) {
 	}
 }
 
-// Unset, they are left unset: the tool reads its own default trust, which the
-// store or its absence already covers.
+// Unset, it stays unset: the tool reads its default trust.
 func TestInjectLeavesAnUnsetAppendOnlyVariableUnset(t *testing.T) {
 	for name, newBundleFn := range map[string]func(*testing.T, []string) (string, string){
 		"with a store": newBundle,
@@ -238,8 +236,8 @@ func TestInjectLeavesAnUnsetAppendOnlyVariableUnset(t *testing.T) {
 	}
 }
 
-// npm reads npm_config_cafile in any case, so every spelling is followed, and
-// two naming the same file add the CA to it once.
+// npm reads npm_config_cafile in any case. Two spellings naming one file add
+// the CA to it once.
 func TestInjectMatchesNpmConfigCafileInAnyCase(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{

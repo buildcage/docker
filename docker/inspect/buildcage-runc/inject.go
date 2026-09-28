@@ -36,8 +36,7 @@ const (
 	// Point at the system store, which replaces the tool's bundle; with no
 	// store, falls back to the same proxy-CA-only file as pointAtOwnCA.
 	pointAtSystemStore
-	// Nothing, store or no store: unset, the tool reads its default trust,
-	// and only a file an image or Dockerfile named needs the CA added.
+	// Left unset, store or no store: the tool then reads its default trust.
 	appendIfSet
 )
 
@@ -57,8 +56,8 @@ var caVariables = []struct {
 	// rustls-native-certs. Not by GnuTLS, so Debian's wget and git go by the
 	// store at their own compiled-in path instead.
 	{"SSL_CERT_FILE", pointAtSystemStore, false},
-	// Each replaces its tool's bundle, and is what a base image carrying a
-	// company's own CA tends to set.
+	// Each replaces its tool's bundle. Base images carrying a company CA
+	// often set them.
 	{"GIT_SSL_CAINFO", appendIfSet, false},
 	{"npm_config_cafile", appendIfSet, true},
 	{"AWS_CA_BUNDLE", appendIfSet, false},
@@ -124,10 +123,9 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 			logf("%s=%s could not be resolved inside the rootfs (%v); leaving it alone", name, value, err)
 			return
 		}
-		// resolveInRoot now resolves a path whose directories do not exist
-		// yet, which the anchors need but this does not: a bundle cannot be
-		// under a directory that is not there, so a variable pointing at one
-		// is the step's own and is left alone rather than mirrored.
+		// resolveInRoot accepts a path whose directories do not exist yet, for
+		// the anchors. A bundle cannot be under a missing directory, so a
+		// variable pointing at one is the step's own and is left alone.
 		if _, err := os.Stat(filepath.Dir(resolved)); err != nil {
 			logf("%s=%s names a directory that is not there; leaving it alone", name, value)
 			return

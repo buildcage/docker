@@ -317,9 +317,9 @@ it: `NODE_EXTRA_CA_CERTS`, `DENO_CERT`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` an
 `CURL_CA_BUNDLE` is set only in a step with no system CA store of its own, since curl reads that
 store already. A variable the base image or the Dockerfile already set is appended to rather than
 redirected. `GIT_SSL_CAINFO`, `npm_config_cafile`, `AWS_CA_BUNDLE`, `CARGO_HTTP_CAINFO` and
-`BUNDLE_SSL_CA_CERT` are appended to the same way when set, and otherwise left unset. Neither the CA nor the
-variables are left in the image layers, except a copy a step
-hides where it cannot be read (see [Limitations](#limitations)). The CA is also left in the
+`BUNDLE_SSL_CA_CERT` are appended to the same way when set, and otherwise left unset. Neither the
+CA nor the variables are left in the image layers, except a copy a step hides where it cannot be
+read (see [Limitations](#limitations)). The CA is also left in the
 distribution's own anchor directory, so a step that installs `ca-certificates` partway through keeps
 trusting it once `update-ca-certificates` has rebuilt the bundle from scratch. A JVM already in the
 base image reads none of those variables and only its own keystore, so the CA is added there too, to
