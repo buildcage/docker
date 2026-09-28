@@ -2,9 +2,9 @@
  * Generate the `inspect` engine's haproxy.cfg and Corefile from one rule set,
  * so what CoreDNS logs as allowed and what HAProxy actually lets through
  * cannot drift apart: a narrower view would misreport an allowed name as
- * denied, a wider one would misreport a denied name as allowed. CoreDNS never
- * resolves a name for real either way; only HAProxy does, and only once a
- * request has already passed these same rules.
+ * denied, and a wider one would misreport a denied name as allowed. CoreDNS
+ * never resolves a name for real either way; only HAProxy does, and only once
+ * a request has already passed these same rules.
  *
  * Usage:
  *   qjs --std -m gen-configs.js <haproxy_out> <corefile_out> <proxy_address> \

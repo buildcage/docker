@@ -18,7 +18,7 @@ services:
       HOST_ADDRESSES: 10.200.0.199
       BUILDCAGE_EXTRA_CA_FILE: /test-fixtures/test-server-cert.pem
       # The rules live here rather than in the Makefile so CI, which drives
-      # compose directly, tests the same ones. audit ignores them all.
+      # compose directly, tests the same ones. audit enforces none of them.
       ALLOWED_HTTPS_RULES: "sub.wildcard.example.com:443 absent.example.com:443 v6only.example.com:443 metadata.example.com:443 runner.example.com:443 impostor.example.com:443 deadend.example.com:443"
       ALLOWED_HTTP_RULES: "allowed.example.com:80 deadend.example.com:80"
       # The ~regex rule reuses tlspass.example.com on a second port, so a
