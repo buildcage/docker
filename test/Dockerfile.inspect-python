@@ -1,0 +1,15 @@
+# Python 3.13+ verifies strictly by default and refuses a CA without keyUsage,
+# which curl and the JVM never check.
+#
+# FROM is deliberately not governed by this engine
+# (see docs/security.md#what-buildkitd-fetches-itself), so this pull
+# succeeds whatever the rules say.
+FROM python:3.13-alpine@sha256:79e7a9b9ff1cbceff819f856fb374477792a5967759d94df266de7b7b4120e6f
+
+SHELL ["/bin/sh", "-c"]
+
+RUN echo "=== [Python strict verification trusts the injected CA] ===" && \
+    python3 -c 'import ssl, urllib.request; assert ssl.create_default_context().verify_flags & ssl.VERIFY_X509_STRICT; print(urllib.request.urlopen("https://allowed.example.com/public/probe", timeout=10).read().decode())' && \
+    echo "OK: Python trusted the proxy CA in-step"
+
+RUN echo "=== End of test ==="
