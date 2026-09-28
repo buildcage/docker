@@ -146,7 +146,29 @@ describe("passthrough", () => {
   // the flag; a rule covering every port has none to gate on.
   it("gates the tlsrule flag on the SNI alone", () => {
     const anyPort = detect({ tlsRules: ["db.example.com:*"] });
-    expect(anyPort).toMatch(/set-var\(txn\.tlsrule\) int\(1\) if tls0_sni\n/);
+    expect(anyPort).toMatch(/set-var\(txn\.tlsrule\) int\(1\) if tls0_sni sni_is_name\n/);
+  });
+});
+
+describe("an SNI that is not a hostname", () => {
+  // `db.example.com:x.evil.com` would match `~^db\.example\.com:.*$` and
+  // resolve under evil.com.
+  const result = detect({ tlsRules: ["~^db\\.example\\.com:.*$", "db.example.com:443"] });
+
+  it("is checked against the hostname charset", () => {
+    expect(result.includes("acl sni_is_name req.ssl_sni -m reg ^[A-Za-z0-9._-]+$")).toBe(true);
+  });
+
+  it("neither passes through nor resolves, whichever form the rule takes", () => {
+    for (const cond of ["tls0_sni sni_is_name", "tls1_sni tls1_port sni_is_name"]) {
+      expect(result.includes(`set-var(txn.pass) int(1) if ${cond}\n`)).toBe(true);
+      expect(result.includes(`set-var(txn.tlsrule) int(1) if ${cond}\n`)).toBe(true);
+      expect(result.includes(`,regsub([^A-Za-z0-9._-],_,g) if ${cond}\n`)).toBe(true);
+    }
+  });
+
+  it("is not checked without a tls rule", () => {
+    expect(detect({ ipRules: ["10.0.0.5:5432"] }).includes("sni_is_name")).toBe(false);
   });
 });
 
@@ -165,7 +187,7 @@ describe("ip rules and the proxy's own address", () => {
 
   it("leaves a tls rule's passthrough alone, which is judged on the SNI", () => {
     const result = detect({ ...FULL }, PROXY);
-    expect(result).toMatch(/set-var\(txn\.pass\) int\(1\) if tls0_sni tls0_port\n/);
+    expect(result).toMatch(/set-var\(txn\.pass\) int\(1\) if tls0_sni tls0_port sni_is_name\n/);
   });
 
   it("declares nothing without an ip rule or a proxy address", () => {

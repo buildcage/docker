@@ -46,7 +46,11 @@ assert_log_contains BLOCKED "runner.wildcard.example.com:80" "internal-address"
 echo ""
 
 echo "[BLOCKED] forged SNI, sanitized to a single log line:"
-assert_log_contains BLOCKED "x__-__T__buildcage__ALLOWED___HTTPS___forged.example.com:443" "not-allowed"
+assert_log_contains BLOCKED "x__-__T__buildcage__ALLOWED___HTTPS___forged.example.com:443" "invalid-sni"
+echo ""
+
+echo "[BLOCKED] an SNI holding a colon, before a ~ rule's port pattern can match it:"
+assert_log_contains BLOCKED "tlsany.example.com_x.evil.example.net:443" "invalid-sni"
 echo ""
 
 echo "[keep-alive] txn.decision/txn.reason must not leak across requests on one connection:"

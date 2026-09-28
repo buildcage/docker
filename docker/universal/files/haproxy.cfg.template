@@ -82,6 +82,8 @@ frontend outbound_proxy
     tcp-request content set-var(txn.sni_log) var(txn.sni),regsub([^A-Za-z0-9._-],_,g) if is_tls has_sni
 
     acl is_https_allowed var(txn.sni_port) -m reg -i -f /etc/haproxy/rules/allowed_https.lst
+    # Keep in sync with HOSTNAME_CHARSET in haproxy-matchers.ts, which says why.
+    acl sni_is_name var(txn.sni) -m reg ^[A-Za-z0-9._-]+$
 
     # ---------------------------------------------------------
     # 1. IP direct access (non DNS-routed)
@@ -103,6 +105,8 @@ frontend outbound_proxy
     tcp-request content set-var(txn.rule_type) str(HTTPS) if is_tls
     tcp-request content set-var(txn.reason) str(missing-sni) if is_tls !has_sni
     tcp-request content reject if is_tls !has_sni
+    tcp-request content set-var(txn.reason) str(invalid-sni) if is_tls has_sni !sni_is_name
+    tcp-request content reject if is_tls has_sni !sni_is_name
 
     # ---------------------------------------------------------
     # 3. TLS allowlist check (before DNS to avoid resolving blocked domains)

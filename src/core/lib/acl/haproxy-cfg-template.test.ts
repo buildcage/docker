@@ -2,6 +2,7 @@
 // keeps the two lists in sync automatically. This catches drift.
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { generateHaproxyConfig } from "./haproxy-config.ts";
+import { HOSTNAME_CHARSET } from "./haproxy-matchers.ts";
 import { INTERNAL_RANGES } from "./haproxy-rules.ts";
 
 const isNode = typeof (globalThis as { process?: unknown }).process !== "undefined";
@@ -134,6 +135,32 @@ describe("universal engine's IP allowlist judges the real destination", () => {
     expect(setters).toStrictEqual([
       `tcp-request content set-var-fmt(${variable}) %[dst]:%[dst_port]`,
     ]);
+  });
+});
+
+describe("universal engine refuses an SNI that is not a hostname", () => {
+  const lines = TEMPLATE.split("\n").map((l) => l.trim());
+
+  it("checks it against the same charset as the inspect engine", () => {
+    expect(aclLines(TEMPLATE, "sni_is_name")).toStrictEqual([
+      `    acl sni_is_name var(txn.sni) -m reg ${HOSTNAME_CHARSET}`,
+    ]);
+  });
+
+  it("refuses it before the allowlist or the resolver can act on it", () => {
+    const reject = lines.indexOf("tcp-request content reject if is_tls has_sni !sni_is_name");
+    expect(
+      lines.includes(
+        "tcp-request content set-var(txn.reason) str(invalid-sni) if is_tls has_sni !sni_is_name",
+      ),
+    ).toBe(true);
+    expect(reject !== -1).toBe(true);
+    expect(
+      reject < lines.indexOf("tcp-request content reject if is_tls has_sni !is_https_allowed"),
+    ).toBe(true);
+    expect(reject < lines.findIndex((l) => l.startsWith("tcp-request content do-resolve"))).toBe(
+      true,
+    );
   });
 });
 

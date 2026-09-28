@@ -40,6 +40,20 @@ describe("inspect stage", () => {
     expect(plainStage({}, "audit").includes(set)).toBe(true);
   });
 
+  it("refuses a Host that is not a hostname before any rule or resolution, in audit too", () => {
+    // `Host: a.com:x.evil.com:80` keeps `a.com:x.evil.com` after host_only,
+    // which `~^https?://a\.com:.*/.*$` would match and do-resolve look up.
+    for (const mode of ["restrict", "audit"] as const) {
+      const plain = plainStage({ httpRules: ["~^a\\.com:.*$"] }, mode);
+      const deny = plain.indexOf("http-request deny deny_status 400 if !host_is_name");
+      expect(plain.includes("acl host_is_name var(txn.host) -m reg ^[A-Za-z0-9._-]+$")).toBe(true);
+      expect(plain.includes("set-var(txn.reason) str(invalid-host) if !host_is_name")).toBe(true);
+      expect(deny > plain.indexOf("set-var(txn.host)")).toBe(true);
+      expect(deny < plain.indexOf("do-resolve")).toBe(true);
+      if (mode === "restrict") expect(deny < plain.indexOf("set-var(txn.allowed)")).toBe(true);
+    }
+  });
+
   it("writes nothing below a deny that carries no condition and so is final", () => {
     // HAProxy skips every http-request rule after an unconditional deny and
     // warns that they are NOOP. The resolver block is what would follow here.

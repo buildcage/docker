@@ -24,7 +24,7 @@ services:
       # The ~regex rule reuses tlspass.example.com on a second port, so a
       # host regex that was mangled as a wildcard would break the existing
       # :443 rule too, not just fail to add the new port.
-      ALLOWED_TLS_RULES: "tlspass.example.com:443 ~^tlspass\\.example\\.com:8443$"
+      ALLOWED_TLS_RULES: "tlspass.example.com:443 ~^tlspass\\.example\\.com:8443$ ~^tlsany\\.example\\.com:.*$"
       # 9080 is distinct from the :80 the URL rule below already allows, so
       # reaching it proves this rule's own doing. 10.200.0.53:53 is the fixture
       # resolver, for DNS over TCP to a resolver other than the gateway.
@@ -62,6 +62,10 @@ services:
         # The "$" is the author's own and must survive: /regexexactly must
         # not match a rule naming /regexexact.
         GET ~^https://ok\.wildcard\.example\.com/regexexact$
+
+        # Its port half matches any text, so a Host of
+        # anyport.example.com:x.evil.example.net:80 would match it.
+        GET ~^https?://anyport\.example\.com:.*/.*$
 
         # Never requested: this is here so real HAProxy sees a path pattern
         # carrying a character its own config parser folds. Unescaped, the `'`
