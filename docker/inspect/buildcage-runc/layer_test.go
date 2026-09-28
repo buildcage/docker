@@ -734,16 +734,22 @@ func TestSweepDirReportsAFailedRead(t *testing.T) {
 	}
 }
 
-// A keystore this cannot reseal fails the build rather than being rewritten
-// into one the JVM that owns it can no longer open.
-func TestSweepDirFailsOnAKeystoreItCannotReseal(t *testing.T) {
+// A keystore this cannot reseal is reported as a copy it cannot strip rather
+// than rewritten into one the JVM that owns it can no longer open, and the
+// sweep carries on to the files after it.
+func TestSweepDirReportsAKeystoreItCannotReseal(t *testing.T) {
+	useTempLog(t)
 	dir := t.TempDir()
 	sealed := keystore(2, trustedEntry(2, "buildcage", testDER))
 	sealed[len(sealed)-1] ^= 0xff
 	mustWriteFile(t, filepath.Join(dir, "cacerts"), string(sealed))
+	mustWriteFile(t, filepath.Join(dir, "zz-bundle.pem"), string(testCA))
 
 	_, err := sweepDir(dir, dir, testCA, caMarksOf(testCA))
-	if err == nil || !strings.Contains(err.Error(), "system keystore password") {
-		t.Fatalf("got %v, want the seal to fail the build", err)
+	if !errors.Is(err, errUnstrippableCA) || !strings.Contains(err.Error(), "cacerts") {
+		t.Fatalf("got %v, want the keystore reported as a copy it cannot strip", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "zz-bundle.pem")); !os.IsNotExist(err) {
+		t.Error("the sweep stopped before the copy after the keystore")
 	}
 }

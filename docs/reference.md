@@ -676,7 +676,8 @@ reach, and what a step can't do to its CA store while it is mounted.
 Two things fail the build by default, naming the file and pointing at `fail_on_ca_residue`:
 
 - a copy of the CA the wrapper finds in the step's layer but cannot take out, such as one inside a
-  binary, an uncompressed archive or a re-wrapped PEM (see [Limitations](../README.md#limitations))
+  binary, an uncompressed archive, a re-wrapped PEM or a JKS keystore sealed with a password other
+  than `changeit` (see [Limitations](../README.md#limitations))
 - a write to an NSS database covered for the step because its user cannot write it (see
   [Limitations](../README.md#limitations))
 

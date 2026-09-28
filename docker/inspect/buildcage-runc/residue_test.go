@@ -48,6 +48,34 @@ func TestFinishOnlyWarnsAboutACopyItCannotStripWhenAskedTo(t *testing.T) {
 	}
 }
 
+// So does a JKS keystore sealed with a password of its own, which is found but
+// cannot be resealed.
+func TestFinishOnlyWarnsAboutAKeystoreItCannotResealWhenAskedTo(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	useWarnOnCAResidue(t)
+	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+
+	in, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed := keystore(2, trustedEntry(2, "buildcage", testDER))
+	sealed[len(sealed)-1] ^= 0xff
+	mustWriteFile(t, filepath.Join(rootfs, "truststore.jks"), string(sealed))
+
+	readStderr := captureStderr(t)
+	err = in.finish(true)
+	stderr := readStderr()
+	if err != nil {
+		t.Fatalf("got %v, want only a warning", err)
+	}
+	if !strings.Contains(stderr, "cannot strip: /truststore.jks") {
+		t.Errorf("the warning does not name the keystore:\n%s", stderr)
+	}
+}
+
 func TestStripLayerLeftoverIsResidue(t *testing.T) {
 	err := stripLayerWithALeftover(t)
 	if !errors.Is(err, errCALeftInLayer) || !isCAResidue(err) {
