@@ -64,12 +64,16 @@ export interface ReportActionDeps {
   failOnBlocked?: boolean;
 }
 
+/** Anything other than a false spelling fails closed, and a typo says so. */
 function readFailOnBlocked(): boolean {
-  try {
-    return core.getBooleanInput("fail_on_blocked");
-  } catch {
-    return true;
+  const value = core.getInput("fail_on_blocked");
+  if (["false", "False", "FALSE"].includes(value)) return false;
+  if (value !== "" && !["true", "True", "TRUE"].includes(value)) {
+    core.warning(
+      `fail_on_blocked must be true or false, not ${JSON.stringify(value)}. Reading it as true.`,
+    );
   }
+  return true;
 }
 
 export async function runReportAction(
