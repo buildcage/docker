@@ -357,6 +357,32 @@ func TestInjectWriteBackFailurePropagates(t *testing.T) {
 	}
 }
 
+// The write-back's failure is the one returned, but a copy the sweep could not
+// strip still reaches the log.
+func TestInjectWriteBackFailureKeepsTheSweepFailureInTheLog(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mount := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")
+	scratchDir, _ := mount["source"].(string)
+	mustWriteFile(t, filepath.Join(scratchDir, "ca-certificates.crt"), "REGENERATED\n")
+	mustWriteFile(t, filepath.Join(rootfs, "cacerts.bin"), "EFI-VAR\x00"+string(testDER))
+	failRsyncOn(t, 2)
+
+	if err := restore.finish(); err == nil || isCAResidue(err) {
+		t.Fatalf("got %v, want the write-back failure", err)
+	}
+	if !strings.Contains(ownLog.String(), "cannot strip: /cacerts.bin") {
+		t.Errorf("the sweep failure is not in the log:\n%s", ownLog.String())
+	}
+}
+
 func TestInjectSkipsRestoreWhenStepSwapsBundleForASymlink(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})

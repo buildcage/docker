@@ -204,6 +204,9 @@ func (in *injection) finish() error {
 	// so a directory the injection created is empty and can go.
 	removeCreatedDirs(in.rootfs, in.created)
 	if firstErr != nil {
+		if sweepErr != nil {
+			logf("%v", sweepErr)
+		}
 		return firstErr
 	}
 	return sweepErr
