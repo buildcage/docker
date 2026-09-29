@@ -11,6 +11,15 @@ import (
 // tool needs one of its own. Removed again when the step ends.
 const ownCAPath = "/etc/buildcage-ca.pem"
 
+// Playwright's Firefox reads no store and none of the variables below, only the
+// policies file this variable names. Its Certificates.Install copies the CA
+// from ownCAPath into the fresh profile each launch makes. The file is removed
+// again when the step ends.
+const (
+	firefoxPoliciesVariable = "PLAYWRIGHT_FIREFOX_POLICIES_JSON"
+	firefoxPoliciesPath     = "/etc/buildcage-firefox-policies.json"
+)
+
 // How each variable is treated when the image or Dockerfile did not set it,
 // and what it falls back to when there is no system CA store to work with.
 //
@@ -67,11 +76,45 @@ var caVariables = []struct {
 
 // caPlan is what the variable pass settled on: the files the CA has to be
 // appended to, the variables to add to the process spec, and the proxy-CA-only
-// file it wrote, if any variable needed one.
+// file and Firefox policies file it wrote, if any variable needed one.
 type caPlan struct {
-	targets      map[string]bool
-	env          map[string]string
-	createdOwnCA string
+	targets                map[string]bool
+	env                    map[string]string
+	createdOwnCA           string
+	createdFirefoxPolicies string
+}
+
+// placeOwnFile writes contents at path inside the rootfs for variableName,
+// returning where it landed, or "" when it was not written. A file already
+// there is the image's own and is left alone.
+func placeOwnFile(rootfs, path string, contents []byte, variableName string) string {
+	resolved, err := resolveInRoot(rootfs, path)
+	if err != nil {
+		logf("cannot place %s: %v", path, err)
+		return ""
+	}
+	if _, err := os.Stat(resolved); err == nil {
+		logf("%s already exists; not setting %s", path, variableName)
+		return ""
+	}
+	if err := os.WriteFile(resolved, contents, 0o644); err != nil {
+		logf("cannot write %s: %v", path, err)
+		return ""
+	}
+	return resolved
+}
+
+// removeOwnFile removes what placeOwnFile wrote, re-resolving the path and
+// removing it only if it still lands where it was written: an ancestor the
+// step turned into an absolute symlink would otherwise send os.Remove out of
+// the rootfs.
+func removeOwnFile(rootfs, path, written string) {
+	resolved, err := resolveInRoot(rootfs, path)
+	if err != nil || resolved != written {
+		logf("not removing %s: it no longer resolves there (%v)", path, err)
+	} else if err := os.Remove(resolved); err != nil && !os.IsNotExist(err) {
+		logf("cannot remove %s: %v", path, err)
+	}
 }
 
 // planCATrust walks caVariables and decides, per variable, whether the CA goes
@@ -86,28 +129,20 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 		plan.targets[store.hostPath] = true
 	}
 
-	// setOwnCA points variableName at ownCAPath, writing it once and sharing
-	// it across every variable that falls back to it.
-	setOwnCA := func(variableName string) {
-		resolved, err := resolveInRoot(s.rootfs, ownCAPath)
-		if err != nil {
-			logf("cannot place %s: %v", ownCAPath, err)
-			return
-		}
-		// More than one variable can take this path, and all of them share
-		// the file: only the first to get here writes it.
+	// writeOwnCA writes ownCAPath once, sharing it across every variable that
+	// needs it, and reports whether it is there.
+	writeOwnCA := func(variableName string) bool {
 		if plan.createdOwnCA == "" {
-			if _, err := os.Stat(resolved); err == nil {
-				logf("%s already exists; not setting %s", ownCAPath, variableName)
-				return
-			}
-			if err := os.WriteFile(resolved, ca, 0o644); err != nil {
-				logf("cannot write %s: %v", ownCAPath, err)
-				return
-			}
-			plan.createdOwnCA = resolved
+			plan.createdOwnCA = placeOwnFile(s.rootfs, ownCAPath, ca, variableName)
 		}
-		plan.env[variableName] = ownCAPath
+		return plan.createdOwnCA != ""
+	}
+
+	// setOwnCA points variableName at ownCAPath.
+	setOwnCA := func(variableName string) {
+		if writeOwnCA(variableName) {
+			plan.env[variableName] = ownCAPath
+		}
 	}
 
 	// appendTo adds the file a variable already names to the targets. A
@@ -165,20 +200,34 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 			setOwnCA(variable.name)
 		}
 	}
+
+	// Not in caVariables: a value already set names a policies file, not a
+	// bundle to append the CA to, so it is left as it is.
+	if value := s.env[firefoxPoliciesVariable]; value != "" {
+		logf("%s=%s is already set; leaving it alone", firefoxPoliciesVariable, value)
+	} else if writeOwnCA(firefoxPoliciesVariable) {
+		policies := []byte(`{"policies":{"Certificates":{"Install":["` + ownCAPath + `"]}}}` + "\n")
+		plan.createdFirefoxPolicies = placeOwnFile(s.rootfs, firefoxPoliciesPath, policies, firefoxPoliciesVariable)
+		if plan.createdFirefoxPolicies != "" {
+			plan.env[firefoxPoliciesVariable] = firefoxPoliciesPath
+		}
+	}
 	return plan
 }
 
 // injection is what a completed inject leaves to be undone once the step has
 // exited: the mirrored directories to reconcile, the NSS database to check, the
-// proxy-CA-only file to remove if one was written, the directories the
-// injection created, and what the step's own layer is read back through.
+// proxy-CA-only and Firefox policies files to remove if they were written, the
+// directories the injection created, and what the step's own layer is read
+// back through.
 type injection struct {
-	rootfs       string
-	ca           []byte
-	binds        []*dirBind
-	nss          *nssBind
-	createdOwnCA string
-	created      createdDirs
+	rootfs                 string
+	ca                     []byte
+	binds                  []*dirBind
+	nss                    *nssBind
+	createdOwnCA           string
+	createdFirefoxPolicies string
+	created                createdDirs
 	// The step's layer as found when the injection began, kept rather than
 	// recomputed at finish: a transient mount-table read failure there would
 	// otherwise report no layer and commit the anchors' scattered copies unswept.
@@ -214,16 +263,10 @@ func (in *injection) finish() error {
 		in.nss.cleanup()
 	}
 	if in.createdOwnCA != "" {
-		// Re-resolve and remove only the path that still lands where inject
-		// wrote it, for the same reason removeCreatedDirs does: an ancestor the
-		// step turned into an absolute symlink would otherwise send os.Remove
-		// out of the rootfs.
-		resolved, err := resolveInRoot(in.rootfs, ownCAPath)
-		if err != nil || resolved != in.createdOwnCA {
-			logf("not removing %s: it no longer resolves there (%v)", ownCAPath, err)
-		} else if err := os.Remove(resolved); err != nil && !os.IsNotExist(err) {
-			logf("cannot remove %s: %v", ownCAPath, err)
-		}
+		removeOwnFile(in.rootfs, ownCAPath, in.createdOwnCA)
+	}
+	if in.createdFirefoxPolicies != "" {
+		removeOwnFile(in.rootfs, firefoxPoliciesPath, in.createdFirefoxPolicies)
 	}
 	// After the write-back, whose own result lands in the layer.
 	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca))
@@ -306,7 +349,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("cannot update the process spec: %v", err)
 	}
 
-	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, nss: nss, createdOwnCA: plan.createdOwnCA, created: created, upper: upper}, nil
+	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, nss: nss, createdOwnCA: plan.createdOwnCA, createdFirefoxPolicies: plan.createdFirefoxPolicies, created: created, upper: upper}, nil
 }
 
 // bindTargets binds each group of CA targets, nested groups folded into the

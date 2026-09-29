@@ -1004,6 +1004,104 @@ func TestInjectFinishRefusesAnOwnCAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	}
 }
 
+// Playwright's Firefox is pointed at a policies file installing the CA from
+// ownCAPath, which is written for it even when every variable that would
+// otherwise take it is already set. Both files go when the step ends.
+func TestInjectPointsPlaywrightsFirefoxAtAPoliciesFile(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt", "DENO_CERT=/etc/ssl/certs/ca-certificates.crt"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := loadEnv(t, bundle)[firefoxPoliciesVariable]; got != firefoxPoliciesPath {
+		t.Errorf("%s = %q, want %q", firefoxPoliciesVariable, got, firefoxPoliciesPath)
+	}
+	raw, err := os.ReadFile(filepath.Join(rootfs, strings.TrimPrefix(firefoxPoliciesPath, "/")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policies struct {
+		Policies struct {
+			Certificates struct{ Install []string }
+		}
+	}
+	if err := json.Unmarshal(raw, &policies); err != nil {
+		t.Fatalf("policies file is not JSON: %v\n%s", err, raw)
+	}
+	if install := policies.Policies.Certificates.Install; !slices.Equal(install, []string{ownCAPath}) {
+		t.Errorf("Certificates.Install = %q, want [%q]", install, ownCAPath)
+	}
+	own, err := os.ReadFile(filepath.Join(rootfs, strings.TrimPrefix(ownCAPath, "/")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(own) != string(testCA) {
+		t.Fatalf("own CA file = %q", own)
+	}
+
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{firefoxPoliciesPath, ownCAPath} {
+		if _, err := os.Stat(filepath.Join(rootfs, strings.TrimPrefix(path, "/"))); !os.IsNotExist(err) {
+			t.Errorf("%s still present: %v", path, err)
+		}
+	}
+}
+
+// A policies file the step already names is its own, and gets nothing added.
+func TestInjectLeavesAnAlreadySetFirefoxPoliciesFileAlone(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{firefoxPoliciesVariable + "=/opt/policies.json"})
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore.finish()
+
+	if got := loadEnv(t, bundle)[firefoxPoliciesVariable]; got != "/opt/policies.json" {
+		t.Errorf("%s = %q, want it left alone", firefoxPoliciesVariable, got)
+	}
+	if _, err := os.Stat(filepath.Join(rootfs, strings.TrimPrefix(firefoxPoliciesPath, "/"))); !os.IsNotExist(err) {
+		t.Errorf("a policies file was written anyway: %v", err)
+	}
+	var out strings.Builder
+	dumpOwnLog(&out)
+	if !strings.Contains(out.String(), firefoxPoliciesVariable+"=/opt/policies.json is already set") {
+		t.Errorf("the log does not say so:\n%s", out.String())
+	}
+}
+
+// A file the image already has at the policies path is left alone, and the
+// variable is not pointed at it.
+func TestInjectLeavesAnExistingFirefoxPoliciesPathAlone(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	existing := filepath.Join(rootfs, strings.TrimPrefix(firefoxPoliciesPath, "/"))
+	mustWriteFile(t, existing, "THE IMAGE PUT THIS HERE")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, set := loadEnv(t, bundle)[firefoxPoliciesVariable]; set {
+		t.Errorf("%s was pointed at a file this run did not write", firefoxPoliciesVariable)
+	}
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(existing); err != nil || string(got) != "THE IMAGE PUT THIS HERE" {
+		t.Fatalf("the image's own file was changed or removed: %q, %v", got, err)
+	}
+}
+
 // A bundle without a spec is not something to guess at: there is nothing to
 // read the rootfs or the environment out of.
 func TestInjectRefusesABundleWithoutASpec(t *testing.T) {

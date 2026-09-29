@@ -1,0 +1,31 @@
+# Each step loads a page through the proxy in Playwright's Firefox, which reads
+# no CA store, only the policies file PLAYWRIGHT_FIREFOX_POLICIES_JSON names,
+# and fails unless it trusts the proxy CA through the one the wrapper points
+# that variable at (inject.go).
+#
+# FROM is deliberately not governed by this engine
+# (see docs/security.md#what-buildkitd-fetches-itself), so this pull
+# succeeds whatever the rules say.
+FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+
+SHELL ["/bin/sh", "-c"]
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/browsers
+
+WORKDIR /opt/check
+COPY firefox/ ./
+RUN npm ci --no-audit --no-fund && \
+    npx --no-install playwright install --with-deps firefox && \
+    rm -rf /var/lib/apt/lists/*
+
+# Without the variable the same browser must refuse the proxy, so the check can
+# fail.
+RUN echo "=== [control: no policies file] ===" && \
+    env -u PLAYWRIGHT_FIREFOX_POLICIES_JSON node firefox-check.js https://allowed.example.com/public/firefox untrusted && \
+    echo "OK: refused without the policies file"
+
+RUN echo "=== [the policies file the wrapper points the variable at] ===" && \
+    node firefox-check.js https://allowed.example.com/public/firefox && \
+    echo "OK: trusted the proxy CA"
+
+RUN echo "=== End of test ==="

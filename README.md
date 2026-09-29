@@ -331,7 +331,9 @@ without `proxy_engine: universal`. Chromium, including the `chrome-headless-shel
 Playwright and Remotion download, reads only its compiled-in root store and the NSS database in
 `$HOME`, so for each step that database's `pkcs11.txt` gains a read-only slot on a database holding
 only the CA, taken back out before the layer is committed. The database itself stays the step's own,
-with whatever the step writes to it.
+with whatever the step writes to it. Playwright's Firefox reads no store either, only the policies
+file `PLAYWRIGHT_FIREFOX_POLICIES_JSON` names, so where that is unset it is pointed at one that
+installs the CA into the fresh profile Playwright makes for each launch.
 
 The full table, with what each variable points at when the step has a system CA store and when it
 has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in
@@ -433,10 +435,14 @@ reported as blocked; see
 - Only the NSS database under the `HOME` the step starts with carries the slot. Chromium started
   with another `HOME` (`HOME=/tmp chromium`, `export HOME=...`) or as another user (`su`, `gosu`,
   `sudo -u`) does not trust the CA. Switch users with `USER` instead, which the slot follows as long
-  as no `ENV HOME` pins the home, and leave `HOME` alone within the step. A Firefox carrying
-  Mozilla's own root list, such as Playwright's or the one Selenium drives, reads a per-profile
-  database and does not trust the CA; use `proxy_engine: universal` or an `allowed_tls_rules`
-  passthrough for it.
+  as no `ENV HOME` pins the home, and leave `HOME` alone within the step.
+- Playwright's Firefox reads `PLAYWRIGHT_FIREFOX_POLICIES_JSON` from 1.54 on. An earlier one, and
+  any other Firefox carrying Mozilla's own root list, such as the one Selenium drives, reads only its
+  own profile's database and does not trust the CA; use `proxy_engine: universal` or an
+  `allowed_tls_rules` passthrough for it. Firefox keeps copies of the CA in its profile, in the
+  certificate database and the page cache, so a profile a step keeps with `launchPersistentContext`
+  fails the build as a copy the wrapper cannot take out, or only warns under
+  `fail_on_ca_residue: false`.
 - A step that changes the CA's own trust in the NSS database (`certutil -M`), or exports it and
   imports it back, copies the CA into the step's database, which fails the build as a copy the
   wrapper cannot take out. A step cannot remove the database's directory (`rm -rf ~/.pki`) either,

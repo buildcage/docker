@@ -648,22 +648,25 @@ starts, so the build has to trust that CA. The CA is valid for two days from whe
 and carries a random `serialNumber` in its subject, so no two runs share one. The wrapper around
 runc sets these variables as each `RUN` step starts. If a variable is already set, by the base image
 or by the Dockerfile, Buildcage appends the CA to whatever file it already points at rather than
-redirecting the variable elsewhere, reading a relative path from the step's `WORKDIR`. Otherwise, where it points depends on whether the step has a
+redirecting the variable elsewhere, reading a relative path from the step's `WORKDIR`.
+`PLAYWRIGHT_FIREFOX_POLICIES_JSON` names a policies file rather than a bundle, so it is left as set.
+Otherwise, where it points depends on whether the step has a
 system CA store:
 
-| Variable              | Read by                                                                   | If unset, with a store                           | If unset, with no store     |
-| --------------------- | ------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------- |
-| `NODE_EXTRA_CA_CERTS` | Node.js                                                                   | Additive: pointed at a file holding only this CA | same, store or no store     |
-| `DENO_CERT`           | Deno                                                                      | Additive: pointed at a file holding only this CA | same, store or no store     |
-| `CURL_CA_BUNDLE`      | curl                                                                      | Left unset; curl already reads the system store  | proxy-CA-only fallback file |
-| `REQUESTS_CA_BUNDLE`  | Python `requests`                                                         | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
-| `PIP_CERT`            | pip                                                                       | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
-| `SSL_CERT_FILE`       | OpenSSL, and anything reading it (Go, Ruby, Rust's `rustls-native-certs`) | Replaces the bundle: pointed at the system store | proxy-CA-only fallback file |
-| `GIT_SSL_CAINFO`      | git                                                                       | Left unset                                       | Left unset                  |
-| `npm_config_cafile`   | npm, in any case (`NPM_CONFIG_CAFILE`)                                    | Left unset                                       | Left unset                  |
-| `AWS_CA_BUNDLE`       | AWS CLI and SDKs                                                          | Left unset                                       | Left unset                  |
-| `CARGO_HTTP_CAINFO`   | Cargo                                                                     | Left unset                                       | Left unset                  |
-| `BUNDLE_SSL_CA_CERT`  | Bundler, when it names a file rather than a directory                     | Left unset                                       | Left unset                  |
+| Variable                           | Read by                                                                   | If unset, with a store                                                                       | If unset, with no store     |
+| ---------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------- |
+| `NODE_EXTRA_CA_CERTS`              | Node.js                                                                   | Additive: pointed at a file holding only this CA                                             | same, store or no store     |
+| `DENO_CERT`                        | Deno                                                                      | Additive: pointed at a file holding only this CA                                             | same, store or no store     |
+| `CURL_CA_BUNDLE`                   | curl                                                                      | Left unset; curl already reads the system store                                              | proxy-CA-only fallback file |
+| `REQUESTS_CA_BUNDLE`               | Python `requests`                                                         | Replaces the bundle: pointed at the system store                                             | proxy-CA-only fallback file |
+| `PIP_CERT`                         | pip                                                                       | Replaces the bundle: pointed at the system store                                             | proxy-CA-only fallback file |
+| `SSL_CERT_FILE`                    | OpenSSL, and anything reading it (Go, Ruby, Rust's `rustls-native-certs`) | Replaces the bundle: pointed at the system store                                             | proxy-CA-only fallback file |
+| `PLAYWRIGHT_FIREFOX_POLICIES_JSON` | Playwright's Firefox, 1.54 and later                                      | Pointed at a policies file whose `Certificates.Install` adds the CA-only file to the profile | same, store or no store     |
+| `GIT_SSL_CAINFO`                   | git                                                                       | Left unset                                                                                   | Left unset                  |
+| `npm_config_cafile`                | npm, in any case (`NPM_CONFIG_CAFILE`)                                    | Left unset                                                                                   | Left unset                  |
+| `AWS_CA_BUNDLE`                    | AWS CLI and SDKs                                                          | Left unset                                                                                   | Left unset                  |
+| `CARGO_HTTP_CAINFO`                | Cargo                                                                     | Left unset                                                                                   | Left unset                  |
+| `BUNDLE_SSL_CA_CERT`               | Bundler, when it names a file rather than a directory                     | Left unset                                                                                   | Left unset                  |
 
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
 Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read

@@ -371,6 +371,19 @@ test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests ag
 	  ./test/assert-inspect-chromium.sh $(TEST_IMAGE)
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
+.PHONY: test_integration_buildkit_inspect_firefox_audit
+test_integration_buildkit_inspect_firefox_audit: ## Run inspect-engine tests against Playwright's Firefox (policies file injection)
+	@echo "Running inspect-engine audit mode tests (Playwright's Firefox)..."
+	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	  $(MAKE) setup_buildkit_inspect_audit
+	@docker buildx build --no-cache \
+	  --builder $(BUILDER_NAME) \
+	  --platform $(TEST_PLATFORM) \
+	  --progress=plain -f test/Dockerfile.inspect-firefox test/ \
+	  --load -t $(TEST_IMAGE)
+	@NO_APP_STORE_COPIES=1 ./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
+	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+
 # Each case hides a copy of the CA the sweep finds but cannot remove, and must
 # fail the build naming the file and pointing at fail_on_ca_residue. With it
 # false, the same copy and a write to a covered NSS database only warn. The control

@@ -24,6 +24,14 @@ else
   pass "no standalone buildcage CA file in the built image"
 fi
 
+# The policies file PLAYWRIGHT_FIREFOX_POLICIES_JSON was pointed at, removed the
+# same way.
+if docker run --rm "$IMAGE" sh -c 'test -e /etc/buildcage-firefox-policies.json'; then
+  fail "/etc/buildcage-firefox-policies.json is present in the built image"
+else
+  pass "no Firefox policies file in the built image"
+fi
+
 # The certificate appended to whichever system CA bundle the rootfs had,
 # removed by the same undo. The CA is generated per build, so a copy of it
 # anywhere in a bundle is one the undo failed to take back out.

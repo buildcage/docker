@@ -104,6 +104,9 @@ jobs:
           - mode: inspect-chromium-audit
             target: test_integration_buildkit_inspect_chromium_audit
             test_compose_file: compose.test-inspect.yaml
+          - mode: inspect-firefox-audit
+            target: test_integration_buildkit_inspect_firefox_audit
+            test_compose_file: compose.test-inspect.yaml
 
     name: "integration: test (${{ matrix.mode }})"
 
