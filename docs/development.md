@@ -267,7 +267,8 @@ buildcage 1787471976000 pass tls 3421 ts=-- reason=- dst=10.200.0.100:5432 sni=d
 `host` and the target are two fields rather than one URL because a request target need not be a
 path: `OPTIONS *` and a `CONNECT`'s authority are both legal, and both leave the target as `-`, so a
 reader splitting a URL back apart would take the host for `registry.npmjs.org-`. A missing `Host`
-prints as `-` too.
+prints as `-` too. The log keeps the `Host` as sent; the report lowercases it and drops one trailing
+dot, as the rules do before matching it.
 
 `ts` is HAProxy's termination state and `reason` the refusal reason where the rule that refused
 knew one the line could not otherwise show. `tlserr` carries haproxy's own error from the handshake

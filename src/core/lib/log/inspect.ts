@@ -225,6 +225,12 @@ function authorityOf(host: string, port: string, scheme: "http" | "https"): stri
   return port === DEFAULT_PORT[scheme] ? host : `${host}:${port}`;
 }
 
+/** A host as the rules match it: lowercased, with one trailing dot dropped
+ *  (see HOST_ONLY). */
+function ruleHost(host: string): string {
+  return host.toLowerCase().replace(/\.$/, "");
+}
+
 /**
  * The host of a connection that never delivered a whole request: its SNI, the
  * only name such a line carries, or failing that the address it was sent to.
@@ -238,7 +244,7 @@ function hostBeforeRequest(
   sni: string | undefined,
   address: string,
 ): { host: string; byAddress: boolean } {
-  if (sni !== undefined && sni !== "-") return { host: sni, byAddress: false };
+  if (sni !== undefined && sni !== "-") return { host: ruleHost(sni), byAddress: false };
   if (address === PROXY_ADDRESS) return { host: UNKNOWN_HOST, byAddress: false };
   return { host: address, byAddress: true };
 }
@@ -266,7 +272,11 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
     // is built around the same host the row carries.
     const parsedRequest = request[3] !== BAD_REQUEST_METHOD;
     const scheme = request[2] as "http" | "https";
-    const authority = request[12];
+    // Spelled as the rules saw it, like the logged path, so one host sent two
+    // ways is one row and a known_blocked rule matches either spelling.
+    const sent = splitHostPort(request[12]);
+    const host = ruleHost(sent.host);
+    const authority = sent.port === undefined ? host : `${host}:${sent.port}`;
     const unnamed = namedByHandshake ? hostBeforeRequest(request[11], request[9]) : undefined;
     const event: TrafficEvent = {
       // <ms> is milliseconds; TrafficEvent.time is seconds.
@@ -275,7 +285,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
       protocol: unnamed?.byAddress ? "tcp" : scheme,
       // The `Host` header names the host; the port comes from dst=, where the
       // request was actually sent.
-      host: unnamed?.host ?? splitHostPort(authority).host,
+      host: unnamed?.host ?? host,
       port: Number(request[10]),
       destination: `${request[9]}:${request[10]}`,
     };
