@@ -10,8 +10,10 @@ on:
   # as the ref, so the image's Sigstore identity names the tag it rebuilds.
   workflow_dispatch:
 
+# Per tag: a group keeps only its newest pending run, so one shared group would
+# cancel another tag's publish.
 concurrency:
-  group: docker-publish
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 permissions: {}
