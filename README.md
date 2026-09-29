@@ -442,7 +442,9 @@ reported as blocked; see
   `allowed_tls_rules` passthrough for it. Firefox keeps copies of the CA in its profile, in the
   certificate database and the page cache, so a profile a step keeps with `launchPersistentContext`
   fails the build as a copy the wrapper cannot take out, or only warns under
-  `fail_on_ca_residue: false`.
+  `fail_on_ca_residue: false`. The policy installs the CA even when every connection is an
+  `allowed_tls_rules` passthrough; to keep it out of such a profile, point
+  `PLAYWRIGHT_FIREFOX_POLICIES_JSON` at a policies file of your own.
 - A step that changes the CA's own trust in the NSS database (`certutil -M`), or exports it and
   imports it back, copies the CA into the step's database, which fails the build as a copy the
   wrapper cannot take out. A step cannot remove the database's directory (`rm -rf ~/.pki`) either,
