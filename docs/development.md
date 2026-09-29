@@ -392,8 +392,9 @@ If you encounter issues, try reproducing the problem locally to get detailed log
 3. **TLS/certificate errors under `proxy_engine: inspect`**: if a `RUN` step fails with a
    certificate error there but works fine under `universal`, the tool likely pins a certificate or
    ships its own trust store rather than reading the CA-trust environment variables Buildcage sets.
-   A JVM already in the base image is handled (`buildcage-runc` injects into its
-   `$JAVA_HOME/lib/security/cacerts`, JKS or PKCS#12); a keystore sealed with a password other than
+   A JDK already in the image is handled (`buildcage-runc` injects into its keystore, JKS or
+   PKCS#12, found through `JAVA_HOME`, `PATH` or the usual install directories); a JDK the step
+   itself downloads is not, and a keystore sealed with a password other than
    the JDK default still needs `universal`. Chromium is handled by adding a slot to its NSS
    database; one the step's user cannot write is covered instead, and a step that writes to that
    fails with "changed the NSS database". See [Limitations](../README.md#limitations).

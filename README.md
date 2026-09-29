@@ -323,7 +323,8 @@ read (see [Limitations](#limitations)). The CA is also left in the
 distribution's own anchor directory, so a step that installs `ca-certificates` partway through keeps
 trusting it once `update-ca-certificates` has rebuilt the bundle from scratch. A JVM already in the
 base image reads none of those variables and only its own keystore, so the CA is added there too, to
-`$JAVA_HOME/lib/security/cacerts` in whichever shape it ships (JKS or PKCS#12), for the step and
+`$JAVA_HOME/lib/security/cacerts` and every other JDK's in the image, in whichever shape it ships
+(JKS or PKCS#12), for the step and
 taken back out before the layer is committed, letting `mvn`, `gradle` and `java` reach the proxy
 without `proxy_engine: universal`. Chromium, including the `chrome-headless-shell` that Puppeteer,
 Playwright and Remotion download, reads only its compiled-in root store and the NSS database in
@@ -402,10 +403,21 @@ reported as blocked; see
 - A tool that pins a specific certificate, or ships a bundled trust store it never lets the system
   update, still needs `proxy_engine: universal` or an `allowed_tls_rules` passthrough: `inspect`
   re-signs the connection, and a pinned or bundled store will not accept the new certificate.
-- The JVM (Java, Kotlin, Scala) reads only its own keystore rather than the CA-trust variables, and
-  a JVM already in the base image is handled: the CA is added to its `$JAVA_HOME/lib/security/cacerts`
-  for the step and removed before the layer is committed. A keystore sealed with a password other
-  than the JDK default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it.
+- The JVM (Java, Kotlin, Scala) reads only its own keystore rather than the CA-trust variables. A
+  JDK already in the image is handled: the CA is added for the step, and removed before the layer is
+  committed, to the keystore of the JDK at `$JAVA_HOME`, of each `java` on `PATH`, and of each JDK
+  under `/usr/lib/jvm`, `/usr/java`, `/opt/java`, or the home's `.sdkman`, `.gradle/jdks`, `.jdks`
+  and `.asdf` directories (up to 32 there). A keystore sealed with a password other than the JDK
+  default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it. A JDK the
+  step itself downloads, such as a Gradle toolchain, an `sdk install` or an unpacked tarball, is not
+  there when the step starts and does not trust the CA. Fetch it in an earlier `RUN` step:
+
+  ```dockerfile
+  RUN tar xzf jdk-21.tar.gz -C /opt/java && /opt/java/jdk-21/bin/java -jar fetch.jar   # fails
+  RUN tar xzf jdk-21.tar.gz -C /opt/java
+  RUN /opt/java/jdk-21/bin/java -jar fetch.jar                                         # fine
+  ```
+
 - Chromium trusts the CA through a slot added to the NSS database it reads: `~/.pki/nssdb` when it
   exists, else `~/.local/share/pki/nssdb`, else a new `~/.pki/nssdb`, which Chromium then fills and
   the image keeps, as it would under a Chromium before M146. A new database belongs to the home's

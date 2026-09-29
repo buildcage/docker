@@ -216,9 +216,10 @@ Three mechanisms make that enforceable:
   proxy's CA by bind-mounting a scratch copy of the CA store over the step's own view of it, writing
   back to the real one only if the step actually changed it. It also leaves the certificate in the
   distribution's anchor directory, so a step that installs `ca-certificates` part-way through keeps
-  trusting it once the bundle is rebuilt, and adds it, the same mirrored way, to the keystore a JVM
-  already in the base image reads (`$JAVA_HOME/lib/security/cacerts`, in either the JKS or PKCS#12
-  shape it ships), which no CA-trust variable would reach. Chromium reads neither, only the NSS
+  trusting it once the bundle is rebuilt, and adds it, the same mirrored way, to the keystore each
+  JDK already in the image reads (`$JAVA_HOME`'s, each `java` on `PATH`'s, and those in the usual
+  install directories, in either the JKS or PKCS#12 shape they ship), which no CA-trust variable
+  would reach. Chromium reads neither, only the NSS
   database in `$HOME`, so the wrapper appends to that database's `pkcs11.txt`, in a mirror like the
   CA store's, a read-only slot on a database holding only the CA, made by `certutil` in the proxy
   container from the CA certificate alone. The wrapper never parses the step's own database: it only
