@@ -353,14 +353,17 @@ jobs:
           TAG: ${{ needs.build-and-push.outputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft 2>&1) || {
-            echo "upload=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          }
+          if ! RELEASE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft 2>view.err); then
+            if grep -qx 'release not found' view.err; then
+              echo "upload=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            cat view.err >&2
+            exit 1
+          fi
           if [ "$(echo "$RELEASE" | jq -r '.isDraft')" != "true" ]; then
-            echo "::warning::Release $TAG is already published, skipping upload"
-            echo "upload=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::Release $TAG is published and immutable, so this build's bundles cannot be attached; its registry attestation still verifies the image."
+            exit 1
           fi
           echo "upload=true" >> "$GITHUB_OUTPUT"
 
@@ -374,6 +377,6 @@ jobs:
         run: |
           echo "$BUNDLE_UNIVERSAL" > buildcage-container-universal.sigstore.json
           echo "$BUNDLE_INSPECT" > buildcage-container-inspect.sigstore.json
-          gh release upload --repo "$GITHUB_REPOSITORY" "$TAG" \
+          gh release upload --clobber --repo "$GITHUB_REPOSITORY" "$TAG" \
             buildcage-container-universal.sigstore.json \
             buildcage-container-inspect.sigstore.json

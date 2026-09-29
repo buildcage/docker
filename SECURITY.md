@@ -47,7 +47,9 @@ exact workflow rejects a signature from any other workflow, ref or repository.
 
 The Sigstore bundle for each release is also attached as a downloadable asset
 (`buildcage-container-universal.sigstore.json` and `buildcage-container-inspect.sigstore.json`) on the
-corresponding [GitHub Release](https://github.com/buildcage/docker/releases).
+corresponding [GitHub Release](https://github.com/buildcage/docker/releases). They are
+attached before the release is published; an image rebuilt after that has only its registry
+attestation.
 
 ## Dependency Management
 
