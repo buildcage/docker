@@ -1,10 +1,8 @@
 #!/bin/bash
-# RUN steps share the buildcage0 bridge, and only a host that passes bridged
-# traffic through iptables (br_netfilter) filters what one sends another. Each
-# step's port is therefore isolated (cni.conflist's portIsolation), which the
-# bridge enforces itself. buildkitd keeps a pool of network namespaces already
-# attached (buildkitd.toml's cniPoolSize), so their ports are there to read
-# without running a build.
+# Every port on buildcage0 must be isolated (cni.conflist's portIsolation):
+# without br_netfilter on the host, nothing else stops RUN steps reaching one
+# another. buildkitd keeps pooled step namespaces attached (buildkitd.toml's
+# cniPoolSize), so there are ports to read without running a build.
 set -uo pipefail
 source "$(dirname "$0")/helpers.sh"
 
