@@ -60,8 +60,7 @@ jobs:
               - 'test/Dockerfile.multiarch'
               - 'test/assert-multiarch.sh'
 
-  # Each job runs the same `make` target a developer runs. `targets` below
-  # fails if a target the Makefile defines has no job here.
+  # Every integration target in the Makefile needs a job here; `targets` checks.
   test:
     needs: changes
     # !cancelled() forces this to evaluate when `changes` is skipped (it runs
