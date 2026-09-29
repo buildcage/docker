@@ -86,9 +86,10 @@ RULES=$(
 echo "  ---- generated rules ----"
 sed 's/^/  /' <<< "$RULES"
 
-# Every host the build reached comes back under the key its rule type names,
-# and nothing else does: a rule for a host audit never saw would be invented,
-# and one under the wrong key would not match in restrict mode.
+# Every host the build reached, or tried to reach and failed only to resolve,
+# comes back under the key its rule type names, and nothing else does: a rule
+# for a host audit never saw would be invented, and one under the wrong key
+# would not match in restrict mode.
 assert_rules() {
   local key="$1" expected="$2" actual
   actual=$(
@@ -113,8 +114,8 @@ if grep -qF "Switch to restrict mode" <<< "$REPORT_MARKDOWN" \
 else
   fail "no restrict-mode example was rendered"
 fi
-assert_rules allowed_https_rules "blocked.example.com:443 blocked.example.com:8443"
-assert_rules allowed_http_rules "blocked.example.com:80 blocked.example.com:8080"
+assert_rules allowed_https_rules "blocked.example.com:443 blocked.example.com:8443 nxdomain.wildcard.example.com:443"
+assert_rules allowed_http_rules "blocked.example.com:80 blocked.example.com:8080 nxdomain.wildcard.example.com:80"
 assert_rules allowed_ip_rules "10.200.0.100:80"
 echo ""
 
