@@ -508,3 +508,127 @@ func TestRemoveNSSSlotReportsAFileItCannotOpen(t *testing.T) {
 		t.Fatal("expected an unreadable pkcs11.txt to be reported")
 	}
 }
+
+// A home copied with cp -a takes the mirror's pkcs11.txt, slot and all, into
+// the layer. The slot comes out of the copy before the layer is committed.
+func TestNSSDBSlotComesOutOfACopiedHome(t *testing.T) {
+	in, _, rootfs, mirror := injectSlot(t, nil)
+	copied := filepath.Join(rootfs, "backup", nssDBPath, "pkcs11.txt")
+	mustMkdirAll(t, filepath.Dir(copied))
+	mustWriteFile(t, copied, "library=\nname=NSS Internal PKCS #11 Module\n\n"+mustRead(t, filepath.Join(mirror, "pkcs11.txt")))
+
+	if err := in.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustRead(t, copied); got != "library=\nname=NSS Internal PKCS #11 Module\n\n" {
+		t.Fatalf("the copy holds %q, want the slot gone and the rest kept", got)
+	}
+}
+
+// stripNSSSlotLayer runs stripLayer over a layer holding a file called name
+// with content, and returns what the file holds after and what it returned.
+func stripNSSSlotLayer(t *testing.T, name, content string) (string, error) {
+	t.Helper()
+	useTempLog(t)
+	rootfs := t.TempDir()
+	path := filepath.Join(rootfs, "backup", name)
+	mustMkdirAll(t, filepath.Dir(path))
+	mustWriteFile(t, path, content)
+	err := stripLayer(rootfs, rootfs, testCA)
+	got, readErr := os.ReadFile(path)
+	if os.IsNotExist(readErr) {
+		return "<removed>", err
+	}
+	return string(got), err
+}
+
+func TestStripLayerTakesTheNSSSlotOutOfPkcs11Txt(t *testing.T) {
+	own := "library=\nname=NSS Internal PKCS #11 Module\n\n"
+	slot := string(nssSlot)
+	for name, c := range map[string]struct{ content, want string }{
+		"beside the file's own entries": {own + slot, own},
+		"alone, which removes the file": {slot, "<removed>"},
+		"twice":                         {slot + own + slot, own},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got, err := stripNSSSlotLayer(t, "pkcs11.txt", c.content); err != nil || got != c.want {
+				t.Fatalf("got (%v, %q), want (nil, %q)", err, got, c.want)
+			}
+		})
+	}
+}
+
+// Only pkcs11.txt is read: NSS opens no other name, and this wrapper's own
+// binary carries the slot's text.
+func TestStripLayerLeavesTheSlotTextOutsidePkcs11Txt(t *testing.T) {
+	content := "BINARY\x00" + string(nssSlot)
+	if got, err := stripNSSSlotLayer(t, "buildcage-runc", content); err != nil || got != content {
+		t.Fatalf("got (%v, %q), want the file left alone", err, got)
+	}
+}
+
+// Larger than any pkcs11.txt NSS writes, so not read.
+func TestStripLayerLeavesAPkcs11TxtTooLargeToBeOne(t *testing.T) {
+	content := string(nssSlot) + strings.Repeat("#", maxPKCS11TxtBytes)
+	if got, err := stripNSSSlotLayer(t, "pkcs11.txt", content); err != nil || got != content {
+		t.Fatal("a pkcs11.txt too large to be one was rewritten or failed")
+	}
+}
+
+// A slot the step reworded still names the proxy CA's database, and is
+// reported.
+func TestStripLayerReportsARewordedNSSSlot(t *testing.T) {
+	content := "library=libsoftokn3.so\nparameters=\"configdir='sql:" + nssCADBDir + "'\"\n\n"
+	_, err := stripNSSSlotLayer(t, "pkcs11.txt", content)
+	if !errors.Is(err, errCALeftInLayer) || !strings.Contains(err.Error(), "/backup/pkcs11.txt") {
+		t.Fatalf("got %v, want the reworded slot reported", err)
+	}
+	useWarnOnCAResidue(t)
+	if err := tolerateResidue(err); err != nil {
+		t.Fatalf("got %v, want only a warning under fail_on_ca_residue: false", err)
+	}
+}
+
+// A pkcs11.txt the sweep cannot rewrite fails the step rather than leaving the
+// slot in the layer.
+func TestStripNSSSlotCopyReportsWhatItCannotDo(t *testing.T) {
+	for name, broken := range map[string]*brokenFile{
+		"a failed stat":     {failStat: true},
+		"a failed read":     {failReadAt: 1},
+		"a failed write":    {failWriteAt: 1},
+		"a failed truncate": {failTruncate: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "pkcs11.txt")
+			mustWriteFile(t, path, "library=\n"+string(nssSlot))
+			useBrokenBundleFile(t, broken)
+			if _, err := stripNSSSlotCopy(path); !errors.Is(err, errBrokenFile) {
+				t.Fatalf("got %v, want the failure reported", err)
+			}
+		})
+	}
+}
+
+// The copy is rewritten through the rootfs, so one the rootfs does not lead to
+// is reported too.
+func TestStripLayerReportsAPkcs11TxtTheRootfsDoesNotReach(t *testing.T) {
+	for name, lay := range map[string]func(t *testing.T, rootfs string){
+		"not there": func(*testing.T, string) {},
+		"through a way out": func(t *testing.T, rootfs string) {
+			mustSymlink(t, "../../../../../../outside", filepath.Join(rootfs, "backup"))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			useTempLog(t)
+			root := t.TempDir()
+			rootfs, upper := filepath.Join(root, "rootfs"), filepath.Join(root, "upper")
+			mustMkdirAll(t, rootfs)
+			mustMkdirAll(t, filepath.Join(upper, "backup"))
+			mustWriteFile(t, filepath.Join(upper, "backup", "pkcs11.txt"), string(nssSlot))
+			lay(t, rootfs)
+			if err := stripLayer(rootfs, upper, testCA); err == nil {
+				t.Fatal("expected the copy to be reported")
+			}
+		})
+	}
+}

@@ -347,6 +347,10 @@ func stripLayer(rootfs, upper string, ca []byte) error {
 	if err != nil {
 		return err
 	}
+	edited, err := stripNSSSlotCopies(upper, rootfs)
+	if err != nil {
+		return err
+	}
 	left, err := verifyLayer(upper, marks.needles)
 	// Paths only, never what is in them: the sweep reads every byte the step
 	// wrote, tokens and credentials among them.
@@ -354,10 +358,36 @@ func stripLayer(rootfs, upper string, ca []byte) error {
 	if err != nil {
 		return err
 	}
+	left = append(left, edited...)
 	if len(left) > 0 {
 		return fmt.Errorf("%w: %s", errCALeftInLayer, strings.Join(left, " "))
 	}
 	return nil
+}
+
+// stripNSSSlotCopies takes the proxy CA's slot out of each pkcs11.txt in the
+// step's layer and returns those still naming its database, which the step
+// reworded. Only that name is read: NSS opens no other, and matching the slot
+// in every file would flag this wrapper's own binary, which carries it.
+func stripNSSSlotCopies(upper, rootfs string) ([]string, error) {
+	upper = filepath.Clean(upper)
+	var left []string
+	err := walkDir(upper, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.Type().IsRegular() || d.Name() != "pkcs11.txt" {
+			return err
+		}
+		rel := path[len(upper):]
+		target, err := resolveInRoot(rootfs, rel)
+		if err != nil {
+			return err
+		}
+		named, err := stripNSSSlotCopy(target)
+		if named {
+			left = append(left, rel)
+		}
+		return err
+	})
+	return left, err
 }
 
 // verifyLayer lists what still carries the certificate after a sweep.
