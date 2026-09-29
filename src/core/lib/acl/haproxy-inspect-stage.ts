@@ -80,6 +80,17 @@ function internalGuard(rules: CompiledRule[]): string[] {
   return lines;
 }
 
+/** Plaintext stage only: the TLS handshake passing through detect keeps
+ *  detect's clock behind this frontend's. */
+const PLAIN_REQUEST_TIMEOUTS = [
+  "    # detect's client timeout runs from the connection, this frontend's from",
+  "    # the hand-off after detect's 5s inspect-delay. Ending a silent client's",
+  "    # wait here first logs it as a timeout rather than a close. The",
+  "    # keep-alive wait stays at the client timeout.",
+  "    timeout http-request 20s",
+  "    timeout http-keep-alive 30s",
+];
+
 /**
  * A frontend that terminates the connection, normalizes the request, lets the
  * rules decide, and only then resolves the Host and connects there.
@@ -94,6 +105,7 @@ export function inspectStage(
     `frontend ${name}`,
     `    bind 127.0.0.1:${port} accept-proxy${bindExtra}`,
     "    mode http",
+    ...(scheme === "http" ? PLAIN_REQUEST_TIMEOUTS : []),
     // Host is attacker-controlled too, but keeps its own ":port" (unlike
     // SNI), so it can't be reduced to a hostname charset. Single-quoted as
     // a whole so the word parser leaves the embedded " alone for regsub's

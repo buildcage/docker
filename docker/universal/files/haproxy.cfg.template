@@ -166,6 +166,12 @@ backend http_relay
 frontend http_in
     bind 127.0.0.1:10026 accept-proxy
     mode http
+    # outbound_proxy's client timeout runs from the connection, this
+    # frontend's from the hand-off after outbound_proxy's 5s inspect-delay.
+    # Ending a silent client's wait here first logs it as a timeout rather
+    # than a close. The keep-alive wait stays at the client timeout.
+    timeout http-request 50s
+    timeout http-keep-alive 1m
     # accept-proxy keeps the build's dst, which names a request with no Host.
     http-request set-var(txn.decision) str(BLOCKED)
     http-request set-var(txn.reason) str(-)
