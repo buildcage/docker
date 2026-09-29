@@ -20,12 +20,12 @@ and links here for the details.
 
 `buildcage/docker` starts the builder. Every input is optional.
 
-| Input                | Default     | Description                                                                                                     |
-| -------------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
-| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it.                                           |
-| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                 |
-| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                  |
-| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA left in the image into a warning. See [CA residue](#ca-residue). |
+| Input                | Default     | Description                                                                                                                                                 |
+| -------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it.                                                                                       |
+| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                                             |
+| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                                              |
+| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA left in the image, or a layer that cannot be checked for one, into a warning. See [CA residue](#ca-residue). |
 
 ```yaml
 - uses: buildcage/docker@b5459229d32c2aad72e4492fac98a192f85f75e0 # v4.0.4
