@@ -95,10 +95,10 @@ make test_integration_buildkit_multiarch
 make test_integration_buildkit_listener_scope
 ```
 
-CI runs these same targets, one job per target (`.github/workflows/test-integration.yml`), so
-`make test_integration_buildkit` and a pull request's integration run cover the same set. The one
-difference is the architecture they build for: `TEST_PLATFORM` is `linux/arm64` for the development
-machines, and CI overrides it with the runner's own.
+`make help` lists every target. `make test_integration_buildkit` runs all of them, and CI runs each
+in its own job (`.github/workflows/test-integration.yml`), with a check that none is left out. The
+one difference is the architecture they build for: `TEST_PLATFORM` is `linux/arm64` for the
+development machines, and CI overrides it with the runner's own.
 
 ### Unit test coverage
 

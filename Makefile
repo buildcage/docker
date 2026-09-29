@@ -210,7 +210,9 @@ report_buildkit: ## Show the buildcage report for the currently running builder
 # ---------------------------------------------------------------------------
 
 .PHONY: test_integration_buildkit
-test_integration_buildkit: test_integration_buildkit_universal_audit test_integration_buildkit_universal_restrict test_integration_buildkit_universal_restrict_no_traffic test_integration_buildkit_inspect_restrict test_integration_buildkit_inspect_debian_audit test_integration_buildkit_inspect_debian_restrict test_integration_buildkit_inspect_java_audit test_integration_buildkit_inspect_byte_exact test_integration_buildkit_inspect_roundtrip test_integration_buildkit_universal_known_blocked test_integration_buildkit_multiarch test_integration_buildkit_listener_scope ## Run all buildkit integration tests
+# Read from the definitions below, so a new target needs no second list.
+INTEGRATION_TARGETS := $(shell sed -nE 's/^(test_integration_buildkit_[a-z0-9_]+):.*/\1/p' $(firstword $(MAKEFILE_LIST)))
+test_integration_buildkit: $(INTEGRATION_TARGETS) ## Run all buildkit integration tests
 
 # The target that verifies post.ts removed the builder. The targets below run
 # post.ts as part of their own teardown where they have one, but the removal

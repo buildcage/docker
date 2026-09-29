@@ -60,9 +60,7 @@ jobs:
               - 'test/Dockerfile.multiarch'
               - 'test/assert-multiarch.sh'
 
-  # Every job here runs the same `make` target a developer runs, so the set CI
-  # covers and the set `make test_integration_buildkit` covers are one list,
-  # kept in the Makefile.
+  # Every integration target in the Makefile needs a job here; `targets` checks.
   test:
     needs: changes
     # !cancelled() forces this to evaluate when `changes` is skipped (it runs
@@ -255,6 +253,26 @@ jobs:
         if: always()
         run: make clean_buildkit 2>/dev/null || true
 
+  targets:
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    name: "integration: every make target has a job"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare the Makefile's integration targets with this workflow's
+        run: |
+          if ! diff \
+            <(make -s --eval 'print_targets: ; @printf "%s\n" $(INTEGRATION_TARGETS)' print_targets | sort) \
+            <(grep -oE '(target:|make) test_integration_buildkit_[a-z0-9_]+' .github/workflows/test-integration.yml | awk '{print $2}' | sort -u); then
+            echo "::error::< lines are Makefile targets no job runs; > lines are jobs with no Makefile target."
+            exit 1
+          fi
+
   # Single, stably-named required status check for branch protection: the
   # `test` job's own name varies per matrix entry (test (universal-audit),
   # test (inspect-restrict), etc.), so branch protection can't target it
@@ -266,6 +284,7 @@ jobs:
     needs:
       [
         changes,
+        targets,
         test,
         test_inspect_roundtrip,
         test_inspect_byte_exact,
