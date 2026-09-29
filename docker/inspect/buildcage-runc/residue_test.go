@@ -128,7 +128,7 @@ func stripLayerWithALeftover(t *testing.T) error {
 	mustMkdirAll(t, upper)
 	mustWriteFile(t, filepath.Join(upper, "bundle.pem"), string(testCA))
 	useMountInfo(t, overlayLine(rootfs, upper))
-	return stripLayer(rootfs, upperDirOf(rootfs), testCA)
+	return stripLayer(rootfs, upperDirOf(rootfs), testCA, nssSlotCopy{})
 }
 
 func TestNSSDBChangeOnlyWarnsWhenAskedTo(t *testing.T) {

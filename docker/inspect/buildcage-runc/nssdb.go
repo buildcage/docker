@@ -70,6 +70,14 @@ var nssDBFiles = []string{"cert9.db", "key4.db"}
 
 var errNSSDBChanged = errors.New("the step changed the NSS database")
 
+// nssSlotCopy is what a copy of the mirror's pkcs11.txt is taken back with:
+// the bytes appendNSSSlot added, and the base names of the directories made for
+// a database the step did not have, deepest first.
+type nssSlotCopy struct {
+	appended    []byte
+	createdDirs []string
+}
+
 // A real /etc/passwd is a few KB.
 const maxPasswdBytes = 1 << 20
 
@@ -199,6 +207,9 @@ func slotNSSDB(s *spec, bundle string, ca []byte, template map[string][]byte, ho
 			b.cleanup()
 			return nil, created, fmt.Errorf("cannot create %s: %w", containerDir, err)
 		}
+		for _, dir := range dirs {
+			b.nssCreatedDirs = append(b.nssCreatedDirs, filepath.Base(dir))
+		}
 	}
 	s.addBindMount(containerDir, b.scratchDir)
 	s.addReadOnlyBindMount(nssCADBDir, caDB)
@@ -286,9 +297,9 @@ func appendNSSSlot(path string, uid, gid int) ([]byte, error) {
 // only by copying the entries it keeps byte for byte, so the slot is found
 // where it was left unless the step itself took it out, in which case the file
 // is written back as the step left it. The separator goes too only when nothing
-// follows the slot: an entry after it would otherwise run into the one before. A pkcs11.txt the step replaced with
-// something other than a file carries no slot. One the injection created is
-// removed once it holds nothing else.
+// follows the slot: an entry after it would otherwise run into the one before.
+// A pkcs11.txt the step replaced with something other than a file carries no
+// slot. One the injection created is removed once it holds nothing else.
 func removeNSSSlot(path string, appended []byte, created bool) error {
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
@@ -331,42 +342,66 @@ func removeNSSSlot(path string, appended []byte, created bool) error {
 }
 
 // stripNSSSlotCopy cuts every copy of the slot out of the pkcs11.txt at path,
-// removing the file if nothing is left. It reports whether the file still
-// names the slot's database, or is too large to check.
-func stripNSSSlotCopy(path string) (bool, error) {
+// with its separator when it ends the file as appendNSSSlot left it. A file
+// left empty is removed, and so are the directories it was copied with when
+// the injection made them. It returns why the file still counts as residue, or
+// "" when it does not.
+func stripNSSSlotCopy(path string, slot nssSlotCopy) (string, error) {
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return false, asNotRegular(path, err)
+		return "", asNotRegular(path, err)
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
-		return false, err
+		return "", err
 	}
-	// Too large to be one NSS wrote: report it unread.
+	// Too large to be one NSS wrote.
 	if info.Size() > maxPKCS11TxtBytes {
-		return true, nil
+		return "over 1 MiB, not read", nil
 	}
 	content := make([]byte, info.Size())
 	if _, err := f.ReadAt(content, 0); err != nil && !errors.Is(err, io.EOF) {
-		return false, err
+		return "", err
 	}
 	kept := content
+	if len(slot.appended) > 0 && bytes.HasSuffix(kept, slot.appended) {
+		kept = kept[:len(kept)-len(slot.appended)]
+	}
 	for bytes.Contains(kept, nssSlot) {
 		kept = bytes.ReplaceAll(kept, nssSlot, nil)
 	}
 	if len(kept) < len(content) {
 		if len(kept) == 0 {
-			return false, os.Remove(path)
+			if err := os.Remove(path); err != nil {
+				return "", err
+			}
+			removeCopiedNSSDirs(filepath.Dir(path), slot.createdDirs)
+			return "", nil
 		}
 		if _, err := f.WriteAt(kept, 0); err != nil {
-			return false, err
+			return "", err
 		}
 		if err := f.Truncate(int64(len(kept))); err != nil {
-			return false, err
+			return "", err
 		}
 	}
-	return bytes.Contains(kept, nssSlotConfigDir), nil
+	if bytes.Contains(kept, nssSlotConfigDir) {
+		return "still names " + nssCADBDir, nil
+	}
+	return "", nil
+}
+
+// removeCopiedNSSDirs removes dir and its parents while each is empty and
+// named as the directory the injection made at that depth, so a pkcs11.txt
+// copied on its own, into /tmp say, takes no directory with it.
+func removeCopiedNSSDirs(dir string, names []string) {
+	for _, name := range names {
+		if filepath.Base(dir) != name || os.Remove(dir) != nil {
+			return
+		}
+		dir = filepath.Dir(dir)
+	}
 }
 
 // checkNSSDBWritable fails when the step's user could not open the database

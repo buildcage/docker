@@ -89,7 +89,9 @@ type dirBind struct {
 	// bound beside it.
 	nssAppended []byte
 	nssHadTxt   bool
-	nssBase     string
+	// As nssSlotCopy.createdDirs.
+	nssCreatedDirs []string
+	nssBase        string
 }
 
 // groupTargetsByBind groups the CA targets by the directory whose mirror carries

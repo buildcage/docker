@@ -37,6 +37,10 @@ var errUnstrippableCA = errors.New("the certificate is in a format this cannot s
 // out.
 var errCALeftInLayer = errors.New("the certificate is still in the step's layer")
 
+// errNSSSlotLeftInLayer means a pkcs11.txt in the layer still names the
+// proxy CA's database after its slot was cut out, or was too large to read.
+var errNSSSlotLeftInLayer = errors.New("the proxy CA's NSS slot is still in the step's layer")
+
 // errLayerUnread means no overlay upper directory was found for the step's
 // layer, usually because BuildKit is not using its overlayfs snapshotter, so
 // nothing could say whether it holds a copy. The log says why.
@@ -336,7 +340,7 @@ func stripCA(path string, ca []byte, marks caMarks) (bool, error) {
 // upper is the layer found when the injection began, not one located afresh: a
 // mount table that read cleanly at inject but fails to now would otherwise
 // report no layer and let the anchors' scattered copies through unswept.
-func stripLayer(rootfs, upper string, ca []byte) error {
+func stripLayer(rootfs, upper string, ca []byte, slot nssSlotCopy) error {
 	if upper == "" {
 		return errLayerUnread
 	}
@@ -347,7 +351,7 @@ func stripLayer(rootfs, upper string, ca []byte) error {
 	if err != nil {
 		return err
 	}
-	edited, err := stripNSSSlotCopies(upper, rootfs)
+	slots, err := stripNSSSlotCopies(upper, rootfs, slot)
 	if err != nil {
 		return err
 	}
@@ -358,18 +362,21 @@ func stripLayer(rootfs, upper string, ca []byte) error {
 	if err != nil {
 		return err
 	}
-	left = append(left, edited...)
+	var errs []error
 	if len(left) > 0 {
-		return fmt.Errorf("%w: %s", errCALeftInLayer, strings.Join(left, " "))
+		errs = append(errs, fmt.Errorf("%w: %s", errCALeftInLayer, strings.Join(left, " ")))
 	}
-	return nil
+	if len(slots) > 0 {
+		errs = append(errs, fmt.Errorf("%w: %s", errNSSSlotLeftInLayer, strings.Join(slots, ", ")))
+	}
+	return errors.Join(errs...)
 }
 
 // stripNSSSlotCopies cuts the slot out of every pkcs11.txt in the step's layer,
-// such as one in a copy of the home, and returns those that still name its
-// database. Other files are not read: NSS opens no other name, and the
-// wrapper's own binary contains the slot text.
-func stripNSSSlotCopies(upper, rootfs string) ([]string, error) {
+// such as one in a copy of the home, and returns those still counting as
+// residue, each with why. Other files are not read: NSS opens no other name,
+// and the wrapper's own binary contains the slot text.
+func stripNSSSlotCopies(upper, rootfs string, slot nssSlotCopy) ([]string, error) {
 	upper = filepath.Clean(upper)
 	var left []string
 	err := walkDir(upper, func(path string, d fs.DirEntry, err error) error {
@@ -381,9 +388,9 @@ func stripNSSSlotCopies(upper, rootfs string) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		named, err := stripNSSSlotCopy(target)
-		if named {
-			left = append(left, rel)
+		why, err := stripNSSSlotCopy(target, slot)
+		if why != "" {
+			left = append(left, rel+" ("+why+")")
 		}
 		return err
 	})
