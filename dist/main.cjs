@@ -7737,6 +7737,9 @@ function generateCorednsConfig(rules, options) {
 	};
 }
 //#endregion
+//#region src/core/lib/log/proxy-address.ts
+const PROXY_SUBNET = "198.19.255.0/24";
+//#endregion
 //#region src/core/lib/acl/haproxy-internal-dst.ts
 function internalDstAcl(name, opts) {
 	return [`    acl ${name} var(txn.dst) -m ip ${opts.internalAddrs.join(" ")}`, ...opts.hostAddressFile ? [`    acl ${name} var(txn.dst) -m ip -f ${opts.hostAddressFile}`] : []];
@@ -7851,7 +7854,7 @@ function internalGuard(rules) {
 		];
 		lines.push(`    # ${rule.raw}`, `    http-request set-var(txn.named_address) bool(true) if ${conds.join(" ")}`);
 	}
-	return lines.push("    acl named_address var(txn.named_address) -m bool", "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address", "    http-request deny deny_status 403 if dst_internal !named_address", ""), lines;
+	return lines.push("    acl named_address var(txn.named_address) -m bool", `    acl dst_proxy_subnet var(txn.dst) -m ip ${PROXY_SUBNET}`, "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address or dst_proxy_subnet", "    http-request deny deny_status 403 if dst_internal !named_address or dst_proxy_subnet", ""), lines;
 }
 const PLAIN_REQUEST_TIMEOUTS = [
 	"    # detect's client timeout runs from the connection, this frontend's from",
@@ -7916,7 +7919,7 @@ function generateHaproxyConfig(options = {}) {
 		hasResolver,
 		internalAddrs: [
 			...INTERNAL_RANGES,
-			"198.19.255.0/24",
+			PROXY_SUBNET,
 			...opts.proxyAddress ? [opts.proxyAddress] : []
 		],
 		hostAddressFile: opts.hostAddressFile

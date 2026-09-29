@@ -1,3 +1,4 @@
+import { PROXY_SUBNET } from "../log/proxy-address.ts";
 import { internalDstAcl, type InternalDstOptions } from "./haproxy-internal-dst.ts";
 import {
   escapeForHaproxy,
@@ -47,6 +48,8 @@ function addressRules(rules: CompiledRule[]): CompiledRule[] {
  * Exempt an internal destination only where a rule naming that address as its
  * host matches the whole request, so `**:80` cannot open 169.254.169.254.
  * Matched here, not in the rule block: audit has none but still guards.
+ * PROXY_SUBNET is never exempt: the gateway's own listener would loop the
+ * proxy into itself.
  */
 function internalGuard(rules: CompiledRule[]): string[] {
   const named = addressRules(rules);
@@ -73,8 +76,9 @@ function internalGuard(rules: CompiledRule[]): string[] {
   }
   lines.push(
     "    acl named_address var(txn.named_address) -m bool",
-    "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address",
-    "    http-request deny deny_status 403 if dst_internal !named_address",
+    `    acl dst_proxy_subnet var(txn.dst) -m ip ${PROXY_SUBNET}`,
+    "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address or dst_proxy_subnet",
+    "    http-request deny deny_status 403 if dst_internal !named_address or dst_proxy_subnet",
     "",
   );
   return lines;
