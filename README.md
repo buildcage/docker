@@ -421,7 +421,9 @@ reported as blocked; see
 
 - Chromium trusts the CA through a slot added to the NSS database it reads: `~/.pki/nssdb` when it
   exists, else `~/.local/share/pki/nssdb`, else a new `~/.pki/nssdb`, which Chromium then fills and
-  the image keeps, as it would under a Chromium before M146. A new database belongs to the home's
+  the image keeps, as it would under a Chromium before M146. A Chromium before M146 does not read
+  `~/.local/share/pki/nssdb`, so use M146 or later where that is the database. A new database
+  belongs to the home's
   owner, so under someone else's home, such as `www-data`'s `/var/www`, Chromium does not open it
   and does not trust the CA. An existing database the step's user cannot write, such as root's used
   after `USER`, cannot take the slot, since Chromium would not open it either. It is covered for the
