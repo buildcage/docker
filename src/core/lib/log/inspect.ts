@@ -225,10 +225,10 @@ function authorityOf(host: string, port: string, scheme: "http" | "https"): stri
   return port === DEFAULT_PORT[scheme] ? host : `${host}:${port}`;
 }
 
-/** A host as the rules match it: lowercased, with one trailing dot dropped
- *  (see HOST_ONLY). */
+/** A host as the rules match it: ASCII lowercased, as HAProxy's `lower` does,
+ *  with one trailing dot dropped (see HOST_ONLY). */
 function ruleHost(host: string): string {
-  return host.toLowerCase().replace(/\.$/, "");
+  return host.replace(/[A-Z]/g, (c) => c.toLowerCase()).replace(/\.$/, "");
 }
 
 /**
@@ -318,7 +318,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
       time: Number(pass[1]) / 1000,
       action: actionFor(reason, isAudit),
       protocol: pass[2] as "tls" | "tcp",
-      host: sni === "-" ? pass[6] : sni,
+      host: sni === "-" ? pass[6] : ruleHost(sni),
       port: Number(pass[7]),
       destination: `${pass[6]}:${pass[7]}`,
     };

@@ -50,6 +50,21 @@ describe("scanInspectLog", () => {
     expect(twoDots.host).toBe("a.com.");
   });
 
+  it("lowercases only ASCII, as HAProxy does before matching", async () => {
+    // U+212A KELVIN SIGN lowercases to "k" in JavaScript, not in HAProxy.
+    const [e] = await parse([
+      "buildcage 1 https GET 403 0 ts=PR reason=- tlserr=- dst=1.1.1.1:443 host=blo\u212Aed.com /x",
+    ]);
+    expect(e.host).toBe("blo\u212Aed.com");
+  });
+
+  it("spells a passthrough's SNI the same way", async () => {
+    const [e] = await parse([
+      "buildcage 1 pass tls 10 ts=-- reason=- dst=10.0.0.9:5432 sni=DB.Example.com",
+    ]);
+    expect(e.host).toBe("db.example.com");
+  });
+
   it("names a request that never came by its SNI, spelled the same way", async () => {
     const [e] = await parse([
       "buildcage 1 https <BADREQ> 400 0 ts=CR reason=- tlserr=- dst=198.19.255.1:443 sni=API.Example.com host=- -",
