@@ -350,10 +350,12 @@ into a query string reaches everyone who can read the run. GitHub masks the valu
 workflow secrets, which leaves the ones it does not: a presigned URL's signature, a token minted
 during the build, or a secret whose URL-encoded form no longer matches what was registered.
 
-The value of a query parameter named `access_token`, `api_key`, `apikey`, `auth`, `client_secret`,
-`code`, `id_token`, `key`, `password`, `private_token`, `refresh_token`, `secret`, `sig`,
-`signature`, `token`, `x-amz-security-token`, `x-amz-signature` or `x-goog-signature` is therefore
-replaced, whatever its case:
+The value of a query parameter named `access_key`, `access_token`, `api_key`, `api_token`, `auth`,
+`auth_token`, `client_secret`, `code`, `id_token`, `jwt`, `key`, `passwd`, `password`,
+`private_token`, `pwd`, `refresh_token`, `secret`, `session_token`, `sig`, `signature`,
+`subscription-key`, `token`, `x-amz-security-token`, `x-amz-signature`, `x-api-key` or
+`x-goog-signature` is therefore replaced. The name is matched ignoring case, `-` and `_`, so
+`api_key`, `api-key`, `apiKey` and `APIKEY` are one name:
 
 ```
 ✅ 00:04.212: GET https://cdn.example.com/x.tar.gz?X-Amz-Signature=***&X-Amz-Expires=3600 -> 200 (4.1MB)

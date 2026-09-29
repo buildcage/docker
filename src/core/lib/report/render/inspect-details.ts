@@ -57,40 +57,45 @@ function renderEvent(event: TrafficEvent, startedAt: number | undefined): string
  * everyone who can read the run, and GitHub masks only values registered as
  * workflow secrets.
  *
- * Matched on the name alone, case-insensitively, so a parameter this does not
- * name keeps its value. That covers most of what a refused request was trying
- * to send, but not an exfiltration payload the sender happened to call `code`
- * or `key`; the traffic artifact and the proxy's own log keep every value
- * verbatim, and are where a suspected payload is read.
+ * Matched on the name alone, ignoring case, `-` and `_`, so a parameter this
+ * does not name keeps its value. That covers most of what a refused request
+ * was trying to send, but not an exfiltration payload the sender happened to
+ * call `code` or `key`; the traffic artifact and the proxy's own log keep every
+ * value verbatim, and are where a suspected payload is read.
  */
 const CREDENTIAL_PARAMS = new Set([
-  "access_key",
-  "access_token",
-  "api_key",
-  "api_token",
+  "accesskey",
+  "accesstoken",
   "apikey",
+  "apitoken",
   "auth",
-  "auth_token",
-  "client_secret",
+  "authtoken",
+  "clientsecret",
   "code",
-  "id_token",
+  "idtoken",
   "jwt",
   "key",
   "passwd",
   "password",
-  "private-token",
-  "private_token",
+  "privatetoken",
   "pwd",
-  "refresh_token",
+  "refreshtoken",
   "secret",
-  "session_token",
+  "sessiontoken",
   "sig",
   "signature",
+  "subscriptionkey",
   "token",
-  "x-amz-security-token",
-  "x-amz-signature",
-  "x-goog-signature",
+  "xamzsecuritytoken",
+  "xamzsignature",
+  "xapikey",
+  "xgoogsignature",
 ]);
+
+/** `api-key`, `api_key`, `apiKey` and `APIKEY` all read as one name. */
+function credentialName(name: string): string {
+  return name.toLowerCase().replace(/[-_]/g, "");
+}
 
 /**
  * The URL with those values replaced and everything else left alone, so the
@@ -111,7 +116,7 @@ function redactCredentialQuery(url: string): string {
       const eq = param.indexOf("=");
       if (eq === -1 || eq === param.length - 1) return param;
       const name = param.slice(0, eq);
-      return CREDENTIAL_PARAMS.has(name.toLowerCase()) ? `${name}=***` : param;
+      return CREDENTIAL_PARAMS.has(credentialName(name)) ? `${name}=***` : param;
     })
     .join("&");
 
