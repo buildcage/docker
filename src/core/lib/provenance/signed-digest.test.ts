@@ -21,12 +21,17 @@ interface Subject {
   annotations: object;
 }
 
-interface MakeBundleOptions {
+const SIMPLE_SIGNING = "application/vnd.dev.cosign.simplesigning.v1+json";
+
+interface MakeEnvelopeOptions {
   payloadType?: string;
   subjects?: Subject[];
 }
 
-function makeBundle(signedDigest: string, { payloadType, subjects }: MakeBundleOptions = {}) {
+function makeEnvelope(
+  signedDigest: string,
+  { payloadType = SIMPLE_SIGNING, subjects }: MakeEnvelopeOptions = {},
+) {
   let payloadObj;
   if (payloadType === "application/vnd.in-toto+json") {
     const subjectList = subjects ?? [
@@ -45,20 +50,18 @@ function makeBundle(signedDigest: string, { payloadType, subjects }: MakeBundleO
       },
     };
   }
-  const payload = Buffer.from(JSON.stringify(payloadObj)).toString("base64");
-  const dsse = payloadType ? { payload, payloadType } : { payload };
-  return { dsseEnvelope: dsse };
+  return { payload: Buffer.from(JSON.stringify(payloadObj)), payloadType };
 }
 
 describe("assertSignedDigest: simple-signing (legacy)", () => {
   it("passes when the signed digest matches the expected digest", () => {
-    expect(() => assertSignedDigest(makeBundle(DIGEST), DIGEST)).not.toThrow();
+    expect(() => assertSignedDigest(makeEnvelope(DIGEST), DIGEST)).not.toThrow();
   });
 
   it("throws VERIFY_FAILED when the signed digest does not match", () => {
     expect.assertions(3);
     try {
-      assertSignedDigest(makeBundle("sha256:different"), DIGEST);
+      assertSignedDigest(makeEnvelope("sha256:different"), DIGEST);
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
       expect((err as VerifyImageError).code).toBe("VERIFY_FAILED");
@@ -67,11 +70,13 @@ describe("assertSignedDigest: simple-signing (legacy)", () => {
   });
 
   it("throws VERIFY_FAILED when the signed digest field is missing", () => {
-    const payload = Buffer.from(JSON.stringify({ critical: { image: {} } })).toString("base64");
-    const bundle = { dsseEnvelope: { payload } };
+    const envelope = {
+      payload: Buffer.from(JSON.stringify({ critical: { image: {} } })),
+      payloadType: SIMPLE_SIGNING,
+    };
     expect.assertions(3);
     try {
-      assertSignedDigest(bundle, DIGEST);
+      assertSignedDigest(envelope, DIGEST);
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
       expect((err as VerifyImageError).code).toBe("VERIFY_FAILED");
@@ -79,10 +84,10 @@ describe("assertSignedDigest: simple-signing (legacy)", () => {
     }
   });
 
-  it("throws VERIFY_FAILED when the DSSE payload field is absent", () => {
+  it("throws VERIFY_FAILED when the DSSE payload is empty", () => {
     expect.assertions(3);
     try {
-      assertSignedDigest({ dsseEnvelope: {} }, DIGEST);
+      assertSignedDigest({ payload: Buffer.alloc(0), payloadType: SIMPLE_SIGNING }, DIGEST);
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
       expect((err as VerifyImageError).code).toBe("VERIFY_FAILED");
@@ -90,21 +95,11 @@ describe("assertSignedDigest: simple-signing (legacy)", () => {
     }
   });
 
-  it("throws VERIFY_FAILED when dsseEnvelope is absent", () => {
+  it("throws VERIFY_FAILED when the payload is not valid JSON", () => {
+    const envelope = { payload: Buffer.from("not json"), payloadType: SIMPLE_SIGNING };
     expect.assertions(2);
     try {
-      assertSignedDigest({}, DIGEST);
-    } catch (err) {
-      expect(err).toBeInstanceOf(VerifyImageError);
-      expect((err as VerifyImageError).code).toBe("VERIFY_FAILED");
-    }
-  });
-
-  it("throws VERIFY_FAILED when the payload is not valid base64 JSON", () => {
-    const bundle = { dsseEnvelope: { payload: "!!!not-base64!!!" } };
-    expect.assertions(2);
-    try {
-      assertSignedDigest(bundle, DIGEST);
+      assertSignedDigest(envelope, DIGEST);
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
       expect((err as VerifyImageError).code).toBe("VERIFY_FAILED");
@@ -117,25 +112,25 @@ const IN_TOTO = "application/vnd.in-toto+json";
 describe("assertSignedDigest: in-toto Statement v1 (cosign --new-bundle-format)", () => {
   it("passes when subject[0].digest.sha256 matches the expected digest", () => {
     expect(() =>
-      assertSignedDigest(makeBundle(DIGEST, { payloadType: IN_TOTO }), DIGEST),
+      assertSignedDigest(makeEnvelope(DIGEST, { payloadType: IN_TOTO }), DIGEST),
     ).not.toThrow();
   });
 
   it("passes when one of multiple subjects matches (others do not)", () => {
-    const bundle = makeBundle(DIGEST, {
+    const envelope = makeEnvelope(DIGEST, {
       payloadType: IN_TOTO,
       subjects: [
         { digest: { sha256: "000other" }, annotations: {} },
         { digest: { sha256: DIGEST.replace(/^sha256:/, "") }, annotations: {} },
       ],
     });
-    expect(() => assertSignedDigest(bundle, DIGEST)).not.toThrow();
+    expect(() => assertSignedDigest(envelope, DIGEST)).not.toThrow();
   });
 
   it("throws VERIFY_FAILED when subject digest does not match", () => {
     expect.assertions(3);
     try {
-      assertSignedDigest(makeBundle("sha256:different", { payloadType: IN_TOTO }), DIGEST);
+      assertSignedDigest(makeEnvelope("sha256:different", { payloadType: IN_TOTO }), DIGEST);
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
       expect((err as VerifyImageError).code).toBe("VERIFY_FAILED");
@@ -144,10 +139,10 @@ describe("assertSignedDigest: in-toto Statement v1 (cosign --new-bundle-format)"
   });
 
   it("throws VERIFY_FAILED when subject array is empty", () => {
-    const bundle = makeBundle(DIGEST, { payloadType: IN_TOTO, subjects: [] });
+    const envelope = makeEnvelope(DIGEST, { payloadType: IN_TOTO, subjects: [] });
     expect.assertions(3);
     try {
-      assertSignedDigest(bundle, DIGEST);
+      assertSignedDigest(envelope, DIGEST);
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
       expect((err as VerifyImageError).code).toBe("VERIFY_FAILED");
@@ -156,13 +151,13 @@ describe("assertSignedDigest: in-toto Statement v1 (cosign --new-bundle-format)"
   });
 
   it("throws VERIFY_FAILED when subject has no sha256 field", () => {
-    const bundle = makeBundle(DIGEST, {
+    const envelope = makeEnvelope(DIGEST, {
       payloadType: IN_TOTO,
       subjects: [{ digest: { md5: "notsha256" }, annotations: {} }],
     });
     expect.assertions(2);
     try {
-      assertSignedDigest(bundle, DIGEST);
+      assertSignedDigest(envelope, DIGEST);
     } catch (err) {
       expect(err).toBeInstanceOf(VerifyImageError);
       expect((err as VerifyImageError).code).toBe("VERIFY_FAILED");
@@ -172,10 +167,7 @@ describe("assertSignedDigest: in-toto Statement v1 (cosign --new-bundle-format)"
 
 describe("an in-toto payload with no subject at all", () => {
   it("refuses it rather than treating the empty list as a match", () => {
-    const payload = Buffer.from(JSON.stringify({}), "utf8").toString("base64");
-    const bundle = {
-      dsseEnvelope: { payloadType: "application/vnd.in-toto+json", payload },
-    };
-    expect(() => assertSignedDigest(bundle, DIGEST)).toThrow(/does not match/);
+    const envelope = { payload: Buffer.from("{}"), payloadType: IN_TOTO };
+    expect(() => assertSignedDigest(envelope, DIGEST)).toThrow(/does not match/);
   });
 });
