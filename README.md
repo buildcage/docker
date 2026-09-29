@@ -437,11 +437,10 @@ reported as blocked; see
 - A step that changes the CA's own trust in the NSS database (`certutil -M`), or exports it and
   imports it back, copies the CA into the step's database, which fails the build as a copy the
   wrapper cannot take out. A step cannot remove the database's directory (`rm -rf ~/.pki`) either,
-  since the step sees it as a mount point. That mount point is there in every `RUN` step, created
-  when the home has no database, so `git clone <url> .` with `WORKDIR` at the home fails, and so does
-  emptying the home (`rm -rf ~/.[!.]*`). Use a `WORKDIR` other than the home. A copy of
-  the home (`cp -a ~ /backup`) carries the slot in its `pkcs11.txt`, which is taken out of the copy
-  before the layer is committed.
+  since the step sees it as a mount point. Every `RUN` step has this mount point, created if the home
+  has no database, so `git clone <url> .` into the home and `rm -rf ~/.[!.]*` both fail; use a
+  `WORKDIR` outside the home. A copy of the home (`cp -a ~ /backup`) has the slot cut out of its
+  `pkcs11.txt` before the layer is committed.
 - A `RUN` step that copies the system CA bundle into a binary or an uncompressed archive
   (`go:embed`, `include_str!`, `tar cf`) fails: the copy carries the build's CA, which cannot be cut
   out of a binary without corrupting it. Copy the bundle in an earlier `RUN` step instead:

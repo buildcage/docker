@@ -679,10 +679,10 @@ func TestStripLayerFailsOnATraceItCannotRemove(t *testing.T) {
 	}
 }
 
-// The readings after the sweep, for the NSS slot and then for the CA, report
-// a failure of their own rather than the sweep's conclusion.
+// A walk that fails after the sweep, in the slot pass or the read-back, is
+// reported.
 func TestStripLayerReportsADirectoryItCannotReadBack(t *testing.T) {
-	for name, nth := range map[string]int{"the NSS slot pass": 2, "the reading back": 3} {
+	for name, nth := range map[string]int{"slot pass": 2, "read-back": 3} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			rootfs, upper := filepath.Join(root, "rootfs"), filepath.Join(root, "fs")

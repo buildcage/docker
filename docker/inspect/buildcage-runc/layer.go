@@ -365,10 +365,10 @@ func stripLayer(rootfs, upper string, ca []byte) error {
 	return nil
 }
 
-// stripNSSSlotCopies takes the proxy CA's slot out of each pkcs11.txt in the
-// step's layer and returns those still naming its database, which the step
-// reworded. Only that name is read: NSS opens no other, and matching the slot
-// in every file would flag this wrapper's own binary, which carries it.
+// stripNSSSlotCopies cuts the slot out of every pkcs11.txt in the step's layer,
+// such as one in a copy of the home, and returns those that still name its
+// database. Other files are not read: NSS opens no other name, and the
+// wrapper's own binary contains the slot text.
 func stripNSSSlotCopies(upper, rootfs string) ([]string, error) {
 	upper = filepath.Clean(upper)
 	var left []string

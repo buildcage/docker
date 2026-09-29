@@ -58,8 +58,8 @@ var nssSlot = []byte("library=libsoftokn3.so\n" +
 	"parameters=\"configdir='sql:" + nssCADBDir + "' flags=readOnly\"\n" +
 	"NSS=\"\"\n\n")
 
-// What names the slot's database in pkcs11.txt, however the rest of the entry
-// was reworded.
+// nssSlotConfigDir identifies the slot even after the rest of its entry is
+// edited.
 var nssSlotConfigDir = []byte("configdir='sql:" + nssCADBDir + "'")
 
 // A real pkcs11.txt is a few hundred bytes per module.
@@ -330,11 +330,9 @@ func removeNSSSlot(path string, appended []byte, created bool) error {
 	return f.Truncate(int64(len(kept)))
 }
 
-// stripNSSSlotCopy takes every copy of the slot out of the pkcs11.txt at path,
-// removing the file once nothing else is left, and reports whether it still
-// names the slot's database afterwards, or is too large to tell. A home copied with cp -a carries one
-// of these out of the mirror and into the layer, where it points at a database
-// the image will not have.
+// stripNSSSlotCopy cuts every copy of the slot out of the pkcs11.txt at path,
+// removing the file if nothing is left. It reports whether the file still
+// names the slot's database, or is too large to check.
 func stripNSSSlotCopy(path string) (bool, error) {
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
@@ -345,8 +343,7 @@ func stripNSSSlotCopy(path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	// Larger than any pkcs11.txt NSS writes, so not read in, and reported
-	// rather than passed unchecked.
+	// Too large to be one NSS wrote: report it unread.
 	if info.Size() > maxPKCS11TxtBytes {
 		return true, nil
 	}

@@ -509,8 +509,7 @@ func TestRemoveNSSSlotReportsAFileItCannotOpen(t *testing.T) {
 	}
 }
 
-// A home copied with cp -a takes the mirror's pkcs11.txt, slot and all, into
-// the layer. The slot comes out of the copy before the layer is committed.
+// cp -a of the home copies the slot into the layer; finish cuts it out.
 func TestNSSDBSlotComesOutOfACopiedHome(t *testing.T) {
 	in, _, rootfs, mirror := injectSlot(t, nil)
 	copied := filepath.Join(rootfs, "backup", nssDBPath, "pkcs11.txt")
@@ -525,8 +524,8 @@ func TestNSSDBSlotComesOutOfACopiedHome(t *testing.T) {
 	}
 }
 
-// stripNSSSlotLayer runs stripLayer over a layer holding a file called name
-// with content, and returns what the file holds after and what it returned.
+// stripNSSSlotLayer writes content to backup/name in a layer, runs stripLayer,
+// and returns the file's content afterwards, or "<removed>".
 func stripNSSSlotLayer(t *testing.T, name, content string) (string, error) {
 	t.Helper()
 	useTempLog(t)
@@ -558,8 +557,7 @@ func TestStripLayerTakesTheNSSSlotOutOfPkcs11Txt(t *testing.T) {
 	}
 }
 
-// Only pkcs11.txt is read: NSS opens no other name, and this wrapper's own
-// binary carries the slot's text.
+// A file with another name, such as the wrapper's own binary, is left alone.
 func TestStripLayerLeavesTheSlotTextOutsidePkcs11Txt(t *testing.T) {
 	content := "BINARY\x00" + string(nssSlot)
 	if got, err := stripNSSSlotLayer(t, "buildcage-runc", content); err != nil || got != content {
@@ -567,8 +565,7 @@ func TestStripLayerLeavesTheSlotTextOutsidePkcs11Txt(t *testing.T) {
 	}
 }
 
-// One larger than any pkcs11.txt NSS writes is not read, and is reported
-// rather than passed unchecked.
+// An oversized pkcs11.txt is reported unread.
 func TestStripLayerReportsAPkcs11TxtTooLargeToRead(t *testing.T) {
 	content := string(nssSlot) + strings.Repeat("#", maxPKCS11TxtBytes)
 	if got, err := stripNSSSlotLayer(t, "pkcs11.txt", content); !errors.Is(err, errCALeftInLayer) || got != content {
@@ -576,13 +573,12 @@ func TestStripLayerReportsAPkcs11TxtTooLargeToRead(t *testing.T) {
 	}
 }
 
-// A slot the step reworded still names the proxy CA's database, and is
-// reported.
-func TestStripLayerReportsARewordedNSSSlot(t *testing.T) {
+// An edited slot that still names the CA database is reported.
+func TestStripLayerReportsAnEditedNSSSlot(t *testing.T) {
 	content := "library=libsoftokn3.so\nparameters=\"configdir='sql:" + nssCADBDir + "'\"\n\n"
 	_, err := stripNSSSlotLayer(t, "pkcs11.txt", content)
 	if !errors.Is(err, errCALeftInLayer) || !strings.Contains(err.Error(), "/backup/pkcs11.txt") {
-		t.Fatalf("got %v, want the reworded slot reported", err)
+		t.Fatalf("got %v, want the edited slot reported", err)
 	}
 	useWarnOnCAResidue(t)
 	if err := tolerateResidue(err); err != nil {
@@ -590,8 +586,7 @@ func TestStripLayerReportsARewordedNSSSlot(t *testing.T) {
 	}
 }
 
-// A pkcs11.txt the sweep cannot rewrite fails the step rather than leaving the
-// slot in the layer.
+// I/O failures on the file are returned.
 func TestStripNSSSlotCopyReportsWhatItCannotDo(t *testing.T) {
 	for name, broken := range map[string]*brokenFile{
 		"a failed stat":     {failStat: true},
@@ -610,12 +605,11 @@ func TestStripNSSSlotCopyReportsWhatItCannotDo(t *testing.T) {
 	}
 }
 
-// The copy is rewritten through the rootfs, so one the rootfs does not lead to
-// is reported too.
+// A copy that cannot be reached through the rootfs is reported.
 func TestStripLayerReportsAPkcs11TxtTheRootfsDoesNotReach(t *testing.T) {
 	for name, lay := range map[string]func(t *testing.T, rootfs string){
 		"not there": func(*testing.T, string) {},
-		"through a way out": func(t *testing.T, rootfs string) {
+		"behind a symlink out of the rootfs": func(t *testing.T, rootfs string) {
 			mustSymlink(t, "../../../../../../outside", filepath.Join(rootfs, "backup"))
 		},
 	} {
