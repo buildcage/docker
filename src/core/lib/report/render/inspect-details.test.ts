@@ -460,6 +460,28 @@ describe("renderInspectDetails credential parameters", () => {
     );
   });
 
+  it("matches the name however its words are joined, keeping the spelling sent", () => {
+    expect(subjectOf("https://h/v1?subscription-key=a&api-key=b&client-secret=c")).toBe(
+      "GET https://h/v1?subscription-key=***&api-key=***&client-secret=***",
+    );
+    expect(
+      subjectOf(
+        "https://h/v1?accessToken=a&apiToken=b&clientSecret=c&authToken=d&refreshToken=e&idToken=f&sessionToken=g",
+      ),
+    ).toBe(
+      "GET https://h/v1?accessToken=***&apiToken=***&clientSecret=***&authToken=***&refreshToken=***&idToken=***&sessionToken=***",
+    );
+    expect(subjectOf("https://h/v1?X-Api-Key=a&subscription_key=b")).toBe(
+      "GET https://h/v1?X-Api-Key=***&subscription_key=***",
+    );
+  });
+
+  it("does not match a name that only contains one it knows", () => {
+    expect(subjectOf("https://h/v1?tokenizer=x&keys=y")).toBe(
+      "GET https://h/v1?tokenizer=x&keys=y",
+    );
+  });
+
   it("leaves a parameter nobody credentialed alone", () => {
     // A refused request has to keep saying what it tried to send, and an
     // exfiltration payload is named whatever its author chose.
