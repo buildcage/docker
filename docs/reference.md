@@ -324,10 +324,10 @@ Setup checks a pattern with JavaScript's regular expressions, but the proxy runs
 backslash may precede punctuation, as in `\.`, one of `\d \D \w \W \s \S \b \B \n \r \t \f`, or a
 single-digit backreference such as `\1`, all of which the two read alike. Any other letter or digit
 after a backslash is refused, as are a backreference to a group the pattern lacks (in a URL rule,
-one outside its own half) and `\B` inside a character class. So is a class the two would end in
-different places: one with a `]` right after `[` or `[^`, or a POSIX class such as `[[:alpha:]]`.
-Escape the bracket (`[\]a]`) or write a range (`[a-z]`) instead. Other syntax only JavaScript
-accepts, such as `[\d-z]`, passes setup and then stops the proxy from starting.
+one outside its own half) and `\B` inside a character class. So are a `]` right after `[` or `[^`
+and a POSIX class such as `[:alpha:]`, inside a class or not, which the two read differently. Escape
+the bracket (`[\]a]`) or write a range (`[a-z]`) instead. Other syntax only JavaScript accepts,
+such as `[\d-z]`, passes setup and then stops the proxy from starting.
 
 In `allowed_url_rules` a `~` expression covers the URL, and is split at the first `/` after `://`:
 everything before that `/` is matched against the host, everything from it onward against the path.

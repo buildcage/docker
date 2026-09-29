@@ -279,8 +279,26 @@ describe("checkRawRegexHalf", () => {
     for (const text of ["[](]a|.*[])]?:443", "[^](]a|.*[])]?:443", "[[:alpha:]]+\\.com:443"]) {
       expect(() => check(text, false)).toThrow(/character class/);
     }
-    expect(() => check("[[.a.]]\\.com:443", false)).toThrow(/class syntax "\[\."/);
-    expect(() => check("[[=a=]]\\.com:443", false)).toThrow(/class syntax "\[="/);
+    expect(() => check("[[.a.]]\\.com:443", false)).toThrow(/class syntax "\[\.a\.\]"/);
+    expect(() => check("[[=a=]]\\.com:443", false)).toThrow(/class syntax "\[=a=\]"/);
+  });
+
+  it("refuses a POSIX class outside a class, which PCRE2 refuses to compile", () => {
+    for (const text of ["[:a:]\\.com:443", "[.a.]\\.com:443", "[:a\\]:]\\.com:443"]) {
+      expect(() => check(text, false)).toThrow(/character class/);
+    }
+  });
+
+  it("keeps a bracket PCRE2 does not take for a POSIX class", () => {
+    for (const text of [
+      "[^.]+\\.com:443",
+      "[.-]\\.com:443",
+      "[a[:]\\.com:443",
+      "[:a]:\\d+",
+      "[:[:]\\.com:443",
+    ]) {
+      expect(() => check(text, false)).not.toThrow();
+    }
   });
 
   it("keeps an escaped bracket in a class, and a literal `[` that opens nothing", () => {

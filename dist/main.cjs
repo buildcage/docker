@@ -145,10 +145,11 @@ function checkResolverRegexSyntax(text, label, rule) {
 		if (unsupported) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". Lookaround and backreferences are not supported in a host pattern, which the resolver matches with RE2`);
 	}
 }
+const POSIX_BRACKET = /^\[([:.=])(?:\\(?:[\\\]]|(?![\\\]]))|\[(?!\1)|[^\]\\[])*?\1\]/;
 function checkClasses(text, label, rule) {
 	for (let [i, inClass] of regexChars(text)) {
 		if (text[i] !== "[") continue;
-		let clash = (inClass ? /^\[[:.=]/ : /^\[\^?\]/).exec(text.slice(i));
+		let rest = text.slice(i), clash = POSIX_BRACKET.exec(rest) ?? (inClass ? null : /^\[\^?\]/.exec(rest));
 		if (clash) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has the character class syntax "${clash[0]}", which the proxy's PCRE2 reads differently from setup. Escape a bracket inside a class ("\\]", "\\["), and spell a POSIX class as a range ("[a-z]")`);
 	}
 }

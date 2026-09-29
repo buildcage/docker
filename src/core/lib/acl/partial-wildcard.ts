@@ -226,16 +226,26 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
 }
 
 /**
- * Class syntax JavaScript (these checks) reads differently from PCRE2 (the
- * proxy) and RE2 (the resolver). A `]` right after `[` or `[^` ends an empty
- * class here but is a literal there, and `[:`, `[.` or `[=` inside a class
- * opens a POSIX class there. Either moves where the class ends, so a `|` these
- * checks see inside a group can sit at the top level for the proxy.
+ * What PCRE2 (the proxy) and RE2 (the resolver) read as a POSIX class, `[:a:]`
+ * and the collating forms `[.a.]` and `[=a=]`. It ends where PCRE2 ends it: at
+ * the first `:]`, `.]` or `=]` matching the opening, unless a bare `]` or a
+ * second opening such as `[:` comes first. Only `\]` and `\\` are skipped over.
+ */
+const POSIX_BRACKET = /^\[([:.=])(?:\\(?:[\\\]]|(?![\\\]]))|\[(?!\1)|[^\]\\[])*?\1\]/;
+
+/**
+ * Class syntax JavaScript (these checks) reads differently from PCRE2 and
+ * RE2. A `]` right after `[` or `[^` ends an empty class here but is a literal
+ * there, and a POSIX class inside a class ends later there. Either moves where
+ * the class ends, so a `|` these checks see inside a group can sit at the top
+ * level for the proxy. A POSIX class outside a class stops the proxy from
+ * starting instead.
  */
 function checkClasses(text: string, label: string, rule: string): void {
   for (const [i, inClass] of regexChars(text)) {
     if (text[i] !== "[") continue;
-    const clash = (inClass ? /^\[[:.=]/ : /^\[\^?\]/).exec(text.slice(i));
+    const rest = text.slice(i);
+    const clash = POSIX_BRACKET.exec(rest) ?? (inClass ? null : /^\[\^?\]/.exec(rest));
     if (clash) {
       throw new Error(
         `Invalid regex in rule "${rule}": the ${label} "${text}" has the character class ` +
