@@ -128,6 +128,30 @@ describe("buildVerifyOptions: SHA pin", () => {
   });
 });
 
+describe("buildVerifyOptions: repository case", () => {
+  function sanMatches(actionRef: string, actionRepo: string, sanRepo: string, tag: string) {
+    const opts = buildVerifyOptions({ actionRef, actionRepo })!;
+    return new RegExp(opts.certificateIdentityURI!).test(
+      `https://github.com/${sanRepo}/${RELEASE_WORKFLOW}@refs/tags/${tag}`,
+    );
+  }
+
+  it("matches the repository in any case", () => {
+    expect(sanMatches("v2.1.0", "Owner/Repo", "owner/repo", "v2.1.0")).toBe(true);
+    expect(sanMatches("v2.1.0", "owner/repo", "Owner/Repo", "v2.1.0")).toBe(true);
+    expect(sanMatches("a".repeat(40), "OWNER/REPO", "owner/repo", "v2.1.0")).toBe(true);
+  });
+
+  it("still matches the tag exactly", () => {
+    expect(sanMatches("v2.1.0", "Owner/Repo", "owner/repo", "V2.1.0")).toBe(false);
+  });
+
+  it("does not match another repository", () => {
+    expect(sanMatches("v2.1.0", "Owner/Repo", "owner/repo2", "v2.1.0")).toBe(false);
+    expect(sanMatches("v2.1.0", "Owner/Repo", "owner/rep", "v2.1.0")).toBe(false);
+  });
+});
+
 describe("buildVerifyOptions: unverifiable refs", () => {
   it("returns null for a branch ref", () => {
     expect(buildVerifyOptions({ actionRef: "main", actionRepo: REPO })).toBe(null);
