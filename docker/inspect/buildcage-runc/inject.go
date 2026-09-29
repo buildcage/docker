@@ -36,22 +36,33 @@ const (
 	// Point at the system store, which replaces the tool's bundle; with no
 	// store, falls back to the same proxy-CA-only file as pointAtOwnCA.
 	pointAtSystemStore
+	// Left unset, store or no store: the tool then reads its default trust.
+	appendIfSet
 )
 
 var caVariables = []struct {
 	name      string
 	whenUnset unsetBehaviour
+	// npm reads its npm_config_* variables whatever their case.
+	anyCase bool
 }{
-	{"NODE_EXTRA_CA_CERTS", pointAtOwnCA},
-	{"DENO_CERT", pointAtOwnCA},
-	{"CURL_CA_BUNDLE", leaveUnset},
-	{"REQUESTS_CA_BUNDLE", pointAtSystemStore},
-	{"PIP_CERT", pointAtSystemStore},
+	{"NODE_EXTRA_CA_CERTS", pointAtOwnCA, false},
+	{"DENO_CERT", pointAtOwnCA, false},
+	{"CURL_CA_BUNDLE", leaveUnset, false},
+	{"REQUESTS_CA_BUNDLE", pointAtSystemStore, false},
+	{"PIP_CERT", pointAtSystemStore, false},
 	// OpenSSL's own override, replacing rather than adding to the default
 	// search path: also read by Go's crypto/x509 on Unix, Ruby, and Rust's
 	// rustls-native-certs. Not by GnuTLS, so Debian's wget and git go by the
 	// store at their own compiled-in path instead.
-	{"SSL_CERT_FILE", pointAtSystemStore},
+	{"SSL_CERT_FILE", pointAtSystemStore, false},
+	// Each replaces its tool's bundle. Base images carrying a company CA
+	// often set them.
+	{"GIT_SSL_CAINFO", appendIfSet, false},
+	{"npm_config_cafile", appendIfSet, true},
+	{"AWS_CA_BUNDLE", appendIfSet, false},
+	{"CARGO_HTTP_CAINFO", appendIfSet, false},
+	{"BUNDLE_SSL_CA_CERT", appendIfSet, false},
 }
 
 // caPlan is what the variable pass settled on: the files the CA has to be
@@ -99,35 +110,44 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 		plan.env[variableName] = ownCAPath
 	}
 
+	// appendTo adds the file a variable already names to the targets. A
+	// relative value is read from the step's working directory, the best
+	// guess at where the tool starts.
+	appendTo := func(name, value string) {
+		path := value
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(s.processCwd(), path)
+		}
+		resolved, err := resolveInRoot(s.rootfs, path)
+		if err != nil {
+			logf("%s=%s could not be resolved inside the rootfs (%v); leaving it alone", name, value, err)
+			return
+		}
+		// resolveInRoot accepts a path whose directories do not exist yet, for
+		// the anchors. A bundle cannot be under a missing directory, so a
+		// variable pointing at one is the step's own and is left alone.
+		if _, err := os.Stat(filepath.Dir(resolved)); err != nil {
+			logf("%s=%s names a directory that is not there; leaving it alone", name, value)
+			return
+		}
+		if info, err := os.Stat(resolved); err == nil && info.IsDir() {
+			logf("%s=%s is a directory, not a bundle; leaving it alone", name, value)
+			return
+		}
+		plan.targets[resolved] = true
+	}
+
 	for _, variable := range caVariables {
-		if value, set := s.env[variable.name]; set && value != "" {
-			// Already pointed somewhere: add to that file rather than
-			// redirecting the variable, which would discard whatever the
-			// author put there. A relative value is read from the step's
-			// working directory, the best guess at where the tool starts.
-			path := value
-			if !filepath.IsAbs(path) {
-				path = filepath.Join(s.processCwd(), path)
+		// Already pointed somewhere: add to that file rather than redirecting
+		// the variable, which would discard whatever the author put there.
+		set := false
+		for name, value := range s.env {
+			if value != "" && (name == variable.name || variable.anyCase && strings.EqualFold(name, variable.name)) {
+				appendTo(name, value)
+				set = true
 			}
-			resolved, err := resolveInRoot(s.rootfs, path)
-			if err != nil {
-				logf("%s=%s could not be resolved inside the rootfs (%v); leaving it alone",
-					variable.name, value, err)
-				continue
-			}
-			// resolveInRoot now resolves a path whose directories do not exist
-			// yet, which the anchors need but this does not: a bundle cannot be
-			// under a directory that is not there, so a variable pointing at one
-			// is the step's own and is left alone rather than mirrored.
-			if _, err := os.Stat(filepath.Dir(resolved)); err != nil {
-				logf("%s=%s names a directory that is not there; leaving it alone", variable.name, value)
-				continue
-			}
-			if info, err := os.Stat(resolved); err == nil && info.IsDir() {
-				logf("%s=%s is a directory, not a bundle; leaving it alone", variable.name, value)
-				continue
-			}
-			plan.targets[resolved] = true
+		}
+		if set {
 			continue
 		}
 		switch variable.whenUnset {

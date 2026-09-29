@@ -187,6 +187,87 @@ func TestInjectAppendsToAnAlreadySetVariableInstead(t *testing.T) {
 	}
 }
 
+// An append-only variable that is set gets the CA in the file it names.
+func TestInjectAppendsToAnAppendOnlyVariable(t *testing.T) {
+	for _, name := range []string{"GIT_SSL_CAINFO", "npm_config_cafile", "AWS_CA_BUNDLE", "CARGO_HTTP_CAINFO", "BUNDLE_SSL_CA_CERT"} {
+		t.Run(name, func(t *testing.T) {
+			useFakeRsync(t)
+			bundle, rootfs := newBundle(t, []string{name + "=/custom/roots.pem"})
+			mustMkdirAll(t, filepath.Join(rootfs, "custom"))
+			mustWriteFile(t, filepath.Join(rootfs, "custom", "roots.pem"), "CUSTOM\n")
+
+			restore, err := inject(bundle, testCA)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = restore.finish() }()
+
+			mirrorHolds(t, loadMounts(t, bundle), "/custom", "roots.pem")
+			if got := loadEnv(t, bundle)[name]; got != "/custom/roots.pem" {
+				t.Errorf("%s was redirected to %q", name, got)
+			}
+		})
+	}
+}
+
+// Unset, it stays unset: the tool reads its default trust.
+func TestInjectLeavesAnUnsetAppendOnlyVariableUnset(t *testing.T) {
+	for name, newBundleFn := range map[string]func(*testing.T, []string) (string, string){
+		"with a store": newBundle,
+		"no store":     newBundleNoStore,
+	} {
+		t.Run(name, func(t *testing.T) {
+			useFakeRsync(t)
+			bundle, _ := newBundleFn(t, []string{"PATH=/usr/bin"})
+
+			restore, err := inject(bundle, testCA)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = restore.finish() }()
+
+			env := loadEnv(t, bundle)
+			for _, variable := range []string{"GIT_SSL_CAINFO", "npm_config_cafile", "NPM_CONFIG_CAFILE", "AWS_CA_BUNDLE", "CARGO_HTTP_CAINFO", "BUNDLE_SSL_CA_CERT"} {
+				if value, set := env[variable]; set {
+					t.Errorf("%s was set to %q", variable, value)
+				}
+			}
+		})
+	}
+}
+
+// npm reads npm_config_cafile in any case. Two spellings naming one file add
+// the CA to it once.
+func TestInjectMatchesNpmConfigCafileInAnyCase(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{
+		"NPM_CONFIG_CAFILE=/a/ca.pem",
+		"npm_config_cafile=/a/ca.pem",
+		"Npm_Config_Cafile=/b/ca.pem",
+	})
+	for _, dir := range []string{"a", "b"} {
+		mustMkdirAll(t, filepath.Join(rootfs, dir))
+		mustWriteFile(t, filepath.Join(rootfs, dir, "ca.pem"), "OWN\n")
+	}
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = restore.finish() }()
+
+	mounts := loadMounts(t, bundle)
+	mirrorHolds(t, mounts, "/b", "ca.pem")
+	scratchDir, _ := findMount(t, mounts, "/a")["source"].(string)
+	got, err := os.ReadFile(filepath.Join(scratchDir, "ca.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(got), string(testCA)); n != 1 {
+		t.Errorf("the CA is in /a/ca.pem %d times, want once", n)
+	}
+}
+
 // A variable pointing at a file nested inside the system store directory is
 // injected in the store's own mirror, not bound on its own: a bind under the
 // store mount would be shadowed by it, so the nested file would otherwise never
