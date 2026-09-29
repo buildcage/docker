@@ -272,6 +272,43 @@ describe("checkRawRegexHalf", () => {
   it("looks for those characters in the host half only", () => {
     expect(() => check("/a'b", false)).not.toThrow();
   });
+
+  it("refuses a class PCRE2 would end somewhere other than setup does", () => {
+    // Setup closes `[]` at once and so finds the "|" inside a group; PCRE2
+    // reads that `]` as a literal and the "|" at the top level.
+    for (const text of ["[](]a|.*[])]?:443", "[^](]a|.*[])]?:443", "[[:alpha:]]+\\.com:443"]) {
+      expect(() => check(text, false)).toThrow(/character class/);
+    }
+    expect(() => check("[[.a.]]\\.com:443", false)).toThrow(/class syntax "\[\."/);
+    expect(() => check("[[=a=]]\\.com:443", false)).toThrow(/class syntax "\[="/);
+  });
+
+  it("keeps an escaped bracket in a class, and a literal `[` that opens nothing", () => {
+    for (const text of [
+      "[\\]a]\\.com:443",
+      "[\\[:]\\.com:443",
+      "[a[]\\.com:443",
+      "a\\[:\\.com:443",
+    ]) {
+      expect(() => check(text, false)).not.toThrow();
+    }
+  });
+
+  it("refuses a backreference to a group the text does not have", () => {
+    expect(() => check("/a\\1", false)).toThrow(/uses "\\1", but has no capturing group/);
+    expect(() => check("/(a)(?:b)\\2", false)).toThrow(/only 1 capturing group/);
+    expect(() => check("/(?<n>a)(b)\\2", false)).not.toThrow();
+    expect(() => check("/(?<=a)(b)\\1", false)).not.toThrow();
+  });
+
+  it("reads a digit escape in a class as the octal both engines take it for", () => {
+    expect(() => check("/[\\1]", false)).not.toThrow();
+  });
+
+  it("refuses `\\B` in a class, which PCRE2 does not accept", () => {
+    expect(() => check("/[\\B]", false)).toThrow(/"\\B" in a character class/);
+    expect(() => check("/[\\b]\\B", false)).not.toThrow();
+  });
 });
 
 describe("endsAnchored", () => {

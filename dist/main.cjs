@@ -114,43 +114,64 @@ function wildcardToRegexPartial(pattern) {
 	let colonIndex = pattern.lastIndexOf(":"), domain = pattern.slice(0, colonIndex), port = pattern.slice(colonIndex + 1);
 	return `${domainToRegexPartial(domain)}:${port === "*" ? "\\d+" : port}`;
 }
-function hasTopLevelAlternation(regex) {
-	let depth = 0, inClass = !1;
+function* regexChars(regex) {
+	let inClass = !1;
 	for (let i = 0; i < regex.length; i++) {
 		let c = regex[i];
-		if (c === "\\") i++;
-		else if (inClass) c === "]" && (inClass = !1);
-		else if (c === "[") inClass = !0;
-		else if (c === "(") depth++;
+		yield [i, inClass], c === "\\" ? i++ : inClass ? c === "]" && (inClass = !1) : c === "[" && (inClass = !0);
+	}
+}
+function hasTopLevelAlternation(regex) {
+	let depth = 0;
+	for (let [i, inClass] of regexChars(regex)) {
+		if (inClass) continue;
+		let c = regex[i];
+		if (c === "(") depth++;
 		else if (c === ")") depth--;
 		else if (c === "|" && depth === 0) return !0;
 	}
 	return !1;
 }
+function capturingGroups(regex) {
+	let count = 0;
+	for (let [i, inClass] of regexChars(regex)) !inClass && /^\((?:(?!\?)|\?<(?![=!]))/.test(regex.slice(i)) && count++;
+	return count;
+}
 const HOST_LITERAL_ILLEGAL = /\\[[\]]/, COREFILE_UNSAFE = /['`]|\{[$%]/, RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9])/;
 function checkResolverRegexSyntax(text, label, rule) {
-	let inClass = !1;
-	for (let i = 0; i < text.length; i++) {
-		let c = text[i];
-		if (!inClass) {
-			let unsupported = RE2_UNSUPPORTED.exec(text.slice(i));
-			if (unsupported) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". Lookaround and backreferences are not supported in a host pattern, which the resolver matches with RE2`);
-		}
-		c === "\\" ? i++ : inClass ? c === "]" && (inClass = !1) : c === "[" && (inClass = !0);
+	for (let [i, inClass] of regexChars(text)) {
+		if (inClass) continue;
+		let unsupported = RE2_UNSUPPORTED.exec(text.slice(i));
+		if (unsupported) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". Lookaround and backreferences are not supported in a host pattern, which the resolver matches with RE2`);
+	}
+}
+function checkClasses(text, label, rule) {
+	for (let [i, inClass] of regexChars(text)) {
+		if (text[i] !== "[") continue;
+		let clash = (inClass ? /^\[[:.=]/ : /^\[\^?\]/).exec(text.slice(i));
+		if (clash) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has the character class syntax "${clash[0]}", which the proxy's PCRE2 reads differently from setup. Escape a bracket inside a class ("\\]", "\\["), and spell a POSIX class as a range ("[a-z]")`);
 	}
 }
 const PORTABLE_ESCAPE = /^(?:[dDwWsSbBnrtf]|[1-9](?!\d))/;
+function checkPortableEscape(text, rest, inClass, groups, label, rule) {
+	if (inClass && rest[0] === "B") throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\B" in a character class, which the proxy's PCRE2 refuses`);
+	if (!inClass && Number(rest[0]) > groups) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${rest[0]}", but has ${groups === 0 ? "no capturing group" : `only ${groups} capturing group(s)`} for it to refer to`);
+}
 function checkEscapes(text, label, rule) {
-	for (let i = 0; i < text.length; i++) {
+	let groups = capturingGroups(text);
+	for (let [i, inClass] of regexChars(text)) {
 		if (text[i] !== "\\") continue;
-		let rest = text.slice(++i);
-		if (PORTABLE_ESCAPE.test(rest)) continue;
+		let rest = text.slice(i + 1);
+		if (PORTABLE_ESCAPE.test(rest)) {
+			checkPortableEscape(text, rest, inClass, groups, label, rule);
+			continue;
+		}
 		let escape = /^(?:\d+|[A-Za-z])/.exec(rest);
 		if (escape) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${escape[0]}". The proxy's PCRE2 reads it differently from setup, so a backslash may precede only punctuation, one of \\d \\D \\w \\W \\s \\S \\b \\B \\n \\r \\t \\f, or a single backreference digit`);
 	}
 }
 function checkRawRegexHalf(text, label, rule, hostHalf) {
-	if (checkEscapes(text, label, rule), hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
+	if (checkClasses(text, label, rule), checkEscapes(text, label, rule), hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
 	if (hostHalf && HOST_LITERAL_ILLEGAL.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a character no hostname can, so the ":" this rule was split at is not its port separator. An IPv6 address is not supported here, in a "~" rule any more than in a literal one`);
 	if (hostHalf && COREFILE_UNSAFE.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a "'", a backtick, "{$" or "{%". No hostname contains one, and the resolver's config cannot quote it`);
 }
@@ -164,17 +185,15 @@ function anchorRawRegex(regex) {
 	return `${regex.startsWith("^") ? "" : "^"}${regex}${endsAnchored(regex) ? "" : "$"}`;
 }
 function portPatternStart(hostPlusPort) {
-	let inClass = !1;
-	for (let i = 0; i < hostPlusPort.length; i++) {
+	let bodyStart = 0;
+	for (let [i, inClass] of regexChars(hostPlusPort)) {
+		if (inClass || i < bodyStart) continue;
 		let c = hostPlusPort[i];
-		if (c === "\\") i++;
-		else if (inClass) c === "]" && (inClass = !1);
-		else if (c === "[") inClass = !0;
-		else if (c === ":") return i;
-		else if (c === "(") {
+		if (c === ":") return i;
+		if (c === "(") {
 			if (hostPlusPort[i + 1] === ":") return i;
 			let syntax = /^\(\?[A-Za-z-]*:?/.exec(hostPlusPort.slice(i));
-			syntax && (i += syntax[0].length - 1);
+			syntax && (bodyStart = i + syntax[0].length);
 		}
 	}
 	return -1;
