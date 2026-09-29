@@ -7105,9 +7105,9 @@ async function verifyBundle(bundleJson, options, expectedDigest) {
 }
 //#endregion
 //#region src/core/lib/provenance/verify-policy.ts
-const RELEASE_REF = /^v\d+(\.\d+(\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?)?)?$/, escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const RELEASE_REF = /^v\d+(\.\d+(\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?)?)?$/, escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), caseInsensitive = (s) => escapeRegex(s).replace(/[A-Za-z]/g, (c) => `[${c.toLowerCase()}${c.toUpperCase()}]`);
 function buildVerifyOptions({ actionRef, actionRepo }) {
-	let sanPrefix = `^${escapeRegex(`https://github.com/${actionRepo}/.github/workflows/docker-publish.yml@refs/tags/`)}`, base = {
+	let sanPrefix = `^${escapeRegex("https://github.com/")}${caseInsensitive(actionRepo)}${escapeRegex("/.github/workflows/docker-publish.yml@refs/tags/")}`, base = {
 		certificateIssuer: "https://token.actions.githubusercontent.com",
 		tlogThreshold: 1,
 		ctLogThreshold: 1
