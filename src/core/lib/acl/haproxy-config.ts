@@ -142,7 +142,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
         rules: httpsRules,
         backend: "origin_tls",
       },
-      { mode, ...shared },
+      { mode, listenPort: opts.listenPort, ...shared },
     ),
     ...inspectStage(
       {
@@ -153,7 +153,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
         rules: httpRules,
         backend: "origin_plain",
       },
-      { mode, ...shared },
+      { mode, listenPort: opts.listenPort, ...shared },
     ),
     ...originBackends(opts.systemCaFile),
   ];
