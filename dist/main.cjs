@@ -593,7 +593,7 @@ async function fetchRegistryToken(registry, repo, basicAuth, _fetch = fetch) {
 		let resp = basicAuth ? await _fetch(url, { headers: { Authorization: `Basic ${basicAuth}` } }) : await _fetch(url);
 		if (resp.status >= 500) throw new VerifyImageError(`Transient error from ${registry} token endpoint: HTTP ${resp.status}`, "TRANSIENT");
 		if (resp.ok) return (await resp.json()).token;
-		throw new VerifyImageError(basicAuth ? `Registry authentication failed: HTTP ${resp.status}. The credentials in Docker config may be expired. Run \`docker login ${registry}\` again.` : `Failed to get registry token: HTTP ${resp.status}. The package may be private. Run \`docker login ${registry}\` (or use docker/login-action with 'packages: read') before this action.`, "TOKEN_ERROR");
+		throw new VerifyImageError(basicAuth ? `Registry authentication failed: HTTP ${resp.status}. The credentials in Docker config may be expired, and ${registry} refuses them even for a public package. Run \`docker login ${registry}\` again, or \`docker logout ${registry}\` if the package is public.` : `Failed to get registry token: HTTP ${resp.status}. The package may be private. Run \`docker login ${registry}\` (or use docker/login-action with 'packages: read') before this action.`, "TOKEN_ERROR");
 	});
 }
 //#endregion

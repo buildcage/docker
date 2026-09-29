@@ -333,7 +333,8 @@ export async function fetchImageConfigLabels(
  * Fetch a pull token via Docker Token Authentication.
  *
  * If Docker credentials for the registry are available (basicAuth from
- * readGhcrBasicAuth), uses Basic auth directly, with no anonymous attempt.
+ * readGhcrBasicAuth), uses Basic auth directly, with no anonymous attempt:
+ * docker pulls the image with the same credentials, so it would fail there.
  * Otherwise falls back to anonymous access (public packages).
  */
 export async function fetchRegistryToken(
@@ -365,7 +366,8 @@ export async function fetchRegistryToken(
     throw new VerifyImageError(
       basicAuth
         ? `Registry authentication failed: HTTP ${resp.status}. ` +
-            `The credentials in Docker config may be expired. Run \`docker login ${registry}\` again.`
+            `The credentials in Docker config may be expired, and ${registry} refuses them even for a public package. ` +
+            `Run \`docker login ${registry}\` again, or \`docker logout ${registry}\` if the package is public.`
         : `Failed to get registry token: HTTP ${resp.status}. ` +
             `The package may be private. Run \`docker login ${registry}\` ` +
             `(or use docker/login-action with 'packages: read') before this action.`,
