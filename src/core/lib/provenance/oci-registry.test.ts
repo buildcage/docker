@@ -188,7 +188,7 @@ describe("fetchRegistryToken", () => {
         return failsWith(401);
       }),
       "TOKEN_ERROR",
-      /docker login/,
+      /docker login.*docker logout/,
     );
     expect(callCount, "should not retry with anonymous").toBe(1);
   });
