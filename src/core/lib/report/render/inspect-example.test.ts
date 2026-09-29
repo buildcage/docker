@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, it, expect } from "vitest";
 
 import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
@@ -169,6 +170,27 @@ describe("pathPatternsFor", () => {
   it("collapses to /** when nothing was shared, rather than clustering", () => {
     // The alternative to /** is listing every URL, which is unmaintainable.
     expect(pathPatternsFor(["/a/x", "/b/y"]).join()).toBe("/**");
+  });
+
+  it("keeps an empty segment, which the rules do not merge away", () => {
+    expect(pathPatternsFor(["//x/1", "//x/2"]).join()).toBe("//x/**");
+    expect(pathPatternsFor(["/a//x/1", "/a//x/2"]).join()).toBe("/a//x/**");
+    expect(pathPatternsFor(["/a/x/1", "/a//x/2"]).join()).toBe("/a/**");
+    expect(pathPatternsFor(["/", "//b"]).join()).toBe("/,//**");
+  });
+
+  it("covers every path it was built from, empty segments included", () => {
+    // Few segments, so generated paths share prefixes often.
+    const segment = fc.constantFrom("", "a", "b");
+    const path = fc.array(segment, { maxLength: 4 }).map((s) => `/${s.join("/")}`);
+    fc.assert(
+      fc.property(fc.array(path, { minLength: 2, maxLength: 4 }), (paths) => {
+        const urls = paths.map((p) => `https://a.example.com${p}`);
+        const lines = buildUrlRuleLines(urls.map((url) => req("GET", url)));
+        for (const url of urls) expect(permits(lines, "GET", url)).toBe(true);
+      }),
+      { numRuns: 1000 },
+    );
   });
 
   it("covers the root, which /** already matches", () => {

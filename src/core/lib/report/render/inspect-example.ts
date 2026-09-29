@@ -93,7 +93,9 @@ function parseRequest(request: TrafficEvent): ParsedRequest | LeftOutRequest | n
 /** The segments every path shares, from the left. */
 function commonPrefixSegments(paths: string[]): string[] {
   // Two or more: pathPatternsFor has already answered the shorter cases.
-  const split = paths.map((p) => p.split("/").filter((s) => s !== ""));
+  // Empty segments stay, since the rules tell `//x` from `/x`; slice(1) drops
+  // only the one split() puts before the leading `/`.
+  const split = paths.map((p) => p.split("/").slice(1));
   let prefix = split[0];
   for (const segments of split.slice(1)) {
     let i = 0;
