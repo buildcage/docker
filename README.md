@@ -287,7 +287,7 @@ are in [Reference](./docs/reference.md#report-action-inputs).
 `upload_traffic_artifact: true` uploads the whole timeline as a `traffic.json`, one row per request
 and per name lookup, with the method, URL, status, size and the address it resolved to. It is
 uploaded even when the build fails. Both engines produce one; under `universal` it omits the method,
-URL and status that only `inspect` sees. The fields are listed in
+URL, status and resolved address that only `inspect` sees. The fields are listed in
 [Reference](./docs/reference.md#traffic-artifact).
 
 ## How it works

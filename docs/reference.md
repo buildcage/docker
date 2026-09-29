@@ -573,8 +573,9 @@ resolver saying no rule allows the name, and it does fail the step.
 named `buildcage-traffic` (`buildcage-traffic-<builder_name>` when the builder is not the default
 one). It carries every name lookup, including the ones the summary folds into the request that
 followed them, and service-discovery lookups with the record type that was asked for. Both engines
-produce one; `universal` never sees a method or a URL, so under it those fields are absent and the
-rows are name lookups and a connection-level view (host, port and bytes).
+produce one; `universal` sees neither the request nor where a name resolved, so under it `method`,
+`url`, `status` and `destination` are absent and the rows are name lookups and a connection-level
+view (host, port and bytes).
 
 | Field         | Always | Notes                                                                                    |
 | ------------- | ------ | ---------------------------------------------------------------------------------------- |
@@ -590,7 +591,7 @@ rows are name lookups and a connection-level view (host, port and bytes).
 | `status`      |        | only when something answered                                                             |
 | `bytes`       |        | absent for a refusal and for `dns`                                                       |
 | `reason`      |        | only when `action` is `block`, `incomplete` or `failed`                                  |
-| `destination` |        | the address it actually resolved to; absent for `dns`                                    |
+| `destination` |        | the address it actually resolved to; `inspect` only, and absent for `dns`                |
 
 A `dns` row's `host` is the name as the resolver logged it: lowercased, with escapes such as `\ `
 and `\DDD` kept.
