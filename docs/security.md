@@ -228,7 +228,8 @@ Three mechanisms make that enforceable:
   fails the build. Injection happens at exec time, never touches LLB, and so
   cannot affect a cache key. Before the step's layer is committed, the wrapper reads that layer back
   and takes the certificate, and the anchor, out of every text file carrying it as PEM, every JKS
-  or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`), each
+  or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`, and
+  resealed in the format it came in, so an older JDK that wrote it can still read it), each
   bare DER a trust store splits the bundle into (Mono's
   `cert-sync` writes one per certificate), and the EFI signature database RHEL's `update-ca-trust`
   writes. A copy it finds but cannot remove fails the build, or only warns under
