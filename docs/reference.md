@@ -672,7 +672,8 @@ on a database holding only this CA, bound at `/dev/buildcage-nssdb`. NSS loads e
 keys and writes stay in its own database. After the step, the slot's bytes are taken back out of
 `pkcs11.txt` and whatever the step changed is written back. A database the step's user cannot write
 is covered for the step with one holding only this CA instead. `HOME` comes from the step's
-environment, or from the image's `/etc/passwd` when that is empty, as runc does.
+environment, or from the image's `/etc/passwd` when that is empty, as runc does, and is read once as
+the step starts: a `HOME` the step changes, or another user it switches to, gets no slot.
 
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
