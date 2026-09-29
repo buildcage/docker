@@ -679,18 +679,22 @@ func TestStripLayerFailsOnATraceItCannotRemove(t *testing.T) {
 	}
 }
 
-// The second reading is a reading of the layer, so it reports a failure of its
-// own rather than the sweep's conclusion.
+// A walk that fails after the sweep, in the slot pass or the read-back, is
+// reported.
 func TestStripLayerReportsADirectoryItCannotReadBack(t *testing.T) {
-	root := t.TempDir()
-	rootfs, upper := filepath.Join(root, "rootfs"), filepath.Join(root, "fs")
-	mustMkdirAll(t, rootfs)
-	mustMkdirAll(t, upper)
-	useMountInfo(t, overlayLine(rootfs, upper))
-	failWalkOn(t, upper, 2)
+	for name, nth := range map[string]int{"slot pass": 2, "read-back": 3} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			rootfs, upper := filepath.Join(root, "rootfs"), filepath.Join(root, "fs")
+			mustMkdirAll(t, rootfs)
+			mustMkdirAll(t, upper)
+			useMountInfo(t, overlayLine(rootfs, upper))
+			failWalkOn(t, upper, nth)
 
-	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA); !errors.Is(err, errBrokenWalk) {
-		t.Fatalf("got %v, want the failed listing to be reported", err)
+			if err := stripLayer(rootfs, upperDirOf(rootfs), testCA); !errors.Is(err, errBrokenWalk) {
+				t.Fatalf("got %v, want the failed listing to be reported", err)
+			}
+		})
 	}
 }
 

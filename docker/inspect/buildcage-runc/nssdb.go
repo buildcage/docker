@@ -58,6 +58,10 @@ var nssSlot = []byte("library=libsoftokn3.so\n" +
 	"parameters=\"configdir='sql:" + nssCADBDir + "' flags=readOnly\"\n" +
 	"NSS=\"\"\n\n")
 
+// nssSlotConfigDir identifies the slot even after the rest of its entry is
+// edited.
+var nssSlotConfigDir = []byte("configdir='sql:" + nssCADBDir + "'")
+
 // A real pkcs11.txt is a few hundred bytes per module.
 const maxPKCS11TxtBytes = 1 << 20
 
@@ -324,6 +328,45 @@ func removeNSSSlot(path string, appended []byte, created bool) error {
 		return err
 	}
 	return f.Truncate(int64(len(kept)))
+}
+
+// stripNSSSlotCopy cuts every copy of the slot out of the pkcs11.txt at path,
+// removing the file if nothing is left. It reports whether the file still
+// names the slot's database, or is too large to check.
+func stripNSSSlotCopy(path string) (bool, error) {
+	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return false, asNotRegular(path, err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return false, err
+	}
+	// Too large to be one NSS wrote: report it unread.
+	if info.Size() > maxPKCS11TxtBytes {
+		return true, nil
+	}
+	content := make([]byte, info.Size())
+	if _, err := f.ReadAt(content, 0); err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	kept := content
+	for bytes.Contains(kept, nssSlot) {
+		kept = bytes.ReplaceAll(kept, nssSlot, nil)
+	}
+	if len(kept) < len(content) {
+		if len(kept) == 0 {
+			return false, os.Remove(path)
+		}
+		if _, err := f.WriteAt(kept, 0); err != nil {
+			return false, err
+		}
+		if err := f.Truncate(int64(len(kept))); err != nil {
+			return false, err
+		}
+	}
+	return bytes.Contains(kept, nssSlotConfigDir), nil
 }
 
 // checkNSSDBWritable fails when the step's user could not open the database
