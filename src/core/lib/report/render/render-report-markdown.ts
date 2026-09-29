@@ -47,7 +47,9 @@ export function renderReportMarkdown(
   }
   if (isAudit) {
     // inspect saw the method and the path of every request, so its example
-    // can be that much narrower than one built from hosts alone.
+    // can be that much narrower than one built from hosts alone. A host that
+    // failed is kept either way: nothing refused it and the next run asks for
+    // it again, so leaving it out would write rules that break that run.
     markdown +=
       report.engine === "inspect"
         ? buildInspectRestrictExample(report.timeline, actionRepo, actionRef, {
@@ -55,7 +57,7 @@ export function renderReportMarkdown(
             allowedIpRules: report.parameters.allowedIpRules,
             allowedTlsRules: report.parameters.allowedTlsRules,
           })
-        : buildRestrictExample(report.passed, actionRepo, actionRef, step);
+        : buildRestrictExample([...report.passed, ...report.failed], actionRepo, actionRef, step);
   }
   if (report.blocked.length > 0) {
     if (report.passed.length > 0) markdown += "\n";

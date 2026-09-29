@@ -27,12 +27,13 @@ export function buildRestrictExample(
 ): string {
   if (!auditedRows || auditedRows.length === 0) return "";
 
-  const groups = new Map<string, string[]>();
+  // A Set per parameter: a host can be both reached and failed in one run.
+  const groups = new Map<string, Set<string>>();
   for (const r of auditedRows) {
     const param = ruleTypeToParam[r.ruleType];
     if (!param) continue;
-    if (!groups.has(param)) groups.set(param, []);
-    groups.get(param)!.push(`${r.host}:${r.port}`);
+    if (!groups.has(param)) groups.set(param, new Set());
+    groups.get(param)!.add(`${r.host}:${r.port}`);
   }
 
   if (groups.size === 0) return "";
