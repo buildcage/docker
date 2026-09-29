@@ -14,7 +14,7 @@ import {
 
 import { errorMessage } from "../errors.ts";
 import { VerifyImageError } from "./errors.ts";
-import { assertSignedDigest, type DsseBundle } from "./signed-digest.ts";
+import { assertSignedDigest } from "./signed-digest.ts";
 
 export interface VerifyBundleOptions {
   certificateIssuer?: string;
@@ -49,7 +49,7 @@ async function fetchTrustedRoot(): ReturnType<typeof getTrustedRoot> {
  * payload.
  */
 export async function verifyBundle(
-  bundleJson: DsseBundle,
+  bundleJson: unknown,
   options: VerifyBundleOptions,
   expectedDigest: string,
 ): Promise<void> {
@@ -75,9 +75,14 @@ export async function verifyBundle(
     );
   }
 
-  const signedEntity = toSignedEntity(bundleFromJSON(bundleJson));
+  const bundle = bundleFromJSON(bundleJson);
+  // A bundle carrying both kinds parses as a message signature, which says nothing
+  // about the DSSE payload the digest is read from.
+  if (bundle.content.$case !== "dsseEnvelope") {
+    throw new VerifyImageError("Bundle is not a DSSE envelope", "VERIFY_FAILED");
+  }
   try {
-    verifier.verify(signedEntity, policy);
+    verifier.verify(toSignedEntity(bundle), policy);
   } catch (err) {
     throw new VerifyImageError(
       `Image provenance verification failed: ${errorMessage(err)}`,
@@ -85,9 +90,5 @@ export async function verifyBundle(
     );
   }
 
-  // The DSSE payload parsed by assertSignedDigest is the exact byte sequence covered by the
-  // signature that verifier.verify() above just cryptographically verified (same in-memory
-  // bundle). @sigstore/verify exposes no accessor for the verified payload, so parsing it
-  // directly is both necessary and sound: it is read only after verification succeeds.
-  assertSignedDigest(bundleJson, expectedDigest);
+  assertSignedDigest(bundle.content.dsseEnvelope, expectedDigest);
 }

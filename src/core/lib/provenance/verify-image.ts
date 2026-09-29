@@ -14,7 +14,6 @@ import { ProvenanceError, VerifyImageError } from "./errors.ts";
 import { imageTagFromRef } from "./image-tag.ts";
 import { fetchBundle } from "./oci-bundle.ts";
 import { fetchManifestDigest, fetchRegistryToken, fetchImageConfigLabels } from "./oci-registry.ts";
-import type { DsseBundle } from "./signed-digest.ts";
 import { verifyBundle } from "./sigstore.ts";
 import { buildVerifyOptions, type VerifyImageIdentity } from "./verify-policy.ts";
 
@@ -53,7 +52,7 @@ export async function verifyImageDigest({
   const bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken);
   // Read before verifyBundle, whose TUF refresh can outlast the registry token.
   const labels = await fetchImageConfigLabels(REGISTRY, repoPath, digest, regToken);
-  await verifyBundle(bundle as DsseBundle, verifyOptions, digest);
+  await verifyBundle(bundle, verifyOptions, digest);
   // The bundle covers the digest, not the tag it was reached through.
   checkImageEngine({ labels, proxyEngine, imageTag: tag });
   return digest;

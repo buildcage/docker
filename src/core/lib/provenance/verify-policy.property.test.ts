@@ -52,9 +52,9 @@ describe("buildVerifyOptions: properties", () => {
         fc.stringMatching(/^[A-Za-z0-9-]{1,20}\/[A-Za-z0-9-]{1,20}$/),
         fc.array(fc.boolean(), { minLength: 41, maxLength: 41 }),
         (canonical, flips) => {
-          const actionRepo = [...canonical]
-            .map((c, i) => (flips[i] ? c.toUpperCase() : c.toLowerCase()))
-            .join("");
+          const actionRepo = canonical.replace(/./g, (c, i: number) =>
+            flips[i] ? c.toUpperCase() : c.toLowerCase(),
+          );
           const result = buildVerifyOptions({ actionRef: "v1.0.0", actionRepo });
           const san = `https://github.com/${canonical}/.github/workflows/docker-publish.yml@refs/tags/v1.0.0`;
           expect(new RegExp(result!.certificateIdentityURI!).test(san)).toBe(true);
