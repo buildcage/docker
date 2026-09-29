@@ -76,7 +76,9 @@ Each container BuildKit spawns for a `RUN` step is placed on an isolated CNI net
 bridge to the proxy whatever its destination, so DNS-resolved and direct-IP connections both arrive
 there, and a `FORWARD` rule drops everything else, so no other protocol has a way out and
 buildkitd's own API is unreachable from a step. An `INPUT` rule likewise restricts the proxy's
-listening port to that same bridge.
+listening port to that same bridge. Steps cannot reach one another across it either: each step's
+port on the bridge is isolated, which the bridge enforces itself, whether or not the host passes
+bridged traffic through iptables.
 
 Nothing in the build has to be told about a proxy: interception is at the network level, so the
 `HTTP_PROXY` family of variables is not what puts a request in front of the rules, and ignoring them
