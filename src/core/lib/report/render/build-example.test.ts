@@ -37,6 +37,17 @@ describe("buildRestrictExample", () => {
     );
   });
 
+  it("writes a host once when it appears twice, as reached and as failed", () => {
+    const rows = [
+      { host: "a.example.com", port: "443", ruleType: "HTTPS" },
+      { host: "b.example.com", port: "443", ruleType: "HTTPS" },
+      { host: "a.example.com", port: "443", ruleType: "HTTPS" },
+    ];
+    const md = buildRestrictExample(rows, REPO, REF);
+    expect(md.match(/a\.example\.com:443/g)).toHaveLength(1);
+    expect(md).toMatch(/a\.example\.com:443\n\s+b\.example\.com:443\n/);
+  });
+
   it("all three rule types", () => {
     const rows = [
       { host: "example.com", port: "443", ruleType: "HTTPS", count: 2 },

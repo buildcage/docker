@@ -163,6 +163,16 @@ describe("renderReportMarkdown: universal", () => {
     expect(md.includes("_(no communication)_")).toBe(false);
   });
 
+  it("suggests a host whose name failed to resolve in audit, which nothing refused", () => {
+    const dnsFailed = { ...failedRow, host: "flaky.example.com", reason: "dns-failed" };
+    const md = renderReportMarkdown(
+      { ...base, parameters: reportParams({ mode: "audit" }), failed: [dnsFailed] },
+      "owner/repo",
+      "v1",
+    );
+    expect(md).toMatch(/allowed_https_rules: >-\n\s+flaky\.example\.com:443\n/);
+  });
+
   it("uses the title option verbatim, e.g. a run step's em-dash label", () => {
     const md = renderReportMarkdown(base, "owner/repo", "v1", {
       title: "Outbound Traffic Report — npm install",

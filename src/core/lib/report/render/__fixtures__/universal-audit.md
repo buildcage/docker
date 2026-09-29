@@ -18,6 +18,7 @@
           proxy_engine: universal
           allowed_https_rules: >-
             a.example.com:443
+            c.example.com:443
           allowed_http_rules: >-
             b.example.com:80
 ```

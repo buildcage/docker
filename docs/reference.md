@@ -537,7 +537,8 @@ second is relayed for the build to judge rather than decrypted.
 `universal` writes its decision before the connection is made and never sees what became of it, so
 `dns-failed` is the only one of the four it can report. `audit` reports them the same way, though
 nothing there was allowed by a rule either: what the table says is that the rules are not what
-stopped these.
+stopped these. The rules `audit` suggests for `restrict` include these hosts too, since the next run
+will ask for them again.
 
 **A connection Buildcage never completed is not here.** It is a refusal, it is in Blocked Hosts, and
 it does fail the step:
