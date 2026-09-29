@@ -114,12 +114,25 @@ func javaOnPath(s *spec) []string {
 	return roots
 }
 
-// listedJDKs returns the entries of jdkParentDirs as container paths, at most
-// maxListedJDKs of them. Each directory is resolved inside the rootfs before it
-// is read, so a symlink cannot point the listing at the host.
+// listedJDKs returns the JDKs among the entries of jdkParentDirs as container
+// paths, each once, at most maxListedJDKs of them. An entry counts as a JDK when
+// it has a security directory; one that does not is looked inside where the
+// parent allows a second level. Each directory is resolved inside the rootfs
+// before it is read, so a symlink cannot point the listing at the host.
 func listedJDKs(s *spec) []string {
 	var home string
 	var roots []string
+	seen := map[string]bool{}
+	isJDK := func(root string) bool {
+		for _, dir := range securityDirs(root) {
+			if resolved, err := resolveInRoot(s.rootfs, dir); err == nil {
+				if info, err := os.Stat(resolved); err == nil && info.IsDir() {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	var list func(dir string, depth int) bool
 	list = func(dir string, depth int) bool {
 		resolved, err := resolveInRoot(s.rootfs, dir)
@@ -131,19 +144,25 @@ func listedJDKs(s *spec) []string {
 			return true
 		}
 		for _, entry := range entries {
-			// A symlink is counted too: /usr/lib/jvm/default-java is one.
-			if !entry.IsDir() && entry.Type()&os.ModeSymlink == 0 {
+			root := filepath.Join(dir, entry.Name())
+			if !isJDK(root) {
+				if depth > 1 && !list(root, depth-1) {
+					return false
+				}
 				continue
 			}
+			// sdkman's current, or /usr/lib/jvm/default-java, names a JDK
+			// already listed.
+			resolvedRoot, _ := resolveInRoot(s.rootfs, root)
+			if seen[resolvedRoot] {
+				continue
+			}
+			seen[resolvedRoot] = true
 			if len(roots) == maxListedJDKs {
-				logf("more than %d JDKs under %v; the rest do not get the CA", maxListedJDKs, dir)
+				logf("more than %d JDKs under the usual directories; those from %s on do not get the CA", maxListedJDKs, root)
 				return false
 			}
-			root := filepath.Join(dir, entry.Name())
 			roots = append(roots, root)
-			if depth > 1 && !list(root, depth-1) {
-				return false
-			}
 		}
 		return true
 	}

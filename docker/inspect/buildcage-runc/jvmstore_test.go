@@ -154,6 +154,31 @@ func TestFindJVMKeystoresFindsJDKsInTheUsualPlaces(t *testing.T) {
 	}
 }
 
+// Only a directory with a security directory counts as a JDK. A Gradle JDK's
+// own bin, lib and the rest are neither counted nor looked into, and a symlink
+// to a listed JDK, such as sdkman's current, is not counted again.
+func TestFindJVMKeystoresCountsOnlyJDKs(t *testing.T) {
+	rootfs := t.TempDir()
+	s := &spec{rootfs: rootfs, env: map[string]string{"HOME": "/home/me"}}
+	for i := range 8 {
+		jdk := filepath.Join(rootfs, "home/me/.gradle/jdks", fmt.Sprintf("temurin-%d", i))
+		for _, sub := range []string{"bin", "conf", "include", "jmods", "legal", "lib/security", "man"} {
+			mustMkdirAll(t, filepath.Join(jdk, sub))
+		}
+	}
+	for i := range maxListedJDKs - 9 {
+		mustMkdirAll(t, filepath.Join(rootfs, "home/me/.sdkman/candidates/java", fmt.Sprintf("%d-tem", i), "lib/security"))
+	}
+	mustSymlink(t, "0-tem", filepath.Join(rootfs, "home/me/.sdkman/candidates/java/current"))
+	last := filepath.Join(rootfs, "home/me/.jdks/last/lib/security/cacerts")
+	mustMkdirAll(t, filepath.Dir(last))
+	mustWriteFile(t, last, "x")
+
+	if got := findJVMKeystores(s); !hasPath(got, last) {
+		t.Fatalf("findJVMKeystores = %v; want the last JDK within the limit, %q", got, last)
+	}
+}
+
 // Two distribution JDKs sharing its keystore through symlinks give it once.
 func TestFindJVMKeystoresTakesASharedKeystoreOnce(t *testing.T) {
 	rootfs := t.TempDir()
@@ -193,8 +218,8 @@ func TestFindJVMKeystoresStopsListingPastTheLimit(t *testing.T) {
 	useTempLog(t)
 	rootfs := t.TempDir()
 	s := &spec{rootfs: rootfs, env: map[string]string{"HOME": "/home/me"}}
-	for i := range maxListedJDKs {
-		mustMkdirAll(t, filepath.Join(rootfs, "home/me/.gradle/jdks/x", fmt.Sprintf("jdk%02d", i)))
+	for i := range maxListedJDKs + 1 {
+		mustMkdirAll(t, filepath.Join(rootfs, "home/me/.gradle/jdks/x", fmt.Sprintf("jdk%02d", i), "lib/security"))
 	}
 	late := filepath.Join(rootfs, "home/me/.jdks/late/lib/security/cacerts")
 	mustMkdirAll(t, filepath.Dir(late))
