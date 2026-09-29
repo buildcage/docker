@@ -136,19 +136,37 @@ export function wildcardToRegexPartial(pattern: string): string {
   return `${domainToRegexPartial(domain)}:${port === "*" ? "\\d+" : port}`;
 }
 
-/** True if `regex` carries a `|` outside every group and character class. */
-function hasTopLevelAlternation(regex: string): boolean {
-  let depth = 0;
+/**
+ * Each index of `regex` other than the character after a backslash, with
+ * whether it sits inside a character class: a class's own `[` is outside it,
+ * its `]` inside.
+ *
+ * Classes are read as JavaScript reads them, `[]` being an empty one.
+ * checkClasses refuses the syntax PCRE2 and RE2 read otherwise, so once it has
+ * passed, the three agree on where every class ends.
+ */
+function* regexChars(regex: string): Generator<[number, boolean]> {
   let inClass = false;
   for (let i = 0; i < regex.length; i++) {
     const c = regex[i];
+    yield [i, inClass];
     if (c === "\\") {
       i++;
     } else if (inClass) {
       if (c === "]") inClass = false;
     } else if (c === "[") {
       inClass = true;
-    } else if (c === "(") {
+    }
+  }
+}
+
+/** True if `regex` carries a `|` outside every group and character class. */
+function hasTopLevelAlternation(regex: string): boolean {
+  let depth = 0;
+  for (const [i, inClass] of regexChars(regex)) {
+    if (inClass) continue;
+    const c = regex[i];
+    if (c === "(") {
       depth++;
     } else if (c === ")") {
       depth--;
@@ -157,6 +175,18 @@ function hasTopLevelAlternation(regex: string): boolean {
     }
   }
   return false;
+}
+
+/**
+ * How many capturing groups `regex` opens: `(` with no `?` after it, or a
+ * named group.
+ */
+function capturingGroups(regex: string): number {
+  let count = 0;
+  for (const [i, inClass] of regexChars(regex)) {
+    if (!inClass && /^\((?:(?!\?)|\?<(?![=!]))/.test(regex.slice(i))) count++;
+  }
+  return count;
 }
 
 /**
@@ -182,25 +212,46 @@ const COREFILE_UNSAFE = /['`]|\{[$%]/;
 const RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9])/;
 
 function checkResolverRegexSyntax(text: string, label: string, rule: string): void {
-  let inClass = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (!inClass) {
-      const unsupported = RE2_UNSUPPORTED.exec(text.slice(i));
-      if (unsupported) {
-        throw new Error(
-          `Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". ` +
-            `Lookaround and backreferences are not supported in a host pattern, which the ` +
-            `resolver matches with RE2`,
-        );
-      }
+  for (const [i, inClass] of regexChars(text)) {
+    if (inClass) continue;
+    const unsupported = RE2_UNSUPPORTED.exec(text.slice(i));
+    if (unsupported) {
+      throw new Error(
+        `Invalid regex in rule "${rule}": the ${label} "${text}" uses "${unsupported[0]}". ` +
+          `Lookaround and backreferences are not supported in a host pattern, which the ` +
+          `resolver matches with RE2`,
+      );
     }
-    if (c === "\\") {
-      i++;
-    } else if (inClass) {
-      if (c === "]") inClass = false;
-    } else if (c === "[") {
-      inClass = true;
+  }
+}
+
+/**
+ * What PCRE2 (the proxy) reads as a POSIX class, `[:a:]`, or collating element,
+ * `[.a.]` and `[=a=]`. It ends at the first `:]`, `.]` or `=]` matching the
+ * opening, unless a bare `]` or a second opening such as `[:` comes first;
+ * only `\]` and `\\` are skipped over.
+ */
+const POSIX_BRACKET = /^\[([:.=])(?:\\(?:[\\\]]|(?![\\\]]))|\[(?!\1)|[^\]\\[])*?\1\]/;
+
+/**
+ * Class syntax JavaScript (these checks) reads differently from PCRE2 and
+ * RE2. JavaScript ends an empty class at a `]` right after `[` or `[^`, where
+ * the other two read a literal, and ends a class at the `]` of a POSIX class
+ * inside it, where they end the POSIX class alone. Either way a `|` these
+ * checks see inside a group can sit at the top level for the proxy. A POSIX
+ * class outside a class stops the proxy from starting instead.
+ */
+function checkClasses(text: string, label: string, rule: string): void {
+  for (const [i, inClass] of regexChars(text)) {
+    if (text[i] !== "[") continue;
+    const rest = text.slice(i);
+    const clash = POSIX_BRACKET.exec(rest) ?? (inClass ? null : /^\[\^?\]/.exec(rest));
+    if (clash) {
+      throw new Error(
+        `Invalid regex in rule "${rule}": the ${label} "${text}" has the character class ` +
+          `syntax "${clash[0]}", which the proxy's PCRE2 reads differently from setup. Escape a ` +
+          `"]" inside a class ("\\]"), and spell a POSIX class as a range ("[a-z]")`,
+      );
     }
   }
 }
@@ -214,11 +265,44 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
  */
 const PORTABLE_ESCAPE = /^(?:[dDwWsSbBnrtf]|[1-9](?!\d))/;
 
+/**
+ * The escapes PORTABLE_ESCAPE lets through that still stop the proxy from
+ * starting. JavaScript reads `[\B]` as a `B` and a reference to a group that
+ * is not there as an octal escape; PCRE2 refuses both. A URL rule's halves are
+ * compiled separately, so the path half cannot refer to a group in the host
+ * half.
+ */
+function checkPortableEscape(
+  text: string,
+  rest: string,
+  inClass: boolean,
+  groups: number,
+  label: string,
+  rule: string,
+): void {
+  if (inClass && rest[0] === "B") {
+    throw new Error(
+      `Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\B" in a character ` +
+        `class, which the proxy's PCRE2 refuses`,
+    );
+  }
+  if (!inClass && Number(rest[0]) > groups) {
+    throw new Error(
+      `Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${rest[0]}" but has ` +
+        `${groups} capturing group${groups === 1 ? "" : "s"}`,
+    );
+  }
+}
+
 function checkEscapes(text: string, label: string, rule: string): void {
-  for (let i = 0; i < text.length; i++) {
+  const groups = capturingGroups(text);
+  for (const [i, inClass] of regexChars(text)) {
     if (text[i] !== "\\") continue;
-    const rest = text.slice(++i);
-    if (PORTABLE_ESCAPE.test(rest)) continue;
+    const rest = text.slice(i + 1);
+    if (PORTABLE_ESCAPE.test(rest)) {
+      checkPortableEscape(text, rest, inClass, groups, label, rule);
+      continue;
+    }
     const escape = /^(?:\d+|[A-Za-z])/.exec(rest);
     if (escape) {
       throw new Error(
@@ -234,9 +318,10 @@ function checkEscapes(text: string, label: string, rule: string): void {
 /**
  * Check part of a `~` rule against what the rule syntax can represent.
  *
- * @throws {Error} if the text uses an escape outside PORTABLE_ESCAPE, carries a
- *   top-level `|`, or a host half holds a character no hostname can or text the
- *   resolver's config cannot quote
+ * @throws {Error} if the text holds class syntax checkClasses refuses, uses an
+ *   escape outside PORTABLE_ESCAPE or one checkPortableEscape refuses, carries
+ *   a top-level `|`, or a host half holds a character no hostname can or text
+ *   the resolver's config cannot quote
  */
 export function checkRawRegexHalf(
   text: string,
@@ -244,6 +329,7 @@ export function checkRawRegexHalf(
   rule: string,
   hostHalf: boolean,
 ): void {
+  checkClasses(text, label, rule);
   checkEscapes(text, label, rule);
   if (hostHalf) checkResolverRegexSyntax(text, label, rule);
   if (hasTopLevelAlternation(text)) {
@@ -306,22 +392,16 @@ export function anchorRawRegex(regex: string): string {
  * @returns the index, or -1 when the fragment names no port
  */
 function portPatternStart(hostPlusPort: string): number {
-  let inClass = false;
-  for (let i = 0; i < hostPlusPort.length; i++) {
+  let bodyStart = 0;
+  for (const [i, inClass] of regexChars(hostPlusPort)) {
+    if (inClass || i < bodyStart) continue;
     const c = hostPlusPort[i];
-    if (c === "\\") {
-      i++;
-    } else if (inClass) {
-      if (c === "]") inClass = false;
-    } else if (c === "[") {
-      inClass = true;
-    } else if (c === ":") {
-      return i;
-    } else if (c === "(") {
+    if (c === ":") return i;
+    if (c === "(") {
       if (hostPlusPort[i + 1] === ":") return i;
       // Past the group's own syntax up to its body: `(?:`, `(?i:`, `(?<name>`.
       const syntax = /^\(\?[A-Za-z-]*:?/.exec(hostPlusPort.slice(i));
-      if (syntax) i += syntax[0].length - 1;
+      if (syntax) bodyStart = i + syntax[0].length;
     }
   }
   return -1;

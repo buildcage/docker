@@ -155,6 +155,12 @@ describe("convertUrlRule regex escape hatch", () => {
     expect(() => convertUrlRule("GET ~^https://(a\\.com/x)$")).toThrow(/does not compile/);
   });
 
+  it("rejects a backreference from the path half to a group in the host half", () => {
+    expect(() => convertUrlRule("GET ~^https://(a)\\.com/\\1$")).toThrow(
+      /path half .* but has 0 capturing groups/,
+    );
+  });
+
   it("rejects an IPv6 authority, whose colons are not the port separator", () => {
     expect(() => convertUrlRule("GET ~^https://\\[::1\\]:443/x$")).toThrow(/IPv6/);
   });
