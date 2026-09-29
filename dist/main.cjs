@@ -150,13 +150,13 @@ function checkClasses(text, label, rule) {
 	for (let [i, inClass] of regexChars(text)) {
 		if (text[i] !== "[") continue;
 		let rest = text.slice(i), clash = POSIX_BRACKET.exec(rest) ?? (inClass ? null : /^\[\^?\]/.exec(rest));
-		if (clash) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has the character class syntax "${clash[0]}", which the proxy's PCRE2 reads differently from setup. Escape a bracket inside a class ("\\]", "\\["), and spell a POSIX class as a range ("[a-z]")`);
+		if (clash) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has the character class syntax "${clash[0]}", which the proxy's PCRE2 reads differently from setup. Escape a "]" inside a class ("\\]"), and spell a POSIX class as a range ("[a-z]")`);
 	}
 }
 const PORTABLE_ESCAPE = /^(?:[dDwWsSbBnrtf]|[1-9](?!\d))/;
 function checkPortableEscape(text, rest, inClass, groups, label, rule) {
 	if (inClass && rest[0] === "B") throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\B" in a character class, which the proxy's PCRE2 refuses`);
-	if (!inClass && Number(rest[0]) > groups) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${rest[0]}", but has ${groups === 0 ? "no capturing group" : `only ${groups} capturing group(s)`} for it to refer to`);
+	if (!inClass && Number(rest[0]) > groups) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${rest[0]}" but has ${groups} capturing group${groups === 1 ? "" : "s"}`);
 }
 function checkEscapes(text, label, rule) {
 	let groups = capturingGroups(text);

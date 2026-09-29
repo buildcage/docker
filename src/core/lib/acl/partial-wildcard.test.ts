@@ -313,8 +313,8 @@ describe("checkRawRegexHalf", () => {
   });
 
   it("refuses a backreference to a group the text does not have", () => {
-    expect(() => check("/a\\1", false)).toThrow(/uses "\\1", but has no capturing group/);
-    expect(() => check("/(a)(?:b)\\2", false)).toThrow(/only 1 capturing group/);
+    expect(() => check("/a\\1", false)).toThrow(/uses "\\1" but has 0 capturing groups/);
+    expect(() => check("/(a)(?:b)\\2", false)).toThrow(/but has 1 capturing group$/);
     expect(() => check("/(?<n>a)(b)\\2", false)).not.toThrow();
     expect(() => check("/(?<=a)(b)\\1", false)).not.toThrow();
   });

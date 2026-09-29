@@ -155,10 +155,9 @@ describe("convertUrlRule regex escape hatch", () => {
     expect(() => convertUrlRule("GET ~^https://(a\\.com/x)$")).toThrow(/does not compile/);
   });
 
-  // The proxy compiles the path half on its own, where the host's group is gone.
   it("rejects a backreference from the path half to a group in the host half", () => {
     expect(() => convertUrlRule("GET ~^https://(a)\\.com/\\1$")).toThrow(
-      /path half .* but has no capturing group/,
+      /path half .* but has 0 capturing groups/,
     );
   });
 

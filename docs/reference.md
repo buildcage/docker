@@ -323,9 +323,9 @@ therefore refused there, in a URL rule's host half as well.
 Setup checks a pattern with JavaScript's regular expressions, but the proxy runs it with PCRE2. A
 backslash may precede punctuation, as in `\.`, one of `\d \D \w \W \s \S \b \B \n \r \t \f`, or a
 single-digit backreference such as `\1`, all of which the two read alike. Any other letter or digit
-after a backslash is refused, as are a backreference to a group the pattern lacks (in a URL rule,
-one outside its own half) and `\B` inside a character class. So are a `]` right after `[` or `[^`
-and a POSIX class such as `[:alpha:]`, inside a class or not, which the two read differently. Escape
+after a backslash is refused. So are a backreference to a group the pattern lacks (in a URL rule,
+one outside its own half), `\B` inside a character class, a `]` right after `[` or `[^`, and a
+POSIX class such as `[:alpha:]`, each of which PCRE2 either reads differently or refuses. Escape
 the bracket (`[\]a]`) or write a range (`[a-z]`) instead. Other syntax only JavaScript accepts,
 such as `[\d-z]`, passes setup and then stops the proxy from starting.
 

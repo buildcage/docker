@@ -226,20 +226,20 @@ function checkResolverRegexSyntax(text: string, label: string, rule: string): vo
 }
 
 /**
- * What PCRE2 (the proxy) and RE2 (the resolver) read as a POSIX class, `[:a:]`
- * and the collating forms `[.a.]` and `[=a=]`. It ends where PCRE2 ends it: at
- * the first `:]`, `.]` or `=]` matching the opening, unless a bare `]` or a
- * second opening such as `[:` comes first. Only `\]` and `\\` are skipped over.
+ * What PCRE2 (the proxy) reads as a POSIX class, `[:a:]`, or collating element,
+ * `[.a.]` and `[=a=]`. It ends at the first `:]`, `.]` or `=]` matching the
+ * opening, unless a bare `]` or a second opening such as `[:` comes first;
+ * only `\]` and `\\` are skipped over.
  */
 const POSIX_BRACKET = /^\[([:.=])(?:\\(?:[\\\]]|(?![\\\]]))|\[(?!\1)|[^\]\\[])*?\1\]/;
 
 /**
  * Class syntax JavaScript (these checks) reads differently from PCRE2 and
- * RE2. A `]` right after `[` or `[^` ends an empty class here but is a literal
- * there, and a POSIX class inside a class ends later there. Either moves where
- * the class ends, so a `|` these checks see inside a group can sit at the top
- * level for the proxy. A POSIX class outside a class stops the proxy from
- * starting instead.
+ * RE2. JavaScript ends an empty class at a `]` right after `[` or `[^`, where
+ * the other two read a literal, and ends a class at the `]` of a POSIX class
+ * inside it, where they end the POSIX class alone. Either way a `|` these
+ * checks see inside a group can sit at the top level for the proxy. A POSIX
+ * class outside a class stops the proxy from starting instead.
  */
 function checkClasses(text: string, label: string, rule: string): void {
   for (const [i, inClass] of regexChars(text)) {
@@ -250,7 +250,7 @@ function checkClasses(text: string, label: string, rule: string): void {
       throw new Error(
         `Invalid regex in rule "${rule}": the ${label} "${text}" has the character class ` +
           `syntax "${clash[0]}", which the proxy's PCRE2 reads differently from setup. Escape a ` +
-          `bracket inside a class ("\\]", "\\["), and spell a POSIX class as a range ("[a-z]")`,
+          `"]" inside a class ("\\]"), and spell a POSIX class as a range ("[a-z]")`,
       );
     }
   }
@@ -288,9 +288,8 @@ function checkPortableEscape(
   }
   if (!inClass && Number(rest[0]) > groups) {
     throw new Error(
-      `Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${rest[0]}", but has ` +
-        `${groups === 0 ? "no capturing group" : `only ${groups} capturing group(s)`} for it to ` +
-        `refer to`,
+      `Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${rest[0]}" but has ` +
+        `${groups} capturing group${groups === 1 ? "" : "s"}`,
     );
   }
 }
