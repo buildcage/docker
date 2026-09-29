@@ -501,8 +501,11 @@ reported as blocked; see
   build: { command: "vp build", untrackedEnv: ["NODE_EXTRA_CA_CERTS"] },
   ```
 
-- The CA store's directory is a mount point for the step's duration, so removing or renaming the
-  directory itself fails, while what is inside it behaves normally:
+- The CA goes into a copy of each directory holding a bundle it is added to (the CA store's, and any
+  a CA variable points into), and the copy is mounted over the directory for the step's duration.
+  When one of them holds another, only the outer one is mounted. Removing or renaming a mounted
+  directory fails, while what is inside it behaves normally and what the step writes there is copied
+  back when it ends:
 
   ```dockerfile
   RUN rm -rf /etc/ssl/certs        # fails: the directory is a mount point
