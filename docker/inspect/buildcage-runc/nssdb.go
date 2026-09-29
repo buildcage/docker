@@ -332,7 +332,7 @@ func removeNSSSlot(path string, appended []byte, created bool) error {
 
 // stripNSSSlotCopy takes every copy of the slot out of the pkcs11.txt at path,
 // removing the file once nothing else is left, and reports whether it still
-// names the slot's database afterwards. A home copied with cp -a carries one
+// names the slot's database afterwards, or is too large to tell. A home copied with cp -a carries one
 // of these out of the mirror and into the layer, where it points at a database
 // the image will not have.
 func stripNSSSlotCopy(path string) (bool, error) {
@@ -345,9 +345,10 @@ func stripNSSSlotCopy(path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	// Larger than any pkcs11.txt NSS writes, so not one to read in.
+	// Larger than any pkcs11.txt NSS writes, so not read in, and reported
+	// rather than passed unchecked.
 	if info.Size() > maxPKCS11TxtBytes {
-		return false, nil
+		return true, nil
 	}
 	content := make([]byte, info.Size())
 	if _, err := f.ReadAt(content, 0); err != nil && !errors.Is(err, io.EOF) {

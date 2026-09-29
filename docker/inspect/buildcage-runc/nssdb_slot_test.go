@@ -567,11 +567,12 @@ func TestStripLayerLeavesTheSlotTextOutsidePkcs11Txt(t *testing.T) {
 	}
 }
 
-// Larger than any pkcs11.txt NSS writes, so not read.
-func TestStripLayerLeavesAPkcs11TxtTooLargeToBeOne(t *testing.T) {
+// One larger than any pkcs11.txt NSS writes is not read, and is reported
+// rather than passed unchecked.
+func TestStripLayerReportsAPkcs11TxtTooLargeToRead(t *testing.T) {
 	content := string(nssSlot) + strings.Repeat("#", maxPKCS11TxtBytes)
-	if got, err := stripNSSSlotLayer(t, "pkcs11.txt", content); err != nil || got != content {
-		t.Fatal("a pkcs11.txt too large to be one was rewritten or failed")
+	if got, err := stripNSSSlotLayer(t, "pkcs11.txt", content); !errors.Is(err, errCALeftInLayer) || got != content {
+		t.Fatalf("got %v, want the file reported and left as it was", err)
 	}
 }
 
