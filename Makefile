@@ -229,6 +229,7 @@ test_integration_buildkit_universal_audit: ## Run universal-engine audit mode te
 	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts
 	@./test/assert-universal-audit.sh
+	@./test/assert-step-port-isolation.sh
 	@node src/post.ts
 	@./test/assert-post.sh
 	@$(MAKE) clean_buildkit
@@ -283,6 +284,7 @@ test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode 
 	@./test/assert-inspect-restrict.sh
 	@BUILDER_NAME=$(BUILDER_NAME) TEST_PLATFORM=$(TEST_PLATFORM) \
 	  ./test/assert-inspect-refuses-embedded-bundle.sh
+	@./test/assert-step-port-isolation.sh
 	@docker buildx build --no-cache \
 	  --builder $(BUILDER_NAME) \
 	  --platform $(TEST_PLATFORM) \
