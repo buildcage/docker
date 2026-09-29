@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
+import { scanInspectLog } from "#core/lib/log/inspect.ts";
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
 import {
@@ -131,6 +132,16 @@ describe("what the build or step can write into a rule", () => {
     expect(buildUrlRuleLines([req("GET", "https://a_b.example.com/x")])).toStrictEqual([
       "GET https://a_b.example.com/x",
     ]);
+  });
+
+  it("writes one rule for a host whose Host header was spelled several ways", async () => {
+    const line = (host: string, path: string) =>
+      `buildcage 1 https GET 200 1 ts=-- reason=- tlserr=- dst=1.1.1.1:443 host=${host} ${path}`;
+    const { events } = await scanInspectLog(
+      [line("ok.com.", "/a/1"), line("OK.COM", "/a/2"), line("ok.com", "/a/3")],
+      true,
+    );
+    expect(buildUrlRuleLines(events)).toStrictEqual(["GET https://ok.com/a/**"]);
   });
 
   it("takes the port the request was sent to, not the one in its Host header", () => {

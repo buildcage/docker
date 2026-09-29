@@ -35,6 +35,43 @@ describe("scanInspectLog", () => {
     expect(e.destination).toBe("104.16.1.34:443");
   });
 
+  it("writes the host as the rules judged it: lowercased, one trailing dot dropped", async () => {
+    const line = (host: string) =>
+      `buildcage 1 https GET 403 0 ts=PR reason=- tlserr=- dst=1.1.1.1:443 host=${host} /x`;
+    const [plain, withPort, twoDots] = await parse([
+      line("Blocked.COM."),
+      line("Blocked.Com.:8443"),
+      line("a.com.."),
+    ]);
+    expect(plain.host).toBe("blocked.com");
+    expect(plain.url).toBe("https://blocked.com/x");
+    expect(withPort.url).toBe("https://blocked.com:8443/x");
+    // The rules drop only one, so a rule for a.com does not match it either.
+    expect(twoDots.host).toBe("a.com.");
+  });
+
+  it("lowercases only ASCII, as HAProxy does before matching", async () => {
+    // U+212A KELVIN SIGN lowercases to "k" in JavaScript, not in HAProxy.
+    const [e] = await parse([
+      "buildcage 1 https GET 403 0 ts=PR reason=- tlserr=- dst=1.1.1.1:443 host=blo\u212Aed.com /x",
+    ]);
+    expect(e.host).toBe("blo\u212Aed.com");
+  });
+
+  it("spells a passthrough's SNI the same way", async () => {
+    const [e] = await parse([
+      "buildcage 1 pass tls 10 ts=-- reason=- dst=10.0.0.9:5432 sni=DB.Example.com",
+    ]);
+    expect(e.host).toBe("db.example.com");
+  });
+
+  it("names a request that never came by its SNI, spelled the same way", async () => {
+    const [e] = await parse([
+      "buildcage 1 https <BADREQ> 400 0 ts=CR reason=- tlserr=- dst=198.19.255.1:443 sni=API.Example.com host=- -",
+    ]);
+    expect(e.host).toBe("api.example.com");
+  });
+
   it("keeps the query string, where an exfiltration payload would be", async () => {
     expect((await parse([REFUSED]))[0].url).toBe("https://evil.example.com/exfil?d=SECRET");
   });

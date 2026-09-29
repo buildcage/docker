@@ -265,6 +265,22 @@ describe("buildInspectReportData", () => {
     expect(r.blocked[0].expected).toBe(true);
   });
 
+  it("takes one host however its Host header spelled it, as the rules do", async () => {
+    const refused = (host: string) =>
+      `buildcage 1787471976 https GET 403 0 ts=PR reason=- tlserr=- dst=1.2.3.4:443 host=${host} /`;
+    const dns = ["2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=blocked.com."];
+    const r = await buildInspectReportData(
+      [START, refused("blocked.com."), refused("BLOCKED.COM"), refused("blocked.com")],
+      dns,
+      reportParams({ knownBlockedRules: ["blocked.com"] }),
+      0,
+    );
+    expect(r.blocked.length).toBe(1);
+    expect(r.blocked[0].host).toBe("blocked.com");
+    expect(r.blocked[0].expected).toBe(true);
+    expect(r.blockedCount).toBe(3);
+  });
+
   it("marks everything as audited when nothing was being enforced", async () => {
     const r = await buildInspectReportData(
       [START, ALLOWED],
