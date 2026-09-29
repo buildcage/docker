@@ -394,9 +394,9 @@ If you encounter issues, try reproducing the problem locally to get detailed log
    certificate error there but works fine under `universal`, the tool likely pins a certificate or
    ships its own trust store rather than reading the CA-trust environment variables Buildcage sets.
    A JDK already in the image at `JAVA_HOME` or on `PATH` is handled (`buildcage-runc` injects into
-   its keystore, JKS or PKCS#12); one neither names, or one the step itself downloads, is not, and a
-   keystore sealed with a password other than the JDK default still needs `universal`. Chromium is
-   handled by adding a slot to its NSS database; one the step's user cannot write is covered instead, and a step that writes to that
+   its keystore, JKS or PKCS#12); any other JDK is not, and a keystore sealed with a password other
+   than the JDK default still needs `universal`. Chromium is handled by adding a slot to its NSS
+   database; one the step's user cannot write is covered instead, and a step that writes to that
    fails with "changed the NSS database". See [Limitations](../README.md#limitations).
 
 4. **The setup step fails with "never became ready"**: the builder came up but `buildctl debug
