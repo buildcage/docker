@@ -198,4 +198,19 @@ describe("universal engine counts the log lines it drops like the inspect engine
   });
 });
 
+describe("universal engine's plaintext request timeout", () => {
+  it("ends a silent client's wait before outbound_proxy's client timeout does", () => {
+    // outbound_proxy's clock starts at the connection, http_in's only after the
+    // hand-off.
+    const seconds = (directive: string, text = TEMPLATE) => {
+      const [, n, unit] = new RegExp(`${directive} (\\d+)(s|m)\\n`).exec(text)!;
+      return Number(n) * (unit === "m" ? 60 : 1);
+    };
+    const httpIn = TEMPLATE.slice(TEMPLATE.indexOf("frontend http_in\n"));
+    const deadline = seconds("timeout client") - seconds("tcp-request inspect-delay");
+    expect(seconds("timeout http-request", httpIn) < deadline).toBe(true);
+    expect(seconds("timeout http-keep-alive", httpIn)).toBe(seconds("timeout client"));
+  });
+});
+
 reportResults();

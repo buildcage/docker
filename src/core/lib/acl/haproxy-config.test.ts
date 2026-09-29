@@ -354,6 +354,28 @@ describe("the internal-address guard", () => {
   });
 });
 
+describe("plaintext request timeout", () => {
+  const section = (name: string) =>
+    FULL_CONFIG.split(/\n(?=frontend |backend )/).find((b) => b.startsWith(`frontend ${name}\n`))!;
+  const seconds = (text: string, directive: string) =>
+    Number(new RegExp(`${directive} (\\d+)s`).exec(text)![1]);
+
+  it("ends a silent client's wait before detect's client timeout does", () => {
+    // detect's clock starts at the connection, http_in's only after the hand-off.
+    const deadline =
+      seconds(FULL_CONFIG, "timeout client") -
+      seconds(section("detect"), "tcp-request inspect-delay");
+    expect(seconds(section("http_in"), "timeout http-request") < deadline).toBe(true);
+    expect(seconds(section("http_in"), "timeout http-keep-alive")).toBe(
+      seconds(FULL_CONFIG, "timeout client"),
+    );
+  });
+
+  it("leaves the TLS stage on the client timeout", () => {
+    expect(section("https_in").includes("timeout http-request")).toBe(false);
+  });
+});
+
 describe("what a log line records", () => {
   it("records the path in a form that does not depend on the HTTP version", () => {
     // %HU is the request target as sent: a path over HTTP/1.1, an absolute URI
