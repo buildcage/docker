@@ -429,10 +429,11 @@ reported as blocked; see
   it fails the build. With `fail_on_ca_residue: false` that write only warns and is discarded.
 - Only the NSS database under the `HOME` the step starts with carries the slot. Chromium started
   with another `HOME` (`HOME=/tmp chromium`, `export HOME=...`) or as another user (`su`, `gosu`,
-  `sudo -u`) does not trust the CA. Switch users with `USER` instead, which the slot follows, and
-  leave `HOME` alone within the step. Firefox, including Playwright's and the one Selenium drives,
-  reads a per-profile database and does not trust the CA; use `proxy_engine: universal` or
-  an `allowed_tls_rules` passthrough for it.
+  `sudo -u`) does not trust the CA. Switch users with `USER` instead, which the slot follows as long
+  as no `ENV HOME` pins the home, and leave `HOME` alone within the step. A Firefox carrying
+  Mozilla's own root list, such as Playwright's or the one Selenium drives, reads a per-profile
+  database and does not trust the CA; use `proxy_engine: universal` or an `allowed_tls_rules`
+  passthrough for it.
 - A step that changes the CA's own trust in the NSS database (`certutil -M`), or exports it and
   imports it back, copies the CA into the step's database, which fails the build as a copy the
   wrapper cannot take out. A step cannot remove the database's directory (`rm -rf ~/.pki`) either,
