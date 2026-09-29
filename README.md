@@ -324,14 +324,13 @@ read (see [Limitations](#limitations)). The CA is also left in the
 distribution's own anchor directory, so a step that installs `ca-certificates` partway through keeps
 trusting it once `update-ca-certificates` has rebuilt the bundle from scratch. A JVM already in the
 base image reads none of those variables and only its own keystore, so the CA is added there too, to
-`$JAVA_HOME/lib/security/cacerts` and every other JDK's in the image, in whichever shape it ships
-(JKS or PKCS#12), for the step and
-taken back out before the layer is committed, letting `mvn`, `gradle` and `java` reach the proxy
-without `proxy_engine: universal`. Chromium, including the `chrome-headless-shell` that Puppeteer,
-Playwright and Remotion download, reads only its compiled-in root store and the NSS database in
-`$HOME`, so for each step that database's `pkcs11.txt` gains a read-only slot on a database holding
-only the CA, taken back out before the layer is committed. The database itself stays the step's own,
-with whatever the step writes to it.
+`$JAVA_HOME/lib/security/cacerts` and that of each `java` on `PATH`, in whichever shape it ships
+(JKS or PKCS#12), for the step and taken back out before the layer is committed, letting `mvn`,
+`gradle` and `java` reach the proxy without `proxy_engine: universal`. Chromium, including the
+`chrome-headless-shell` that Puppeteer, Playwright and Remotion download, reads only its compiled-in
+root store and the NSS database in `$HOME`, so for each step that database's `pkcs11.txt` gains a
+read-only slot on a database holding only the CA, taken back out before the layer is committed. The
+database itself stays the step's own, with whatever the step writes to it.
 
 The full table, with what each variable points at when the step has a system CA store and when it
 has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in
@@ -405,18 +404,18 @@ reported as blocked; see
   update, still needs `proxy_engine: universal` or an `allowed_tls_rules` passthrough: `inspect`
   re-signs the connection, and a pinned or bundled store will not accept the new certificate.
 - The JVM (Java, Kotlin, Scala) reads only its own keystore rather than the CA-trust variables. A
-  JDK already in the image is handled: the CA is added for the step, and removed before the layer is
-  committed, to the keystore of the JDK at `$JAVA_HOME`, of each `java` on `PATH`, and of each JDK
-  under `/usr/lib/jvm`, `/usr/java`, `/opt/java`, or the home's `.sdkman`, `.gradle/jdks`, `.jdks`
-  and `.asdf` directories (up to 32 there). A keystore sealed with a password other than the JDK
-  default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it. A JDK the
-  step itself downloads, such as a Gradle toolchain, an `sdk install` or an unpacked tarball, is not
-  there when the step starts and does not trust the CA. Fetch it in an earlier `RUN` step:
+  JDK already in the image at `$JAVA_HOME` or on `PATH` is handled: the CA is added to its keystore
+  for the step and removed before the layer is committed. A keystore sealed with a password other
+  than the JDK default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it.
+  No other JDK trusts the CA, such as a Gradle toolchain under `~/.gradle/jdks` or one the step
+  itself downloads (an `sdk install`, an unpacked tarball). Fetch it in an earlier `RUN` step and
+  put it on `PATH` or `JAVA_HOME` with `ENV`:
 
   ```dockerfile
   RUN tar xzf jdk-21.tar.gz -C /opt/java && /opt/java/jdk-21/bin/java -jar fetch.jar   # fails
   RUN tar xzf jdk-21.tar.gz -C /opt/java
-  RUN /opt/java/jdk-21/bin/java -jar fetch.jar                                         # fine
+  ENV PATH=/opt/java/jdk-21/bin:$PATH
+  RUN java -jar fetch.jar                                                              # fine
   ```
 
 - Chromium trusts the CA through a slot added to the NSS database it reads: `~/.pki/nssdb` when it
@@ -509,6 +508,10 @@ reported as blocked; see
   RUN rm -rf /etc/ssl/certs        # fails: the directory is a mount point
   RUN rm -rf /etc/ssl/certs/*      # fine
   ```
+
+  So is the `lib/security` directory of a JDK at `$JAVA_HOME` or on `PATH` with a keystore of its
+  own rather than a link to the distribution's, so a step cannot remove that JDK. Take it off `PATH`
+  and `JAVA_HOME` with `ENV` first.
 
 - A custom CA path that is unexpectedly large (more than 20 MiB or 512 files) has injection skipped
   for that variable only, the same degradation as when no CA bundle is found at all. A system CA

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -127,109 +126,18 @@ func TestFindJVMKeystoresFollowsJavaOnPath(t *testing.T) {
 	}
 }
 
-// A JDK in one of the usual places is found without JAVA_HOME or PATH naming
-// it, those under the step user's home included.
-func TestFindJVMKeystoresFindsJDKsInTheUsualPlaces(t *testing.T) {
+// A JDK that neither JAVA_HOME nor PATH names, such as a Gradle toolchain, is
+// not injected into, so a later step can still remove it.
+func TestFindJVMKeystoresLeavesOtherJDKsAlone(t *testing.T) {
 	rootfs := t.TempDir()
-	s := &spec{rootfs: rootfs, env: map[string]string{"HOME": "/home/me"}}
-	var want []string
-	for _, root := range []string{
-		"usr/lib/jvm/a",
-		"opt/java/b",
-		"home/me/.gradle/jdks/x/jdk-17",
-		"home/me/.sdkman/candidates/java/21-tem",
-	} {
-		cacerts := filepath.Join(rootfs, root, "lib/security/cacerts")
-		mustMkdirAll(t, filepath.Dir(cacerts))
-		mustWriteFile(t, cacerts, "x")
-		want = append(want, cacerts)
+	s := &spec{rootfs: rootfs, env: map[string]string{"HOME": "/root", "PATH": "/usr/bin"}}
+	for _, root := range []string{"usr/lib/jvm/jdk-21", "root/.gradle/jdks/temurin-17"} {
+		mustMkdirAll(t, filepath.Join(rootfs, root, "lib/security"))
+		mustWriteFile(t, filepath.Join(rootfs, root, "lib/security/cacerts"), "x")
 	}
-	mustWriteFile(t, filepath.Join(rootfs, "usr/lib/jvm/.a.jinfo"), "x")
-
-	got := findJVMKeystores(s)
-	for _, cacerts := range want {
-		if !hasPath(got, cacerts) {
-			t.Errorf("findJVMKeystores = %v; want it to include %q", got, cacerts)
-		}
-	}
-}
-
-// Only a directory with a security directory counts as a JDK. A Gradle JDK's
-// own bin, lib and the rest are neither counted nor looked into, and a symlink
-// to a listed JDK, such as sdkman's current, is not counted again.
-func TestFindJVMKeystoresCountsOnlyJDKs(t *testing.T) {
-	rootfs := t.TempDir()
-	s := &spec{rootfs: rootfs, env: map[string]string{"HOME": "/home/me"}}
-	for i := range 8 {
-		jdk := filepath.Join(rootfs, "home/me/.gradle/jdks", fmt.Sprintf("temurin-%d", i))
-		for _, sub := range []string{"bin", "conf", "include", "jmods", "legal", "lib/security", "man"} {
-			mustMkdirAll(t, filepath.Join(jdk, sub))
-		}
-	}
-	for i := range maxListedJDKs - 9 {
-		mustMkdirAll(t, filepath.Join(rootfs, "home/me/.sdkman/candidates/java", fmt.Sprintf("%d-tem", i), "lib/security"))
-	}
-	mustSymlink(t, "0-tem", filepath.Join(rootfs, "home/me/.sdkman/candidates/java/current"))
-	last := filepath.Join(rootfs, "home/me/.jdks/last/lib/security/cacerts")
-	mustMkdirAll(t, filepath.Dir(last))
-	mustWriteFile(t, last, "x")
-
-	if got := findJVMKeystores(s); !hasPath(got, last) {
-		t.Fatalf("findJVMKeystores = %v; want the last JDK within the limit, %q", got, last)
-	}
-}
-
-// Two distribution JDKs sharing its keystore through symlinks give it once.
-func TestFindJVMKeystoresTakesASharedKeystoreOnce(t *testing.T) {
-	rootfs := t.TempDir()
-	s := &spec{rootfs: rootfs, env: map[string]string{}}
-	real := filepath.Join(rootfs, "etc/ssl/certs/java/cacerts")
-	mustMkdirAll(t, filepath.Dir(real))
-	mustWriteFile(t, real, "x")
-	for _, jdk := range []string{"java-17", "java-21"} {
-		dir := filepath.Join(rootfs, "usr/lib/jvm", jdk, "lib/security")
-		mustMkdirAll(t, dir)
-		mustSymlink(t, "/etc/ssl/certs/java/cacerts", filepath.Join(dir, "cacerts"))
-	}
-
-	if got := findJVMKeystores(s); len(got) != 1 || got[0] != real {
-		t.Fatalf("findJVMKeystores = %v; want the single real path %q", got, real)
-	}
-}
-
-// A JDK directory that leads out of the rootfs is not read.
-func TestFindJVMKeystoresIgnoresAJDKDirectoryOutsideTheRootfs(t *testing.T) {
-	rootfs := t.TempDir()
-	s := &spec{rootfs: rootfs, env: map[string]string{}}
-	outside := t.TempDir()
-	mustMkdirAll(t, filepath.Join(outside, "jdk/lib/security"))
-	mustWriteFile(t, filepath.Join(outside, "jdk/lib/security/cacerts"), "x")
-	mustMkdirAll(t, filepath.Join(rootfs, "usr/lib"))
-	mustSymlink(t, "../../../../../../../../"+outside, filepath.Join(rootfs, "usr/lib/jvm"))
 
 	if got := findJVMKeystores(s); len(got) != 0 {
-		t.Fatalf("found keystores outside the rootfs: %v", got)
-	}
-}
-
-// Past maxListedJDKs the listing stops and says so, here partway through
-// Gradle's nested toolchains.
-func TestFindJVMKeystoresStopsListingPastTheLimit(t *testing.T) {
-	useTempLog(t)
-	rootfs := t.TempDir()
-	s := &spec{rootfs: rootfs, env: map[string]string{"HOME": "/home/me"}}
-	for i := range maxListedJDKs + 1 {
-		mustMkdirAll(t, filepath.Join(rootfs, "home/me/.gradle/jdks/x", fmt.Sprintf("jdk%02d", i), "lib/security"))
-	}
-	late := filepath.Join(rootfs, "home/me/.jdks/late/lib/security/cacerts")
-	mustMkdirAll(t, filepath.Dir(late))
-	mustWriteFile(t, late, "x")
-
-	if got := findJVMKeystores(s); hasPath(got, late) {
-		t.Errorf("a JDK past the limit was taken: %v", got)
-	}
-	if !strings.Contains(ownLog.String(), "more than") {
-		t.Errorf("the limit was not logged:\n%s", ownLog.String())
+		t.Fatalf("findJVMKeystores = %v; want none", got)
 	}
 }
 
@@ -439,16 +347,18 @@ func TestInjectLeavesAnUntouchedKeystoreAlone(t *testing.T) {
 	}
 }
 
-// A second JDK beside JAVA_HOME's gets the CA in a bind of its own, and both
-// real keystores are left as they were.
+// A second JDK on PATH beside JAVA_HOME's gets the CA in a bind of its own, and
+// both real keystores are left as they were.
 func TestInjectCoversASecondJDK(t *testing.T) {
 	useFakeRsync(t)
-	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java/main"})
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java/main", "PATH=/opt/java/other/bin"})
 	useMountInfo(t, overlayLine(rootfs, rootfs))
 	original := keystore(2, trustedEntry(2, "digicert", otherDER))
 	for _, jdk := range []string{"main", "other"} {
 		writeRootfsKeystore(t, rootfs, "/opt/java/"+jdk+"/lib/security/cacerts", original)
 	}
+	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/other/bin"))
+	mustWriteFile(t, filepath.Join(rootfs, "opt/java/other/bin/java"), "java")
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
