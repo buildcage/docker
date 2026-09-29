@@ -243,8 +243,9 @@ Three mechanisms make that enforceable:
   PKCS#12 naming more than a million key-derivation iterations. Those are not failed on, since
   dependencies ship encrypted test keystores and failing on them would break builds that never
   touched the CA. Reading the layer back needs BuildKit's `overlayfs` snapshotter, which the builder
-  started by this action gets. On a builder whose data root cannot hold an overlay upper directory,
-  BuildKit falls back to another snapshotter and the wrapper cannot check the layer. Each step then
+  gets when Docker's data root can hold an overlay upper directory, as on GitHub-hosted runners.
+  Where it cannot, such as a data root that is itself on overlayfs, BuildKit falls back to another
+  snapshotter and the wrapper cannot check the layer. Each step then
   fails, or under `fail_on_ca_residue: false` warns and keeps only the store directory's own undo,
   so a copy the step made of the CA can stay in the image. The layer is read back
   whatever the step exited with. The wrapper fails a step through its exit code, 1 or the step's own
