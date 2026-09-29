@@ -162,6 +162,9 @@ jobs:
         engine: [universal, inspect]
     runs-on: ${{ matrix.runner }}
     name: "verify (${{ matrix.engine }}, ${{ matrix.runner }})"
+    env:
+      # Unique per leg, so each leg's traffic artifact gets its own name.
+      BUILDER: buildcage-${{ strategy.job-index }}
 
     steps:
       - name: Checkout
@@ -209,6 +212,7 @@ jobs:
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.image.outputs.ref }}
         with:
+          builder_name: ${{ env.BUILDER }}
           proxy_mode: restrict
           proxy_engine: ${{ matrix.engine }}
           # Each engine gets the rule kind it actually enforces on.
@@ -219,8 +223,7 @@ jobs:
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
           driver: remote
-          # Matches action.yml's default builder_name; update together.
-          endpoint: docker-container://buildcage
+          endpoint: docker-container://${{ env.BUILDER }}
 
       # alpine for busybox wget alone: buildkitd fetches FROM off the isolated
       # network, so the base image needs no rule of its own.
@@ -255,23 +258,32 @@ jobs:
           no-cache: true
 
       # The build only sees that the second request failed, which an outage
-      # would produce too. fail_on_blocked stays at its default so that the
-      # report finding the refusal is what the next step asserts on, and
-      # producing it exercises the image's own report-action.js.
+      # would produce too, so the traffic record has to show the proxy refused it.
       - name: Show proxy report
-        id: report
         if: always()
-        continue-on-error: true
         uses: ./report
+        with:
+          builder_name: ${{ env.BUILDER }}
+          fail_on_blocked: false
+          upload_traffic_artifact: true
+          traffic_artifact_retention_days: 1
 
-      - name: The report must have recorded the refusal
-        env:
-          REPORT_OUTCOME: ${{ steps.report.outcome }}
+      - name: Download the traffic artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: buildcage-traffic-${{ env.BUILDER }}
+          path: /tmp/buildcage-traffic
+
+      - name: The proxy must have allowed example.com and refused neverssl.com
         run: |
-          if [ "$REPORT_OUTCOME" != "failure" ]; then
-            echo "::error::no blocked connection reached the report"
-            exit 1
-          fi
+          node -e '
+            const rows = JSON.parse(require("node:fs").readFileSync("/tmp/buildcage-traffic/traffic.json", "utf8"));
+            const has = (action, host) => rows.some((r) => r.action === action && r.host === host);
+            if (!has("allow", "example.com") || !has("block", "neverssl.com")) {
+              console.log("::error::the traffic record does not show example.com allowed and neverssl.com blocked");
+              process.exit(1);
+            }
+          '
 
       # No cleanup step: ephemeral runner, and setup's post-hook already
       # stops the container.
