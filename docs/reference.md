@@ -572,8 +572,9 @@ resolver saying no rule allows the name, and it does fail the step.
 `upload_traffic_artifact: true` uploads the report's timeline as a `traffic.json` inside an artifact
 named `buildcage-traffic` (`buildcage-traffic-<builder_name>` when the builder is not the default
 one). It carries every name lookup, including the ones the summary folds into the request that
-followed them, and service-discovery lookups with the record type that was asked for. `universal`
-never sees a method or a URL, so this input only does anything under `inspect`.
+followed them, and service-discovery lookups with the record type that was asked for. Both engines
+produce one; `universal` never sees a method or a URL, so under it those fields are absent and the
+rows are name lookups and a connection-level view (host, port and bytes).
 
 | Field         | Always | Notes                                                                                    |
 | ------------- | ------ | ---------------------------------------------------------------------------------------- |
