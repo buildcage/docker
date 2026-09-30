@@ -14,7 +14,7 @@ function plainStage(inputs: RuleInputs, mode: "restrict" | "audit" = "restrict")
       rules: compileRuleSet(inputs).http,
       backend: "origin_plain",
     },
-    { mode, hasResolver: true, internalAddrs: INTERNAL_RANGES },
+    { mode, hasResolver: true, internalAddrs: INTERNAL_RANGES, listenPort: 10024 },
   ).join("\n");
 }
 
@@ -77,6 +77,17 @@ describe("inspect stage", () => {
     expect(
       named[2].endsWith(
         "-m str 127.0.0.2 } { dst_port 80 } { path -m beg /latest/ } { method GET }",
+      ),
+    ).toBe(true);
+  });
+
+  it("never exempts the proxy's own network or listener, which would loop back", () => {
+    const plain = plainStage({ httpRules: ["127.0.0.1:10024"] });
+    expect(plain.includes("acl dst_proxy_self var(txn.dst) -m ip 198.19.255.0/24")).toBe(true);
+    expect(plain.includes("acl dst_proxy_self dst_port 10024")).toBe(true);
+    expect(
+      plain.includes(
+        "deny deny_status 403 if dst_internal !named_address or dst_internal dst_proxy_self\n",
       ),
     ).toBe(true);
   });

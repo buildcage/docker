@@ -1,3 +1,4 @@
+import { PROXY_SUBNET } from "../log/proxy-address.ts";
 import { internalDstAcl, type InternalDstOptions } from "./haproxy-internal-dst.ts";
 import {
   escapeForHaproxy,
@@ -25,6 +26,8 @@ export interface InspectStageSpec {
 export interface InspectStageContext extends InternalDstOptions {
   mode: "restrict" | "audit";
   hasResolver: boolean;
+  /** The detect frontend's port, bound on every address the proxy holds. */
+  listenPort: number;
 }
 
 /** The SNI field, for the stage that terminates TLS. It names the host of a
@@ -47,8 +50,10 @@ function addressRules(rules: CompiledRule[]): CompiledRule[] {
  * Exempt an internal destination only where a rule naming that address as its
  * host matches the whole request, so `**:80` cannot open 169.254.169.254.
  * Matched here, not in the rule block: audit has none but still guards.
+ * PROXY_SUBNET and the listener port are never exempt: a rule naming the
+ * proxy's own listener, on any of its addresses, would loop it into itself.
  */
-function internalGuard(rules: CompiledRule[]): string[] {
+function internalGuard(rules: CompiledRule[], listenPort: number): string[] {
   const named = addressRules(rules);
   if (named.length === 0) {
     return [
@@ -73,8 +78,10 @@ function internalGuard(rules: CompiledRule[]): string[] {
   }
   lines.push(
     "    acl named_address var(txn.named_address) -m bool",
-    "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address",
-    "    http-request deny deny_status 403 if dst_internal !named_address",
+    `    acl dst_proxy_self var(txn.dst) -m ip ${PROXY_SUBNET}`,
+    `    acl dst_proxy_self dst_port ${listenPort}`,
+    "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address or dst_internal dst_proxy_self",
+    "    http-request deny deny_status 403 if dst_internal !named_address or dst_internal dst_proxy_self",
     "",
   );
   return lines;
@@ -204,7 +211,7 @@ export function inspectStage(
       "",
       "    # A resolved destination may not be internal; see INTERNAL_RANGES.",
       ...internalDstAcl("dst_internal", ctx),
-      ...internalGuard(rules),
+      ...internalGuard(rules, ctx.listenPort),
     );
   }
   l.push(`    default_backend ${backend}`, "");
