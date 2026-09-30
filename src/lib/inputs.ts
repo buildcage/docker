@@ -2,11 +2,6 @@
  * Every `core.getInput` the setup and post steps make, in one place, so that
  * what this action reads is answerable from one file rather than by grepping
  * the entry points. The report action has its own (report/src/lib/inputs.ts).
- *
- * Read in two calls rather than one because the setup step needs the engine
- * before it resolves the image and the rules only after: folding them together
- * would move rule validation ahead of image verification, changing which error
- * a run with both problems reports.
  */
 import * as core from "@actions/core";
 
@@ -27,14 +22,6 @@ export type GetInput = (name: string) => string;
 
 export function readBuilderName(getInput: GetInput = core.getInput): string {
   return getInput("builder_name") || DEFAULT_BUILDER_NAME;
-}
-
-export interface EngineInputs {
-  proxyEngine: ProxyEngine;
-}
-
-export function readEngineInputs(getInput: GetInput = core.getInput): EngineInputs {
-  return { proxyEngine: resolveProxyEngine(getInput("proxy_engine")) };
 }
 
 const PROXY_MODES = ["audit", "restrict"] as const;
@@ -78,7 +65,9 @@ export function resolveFailOnCaResidue(input: string | undefined): boolean {
   );
 }
 
-export interface ParsedRuleInputs {
+export interface SetupInputs {
+  proxyEngine: ProxyEngine;
+  builderName: string;
   proxyMode: ProxyMode;
   /** Whether CA residue in a layer fails the build rather than only warning. */
   failOnCaResidue: boolean;
@@ -93,20 +82,22 @@ export interface ParsedRuleInputs {
 }
 
 /**
- * Parse and validate every rule input.
+ * Parse and validate every input the setup step takes, in one call so that a
+ * typo fails before anything touches the network.
  *
  * URL and TLS rules are compiled here even on the engines that ignore them,
  * purely so a typo fails at setup rather than silently inside the container.
  * Everything is then compiled once more the way the container does it, so a
  * rule this parser accepts but the container refuses fails here too.
  *
- * The statement order decides which malformed-rule error surfaces first.
+ * The statement order decides which error surfaces first.
  *
- * @throws {SetupError} if proxy_mode is neither mode, or fail_on_ca_residue
- *   is not a boolean
+ * @throws {SetupError} if proxy_engine or proxy_mode is not a known value, or
+ *   fail_on_ca_residue is not a boolean
  * @throws {InvalidRulesError} if any rule is malformed
  */
-export function readRuleInputs(getInput: GetInput = core.getInput): ParsedRuleInputs {
+export function readSetupInputs(getInput: GetInput = core.getInput): SetupInputs {
+  const proxyEngine = resolveProxyEngine(getInput("proxy_engine"));
   const proxyMode = resolveProxyMode(getInput("proxy_mode"));
   const failOnCaResidue = resolveFailOnCaResidue(getInput("fail_on_ca_residue"));
   const rules = buildACLRules({
@@ -122,6 +113,8 @@ export function readRuleInputs(getInput: GetInput = core.getInput): ParsedRuleIn
   const urlRules = compiledUrlRules.map((r) => r.raw);
 
   return {
+    proxyEngine,
+    builderName: readBuilderName(getInput),
     proxyMode,
     failOnCaResidue,
     httpsRules: rules.httpsRules,

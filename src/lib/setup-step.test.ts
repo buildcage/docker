@@ -7,9 +7,7 @@ import { runSetupStep, COMPOSE_FILE, type SetupStepDeps } from "./setup-step.ts"
 // the order they run in, what each one is handed, and which of them still run
 // when an earlier step fails.
 const mocks = {
-  readEngineInputs: vi.fn(),
-  readRuleInputs: vi.fn(),
-  readBuilderName: vi.fn(),
+  readSetupInputs: vi.fn(),
   readLocalImageOverride: vi.fn(),
   verifyImageDigestOrThrow: vi.fn(),
   checkUrlAndTlsRuleSupport: vi.fn(),
@@ -39,18 +37,7 @@ const PROJECT_NAME = "buildcage-eeb358f947ee";
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.readEngineInputs.mockReturnValue({ proxyEngine: "universal" });
-  mocks.readRuleInputs.mockReturnValue({
-    proxyMode: "restrict",
-    failOnCaResidue: true,
-    httpsRules: ["example.com:443"],
-    httpRules: [],
-    ipRules: [],
-    urlRules: [],
-    tlsRules: [],
-    knownBlockedRules: [],
-  });
-  mocks.readBuilderName.mockReturnValue("buildcage");
+  mocks.readSetupInputs.mockReturnValue(inputsWith());
   mocks.readLocalImageOverride.mockResolvedValue(null);
   mocks.verifyImageDigestOrThrow.mockResolvedValue(DIGEST);
   // The real one runs the callback; a test that cares asserts on logRules.
@@ -59,6 +46,23 @@ beforeEach(() => {
     new SetupError("builder never came up", "BUILDER_NOT_READY"),
   );
 });
+
+/** What readSetupInputs returns, with `overrides` on top of a minimal run. */
+function inputsWith(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    proxyEngine: "universal",
+    builderName: "buildcage",
+    proxyMode: "restrict",
+    failOnCaResidue: true,
+    httpsRules: ["example.com:443"],
+    httpRules: [],
+    ipRules: [],
+    urlRules: [],
+    tlsRules: [],
+    knownBlockedRules: [],
+    ...overrides,
+  };
+}
 
 /** Call order of a step that ran, for comparing two steps against each other. */
 function orderOf(mock: { mock: { invocationCallOrder: number[] } }): number {
@@ -78,8 +82,8 @@ describe("runSetupStep", () => {
   it("reads the engine before it resolves the image", async () => {
     await runSetupStep(ENV, deps);
 
-    expect(orderOf(mocks.readEngineInputs)).toBeLessThan(orderOf(mocks.readLocalImageOverride));
-    expect(orderOf(mocks.readEngineInputs)).toBeLessThan(orderOf(mocks.verifyImageDigestOrThrow));
+    expect(orderOf(mocks.readSetupInputs)).toBeLessThan(orderOf(mocks.readLocalImageOverride));
+    expect(orderOf(mocks.readSetupInputs)).toBeLessThan(orderOf(mocks.verifyImageDigestOrThrow));
     expect(mocks.verifyImageDigestOrThrow).toHaveBeenCalledWith({
       actionRef: "v3.2.1",
       actionRepo: "buildcage/docker",
@@ -98,19 +102,22 @@ describe("runSetupStep", () => {
     });
   });
 
-  // Folding the two input reads into one would move rule validation ahead of
-  // image verification, changing which error a run with both problems reports.
-  it("validates the rules only after the image has been verified", async () => {
-    await runSetupStep(ENV, deps);
+  // A typo in an input fails without waiting on verification's network calls.
+  it("reports invalid inputs before it resolves the image", async () => {
+    mocks.readSetupInputs.mockImplementation(() => {
+      throw new Error("Invalid rule");
+    });
 
-    expect(orderOf(mocks.verifyImageDigestOrThrow)).toBeLessThan(orderOf(mocks.readRuleInputs));
+    await expect(runSetupStep(ENV, deps)).rejects.toThrow("Invalid rule");
+    expect(mocks.readLocalImageOverride).not.toHaveBeenCalled();
+    expect(mocks.verifyImageDigestOrThrow).not.toHaveBeenCalled();
+    expect(mocks.runDocker).not.toHaveBeenCalled();
   });
 
-  it("reports an unverifiable image without reading the rules at all", async () => {
+  it("starts no builder when the image cannot be verified", async () => {
     mocks.verifyImageDigestOrThrow.mockRejectedValue(new Error("no signature found"));
 
     await expect(runSetupStep(ENV, deps)).rejects.toThrow("no signature found");
-    expect(mocks.readRuleInputs).not.toHaveBeenCalled();
     expect(mocks.runDocker).not.toHaveBeenCalled();
   });
 
@@ -129,16 +136,12 @@ describe("runSetupStep", () => {
   });
 
   it("checks known_blocked_rules URL lines against the engine, host lines excluded", async () => {
-    mocks.readRuleInputs.mockReturnValue({
-      proxyMode: "restrict",
-      failOnCaResidue: true,
-      httpsRules: [],
-      httpRules: [],
-      ipRules: [],
-      urlRules: [],
-      tlsRules: [],
-      knownBlockedRules: ["telemetry.example.com:*", "POST https://api.example.com/telemetry"],
-    });
+    mocks.readSetupInputs.mockReturnValue(
+      inputsWith({
+        httpsRules: [],
+        knownBlockedRules: ["telemetry.example.com:*", "POST https://api.example.com/telemetry"],
+      }),
+    );
 
     await runSetupStep(ENV, deps);
 
@@ -180,16 +183,18 @@ describe("runSetupStep", () => {
   });
 
   it("hands the builder the rules that were read, not the job environment's", async () => {
-    mocks.readRuleInputs.mockReturnValue({
-      proxyMode: "audit",
-      failOnCaResidue: false,
-      httpsRules: ["example.com:443", "*.npmjs.org:443"],
-      httpRules: ["deb.debian.org:80"],
-      ipRules: ["10.0.0.0/8"],
-      urlRules: ["GET https://example.com/ok"],
-      tlsRules: ["example.com"],
-      knownBlockedRules: ["blocked.example:443"],
-    });
+    mocks.readSetupInputs.mockReturnValue(
+      inputsWith({
+        proxyMode: "audit",
+        failOnCaResidue: false,
+        httpsRules: ["example.com:443", "*.npmjs.org:443"],
+        httpRules: ["deb.debian.org:80"],
+        ipRules: ["10.0.0.0/8"],
+        urlRules: ["GET https://example.com/ok"],
+        tlsRules: ["example.com"],
+        knownBlockedRules: ["blocked.example:443"],
+      }),
+    );
 
     await runSetupStep({ ...ENV, PROXY_MODE: "restrict", ALLOWED_HTTP_RULES: "leaked:80" }, deps);
 
