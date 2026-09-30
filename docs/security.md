@@ -475,7 +475,8 @@ signing workflow and its ref or version, and the source commit SHA carried in Fu
 Two assertions then run against the verified bundle, both fail-closed:
 
 - **The signed digest must equal the digest the tag resolved to.** It is read from the verified
-  DSSE envelope, and a bundle that is not a DSSE envelope is rejected. This closes the attribution gap the Referrers API leaves open.
+  DSSE envelope, and a bundle that is not a DSSE envelope is rejected. This closes the attribution
+  gap the Referrers API leaves open.
 - **The image's `org.opencontainers.image.version` must name the engine this run asked for.** The
   signature covers a digest, not a tag, so without this a `-inspect` tag repointed at the same
   release's `universal` image would run without URL and TLS enforcement.
