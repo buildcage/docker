@@ -42,8 +42,7 @@ var errCALeftInLayer = errors.New("the certificate is still in the step's layer"
 var errNSSSlotLeftInLayer = errors.New("the proxy CA's NSS slot is still in the step's layer")
 
 // errLayerUnread means no overlay upper directory was found for the step's
-// layer, usually because BuildKit is not using its overlayfs snapshotter, so
-// nothing could say whether it holds a copy. The log says why.
+// layer, so nothing could say whether it would hold a copy. The log says why.
 var errLayerUnread = errors.New("no overlay upper directory was found for the step's layer, so it could not be checked for copies of the proxy CA")
 
 // readMountInfo is a var so tests can hand the parser lines captured from a

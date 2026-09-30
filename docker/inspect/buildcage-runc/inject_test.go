@@ -30,6 +30,8 @@ func newBundleNoStore(t *testing.T, env []string) (bundle, rootfs string) {
 		t.Fatal(err)
 	}
 	mustWriteFile(t, filepath.Join(bundle, "config.json"), string(raw))
+	// inject refuses a step whose layer it cannot read back.
+	useMountInfo(t, overlayLine(rootfs, rootfs))
 	return bundle, rootfs
 }
 

@@ -154,6 +154,12 @@ func TestUpperDirOfReportsWhatItCannotRead(t *testing.T) {
 			t.Fatalf("got %q, want no layer", got)
 		}
 	})
+
+	t.Run("this process's own mount table", func(t *testing.T) {
+		if got := upperDirOf(t.TempDir()); got != "" {
+			t.Fatalf("got %q, want no overlay over a temporary directory", got)
+		}
+	})
 }
 
 func TestUnescapeMountInfoDecodesTheCharactersTheKernelEscapes(t *testing.T) {

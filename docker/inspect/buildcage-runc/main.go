@@ -114,7 +114,12 @@ func run(args []string) int {
 	if bundle != "" {
 		logTag = "[" + filepath.Base(bundle) + "]"
 	}
-	injected := setupInjection(sub, bundle)
+	injected, err := setupInjection(sub, bundle)
+	if err != nil {
+		logf("not running the step: %v", err)
+		dumpOwnLog(os.Stderr)
+		return 1
+	}
 
 	cmd := exec.Command(realRunc, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
@@ -160,28 +165,32 @@ func run(args []string) int {
 }
 
 // setupInjection makes the step trust the proxy's CA, returning what undoes it
-// again, or nil when there is nothing to undo.
+// again, or nil when there is nothing to undo. An error means the step must
+// not run.
 //
 // `run` only, not `create`: restore is tied to the wrapped process exiting, but
 // `runc create` returns before the process runs, so the CA would be gone by
 // `runc start`. BuildKit's runcexecutor uses `run`.
-func setupInjection(sub, bundle string) *injection {
+func setupInjection(sub, bundle string) (*injection, error) {
 	if sub != "run" || bundle == "" {
-		return nil
+		return nil, nil
 	}
 	ca, err := os.ReadFile(caFile)
 	if err != nil {
 		// Without a CA there is nothing to trust and nothing to undo; the step
 		// still runs, and its TLS failures will say so.
 		logf("no CA at %s (%v); running without injection", caFile, err)
-		return nil
+		return nil, nil
 	}
 	injected, err := inject(bundle, ca)
+	if errors.Is(err, errLayerUnread) {
+		return nil, err
+	}
 	if err != nil {
 		logf("injection failed for %s: %v", bundle, err)
-		return nil
+		return nil, nil
 	}
-	return injected
+	return injected, nil
 }
 
 // forwardSignals relays signals to runc until the returned function is called.

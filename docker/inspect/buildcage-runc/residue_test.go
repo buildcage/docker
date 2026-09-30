@@ -77,9 +77,9 @@ func TestFinishOnlyWarnsAboutAKeystoreItCannotResealWhenAskedTo(t *testing.T) {
 	}
 }
 
-// A layer that cannot be read back fails the build, or only warns when asked
-// to.
-func TestFinishOnlyWarnsAboutAnUnreadLayerWhenAskedTo(t *testing.T) {
+// A step whose layer cannot be read back does not run, whatever
+// fail_on_ca_residue says, and nothing is placed in its rootfs.
+func TestInjectRefusesAStepWithoutALayerToReadBack(t *testing.T) {
 	for _, fail := range []bool{true, false} {
 		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
 			useTempLog(t)
@@ -90,24 +90,11 @@ func TestFinishOnlyWarnsAboutAnUnreadLayerWhenAskedTo(t *testing.T) {
 			bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
 			useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
 
-			in, err := inject(bundle, testCA)
-			if err != nil {
-				t.Fatal(err)
+			if _, err := inject(bundle, testCA); !errors.Is(err, errLayerUnread) {
+				t.Fatalf("got %v, want the unread layer to refuse the step", err)
 			}
-			readStderr := captureStderr(t)
-			err = in.finish()
-			stderr := readStderr()
-			if fail {
-				if !errors.Is(err, errLayerUnread) {
-					t.Fatalf("got %v, want the unread layer to fail the step", err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("got %v, want only a warning", err)
-			}
-			if !strings.Contains(stderr, "buildcage: warning:") || !strings.Contains(stderr, "could not be checked") {
-				t.Errorf("no warning about the unread layer:\n%s", stderr)
+			if entries, _ := os.ReadDir(rootfs); len(entries) != 1 || entries[0].Name() != "etc" {
+				t.Errorf("rootfs holds %v, want it untouched", entries)
 			}
 		})
 	}
@@ -159,8 +146,10 @@ func TestMirrorWritesBackAroundACopyItCannotStripWhenAskedTo(t *testing.T) {
 
 func TestTolerateResidueLeavesOtherFailuresAlone(t *testing.T) {
 	useWarnOnCAResidue(t)
-	if err := tolerateResidue(errBrokenWalk); !errors.Is(err, errBrokenWalk) {
-		t.Fatalf("got %v, want the failure passed through", err)
+	for _, failure := range []error{errBrokenWalk, errLayerUnread} {
+		if err := tolerateResidue(failure); !errors.Is(err, failure) {
+			t.Fatalf("got %v, want %v passed through", err, failure)
+		}
 	}
 	if err := tolerateResidue(nil); err != nil {
 		t.Fatalf("got %v from no failure", err)
@@ -188,14 +177,17 @@ func TestRunHintsAtFailOnCAResidue(t *testing.T) {
 	}
 }
 
-// So does a step whose layer could not be read back.
-func TestRunHintsAtFailOnCAResidueForAnUnreadLayer(t *testing.T) {
+// A step whose layer cannot be read back fails before runc starts it, and the
+// build log says why without pointing at fail_on_ca_residue.
+func TestRunRefusesAStepWithoutALayerToReadBack(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useTempCAFile(t, string(testCA))
 	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
 	useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
-	useFakeRunc(t, "exit 0")
+	ran := filepath.Join(t.TempDir(), "ran")
+	t.Setenv("RAN", ran)
+	useFakeRunc(t, `touch "$RAN"`)
 
 	readStderr := captureStderr(t)
 	code := run([]string{"run", "--bundle", bundle, "id"})
@@ -204,8 +196,14 @@ func TestRunHintsAtFailOnCAResidueForAnUnreadLayer(t *testing.T) {
 	if code != 1 {
 		t.Errorf("run exited %d, want 1", code)
 	}
-	if !strings.Contains(stderr, "buildcage: hint:") {
-		t.Errorf("no hint at fail_on_ca_residue:\n%s", stderr)
+	if _, err := os.Stat(ran); !os.IsNotExist(err) {
+		t.Errorf("runc ran the step: %v", err)
+	}
+	if !strings.Contains(stderr, "not running the step: "+errLayerUnread.Error()) {
+		t.Errorf("the build log does not say why:\n%s", stderr)
+	}
+	if strings.Contains(stderr, "fail_on_ca_residue") {
+		t.Errorf("an unread layer hinted at fail_on_ca_residue:\n%s", stderr)
 	}
 }
 

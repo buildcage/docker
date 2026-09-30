@@ -52,6 +52,9 @@ Docker installation:
 - **Self-hosted**
   - Docker Engine 25.0 or later, with Compose v2.20.2 or later
   - A host using cgroup v2
+  - For the `inspect` engine, a Docker data root that can hold an overlayfs upper directory: not
+    itself on overlayfs (Docker-in-Docker needs a volume for `/var/lib/docker`) and not on XFS
+    formatted with `ftype=0`
 
 A runner that falls short fails while the builder starts, before any `RUN` step runs.
 
@@ -452,10 +455,8 @@ reported as blocked; see
   ```
 
 - A copy of the CA left in a step's layer is removed. One that cannot be, such as in a JKS keystore
-  sealed with a password other than `changeit`, fails the build, and so does every step on a builder
-  whose BuildKit does not use the `overlayfs` snapshotter, since the layer cannot be checked
-  (`fail_on_ca_residue: false` makes either a warning, see
-  [CA residue](./docs/reference.md#ca-residue)). A copy that cannot be read, in a compressed archive or a keystore encrypted under a password other than
+  sealed with a password other than `changeit`, fails the build (`fail_on_ca_residue: false` makes it
+  a warning, see [CA residue](./docs/reference.md#ca-residue)). A copy that cannot be read, in a compressed archive or a keystore encrypted under a password other than
   none or `changeit` or naming more than a million key-derivation iterations, is not found and stays
   in the image, as is one hex-dumped or re-encoded as base64 outside a PEM block in lines shorter
   than 48 characters. See

@@ -181,7 +181,6 @@ type injection struct {
 	// The step's layer as found when the injection began, kept rather than
 	// recomputed at finish: a transient mount-table read failure there would
 	// otherwise report no layer and commit the anchors' scattered copies unswept.
-	// Empty when there was no overlay, in which case no anchors were placed.
 	upper string
 }
 
@@ -192,8 +191,7 @@ type injection struct {
 //
 // The layer is read back whatever the step exited with: BuildKit commits it
 // for a non-zero exit the LLB's ValidExitCodes allows, and keeps a failed
-// step's layer for debugging. A layer that cannot be read back counts as
-// residue.
+// step's layer for debugging.
 func (in *injection) finish() error {
 	var firstErr error
 	for _, b := range in.binds {
@@ -249,6 +247,13 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		return nil, err
 	}
 
+	// Only a layer that can be read back afterwards can be checked for the
+	// copies a rebuild scatters, so a step without one does not run.
+	upper := upperDirOf(s.rootfs)
+	if upper == "" {
+		return nil, errLayerUnread
+	}
+
 	// A store's absence is not fatal: the store itself is simply not an
 	// append target, and every otherwise-unset variable falls back to the
 	// proxy-CA-only file instead (see the unsetBehaviour comment above).
@@ -257,17 +262,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("no system CA store in %s (%v); falling back to proxy-CA-only trust", s.rootfs, storeErr)
 	}
 
-	// Only when the step's layer can be read back afterwards: stripLayer is what
-	// takes the copies a rebuild scatters back out, and without it the anchor is
-	// not placed, leaving the engine the behaviour it had before (see
-	// README.md#limitations).
-	upper := upperDirOf(s.rootfs)
-	var created createdDirs
-	if upper != "" {
-		created = placeAnchors(s.rootfs, ca)
-	} else {
-		logf("no overlay upper directory found for the step's layer; not placing anchors")
-	}
+	created := placeAnchors(s.rootfs, ca)
 
 	plan := planCATrust(s, ca, store)
 

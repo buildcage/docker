@@ -11,13 +11,12 @@ import (
 var failOnCAResidue = os.Getenv("FAIL_ON_CA_RESIDUE") != "false"
 
 const residueHint = "to let the build carry on with only a warning, set fail_on_ca_residue: false on the setup action " +
-	"(a copy of the CA or its NSS slot then stays in the image, and a layer that cannot be checked is committed unchecked)"
+	"(a copy of the CA or its NSS slot then stays in the image)"
 
 // isCAResidue is what fail_on_ca_residue governs. Anything else, such as a
-// failed write-back or an error reading the layer back, always fails.
+// failed write-back or a layer that cannot be read back, always fails.
 func isCAResidue(err error) bool {
-	return errors.Is(err, errUnstrippableCA) || errors.Is(err, errCALeftInLayer) || errors.Is(err, errNSSSlotLeftInLayer) ||
-		errors.Is(err, errLayerUnread)
+	return errors.Is(err, errUnstrippableCA) || errors.Is(err, errCALeftInLayer) || errors.Is(err, errNSSSlotLeftInLayer)
 }
 
 // tolerateResidue turns residue into a warning when fail_on_ca_residue is false.
