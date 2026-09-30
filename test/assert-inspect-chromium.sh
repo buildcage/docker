@@ -34,13 +34,19 @@ else
   fail "the module a step added with modutil is gone from /root/.pki/nssdb/pkcs11.txt"
 fi
 
-for dir in /home/app/.pki /dev/buildcage-nssdb /tmp/control; do
+for dir in /home/app/.pki /home/copier/.pki /tmp/home-copy/.pki/nssdb/pkcs11.txt /dev/buildcage-nssdb /tmp/control; do
   if docker run --rm --user root "$IMAGE" sh -c "test -e $dir"; then
     fail "$dir is in the built image"
   else
     pass "no $dir in the built image"
   fi
 done
+
+if docker run --rm --user root "$IMAGE" sh -c 'test -f /tmp/home-copy/.bashrc'; then
+  pass "the copy of a home is in the built image"
+else
+  fail "the copy of a home is missing from the built image"
+fi
 
 if docker run --rm --user root "$IMAGE" sh -c '[ "$(ls -A /home/reader/.pki/nssdb)" = "$(printf "cert9.db\nkey4.db\npkcs11.txt")" ]'; then
   pass "the covered database is as the image left it"

@@ -97,5 +97,11 @@ RUN echo "=== [a database the user cannot write] ===" && \
     node chromium-check.js https://allowed.example.com/public/chromium && \
     echo "OK: trusted the proxy CA"
 
+# A copy of a home with no database takes no pkcs11.txt with it.
+USER root
+RUN useradd -m copier
+USER copier
+RUN cp -a /home/copier /tmp/home-copy
+
 USER root
 RUN echo "=== End of test ==="

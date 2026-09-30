@@ -677,11 +677,12 @@ on a database holding only this CA, bound at `/dev/buildcage-nssdb`. NSS loads e
 `pkcs11.txt` names, so Chromium trusts the CA through that slot while the step's own certificates,
 keys and writes stay in its own database. After the step, the slot's bytes are taken back out of
 `pkcs11.txt` and whatever the step changed is written back. The slot is also cut out of every other
-`pkcs11.txt` in the layer, such as one in a copy of the home. One that still names
-`/dev/buildcage-nssdb` afterwards counts as CA residue. A database the step's user cannot write
-is covered for the step with one holding only this CA instead. `HOME` comes from the step's
-environment, or from the image's `/etc/passwd` when that is empty, as runc does, and is read once as
-the step starts: a `HOME` the step changes, or another user it switches to, gets no slot.
+`pkcs11.txt` in the layer, such as one in a copy of the home, and one left holding nothing else is
+removed. One that still names `/dev/buildcage-nssdb` afterwards, or is over 1 MiB and so is not
+read, counts as CA residue. A database the step's user cannot write is covered for the step with one
+holding only this CA instead. `HOME` comes from the step's environment, or from the image's
+`/etc/passwd` when that is empty, as runc does, and is read once as the step starts: a `HOME` the
+step changes, or another user it switches to, gets no slot.
 
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
@@ -689,19 +690,21 @@ reach, and what a step can't do to its CA store while it is mounted.
 
 ### CA residue
 
-Three things fail the build by default, pointing at `fail_on_ca_residue`:
+Four things fail the build by default, pointing at `fail_on_ca_residue`:
 
 - a copy of the CA the wrapper finds in the step's layer but cannot take out, such as one inside a
   binary, an uncompressed archive, a re-wrapped PEM or a JKS keystore sealed with a password other
   than `changeit` (see [Limitations](../README.md#limitations))
+- a `pkcs11.txt` in the step's layer that still names the CA's slot, or is too large to read (see
+  [CA trust variables](#ca-trust-variables))
 - a write to an NSS database covered for the step because its user cannot write it (see
   [Limitations](../README.md#limitations))
 - a step whose layer the wrapper cannot check, because BuildKit is not using its `overlayfs`
   snapshotter (see [Security Details](./security.md#inspect-proxy-engine))
 
-With `fail_on_ca_residue: false` all three only warn: the copy stays in the image, the write is
-discarded, and the unchecked layer is committed as it is. An error reading the layer back or
-restoring it fails the build either way.
+With `fail_on_ca_residue: false` all four only warn: the copy or the slot stays in the image, the
+write is discarded, and the unchecked layer is committed as it is. An error reading the layer back
+or restoring it fails the build either way.
 
 The CA is valid for two days and unique to the run, so a copy left in an image trusts only a proxy
 that no longer exists. It still shows the image was built behind Buildcage.

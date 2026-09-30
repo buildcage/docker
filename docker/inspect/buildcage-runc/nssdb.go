@@ -286,9 +286,9 @@ func appendNSSSlot(path string, uid, gid int) ([]byte, error) {
 // only by copying the entries it keeps byte for byte, so the slot is found
 // where it was left unless the step itself took it out, in which case the file
 // is written back as the step left it. The separator goes too only when nothing
-// follows the slot: an entry after it would otherwise run into the one before. A pkcs11.txt the step replaced with
-// something other than a file carries no slot. One the injection created is
-// removed once it holds nothing else.
+// follows the slot: an entry after it would otherwise run into the one before.
+// A pkcs11.txt the step replaced with something other than a file carries no
+// slot. One the injection created is removed once it holds nothing else.
 func removeNSSSlot(path string, appended []byte, created bool) error {
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
@@ -330,43 +330,50 @@ func removeNSSSlot(path string, appended []byte, created bool) error {
 	return f.Truncate(int64(len(kept)))
 }
 
-// stripNSSSlotCopy cuts every copy of the slot out of the pkcs11.txt at path,
-// removing the file if nothing is left. It reports whether the file still
-// names the slot's database, or is too large to check.
-func stripNSSSlotCopy(path string) (bool, error) {
+// stripNSSSlotCopy cuts every copy of the slot out of the pkcs11.txt at path.
+// When the file still ends in appended, the separator and slot appendNSSSlot
+// added, the separator goes too. A file left empty is removed. It returns why
+// the file still counts as residue, or "" when it does not.
+func stripNSSSlotCopy(path string, appended []byte) (string, error) {
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return false, asNotRegular(path, err)
+		return "", asNotRegular(path, err)
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
-		return false, err
+		return "", err
 	}
-	// Too large to be one NSS wrote: report it unread.
+	// Too large to be one NSS wrote.
 	if info.Size() > maxPKCS11TxtBytes {
-		return true, nil
+		return "over 1 MiB, not read", nil
 	}
 	content := make([]byte, info.Size())
 	if _, err := f.ReadAt(content, 0); err != nil && !errors.Is(err, io.EOF) {
-		return false, err
+		return "", err
 	}
 	kept := content
+	if len(appended) > 0 && bytes.HasSuffix(kept, appended) {
+		kept = kept[:len(kept)-len(appended)]
+	}
 	for bytes.Contains(kept, nssSlot) {
 		kept = bytes.ReplaceAll(kept, nssSlot, nil)
 	}
 	if len(kept) < len(content) {
 		if len(kept) == 0 {
-			return false, os.Remove(path)
+			return "", os.Remove(path)
 		}
 		if _, err := f.WriteAt(kept, 0); err != nil {
-			return false, err
+			return "", err
 		}
 		if err := f.Truncate(int64(len(kept))); err != nil {
-			return false, err
+			return "", err
 		}
 	}
-	return bytes.Contains(kept, nssSlotConfigDir), nil
+	if bytes.Contains(kept, nssSlotConfigDir) {
+		return "still names " + nssCADBDir, nil
+	}
+	return "", nil
 }
 
 // checkNSSDBWritable fails when the step's user could not open the database
