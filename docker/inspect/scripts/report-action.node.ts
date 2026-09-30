@@ -27,8 +27,6 @@ runReportAction({
       parameters,
       readProxyDroppedLogs(docker, containerId),
     ),
-  // The only engine with a per-request timeline to write.
-  writesTrafficFile: true,
 }).catch((e) => {
   console.log(`::error::Unexpected error in report-action: ${errorMessage(e)}`);
   process.exit(1);

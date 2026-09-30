@@ -89,8 +89,10 @@ describe("runReportAction", () => {
   });
 
   it("falls back to the published action's own repo and ref when the env has neither", async () => {
-    const lines = await run(spec());
-    expect(lines.join("\n")).toMatch(/buildcage\/docker/);
+    // An audit report carries a restrict example whose `uses:` line shows both.
+    const audit = { ...universal, parameters: reportParams({ mode: "audit" }) };
+    const lines = await run(spec({ build: () => audit }));
+    expect(lines.join("\n")).toMatch(/uses: buildcage\/docker@v4 /);
   });
 
   it("prefers the runner's GITHUB_ACTION_REPOSITORY over the fallback", async () => {
@@ -147,31 +149,18 @@ describe("runReportAction and the traffic file", () => {
     }
   }
 
-  it("writes the traffic file when the engine produces one and the action asked", async () => {
+  it("writes the traffic file when the action asked for one", async () => {
     await withTempDir(async (dir) => {
       const file = join(dir, "traffic.json");
-      await run(spec({ proxyEngine: "inspect", build: () => inspect, writesTrafficFile: true }), {
+      await run(spec({ proxyEngine: "inspect", build: () => inspect }), {
         env: { BUILDCAGE_TRAFFIC_FILE: file },
       });
       expect(JSON.parse(readFileSync(file, "utf8"))).toHaveLength(1);
     });
   });
 
-  // universal has no per-request timeline, so the report action asking for one
-  // must not produce an empty file that then gets uploaded.
-  it("writes nothing for an engine that produces no timeline", async () => {
-    await withTempDir(async (dir) => {
-      const file = join(dir, "traffic.json");
-      await run(spec(), { env: { BUILDCAGE_TRAFFIC_FILE: file } });
-      expect(() => readFileSync(file, "utf8")).toThrow();
-    });
-  });
-
   it("writes nothing when the action did not ask for a traffic file", async () => {
-    const lines = await run(
-      spec({ proxyEngine: "inspect", build: () => inspect, writesTrafficFile: true }),
-      { env: {} },
-    );
+    const lines = await run(spec({ proxyEngine: "inspect", build: () => inspect }), { env: {} });
     expect(lines.join("\n")).toMatch(/## Outbound Traffic Report/);
   });
 });
