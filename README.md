@@ -404,8 +404,9 @@ reported as blocked; see
   update, still needs `proxy_engine: universal` or an `allowed_tls_rules` passthrough: `inspect`
   re-signs the connection, and a pinned or bundled store will not accept the new certificate.
 - The JVM (Java, Kotlin, Scala) reads only its own keystore rather than the CA-trust variables. A
-  JDK already in the image at `$JAVA_HOME` or on `PATH` is handled: the CA is added to its keystore
-  for the step and removed before the layer is committed. A keystore sealed with a password other
+  JDK already in the image at `$JAVA_HOME` or on `PATH` is handled, as is the keystore a
+  distribution's JDKs share (`/etc/ssl/certs/java`, `/etc/pki/java`): the CA is added to it for the
+  step and removed before the layer is committed. A keystore sealed with a password other
   than the JDK default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it.
   No other JDK trusts the CA, such as a Gradle toolchain under `~/.gradle/jdks` or one the step
   itself downloads (an `sdk install`, an unpacked tarball). Fetch it in an earlier `RUN` step and

@@ -52,11 +52,10 @@ func injectedAliasFor(i int) string {
 // the CA has to go into whichever exist, not cacerts alone.
 var jvmKeystoreNames = []string{"jssecacerts", "cacerts"}
 
-// Security directories tried when JAVA_HOME is unset. JAVA_HOME covers the Java
-// base images this is aimed at; these catch a JVM installed at a fixed location
-// without it. /etc/ssl/certs/java is Debian's ca-certificates-java output and
-// the /etc/pki ones are RHEL's, each a symlink resolveInRoot follows to the
-// real file.
+// Security directories tried after JAVA_HOME and PATH. Those cover the Java
+// base images this is aimed at; these catch a distribution JDK neither names.
+// /etc/ssl/certs/java is Debian's ca-certificates-java output and the /etc/pki
+// ones are RHEL's, each a symlink resolveInRoot follows to the real file.
 var knownJVMKeystoreDirs = []string{
 	"/etc/ssl/certs/java",
 	"/etc/pki/java",
