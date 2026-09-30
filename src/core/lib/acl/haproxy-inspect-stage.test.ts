@@ -14,7 +14,7 @@ function plainStage(inputs: RuleInputs, mode: "restrict" | "audit" = "restrict")
       rules: compileRuleSet(inputs).http,
       backend: "origin_plain",
     },
-    { mode, hasResolver: true, internalAddrs: INTERNAL_RANGES, listenPort: 10024 },
+    { mode, internalAddrs: INTERNAL_RANGES, listenPort: 10024 },
   ).join("\n");
 }
 

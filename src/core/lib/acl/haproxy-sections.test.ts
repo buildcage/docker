@@ -11,8 +11,8 @@ describe("section boundaries", () => {
     // section stopping at its last directive would run that directive into the
     // next section's heading.
     expect(last(preamble({ global: [], defaults: [] }))).toBe("");
-    expect(last(resolversSection(["1.1.1.1"], false))).toBe("");
-    expect(last(resolversSection([], true))).toBe("");
+    expect(last(resolversSection(["1.1.1.1"]))).toBe("");
+    expect(last(resolversSection([]))).toBe("");
     expect(last(originBackends("/etc/ssl/certs/ca-certificates.crt"))).toBe("");
   });
 });

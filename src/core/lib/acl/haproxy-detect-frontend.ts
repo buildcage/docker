@@ -9,12 +9,11 @@ export interface DetectFrontendSpec extends InternalDstOptions {
   plainStagePort: number;
   ipRules: CompiledIpRule[];
   tlsHosts: CompiledTlsRule[];
-  hasResolver: boolean;
   /**
    * The address CoreDNS answers every name with. A connection to it came
    * through a name, so no IP rule may pass it through; see detectFrontend.
    */
-  proxyAddress?: string;
+  proxyAddress: string;
 }
 
 /**
@@ -31,13 +30,7 @@ function tlsCond(host: CompiledTlsRule): string {
  * frontends according to what the first bytes say it is.
  */
 export function detectFrontend(spec: DetectFrontendSpec): string[] {
-  const { listenPort, tlsStagePort, plainStagePort, ipRules, tlsHosts, hasResolver, proxyAddress } =
-    spec;
-  // Every name resolves to the proxy's own address, so an IP rule covering it
-  // (`198.18.0.0/15:443`) would pass every named connection through
-  // uninspected, to an origin that is the proxy itself.
-  const excludeDnsRouted = ipRules.length > 0 && proxyAddress !== undefined;
-  const notDnsRouted = excludeDnsRouted ? " !dns_routed" : "";
+  const { listenPort, tlsStagePort, plainStagePort, ipRules, tlsHosts, proxyAddress } = spec;
   const hasPassthrough = ipRules.length > 0 || tlsHosts.length > 0;
   const l: string[] = [];
   l.push(
@@ -60,7 +53,10 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
     if (tlsHosts.some((host) => host.hostMatch === "hostPort")) {
       l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]");
     }
-    if (excludeDnsRouted) {
+    // Every name resolves to the proxy's own address, so an IP rule covering it
+    // (`198.18.0.0/15:443`) would pass every named connection through
+    // uninspected, to an origin that is the proxy itself.
+    if (ipRules.length > 0) {
       l.push(
         "    # dst is the proxy only when the name went through this container's DNS.",
         `    acl dns_routed dst ${proxyAddress}`,
@@ -89,7 +85,7 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
     }
     const tlsConds = tlsHosts.map(tlsCond);
     const conds = [
-      ...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""}${notDnsRouted}`),
+      ...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""} !dns_routed`),
       ...tlsConds,
     ];
 
@@ -111,7 +107,7 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
       "    tcp-request content set-var(txn.proto) str(tcp) unless { req.ssl_hello_type 1 }",
     );
 
-    if (tlsHosts.length > 0 && hasResolver) {
+    if (tlsHosts.length > 0) {
       // The SNI is resolved here and connected to, as on the inspected path:
       // an SNI is not a destination, so a ClientHello with an allowed
       // name must not become a tunnel to an address of the build's choosing.

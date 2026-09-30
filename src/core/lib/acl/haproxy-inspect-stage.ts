@@ -25,7 +25,6 @@ export interface InspectStageSpec {
 /** What both frontends share. */
 export interface InspectStageContext extends InternalDstOptions {
   mode: "restrict" | "audit";
-  hasResolver: boolean;
   /** The detect frontend's port, bound on every address the proxy holds. */
   listenPort: number;
 }
@@ -106,7 +105,7 @@ export function inspectStage(
   { name, port, bindExtra, scheme, rules, backend }: InspectStageSpec,
   ctx: InspectStageContext,
 ): string[] {
-  const { mode, hasResolver } = ctx;
+  const { mode } = ctx;
   const l: string[] = [];
   l.push(
     `frontend ${name}`,
@@ -186,7 +185,7 @@ export function inspectStage(
   l.push(...ruleBlock(rules, mode, scheme));
   // Skipped entirely when the block above denies unconditionally: HAProxy
   // would never reach these rules, and warns that they are NOOP.
-  if (hasResolver && !deniesEverything(rules, mode)) {
+  if (!deniesEverything(rules, mode)) {
     l.push(
       "    # Connect to the address this proxy resolves the Host to, discarding",
       "    # the client's address, so a forged Host or doctored /etc/hosts cannot",

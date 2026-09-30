@@ -19,8 +19,8 @@ import { buildUrlRules } from "./url-rules.ts";
 const PROXY = "198.19.255.1";
 
 const CASES: Record<string, HaproxyConfigOptions> = {
-  // No options at all: the static skeleton every other case is a delta from.
-  defaults: {},
+  // Only the required option: the skeleton every other case is a delta from.
+  defaults: { proxyAddress: PROXY },
 
   // One rule of every kind, resolving through named upstreams.
   "restrict-full": {
@@ -61,7 +61,7 @@ const CASES: Record<string, HaproxyConfigOptions> = {
   // The other resolver style: the container's own /etc/resolv.conf.
   "restrict-resolv-conf": {
     httpsRules: ["a.example.com:443"],
-    useResolvConf: true,
+    resolverAddress: [],
     proxyAddress: PROXY,
   },
 
@@ -79,12 +79,6 @@ const CASES: Record<string, HaproxyConfigOptions> = {
     tlsRules: ["~^db[0-9]+\\.example\\.com$:5432"],
     resolverAddress: ["1.1.1.1"],
     proxyAddress: PROXY,
-  },
-
-  // No resolver at all: nothing is resolved, so the do-resolve path is absent.
-  "restrict-no-resolver": {
-    httpsRules: ["a.example.com:443"],
-    ipRules: ["10.0.0.5:5432"],
   },
 };
 

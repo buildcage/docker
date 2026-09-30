@@ -65,7 +65,6 @@ try {
     urlRules,
     mode: mode === "audit" ? "audit" : "restrict",
     resolverAddress: upstreams,
-    useResolvConf: upstreams.length === 0,
     proxyAddress,
     hostAddressFile,
   });

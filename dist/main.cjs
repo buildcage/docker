@@ -7637,14 +7637,14 @@ function tlsCond(host) {
 	return `${host.id}_sni${host.port ? ` ${host.id}_port` : ""} sni_is_name`;
 }
 function detectFrontend(spec) {
-	let { listenPort, tlsStagePort, plainStagePort, ipRules, tlsHosts, hasResolver, proxyAddress } = spec, excludeDnsRouted = ipRules.length > 0 && proxyAddress !== void 0, notDnsRouted = excludeDnsRouted ? " !dns_routed" : "", hasPassthrough = ipRules.length > 0 || tlsHosts.length > 0, l = [];
+	let { listenPort, tlsStagePort, plainStagePort, ipRules, tlsHosts, proxyAddress } = spec, hasPassthrough = ipRules.length > 0 || tlsHosts.length > 0, l = [];
 	if (l.push("# One listener for everything redirected here. The first bytes say whether", "# this is a handshake or a plain request, so no port has to be declared as", "# one or the other in advance.", "frontend detect", `    bind *:${listenPort}`, "    mode tcp", "    tcp-request inspect-delay 5s", ""), hasPassthrough) {
-		l.push("    # Passed through untouched: judged before anything is decrypted."), ipRules.some((rule) => rule.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]"), tlsHosts.some((host) => host.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]"), excludeDnsRouted && l.push("    # dst is the proxy only when the name went through this container's DNS.", `    acl dns_routed dst ${proxyAddress}`);
+		l.push("    # Passed through untouched: judged before anything is decrypted."), ipRules.some((rule) => rule.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]"), tlsHosts.some((host) => host.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]"), ipRules.length > 0 && l.push("    # dst is the proxy only when the name went through this container's DNS.", `    acl dns_routed dst ${proxyAddress}`);
 		for (let rule of ipRules) l.push(`    # ${rule.raw}`), l.push(rule.hostMatch === "hostPort" ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${escapeForHaproxy(rule.address)}` : `    acl ${rule.id}_dst dst ${rule.address}`), rule.port && l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
 		tlsHosts.length > 0 && l.push(`    acl sni_is_name req.ssl_sni -m reg ${HOSTNAME_CHARSET}`);
 		for (let host of tlsHosts) l.push(`    # ${host.raw}`), l.push(host.hostMatch === "hostPort" ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${escapeForHaproxy(host.hostRegex)}` : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${escapeForHaproxy(host.hostRegex)}`), host.port && l.push(`    acl ${host.id}_port dst_port ${host.port}`);
-		let tlsConds = tlsHosts.map(tlsCond), conds = [...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""}${notDnsRouted}`), ...tlsConds];
-		if (l.push("", ...conds.map((cond) => `    tcp-request content set-var(txn.pass) int(1) if ${cond}`), ...tlsConds.map((cond) => `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${cond}`), "    tcp-request content set-var(txn.proto) str(tls) if { req.ssl_hello_type 1 }", "    tcp-request content set-var(txn.proto) str(tcp) unless { req.ssl_hello_type 1 }"), tlsHosts.length > 0 && hasResolver) {
+		let tlsConds = tlsHosts.map(tlsCond), conds = [...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""} !dns_routed`), ...tlsConds];
+		if (l.push("", ...conds.map((cond) => `    tcp-request content set-var(txn.pass) int(1) if ${cond}`), ...tlsConds.map((cond) => `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${cond}`), "    tcp-request content set-var(txn.proto) str(tls) if { req.ssl_hello_type 1 }", "    tcp-request content set-var(txn.proto) str(tcp) unless { req.ssl_hello_type 1 }"), tlsHosts.length > 0) {
 			l.push("");
 			for (let host of tlsHosts) l.push(`    tcp-request content set-var(txn.tlsrule) int(1) if ${tlsCond(host)}`);
 			l.push("    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.tlsrule) -m found }", "    tcp-request content set-var(txn.reason) str(dns-failed) if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content reject if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content set-dst var(txn.dst) if { var(txn.dst) -m found }", ...internalDstAcl("pass_dst_internal", spec), "    tcp-request content set-var(txn.reason) str(internal-address) if { var(txn.tlsrule) -m found } pass_dst_internal", "    tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal");
@@ -7875,8 +7875,8 @@ const PLAIN_REQUEST_TIMEOUTS = [
 	"    timeout http-keep-alive 30s"
 ];
 function inspectStage({ name, port, bindExtra, scheme, rules, backend }, ctx) {
-	let { mode, hasResolver } = ctx, l = [];
-	return l.push(`frontend ${name}`, `    bind 127.0.0.1:${port} accept-proxy${bindExtra}`, "    mode http", ...scheme === "http" ? PLAIN_REQUEST_TIMEOUTS : [], "    http-request set-var(txn.host_log) 'req.hdr(host),regsub(\"[\\s\\\"[:cntrl:]]\",_,g)'", "", "    # Decode before stripping `..`: `.` is unreserved, so `%2e%2e` is not", "    # a dot-dot segment until decoded, and stripping first would miss it.", "    http-request normalize-uri percent-decode-unreserved", "    http-request normalize-uri path-strip-dotdot", "", "    # pathq, not %HU: %HU is the target as sent (a path over HTTP/1.1, an", "    # absolute URI over HTTP/2), and pathq is not readable at log time.", "    # Set after normalization, so the log shows the path the rules matched.", "    http-request set-var(txn.pathq) 'pathq,regsub(\"[\\\"[:cntrl:]]\",_,g)'", "", "    # A request with no Host names nothing: the rules match on it, the", "    # origin is resolved from it, and the log's URL is built from it. Named", "    # here rather than left to the log's own empty fields, which a Host the", "    # client chose can imitate. Refused in `audit` too, as the same check", "    # in the universal engine is: there is nothing to connect to either way.", "    # Ahead of the path denies below, so that a request carrying neither a", "    # Host nor a legal path is named by the one the report can act on: the", "    # other leaves a row named for the `-` the log prints in its place.", "    acl has_host hdr(host) -m found", "    acl host_not_empty hdr_len(host) gt 0", "    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty", "    http-request deny deny_status 400 if !has_host or !host_not_empty", "", "    # The one Host every later step reads. An acl on req.hdr(host) scans", "    # every value while a fetch takes the last, so reading the header twice", "    # could judge one value and connect to another.", "    http-request set-var(txn.host) req.hdr(host),lower,host_only,regsub(\\.$,)", "    # A `:` left in the name could let a `~` rule's port pattern match it.", "    # Refused in `audit` too.", `    acl host_is_name var(txn.host) -m reg ${HOSTNAME_CHARSET}`, "    http-request set-var(txn.reason) str(invalid-host) if !host_is_name", "    http-request deny deny_status 400 if !host_is_name", "", "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may", "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a", "    # valid path char at all. None is stripped, so each is refused. A lone", "    # encoded separator stays legal (e.g. npm's `/@scope%2fpackage`).", "    # `;` (or `%3b`) ends a segment too: Tomcat and Jetty drop what follows", "    # as a path parameter, so they read `..;/` as `../`.", "    # `\\\\` is one literal backslash: HAProxy's parser takes the pair as one.", "    http-request deny deny_status 403 if { path -m reg -i (^|/|%2f|%5c)\\.\\.($|/|;|%2f|%5c|%3b) }", "    http-request deny deny_status 403 if { path -m sub \\\\ }", "", `    log-format "buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${sniField(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`, ""), l.push(...ruleBlock(rules, mode, scheme)), hasResolver && !deniesEverything(rules, mode) && l.push("    # Connect to the address this proxy resolves the Host to, discarding", "    # the client's address, so a forged Host or doctored /etc/hosts cannot", "    # choose the target.", "    # txn.host has already dropped the port a header carries, which is not", "    # part of the name. An address is taken as-is: no resolver can answer", "    # one, and the rules above already decided, so nothing is loosened.", `    acl host_is_address var(txn.host) -m reg ${HOST_IS_ADDRESS}`, "    http-request set-var(txn.dst) var(txn.host) if host_is_address", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address", "    # A fresh attempt, not a replay: nothing cached the failure.", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address or { var(txn.dst) -m found }", "    http-request set-var(txn.reason) str(dns-failed) unless { var(txn.dst) -m found }", "    http-request deny deny_status 502 unless { var(txn.dst) -m found }", "", "    # Set before the internal-destination check below, not after: %[dst] in", "    # the log-format is this, and a refusal must show the address that", "    # tripped it, not whatever the client's own (fake, unresolved) address", "    # was: CoreDNS never hands out a real one; see coredns-config.ts.", "    http-request set-dst var(txn.dst)", "", "    # A resolved destination may not be internal; see INTERNAL_RANGES.", ...internalDstAcl("dst_internal", ctx), ...internalGuard(rules, ctx.listenPort)), l.push(`    default_backend ${backend}`, ""), l;
+	let { mode } = ctx, l = [];
+	return l.push(`frontend ${name}`, `    bind 127.0.0.1:${port} accept-proxy${bindExtra}`, "    mode http", ...scheme === "http" ? PLAIN_REQUEST_TIMEOUTS : [], "    http-request set-var(txn.host_log) 'req.hdr(host),regsub(\"[\\s\\\"[:cntrl:]]\",_,g)'", "", "    # Decode before stripping `..`: `.` is unreserved, so `%2e%2e` is not", "    # a dot-dot segment until decoded, and stripping first would miss it.", "    http-request normalize-uri percent-decode-unreserved", "    http-request normalize-uri path-strip-dotdot", "", "    # pathq, not %HU: %HU is the target as sent (a path over HTTP/1.1, an", "    # absolute URI over HTTP/2), and pathq is not readable at log time.", "    # Set after normalization, so the log shows the path the rules matched.", "    http-request set-var(txn.pathq) 'pathq,regsub(\"[\\\"[:cntrl:]]\",_,g)'", "", "    # A request with no Host names nothing: the rules match on it, the", "    # origin is resolved from it, and the log's URL is built from it. Named", "    # here rather than left to the log's own empty fields, which a Host the", "    # client chose can imitate. Refused in `audit` too, as the same check", "    # in the universal engine is: there is nothing to connect to either way.", "    # Ahead of the path denies below, so that a request carrying neither a", "    # Host nor a legal path is named by the one the report can act on: the", "    # other leaves a row named for the `-` the log prints in its place.", "    acl has_host hdr(host) -m found", "    acl host_not_empty hdr_len(host) gt 0", "    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty", "    http-request deny deny_status 400 if !has_host or !host_not_empty", "", "    # The one Host every later step reads. An acl on req.hdr(host) scans", "    # every value while a fetch takes the last, so reading the header twice", "    # could judge one value and connect to another.", "    http-request set-var(txn.host) req.hdr(host),lower,host_only,regsub(\\.$,)", "    # A `:` left in the name could let a `~` rule's port pattern match it.", "    # Refused in `audit` too.", `    acl host_is_name var(txn.host) -m reg ${HOSTNAME_CHARSET}`, "    http-request set-var(txn.reason) str(invalid-host) if !host_is_name", "    http-request deny deny_status 400 if !host_is_name", "", "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may", "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a", "    # valid path char at all. None is stripped, so each is refused. A lone", "    # encoded separator stays legal (e.g. npm's `/@scope%2fpackage`).", "    # `;` (or `%3b`) ends a segment too: Tomcat and Jetty drop what follows", "    # as a path parameter, so they read `..;/` as `../`.", "    # `\\\\` is one literal backslash: HAProxy's parser takes the pair as one.", "    http-request deny deny_status 403 if { path -m reg -i (^|/|%2f|%5c)\\.\\.($|/|;|%2f|%5c|%3b) }", "    http-request deny deny_status 403 if { path -m sub \\\\ }", "", `    log-format "buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${sniField(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`, ""), l.push(...ruleBlock(rules, mode, scheme)), deniesEverything(rules, mode) || l.push("    # Connect to the address this proxy resolves the Host to, discarding", "    # the client's address, so a forged Host or doctored /etc/hosts cannot", "    # choose the target.", "    # txn.host has already dropped the port a header carries, which is not", "    # part of the name. An address is taken as-is: no resolver can answer", "    # one, and the rules above already decided, so nothing is loosened.", `    acl host_is_address var(txn.host) -m reg ${HOST_IS_ADDRESS}`, "    http-request set-var(txn.dst) var(txn.host) if host_is_address", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address", "    # A fresh attempt, not a replay: nothing cached the failure.", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address or { var(txn.dst) -m found }", "    http-request set-var(txn.reason) str(dns-failed) unless { var(txn.dst) -m found }", "    http-request deny deny_status 502 unless { var(txn.dst) -m found }", "", "    # Set before the internal-destination check below, not after: %[dst] in", "    # the log-format is this, and a refusal must show the address that", "    # tripped it, not whatever the client's own (fake, unresolved) address", "    # was: CoreDNS never hands out a real one; see coredns-config.ts.", "    http-request set-dst var(txn.dst)", "", "    # A resolved destination may not be internal; see INTERNAL_RANGES.", ...internalDstAcl("dst_internal", ctx), ...internalGuard(rules, ctx.listenPort)), l.push(`    default_backend ${backend}`, ""), l;
 }
 //#endregion
 //#region src/core/lib/acl/haproxy-sections.ts
@@ -7908,13 +7908,13 @@ function preamble(spec) {
 		""
 	];
 }
-function resolversSection(resolvers, useResolvConf) {
+function resolversSection(resolvers) {
 	return [
 		"# Real resolution happens once a request has already passed the rule",
 		"# ACLs below; the build's own resolver (CoreDNS) never gives out a real",
 		"# answer, so this is the only place a name becomes an address.",
 		"resolvers buildcage",
-		...useResolvConf ? ["    parse-resolv-conf"] : resolvers.map((addr, i) => `    nameserver ns${i + 1} ${addr}:53`),
+		...resolvers.length === 0 ? ["    parse-resolv-conf"] : resolvers.map((addr, i) => `    nameserver ns${i + 1} ${addr}:53`),
 		"    hold valid 60s",
 		"    resolve_retries 4",
 		"    timeout retry 1s",
@@ -7946,18 +7946,15 @@ const DEFAULTS = {
 	defaultCertFile: "/etc/haproxy/default.pem",
 	systemCaFile: "/etc/ssl/certs/ca-certificates.crt"
 }, TLS_STAGE_PORT = 10025, PLAIN_STAGE_PORT = 10026;
-function generateHaproxyConfig(options = {}) {
+function generateHaproxyConfig(options) {
 	let opts = {
 		...DEFAULTS,
 		...options
-	}, mode = opts.mode ?? "restrict", { https: httpsRules, http: httpRules, ip: ipRules, tls: tlsHosts, warnings } = compileRuleSet(options), resolvers = opts.resolverAddress ?? [], useResolvConf = resolvers.length === 0 && opts.useResolvConf === !0, hasResolver = resolvers.length > 0 || useResolvConf;
-	if (hasResolver && !opts.proxyAddress) throw Error("proxyAddress is required whenever a resolver is configured");
-	let shared = {
-		hasResolver,
+	}, mode = opts.mode ?? "restrict", { https: httpsRules, http: httpRules, ip: ipRules, tls: tlsHosts, warnings } = compileRuleSet(options), shared = {
 		internalAddrs: [
 			...INTERNAL_RANGES,
 			PROXY_SUBNET,
-			...opts.proxyAddress ? [opts.proxyAddress] : []
+			opts.proxyAddress
 		],
 		hostAddressFile: opts.hostAddressFile
 	};
@@ -7971,7 +7968,7 @@ function generateHaproxyConfig(options = {}) {
 				],
 				defaults: ["    timeout client 30s", "    timeout server 30s"]
 			}),
-			...hasResolver ? resolversSection(resolvers, useResolvConf) : [],
+			...resolversSection(opts.resolverAddress ?? []),
 			...detectFrontend({
 				listenPort: opts.listenPort,
 				tlsStagePort: TLS_STAGE_PORT,
@@ -8052,7 +8049,7 @@ function generateUniversalHaproxyConfig(options) {
 					"    timeout server 1m"
 				]
 			}),
-			...resolversSection(resolvers, resolvers.length === 0),
+			...resolversSection(resolvers),
 			"# --- Frontend ---",
 			"frontend outbound_proxy",
 			"    bind *:10024",
@@ -8219,7 +8216,10 @@ function buildUrlRulesOrThrow(rulesInput) {
 const PLACEHOLDER_PROXY_ADDRESS = "192.0.2.1";
 function checkRulesCompileOrThrow(inputs) {
 	try {
-		generateHaproxyConfig(inputs), generateUniversalHaproxyConfig({
+		generateHaproxyConfig({
+			...inputs,
+			proxyAddress: PLACEHOLDER_PROXY_ADDRESS
+		}), generateUniversalHaproxyConfig({
 			...inputs,
 			proxyAddress: PLACEHOLDER_PROXY_ADDRESS,
 			hostAddressFile: "/dev/null"
