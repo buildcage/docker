@@ -668,6 +668,10 @@ system CA store:
 | `CARGO_HTTP_CAINFO`   | Cargo                                                                     | Left unset                                       | Left unset                  |
 | `BUNDLE_SSL_CA_CERT`  | Bundler, when it names a file rather than a directory                     | Left unset                                       | Left unset                  |
 
+The file holding only this CA is bound read-only at `/dev/buildcage-ca.pem`, on the `/dev` tmpfs
+runc gives every container, so it never reaches a layer. A step that already mounts something at
+that path gets none of the variables that would point there.
+
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
 Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read
 `~/.local/share/pki/nssdb` when it does not, so the database is the first of those that exists, or a

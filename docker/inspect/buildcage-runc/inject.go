@@ -8,8 +8,9 @@ import (
 )
 
 // File the container is pointed at when a variable was not already set and the
-// tool needs one of its own. Removed again when the step ends.
-const ownCAPath = "/etc/buildcage-ca.pem"
+// tool needs one of its own: bound read-only under the /dev tmpfs runc gives
+// every container, so it never reaches a layer.
+const ownCAPath = "/dev/buildcage-ca.pem"
 
 // How each variable is treated when the image or Dockerfile did not set it,
 // and what it falls back to when there is no system CA store to work with.
@@ -66,19 +67,19 @@ var caVariables = []struct {
 }
 
 // caPlan is what the variable pass settled on: the files the CA has to be
-// appended to, the variables to add to the process spec, and the proxy-CA-only
-// file it wrote, if any variable needed one.
+// appended to, the variables to add to the process spec, and the scratch
+// directory holding the proxy-CA-only file, if any variable needed one.
 type caPlan struct {
-	targets      map[string]bool
-	env          map[string]string
-	createdOwnCA string
+	targets  map[string]bool
+	env      map[string]string
+	ownCADir string
 }
 
 // planCATrust walks caVariables and decides, per variable, whether the CA goes
 // into the file it already names, whether to point it at the system store, or
 // whether to give it a file holding only this CA. See the unsetBehaviour
 // comment above for why each variable falls where it does.
-func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
+func planCATrust(s *spec, bundle string, ca []byte, store systemStore) caPlan {
 	// Every bundle the CA has to go into, keyed by resolved path so a file
 	// named by two variables is only written once.
 	plan := caPlan{targets: map[string]bool{}, env: map[string]string{}}
@@ -86,26 +87,26 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 		plan.targets[store.hostPath] = true
 	}
 
-	// setOwnCA points variableName at ownCAPath, writing it once and sharing
+	// setOwnCA points variableName at ownCAPath, binding it once and sharing
 	// it across every variable that falls back to it.
 	setOwnCA := func(variableName string) {
-		resolved, err := resolveInRoot(s.rootfs, ownCAPath)
-		if err != nil {
-			logf("cannot place %s: %v", ownCAPath, err)
-			return
-		}
-		// More than one variable can take this path, and all of them share
-		// the file: only the first to get here writes it.
-		if plan.createdOwnCA == "" {
-			if _, err := os.Stat(resolved); err == nil {
-				logf("%s already exists; not setting %s", ownCAPath, variableName)
+		if plan.ownCADir == "" {
+			if s.mountedWithin(ownCAPath) {
+				logf("a mount already covers %s; not setting %s", ownCAPath, variableName)
 				return
 			}
-			if err := os.WriteFile(resolved, ca, 0o644); err != nil {
+			dir, err := newScratchDir(bundle)
+			file := filepath.Join(dir, "ca.pem")
+			if err == nil {
+				err = os.WriteFile(file, ca, 0o644)
+			}
+			if err != nil {
+				removeScratchDir(dir)
 				logf("cannot write %s: %v", ownCAPath, err)
 				return
 			}
-			plan.createdOwnCA = resolved
+			s.addReadOnlyBindMount(ownCAPath, file)
+			plan.ownCADir = dir
 		}
 		plan.env[variableName] = ownCAPath
 	}
@@ -169,15 +170,15 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 }
 
 // injection is what a completed inject leaves to be undone once the step has
-// exited: the mirrored directories to reconcile, the proxy-CA-only file to
-// remove if one was written, the directories the injection created, and what
-// the step's own layer is read back through.
+// exited: the mirrored directories to reconcile, the scratch directory of the
+// proxy-CA-only file if one was bound, the directories the injection created,
+// and what the step's own layer is read back through.
 type injection struct {
-	rootfs       string
-	ca           []byte
-	binds        []*dirBind
-	createdOwnCA string
-	created      createdDirs
+	rootfs   string
+	ca       []byte
+	binds    []*dirBind
+	ownCADir string
+	created  createdDirs
 	// The step's layer as found when the injection began, kept rather than
 	// recomputed at finish: a transient mount-table read failure there would
 	// otherwise report no layer and commit the anchors' scattered copies unswept.
@@ -205,17 +206,8 @@ func (in *injection) finish() error {
 		}
 		b.cleanup()
 	}
-	if in.createdOwnCA != "" {
-		// Re-resolve and remove only the path that still lands where inject
-		// wrote it, for the same reason removeCreatedDirs does: an ancestor the
-		// step turned into an absolute symlink would otherwise send os.Remove
-		// out of the rootfs.
-		resolved, err := resolveInRoot(in.rootfs, ownCAPath)
-		if err != nil || resolved != in.createdOwnCA {
-			logf("not removing %s: it no longer resolves there (%v)", ownCAPath, err)
-		} else if err := os.Remove(resolved); err != nil && !os.IsNotExist(err) {
-			logf("cannot remove %s: %v", ownCAPath, err)
-		}
+	if in.ownCADir != "" {
+		removeScratchDir(in.ownCADir)
 	}
 	// After the write-back, whose own result lands in the layer.
 	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssAppended()))
@@ -269,7 +261,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("no overlay upper directory found for the step's layer; not placing anchors")
 	}
 
-	plan := planCATrust(s, ca, store)
+	plan := planCATrust(s, bundle, ca, store)
 
 	binds := bindTargets(s, bundle, groupTargetsByBind(plan.targets, store), ca, store)
 
@@ -308,7 +300,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("cannot update the process spec: %v", err)
 	}
 
-	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, createdOwnCA: plan.createdOwnCA, created: created, upper: upper}, nil
+	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created, upper: upper}, nil
 }
 
 // bindTargets binds each group of CA targets, nested groups folded into the
