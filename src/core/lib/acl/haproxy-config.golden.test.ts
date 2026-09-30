@@ -5,7 +5,7 @@
  * catches a wrong one. These fix the whole file instead, so a change that
  * moves a section, reorders two ACLs or drops a line nothing asserts on still
  * shows up. Between them they reach every branch the options expose: both
- * modes, both resolver styles, each rule kind, and the host-address file.
+ * modes, each rule kind, and the host-address file.
  *
  * vitest-only (see test/golden.node.ts), so this file is kept out of the qjs test
  * bundle by rolldown.scripts.config.js's *.golden.test.ts exclude.
@@ -22,13 +22,12 @@ const CASES: Record<string, HaproxyConfigOptions> = {
   // Only the required option: the skeleton every other case is a delta from.
   defaults: { proxyAddress: PROXY },
 
-  // One rule of every kind, resolving through named upstreams.
+  // One rule of every kind.
   "restrict-full": {
     httpsRules: ["a.example.com:443"],
     httpRules: ["b.example.com:80"],
     ipRules: ["10.0.0.5:5432"],
     tlsRules: ["db.example.com:443"],
-    resolverAddress: ["1.1.1.1", "8.8.8.8"],
     proxyAddress: PROXY,
   },
 
@@ -39,7 +38,6 @@ const CASES: Record<string, HaproxyConfigOptions> = {
     httpRules: ["b.example.com:80"],
     ipRules: ["10.0.0.5:5432"],
     tlsRules: ["db.example.com:443"],
-    resolverAddress: ["1.1.1.1", "8.8.8.8"],
     proxyAddress: PROXY,
   },
 
@@ -54,21 +52,12 @@ const CASES: Record<string, HaproxyConfigOptions> = {
         "GET https://169.254.169.254/latest/meta-data/*",
       ].join("\n"),
     ),
-    resolverAddress: ["1.1.1.1"],
-    proxyAddress: PROXY,
-  },
-
-  // The other resolver style: the container's own /etc/resolv.conf.
-  "restrict-resolv-conf": {
-    httpsRules: ["a.example.com:443"],
-    resolverAddress: [],
     proxyAddress: PROXY,
   },
 
   // The internal-destination guard's file-backed half.
   "restrict-host-address-file": {
     httpsRules: ["a.example.com:443"],
-    resolverAddress: ["1.1.1.1"],
     proxyAddress: PROXY,
     hostAddressFile: "/etc/haproxy/host-addrs.lst",
   },
@@ -77,7 +66,6 @@ const CASES: Record<string, HaproxyConfigOptions> = {
   "restrict-wildcards": {
     httpsRules: ["*.example.com:443", "**.example.org:*", "plain.example.net:443"],
     tlsRules: ["~^db[0-9]+\\.example\\.com$:5432"],
-    resolverAddress: ["1.1.1.1"],
     proxyAddress: PROXY,
   },
 };

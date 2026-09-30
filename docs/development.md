@@ -42,11 +42,6 @@ Each target sets `PROXY_ENGINE`, which picks the build context at image build ti
 `compose.yaml`'s `build.dockerfile: docker/${PROXY_ENGINE:-inspect}/Dockerfile` (see
 [Engines](../README.md#engines)).
 
-`EXTERNAL_RESOLVER` is the one variable here with no action input behind it: the action pins it empty
-(`src/lib/compose-env.ts`), and locally it takes a comma-separated list of IPv4 addresses for HAProxy
-to resolve against in place of the container's own `/etc/resolv.conf`. The integration tests set it
-to reach their own fixture resolver.
-
 ### End-to-End Workflow
 
 ```bash

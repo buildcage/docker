@@ -11,7 +11,6 @@ const OPTIONS = {
   httpRules: ["b.example.com:80"],
   ipRules: ["10.0.0.5:5432"],
   tlsRules: ["db.example.com:443"],
-  resolverAddress: ["1.1.1.1"],
   proxyAddress: "198.19.255.1",
 };
 

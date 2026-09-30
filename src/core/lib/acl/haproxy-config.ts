@@ -33,13 +33,6 @@ export interface HaproxyConfigOptions extends RuleInputs {
   /** Where redirected traffic arrives. */
   listenPort?: number;
   /**
-   * Upstream DNS servers a name is resolved against, once a request has
-   * already passed the rule ACLs. Not the resolver the build itself
-   * uses, which never gives out a real answer; see coredns-config.ts.
-   * Empty or omitted resolves through the container's own /etc/resolv.conf.
-   */
-  resolverAddress?: string[];
-  /**
    * The proxy's own address (the CoreDNS/gateway address), excluded from a
    * resolved destination like every other internal range; see
    * INTERNAL_RANGES.
@@ -106,7 +99,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions): GeneratedH
       ],
       defaults: ["    timeout client 30s", "    timeout server 30s"],
     }),
-    ...resolversSection(opts.resolverAddress ?? []),
+    ...resolversSection(),
     ...detectFrontend({
       listenPort: opts.listenPort,
       tlsStagePort: TLS_STAGE_PORT,

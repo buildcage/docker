@@ -20,8 +20,6 @@ export interface UniversalHaproxyConfigOptions {
   httpsRules?: string[];
   httpRules?: string[];
   ipRules?: string[];
-  /** Upstream DNS servers; none means the container's own /etc/resolv.conf. */
-  resolverAddress?: string[];
   /** The address CoreDNS answers every name with. */
   proxyAddress: string;
   /** Pattern file of the runner's own addresses; see InternalDstOptions. */
@@ -92,7 +90,6 @@ export function generateUniversalHaproxyConfig(
   }
 
   const decision = audit ? "AUDIT" : "ALLOWED";
-  const resolvers = options.resolverAddress ?? [];
   const guard: InternalDstOptions = {
     internalAddrs: [...INTERNAL_RANGES, PROXY_SUBNET],
     hostAddressFile: options.hostAddressFile,
@@ -103,7 +100,7 @@ export function generateUniversalHaproxyConfig(
       global: ["    maxconn 2048"],
       defaults: ["    mode tcp", "    timeout client 1m", "    timeout server 1m"],
     }),
-    ...resolversSection(resolvers),
+    ...resolversSection(),
     "# --- Frontend ---",
     "frontend outbound_proxy",
     "    bind *:10024",

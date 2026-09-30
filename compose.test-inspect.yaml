@@ -12,7 +12,6 @@ services:
     environment:
       TEST_NET_ADDR: 10.200.0.2/24
       TEST_NET_SUBNET: ${TEST_NET_SUBNET:-10.210.0.0/24}
-      EXTERNAL_RESOLVER: 10.200.0.53
       # These tests drive compose directly, so this stands in for what the
       # action computes. Nothing answers on it, so only the guard can block it.
       HOST_ADDRESSES: 10.200.0.199
@@ -80,6 +79,9 @@ services:
     # Wrapped here rather than in the image: the builder is the product image
     # and carries no test-only setup.
     entrypoint: ["/test-hooks/attach-test-net-addr.sh", "/init"]
+    # Docker's embedded DNS forwards here, so HAProxy and buildkitd reach the fixture
+    # resolver through resolv.conf, as they reach the runner's DNS in a job.
+    dns: [10.200.0.53]
     networks:
       default:
       test-net:
@@ -118,9 +120,8 @@ services:
     networks:
       test-net:
 
-  # Upstream for the builder's HAProxy, which resolves the real destination
-  # against it once a request has already passed the rules; CoreDNS itself
-  # never forwards here.
+  # Upstream for the builder's HAProxy, through Docker's embedded DNS, once a
+  # request has already passed the rules; CoreDNS itself never forwards here.
   test-dns:
     build: test/test-dns-inspect
     cap_add:

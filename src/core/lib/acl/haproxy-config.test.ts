@@ -29,7 +29,6 @@ const FULL = {
   httpRules: ["b.example.com:80"],
   ipRules: ["10.0.0.5:5432"],
   tlsRules: ["db.example.com:443"],
-  resolverAddress: ["1.1.1.1", "8.8.8.8"],
   proxyAddress: PROXY_ADDRESS,
 };
 
@@ -192,15 +191,14 @@ describe("resolving, which only a request the rules already admitted reaches", (
     expect(resolveLine.includes("if { var(txn.tlsrule) -m found }")).toBe(true);
   });
 
-  it("still resolves on both listeners when it does, rather than trusting the client", () => {
+  it("resolves on both listeners rather than trusting the client", () => {
     // Missed here, set-dst would never run and the connection would go
     // wherever the client's own address said.
-    const resolvConf = gen({ ...FULL, resolverAddress: [] });
     for (const frontend of ["https_in", "http_in"]) {
-      const segment = frontendSegment(resolvConf, frontend);
+      const segment = frontendSegment(FULL_CONFIG, frontend);
       expect(segment.includes("do-resolve(txn.dst,buildcage,ipv4) var(txn.host)")).toBe(true);
     }
-    expect(resolvConf.includes("tcp-request content do-resolve(txn.dst,buildcage,ipv4)")).toBe(
+    expect(FULL_CONFIG.includes("tcp-request content do-resolve(txn.dst,buildcage,ipv4)")).toBe(
       true,
     );
   });
@@ -220,29 +218,15 @@ describe("resolving, which only a request the rules already admitted reaches", (
     }
   });
 
-  it("supports more than one upstream nameserver, not just the first", () => {
-    expect(FULL_CONFIG.includes("nameserver ns1 1.1.1.1:53")).toBe(true);
-    expect(FULL_CONFIG.includes("nameserver ns2 8.8.8.8:53")).toBe(true);
-  });
-
   it("accepts an answer past the 512-byte default, which would resolve nothing", () => {
     // An internal zone often serves enough records to pass it, and a
     // truncated answer is no answer at all.
     expect(FULL_CONFIG.includes("    accepted_payload_size 8192")).toBe(true);
   });
 
-  it("falls back to the container's own resolv.conf, not a public resolver", () => {
-    for (const resolvConf of [
-      gen({ ...FULL, resolverAddress: [] }),
-      gen({ httpsRules: FULL.httpsRules }),
-    ]) {
-      expect(resolvConf.includes("    parse-resolv-conf")).toBe(true);
-      expect(resolvConf.includes("nameserver ns1")).toBe(false);
-    }
-  });
-
-  it("reads resolv.conf only when no upstream is named", () => {
-    expect(FULL_CONFIG.includes("parse-resolv-conf")).toBe(false);
+  it("resolves through the container's own resolv.conf, not a public resolver", () => {
+    expect(FULL_CONFIG.includes("    parse-resolv-conf")).toBe(true);
+    expect(FULL_CONFIG.includes("nameserver")).toBe(false);
   });
 });
 
@@ -329,17 +313,6 @@ describe("the internal-address guard", () => {
         "tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal",
       ),
     ).toBe(true);
-  });
-
-  it("does not fold the upstream resolvers into the internal-address guard", () => {
-    // resolverAddress names real, external nameservers, not the gateway;
-    // conflating the two would make a rule resolving to 1.1.1.1 unreachable
-    // and, worse, would have masked a resolved destination actually landing
-    // on the proxy's own address.
-    const acl = FULL_CONFIG.split("\n").find((l) => l.includes("acl dst_internal"))!;
-    expect(acl.includes("1.1.1.1")).toBe(false);
-    expect(acl.includes("8.8.8.8")).toBe(false);
-    expect(acl.trim().endsWith("198.19.255.1")).toBe(true);
   });
 });
 

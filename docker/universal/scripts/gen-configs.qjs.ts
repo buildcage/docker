@@ -5,11 +5,10 @@
  *
  * Usage:
  *   qjs --std -m gen-configs.js <haproxy_out> <corefile_out> <proxy_address> \
- *     <host_address_file> <upstream_resolvers> <mode> <https_rules> \
- *     <http_rules> <ip_rules>
+ *     <host_address_file> <mode> <https_rules> <http_rules> <ip_rules>
  *
- * Rules are whitespace separated; `universal` has no url or tls rules. An
- * empty <upstream_resolvers> means the container's own /etc/resolv.conf.
+ * Rules are whitespace separated; `universal` has no url or tls rules. A name
+ * is resolved against the container's own /etc/resolv.conf.
  */
 import * as std from "qjs:std";
 
@@ -23,7 +22,6 @@ const [
   corefileOut,
   proxyAddress,
   hostAddressFile,
-  upstreamsInput,
   mode,
   httpsInput,
   httpInput,
@@ -52,7 +50,6 @@ try {
     httpsRules,
     httpRules,
     ipRules: splitRuleTokens(ipInput),
-    resolverAddress: splitRuleTokens(upstreamsInput),
     proxyAddress,
     hostAddressFile,
   });

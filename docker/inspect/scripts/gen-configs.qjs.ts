@@ -8,11 +8,11 @@
  *
  * Usage:
  *   qjs --std -m gen-configs.js <haproxy_out> <corefile_out> <proxy_address> \
- *     <host_address_file> <upstream_resolvers> <mode> <https_rules> \
- *     <http_rules> <ip_rules> <tls_rules> <url_rules>
+ *     <host_address_file> <mode> <https_rules> <http_rules> <ip_rules> \
+ *     <tls_rules> <url_rules>
  *
  * Host and IP rules are whitespace separated, URL rules newline separated
- * (each carries a method and a space). An empty <upstream_resolvers> means the
+ * (each carries a method and a space). A name is resolved against the
  * container's own /etc/resolv.conf.
  */
 import * as std from "qjs:std";
@@ -28,7 +28,6 @@ const [
   corefileOut,
   proxyAddress,
   hostAddressFile,
-  upstreamsInput,
   mode,
   httpsInput,
   httpInput,
@@ -50,7 +49,6 @@ try {
   // mismatch rather than an empty address list.
   if (!hostAddressFile) throw new Error("no host address file given");
 
-  const upstreams = splitRuleTokens(upstreamsInput);
   const httpsRules = splitRuleTokens(httpsInput);
   const httpRules = splitRuleTokens(httpInput);
   const ipRules = splitRuleTokens(ipInput);
@@ -64,7 +62,6 @@ try {
     tlsRules,
     urlRules,
     mode: mode === "audit" ? "audit" : "restrict",
-    resolverAddress: upstreams,
     proxyAddress,
     hostAddressFile,
   });

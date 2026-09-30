@@ -21,32 +21,12 @@ mkdir -p /etc/haproxy/rules
 } | sort -u > "$HOST_ADDR_FILE"
 echo "init-haproxy-cfg: guarded runner addresses=$(tr '\n' ' ' < "$HOST_ADDR_FILE")"
 
-# Only the integration tests name an upstream; when it is unset, HAProxy reads
-# the container's own /etc/resolv.conf, so a name resolves against the runner's
-# own DNS rather than a hardcoded public one. Each entry is substituted into
-# the generated resolvers section verbatim, so a value that is not an address
-# is refused here rather than left to open a directive of its own in that file.
-UPSTREAM_RESOLVERS=$(echo "$EXTERNAL_RESOLVER" | tr ',' ' ')
-for ip in $UPSTREAM_RESOLVERS; do
-    if ! echo "$ip" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
-        echo "init-haproxy-cfg: EXTERNAL_RESOLVER takes IPv4 addresses; \"$ip\" is not one" >&2
-        exit 1
-    fi
-done
-
-if [ -z "$UPSTREAM_RESOLVERS" ]; then
-    echo "init-haproxy-cfg: resolver=(default, via /etc/resolv.conf)"
-else
-    echo "init-haproxy-cfg: resolver=$UPSTREAM_RESOLVERS"
-fi
-
 # CoreDNS's s6 unit depends on this oneshot too, for its Corefile.
 qjs --std -m /opt/buildcage/scripts/gen-configs.js \
     /etc/haproxy/haproxy.cfg \
     /etc/coredns/Corefile \
     "$GATEWAY" \
     "$HOST_ADDR_FILE" \
-    "$UPSTREAM_RESOLVERS" \
     "${PROXY_MODE:-restrict}" \
     "$ALLOWED_HTTPS_RULES" \
     "$ALLOWED_HTTP_RULES" \

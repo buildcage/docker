@@ -52,18 +52,16 @@ export function preamble(spec: PreambleSpec): string[] {
 }
 
 /**
- * The resolver every do-resolve uses after the rules allow a connection.
- * With no upstreams it reads the container's own /etc/resolv.conf.
+ * The resolver every do-resolve uses after the rules allow a connection: the
+ * one the container's own /etc/resolv.conf names, as for the runner itself.
  */
-export function resolversSection(resolvers: string[]): string[] {
+export function resolversSection(): string[] {
   return [
     "# Real resolution happens once a request has already passed the rule",
     "# ACLs below; the build's own resolver (CoreDNS) never gives out a real",
     "# answer, so this is the only place a name becomes an address.",
     "resolvers buildcage",
-    ...(resolvers.length === 0
-      ? ["    parse-resolv-conf"]
-      : resolvers.map((addr, i) => `    nameserver ns${i + 1} ${addr}:53`)),
+    "    parse-resolv-conf",
     // The only hold do-resolve reads, and it ignores the record's own TTL,
     // so it is also how long a rotated address keeps being dialled. A minute
     // is about the TTL of the hosts a build talks to.
