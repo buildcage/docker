@@ -19,7 +19,7 @@ import { REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
 
 import { copyFromContainerImage } from "./copy-from-image.ts";
 import { findReportSourceContainer } from "./find-report-source.ts";
-import { readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
+import { checkFailOnBlocked, readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
 import { runReportScript } from "./run-report-script.ts";
 import { uploadTrafficArtifact } from "./traffic-artifact.ts";
 
@@ -34,6 +34,7 @@ import { uploadTrafficArtifact } from "./traffic-artifact.ts";
  */
 export interface ReportStepDeps {
   readBuilderName: typeof readBuilderName;
+  checkFailOnBlocked: typeof checkFailOnBlocked;
   readTrafficArtifactInputs: typeof readTrafficArtifactInputs;
   createDocker: typeof createDocker;
   findReportSourceContainer: typeof findReportSourceContainer;
@@ -44,8 +45,8 @@ export interface ReportStepDeps {
    *  removal. Seams because everything this step writes goes through them. */
   makeScratchDir: () => string;
   removeScratchDir: (dir: string) => void;
-  /** The inputs' own migration and misuse messages. They go to the always-on
-   *  emitter: this action's report is written by the script it launches. */
+  /** The upload's own messages. They go to the always-on emitter: this
+   *  action's report is written by the script it launches. */
   warn: (message: string) => void;
 }
 
@@ -58,6 +59,7 @@ const removeScratchDirTree = (dir: string): void => rmSync(dir, { recursive: tru
 
 const realDeps: ReportStepDeps = {
   readBuilderName,
+  checkFailOnBlocked,
   readTrafficArtifactInputs,
   createDocker,
   findReportSourceContainer,
@@ -80,6 +82,7 @@ export async function runReportStep(
 ): Promise<void> {
   const {
     readBuilderName,
+    checkFailOnBlocked,
     readTrafficArtifactInputs,
     createDocker,
     findReportSourceContainer,
@@ -92,7 +95,8 @@ export async function runReportStep(
   } = { ...realDeps, ...overrides };
 
   const builderName = readBuilderName();
-  const trafficArtifact = readTrafficArtifactInputs(warn);
+  checkFailOnBlocked();
+  const trafficArtifact = readTrafficArtifactInputs();
   // The COMPOSE_PROJECT_NAME override is gated to this repo's own CI/dev
   // testing. The gate reads process.env, not the passed env, so rolldown's
   // replacePlugin folds it to a constant at build time and tree-shakes the

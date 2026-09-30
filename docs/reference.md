@@ -377,12 +377,15 @@ refused with an error naming what to write instead.
 `buildcage/docker/report` reads the builder's communication log, writes the Job Summary, and
 optionally fails the job when blocked connections are found. Every input is optional.
 
-| Input                             | Default     | Description                                                                                                                                                     |
-| --------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `builder_name`                    | `buildcage` | Name of the builder container                                                                                                                                   |
-| `fail_on_blocked`                 | `true`      | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode). A value other than `true` or `false` warns and is read as `true` |
-| `upload_traffic_artifact`         | `false`     | Upload the observed traffic as a JSON artifact named `buildcage-traffic`; both engines write it                                                                 |
-| `traffic_artifact_retention_days` | empty       | How long to keep that artifact, in days; empty uses the repository's own default                                                                                |
+| Input                             | Default     | Description                                                                                        |
+| --------------------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `builder_name`                    | `buildcage` | Name of the builder container                                                                      |
+| `fail_on_blocked`                 | `true`      | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode)      |
+| `upload_traffic_artifact`         | `false`     | Upload the observed traffic as a JSON artifact named `buildcage-traffic`; both engines write it    |
+| `traffic_artifact_retention_days` | empty       | How long to keep that artifact, as a whole number of days; empty uses the repository's own default |
+
+`fail_on_blocked` and `upload_traffic_artifact` take `true` or `false`. Any other value, or a
+retention that is not a whole number above zero, fails the step before the report is written.
 
 In restrict mode the step fails when blocked connections are detected, and the workflow fails with
 it.

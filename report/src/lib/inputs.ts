@@ -12,18 +12,32 @@ import * as core from "@actions/core";
 
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
+import { ReportError } from "./errors.ts";
+
 /** Narrowed to what this module needs, so a test can pass a plain lookup. */
 export type GetInput = (name: string) => string;
 
-/** Where a rejected value's explanation goes; the entry point supplies it. */
-export type Warn = (message: string) => void;
-
-/** The spellings @actions/core's own getBooleanInput accepts. */
-const TRUE_INPUTS = ["true", "True", "TRUE"];
-const FALSE_INPUTS = ["false", "False", "FALSE"];
-
 export function readBuilderName(getInput: GetInput = core.getInput): string {
   return getInput("builder_name") || DEFAULT_BUILDER_NAME;
+}
+
+/** Not `getBooleanInput`, which cannot tell unset from misspelled. Only unset,
+ *  as when a dev or test invocation skips action.yml's defaults, takes the default. */
+function readBooleanInput(name: string, fallback: boolean, getInput: GetInput): boolean {
+  const value = getInput(name);
+  if (value === "") return fallback;
+  if (["true", "True", "TRUE"].includes(value)) return true;
+  if (["false", "False", "FALSE"].includes(value)) return false;
+  throw new ReportError(
+    `Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`,
+    "INVALID_BOOLEAN_INPUT",
+  );
+}
+
+/** The report script in the image reads fail_on_blocked itself; this only
+ *  refuses a typo before anything runs. */
+export function checkFailOnBlocked(getInput: GetInput = core.getInput): void {
+  readBooleanInput("fail_on_blocked", true, getInput);
 }
 
 export interface TrafficArtifactInputs {
@@ -32,44 +46,20 @@ export interface TrafficArtifactInputs {
   retentionDays?: number;
 }
 
+/** The retention is checked even when nothing is uploaded: a bad value is a
+ *  mistake either way. */
 export function readTrafficArtifactInputs(
-  warn: Warn,
   getInput: GetInput = core.getInput,
 ): TrafficArtifactInputs {
-  return {
-    wanted: readBoolean("upload_traffic_artifact", getInput, warn),
-    retentionDays: readRetentionDays(getInput, warn),
-  };
-}
-
-/**
- * An unset input is a no: the dev and test invocations run this from source
- * rather than through action.yml's own defaults. Any other value that cannot
- * be read is a typo, and saying so beats an artifact that never appears.
- */
-function readBoolean(name: string, getInput: GetInput, warn: Warn): boolean {
-  const value = getInput(name);
-  if (TRUE_INPUTS.includes(value)) {
-    return true;
-  }
-  if (value !== "" && !FALSE_INPUTS.includes(value)) {
-    warn(`${name} must be true or false, not ${JSON.stringify(value)}. Reading it as false.`);
-  }
-  return false;
-}
-
-function readRetentionDays(getInput: GetInput, warn: Warn): number | undefined {
-  const value = getInput("traffic_artifact_retention_days");
-  if (value === "") {
-    return undefined;
-  }
-  const days = Number(value);
-  if (!Number.isInteger(days) || days <= 0) {
-    warn(
-      `traffic_artifact_retention_days must be a whole number of days above zero, not ` +
-        `${JSON.stringify(value)}. Leaving the retention to the repository's own default.`,
+  const wanted = readBooleanInput("upload_traffic_artifact", false, getInput);
+  const days = getInput("traffic_artifact_retention_days");
+  if (days === "") return { wanted };
+  if (!/^[1-9]\d*$/.test(days)) {
+    throw new ReportError(
+      `Invalid traffic_artifact_retention_days: ${JSON.stringify(days)}. ` +
+        "Must be a whole number of days above zero.",
+      "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS",
     );
-    return undefined;
   }
-  return days;
+  return { wanted, retentionDays: Number(days) };
 }

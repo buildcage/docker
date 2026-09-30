@@ -64,7 +64,8 @@ export interface ReportActionDeps {
   failOnBlocked?: boolean;
 }
 
-/** Anything other than a false spelling fails closed, and a typo says so. */
+/** Anything other than a false spelling fails closed, and a typo says so. The
+ *  report action refuses a typo first; this covers direct runs and an older action. */
 function readFailOnBlocked(): boolean {
   const value = core.getInput("fail_on_blocked");
   if (["false", "False", "FALSE"].includes(value)) return false;

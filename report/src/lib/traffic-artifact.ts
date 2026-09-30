@@ -4,7 +4,8 @@ import { dirname } from "node:path";
 import { errorMessage } from "#core/lib/errors.ts";
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
-import type { Warn } from "./inputs.ts";
+/** Where a failed upload's explanation goes; the entry point supplies it. */
+type Warn = (message: string) => void;
 
 /** Fixed so a workflow can name it, suffixed per builder against collisions. */
 export function artifactName(builderName: string): string {
