@@ -56,42 +56,43 @@ func TestFindJVMKeystoresIncludesJssecacerts(t *testing.T) {
 	}
 }
 
-// JAVA_HOME unset, a JVM at a known fixed directory instead: Debian's, or one of
-// RHEL's, each followed through its symlink to the real file.
-func TestFindJVMKeystoresFromKnownDirs(t *testing.T) {
-	for _, dir := range []string{"etc/ssl/certs/java", "etc/pki/java", "etc/pki/ca-trust/extracted/java"} {
-		t.Run(dir, func(t *testing.T) {
-			rootfs := t.TempDir()
-			s := &spec{rootfs: rootfs, env: map[string]string{}}
-			cacerts := filepath.Join(rootfs, dir, "cacerts")
-			mustMkdirAll(t, filepath.Dir(cacerts))
-			mustWriteFile(t, cacerts, "x")
+// A distribution keystore at a fixed directory is not found on its own: only
+// through a JDK at JAVA_HOME or on PATH, so a JDK-less image gets no mount there.
+func TestFindJVMKeystoresIgnoresAFixedDirWithoutAJDK(t *testing.T) {
+	rootfs := t.TempDir()
+	s := &spec{rootfs: rootfs, env: map[string]string{"PATH": "/usr/bin"}}
+	cacerts := filepath.Join(rootfs, "etc/pki/ca-trust/extracted/java/cacerts")
+	mustMkdirAll(t, filepath.Dir(cacerts))
+	mustWriteFile(t, cacerts, "x")
 
-			if got := findJVMKeystores(s); !hasPath(got, cacerts) {
-				t.Fatalf("findJVMKeystores = %v; want it to include %q", got, cacerts)
-			}
-		})
+	if got := findJVMKeystores(s); len(got) != 0 {
+		t.Fatalf("findJVMKeystores = %v; want none without a JDK", got)
 	}
 }
 
-// A keystore reachable by two candidate paths (JAVA_HOME's cacerts symlinked to
-// a known fixed path) is returned once, not injected into twice.
+// Two JDKs whose cacerts link to the one shared distribution keystore (one at
+// JAVA_HOME, one on PATH) have it returned once, not injected into twice.
 func TestFindJVMKeystoresDeduplicates(t *testing.T) {
 	rootfs := t.TempDir()
-	s := &spec{rootfs: rootfs, env: map[string]string{"JAVA_HOME": "/opt/java"}}
+	s := &spec{rootfs: rootfs, env: map[string]string{"JAVA_HOME": "/opt/java", "PATH": "/usr/bin"}}
 	real := filepath.Join(rootfs, "etc/ssl/certs/java/cacerts")
 	mustMkdirAll(t, filepath.Dir(real))
 	mustWriteFile(t, real, "x")
-	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/lib/security"))
-	mustSymlink(t, "/etc/ssl/certs/java/cacerts", filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	for _, jdk := range []string{"opt/java", "usr/lib/jvm/jdk-17"} {
+		mustMkdirAll(t, filepath.Join(rootfs, jdk, "lib/security"))
+		mustSymlink(t, "/etc/ssl/certs/java/cacerts", filepath.Join(rootfs, jdk, "lib/security/cacerts"))
+	}
+	mustMkdirAll(t, filepath.Join(rootfs, "usr/lib/jvm/jdk-17/bin"))
+	mustWriteFile(t, filepath.Join(rootfs, "usr/lib/jvm/jdk-17/bin/java"), "x")
+	mustMkdirAll(t, filepath.Join(rootfs, "usr/bin"))
+	mustSymlink(t, "/usr/lib/jvm/jdk-17/bin/java", filepath.Join(rootfs, "usr/bin/java"))
 
 	if got := findJVMKeystores(s); len(got) != 1 || got[0] != real {
 		t.Fatalf("findJVMKeystores = %v; want the single real path %q", got, real)
 	}
 }
 
-// JAVA_HOME names a directory with no keystore, and no known path has one
-// either, so nothing is found.
+// JAVA_HOME names a directory with no keystore, so nothing is found.
 func TestFindJVMKeystoresNoneFound(t *testing.T) {
 	s := &spec{rootfs: t.TempDir(), env: map[string]string{"JAVA_HOME": "/opt/java"}}
 	if got := findJVMKeystores(s); len(got) != 0 {
