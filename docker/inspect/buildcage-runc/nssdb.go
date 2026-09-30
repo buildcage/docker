@@ -9,10 +9,9 @@ package main
 // slot while the step's own certificates, keys and writes stay in its own.
 // Taking the slot back out of pkcs11.txt is the whole undo.
 //
-// A database the step's user cannot write is covered instead, by a copy of a
-// template holding only the proxy CA, and a step that changes that copy fails
-// the build: Chromium opens nothing it cannot open read-write, the slot
-// included.
+// A database that cannot take the slot, such as one the step's user cannot
+// write, is left alone: Chromium opens nothing it cannot open read-write, the
+// slot included, so it does not trust the CA there.
 
 import (
 	"bufio"
@@ -68,44 +67,35 @@ const maxPKCS11TxtBytes = 1 << 20
 // The files Chromium opens read-write in a database it uses.
 var nssDBFiles = []string{"cert9.db", "key4.db"}
 
-var errNSSDBChanged = errors.New("the step changed the NSS database")
-
 // A real /etc/passwd is a few KB.
 const maxPasswdBytes = 1 << 20
 
-type nssBind struct {
-	containerDir string
-	scratchDir   string
-	baseline     []fileEntry
-}
-
-// placeNSSDB makes Chromium trust the CA through the step's own database when
-// the step's user can write it, and through a covering one otherwise. It
-// returns neither, having logged why, when there is nowhere to place either.
+// placeNSSDB makes Chromium trust the CA through the step's own database. It
+// returns nil, having logged why, when that database cannot take the slot.
 // created holds the directories made to bind over.
-func placeNSSDB(s *spec, bundle string, ca []byte) (*dirBind, *nssBind, createdDirs) {
+func placeNSSDB(s *spec, bundle string, ca []byte) (*dirBind, createdDirs) {
 	var created createdDirs
 	template, err := readNSSTemplate()
 	if err != nil {
 		logf("no NSS database template at %s (%v); not injecting into Chromium's", nssTemplateDir, err)
-		return nil, nil, created
+		return nil, created
 	}
 
-	uid, gid := s.processUser()
+	uid, _ := s.processUser()
 	home := homeOf(s, uid)
 	if !filepath.IsAbs(home) || filepath.Clean(home) == "/" {
 		logf("the step's home directory is %q; not injecting into Chromium's NSS database", home)
-		return nil, nil, created
+		return nil, created
 	}
 	resolvedHome, err := resolveInRoot(s.rootfs, home)
 	if err != nil {
 		logf("HOME=%s could not be resolved inside the rootfs (%v); not injecting into Chromium's NSS database", home, err)
-		return nil, nil, created
+		return nil, created
 	}
 	homeInfo, err := os.Stat(resolvedHome)
 	if err != nil || !homeInfo.IsDir() {
 		logf("HOME=%s is not a directory in the rootfs; not injecting into Chromium's NSS database", home)
-		return nil, nil, created
+		return nil, created
 	}
 
 	hostDir, exists, err := chooseStepNSSDB(s.rootfs, home)
@@ -113,13 +103,17 @@ func placeNSSDB(s *spec, bundle string, ca []byte) (*dirBind, *nssBind, createdD
 		var b *dirBind
 		b, created, err = slotNSSDB(s, bundle, ca, template, hostDir, exists, homeInfo)
 		if err == nil {
-			return b, nil, created
+			return b, created
 		}
 	}
-	logf("cannot add the proxy CA to the step's own NSS database under %s (%v); covering it with one trusting only the proxy CA", home, err)
-	cover, coverCreated := coverNSSDB(s, bundle, template, home, uid, gid)
-	created.add(coverCreated.dirs)
-	return nil, cover, created
+	// err names builder-side paths.
+	reason := strings.ReplaceAll(err.Error(), s.rootfs+"/", "/")
+	msg := fmt.Sprintf("cannot add the proxy CA to Chromium's NSS database under %s (%s), "+
+		"so Chromium in this step will not trust the proxy; use proxy_engine: universal for it", home, reason)
+	logf("%s", msg)
+	// Also to stderr, which is the step's output in the build log.
+	fmt.Fprintf(os.Stderr, "buildcage: warning: %s\n", msg)
+	return nil, created
 }
 
 // chooseStepNSSDB picks the database Chromium would read: the legacy one when
@@ -459,51 +453,6 @@ func writeCADB(dir string, template map[string][]byte) error {
 	return nil
 }
 
-// coverNSSDB binds a copy of the template over the legacy path, returning nil,
-// having logged why, when it cannot be placed.
-func coverNSSDB(s *spec, bundle string, template map[string][]byte, home string, uid, gid int) (*nssBind, createdDirs) {
-	var created createdDirs
-	hostDir, exists, err := chooseNSSDB(s.rootfs, filepath.Join(home, nssDBPath))
-	if err != nil {
-		logf("cannot place Chromium's NSS database under %s: %v", home, err)
-		return nil, created
-	}
-	containerDir := containerPathOf(s.rootfs, hostDir)
-	if s.mountConflicts(containerDir) {
-		logf("a mount already covers %s; not injecting into Chromium's NSS database", containerDir)
-		return nil, created
-	}
-
-	scratch, err := newScratchDir(bundle)
-	if err != nil {
-		logf("cannot create a scratch directory for %s: %v", containerDir, err)
-		return nil, created
-	}
-	b := &nssBind{containerDir: containerDir, scratchDir: scratch}
-	if err := b.prepare(template, uid, gid); err != nil {
-		logf("cannot prepare Chromium's NSS database for %s: %v", containerDir, err)
-		b.cleanup()
-		return nil, created
-	}
-
-	// Last, so a failure above leaves nothing behind.
-	if !exists {
-		dirs, err := mkdirAllTracking(hostDir)
-		created.add(dirs)
-		if err == nil {
-			err = ownDirs(dirs, uid, gid)
-		}
-		if err != nil {
-			logf("cannot create %s to bind Chromium's NSS database over: %v", containerDir, err)
-			b.cleanup()
-			return nil, created
-		}
-	}
-	s.addBindMount(containerDir, scratch)
-	logf("bound a database trusting only the proxy CA over %s", containerDir)
-	return b, created
-}
-
 func chooseNSSDB(rootfs, path string) (hostDir string, exists bool, err error) {
 	resolved, err := resolveInRoot(rootfs, path)
 	if err != nil {
@@ -561,57 +510,6 @@ func readNSSTemplate() (map[string][]byte, error) {
 		return nil, fmt.Errorf("%s holds no database", nssTemplateDir)
 	}
 	return files, nil
-}
-
-// prepare hands the copy to the step's user: Chromium ignores a database it
-// cannot open read-write.
-func (b *nssBind) prepare(template map[string][]byte, uid, gid int) error {
-	paths := []string{b.scratchDir}
-	for name, content := range template {
-		path := filepath.Join(b.scratchDir, name)
-		// Untested by design: a new file in a directory this process just made.
-		//coverage:ignore start
-		if err := os.WriteFile(path, content, 0o600); err != nil {
-			return err
-		}
-		//coverage:ignore stop
-		paths = append(paths, path)
-	}
-	for _, path := range paths {
-		if err := os.Chown(path, uid, gid); err != nil {
-			return err
-		}
-	}
-	baseline, err := captureManifest(b.scratchDir)
-	if err != nil {
-		return err
-	}
-	b.baseline = baseline
-	return nil
-}
-
-// finish fails when the step changed the database's content. Chromium reading
-// it leaves every file as it was. Ownership and mode are not compared, so a
-// chown -R or chmod -R over $HOME does not count as a change.
-func (b *nssBind) finish() error {
-	current, err := captureManifest(b.scratchDir)
-	// Only the step can have made its own copy unreadable.
-	if err != nil {
-		return fmt.Errorf("%w at %s: it can no longer be read back: %v", errNSSDBChanged, b.containerDir, err)
-	}
-	if !slices.EqualFunc(current, b.baseline, sameNSSContent) {
-		return fmt.Errorf("%w at %s, which the inspect engine replaces for the step with one trusting only its proxy CA; "+
-			"the write is discarded (see README.md#limitations)", errNSSDBChanged, b.containerDir)
-	}
-	return nil
-}
-
-func sameNSSContent(a, b fileEntry) bool {
-	return a.path == b.path && a.mode.Type() == b.mode.Type() && a.symlinkTo == b.symlinkTo && a.sha256 == b.sha256
-}
-
-func (b *nssBind) cleanup() {
-	removeScratchDir(b.scratchDir)
 }
 
 // homeOf follows runc: an empty HOME comes from /etc/passwd, falling back to /.

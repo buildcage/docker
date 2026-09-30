@@ -231,7 +231,7 @@ func TestNSSDBSlotFailsOnTheCACopiedIntoTheStepsDatabase(t *testing.T) {
 	}
 }
 
-func TestNSSDBIsCoveredWhenTheSlotCannotBeAdded(t *testing.T) {
+func TestNSSDBIsSkippedWhenTheSlotCannotBeAdded(t *testing.T) {
 	for name, arrange := range map[string]func(t *testing.T, bundle, legacy string){
 		"a database the user cannot write": func(t *testing.T, _, legacy string) {
 			if err := os.Chmod(legacy, 0o555); err != nil {
@@ -277,21 +277,20 @@ func TestNSSDBIsCoveredWhenTheSlotCannotBeAdded(t *testing.T) {
 			mustWriteFile(t, filepath.Join(legacy, "cert9.db"), "THE STEP'S OWN")
 			giveToStepUser(t, legacy, uid, gid)
 			arrange(t, bundle, legacy)
+			readStderr := captureStderr(t)
 
 			in, err := inject(bundle, testCA)
+			stderr := readStderr()
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertNoSlot(t, in)
-			if in.nss == nil || in.nss.containerDir != "/root/.pki/nssdb" {
-				t.Fatal("the database was not covered instead")
-			}
+			assertNSSDBSkipped(t, in, bundle, "/root/.pki/nssdb", stderr)
 		})
 	}
 }
 
 // failWalkUnderOnce fails the first walk of anything under root, which here is
-// the mirror's first manifest, and lets the cover's own walks through.
+// the mirror's first manifest.
 func failWalkUnderOnce(t *testing.T, root string) {
 	t.Helper()
 	failed := false
@@ -307,7 +306,7 @@ func failWalkUnderOnce(t *testing.T, root string) {
 }
 
 // The mirror's second manifest, taken after the slot went in.
-func TestNSSDBIsCoveredWhenTheMirrorCannotBeReadAfterTheSlot(t *testing.T) {
+func TestNSSDBIsSkippedWhenTheMirrorCannotBeReadAfterTheSlot(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
@@ -324,37 +323,34 @@ func TestNSSDBIsCoveredWhenTheMirrorCannotBeReadAfterTheSlot(t *testing.T) {
 		return old(dir, fn)
 	}
 	t.Cleanup(func() { walkDir = old })
+	readStderr := captureStderr(t)
 
 	in, err := inject(bundle, testCA)
+	stderr := readStderr()
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoSlot(t, in)
-	if in.nss == nil {
-		t.Fatal("the database was not covered instead")
-	}
+	assertNSSDBSkipped(t, in, bundle, "/root/.pki/nssdb", stderr)
 }
 
-// An XDG path that cannot be read leaves the legacy one to cover.
-func TestNSSDBIsCoveredWhenTheXDGPathCannotBeResolved(t *testing.T) {
+func TestNSSDBIsSkippedWhenTheXDGPathCannotBeResolved(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useNSSTemplate(t)
 	uid, gid := stepUser()
 	bundle, rootfs := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
 	mustSymlink(t, "../../../../../..", filepath.Join(rootfs, "root/.local"))
+	readStderr := captureStderr(t)
 
 	in, err := inject(bundle, testCA)
+	stderr := readStderr()
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoSlot(t, in)
-	if in.nss == nil || in.nss.containerDir != "/root/.pki/nssdb" {
-		t.Fatal("the legacy path was not covered instead")
-	}
+	assertNSSDBSkipped(t, in, bundle, "/root/.pki/nssdb", stderr)
 }
 
-func TestNSSDBIsCoveredWhenTheDatabaseCannotBeListed(t *testing.T) {
+func TestNSSDBIsSkippedWhenTheDatabaseCannotBeListed(t *testing.T) {
 	skipIfRoot(t)
 	useTempLog(t)
 	useFakeRsync(t)
