@@ -83,10 +83,11 @@ func javaOnPath(s *spec) []string {
 }
 
 // findJVMKeystores returns the resolved host paths of every JVM keystore inside
-// the rootfs: JAVA_HOME's first, then each java on PATH's. Each is
-// deduplicated by where it resolves, so a distribution's JDKs, which link to
-// one shared keystore, have it injected once. Other JDKs in the image are left alone: a keystore's
-// directory is a mount point for the step, so no later step could remove them.
+// the rootfs: JAVA_HOME's first, then each java on PATH's. Each is deduplicated
+// by where it resolves, so a distribution's JDKs, which link to one shared
+// keystore, have it injected once. Other JDKs in the image are left alone: a
+// keystore's directory is a mount point for the step, so no later step could
+// remove them.
 func findJVMKeystores(s *spec) []string {
 	var dirs []string
 	if home := s.env["JAVA_HOME"]; home != "" {
