@@ -330,10 +330,10 @@ func removeNSSSlot(path string, appended []byte, created bool) error {
 	return f.Truncate(int64(len(kept)))
 }
 
-// stripNSSSlotCopy cuts every copy of the slot out of the pkcs11.txt at path,
-// and the separator before it too when the file still ends in appended, the
-// bytes appendNSSSlot added. A file left empty is removed. It returns why the file still counts as
-// residue, or "" when it does not.
+// stripNSSSlotCopy cuts every copy of the slot out of the pkcs11.txt at path.
+// When the file still ends in appended, the separator and slot appendNSSSlot
+// added, the separator goes too. A file left empty is removed. It returns why
+// the file still counts as residue, or "" when it does not.
 func stripNSSSlotCopy(path string, appended []byte) (string, error) {
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {

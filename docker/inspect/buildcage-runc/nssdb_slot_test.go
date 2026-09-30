@@ -524,8 +524,8 @@ func TestNSSDBSlotComesOutOfACopiedHome(t *testing.T) {
 	}
 }
 
-// A copy of a pkcs11.txt the injection created goes, and its directory stays:
-// nothing says whether the step made it or found it there.
+// A copy of a pkcs11.txt the injection created is removed, and its directory
+// kept: nothing says whether the step made it or found it there.
 func TestNSSDBSlotCopyOfACreatedDatabaseLeavesItsDirectory(t *testing.T) {
 	in, _, rootfs, mirror := injectSlot(t, nil)
 	copied := filepath.Join(rootfs, "backup", nssDBPath, "pkcs11.txt")

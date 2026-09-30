@@ -680,9 +680,9 @@ keys and writes stay in its own database. After the step, the slot's bytes are t
 `pkcs11.txt` in the layer, such as one in a copy of the home, and one left holding nothing else is
 removed. One that still names `/dev/buildcage-nssdb` afterwards, or is over 1 MiB and so is not
 read, counts as CA residue. A database the step's user cannot write is covered for the step with one
-holding only this CA instead. `HOME` comes from the step's environment, or from the image's `/etc/passwd` when that is
-empty, as runc does, and is read once as the step starts: a `HOME` the step changes, or another user
-it switches to, gets no slot.
+holding only this CA instead. `HOME` comes from the step's environment, or from the image's
+`/etc/passwd` when that is empty, as runc does, and is read once as the step starts: a `HOME` the
+step changes, or another user it switches to, gets no slot.
 
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
@@ -703,8 +703,8 @@ Four things fail the build by default, pointing at `fail_on_ca_residue`:
   snapshotter (see [Security Details](./security.md#inspect-proxy-engine))
 
 With `fail_on_ca_residue: false` all four only warn: the copy or the slot stays in the image, the
-write is discarded, and the unchecked layer is committed as it is. An error reading the layer back or
-restoring it fails the build either way.
+write is discarded, and the unchecked layer is committed as it is. An error reading the layer back
+or restoring it fails the build either way.
 
 The CA is valid for two days and unique to the run, so a copy left in an image trusts only a proxy
 that no longer exists. It still shows the image was built behind Buildcage.
