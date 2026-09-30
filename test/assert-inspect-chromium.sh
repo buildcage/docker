@@ -34,7 +34,7 @@ else
   fail "the module a step added with modutil is gone from /root/.pki/nssdb/pkcs11.txt"
 fi
 
-for dir in /home/app/.pki /home/copier/.pki /tmp/home-copy/.pki /dev/buildcage-nssdb /tmp/control; do
+for dir in /home/app/.pki /home/copier/.pki /tmp/home-copy/.pki/nssdb/pkcs11.txt /dev/buildcage-nssdb /tmp/control; do
   if docker run --rm --user root "$IMAGE" sh -c "test -e $dir"; then
     fail "$dir is in the built image"
   else

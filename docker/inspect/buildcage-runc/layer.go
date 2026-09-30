@@ -340,7 +340,7 @@ func stripCA(path string, ca []byte, marks caMarks) (bool, error) {
 // upper is the layer found when the injection began, not one located afresh: a
 // mount table that read cleanly at inject but fails to now would otherwise
 // report no layer and let the anchors' scattered copies through unswept.
-func stripLayer(rootfs, upper string, ca []byte, slot nssSlotCopy) error {
+func stripLayer(rootfs, upper string, ca, nssAppended []byte) error {
 	if upper == "" {
 		return errLayerUnread
 	}
@@ -351,7 +351,7 @@ func stripLayer(rootfs, upper string, ca []byte, slot nssSlotCopy) error {
 	if err != nil {
 		return err
 	}
-	slots, err := stripNSSSlotCopies(upper, rootfs, slot)
+	slots, err := stripNSSSlotCopies(upper, rootfs, nssAppended)
 	if err != nil {
 		return err
 	}
@@ -376,7 +376,7 @@ func stripLayer(rootfs, upper string, ca []byte, slot nssSlotCopy) error {
 // such as one in a copy of the home, and returns those still counting as
 // residue, each with why. Other files are not read: NSS opens no other name,
 // and the wrapper's own binary contains the slot text.
-func stripNSSSlotCopies(upper, rootfs string, slot nssSlotCopy) ([]string, error) {
+func stripNSSSlotCopies(upper, rootfs string, nssAppended []byte) ([]string, error) {
 	upper = filepath.Clean(upper)
 	var left []string
 	err := walkDir(upper, func(path string, d fs.DirEntry, err error) error {
@@ -388,7 +388,7 @@ func stripNSSSlotCopies(upper, rootfs string, slot nssSlotCopy) ([]string, error
 		if err != nil {
 			return err
 		}
-		why, err := stripNSSSlotCopy(target, slot)
+		why, err := stripNSSSlotCopy(target, nssAppended)
 		if why != "" {
 			left = append(left, rel+" ("+why+")")
 		}

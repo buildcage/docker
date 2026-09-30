@@ -226,7 +226,7 @@ func (in *injection) finish() error {
 		}
 	}
 	// After the write-back, whose own result lands in the layer.
-	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssSlotCopy()))
+	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssAppended()))
 	// After the sweep, which has by now emptied and removed the anchor files,
 	// so a directory the injection created is empty and can go.
 	removeCreatedDirs(in.rootfs, in.created)
@@ -239,14 +239,14 @@ func (in *injection) finish() error {
 	return sweepErr
 }
 
-// nssSlotCopy describes the slot the NSS mirror gained, if there is one.
-func (in *injection) nssSlotCopy() nssSlotCopy {
+// nssAppended is what the NSS mirror's pkcs11.txt gained, if there is one.
+func (in *injection) nssAppended() []byte {
 	for _, b := range in.binds {
 		if b.nssAppended != nil {
-			return nssSlotCopy{appended: b.nssAppended, createdDirs: b.nssCreatedDirs}
+			return b.nssAppended
 		}
 	}
-	return nssSlotCopy{}
+	return nil
 }
 
 // inject makes the step trust the proxy's CA, returning what finishes the

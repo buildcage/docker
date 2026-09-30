@@ -524,23 +524,22 @@ func TestNSSDBSlotComesOutOfACopiedHome(t *testing.T) {
 	}
 }
 
-// A copy of a database the injection created goes whole, directories and all,
-// leaving the directory it was copied into.
-func TestNSSDBSlotCopyOfACreatedDatabaseLeavesNothing(t *testing.T) {
+// A copy of a pkcs11.txt the injection created goes, and its directory stays:
+// nothing says whether the step made it or found it there.
+func TestNSSDBSlotCopyOfACreatedDatabaseLeavesItsDirectory(t *testing.T) {
 	in, _, rootfs, mirror := injectSlot(t, nil)
-	backup := filepath.Join(rootfs, "backup")
-	copied := filepath.Join(backup, nssDBPath, "pkcs11.txt")
+	copied := filepath.Join(rootfs, "backup", nssDBPath, "pkcs11.txt")
 	mustMkdirAll(t, filepath.Dir(copied))
 	mustWriteFile(t, copied, mustRead(t, filepath.Join(mirror, "pkcs11.txt")))
 
 	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(backup, ".pki")); !os.IsNotExist(err) {
-		t.Fatalf("got %v, want the copied .pki gone", err)
+	if _, err := os.Stat(copied); !os.IsNotExist(err) {
+		t.Fatalf("got %v, want the copied pkcs11.txt gone", err)
 	}
-	if _, err := os.Stat(backup); err != nil {
-		t.Fatalf("got %v, want the directory copied into kept", err)
+	if _, err := os.Stat(filepath.Dir(copied)); err != nil {
+		t.Fatalf("got %v, want its directory kept", err)
 	}
 }
 
@@ -561,39 +560,6 @@ func TestNSSDBSlotCopyLosesItsSeparator(t *testing.T) {
 	}
 }
 
-// Only empty directories named as the ones the injection made are removed.
-func TestRemoveCopiedNSSDirsKeepsOtherDirectories(t *testing.T) {
-	names := []string{"nssdb", ".pki"}
-	for name, c := range map[string]struct {
-		lay  func(t *testing.T, root string) string
-		kept string
-	}{
-		"a pkcs11.txt copied on its own": {
-			func(t *testing.T, root string) string { return filepath.Join(root, "tmp") },
-			"tmp",
-		},
-		"a database the step also wrote to": {
-			func(t *testing.T, root string) string {
-				dir := filepath.Join(root, nssDBPath)
-				mustMkdirAll(t, dir)
-				mustWriteFile(t, filepath.Join(dir, "cert9.db"), "THE STEP'S OWN")
-				return dir
-			},
-			nssDBPath,
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
-			dir := c.lay(t, root)
-			mustMkdirAll(t, dir)
-			removeCopiedNSSDirs(dir, names)
-			if _, err := os.Stat(filepath.Join(root, c.kept)); err != nil {
-				t.Fatalf("got %v, want %s kept", err, c.kept)
-			}
-		})
-	}
-}
-
 // stripNSSSlotLayer writes content to backup/name in a layer, runs stripLayer,
 // and returns the file's content afterwards, or "<removed>".
 func stripNSSSlotLayer(t *testing.T, name, content string) (string, error) {
@@ -603,7 +569,7 @@ func stripNSSSlotLayer(t *testing.T, name, content string) (string, error) {
 	path := filepath.Join(rootfs, "backup", name)
 	mustMkdirAll(t, filepath.Dir(path))
 	mustWriteFile(t, path, content)
-	err := stripLayer(rootfs, rootfs, testCA, nssSlotCopy{})
+	err := stripLayer(rootfs, rootfs, testCA, nil)
 	got, readErr := os.ReadFile(path)
 	if os.IsNotExist(readErr) {
 		return "<removed>", err
@@ -672,7 +638,7 @@ func TestStripNSSSlotCopyReportsWhatItCannotDo(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "pkcs11.txt")
 			mustWriteFile(t, path, "library=\n"+string(nssSlot))
 			useBrokenBundleFile(t, broken)
-			if _, err := stripNSSSlotCopy(path, nssSlotCopy{}); !errors.Is(err, errBrokenFile) {
+			if _, err := stripNSSSlotCopy(path, nil); !errors.Is(err, errBrokenFile) {
 				t.Fatalf("got %v, want the failure reported", err)
 			}
 		})
@@ -689,7 +655,7 @@ func TestStripNSSSlotCopyReportsAFileItCannotRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
-	if _, err := stripNSSSlotCopy(path, nssSlotCopy{}); err == nil {
+	if _, err := stripNSSSlotCopy(path, nil); err == nil {
 		t.Fatal("expected the failed removal to be reported")
 	}
 }
@@ -710,7 +676,7 @@ func TestStripLayerReportsAPkcs11TxtTheRootfsDoesNotReach(t *testing.T) {
 			mustMkdirAll(t, filepath.Join(upper, "backup"))
 			mustWriteFile(t, filepath.Join(upper, "backup", "pkcs11.txt"), string(nssSlot))
 			lay(t, rootfs)
-			if err := stripLayer(rootfs, upper, testCA, nssSlotCopy{}); err == nil {
+			if err := stripLayer(rootfs, upper, testCA, nil); err == nil {
 				t.Fatal("expected the copy to be reported")
 			}
 		})

@@ -677,11 +677,10 @@ on a database holding only this CA, bound at `/dev/buildcage-nssdb`. NSS loads e
 `pkcs11.txt` names, so Chromium trusts the CA through that slot while the step's own certificates,
 keys and writes stay in its own database. After the step, the slot's bytes are taken back out of
 `pkcs11.txt` and whatever the step changed is written back. The slot is also cut out of every other
-`pkcs11.txt` in the layer, such as one in a copy of the home. A copy left holding nothing else is
-removed, with the directories the injection made for it. One that still names
-`/dev/buildcage-nssdb` afterwards, or is over 1 MiB and so is not read, counts as CA residue. A
-database the step's user cannot write is covered for the step with one holding only this CA
-instead. `HOME` comes from the step's environment, or from the image's `/etc/passwd` when that is
+`pkcs11.txt` in the layer, such as one in a copy of the home, and one left holding nothing else is
+removed. One that still names `/dev/buildcage-nssdb` afterwards, or is over 1 MiB and so is not
+read, counts as CA residue. A database the step's user cannot write is covered for the step with one
+holding only this CA instead. `HOME` comes from the step's environment, or from the image's `/etc/passwd` when that is
 empty, as runc does, and is read once as the step starts: a `HOME` the step changes, or another user
 it switches to, gets no slot.
 

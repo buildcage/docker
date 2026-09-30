@@ -599,7 +599,7 @@ func TestStripLayerSweepsAndThenChecksItself(t *testing.T) {
 	mustHardLink(t, filepath.Join(upper, "roots.pem"), filepath.Join(rootfs, "roots.pem"))
 	useMountInfo(t, overlayLine(rootfs, upper))
 
-	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nssSlotCopy{}); err != nil {
+	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(filepath.Join(upper, "bundle.pem"))
@@ -618,7 +618,7 @@ func TestStripLayerReportsWhatIsNotAnOverlay(t *testing.T) {
 	mustWriteFile(t, filepath.Join(rootfs, "bundle.pem"), string(testCA))
 	useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
 
-	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nssSlotCopy{}); !errors.Is(err, errLayerUnread) {
+	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil); !errors.Is(err, errLayerUnread) {
 		t.Fatalf("got %v, want the layer reported as unread", err)
 	}
 	got, err := os.ReadFile(filepath.Join(rootfs, "bundle.pem"))
@@ -641,7 +641,7 @@ func TestStripLayerFailsOnACopyItCouldNotRemove(t *testing.T) {
 	mustHardLink(t, filepath.Join(upper, "store.db"), filepath.Join(rootfs, "store.db"))
 	useMountInfo(t, overlayLine(rootfs, upper))
 
-	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nssSlotCopy{}); !errors.Is(err, errUnstrippableCA) {
+	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil); !errors.Is(err, errUnstrippableCA) {
 		t.Fatalf("got %v, want the build to be failed", err)
 	}
 }
@@ -665,7 +665,7 @@ func TestStripLayerFailsOnATraceItCannotRemove(t *testing.T) {
 	}
 	useMountInfo(t, overlayLine(rootfs, upper))
 
-	err := stripLayer(rootfs, upperDirOf(rootfs), caPEM, nssSlotCopy{})
+	err := stripLayer(rootfs, upperDirOf(rootfs), caPEM, nil)
 	if !errors.Is(err, errUnstrippableCA) {
 		t.Fatalf("got %v, want the build to be failed", err)
 	}
@@ -691,7 +691,7 @@ func TestStripLayerReportsADirectoryItCannotReadBack(t *testing.T) {
 			useMountInfo(t, overlayLine(rootfs, upper))
 			failWalkOn(t, upper, nth)
 
-			if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nssSlotCopy{}); !errors.Is(err, errBrokenWalk) {
+			if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil); !errors.Is(err, errBrokenWalk) {
 				t.Fatalf("got %v, want the failed listing to be reported", err)
 			}
 		})
@@ -710,7 +710,7 @@ func TestStripLayerFailsOnWhatTheSweepMissed(t *testing.T) {
 	// the layer keeps its copy and only the reading back notices.
 	useMountInfo(t, overlayLine(rootfs, upper))
 
-	err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nssSlotCopy{})
+	err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil)
 	if err == nil || !strings.Contains(err.Error(), "still in the step's layer") {
 		t.Fatalf("got %v, want the leftover copy to fail the build", err)
 	}
