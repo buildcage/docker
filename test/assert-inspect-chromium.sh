@@ -4,8 +4,8 @@ source "$(dirname "$0")/helpers.sh"
 
 # The build's own steps check Chromium trusted the proxy CA; this checks the
 # committed image carries none of what the wrapper added to the databases, that
-# what the steps wrote to them is there, and that a step writing to a covered
-# database fails the build.
+# what the steps wrote to them is there, and that a step whose database cannot
+# take the slot warns.
 
 IMAGE="${1:-buildcage-test}"
 BUILDER="${BUILDER_NAME:-buildcage}"
@@ -49,40 +49,34 @@ else
 fi
 
 if docker run --rm --user root "$IMAGE" sh -c '[ "$(ls -A /home/reader/.pki/nssdb)" = "$(printf "cert9.db\nkey4.db\npkcs11.txt")" ]'; then
-  pass "the covered database is as the image left it"
+  pass "the database that took no slot is as the image left it"
 else
-  fail "the covered database changed in the built image"
+  fail "the database that took no slot changed in the built image"
 fi
 
 echo ""
-echo "=== A Step Writing To The Database Fails The Build ==="
+echo "=== A Database The Step's User Cannot Write Warns ==="
 echo ""
 
 set +e
 OUT=$(docker buildx build --no-cache \
   --builder "$BUILDER" \
   --platform "$PLATFORM" \
-  --progress=plain -f "$(dirname "$0")/Dockerfile.inspect-nssdb-write" "$(dirname "$0")" 2>&1)
+  --progress=plain -f "$(dirname "$0")/Dockerfile.inspect-nssdb-unwritable" "$(dirname "$0")" 2>&1)
 CODE=$?
 set -e
 echo "$OUT" | tail -20
 
 if [ "$CODE" -eq 0 ]; then
-  fail "the build succeeded, so the write was dropped silently"
+  pass "the build succeeded"
 else
-  pass "the build failed"
+  fail "the build failed"
 fi
 
-if grep -q "changed the NSS database at /home/app/.pki/nssdb" <<<"$OUT"; then
-  pass "the failure names the database the step wrote to"
+if grep -q "buildcage: warning: cannot add the proxy CA to Chromium's NSS database under /home/app .*use proxy_engine: universal" <<<"$OUT"; then
+  pass "the step's output warns that Chromium goes without the CA"
 else
-  fail "the build log does not name /home/app/.pki/nssdb as changed"
-fi
-
-if grep -q "hint: .*fail_on_ca_residue: false" <<<"$OUT"; then
-  pass "the failure points at fail_on_ca_residue"
-else
-  fail "the build log does not point at fail_on_ca_residue"
+  fail "the build log does not warn that /home/app's database took no slot"
 fi
 
 assert_results

@@ -86,16 +86,16 @@ RUN echo "=== [a user of its own, HOME from /etc/passwd, an XDG database] ===" &
     node own-ca-server.js node chromium-check.js https://localhost:9443/ && \
     echo "OK: trusted the proxy CA and the image's own"
 
-# A database the step's user cannot write is covered instead: Chromium opens
-# none it cannot open read-write.
+# A database the step's user cannot write takes no slot, so Chromium does not
+# trust the proxy CA.
 USER root
 RUN useradd -m reader && mkdir -p /home/reader/.pki/nssdb && \
     certutil -N -d sql:/home/reader/.pki/nssdb --empty-password && \
     chmod -R a+rX /home/reader/.pki
 USER reader
 RUN echo "=== [a database the user cannot write] ===" && \
-    node chromium-check.js https://allowed.example.com/public/chromium && \
-    echo "OK: trusted the proxy CA"
+    node chromium-check.js https://allowed.example.com/public/chromium untrusted && \
+    echo "OK: refused without a slot"
 
 # A copy of a home with no database takes no pkcs11.txt with it.
 USER root

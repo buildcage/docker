@@ -169,14 +169,13 @@ func planCATrust(s *spec, ca []byte, store systemStore) caPlan {
 }
 
 // injection is what a completed inject leaves to be undone once the step has
-// exited: the mirrored directories to reconcile, the NSS database to check, the
-// proxy-CA-only file to remove if one was written, the directories the
-// injection created, and what the step's own layer is read back through.
+// exited: the mirrored directories to reconcile, the proxy-CA-only file to
+// remove if one was written, the directories the injection created, and what
+// the step's own layer is read back through.
 type injection struct {
 	rootfs       string
 	ca           []byte
 	binds        []*dirBind
-	nss          *nssBind
 	createdOwnCA string
 	created      createdDirs
 	// The step's layer as found when the injection began, kept rather than
@@ -205,13 +204,6 @@ func (in *injection) finish() error {
 			}
 		}
 		b.cleanup()
-	}
-	if in.nss != nil {
-		// Logged once, by run, as the error that fails the step.
-		if err := tolerateResidue(in.nss.finish()); err != nil && firstErr == nil {
-			firstErr = err
-		}
-		in.nss.cleanup()
 	}
 	if in.createdOwnCA != "" {
 		// Re-resolve and remove only the path that still lands where inject
@@ -305,7 +297,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	}
 
 	// Chromium reads neither the store nor any variable (see nssdb.go).
-	nssMirror, nss, nssCreated := placeNSSDB(s, bundle, ca)
+	nssMirror, nssCreated := placeNSSDB(s, bundle, ca)
 	if nssMirror != nil {
 		binds = append(binds, nssMirror)
 	}
@@ -316,7 +308,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("cannot update the process spec: %v", err)
 	}
 
-	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, nss: nss, createdOwnCA: plan.createdOwnCA, created: created, upper: upper}, nil
+	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, createdOwnCA: plan.createdOwnCA, created: created, upper: upper}, nil
 }
 
 // bindTargets binds each group of CA targets, nested groups folded into the

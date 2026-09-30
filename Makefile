@@ -373,9 +373,9 @@ test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests ag
 
 # Each case hides a copy of the CA the sweep finds but cannot remove, and must
 # fail the build naming the file and pointing at fail_on_ca_residue. With it
-# false, the same copy and a write to a covered NSS database only warn. The control
-# writes an unrelated encrypted keystore and must build. The resealed case
-# must build with the CA taken out and the keystore still sealed under changeit.
+# false, the same copy only warns. The control writes an unrelated encrypted
+# keystore and must build. The resealed case must build with the CA taken out
+# and the keystore still sealed under changeit.
 .PHONY: test_integration_buildkit_inspect_hidden_ca
 test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that hides a copy of the CA the sweep cannot remove
 	@echo "Running inspect-engine hidden CA copy tests..."
@@ -446,15 +446,6 @@ test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that
 	@grep -q "buildcage: warning: .*cannot strip: /app/" $(SCRATCH_PREFIX)-hidden-ca.log \
 	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: no warning names the copy of the CA"; exit 1; }
 	@echo "PASS: the build carried on past the copy of the CA, warning about it"
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.inspect-nssdb-write test/ \
-	  > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1 \
-	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: the write to the NSS database failed the build"; exit 1; }
-	@grep -q "buildcage: warning: .*changed the NSS database at /home/app/.pki/nssdb" $(SCRATCH_PREFIX)-hidden-ca.log \
-	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: no warning names the NSS database"; exit 1; }
-	@echo "PASS: the build carried on past the write to the NSS database, warning about it"
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_inspect_byte_exact

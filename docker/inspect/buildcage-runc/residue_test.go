@@ -131,36 +131,6 @@ func stripLayerWithALeftover(t *testing.T) error {
 	return stripLayer(rootfs, upperDirOf(rootfs), testCA, nil)
 }
 
-func TestNSSDBChangeOnlyWarnsWhenAskedTo(t *testing.T) {
-	useTempLog(t)
-	useFakeRsync(t)
-	useNSSTemplate(t)
-	useWarnOnCAResidue(t)
-	uid, gid := stepUser()
-	bundle, rootfs := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
-	unwritableNSSDB(t, rootfs, "/root")
-
-	in, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scratch := nssMountSource(t, bundle, "/root/.pki/nssdb")
-	mustWriteFile(t, filepath.Join(scratch, "cert9.db"), "WITH A CA OF THE STEP'S OWN")
-
-	readStderr := captureStderr(t)
-	err = in.finish()
-	stderr := readStderr()
-	if err != nil {
-		t.Fatalf("got %v, want only a warning", err)
-	}
-	if !strings.Contains(stderr, "changed the NSS database at /root/.pki/nssdb") {
-		t.Errorf("the warning does not name the database:\n%s", stderr)
-	}
-	if _, err := os.Stat(scratch); !os.IsNotExist(err) {
-		t.Error("the scratch database was left behind")
-	}
-}
-
 // A copy the step leaves in a mirrored store goes back to the rootfs with the
 // rest of the step's change, rather than taking the change down with it.
 func TestMirrorWritesBackAroundACopyItCannotStripWhenAskedTo(t *testing.T) {

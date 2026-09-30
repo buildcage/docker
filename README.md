@@ -425,10 +425,8 @@ reported as blocked; see
   belongs to the home's
   owner, so under someone else's home, such as `www-data`'s `/var/www`, Chromium does not open it
   and does not trust the CA. An existing database the step's user cannot write, such as root's used
-  after `USER`, cannot take the slot, since Chromium would not open it either. It is covered for the
-  step with one holding only the CA instead: a private CA or client certificate kept there is lost,
-  though only on an `allowed_tls_rules` or `allowed_ip_rules` passthrough, and a step that writes to
-  it fails the build. With `fail_on_ca_residue: false` that write only warns and is discarded.
+  after `USER`, takes no slot, since Chromium would not open it either, and the step warns; use
+  `proxy_engine: universal` for Chromium there.
 - Only the NSS database under the `HOME` the step starts with carries the slot. Chromium started
   with another `HOME` (`HOME=/tmp chromium`, `export HOME=...`) or as another user (`su`, `gosu`,
   `sudo -u`) does not trust the CA. Switch users with `USER` instead, which the slot follows as long

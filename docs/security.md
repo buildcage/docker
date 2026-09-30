@@ -226,9 +226,8 @@ Three mechanisms make that enforceable:
   CA store's, a read-only slot on a database holding only the CA, made by `certutil` in the proxy
   container from the CA certificate alone. The wrapper never parses the step's own database: it only
   copies its files, and takes out of `pkcs11.txt` exactly the bytes it appended. A database the
-  step's user cannot write is covered with the CA-only one instead, and a step that changes that
-  fails the build. Injection happens at exec time, never touches LLB, and so
-  cannot affect a cache key. Before the step's layer is committed, the wrapper reads that layer back
+  step's user cannot write is left alone, and Chromium there does not trust the CA. Injection
+  happens at exec time, never touches LLB, and so cannot affect a cache key. Before the step's layer is committed, the wrapper reads that layer back
   and takes the certificate, and the anchor, out of every text file carrying it as PEM, every JKS
   or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`, and
   resealed in the format it came in, so an older JDK that wrote it can still read it), each
@@ -331,7 +330,7 @@ the system update, will not work. The JVM (Java, Kotlin, Scala) reads only its o
 than the CA-trust variables; a JVM already in the base image is handled by injecting into that
 keystore, but one sealed with a password other than the JDK default falls back to `universal`.
 Chromium's NSS database is given a read-only slot trusting the CA; one the step's user cannot
-write is covered instead, and a step that writes to that fails.
+write takes none, so Chromium there needs `universal`.
 See [Limitations](../README.md#limitations) for the rest of the
 compatibility picture.
 

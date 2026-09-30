@@ -1,6 +1,6 @@
-# Writing to a covered NSS database fails the build, or only warns under
-# fail_on_ca_residue: false. A database is covered when the step's user cannot
-# write it, as here: root's, used by another user.
+# An NSS database the step's user cannot write takes no slot: the step runs,
+# and its output warns that Chromium goes without the CA. Here it is root's,
+# used by another user.
 #
 # FROM is deliberately not governed by this engine
 # (see docs/security.md#what-buildkitd-fetches-itself), so this pull
@@ -11,4 +11,4 @@ SHELL ["/bin/sh", "-c"]
 
 RUN adduser -D app && mkdir -p /home/app/.pki/nssdb
 USER app
-RUN touch /home/app/.pki/nssdb/written-by-the-step
+RUN test -z "$(ls -A /home/app/.pki/nssdb)" && ! test -e /dev/buildcage-nssdb
