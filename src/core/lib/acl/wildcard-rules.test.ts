@@ -51,10 +51,28 @@ describe("wildcardToRegex", () => {
     expect(() => wildcardToRegex("a..example.com:443")).toThrow(/empty label/);
   });
 
-  it("keeps an IPv4 CIDR block, which only an IP rule gives meaning", () => {
-    expect(wildcardToRegex("10.0.0.0/8:443")).toBe("10\\.0\\.0\\.0/8:443");
+  it("turns an IPv4 CIDR block into the addresses it covers", () => {
+    expect(wildcardToRegex("10.0.0.0/8:443")).toBe("10\\.[0-9]+\\.[0-9]+\\.[0-9]+:443");
+    expect(wildcardToRegex("10.1.2.3/32:443")).toBe("10\\.1\\.2\\.3:443");
+    expect(wildcardToRegex("0.0.0.0/0:443")).toBe("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+:443");
     expect(() => wildcardToRegex("example.com/8:443")).toThrow(/no hostname can/);
-    expect(wildcardToRegex("0.0.0.0/0:443")).toBe("0\\.0\\.0\\.0/0:443");
+  });
+
+  it("lists the values of an octet a CIDR prefix only partly fixes", () => {
+    expect(wildcardToRegex("192.168.1.9/30:*")).toBe("192\\.168\\.1\\.(?:8|9|10|11):\\d+");
+    // Host bits are masked off, as HAProxy's dst does.
+    expect(wildcardToRegex("172.31.0.0/12:443")).toBe(
+      "172\\.(?:16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31)\\.[0-9]+\\.[0-9]+:443",
+    );
+  });
+
+  it("matches a CIDR block against exactly the addresses inside it", () => {
+    const re = new RegExp(convertRule("10.20.0.0/14:443"));
+    expect(re.test("10.20.0.1:443")).toBe(true);
+    expect(re.test("10.23.255.255:443")).toBe(true);
+    expect(re.test("10.24.0.1:443")).toBe(false);
+    expect(re.test("10.19.255.255:443")).toBe(false);
+    expect(re.test("10.20.0.1:444")).toBe(false);
   });
 
   it("rejects a CIDR block HAProxy would misread or reject", () => {

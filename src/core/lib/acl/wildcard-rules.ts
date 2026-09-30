@@ -142,6 +142,27 @@ export function convertRule(rule: string): string {
 }
 
 /**
+ * A CIDR block as a regex over the dotted addresses it covers, since the
+ * `universal` engine matches an IP rule against the address as text. An octet
+ * the prefix fixes is written out, one it partly fixes lists its values, and
+ * one it leaves free takes any number.
+ */
+function cidrToRegex(cidr: string): string {
+  const [address, prefix] = cidr.split("/");
+  return address
+    .split(".")
+    .map((octet, i) => {
+      const bits = Math.min(Math.max(Number(prefix) - 8 * i, 0), 8);
+      if (bits === 0) return "[0-9]+";
+      const low = Number(octet) & (0xff << (8 - bits)) & 0xff;
+      if (bits === 8) return String(low);
+      const values = Array.from({ length: 2 ** (8 - bits) }, (_, n) => low + n);
+      return `(?:${values.join("|")})`;
+    })
+    .join("\\.");
+}
+
+/**
  * Convert a domain wildcard to a regex string (without anchors or port).
  *
  * A dot-separated part containing `*` must be exactly `*` or `**`.
@@ -155,7 +176,7 @@ function domainToRegex(domain: string): string {
           `leading zero, and the prefix is 0 to 32`,
       );
     }
-    return domain.replace(/\./g, "\\.");
+    return cidrToRegex(domain);
   }
   const regexParts = domain.split(".").map((part) => {
     checkHostLabel(part, domain);

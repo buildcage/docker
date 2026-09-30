@@ -74,7 +74,13 @@ function rejectGluedHash(rule) {
 }
 //#endregion
 //#region src/core/lib/acl/ipv4.ts
-const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[12]?[0-9])", IPV4 = `${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}`, OCTET_RE = RegExp(`^${OCTET}$`), IPV4_OR_CIDR = RegExp(`^${IPV4}(?:/${PREFIX})?$`), IPV4_CIDR = RegExp(`^${IPV4}/${PREFIX}$`), REGEX_META = /[.+^$()[\]{}|\\]/g, DOMAIN = {
+const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[12]?[0-9])", IPV4 = `${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}`, OCTET_RE = RegExp(`^${OCTET}$`), IPV4_OR_CIDR = RegExp(`^${IPV4}(?:/${PREFIX})?$`), IPV4_CIDR = RegExp(`^${IPV4}/${PREFIX}$`);
+function isIpRuleAddress(host) {
+	return /[*?]/.test(host) ? host.split(".").every((octet) => /[*?]/.test(octet) || OCTET_RE.test(octet)) : IPV4_OR_CIDR.test(host);
+}
+//#endregion
+//#region src/core/lib/acl/partial-wildcard.ts
+const REGEX_META = /[.+^$()[\]{}|\\]/g, DOMAIN = {
 	across: ".+",
 	within: "[^.]+",
 	single: "[^.]"
@@ -381,10 +387,19 @@ function parseAndValidateKnownBlockedRules(rulesInput) {
 function convertRule(rule) {
 	return rule.startsWith("~") ? (splitRawRegexHost(rule), anchorRawRegex(rule.slice(1))) : `^${wildcardToRegex(rule)}$`;
 }
+function cidrToRegex(cidr) {
+	let [address, prefix] = cidr.split("/");
+	return address.split(".").map((octet, i) => {
+		let bits = Math.min(Math.max(Number(prefix) - 8 * i, 0), 8);
+		if (bits === 0) return "[0-9]+";
+		let low = Number(octet) & 255 << 8 - bits & 255;
+		return bits === 8 ? String(low) : `(?:${Array.from({ length: 2 ** (8 - bits) }, (_, n) => low + n).join("|")})`;
+	}).join("\\.");
+}
 function domainToRegex(domain) {
 	if (/^[\d.]+\/\d+$/.test(domain)) {
 		if (!IPV4_CIDR.test(domain)) throw Error(`Invalid CIDR block "${domain}": each octet is a decimal from 0 to 255 without a leading zero, and the prefix is 0 to 32`);
-		return domain.replace(/\./g, "\\.");
+		return cidrToRegex(domain);
 	}
 	return domain.split(".").map((part) => {
 		if (checkHostLabel(part, domain), part === "**") return ".+";
@@ -7292,149 +7307,6 @@ function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue,
 	};
 }
 //#endregion
-//#region src/core/lib/acl/haproxy-rules.ts
-const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`, INTERNAL_RANGES = [
-	"0.0.0.0/8",
-	"127.0.0.0/8",
-	"169.254.0.0/16",
-	"100.64.0.0/10",
-	"192.0.0.0/24",
-	"168.63.129.16/32",
-	"::1/128",
-	"fe80::/10"
-];
-function splitHostRule(pattern) {
-	let colonIndex = pattern.lastIndexOf(":");
-	if (colonIndex === -1) throw Error(`Invalid rule "${pattern}": missing port`);
-	let port = pattern.slice(colonIndex + 1);
-	if (!/^(?:\d+|\*)$/.test(port)) throw Error(`Invalid port in rule "${pattern}": "${port}"`);
-	let host = pattern.slice(0, colonIndex);
-	if (host.includes(":")) throw Error(`Invalid host in rule "${pattern}": "${host}" holds a ":", so the one this rule was split at is not its port separator. An IPv6 address is not supported here.`);
-	return {
-		host,
-		port
-	};
-}
-function hostOnlyRegexOfRule(pattern) {
-	return pattern.startsWith("~") ? splitRawRegexHost(pattern).host : domainToRegexPartial(splitHostRule(pattern).host);
-}
-function hostOnlyRegexOfUrlRule(rule) {
-	let authority = rule.authorityRegex.slice(1, -1);
-	return rule.isRegex ? authority : authority.slice(0, authority.lastIndexOf(":"));
-}
-function urlRuleToMatcher(rule) {
-	let hostOnly = hostOnlyRegexOfUrlRule(rule), port = rule.authorityRegex.slice(1, -1).slice(hostOnly.length + 1);
-	return {
-		hostRegex: `^${hostOnly}$`,
-		port: port === "[0-9]+" ? null : port
-	};
-}
-function hostRuleToMatcher(pattern) {
-	if (pattern.startsWith("~")) return splitRawRegexHost(pattern), {
-		hostMatch: "hostPort",
-		hostRegex: anchorRawRegex(pattern.slice(1)),
-		port: null
-	};
-	let { port } = splitHostRule(pattern);
-	return {
-		hostMatch: "wildcard",
-		hostRegex: `^${hostOnlyRegexOfRule(pattern)}$`,
-		port: port === "*" ? null : port
-	};
-}
-function compileSchemeRules(hostRules, urlRules, scheme) {
-	let out = [];
-	for (let pattern of hostRules ?? []) out.push({
-		id: "",
-		...hostRuleToMatcher(pattern),
-		pathRegex: "^/",
-		methods: null,
-		raw: pattern
-	});
-	for (let rule of urlRules ?? []) if (rule.schemes.includes(scheme)) {
-		if (rule.isRegex) {
-			out.push({
-				id: "",
-				hostMatch: "hostBareFull",
-				hostRegex: rule.hostRegex,
-				port: null,
-				pathRegex: rule.pathRegex,
-				methods: rule.methods,
-				raw: rule.raw
-			});
-			continue;
-		}
-		out.push({
-			id: "",
-			hostMatch: "wildcard",
-			...urlRuleToMatcher(rule),
-			pathRegex: rule.pathRegex,
-			methods: rule.methods,
-			raw: rule.raw
-		});
-	}
-	return out.forEach((rule, i) => {
-		rule.id = `${scheme === "https" ? "s" : "p"}${i}`;
-	}), out;
-}
-function compileIpRules(rules, warnings) {
-	let out = [];
-	return (rules ?? []).forEach((rule, index) => {
-		if (rule.startsWith("~")) {
-			splitRawRegexHost(rule), out.push({
-				id: `ip${index}`,
-				address: anchorRawRegex(rule.slice(1)),
-				hostMatch: "hostPort",
-				port: null,
-				raw: rule
-			});
-			return;
-		}
-		let colonIndex = rule.lastIndexOf(":");
-		if (colonIndex === -1) {
-			warnings.push(`IP rule ${JSON.stringify(rule)} has no port. It is ignored.`);
-			return;
-		}
-		let address = rule.slice(0, colonIndex), port = rule.slice(colonIndex + 1);
-		if (!IPV4_OR_CIDR.test(address)) {
-			warnings.push(`IP rule ${JSON.stringify(rule)} is not an address or CIDR block, which is all that can be tunnelled without inspection. It is ignored.`);
-			return;
-		}
-		out.push({
-			id: `ip${index}`,
-			address,
-			hostMatch: "wildcard",
-			port: port === "*" ? null : port,
-			raw: rule
-		});
-	}), out;
-}
-function compileRuleSet(inputs) {
-	let warnings = [];
-	return {
-		https: compileSchemeRules(inputs.httpsRules, inputs.urlRules, "https"),
-		http: compileSchemeRules(inputs.httpRules, inputs.urlRules, "http"),
-		ip: compileIpRules(inputs.ipRules, warnings),
-		tls: (inputs.tlsRules ?? []).map((pattern, index) => ({
-			id: `tls${index}`,
-			...hostRuleToMatcher(pattern),
-			raw: pattern
-		})),
-		resolverHosts: resolverHosts(inputs),
-		warnings
-	};
-}
-function resolverHosts(inputs) {
-	let hosts = [], add = (regex) => {
-		hosts.includes(regex) || hosts.push(regex);
-	};
-	for (let pattern of inputs.httpsRules ?? []) add(hostOnlyRegexOfRule(pattern));
-	for (let pattern of inputs.httpRules ?? []) add(hostOnlyRegexOfRule(pattern));
-	for (let pattern of inputs.tlsRules ?? []) add(hostOnlyRegexOfRule(pattern));
-	for (let rule of inputs.urlRules ?? []) add(hostOnlyRegexOfUrlRule(rule));
-	return hosts;
-}
-//#endregion
 //#region src/lib/engine-rule-support.ts
 function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn) {
 	if (proxyEngine === "inspect") return;
@@ -7455,23 +7327,6 @@ function checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedU
 		return;
 	}
 	throw new SetupError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`, "INVALID_PROXY_ENGINE");
-}
-function unsupportedIpRules(proxyEngine, ipRules) {
-	return ipRules.filter((rule) => {
-		if (rule.startsWith("~")) return !1;
-		let address = rule.slice(0, rule.lastIndexOf(":"));
-		return proxyEngine === "inspect" ? !IPV4_OR_CIDR.test(address) : address.includes("/");
-	});
-}
-function checkIpRuleSupport({ proxyEngine, proxyMode, ipRules }, warn) {
-	let unsupported = unsupportedIpRules(proxyEngine, ipRules);
-	if (unsupported.length === 0) return;
-	let list = unsupported.map((rule) => JSON.stringify(rule)).join(", "), remedy = proxyEngine === "inspect" ? "proxy_engine: inspect matches an IP rule as an address or a CIDR block, not a wildcard. Write a CIDR block instead (192.168.1.0/24:443 for 192.168.1.*:443), or a \"~\" regex." : "proxy_engine: universal matches an IP rule as text, which a CIDR block never equals. Write a wildcard instead (192.168.1.*:443 for 192.168.1.0/24:443), or a \"~\" regex.";
-	if (proxyMode === "audit") {
-		warn(`allowed_ip_rules ${list} can never match. ${remedy} They are ignored for this run.`);
-		return;
-	}
-	throw new SetupError(`allowed_ip_rules ${list} can never match, so the connections they name would be blocked. ` + remedy, "INVALID_PROXY_ENGINE");
 }
 //#endregion
 //#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/summary.js
@@ -7825,6 +7680,159 @@ function ruleBlock(rules, mode, scheme) {
 	return lines.push("    http-request deny unless { var(txn.allowed) -m bool }"), lines.push(""), lines;
 }
 //#endregion
+//#region src/core/lib/acl/haproxy-rules.ts
+const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`, INTERNAL_RANGES = [
+	"0.0.0.0/8",
+	"127.0.0.0/8",
+	"169.254.0.0/16",
+	"100.64.0.0/10",
+	"192.0.0.0/24",
+	"168.63.129.16/32",
+	"::1/128",
+	"fe80::/10"
+];
+function splitHostRule(pattern) {
+	let colonIndex = pattern.lastIndexOf(":");
+	if (colonIndex === -1) throw Error(`Invalid rule "${pattern}": missing port`);
+	let port = pattern.slice(colonIndex + 1);
+	if (!/^(?:\d+|\*)$/.test(port)) throw Error(`Invalid port in rule "${pattern}": "${port}"`);
+	let host = pattern.slice(0, colonIndex);
+	if (host.includes(":")) throw Error(`Invalid host in rule "${pattern}": "${host}" holds a ":", so the one this rule was split at is not its port separator. An IPv6 address is not supported here.`);
+	return {
+		host,
+		port
+	};
+}
+function hostOnlyRegexOfRule(pattern) {
+	return pattern.startsWith("~") ? splitRawRegexHost(pattern).host : domainToRegexPartial(splitHostRule(pattern).host);
+}
+function hostOnlyRegexOfUrlRule(rule) {
+	let authority = rule.authorityRegex.slice(1, -1);
+	return rule.isRegex ? authority : authority.slice(0, authority.lastIndexOf(":"));
+}
+function urlRuleToMatcher(rule) {
+	let hostOnly = hostOnlyRegexOfUrlRule(rule), port = rule.authorityRegex.slice(1, -1).slice(hostOnly.length + 1);
+	return {
+		hostRegex: `^${hostOnly}$`,
+		port: port === "[0-9]+" ? null : port
+	};
+}
+function hostRuleToMatcher(pattern) {
+	if (pattern.startsWith("~")) return splitRawRegexHost(pattern), {
+		hostMatch: "hostPort",
+		hostRegex: anchorRawRegex(pattern.slice(1)),
+		port: null
+	};
+	let { port } = splitHostRule(pattern);
+	return {
+		hostMatch: "wildcard",
+		hostRegex: `^${hostOnlyRegexOfRule(pattern)}$`,
+		port: port === "*" ? null : port
+	};
+}
+function compileSchemeRules(hostRules, urlRules, scheme) {
+	let out = [];
+	for (let pattern of hostRules ?? []) out.push({
+		id: "",
+		...hostRuleToMatcher(pattern),
+		pathRegex: "^/",
+		methods: null,
+		raw: pattern
+	});
+	for (let rule of urlRules ?? []) if (rule.schemes.includes(scheme)) {
+		if (rule.isRegex) {
+			out.push({
+				id: "",
+				hostMatch: "hostBareFull",
+				hostRegex: rule.hostRegex,
+				port: null,
+				pathRegex: rule.pathRegex,
+				methods: rule.methods,
+				raw: rule.raw
+			});
+			continue;
+		}
+		out.push({
+			id: "",
+			hostMatch: "wildcard",
+			...urlRuleToMatcher(rule),
+			pathRegex: rule.pathRegex,
+			methods: rule.methods,
+			raw: rule.raw
+		});
+	}
+	return out.forEach((rule, i) => {
+		rule.id = `${scheme === "https" ? "s" : "p"}${i}`;
+	}), out;
+}
+function compileIpRules(rules, warnings) {
+	let out = [];
+	return (rules ?? []).forEach((rule, index) => {
+		if (rule.startsWith("~")) {
+			splitRawRegexHost(rule), out.push({
+				id: `ip${index}`,
+				address: anchorRawRegex(rule.slice(1)),
+				hostMatch: "hostPort",
+				port: null,
+				raw: rule
+			});
+			return;
+		}
+		let colonIndex = rule.lastIndexOf(":");
+		if (colonIndex === -1) {
+			warnings.push(`IP rule ${JSON.stringify(rule)} has no port. It is ignored.`);
+			return;
+		}
+		let address = rule.slice(0, colonIndex), port = rule.slice(colonIndex + 1);
+		if (!isIpRuleAddress(address)) {
+			warnings.push(`IP rule ${JSON.stringify(rule)} is not an address, CIDR block or address wildcard, which is all that can be tunnelled without inspection. It is ignored.`);
+			return;
+		}
+		if (!IPV4_OR_CIDR.test(address)) {
+			out.push({
+				id: `ip${index}`,
+				address: convertRule(rule),
+				hostMatch: "hostPort",
+				port: null,
+				raw: rule
+			});
+			return;
+		}
+		out.push({
+			id: `ip${index}`,
+			address,
+			hostMatch: "wildcard",
+			port: port === "*" ? null : port,
+			raw: rule
+		});
+	}), out;
+}
+function compileRuleSet(inputs) {
+	let warnings = [];
+	return {
+		https: compileSchemeRules(inputs.httpsRules, inputs.urlRules, "https"),
+		http: compileSchemeRules(inputs.httpRules, inputs.urlRules, "http"),
+		ip: compileIpRules(inputs.ipRules, warnings),
+		tls: (inputs.tlsRules ?? []).map((pattern, index) => ({
+			id: `tls${index}`,
+			...hostRuleToMatcher(pattern),
+			raw: pattern
+		})),
+		resolverHosts: resolverHosts(inputs),
+		warnings
+	};
+}
+function resolverHosts(inputs) {
+	let hosts = [], add = (regex) => {
+		hosts.includes(regex) || hosts.push(regex);
+	};
+	for (let pattern of inputs.httpsRules ?? []) add(hostOnlyRegexOfRule(pattern));
+	for (let pattern of inputs.httpRules ?? []) add(hostOnlyRegexOfRule(pattern));
+	for (let pattern of inputs.tlsRules ?? []) add(hostOnlyRegexOfRule(pattern));
+	for (let rule of inputs.urlRules ?? []) add(hostOnlyRegexOfUrlRule(rule));
+	return hosts;
+}
+//#endregion
 //#region src/core/lib/acl/haproxy-inspect-stage.ts
 function sniField(scheme) {
 	return scheme === "https" ? " sni=%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]" : "";
@@ -7998,9 +8006,6 @@ function checkRulesCompileOrThrow(inputs) {
 	}
 }
 const IP_RULE_HOST = /^[0-9.*?/]+$/;
-function isIpRuleAddress(host) {
-	return /[*?]/.test(host) ? host.split(".").every((octet) => /[*?]/.test(octet) || OCTET_RE.test(octet)) : IPV4_OR_CIDR.test(host);
-}
 function parseIpRulesOrThrow(rulesInput) {
 	let rules = parseRulesOrThrow(rulesInput);
 	for (let rule of rules) {
@@ -8095,7 +8100,6 @@ const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("
 	verifyImageDigestOrThrow,
 	checkUrlAndTlsRuleSupport,
 	checkKnownBlockedUrlRuleSupport,
-	checkIpRuleSupport,
 	logRules,
 	withLogGroup,
 	builderStartError,
@@ -8123,7 +8127,7 @@ async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }, { ve
 	};
 }
 async function runSetupStep(env, overrides = {}) {
-	let { readEngineInputs, readRuleInputs, readBuilderName, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, checkIpRuleSupport, logRules, withLogGroup, builderStartError, runDocker, log, warn } = {
+	let { readEngineInputs, readRuleInputs, readBuilderName, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, log, warn } = {
 		...realDeps,
 		...overrides
 	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", { proxyEngine } = readEngineInputs();
@@ -8147,10 +8151,6 @@ async function runSetupStep(env, overrides = {}) {
 		proxyEngine,
 		proxyMode,
 		knownBlockedUrlRules: knownBlockedRules.filter(isKnownBlockedUrlRule)
-	}, warn), checkIpRuleSupport({
-		proxyEngine,
-		proxyMode,
-		ipRules
 	}, warn), withLogGroup("buildcage: Configured ACL Rules", () => {
 		logRules("HTTPS", httpsRules), logRules("HTTP", httpRules), logRules("IP", ipRules), logRules("URL", urlRules), logRules("TLS", tlsRules), logRules("Known blocked", knownBlockedRules);
 	});

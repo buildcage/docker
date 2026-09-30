@@ -1,5 +1,3 @@
-import { IPV4_OR_CIDR } from "#core/lib/acl/haproxy-rules.ts";
-
 import type { ProxyEngine } from "./engine.ts";
 import { SetupError } from "./errors.ts";
 
@@ -100,62 +98,6 @@ export function checkKnownBlockedUrlRuleSupport(
   throw new SetupError(
     `${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: ` +
       `inspect.`,
-    "INVALID_PROXY_ENGINE",
-  );
-}
-
-/**
- * The `allowed_ip_rules` an engine cannot enforce as written. `inspect` hands
- * an address to HAProxy's `dst` match, which takes an address or a CIDR block
- * but no wildcard; `universal` matches the address as text, which a CIDR block
- * never equals. A `~` rule is a regex on either engine and always works.
- */
-function unsupportedIpRules(proxyEngine: ProxyEngine, ipRules: string[]): string[] {
-  return ipRules.filter((rule) => {
-    if (rule.startsWith("~")) return false;
-    const address = rule.slice(0, rule.lastIndexOf(":"));
-    return proxyEngine === "inspect" ? !IPV4_OR_CIDR.test(address) : address.includes("/");
-  });
-}
-
-/**
- * Otherwise the rule is silently dropped (`inspect`) or never matches
- * (`universal`), and which form fails differs by engine.
- * Checked once at setup and split like checkUrlAndTlsRuleSupport: an error in
- * `restrict`, a warning in `audit`.
- */
-export function checkIpRuleSupport(
-  {
-    proxyEngine,
-    proxyMode,
-    ipRules,
-  }: {
-    proxyEngine: ProxyEngine;
-    proxyMode: string;
-    ipRules: string[];
-  },
-  warn: (message: string) => void,
-): void {
-  const unsupported = unsupportedIpRules(proxyEngine, ipRules);
-  if (unsupported.length === 0) return;
-
-  const list = unsupported.map((rule) => JSON.stringify(rule)).join(", ");
-  const remedy =
-    proxyEngine === "inspect"
-      ? `proxy_engine: inspect matches an IP rule as an address or a CIDR block, not a ` +
-        `wildcard. Write a CIDR block instead (192.168.1.0/24:443 for 192.168.1.*:443), or a ` +
-        `"~" regex.`
-      : `proxy_engine: universal matches an IP rule as text, which a CIDR block never equals. ` +
-        `Write a wildcard instead (192.168.1.*:443 for 192.168.1.0/24:443), or a "~" regex.`;
-
-  if (proxyMode === "audit") {
-    warn(`allowed_ip_rules ${list} can never match. ${remedy} They are ignored for this run.`);
-    return;
-  }
-
-  throw new SetupError(
-    `allowed_ip_rules ${list} can never match, so the connections they name would be blocked. ` +
-      remedy,
     "INVALID_PROXY_ENGINE",
   );
 }

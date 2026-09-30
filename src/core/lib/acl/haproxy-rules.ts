@@ -4,9 +4,10 @@
  * into config text, and this module knows nothing about that text.
  */
 
-import { IPV4_OR_CIDR, OCTET } from "./ipv4.ts";
+import { IPV4_OR_CIDR, OCTET, isIpRuleAddress } from "./ipv4.ts";
 import { anchorRawRegex, domainToRegexPartial, splitRawRegexHost } from "./partial-wildcard.ts";
 import type { UrlRule } from "./url-rules.ts";
+import { convertRule } from "./wildcard-rules.ts";
 
 export { IPV4_OR_CIDR };
 
@@ -278,11 +279,23 @@ function compileIpRules(rules: string[] | undefined, warnings: string[]): Compil
     }
     const address = rule.slice(0, colonIndex);
     const port = rule.slice(colonIndex + 1);
-    if (!IPV4_OR_CIDR.test(address)) {
+    if (!isIpRuleAddress(address)) {
       warnings.push(
-        `IP rule ${JSON.stringify(rule)} is not an address or CIDR block, which is all that can be ` +
-          `tunnelled without inspection. It is ignored.`,
+        `IP rule ${JSON.stringify(rule)} is not an address, CIDR block or address wildcard, ` +
+          `which is all that can be tunnelled without inspection. It is ignored.`,
       );
+      return;
+    }
+    if (!IPV4_OR_CIDR.test(address)) {
+      // `dst` takes no wildcard, so the address is matched as text the way
+      // the `universal` engine matches every IP rule.
+      out.push({
+        id: `ip${index}`,
+        address: convertRule(rule),
+        hostMatch: "hostPort",
+        port: null,
+        raw: rule,
+      });
       return;
     }
     out.push({

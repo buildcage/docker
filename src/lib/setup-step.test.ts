@@ -14,7 +14,6 @@ const mocks = {
   verifyImageDigestOrThrow: vi.fn(),
   checkUrlAndTlsRuleSupport: vi.fn(),
   checkKnownBlockedUrlRuleSupport: vi.fn(),
-  checkIpRuleSupport: vi.fn(),
   logRules: vi.fn(),
   withLogGroup: vi.fn(),
   builderStartError: vi.fn(),
@@ -150,29 +149,6 @@ describe("runSetupStep", () => {
     });
     expect(mocks.checkKnownBlockedUrlRuleSupport.mock.calls[0]![1]).toBe(mocks.warn);
     expect(orderOf(mocks.checkKnownBlockedUrlRuleSupport)).toBeLessThan(orderOf(mocks.runDocker));
-  });
-
-  it("checks allowed_ip_rules against the engine before the builder starts", async () => {
-    mocks.readRuleInputs.mockReturnValue({
-      proxyMode: "restrict",
-      failOnCaResidue: true,
-      httpsRules: [],
-      httpRules: [],
-      ipRules: ["10.0.0.0/8:443"],
-      urlRules: [],
-      tlsRules: [],
-      knownBlockedRules: [],
-    });
-
-    await runSetupStep(ENV, deps);
-
-    expect(mocks.checkIpRuleSupport.mock.calls[0]![0]).toStrictEqual({
-      proxyEngine: "universal",
-      proxyMode: "restrict",
-      ipRules: ["10.0.0.0/8:443"],
-    });
-    expect(mocks.checkIpRuleSupport.mock.calls[0]![1]).toBe(mocks.warn);
-    expect(orderOf(mocks.checkIpRuleSupport)).toBeLessThan(orderOf(mocks.runDocker));
   });
 
   it("pulls the image by verified digest, under the action's own repository", async () => {

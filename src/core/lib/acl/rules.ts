@@ -2,7 +2,7 @@ import { ActionError, errorMessage } from "../errors.ts";
 import { generateCorednsConfig } from "./coredns-config.ts";
 import { generateHaproxyConfig } from "./haproxy-config.ts";
 import { compileRuleSet, type RuleInputs } from "./haproxy-rules.ts";
-import { IPV4_OR_CIDR, OCTET_RE } from "./ipv4.ts";
+import { isIpRuleAddress } from "./ipv4.ts";
 import { buildUrlRules, type UrlRule } from "./url-rules.ts";
 import { parseAndValidateKnownBlockedRules, parseAndValidateRules } from "./wildcard-rules.ts";
 
@@ -69,12 +69,6 @@ export function checkRulesCompileOrThrow(inputs: RuleInputs): void {
  * and the IP path matches only the address a connection goes to.
  */
 const IP_RULE_HOST = /^[0-9.*?/]+$/;
-
-/** A wildcard octet stands for any value, so only the literal ones are checked. */
-function isIpRuleAddress(host: string): boolean {
-  if (!/[*?]/.test(host)) return IPV4_OR_CIDR.test(host);
-  return host.split(".").every((octet) => /[*?]/.test(octet) || OCTET_RE.test(octet));
-}
 
 /**
  * parseRulesOrThrow for `allowed_ip_rules`, which also refuses a rule that

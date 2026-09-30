@@ -108,8 +108,17 @@ describe("ip rule compilation", () => {
     expect(set.warnings[0].includes("no port")).toBe(true);
   });
 
-  it("warns and drops a pattern, since only an address can be tunnelled", () => {
-    const set = compileRuleSet({ ipRules: ["10.0.0.*:5432"] });
+  it("matches an address wildcard as text, since dst takes none", () => {
+    const set = compileRuleSet({ ipRules: ["10.0.0.*:5432", "10.0.?.1:*"] });
+    expect(set.warnings.length).toBe(0);
+    expect(set.ip[0].hostMatch).toBe("hostPort");
+    expect(set.ip[0].address).toBe("^10\\.0\\.0\\.[^.]+:5432$");
+    expect(set.ip[0].port).toBe(null);
+    expect(set.ip[1].address).toBe("^10\\.0\\.[^.]\\.1:\\d+$");
+  });
+
+  it("warns and drops a host name, which no connection's address is", () => {
+    const set = compileRuleSet({ ipRules: ["db.example.com:5432"] });
     expect(set.ip.length).toBe(0);
     expect(set.warnings.length).toBe(1);
   });
