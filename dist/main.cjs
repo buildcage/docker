@@ -76,7 +76,9 @@ function rejectGluedHash(rule) {
 //#region src/core/lib/acl/ipv4.ts
 const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[12]?[0-9])", IPV4 = `${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}`, OCTET_RE = RegExp(`^${OCTET}$`), IPV4_OR_CIDR = RegExp(`^${IPV4}(?:/${PREFIX})?$`), IPV4_CIDR = RegExp(`^${IPV4}/${PREFIX}$`);
 function isIpRuleAddress(host) {
-	return /[*?]/.test(host) ? host.split(".").every((octet) => /[*?]/.test(octet) || OCTET_RE.test(octet)) : IPV4_OR_CIDR.test(host);
+	if (!/[*?]/.test(host)) return IPV4_OR_CIDR.test(host);
+	let octets = host.split(".");
+	return octets.length > 4 || octets.length < 4 && !host.includes("**") ? !1 : octets.every((octet) => /[*?]/.test(octet) || OCTET_RE.test(octet));
 }
 //#endregion
 //#region src/core/lib/acl/partial-wildcard.ts
@@ -8012,7 +8014,7 @@ function parseIpRulesOrThrow(rulesInput) {
 		if (rule.startsWith("~")) continue;
 		let host = rule.slice(0, rule.lastIndexOf(":"));
 		if (!IP_RULE_HOST.test(host)) throw new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against the address a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
-		if (!isIpRuleAddress(host)) throw new InvalidRulesError(`IP rule "${rule}" is not an IPv4 address: write each octet as a decimal from 0 to 255 without a leading zero (10.0.0.1, not 010.0.0.1), and a CIDR prefix from 0 to 32.`, "INVALID_RULES");
+		if (!isIpRuleAddress(host)) throw new InvalidRulesError(`IP rule "${rule}" is not an IPv4 address: write four octets, each a decimal from 0 to 255 without a leading zero (10.0.0.1, not 010.0.0.1) or a wildcard (10.0.*.*, or 10.** across dots), and a CIDR prefix from 0 to 32.`, "INVALID_RULES");
 	}
 	return rules;
 }

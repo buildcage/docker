@@ -123,6 +123,12 @@ describe("ip rule compilation", () => {
     expect(set.warnings.length).toBe(1);
   });
 
+  it("warns and drops a wildcard with too few octets, which no address matches", () => {
+    const set = compileRuleSet({ ipRules: ["10.0.*:5432"] });
+    expect(set.ip.length).toBe(0);
+    expect(set.warnings.length).toBe(1);
+  });
+
   it("accepts a CIDR block", () => {
     expect(compileRuleSet({ ipRules: ["10.0.0.0/24:5432"] }).ip[0].address).toBe("10.0.0.0/24");
   });

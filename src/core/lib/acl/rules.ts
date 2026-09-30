@@ -89,8 +89,9 @@ export function parseIpRulesOrThrow(rulesInput: string | undefined): string[] {
     }
     if (!isIpRuleAddress(host)) {
       throw new InvalidRulesError(
-        `IP rule "${rule}" is not an IPv4 address: write each octet as a decimal from 0 to 255 ` +
-          `without a leading zero (10.0.0.1, not 010.0.0.1), and a CIDR prefix from 0 to 32.`,
+        `IP rule "${rule}" is not an IPv4 address: write four octets, each a decimal from 0 to ` +
+          `255 without a leading zero (10.0.0.1, not 010.0.0.1) or a wildcard (10.0.*.*, or ` +
+          `10.** across dots), and a CIDR prefix from 0 to 32.`,
         "INVALID_RULES",
       );
     }
