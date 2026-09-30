@@ -118,7 +118,7 @@ describe("ip rule compilation", () => {
   });
 
   it("warns and drops a host name, which no connection's address is", () => {
-    const set = compileRuleSet({ ipRules: ["db.example.com:5432"] });
+    const set = compileRuleSet({ ipRules: ["db-primary:5432"] });
     expect(set.ip.length).toBe(0);
     expect(set.warnings.length).toBe(1);
   });
