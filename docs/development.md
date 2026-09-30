@@ -396,8 +396,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
    A JDK already in the image at `JAVA_HOME` or on `PATH` is handled (`buildcage-runc` injects into
    its keystore, JKS or PKCS#12); any other JDK is not, and a keystore sealed with a password other
    than the JDK default still needs `universal`. Chromium is handled by adding a slot to its NSS
-   database; one that cannot take it, such as one the step's user cannot write, is skipped with a
-   warning in the step's output, and Chromium there needs `universal`. See
+   database; one the step's user cannot write takes none, and Chromium there needs `universal`. See
    [Limitations](../README.md#limitations).
 
 4. **The setup step fails with "never became ready"**: the builder came up but `buildctl debug

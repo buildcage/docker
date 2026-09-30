@@ -1,6 +1,5 @@
-# An NSS database the step's user cannot write takes no slot: the step runs,
-# and its output warns that Chromium goes without the CA. Here it is root's,
-# used by another user.
+# An NSS database the step's user cannot write takes no slot, and the step
+# warns instead of failing.
 #
 # FROM is deliberately not governed by this engine
 # (see docs/security.md#what-buildkitd-fetches-itself), so this pull

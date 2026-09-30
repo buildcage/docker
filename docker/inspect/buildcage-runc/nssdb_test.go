@@ -147,8 +147,6 @@ func TestNSSDBSkipsADatabaseTheStepUserCannotWrite(t *testing.T) {
 	}
 }
 
-// assertNSSDBSkipped fails the test unless nothing was bound for Chromium and
-// the step's output says why and what to use instead.
 func assertNSSDBSkipped(t *testing.T, in *injection, bundle, dest, stderr string) {
 	t.Helper()
 	assertNoSlot(t, in)
