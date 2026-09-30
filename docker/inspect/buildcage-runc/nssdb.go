@@ -106,8 +106,11 @@ func placeNSSDB(s *spec, bundle string, ca []byte) (*dirBind, createdDirs) {
 			return b, created
 		}
 	}
-	msg := fmt.Sprintf("cannot add the proxy CA to Chromium's NSS database under %s (%v), "+
-		"so Chromium in this step will not trust the proxy; use proxy_engine: universal for it", home, err)
+	// The paths in err are the builder's; the step's output names them as the
+	// step sees them.
+	reason := strings.ReplaceAll(err.Error(), s.rootfs+"/", "/")
+	msg := fmt.Sprintf("cannot add the proxy CA to Chromium's NSS database under %s (%s), "+
+		"so Chromium in this step will not trust the proxy; use proxy_engine: universal for it", home, reason)
 	logf("%s", msg)
 	// Also to stderr, which is the step's output in the build log.
 	fmt.Fprintf(os.Stderr, "buildcage: warning: %s\n", msg)

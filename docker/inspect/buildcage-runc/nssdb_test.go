@@ -136,6 +136,9 @@ func TestNSSDBSkipsADatabaseTheStepUserCannotWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNSSDBSkipped(t, in, bundle, "/home/app/.pki/nssdb", stderr)
+	if !strings.Contains(stderr, "(/home/app/.pki/nssdb is not writable by uid") || strings.Contains(stderr, rootfs) {
+		t.Fatalf("the warning does not name the database as the step sees it:\n%s", stderr)
+	}
 	if err := in.finish(); err != nil {
 		t.Fatal(err)
 	}
