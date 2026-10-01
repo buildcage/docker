@@ -21,7 +21,7 @@ ARG CNI_SHA256_ARM64
 ARG COREDNS_VERSION
 ARG COREDNS_SHA256_AMD64
 ARG COREDNS_SHA256_ARM64
-RUN apk add --no-cache curl gettext util-linux-misc && \
+RUN apk add --no-cache curl util-linux-misc && \
     mkdir -p /opt/cni/bin && \
     ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') && \
     EXPECTED_SHA256=$([ "$ARCH" = "amd64" ] && echo "$CNI_SHA256_AMD64" || echo "$CNI_SHA256_ARM64") && \
@@ -36,7 +36,7 @@ RUN apk add --no-cache curl gettext util-linux-misc && \
     tar -C /usr/local/bin -xz -f /tmp/coredns.tgz coredns
 
 # Bundle the Docker-image scripts (rolldown; see rolldown.scripts.config.js):
-# convert-rule.qjs.ts and report-action.node.ts. Architecture-independent
+# gen-configs.qjs.ts and report-action.node.ts. Architecture-independent
 # output, so pinned to --platform=$BUILDPLATFORM (no QEMU).
 FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS scripts-build
 WORKDIR /build
@@ -88,9 +88,6 @@ ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=90000
 # the default 3000 costs every teardown 3s. The services stop in under 1s.
 ENV S6_KILL_GRACETIME=500
 
-COPY --from=deps /usr/bin/envsubst /usr/bin/envsubst
-COPY --from=deps /usr/lib/libintl.so* /usr/lib/
-
 COPY --from=deps /opt/cni/bin /opt/cni/bin
 COPY --from=deps /usr/local/bin/coredns /usr/local/bin/coredns
 # For s6-rc.d/haproxy/run. The binary alone needs only musl; the package
@@ -109,12 +106,9 @@ COPY docker/universal/files/buildkitd.toml /etc/buildkit/buildkitd.toml
 COPY docker/universal/files/cni.conflist   /etc/buildkit/cni.conflist
 
 RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
-COPY docker/universal/files/haproxy.cfg.template /etc/haproxy/haproxy.cfg.template
 
-COPY --from=scripts-build /build/dist/qjs/src/core/scripts/convert-rule.js /opt/buildcage/scripts/convert-rule.js
-
-# Writes the Corefile at startup (see init-haproxy-cfg).
-COPY --from=scripts-build /build/dist/qjs/docker/universal/scripts/gen-coredns.js /opt/buildcage/scripts/gen-coredns.js
+# Writes haproxy.cfg and the Corefile at startup (see init-haproxy-cfg).
+COPY --from=scripts-build /build/dist/qjs/docker/universal/scripts/gen-configs.js /opt/buildcage/scripts/gen-configs.js
 
 # Never run inside the image: the report action `docker cp`s it out and runs
 # it on the runner (see report-action.node.ts).

@@ -2,7 +2,6 @@ import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import {
   wildcardToRegex,
   convertRule,
-  buildRules,
   splitRuleTokens,
   parseAndValidateRules,
   completeRulePort,
@@ -185,26 +184,6 @@ describe("convertRule: regex behavior", () => {
     expect(re.test("example.com:443")).toBeTruthy();
     expect(re.test("example.com:8080")).toBeTruthy();
     expect(!re.test("example.com:abc")).toBeTruthy();
-  });
-});
-
-describe("buildRules", () => {
-  it("converts multiple rules", () => {
-    expect(buildRules("example.com:443 *.foo.com:8443")).toStrictEqual([
-      "^example\\.com:443$",
-      "^[^.]+\\.foo\\.com:8443$",
-    ]);
-  });
-
-  it("empty input → empty array", () => {
-    expect(buildRules("")).toStrictEqual([]);
-  });
-
-  it("regex rules (~ prefix)", () => {
-    expect(buildRules("~^custom\\.regex:(443|8080)$ example.com:443")).toStrictEqual([
-      "^custom\\.regex:(443|8080)$",
-      "^example\\.com:443$",
-    ]);
   });
 });
 

@@ -7,7 +7,7 @@ import { buildUniversalReportData } from "./universal.ts";
 const HAPROXY_START = "buildcage haproxy starting 1787471970000";
 const DNS_START = "2026-08-23 16:44:58.000000000  buildcage coredns starting";
 
-/** A proxy decision line in the log-format the template emits. */
+/** A proxy decision line in the universal engine's log-format. */
 const proxy = (
   decision: string,
   ruleType: string,

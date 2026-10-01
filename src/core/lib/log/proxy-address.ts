@@ -4,8 +4,8 @@
  * named rather than addressed, so its destination says nothing about which
  * name.
  *
- * init-inspect-cfg echoes it as GATEWAY= and cannot import it, so the test
- * beside this keeps the two in sync. Each action tests its own network's
+ * Each engine's init script sets it as GATEWAY= and cannot import it, so the
+ * test beside this keeps them in sync. Each action tests its own network's
  * gateway outside core.
  *
  * It sits at the far end of 198.18.0.0/15, the RFC 2544 benchmarking block:

@@ -25,7 +25,7 @@ import { PROXY_SUBNET } from "../log/proxy-address.ts";
 import { detectFrontend } from "./haproxy-detect-frontend.ts";
 import { inspectStage } from "./haproxy-inspect-stage.ts";
 import { compileRuleSet, INTERNAL_RANGES, type RuleInputs } from "./haproxy-rules.ts";
-import { PREAMBLE, resolversSection, originBackends } from "./haproxy-sections.ts";
+import { preamble, resolversSection, originBackends } from "./haproxy-sections.ts";
 
 export interface HaproxyConfigOptions extends RuleInputs {
   /** `audit` records without enforcing, so nothing may be refused. */
@@ -122,7 +122,14 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
   };
 
   const config = [
-    ...PREAMBLE,
+    ...preamble({
+      global: [
+        "    # normalize-uri is still marked experimental upstream.",
+        "    expose-experimental-directives",
+        "    tune.ssl.default-dh-param 2048",
+      ],
+      defaults: ["    timeout client 30s", "    timeout server 30s"],
+    }),
     ...(hasResolver ? resolversSection(resolvers, useResolvConf) : []),
     ...detectFrontend({
       listenPort: opts.listenPort,

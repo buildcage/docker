@@ -2,6 +2,7 @@ import { ActionError, errorMessage } from "../errors.ts";
 import { generateCorednsConfig } from "./coredns-config.ts";
 import { generateHaproxyConfig } from "./haproxy-config.ts";
 import { compileRuleSet, type RuleInputs } from "./haproxy-rules.ts";
+import { generateUniversalHaproxyConfig } from "./haproxy-universal-config.ts";
 import { isIpRuleAddress } from "./ipv4.ts";
 import { buildUrlRules, type UrlRule } from "./url-rules.ts";
 import { parseAndValidateKnownBlockedRules, parseAndValidateRules } from "./wildcard-rules.ts";
@@ -57,6 +58,11 @@ const PLACEHOLDER_PROXY_ADDRESS = "192.0.2.1";
 export function checkRulesCompileOrThrow(inputs: RuleInputs): void {
   try {
     generateHaproxyConfig(inputs);
+    generateUniversalHaproxyConfig({
+      ...inputs,
+      proxyAddress: PLACEHOLDER_PROXY_ADDRESS,
+      hostAddressFile: "/dev/null",
+    });
     generateCorednsConfig(compileRuleSet(inputs), { proxyAddress: PLACEHOLDER_PROXY_ADDRESS });
   } catch (e) {
     throw new InvalidRulesError(errorMessage(e), "INVALID_RULES");
