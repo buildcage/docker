@@ -61,12 +61,11 @@ func securityDirs(root string) []string {
 	}
 }
 
-// javaOnPath returns the JDK root of each java on the step's PATH, followed
-// through its symlinks (/usr/bin/java to /etc/alternatives to the JDK), as
-// container paths. A JDK 8's jre/bin/java gives its jre/, whose lib/security
-// is the one it reads.
-func javaOnPath(s *spec) []string {
-	var roots []string
+// javaOnPath returns the JDK root of the first java on the step's PATH, the one
+// a bare `java` runs, followed through its symlinks (/usr/bin/java to
+// /etc/alternatives to the JDK), as a container path. A JDK 8's jre/bin/java
+// gives its jre/, whose lib/security is the one it reads.
+func javaOnPath(s *spec) (string, bool) {
 	for _, dir := range filepath.SplitList(s.env["PATH"]) {
 		if !filepath.IsAbs(dir) {
 			continue
@@ -75,25 +74,26 @@ func javaOnPath(s *spec) []string {
 		if err != nil {
 			continue
 		}
-		if info, err := os.Stat(resolved); err == nil && info.Mode().IsRegular() {
-			roots = append(roots, filepath.Dir(filepath.Dir(containerPathOf(s.rootfs, resolved))))
+		// The shell passes over a java it cannot execute, so this does too.
+		if info, err := os.Stat(resolved); err == nil && info.Mode().IsRegular() && info.Mode()&0o111 != 0 {
+			return filepath.Dir(filepath.Dir(containerPathOf(s.rootfs, resolved))), true
 		}
 	}
-	return roots
+	return "", false
 }
 
 // findJVMKeystores returns the resolved host paths of every JVM keystore inside
-// the rootfs: JAVA_HOME's first, then each java on PATH's. Each is deduplicated
-// by where it resolves, so a distribution's JDKs, which link to one shared
-// keystore, have it injected once. Other JDKs in the image are left alone: a
-// keystore's directory is a mount point for the step, so no later step could
-// remove them.
+// the rootfs: JAVA_HOME's first, then that of the first java on PATH. Each is
+// deduplicated by where it resolves, so a distribution's JDKs, which link to
+// one shared keystore, have it injected once. Other JDKs in the image are left
+// alone: a keystore's directory is a mount point for the step, so no later
+// step could remove them.
 func findJVMKeystores(s *spec) []string {
 	var dirs []string
 	if home := s.env["JAVA_HOME"]; home != "" {
 		dirs = append(dirs, securityDirs(home)...)
 	}
-	for _, root := range javaOnPath(s) {
+	if root, ok := javaOnPath(s); ok {
 		dirs = append(dirs, securityDirs(root)...)
 	}
 

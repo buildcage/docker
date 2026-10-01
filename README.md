@@ -327,7 +327,7 @@ read (see [Limitations](#limitations)). The CA is also left in the
 distribution's own anchor directory, so a step that installs `ca-certificates` partway through keeps
 trusting it once `update-ca-certificates` has rebuilt the bundle from scratch. A JVM already in the
 base image reads none of those variables and only its own keystore, so the CA is added there too, to
-`$JAVA_HOME/lib/security/cacerts` and that of each `java` on `PATH`, in whichever shape it ships
+`$JAVA_HOME/lib/security/cacerts` and that of the first `java` on `PATH`, in whichever shape it ships
 (JKS or PKCS#12), for the step and taken back out before the layer is committed, letting `mvn`,
 `gradle` and `java` reach the proxy without `proxy_engine: universal`. Chromium, including the
 `chrome-headless-shell` that Puppeteer, Playwright and Remotion download, reads only its compiled-in
@@ -407,12 +407,13 @@ reported as blocked; see
   update, still needs `proxy_engine: universal` or an `allowed_tls_rules` passthrough: `inspect`
   re-signs the connection, and a pinned or bundled store will not accept the new certificate.
 - The JVM (Java, Kotlin, Scala) reads only its own keystore rather than the CA-trust variables. A
-  JDK already in the image at `$JAVA_HOME` or on `PATH` is handled: the CA is added to its keystore
-  for the step and removed before the layer is committed. A keystore sealed with a password other
-  than the JDK default still falls back to `proxy_engine: universal`: Buildcage will not rewrite it.
-  No other JDK trusts the CA, such as a Gradle toolchain under `~/.gradle/jdks` or one the step
-  itself downloads (an `sdk install`, an unpacked tarball). Fetch it in an earlier `RUN` step and
-  put it on `PATH` or `JAVA_HOME` with `ENV`:
+  JDK already in the image at `$JAVA_HOME` or behind the first `java` on `PATH` is handled: the CA is
+  added to its keystore for the step and removed before the layer is committed. A keystore sealed
+  with a password other than the JDK default still falls back to `proxy_engine: universal`:
+  Buildcage will not rewrite it. No other JDK trusts the CA, such as one further along `PATH`, a
+  Gradle toolchain under `~/.gradle/jdks` or one the step itself downloads (an `sdk install`, an
+  unpacked tarball). Fetch it in an earlier `RUN` step and put it first on `PATH` or on `JAVA_HOME`
+  with `ENV`:
 
   ```dockerfile
   RUN tar xzf jdk-21.tar.gz -C /opt/java && /opt/java/jdk-21/bin/java -jar fetch.jar   # fails
@@ -511,11 +512,12 @@ reported as blocked; see
   RUN rm -rf /etc/ssl/certs/*      # fine
   ```
 
-  The same goes for the directory holding the keystore of a JDK at `$JAVA_HOME` or on `PATH`, unless
-  it is inside the CA store's mount. A JDK with a keystore of its own has its `lib/security` mounted,
-  so a step cannot remove that JDK; take it off `PATH` and `JAVA_HOME` with `ENV` first. A
-  distribution JDK links to a shared keystore: Debian's is inside `/etc/ssl/certs` and adds no mount
-  point, while on RHEL, Fedora and their derivatives `/etc/pki/ca-trust/extracted/java` is one.
+  The same goes for the directory holding the keystore of a JDK at `$JAVA_HOME` or behind the first
+  `java` on `PATH`, unless it is inside the CA store's mount. A JDK with a keystore of its own has
+  its `lib/security` mounted, so a step cannot remove that JDK; take it off `PATH` and `JAVA_HOME`
+  with `ENV` first. A distribution JDK links to a shared keystore: Debian's is inside
+  `/etc/ssl/certs` and adds no mount point, while on RHEL, Fedora and their derivatives
+  `/etc/pki/ca-trust/extracted/java` is one.
 
 - A custom CA path that is unexpectedly large (more than 20 MiB or 512 files) has injection skipped
   for that variable only, the same degradation as when no CA bundle is found at all. A system CA
