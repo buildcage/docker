@@ -232,7 +232,12 @@ describe("checkRawRegexHalf", () => {
   });
 
   it("refuses a flag modifier, which QuickJS cannot compile", () => {
-    for (const text of ["^(?i:api)\\.com:443", "^(?-i:api)\\.com:443", "/(?i-m:x)"]) {
+    for (const text of [
+      "^(?i:api)\\.com:443",
+      "^(?-i:api)\\.com:443",
+      "/(?i-m:x)",
+      "a\\\\(?i:x)",
+    ]) {
       expect(() => check(text, false)).toThrow(/uses "\(\?[a-z-]+:", which the proxy's QuickJS/);
     }
   });
