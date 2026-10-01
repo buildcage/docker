@@ -31,7 +31,6 @@ export function describeReportOutcomes(
       blockedRows: report.blocked,
       logLooksPlausible: report.logLooksPlausible,
       engineLabel,
-      engine: report.engine,
     }),
   ];
   const undecided = describeUndecidedRequests(report, engineLabel);
@@ -85,7 +84,6 @@ function describeUndecidedRequests(
  *
  * A notice where describeUndecidedRequests warns: these have a table of their
  * own, so it only has to say that the step passed although connections failed.
- * Counted off the rows rather than a timeline, which only `inspect` has.
  *
  * `audit` enforces nothing, so nothing there was allowed by a rule and the
  * opening says only what happened, the same distinction actionFor makes between

@@ -25,7 +25,6 @@ const message = (overrides: Partial<BuildBlockedMessageOptions> = {}) =>
     blockedCount: 2,
     blockedRows: [{ expected: false }, { expected: false }],
     engineLabel: "sandbox",
-    engine: "universal",
     isAudit: false,
     ...overrides,
   });
@@ -38,7 +37,6 @@ const described = (overrides: Partial<DescribeBlockedOutcomeOptions> = {}) =>
     blockedRows: [{ expected: false }],
     logLooksPlausible: true,
     engineLabel: "proxy",
-    engine: "universal",
     ...overrides,
   });
 
@@ -114,18 +112,7 @@ describe("determineBlockedOutcome", () => {
 
 describe("buildBlockedMessage", () => {
   it("stays the base text when no rows matched known_blocked_rules", () => {
-    expect(message()).toBe("2 blocked connection(s) detected by buildcage sandbox");
-  });
-
-  // Every other engine takes universal's branch: only inspect's resolver
-  // decides about a name, so only its count can hold a lookup.
-  it("names lookups too under inspect, and connections alone otherwise", () => {
-    expect(message({ engine: "inspect" })).toBe(
-      "2 blocked connection(s) and lookup(s) detected by buildcage sandbox",
-    );
-    expect(message({ engine: "universal" })).toBe(
-      "2 blocked connection(s) detected by buildcage sandbox",
-    );
+    expect(message()).toBe("2 blocked connection(s) and lookup(s) detected by buildcage sandbox");
   });
 
   it("notes that all rows matched when every row is expected", () => {
@@ -154,7 +141,7 @@ describe("buildBlockedMessage", () => {
     ];
     for (const blockedRows of rowSets) {
       expect(message({ blockedCount: 5, blockedRows, isAudit: true })).toBe(
-        "5 blocked connection(s) detected by buildcage sandbox",
+        "5 blocked connection(s) and lookup(s) detected by buildcage sandbox",
       );
     }
   });
@@ -165,7 +152,7 @@ describe("describeBlockedOutcome", () => {
     expect(described()).toStrictEqual({
       level: "error",
       shouldFail: true,
-      message: "1 blocked connection(s) detected by buildcage proxy",
+      message: "1 blocked connection(s) and lookup(s) detected by buildcage proxy",
     });
   });
 
@@ -191,7 +178,7 @@ describe("describeBlockedOutcome", () => {
       level: "error",
       shouldFail: true,
       message:
-        "buildcage proxy logs are incomplete, so this report is not a full record of what ran (3 blocked connection(s) still recorded). Either the logs don't begin where a real run does, one carries a line the report cannot read, or the proxy dropped lines it could not write (or could not say whether it had). A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
+        "buildcage proxy logs are incomplete, so this report is not a full record of what ran (3 blocked connection(s) and lookup(s) still recorded). Either the logs don't begin where a real run does, one carries a line the report cannot read, or the proxy dropped lines it could not write (or could not say whether it had). A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
     });
   });
 
@@ -204,9 +191,11 @@ describe("describeBlockedOutcome", () => {
     });
     expect(result.level).toBe("notice");
     expect(result.shouldFail).toBe(false);
-    expect(result.message.startsWith("2 blocked connection(s) detected by buildcage proxy")).toBe(
-      true,
-    );
+    expect(
+      result.message.startsWith(
+        "2 blocked connection(s) and lookup(s) detected by buildcage proxy",
+      ),
+    ).toBe(true);
     expect(result.message.includes("the logs are incomplete")).toBe(true);
   });
 
