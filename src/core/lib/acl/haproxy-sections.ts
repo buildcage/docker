@@ -51,7 +51,7 @@ export function preamble(spec: PreambleSpec): string[] {
   ];
 }
 
-/** The resolver every do-resolve uses, once the rules have allowed. */
+/** The resolver every do-resolve uses after the rules allow a connection. */
 export function resolversSection(resolvers: string[], useResolvConf: boolean): string[] {
   return [
     "# Real resolution happens once a request has already passed the rule",
