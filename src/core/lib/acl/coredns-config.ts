@@ -1,5 +1,5 @@
 /**
- * Corefile generator, shared by both engines.
+ * Corefile generator.
  *
  * Every name resolves locally to the proxy's own address, allowed or not, so
  * the build connects to the proxy and what it asked for is recorded before
