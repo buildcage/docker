@@ -10,6 +10,7 @@ import { runReportStep, type ReportStepDeps } from "./report-step.ts";
 // when an earlier step fails.
 const mocks = {
   readBuilderName: vi.fn(),
+  checkFailOnBlocked: vi.fn(),
   readTrafficArtifactInputs: vi.fn(),
   createDocker: vi.fn(),
   findReportSourceContainer: vi.fn(),
@@ -90,6 +91,17 @@ describe("runReportStep", () => {
   it("removes the scratch directory it made", async () => {
     await runReportStep({}, deps);
     expect(mocks.removeScratchDir).toHaveBeenCalledWith(SCRATCH);
+  });
+});
+
+describe("input checks", () => {
+  it("stops before touching Docker when an input is invalid", async () => {
+    mocks.checkFailOnBlocked.mockImplementation(() => {
+      throw new ReportError("bad", "INVALID_BOOLEAN_INPUT");
+    });
+    await expect(runReportStep({}, deps)).rejects.toThrow(ReportError);
+    expect(mocks.createDocker).not.toHaveBeenCalled();
+    expect(mocks.runReportScript).not.toHaveBeenCalled();
   });
 });
 

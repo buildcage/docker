@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
-import { readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
+import { ReportError } from "./errors.ts";
+import { checkFailOnBlocked, readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
 function inputs(values: Record<string, string> = {}): (name: string) => string {
@@ -25,69 +26,73 @@ describe("readBuilderName", () => {
   });
 });
 
-describe("readTrafficArtifactInputs", () => {
-  const silent = () => {};
+describe("checkFailOnBlocked", () => {
+  it.each(["", "true", "True", "TRUE", "false", "False", "FALSE"])("accepts %o", (value) => {
+    expect(() => checkFailOnBlocked(inputs({ fail_on_blocked: value }))).not.toThrow();
+  });
 
+  it("refuses a typo rather than guessing", () => {
+    expect(() => checkFailOnBlocked(inputs({ fail_on_blocked: "yes" }))).toThrow(
+      new ReportError(
+        'Invalid fail_on_blocked: "yes". Must be true or false.',
+        "INVALID_BOOLEAN_INPUT",
+      ),
+    );
+  });
+});
+
+describe("readTrafficArtifactInputs", () => {
   it.each(["true", "True", "TRUE"])("reads %o as a yes", (value) => {
-    expect(
-      readTrafficArtifactInputs(silent, inputs({ upload_traffic_artifact: value })).wanted,
-    ).toBe(true);
+    expect(readTrafficArtifactInputs(inputs({ upload_traffic_artifact: value })).wanted).toBe(true);
   });
 
   it.each(["false", "False", "FALSE"])("reads %o as a no", (value) => {
-    const warn = vi.fn();
-
-    expect(readTrafficArtifactInputs(warn, inputs({ upload_traffic_artifact: value })).wanted).toBe(
+    expect(readTrafficArtifactInputs(inputs({ upload_traffic_artifact: value })).wanted).toBe(
       false,
     );
-    expect(warn).not.toHaveBeenCalled();
   });
 
   // The dev and test invocations run this from source rather than through
   // action.yml's own defaults.
-  it("is a silent no when unset", () => {
-    const warn = vi.fn();
-
-    expect(readTrafficArtifactInputs(warn, inputs()).wanted).toBe(false);
-    expect(warn).not.toHaveBeenCalled();
+  it("is a no when unset", () => {
+    expect(readTrafficArtifactInputs(inputs())).toStrictEqual({ wanted: false });
   });
 
-  it("warns rather than reading a typo as a no", () => {
-    const warn = vi.fn();
-
-    expect(readTrafficArtifactInputs(warn, inputs({ upload_traffic_artifact: "yes" })).wanted).toBe(
-      false,
-    );
-    expect(warn).toHaveBeenCalledWith(
-      'upload_traffic_artifact must be true or false, not "yes". Reading it as false.',
+  it("refuses a typo rather than reading it as a no", () => {
+    expect(() => readTrafficArtifactInputs(inputs({ upload_traffic_artifact: "yes" }))).toThrow(
+      new ReportError(
+        'Invalid upload_traffic_artifact: "yes". Must be true or false.',
+        "INVALID_BOOLEAN_INPUT",
+      ),
     );
   });
 
   it("passes a positive whole number of retention days through", () => {
     expect(
-      readTrafficArtifactInputs(silent, inputs({ traffic_artifact_retention_days: "7" }))
-        .retentionDays,
+      readTrafficArtifactInputs(inputs({ traffic_artifact_retention_days: "7" })).retentionDays,
     ).toBe(7);
   });
 
-  it("leaves the retention to the repository's own default when unset", () => {
-    const warn = vi.fn();
+  it.each(["0", "-1", "7.5", "forever", "1e1", "0x10", " 7", "07"])(
+    "refuses a retention of %o",
+    (value) => {
+      expect(() =>
+        readTrafficArtifactInputs(inputs({ traffic_artifact_retention_days: value })),
+      ).toThrow(
+        new ReportError(
+          `Invalid traffic_artifact_retention_days: ${JSON.stringify(value)}. ` +
+            "Must be a whole number of days above zero.",
+          "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS",
+        ),
+      );
+    },
+  );
 
-    expect(readTrafficArtifactInputs(warn, inputs()).retentionDays).toBeUndefined();
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  it.each(["0", "-1", "7.5", "forever"])("warns about %o rather than dropping it", (value) => {
-    const warn = vi.fn();
-
-    expect(
-      readTrafficArtifactInputs(warn, inputs({ traffic_artifact_retention_days: value }))
-        .retentionDays,
-    ).toBeUndefined();
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `traffic_artifact_retention_days must be a whole number of days above zero, not ${JSON.stringify(value)}`,
+  it("refuses a bad retention even when nothing is uploaded", () => {
+    expect(() =>
+      readTrafficArtifactInputs(
+        inputs({ upload_traffic_artifact: "false", traffic_artifact_retention_days: "0" }),
       ),
-    );
+    ).toThrow(ReportError);
   });
 });

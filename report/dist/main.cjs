@@ -10913,37 +10913,35 @@ var ExitCode, init_core = __esmMin((() => {
 //#endregion
 //#region report/src/lib/inputs.ts
 init_core();
-const TRUE_INPUTS = [
-	"true",
-	"True",
-	"TRUE"
-], FALSE_INPUTS = [
-	"false",
-	"False",
-	"FALSE"
-];
-function readBuilderName(getInput$1 = getInput) {
-	return getInput$1("builder_name") || "buildcage";
+function readBuilderName(getInput$2 = getInput) {
+	return getInput$2("builder_name") || "buildcage";
 }
-function readTrafficArtifactInputs(warn, getInput$2 = getInput) {
-	return {
-		wanted: readBoolean("upload_traffic_artifact", getInput$2, warn),
-		retentionDays: readRetentionDays(getInput$2, warn)
-	};
-}
-function readBoolean(name, getInput, warn) {
+function readBooleanInput(name, fallback, getInput) {
 	let value = getInput(name);
-	return TRUE_INPUTS.includes(value) ? !0 : (value !== "" && !FALSE_INPUTS.includes(value) && warn(`${name} must be true or false, not ${JSON.stringify(value)}. Reading it as false.`), !1);
+	if (value === "") return fallback;
+	if ([
+		"true",
+		"True",
+		"TRUE"
+	].includes(value)) return !0;
+	if ([
+		"false",
+		"False",
+		"FALSE"
+	].includes(value)) return !1;
+	throw new ReportError(`Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`, "INVALID_BOOLEAN_INPUT");
 }
-function readRetentionDays(getInput, warn) {
-	let value = getInput("traffic_artifact_retention_days");
-	if (value === "") return;
-	let days = Number(value);
-	if (!Number.isInteger(days) || days <= 0) {
-		warn(`traffic_artifact_retention_days must be a whole number of days above zero, not ${JSON.stringify(value)}. Leaving the retention to the repository's own default.`);
-		return;
-	}
-	return days;
+function checkFailOnBlocked(getInput$3 = getInput) {
+	readBooleanInput("fail_on_blocked", !0, getInput$3);
+}
+function readTrafficArtifactInputs(getInput$1 = getInput) {
+	let wanted = readBooleanInput("upload_traffic_artifact", !1, getInput$1), days = getInput$1("traffic_artifact_retention_days");
+	if (days === "") return { wanted };
+	if (!/^[1-9]\d*$/.test(days)) throw new ReportError(`Invalid traffic_artifact_retention_days: ${JSON.stringify(days)}. Must be a whole number of days above zero.`, "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS");
+	return {
+		wanted,
+		retentionDays: Number(days)
+	};
 }
 //#endregion
 //#region report/src/lib/run-report-script.ts
@@ -56369,6 +56367,7 @@ async function uploadTrafficArtifact(file, builderName, warn, { retentionDays, f
 }
 const realDeps = {
 	readBuilderName,
+	checkFailOnBlocked,
 	readTrafficArtifactInputs,
 	createDocker,
 	findReportSourceContainer,
@@ -56383,10 +56382,12 @@ const realDeps = {
 	warn: annotate.warning
 };
 async function runReportStep(env, overrides = {}) {
-	let { readBuilderName, readTrafficArtifactInputs, createDocker, findReportSourceContainer, copyFromContainerImage, runReportScript, uploadTrafficArtifact, makeScratchDir, removeScratchDir, warn } = {
+	let { readBuilderName, checkFailOnBlocked, readTrafficArtifactInputs, createDocker, findReportSourceContainer, copyFromContainerImage, runReportScript, uploadTrafficArtifact, makeScratchDir, removeScratchDir, warn } = {
 		...realDeps,
 		...overrides
-	}, builderName = readBuilderName(), trafficArtifact = readTrafficArtifactInputs(warn), projectName = resolveProjectName(builderName, void 0), containerId = findReportSourceContainer(createDocker(), projectName, builderName), scratchDir = makeScratchDir(), trafficFile = trafficArtifact.wanted ? (0, node_path.join)(scratchDir, "traffic.json") : void 0;
+	}, builderName = readBuilderName();
+	checkFailOnBlocked();
+	let trafficArtifact = readTrafficArtifactInputs(), projectName = resolveProjectName(builderName, void 0), containerId = findReportSourceContainer(createDocker(), projectName, builderName), scratchDir = makeScratchDir(), trafficFile = trafficArtifact.wanted ? (0, node_path.join)(scratchDir, "traffic.json") : void 0;
 	try {
 		let reportActionPath = (0, node_path.join)(scratchDir, "report-action.js");
 		copyFromContainerImage(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath), process.exitCode = runReportScript(reportActionPath, containerId, { trafficFile });

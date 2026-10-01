@@ -12,7 +12,15 @@ import { ActionError } from "#core/lib/errors.ts";
  *   REPORT_SCRIPT_FAILED: report-action.js couldn't even be launched (a
  *                         report-action.js that ran and exited nonzero is
  *                         reproduced via this action's exit code instead)
+ *   INVALID_BOOLEAN_INPUT: fail_on_blocked or upload_traffic_artifact is
+ *                         neither true nor false
+ *   INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS: traffic_artifact_retention_days
+ *                         is not a whole number above zero
  */
 export class ReportError extends ActionError<
-  "DOCKER_UNAVAILABLE" | "CONTAINER_NOT_FOUND" | "REPORT_SCRIPT_FAILED"
+  | "DOCKER_UNAVAILABLE"
+  | "CONTAINER_NOT_FOUND"
+  | "REPORT_SCRIPT_FAILED"
+  | "INVALID_BOOLEAN_INPUT"
+  | "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS"
 > {}
