@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { InvalidInputError } from "#core/lib/actions/inputs.ts";
 import { REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
 
 import { ReportError } from "./errors.ts";
@@ -97,9 +98,9 @@ describe("runReportStep", () => {
 describe("input checks", () => {
   it("stops before touching Docker when an input is invalid", async () => {
     mocks.checkFailOnBlocked.mockImplementation(() => {
-      throw new ReportError("bad", "INVALID_BOOLEAN_INPUT");
+      throw new InvalidInputError("bad", "INVALID_BOOLEAN_INPUT");
     });
-    await expect(runReportStep({}, deps)).rejects.toThrow(ReportError);
+    await expect(runReportStep({}, deps)).rejects.toThrow(InvalidInputError);
     expect(mocks.createDocker).not.toHaveBeenCalled();
     expect(mocks.runReportScript).not.toHaveBeenCalled();
   });

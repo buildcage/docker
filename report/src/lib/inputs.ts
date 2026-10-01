@@ -10,28 +10,14 @@
  */
 import * as core from "@actions/core";
 
+import { readBooleanInput, readRetentionDays } from "#core/lib/actions/inputs.ts";
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
-
-import { ReportError } from "./errors.ts";
 
 /** Narrowed to what this module needs, so a test can pass a plain lookup. */
 export type GetInput = (name: string) => string;
 
 export function readBuilderName(getInput: GetInput = core.getInput): string {
   return getInput("builder_name") || DEFAULT_BUILDER_NAME;
-}
-
-/** Not `getBooleanInput`: it cannot tell unset from misspelled. Unset (a dev or
- *  test run without action.yml's defaults) takes the default. */
-function readBooleanInput(name: string, fallback: boolean, getInput: GetInput): boolean {
-  const value = getInput(name);
-  if (value === "") return fallback;
-  if (["true", "True", "TRUE"].includes(value)) return true;
-  if (["false", "False", "FALSE"].includes(value)) return false;
-  throw new ReportError(
-    `Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`,
-    "INVALID_BOOLEAN_INPUT",
-  );
 }
 
 /** The report script in the image reads fail_on_blocked itself; this only
@@ -51,15 +37,8 @@ export interface TrafficArtifactInputs {
 export function readTrafficArtifactInputs(
   getInput: GetInput = core.getInput,
 ): TrafficArtifactInputs {
-  const wanted = readBooleanInput("upload_traffic_artifact", false, getInput);
-  const days = getInput("traffic_artifact_retention_days");
-  if (days === "") return { wanted };
-  if (!/^[1-9]\d*$/.test(days)) {
-    throw new ReportError(
-      `Invalid traffic_artifact_retention_days: ${JSON.stringify(days)}. ` +
-        "Must be a whole number of days above zero.",
-      "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS",
-    );
-  }
-  return { wanted, retentionDays: Number(days) };
+  return {
+    wanted: readBooleanInput("upload_traffic_artifact", false, getInput),
+    retentionDays: readRetentionDays(getInput),
+  };
 }
