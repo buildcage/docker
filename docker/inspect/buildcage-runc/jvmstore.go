@@ -74,7 +74,8 @@ func javaOnPath(s *spec) (string, bool) {
 		if err != nil {
 			continue
 		}
-		if info, err := os.Stat(resolved); err == nil && info.Mode().IsRegular() {
+		// The shell passes over a java it cannot execute, so this does too.
+		if info, err := os.Stat(resolved); err == nil && info.Mode().IsRegular() && info.Mode()&0o111 != 0 {
 			return filepath.Dir(filepath.Dir(containerPathOf(s.rootfs, resolved))), true
 		}
 	}

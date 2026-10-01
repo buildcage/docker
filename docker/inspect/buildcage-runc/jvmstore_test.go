@@ -19,6 +19,15 @@ func writeRootfsKeystore(t *testing.T, rootfs, containerPath string, content []b
 	mustWriteFile(t, abs, string(content))
 }
 
+// writeJava places an executable java at path, creating its directory.
+func writeJava(t *testing.T, path string) {
+	t.Helper()
+	mustMkdirAll(t, filepath.Dir(path))
+	if err := os.WriteFile(path, []byte("java"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func hasPath(paths []string, want string) bool {
 	for _, p := range paths {
 		if p == want {
@@ -83,7 +92,7 @@ func TestFindJVMKeystoresDeduplicates(t *testing.T) {
 		mustSymlink(t, "/etc/ssl/certs/java/cacerts", filepath.Join(rootfs, jdk, "lib/security/cacerts"))
 	}
 	mustMkdirAll(t, filepath.Join(rootfs, "usr/lib/jvm/jdk-17/bin"))
-	mustWriteFile(t, filepath.Join(rootfs, "usr/lib/jvm/jdk-17/bin/java"), "x")
+	writeJava(t, filepath.Join(rootfs, "usr/lib/jvm/jdk-17/bin/java"))
 	mustMkdirAll(t, filepath.Join(rootfs, "usr/bin"))
 	mustSymlink(t, "/usr/lib/jvm/jdk-17/bin/java", filepath.Join(rootfs, "usr/bin/java"))
 
@@ -113,7 +122,7 @@ func TestFindJVMKeystoresFollowsJavaOnPath(t *testing.T) {
 			s := &spec{rootfs: rootfs, env: map[string]string{"PATH": "relative:/escape:/usr/local/bin"}}
 			mustSymlink(t, "../../../../../../../../outside", filepath.Join(rootfs, "escape"))
 			mustMkdirAll(t, filepath.Join(rootfs, filepath.Dir(c.java)))
-			mustWriteFile(t, filepath.Join(rootfs, c.java), "java")
+			writeJava(t, filepath.Join(rootfs, c.java))
 			mustMkdirAll(t, filepath.Join(rootfs, "usr/local/bin"))
 			mustSymlink(t, "/"+c.java, filepath.Join(rootfs, "usr/local/bin/java"))
 			cacerts := filepath.Join(rootfs, c.cacerts)
@@ -359,7 +368,7 @@ func TestInjectCoversASecondJDK(t *testing.T) {
 		writeRootfsKeystore(t, rootfs, "/opt/java/"+jdk+"/lib/security/cacerts", original)
 	}
 	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/other/bin"))
-	mustWriteFile(t, filepath.Join(rootfs, "opt/java/other/bin/java"), "java")
+	writeJava(t, filepath.Join(rootfs, "opt/java/other/bin/java"))
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
@@ -386,19 +395,20 @@ func TestInjectCoversASecondJDK(t *testing.T) {
 	}
 }
 
-// Only the first java on PATH, the one a bare `java` runs, has its keystore
-// injected: a JDK further along PATH gets no CA and no mount, so a later step
-// can still remove it.
+// Only the JDK a bare `java` runs, the first executable java on PATH, has its
+// keystore injected: one further along PATH gets no CA and no mount, so a later
+// step can still remove it.
 func TestInjectSkipsAJDKFurtherAlongPath(t *testing.T) {
 	useFakeRsync(t)
-	bundle, rootfs := newBundle(t, []string{"PATH=/opt/jdk-21/bin:/opt/jdk-17/bin"})
+	bundle, rootfs := newBundle(t, []string{"PATH=/opt/stub/bin:/opt/jdk-21/bin:/opt/jdk-17/bin"})
 	useMountInfo(t, overlayLine(rootfs, rootfs))
 	for _, jdk := range []string{"jdk-21", "jdk-17"} {
 		writeRootfsKeystore(t, rootfs, "/opt/"+jdk+"/lib/security/cacerts",
 			keystore(2, trustedEntry(2, "digicert", otherDER)))
-		mustMkdirAll(t, filepath.Join(rootfs, "opt", jdk, "bin"))
-		mustWriteFile(t, filepath.Join(rootfs, "opt", jdk, "bin/java"), "java")
+		writeJava(t, filepath.Join(rootfs, "opt", jdk, "bin/java"))
 	}
+	mustMkdirAll(t, filepath.Join(rootfs, "opt/stub/bin"))
+	mustWriteFile(t, filepath.Join(rootfs, "opt/stub/bin/java"), "not executable")
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {
