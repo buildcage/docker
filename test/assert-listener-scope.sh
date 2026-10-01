@@ -1,11 +1,10 @@
 #!/bin/bash
 # HAProxy binds *:10024 (both engines' CoreDNS also binds *:53), but only
-# buildcage0, the CNI bridge BuildKit wires up once a build
-# starts, may reach them (see docker/{universal,inspect}/files/s6-scripts/
-# init-iptables). This starts each engine's builder on its own, with no build
-# running, so buildcage0 never exists: :10024/:53 must be unreachable both from
-# another container on the builder's own compose network and from the runner
-# host itself.
+# buildcage0, the CNI bridge BuildKit wires up once a build starts, may reach
+# them (see docker/common/files/s6-scripts/init-iptables). This starts each
+# engine's builder on its own, with no build running, so buildcage0 never
+# exists: :10024/:53 must be unreachable both from another container on the
+# builder's own compose network and from the runner host itself.
 #
 # The same standalone builder also has to reach its own readiness checks over
 # loopback and exit on SIGTERM, which is what tells an over-broad rule from a

@@ -23,7 +23,7 @@ echo ""
 # report-action.js runs its own plausibility check against the haproxy log
 # above; a regression here means it treats the traffic-free log as
 # suspicious and fails the step despite blockedCount being 0 (see
-# docker/universal/files/s6-rc.d/haproxy/run). fail_on_blocked is forced
+# docker/common/files/s6-rc.d/haproxy/run). fail_on_blocked is forced
 # to true (matching action.yml's default) since that's the setting under
 # which the false positive actually fails the job.
 REPORT_EXIT_CODE=0

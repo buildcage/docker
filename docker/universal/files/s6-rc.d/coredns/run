@@ -1,5 +1,0 @@
-#!/command/with-contenv sh
-exec 2>&1
-# Guaranteed non-decision line for report's head check (see log/inspect.ts).
-echo "buildcage coredns starting"
-exec s6-notifyoncheck -d -w 250 -n 12 s6-setuidgid coredns coredns -conf /etc/coredns/Corefile

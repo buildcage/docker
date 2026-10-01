@@ -64,7 +64,7 @@ const DNS_SERVICE_DENIED = new RegExp(
 /** Any line of ours but a reverse lookup, which never becomes an event. */
 const DNS_LINE = /^\S+ \S+\s+.*buildcage dns (?!reverse )/;
 /** Echoed before CoreDNS starts, so it is always the log's first line (see
- *  docker/inspect/files/s6-rc.d/coredns/run). s6-log stamps this log, hence
+ *  docker/common/files/s6-rc.d/coredns/run). s6-log stamps this log, hence
  *  the suffix test. */
 const DNS_START_MARKER = "buildcage coredns starting";
 

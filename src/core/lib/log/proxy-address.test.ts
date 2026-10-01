@@ -8,8 +8,8 @@ describe("PROXY_ADDRESS", () => {
   // The init scripts cannot import this; a mismatch would make the parser
   // name every name-based connection by the wrong address.
   for (const script of [
-    "inspect/files/s6-scripts/init-inspect-cfg",
-    "universal/files/s6-scripts/init-haproxy-cfg",
+    "inspect/files/s6-scripts/init-cfg",
+    "universal/files/s6-scripts/init-cfg",
   ]) {
     it(`matches the gateway ${script} passes its config generator`, () => {
       const text = readFileSync(new URL(`../../../../docker/${script}`, import.meta.url), "utf8");

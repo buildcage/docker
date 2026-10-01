@@ -103,11 +103,11 @@ RUN apk add --no-cache --virtual .setcap libcap-utils && \
 
 RUN mkdir -p /etc/buildkit /etc/coredns /var/log/coredns
 COPY docker/universal/files/buildkitd.toml /etc/buildkit/buildkitd.toml
-COPY docker/universal/files/cni.conflist   /etc/buildkit/cni.conflist
+COPY docker/common/files/cni.conflist      /etc/buildkit/cni.conflist
 
 RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
 
-# Writes haproxy.cfg and the Corefile at startup (see init-haproxy-cfg).
+# Writes haproxy.cfg and the Corefile at startup (see init-cfg).
 COPY --from=scripts-build /build/dist/qjs/docker/universal/scripts/gen-configs.js /opt/buildcage/scripts/gen-configs.js
 
 # Never run inside the image: the report action `docker cp`s it out and runs
@@ -116,7 +116,9 @@ COPY --from=scripts-build /build/dist/report-action/docker/universal/scripts/rep
 
 COPY docker/universal/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 
-COPY docker/universal/files/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+# The services both engines run, then this engine's own files on top.
+COPY docker/common/files/s6-rc.d/       /etc/s6-overlay/s6-rc.d/
+COPY docker/common/files/s6-scripts/    /etc/s6-overlay/scripts/
 COPY docker/universal/files/s6-scripts/ /etc/s6-overlay/scripts/
 
 ENTRYPOINT ["/init"]

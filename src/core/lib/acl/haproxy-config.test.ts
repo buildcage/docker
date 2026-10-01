@@ -281,7 +281,7 @@ describe("the internal-address guard", () => {
   });
 
   it("emits no host-address acl when no file is given, rather than an unreadable path", () => {
-    // This generator is only ever called by init-inspect-cfg, which always
+    // This generator is only ever called by inspect's init-cfg, which always
     // writes the file, so an absent path means the two are out of step.
     expect(FULL_CONFIG.includes("-m ip -f")).toBe(false);
   });

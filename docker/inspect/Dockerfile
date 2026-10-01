@@ -72,7 +72,7 @@ LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/report/report-source.ts.
 
-# nss-tools provides certutil for init-inspect-cfg's NSS database.
+# nss-tools provides certutil for init-cfg's NSS database.
 RUN apk add --no-cache \
       s6-overlay \
       openssl \
@@ -126,7 +126,7 @@ COPY --from=runc-wrapper-build /out/buildcage-runc /opt/buildcage/bin/buildcage-
 RUN mkdir -p /etc/buildkit /etc/coredns /etc/haproxy /var/log/haproxy \
       /var/log/coredns /var/log/buildcage /run/buildcage
 COPY docker/inspect/files/buildkitd.toml /etc/buildkit/buildkitd.toml
-COPY docker/inspect/files/cni.conflist   /etc/buildkit/cni.conflist
+COPY docker/common/files/cni.conflist    /etc/buildkit/cni.conflist
 
 # Writes haproxy.cfg and the Corefile at startup, both from one rule set in a single run.
 COPY --from=scripts-build /build/dist/qjs/docker/inspect/scripts/gen-configs.js /opt/buildcage/scripts/gen-configs.js
@@ -137,6 +137,9 @@ COPY --from=scripts-build /build/dist/report-action/docker/inspect/scripts/repor
 
 COPY docker/inspect/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 
+# The services both engines run, then this engine's own files on top.
+COPY docker/common/files/s6-rc.d/     /etc/s6-overlay/s6-rc.d/
+COPY docker/common/files/s6-scripts/  /etc/s6-overlay/scripts/
 COPY docker/inspect/files/s6-rc.d/    /etc/s6-overlay/s6-rc.d/
 COPY docker/inspect/files/s6-scripts/ /etc/s6-overlay/scripts/
 
@@ -144,7 +147,7 @@ COPY docker/inspect/files/s6-scripts/ /etc/s6-overlay/scripts/
 # store contains, so the proxy has to be told to trust it when it verifies the
 # origin. The marker exists only in an image built with this arg set, so a
 # released proxy has no way to be told the same thing: the check in
-# init-inspect-cfg finds nothing to act on. Never set for a real build.
+# init-cfg finds nothing to act on. Never set for a real build.
 ARG BUILDCAGE_TEST_HOOKS=""
 RUN if [ -n "$BUILDCAGE_TEST_HOOKS" ]; then touch /opt/buildcage/.test-hooks; fi
 
