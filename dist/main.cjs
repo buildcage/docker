@@ -140,9 +140,14 @@ function hasTopLevelAlternation(regex) {
 	}
 	return !1;
 }
+const NAMED_GROUP = /^\(\?<(?![=!])([^>]*)>/;
 function capturingGroups(regex) {
 	let count = 0;
-	for (let [i, inClass] of regexChars(regex)) !inClass && /^\((?:(?!\?)|\?<(?![=!]))/.test(regex.slice(i)) && count++;
+	for (let [i, inClass] of regexChars(regex)) {
+		if (inClass) continue;
+		let rest = regex.slice(i);
+		(/^\((?!\?)/.test(rest) || NAMED_GROUP.test(rest)) && count++;
+	}
 	return count;
 }
 const HOST_LITERAL_ILLEGAL = /\\[[\]]/, COREFILE_UNSAFE = /['`]|\{[$%]/, RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9])/;
@@ -179,8 +184,21 @@ function checkEscapes(text, label, rule) {
 		if (escape) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "\\${escape[0]}". The proxy's PCRE2 reads it differently from setup, so a backslash may precede only punctuation, one of \\d \\D \\w \\W \\s \\S \\b \\B \\n \\r \\t \\f, or a single backreference digit`);
 	}
 }
+function checkGroups(text, label, rule) {
+	let names = new Set();
+	for (let [i, inClass] of regexChars(text)) {
+		if (inClass) continue;
+		let rest = text.slice(i), opening = /^\(\?(?![:=!<])[^:)]*:?/.exec(rest);
+		if (opening) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "${opening[0]}", which the proxy's QuickJS refuses. A host matches in any case already; in a path, spell each case as a class, as in "[Aa]"`);
+		let name = NAMED_GROUP.exec(rest)?.[1];
+		if (name !== void 0) {
+			if (names.has(name)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses the group name "${name}" twice, which the proxy's QuickJS refuses`);
+			names.add(name);
+		}
+	}
+}
 function checkRawRegexHalf(text, label, rule, hostHalf) {
-	if (checkClasses(text, label, rule), checkEscapes(text, label, rule), hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
+	if (checkClasses(text, label, rule), checkEscapes(text, label, rule), checkGroups(text, label, rule), hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
 	if (hostHalf && HOST_LITERAL_ILLEGAL.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a character no hostname can, so the ":" this rule was split at is not its port separator. An IPv6 address is not supported here, in a "~" rule any more than in a literal one`);
 	if (hostHalf && COREFILE_UNSAFE.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a "'", a backtick, "{$" or "{%". No hostname contains one, and the resolver's config cannot quote it`);
 }
@@ -201,8 +219,7 @@ function portPatternStart(hostPlusPort) {
 		if (c === ":") return i;
 		if (c === "(") {
 			if (hostPlusPort[i + 1] === ":") return i;
-			let syntax = /^\(\?[A-Za-z-]*:?/.exec(hostPlusPort.slice(i));
-			syntax && (bodyStart = i + syntax[0].length);
+			hostPlusPort.startsWith("(?:", i) && (bodyStart = i + 3);
 		}
 	}
 	return -1;
