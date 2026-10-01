@@ -51,14 +51,17 @@ export function preamble(spec: PreambleSpec): string[] {
   ];
 }
 
-/** The resolver every do-resolve uses after the rules allow a connection. */
-export function resolversSection(resolvers: string[], useResolvConf: boolean): string[] {
+/**
+ * The resolver every do-resolve uses after the rules allow a connection.
+ * With no upstreams it reads the container's own /etc/resolv.conf.
+ */
+export function resolversSection(resolvers: string[]): string[] {
   return [
     "# Real resolution happens once a request has already passed the rule",
     "# ACLs below; the build's own resolver (CoreDNS) never gives out a real",
     "# answer, so this is the only place a name becomes an address.",
     "resolvers buildcage",
-    ...(useResolvConf
+    ...(resolvers.length === 0
       ? ["    parse-resolv-conf"]
       : resolvers.map((addr, i) => `    nameserver ns${i + 1} ${addr}:53`)),
     // The only hold do-resolve reads, and it ignores the record's own TTL,

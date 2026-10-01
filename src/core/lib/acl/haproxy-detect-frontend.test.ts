@@ -16,8 +16,8 @@ function detect(inputs: RuleInputs = {}, options: Partial<DetectFrontendSpec> = 
     plainStagePort: 10026,
     ipRules: ip,
     tlsHosts: tls,
-    hasResolver: true,
     internalAddrs: INTERNAL_RANGES,
+    proxyAddress: "198.19.255.1",
     ...options,
   }).join("\n");
 }
@@ -173,11 +173,9 @@ describe("an SNI that is not a hostname", () => {
 });
 
 describe("ip rules and the proxy's own address", () => {
-  const PROXY = { proxyAddress: "198.19.255.1" };
-
   it("never passes through a connection that reached the proxy through a name", () => {
     // 198.18.0.0/15 covers the proxy, which every name resolves to.
-    const result = detect({ ipRules: ["198.18.0.0/15:443", "~^198\\.19\\.255\\.1:443$"] }, PROXY);
+    const result = detect({ ipRules: ["198.18.0.0/15:443", "~^198\\.19\\.255\\.1:443$"] });
     expect(result.includes("acl dns_routed dst 198.19.255.1")).toBe(true);
     expect(result.includes("set-var(txn.pass) int(1) if ip0_dst ip0_port !dns_routed\n")).toBe(
       true,
@@ -186,13 +184,12 @@ describe("ip rules and the proxy's own address", () => {
   });
 
   it("leaves a tls rule's passthrough alone, which is judged on the SNI", () => {
-    const result = detect({ ...FULL }, PROXY);
+    const result = detect({ ...FULL });
     expect(result).toMatch(/set-var\(txn\.pass\) int\(1\) if tls0_sni tls0_port sni_is_name\n/);
   });
 
-  it("declares nothing without an ip rule or a proxy address", () => {
-    expect(detect({ tlsRules: ["db.example.com:443"] }, PROXY).includes("dns_routed")).toBe(false);
-    expect(detect({ ipRules: ["10.0.0.5:5432"] }).includes("dns_routed")).toBe(false);
+  it("declares nothing without an ip rule", () => {
+    expect(detect({ tlsRules: ["db.example.com:443"] }).includes("dns_routed")).toBe(false);
   });
 });
 

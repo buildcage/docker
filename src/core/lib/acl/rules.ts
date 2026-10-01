@@ -57,7 +57,7 @@ const PLACEHOLDER_PROXY_ADDRESS = "192.0.2.1";
  */
 export function checkRulesCompileOrThrow(inputs: RuleInputs): void {
   try {
-    generateHaproxyConfig(inputs);
+    generateHaproxyConfig({ ...inputs, proxyAddress: PLACEHOLDER_PROXY_ADDRESS });
     generateUniversalHaproxyConfig({
       ...inputs,
       proxyAddress: PLACEHOLDER_PROXY_ADDRESS,

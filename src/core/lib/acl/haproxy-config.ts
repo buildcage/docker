@@ -36,20 +36,15 @@ export interface HaproxyConfigOptions extends RuleInputs {
    * Upstream DNS servers a name is resolved against, once a request has
    * already passed the rule ACLs. Not the resolver the build itself
    * uses, which never gives out a real answer; see coredns-config.ts.
+   * Empty or omitted resolves through the container's own /etc/resolv.conf.
    */
   resolverAddress?: string[];
-  /**
-   * Resolve through the container's own /etc/resolv.conf rather than named
-   * upstreams, so a name resolves against the runner's own DNS. Ignored when
-   * resolverAddress names upstreams of its own.
-   */
-  useResolvConf?: boolean;
   /**
    * The proxy's own address (the CoreDNS/gateway address), excluded from a
    * resolved destination like every other internal range; see
    * INTERNAL_RANGES.
    */
-  proxyAddress?: string;
+  proxyAddress: string;
   /**
    * Pattern file of the runner's own addresses, added to the
    * internal-destination guard. A file because HAProxy refuses to start on an
@@ -81,10 +76,9 @@ export interface GeneratedHaproxyConfig {
 /**
  * Generate a haproxy.cfg from buildcage's rules.
  *
- * @throws {Error} if a host rule has invalid wildcard syntax, or if a resolver
- *   is configured without proxyAddress
+ * @throws {Error} if a host rule has invalid wildcard syntax
  */
-export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): GeneratedHaproxyConfig {
+export function generateHaproxyConfig(options: HaproxyConfigOptions): GeneratedHaproxyConfig {
   const opts = { ...DEFAULTS, ...options };
   const mode = opts.mode ?? "restrict";
   const {
@@ -95,29 +89,11 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
     warnings,
   } = compileRuleSet(options);
 
-  const resolvers = opts.resolverAddress ?? [];
-  const useResolvConf = resolvers.length === 0 && opts.useResolvConf === true;
-  // Every block below reads this rather than resolvers.length: one left behind
-  // would drop do-resolve on the resolv.conf path alone, sending the request
-  // wherever the client's own address said.
-  const hasResolver = resolvers.length > 0 || useResolvConf;
-  // Required together, not just individually optional: without proxyAddress
-  // here, a name do-resolve sends back to the proxy's own gateway would pass
-  // the internal-address guard below unnoticed, so this fails closed.
-  if (hasResolver && !opts.proxyAddress) {
-    throw new Error("proxyAddress is required whenever a resolver is configured");
-  }
-
   const shared = {
-    hasResolver,
     // The proxy's own address and network, not the upstream(s) a name is
     // resolved against: a name resolving to the gateway or to a step is as
     // internal as any other.
-    internalAddrs: [
-      ...INTERNAL_RANGES,
-      PROXY_SUBNET,
-      ...(opts.proxyAddress ? [opts.proxyAddress] : []),
-    ],
+    internalAddrs: [...INTERNAL_RANGES, PROXY_SUBNET, opts.proxyAddress],
     hostAddressFile: opts.hostAddressFile,
   };
 
@@ -130,7 +106,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions = {}): Gener
       ],
       defaults: ["    timeout client 30s", "    timeout server 30s"],
     }),
-    ...(hasResolver ? resolversSection(resolvers, useResolvConf) : []),
+    ...resolversSection(opts.resolverAddress ?? []),
     ...detectFrontend({
       listenPort: opts.listenPort,
       tlsStagePort: TLS_STAGE_PORT,

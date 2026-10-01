@@ -103,7 +103,7 @@ export function generateUniversalHaproxyConfig(
       global: ["    maxconn 2048"],
       defaults: ["    mode tcp", "    timeout client 1m", "    timeout server 1m"],
     }),
-    ...resolversSection(resolvers, resolvers.length === 0),
+    ...resolversSection(resolvers),
     "# --- Frontend ---",
     "frontend outbound_proxy",
     "    bind *:10024",

@@ -1,9 +1,11 @@
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
-import { generateHaproxyConfig } from "./haproxy-config.ts";
+import { generateHaproxyConfig, type HaproxyConfigOptions } from "./haproxy-config.ts";
 import { buildUrlRules } from "./url-rules.ts";
 
-function gen(options: Parameters<typeof generateHaproxyConfig>[0] = {}): string {
-  return generateHaproxyConfig(options).config;
+const PROXY_ADDRESS = "198.19.255.1";
+
+function gen(options: Partial<HaproxyConfigOptions> = {}): string {
+  return generateHaproxyConfig({ proxyAddress: PROXY_ADDRESS, ...options }).config;
 }
 
 /** HAProxy's own per-line word cap (MAX_LINE_ARGS); it refuses to start past this. */
@@ -28,7 +30,7 @@ const FULL = {
   ipRules: ["10.0.0.5:5432"],
   tlsRules: ["db.example.com:443"],
   resolverAddress: ["1.1.1.1", "8.8.8.8"],
-  proxyAddress: "198.19.255.1",
+  proxyAddress: PROXY_ADDRESS,
 };
 
 // Each of the directives these cases name still lets ordinary traffic through
@@ -191,10 +193,9 @@ describe("resolving, which only a request the rules already admitted reaches", (
   });
 
   it("still resolves on both listeners when it does, rather than trusting the client", () => {
-    // do-resolve sits behind the same flag the nameserver lines do. Missed
-    // here, set-dst would never run and the connection would go wherever the
-    // client's own address said.
-    const resolvConf = gen({ ...FULL, resolverAddress: [], useResolvConf: true });
+    // Missed here, set-dst would never run and the connection would go
+    // wherever the client's own address said.
+    const resolvConf = gen({ ...FULL, resolverAddress: [] });
     for (const frontend of ["https_in", "http_in"]) {
       const segment = frontendSegment(resolvConf, frontend);
       expect(segment.includes("do-resolve(txn.dst,buildcage,ipv4) var(txn.host)")).toBe(true);
@@ -231,28 +232,17 @@ describe("resolving, which only a request the rules already admitted reaches", (
   });
 
   it("falls back to the container's own resolv.conf, not a public resolver", () => {
-    const resolvConf = gen({ ...FULL, resolverAddress: [], useResolvConf: true });
-    expect(resolvConf.includes("    parse-resolv-conf")).toBe(true);
-    expect(resolvConf.includes("nameserver ns1")).toBe(false);
+    for (const resolvConf of [
+      gen({ ...FULL, resolverAddress: [] }),
+      gen({ httpsRules: FULL.httpsRules }),
+    ]) {
+      expect(resolvConf.includes("    parse-resolv-conf")).toBe(true);
+      expect(resolvConf.includes("nameserver ns1")).toBe(false);
+    }
   });
 
-  it("prefers named upstreams over resolv.conf when both are given", () => {
-    const both = gen({ ...FULL, useResolvConf: true });
-    expect(both.includes("nameserver ns1 1.1.1.1:53")).toBe(true);
-    expect(both.includes("parse-resolv-conf")).toBe(false);
-  });
-
-  it("refuses to resolve through resolv.conf without the proxy's own address", () => {
-    // The internal-address guard is built from proxyAddress, so resolving
-    // without one has to fail closed.
-    expect(() =>
-      generateHaproxyConfig({
-        ...FULL,
-        resolverAddress: [],
-        proxyAddress: undefined,
-        useResolvConf: true,
-      }),
-    ).toThrow(/proxyAddress is required/);
+  it("reads resolv.conf only when no upstream is named", () => {
+    expect(FULL_CONFIG.includes("parse-resolv-conf")).toBe(false);
   });
 });
 
@@ -594,7 +584,10 @@ describe("line length", () => {
 
 describe("address wildcards", () => {
   it("matches the address as text rather than approximating a range", () => {
-    const result = generateHaproxyConfig({ ipRules: ["10.0.0.*:5432"] });
+    const result = generateHaproxyConfig({
+      ipRules: ["10.0.0.*:5432"],
+      proxyAddress: PROXY_ADDRESS,
+    });
     expect(result.warnings.length).toBe(0);
     expect(
       result.config.includes("acl ip0_dst var(txn.dst_str) -m reg ^10\\\\.0\\\\.0\\\\.[^.]+:5432$"),
