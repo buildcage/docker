@@ -318,6 +318,11 @@ POSIX class such as `[:alpha:]`, each of which PCRE2 either reads differently or
 the bracket (`[\]a]`) or write a range (`[a-z]`) instead. Other syntax only JavaScript accepts,
 such as `[\d-z]`, passes setup and then stops the proxy from starting.
 
+The proxy image generates its configuration with QuickJS, which refuses two group forms Node
+accepts: a flag modifier such as `(?i:`, and one group name used in two alternatives. Setup refuses
+both. A host needs no `(?i:`, since it matches in any case; in a path, spell each case as a class,
+as in `[Aa]`.
+
 In `allowed_url_rules` a `~` expression covers the URL, and is split at the first `/` after `://`:
 everything before that `/` is matched against the host, everything from it onward against the path.
 The scheme before `://` must be written `https`, `http` or `https?`, the last covering both; any

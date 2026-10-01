@@ -191,6 +191,29 @@ describe("checkRulesCompileOrThrow", () => {
     ).not.toThrow();
   });
 
+  // Node compiles both; QuickJS, which compiles the same rules when the proxy
+  // starts, refuses both.
+  it("refuses, as INVALID_RULES, group syntax the container's QuickJS refuses", () => {
+    for (const group of ["(?i:a)", "((?<n>a)|(?<n>b))"]) {
+      const host = `~^${group}\\.example\\.com:443$`;
+      for (const inputs of [
+        { httpsRules: [host] },
+        { httpRules: [host] },
+        { tlsRules: [host] },
+        { ipRules: [`~^10\\.0\\.0\\.${group}:443$`] },
+      ]) {
+        expect(codeOfThrown(() => checkRulesCompileOrThrow(inputs))).toBe("INVALID_RULES");
+      }
+      expect(codeOfThrown(() => parseKnownBlockedRulesOrThrow(host))).toBe("INVALID_RULES");
+      for (const url of [
+        `GET ~^https://${group}\\.example\\.com/x`,
+        `GET ~^https://example\\.com/${group}`,
+      ]) {
+        expect(codeOfThrown(() => buildUrlRulesOrThrow(url))).toBe("INVALID_RULES");
+      }
+    }
+  });
+
   // Passes the setup parser, which lets a CIDR block through for IP rules, but
   // not the proxy's own host compiler.
   it("refuses, as INVALID_RULES, a rule only the container's compiler rejects", () => {

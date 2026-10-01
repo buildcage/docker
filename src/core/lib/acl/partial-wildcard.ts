@@ -316,12 +316,43 @@ function checkEscapes(text: string, label: string, rule: string): void {
 }
 
 /**
+ * Group syntax Node (setup) accepts and QuickJS-ng (the config generator
+ * inside the proxy image) refuses: a flag modifier such as `(?i:`, and one
+ * group name used in two alternatives.
+ */
+function checkGroups(text: string, label: string, rule: string): void {
+  const names = new Set<string>();
+  for (const [i, inClass] of regexChars(text)) {
+    if (inClass) continue;
+    const rest = text.slice(i);
+    const modifier = /^\(\?[A-Za-z-]+:?/.exec(rest);
+    if (modifier) {
+      throw new Error(
+        `Invalid regex in rule "${rule}": the ${label} "${text}" uses the flag modifier ` +
+          `"${modifier[0]}", which the proxy's QuickJS refuses. A host matches regardless of ` +
+          `case already; spell a path's other case as a class, as in "[Aa]"`,
+      );
+    }
+    const name = /^\(\?<(?![=!])([^>]*)>/.exec(rest)?.[1];
+    if (name === undefined) continue;
+    if (names.has(name)) {
+      throw new Error(
+        `Invalid regex in rule "${rule}": the ${label} "${text}" names two groups "${name}", ` +
+          `which the proxy's QuickJS refuses`,
+      );
+    }
+    names.add(name);
+  }
+}
+
+/**
  * Check part of a `~` rule against what the rule syntax can represent.
  *
  * @throws {Error} if the text holds class syntax checkClasses refuses, uses an
- *   escape outside PORTABLE_ESCAPE or one checkPortableEscape refuses, carries
- *   a top-level `|`, or a host half holds a character no hostname can or text
- *   the resolver's config cannot quote
+ *   escape outside PORTABLE_ESCAPE or one checkPortableEscape refuses, holds
+ *   group syntax checkGroups refuses, carries a top-level `|`, or a host half
+ *   holds a character no hostname can or text the resolver's config cannot
+ *   quote
  */
 export function checkRawRegexHalf(
   text: string,
@@ -331,6 +362,7 @@ export function checkRawRegexHalf(
 ): void {
   checkClasses(text, label, rule);
   checkEscapes(text, label, rule);
+  checkGroups(text, label, rule);
   if (hostHalf) checkResolverRegexSyntax(text, label, rule);
   if (hasTopLevelAlternation(text)) {
     throw new Error(
@@ -385,9 +417,8 @@ export function anchorRawRegex(regex: string): string {
  * in the whole fragment, keeps a port group's own `(` out of the host half
  * so both halves stay balanced regexes on their own.
  *
- * A `:` that is escaped, inside a character class, or part of a group's own
- * syntax (`(?:`, `(?i:`) is not a port separator, so `(?:a|b)\.com:443`
- * splits at its last colon.
+ * A `:` that is escaped, inside a character class, or the one in `(?:` is not
+ * a port separator, so `(?:a|b)\.com:443` splits at its last colon.
  *
  * @returns the index, or -1 when the fragment names no port
  */
@@ -399,9 +430,7 @@ function portPatternStart(hostPlusPort: string): number {
     if (c === ":") return i;
     if (c === "(") {
       if (hostPlusPort[i + 1] === ":") return i;
-      // Past the group's own syntax up to its body: `(?:`, `(?i:`, `(?<name>`.
-      const syntax = /^\(\?[A-Za-z-]*:?/.exec(hostPlusPort.slice(i));
-      if (syntax) bodyStart = i + syntax[0].length;
+      if (hostPlusPort.startsWith("(?:", i)) bodyStart = i + 3;
     }
   }
   return -1;

@@ -231,6 +231,28 @@ describe("checkRawRegexHalf", () => {
     }
   });
 
+  it("refuses a flag modifier, which QuickJS cannot compile", () => {
+    for (const text of ["^(?i:api)\\.com:443", "^(?-i:api)\\.com:443", "/(?i-m:x)"]) {
+      expect(() => check(text, false)).toThrow(/flag modifier "\(\?[a-z-]+:"/);
+    }
+  });
+
+  it("refuses a group name used twice, which QuickJS cannot compile", () => {
+    expect(() => check("^((?<a>x)|(?<a>y))\\.com:443", false)).toThrow(/two groups "a"/);
+  });
+
+  it("keeps the group syntax QuickJS compiles", () => {
+    for (const text of [
+      "(?:a|b)\\.com:443",
+      "((?<a>x)|(?<b>y))\\.com:443",
+      "(?=a)(?!b)(?<=c)(?<!d)\\.com:443",
+      "[(?i:]\\.com:443",
+      "\\(?i:443",
+    ]) {
+      expect(() => check(text, false)).not.toThrow();
+    }
+  });
+
   it("leaves an alternation inside a group or a character class alone", () => {
     expect(() => check("a\\.com:(443|8443)", false)).not.toThrow();
     expect(() => check("a\\.com:[4|8]443", false)).not.toThrow();
@@ -403,10 +425,6 @@ describe("splitDomainFromPortPattern", () => {
     expect(splitDomainFromPortPattern("(?:a|b)\\.com:443")).toStrictEqual({
       domain: "(?:a|b)\\.com",
       portPattern: ":443",
-    });
-    expect(splitDomainFromPortPattern("(?i:a)\\.com(:443)?")).toStrictEqual({
-      domain: "(?i:a)\\.com",
-      portPattern: "(:443)?",
     });
     expect(splitDomainFromPortPattern("(?<n>a)\\.com:443")).toStrictEqual({
       domain: "(?<n>a)\\.com",
