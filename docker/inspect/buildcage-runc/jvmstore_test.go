@@ -386,6 +386,34 @@ func TestInjectCoversASecondJDK(t *testing.T) {
 	}
 }
 
+// Only the first java on PATH, the one a bare `java` runs, has its keystore
+// injected: a JDK further along PATH gets no CA and no mount, so a later step
+// can still remove it.
+func TestInjectSkipsAJDKFurtherAlongPath(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/opt/jdk-21/bin:/opt/jdk-17/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	for _, jdk := range []string{"jdk-21", "jdk-17"} {
+		writeRootfsKeystore(t, rootfs, "/opt/"+jdk+"/lib/security/cacerts",
+			keystore(2, trustedEntry(2, "digicert", otherDER)))
+		mustMkdirAll(t, filepath.Join(rootfs, "opt", jdk, "bin"))
+		mustWriteFile(t, filepath.Join(rootfs, "opt", jdk, "bin/java"), "java")
+	}
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mounts := loadMounts(t, bundle)
+	findMount(t, mounts, "/opt/jdk-21/lib/security")
+	if hasMount(mounts, "/opt/jdk-17/lib/security") {
+		t.Error("the JDK further along PATH has its keystore directory mounted")
+	}
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // A step that changes the keystore gets its change written back with the proxy
 // CA taken out and its own additions kept.
 func TestInjectWritesBackWhenTheStepChangesTheKeystore(t *testing.T) {
