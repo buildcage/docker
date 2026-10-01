@@ -30,6 +30,7 @@ TEST_PLATFORM ?= linux/arm64
 # Whatever the host is not, so test_integration_buildkit_multiarch's second
 # build is a cross build wherever it runs.
 MULTIARCH_CROSS_PLATFORM ?= $(if $(filter arm64 aarch64,$(shell uname -m)),linux/amd64,linux/arm64)
+BUILDX_BUILD = docker buildx build --no-cache --builder $(BUILDER_NAME) --platform $(TEST_PLATFORM) --progress=plain
 
 # Compose project name, trusted by report/src/main.ts and
 # src/post.ts via their own BUILDCAGE_BUILD_TEST_HOOKS-gated overrides
@@ -140,53 +141,22 @@ test_unit_qjs: ## Run unit tests in Docker
 # setup_buildkit_{engine}_{mode}: start the builder only
 # ---------------------------------------------------------------------------
 
-.PHONY: setup_buildkit_universal_audit
+SETUP_TARGETS := setup_buildkit_universal_audit setup_buildkit_universal_restrict setup_buildkit_inspect_audit setup_buildkit_inspect_restrict
+.PHONY: $(SETUP_TARGETS)
 setup_buildkit_universal_audit: ## Start universal engine in audit mode
-	@echo "Starting buildcage (universal engine) in AUDIT mode..."
-	@COMPOSE_FILE=$(COMPOSE_FILE) \
-	  PROXY_ENGINE=universal \
-	  PROXY_MODE=audit \
-	  docker compose -p $(COMPOSE_PROJECT_NAME) up -d --wait --build
-	@docker buildx rm $(BUILDER_NAME) 2>/dev/null || true
-	@echo "Creating buildx builder..."
-	@docker buildx create --bootstrap \
-		--name $(BUILDER_NAME) \
-		--driver remote docker-container://$(BUILDER_NAME)
-
-.PHONY: setup_buildkit_universal_restrict
 setup_buildkit_universal_restrict: ## Start universal engine in restrict mode
-	@echo "Starting buildcage (universal engine) in RESTRICT mode..."
-	@COMPOSE_FILE=$(COMPOSE_FILE) \
-	  PROXY_ENGINE=universal \
-	  PROXY_MODE=restrict \
-	  ALLOWED_HTTP_RULES="$${ALLOWED_HTTP_RULES:-}" \
-	  ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443}" \
-	  docker compose -p $(COMPOSE_PROJECT_NAME) up -d --wait --build
-	@docker buildx rm $(BUILDER_NAME) 2>/dev/null || true
-	@echo "Creating buildx builder..."
-	@docker buildx create --bootstrap \
-		--name $(BUILDER_NAME) \
-		--driver remote docker-container://$(BUILDER_NAME)
-
-.PHONY: setup_buildkit_inspect_audit
 setup_buildkit_inspect_audit: ## Start inspect proxy engine in audit mode
-	@echo "Starting buildcage (inspect proxy engine) in AUDIT mode..."
-	@COMPOSE_FILE=$(COMPOSE_FILE) \
-	  PROXY_ENGINE=inspect \
-	  PROXY_MODE=audit \
-	  docker compose -p $(COMPOSE_PROJECT_NAME) up -d --wait --build
-	@docker buildx rm $(BUILDER_NAME) 2>/dev/null || true
-	@echo "Creating buildx builder..."
-	@docker buildx create --bootstrap \
-		--name $(BUILDER_NAME) \
-		--driver remote docker-container://$(BUILDER_NAME)
-
-.PHONY: setup_buildkit_inspect_restrict
 setup_buildkit_inspect_restrict: ## Start inspect proxy engine in restrict mode
-	@echo "Starting buildcage (inspect proxy engine) in RESTRICT mode..."
+
+# Only this target starts with default rules; ALLOWED_HTTPS_RULES replaces them.
+setup_buildkit_universal_restrict: DEFAULT_ALLOWED_HTTPS_RULES := github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443
+
+$(SETUP_TARGETS): setup_buildkit_%:
+	@echo "Starting buildcage ($(word 1,$(subst _, ,$*)) engine) in $(if $(filter audit,$(word 2,$(subst _, ,$*))),AUDIT,RESTRICT) mode..."
 	@COMPOSE_FILE=$(COMPOSE_FILE) \
-	  PROXY_ENGINE=inspect \
-	  PROXY_MODE=restrict \
+	  PROXY_ENGINE=$(word 1,$(subst _, ,$*)) \
+	  PROXY_MODE=$(word 2,$(subst _, ,$*)) \
+	  $(if $(DEFAULT_ALLOWED_HTTPS_RULES),ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-$(DEFAULT_ALLOWED_HTTPS_RULES)}") \
 	  docker compose -p $(COMPOSE_PROJECT_NAME) up -d --wait --build
 	@docker buildx rm $(BUILDER_NAME) 2>/dev/null || true
 	@echo "Creating buildx builder..."
@@ -222,10 +192,7 @@ test_integration_buildkit_universal_audit: ## Run universal-engine audit mode te
 	@echo "Running universal-engine audit mode tests..."
 	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
 	  $(MAKE) setup_buildkit_universal_audit
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.universal-audit test/ \
+	@$(BUILDX_BUILD) -f test/Dockerfile.universal-audit test/ \
 	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts
 	@./test/assert-universal-audit.sh
@@ -239,10 +206,7 @@ test_integration_buildkit_universal_restrict: ## Run universal-engine restrict m
 	@echo "Running universal-engine restrict mode tests..."
 	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
 	  $(MAKE) setup_buildkit_universal_restrict
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.universal-restrict test/ \
+	@$(BUILDX_BUILD) -f test/Dockerfile.universal-restrict test/ \
 	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts || true
 	@./test/assert-universal-restrict.sh
@@ -254,10 +218,7 @@ test_integration_buildkit_universal_restrict_no_traffic: ## Run universal-engine
 	@echo "Running universal-engine restrict mode tests with zero outbound traffic..."
 	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
 	  $(MAKE) setup_buildkit_universal_restrict
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.universal-restrict-no-traffic test/ \
+	@$(BUILDX_BUILD) -f test/Dockerfile.universal-restrict-no-traffic test/ \
 	  --load -t $(TEST_IMAGE)
 	@INPUT_FAIL_ON_BLOCKED=true node report/src/main.ts
 	@./test/assert-universal-restrict-no-traffic.sh
@@ -273,10 +234,7 @@ test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode 
 	@echo "Running inspect-engine restrict mode tests..."
 	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
 	  $(MAKE) setup_buildkit_inspect_restrict
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.inspect-restrict test/ \
+	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-restrict test/ \
 	  --load -t $(TEST_IMAGE)
 	@./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@./test/assert-inspect-no-layer-bloat.sh $(TEST_IMAGE)
@@ -285,10 +243,7 @@ test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode 
 	@BUILDER_NAME=$(BUILDER_NAME) TEST_PLATFORM=$(TEST_PLATFORM) \
 	  ./test/assert-inspect-refuses-embedded-bundle.sh
 	@./test/assert-step-port-isolation.sh
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.inspect-python test/ \
+	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-python test/ \
 	  --load -t $(TEST_IMAGE)
 	@node src/post.ts
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
@@ -301,10 +256,7 @@ test_integration_buildkit_inspect_debian_audit: ## Run inspect-engine audit mode
 	@echo "Running inspect-engine audit mode tests (Debian/apt)..."
 	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
 	  $(MAKE) setup_buildkit_inspect_audit
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.inspect-debian test/ \
+	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-debian test/ \
 	  --load -t $(TEST_IMAGE)
 	@./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@./test/assert-inspect-no-layer-bloat.sh $(TEST_IMAGE)
@@ -317,10 +269,7 @@ test_integration_buildkit_inspect_debian_restrict: ## Run inspect-engine restric
 	@echo "Running inspect-engine restrict mode tests (Debian/apt)..."
 	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
 	  $(MAKE) setup_buildkit_inspect_restrict
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.inspect-debian test/ \
+	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-debian test/ \
 	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts || true
 	@./test/assert-inspect-debian.sh restrict
@@ -338,19 +287,14 @@ test_integration_buildkit_inspect_java_audit: ## Run inspect-engine tests agains
 	  $(MAKE) setup_buildkit_inspect_audit
 	@for base in $(TEST_TEMURIN_PKCS12_IMAGE) $(TEST_TEMURIN_JKS_IMAGE); do \
 	  echo "=== Java base image: $$base ==="; \
-	  docker buildx build --no-cache \
-	    --builder $(BUILDER_NAME) \
-	    --platform $(TEST_PLATFORM) \
+	  $(BUILDX_BUILD) \
 	    --build-arg BASE=$$base \
-	    --progress=plain -f test/Dockerfile.inspect-java test/ \
+	    -f test/Dockerfile.inspect-java test/ \
 	    --load -t $(TEST_IMAGE) || exit 1; \
 	  NO_APP_STORE_COPIES=1 ./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE) || exit 1; \
 	done
 	@echo "=== Java real-tool case: Maven resolving a dependency ==="
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f test/Dockerfile.inspect-java-maven test/ \
+	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-java-maven test/ \
 	  --load -t $(TEST_IMAGE)
 	@NO_APP_STORE_COPIES=1 ./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
@@ -383,11 +327,9 @@ test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that
 	  $(MAKE) setup_buildkit_inspect_audit
 	@for case in leaf json; do \
 	  echo "=== A copy of the CA the sweep cannot take out: $$case ==="; \
-	  if docker buildx build --no-cache \
-	      --builder $(BUILDER_NAME) \
-	      --platform $(TEST_PLATFORM) \
+	  if $(BUILDX_BUILD) \
 	      --build-arg CASE=$$case \
-	      --progress=plain -f test/Dockerfile.inspect-hidden-ca test/ \
+	      -f test/Dockerfile.inspect-hidden-ca test/ \
 	      > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1; then \
 	    echo "FAIL: the build committed a copy of the CA ($$case)"; exit 1; \
 	  fi; \
@@ -402,18 +344,14 @@ test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that
 	  echo "PASS: the build failed on the copy of the CA, pointing at fail_on_ca_residue ($$case)"; \
 	done
 	@echo "=== An encrypted keystore that is not the CA's ==="
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
+	@$(BUILDX_BUILD) \
 	  --build-arg CASE=control \
-	  --progress=plain -f test/Dockerfile.inspect-hidden-ca test/
+	  -f test/Dockerfile.inspect-hidden-ca test/
 	@echo "PASS: the build kept a keystore that is not the CA's"
 	@echo "=== A keystore under changeit the sweep takes the CA out of ==="
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
+	@$(BUILDX_BUILD) \
 	  --build-arg CASE=resealed \
-	  --progress=plain -f test/Dockerfile.inspect-hidden-ca test/ \
+	  -f test/Dockerfile.inspect-hidden-ca test/ \
 	  --load -t $(TEST_IMAGE)
 	@listing=$$(docker run --rm $(TEST_IMAGE) keytool -list -keystore /app/trust.p12 -storepass changeit) \
 	  || { echo "FAIL: the resealed keystore does not open under changeit"; exit 1; }; \
@@ -436,11 +374,9 @@ test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that
 	@echo "=== fail_on_ca_residue: false, where the same copy only warns ==="
 	@FAIL_ON_CA_RESIDUE=false COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
 	  $(MAKE) setup_buildkit_inspect_audit
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
+	@$(BUILDX_BUILD) \
 	  --build-arg CASE=leaf \
-	  --progress=plain -f test/Dockerfile.inspect-hidden-ca test/ \
+	  -f test/Dockerfile.inspect-hidden-ca test/ \
 	  > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1 \
 	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: the copy of the CA failed the build"; exit 1; }
 	@grep -q "buildcage: warning: .*cannot strip: /app/" $(SCRATCH_PREFIX)-hidden-ca.log \
@@ -527,10 +463,7 @@ example_universal_audit: ## Run audit mode example tests
 	  "WORKDIR /app" \
 	  "RUN npm init -y && npm install --ignore-scripts express" \
 	  > $(SCRATCH_PREFIX)-build-context/Dockerfile
-	docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f $(SCRATCH_PREFIX)-build-context/Dockerfile $(SCRATCH_PREFIX)-build-context \
+	$(BUILDX_BUILD) -f $(SCRATCH_PREFIX)-build-context/Dockerfile $(SCRATCH_PREFIX)-build-context \
 	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts
 	@$(MAKE) clean_buildkit
@@ -548,10 +481,7 @@ example_universal_restrict: ## Run restrict mode example tests
 	  "RUN npm init -y && npm install --ignore-scripts express" \
 	  "RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true" \
 	  > $(SCRATCH_PREFIX)-build-context/Dockerfile
-	docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --progress=plain -f $(SCRATCH_PREFIX)-build-context/Dockerfile $(SCRATCH_PREFIX)-build-context \
+	$(BUILDX_BUILD) -f $(SCRATCH_PREFIX)-build-context/Dockerfile $(SCRATCH_PREFIX)-build-context \
 	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts || true
 	@$(MAKE) clean_buildkit
