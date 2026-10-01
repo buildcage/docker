@@ -233,12 +233,12 @@ describe("checkRawRegexHalf", () => {
 
   it("refuses a flag modifier, which QuickJS cannot compile", () => {
     for (const text of ["^(?i:api)\\.com:443", "^(?-i:api)\\.com:443", "/(?i-m:x)"]) {
-      expect(() => check(text, false)).toThrow(/flag modifier "\(\?[a-z-]+:"/);
+      expect(() => check(text, false)).toThrow(/uses "\(\?[a-z-]+:", which the proxy's QuickJS/);
     }
   });
 
   it("refuses a group name used twice, which QuickJS cannot compile", () => {
-    expect(() => check("^((?<a>x)|(?<a>y))\\.com:443", false)).toThrow(/two groups "a"/);
+    expect(() => check("^((?<a>x)|(?<a>y))\\.com:443", false)).toThrow(/group name "a" twice/);
   });
 
   it("keeps the group syntax QuickJS compiles", () => {

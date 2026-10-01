@@ -140,9 +140,14 @@ function hasTopLevelAlternation(regex) {
 	}
 	return !1;
 }
+const NAMED_GROUP = /^\(\?<(?![=!])([^>]*)>/;
 function capturingGroups(regex) {
 	let count = 0;
-	for (let [i, inClass] of regexChars(regex)) !inClass && /^\((?:(?!\?)|\?<(?![=!]))/.test(regex.slice(i)) && count++;
+	for (let [i, inClass] of regexChars(regex)) {
+		if (inClass) continue;
+		let rest = regex.slice(i);
+		(/^\((?!\?)/.test(rest) || NAMED_GROUP.test(rest)) && count++;
+	}
 	return count;
 }
 const HOST_LITERAL_ILLEGAL = /\\[[\]]/, COREFILE_UNSAFE = /['`]|\{[$%]/, RE2_UNSUPPORTED = /^(?:\(\?<?[=!]|\\[1-9])/;
@@ -183,11 +188,11 @@ function checkGroups(text, label, rule) {
 	let names = new Set();
 	for (let [i, inClass] of regexChars(text)) {
 		if (inClass) continue;
-		let rest = text.slice(i), modifier = /^\(\?[A-Za-z-]+:?/.exec(rest);
-		if (modifier) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses the flag modifier "${modifier[0]}", which the proxy's QuickJS refuses. A host matches regardless of case already; spell a path's other case as a class, as in "[Aa]"`);
-		let name = /^\(\?<(?![=!])([^>]*)>/.exec(rest)?.[1];
+		let rest = text.slice(i), opening = /^\(\?(?![:=!<])[^:)]*:?/.exec(rest);
+		if (opening) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses "${opening[0]}", which the proxy's QuickJS refuses. A host matches in any case already; in a path, spell each case as a class, as in "[Aa]"`);
+		let name = NAMED_GROUP.exec(rest)?.[1];
 		if (name !== void 0) {
-			if (names.has(name)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" names two groups "${name}", which the proxy's QuickJS refuses`);
+			if (names.has(name)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" uses the group name "${name}" twice, which the proxy's QuickJS refuses`);
 			names.add(name);
 		}
 	}

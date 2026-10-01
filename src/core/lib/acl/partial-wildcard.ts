@@ -177,6 +177,9 @@ function hasTopLevelAlternation(regex: string): boolean {
   return false;
 }
 
+/** A named group's opening, capturing its name. */
+const NAMED_GROUP = /^\(\?<(?![=!])([^>]*)>/;
+
 /**
  * How many capturing groups `regex` opens: `(` with no `?` after it, or a
  * named group.
@@ -184,7 +187,9 @@ function hasTopLevelAlternation(regex: string): boolean {
 function capturingGroups(regex: string): number {
   let count = 0;
   for (const [i, inClass] of regexChars(regex)) {
-    if (!inClass && /^\((?:(?!\?)|\?<(?![=!]))/.test(regex.slice(i))) count++;
+    if (inClass) continue;
+    const rest = regex.slice(i);
+    if (/^\((?!\?)/.test(rest) || NAMED_GROUP.test(rest)) count++;
   }
   return count;
 }
@@ -317,28 +322,29 @@ function checkEscapes(text: string, label: string, rule: string): void {
 
 /**
  * Group syntax Node (setup) accepts and QuickJS-ng (the config generator
- * inside the proxy image) refuses: a flag modifier such as `(?i:`, and one
- * group name used in two alternatives.
+ * inside the proxy image) refuses. Any `(?` other than `(?:`, a lookaround or
+ * a named group is refused, a flag modifier such as `(?i:` among them, and so
+ * is one group name used in two alternatives.
  */
 function checkGroups(text: string, label: string, rule: string): void {
   const names = new Set<string>();
   for (const [i, inClass] of regexChars(text)) {
     if (inClass) continue;
     const rest = text.slice(i);
-    const modifier = /^\(\?[A-Za-z-]+:?/.exec(rest);
-    if (modifier) {
+    const opening = /^\(\?(?![:=!<])[^:)]*:?/.exec(rest);
+    if (opening) {
       throw new Error(
-        `Invalid regex in rule "${rule}": the ${label} "${text}" uses the flag modifier ` +
-          `"${modifier[0]}", which the proxy's QuickJS refuses. A host matches regardless of ` +
-          `case already; spell a path's other case as a class, as in "[Aa]"`,
+        `Invalid regex in rule "${rule}": the ${label} "${text}" uses "${opening[0]}", which the ` +
+          `proxy's QuickJS refuses. A host matches in any case already; in a path, spell each ` +
+          `case as a class, as in "[Aa]"`,
       );
     }
-    const name = /^\(\?<(?![=!])([^>]*)>/.exec(rest)?.[1];
+    const name = NAMED_GROUP.exec(rest)?.[1];
     if (name === undefined) continue;
     if (names.has(name)) {
       throw new Error(
-        `Invalid regex in rule "${rule}": the ${label} "${text}" names two groups "${name}", ` +
-          `which the proxy's QuickJS refuses`,
+        `Invalid regex in rule "${rule}": the ${label} "${text}" uses the group name ` +
+          `"${name}" twice, which the proxy's QuickJS refuses`,
       );
     }
     names.add(name);
