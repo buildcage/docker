@@ -74,7 +74,7 @@ describe("parseIpRulesOrThrow", () => {
       "10.0.0.1?:22",
       "10.**:443",
       "10.0.0.0/8:443",
-      "~^x:443$",
+      "~^192\\.168\\.1\\.\\d+:80$",
     ];
     expect(parseIpRulesOrThrow(rules.join(" "))).toStrictEqual(rules);
   });
@@ -84,6 +84,26 @@ describe("parseIpRulesOrThrow", () => {
       "INVALID_RULES",
     );
     expect(() => parseIpRulesOrThrow("github.com:443")).toThrow(/"github\.com:443" names a host/);
+  });
+
+  it("refuses a regex with a letter outside every escape and class", () => {
+    for (const rule of [
+      "~^example\\.com:443$",
+      "~^x:443$",
+      "~^10\\.0\\.0\\.1:https$",
+      "~^(?<n>10)\\.x:443$",
+    ]) {
+      expect(() => parseIpRulesOrThrow(rule)).toThrow(/names a host/);
+    }
+  });
+
+  it("keeps a regex whose letters are escapes, classes or a group's name", () => {
+    const rules = [
+      "~^10\\.(?:0|1)\\.\\d+\\.\\d+:443$",
+      "~^(?<a>10)\\.0\\.0\\.1:443$",
+      "~^10\\.0\\.0\\.[0-9a]:\\d+$",
+    ];
+    expect(parseIpRulesOrThrow(rules.join(" "))).toStrictEqual(rules);
   });
 
   it("still rejects a syntax error first", () => {

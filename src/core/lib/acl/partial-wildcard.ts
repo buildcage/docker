@@ -160,6 +160,21 @@ function* regexChars(regex: string): Generator<[number, boolean]> {
   }
 }
 
+/**
+ * True if `regex` holds a letter that matches itself: one outside every
+ * character class and escape, and not a group's name.
+ */
+export function hasLiteralLetter(regex: string): boolean {
+  let nameEnd = 0;
+  for (const [i, inClass] of regexChars(regex)) {
+    if (inClass || i < nameEnd) continue;
+    const named = NAMED_GROUP.exec(regex.slice(i));
+    if (named) nameEnd = i + named[0].length;
+    else if (/[A-Za-z]/.test(regex[i])) return true;
+  }
+  return false;
+}
+
 /** True if `regex` carries a `|` outside every group and character class. */
 function hasTopLevelAlternation(regex: string): boolean {
   let depth = 0;
