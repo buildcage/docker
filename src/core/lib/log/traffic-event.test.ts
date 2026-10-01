@@ -47,12 +47,6 @@ describe("isRedundantDns", () => {
     expect(redundant(dns, [dns, request])).toBe(true);
   });
 
-  it("matches a host the request spelled with different case", () => {
-    const dns = event({ protocol: "dns", action: "allow", host: "a.example.com" });
-    const request = event({ protocol: "https", action: "allow", host: "A.Example.COM" });
-    expect(redundant(dns, [dns, request])).toBe(true);
-  });
-
   it("ignores a second DNS record for the same host", () => {
     // Two records for one name (the plain name and a search-domain variant of
     // it, say) do not make each other redundant. Only a connection does.
@@ -81,10 +75,10 @@ describe("isRedundantDns", () => {
 });
 
 describe("connectedHosts", () => {
-  it("indexes only what was connected to, lowercased and split by outcome", () => {
+  it("indexes only what was connected to, split by outcome", () => {
     const connected = connectedHosts([
-      event({ protocol: "https", action: "allow", host: "Allowed.Example.COM" }),
-      event({ protocol: "https", action: "block", host: "Refused.Example.COM" }),
+      event({ protocol: "https", action: "allow", host: "allowed.example.com" }),
+      event({ protocol: "https", action: "block", host: "refused.example.com" }),
       event({ protocol: "dns", action: "block", host: "lookup.example.com" }),
     ]);
     expect([...connected.any].sort().join(",")).toBe("allowed.example.com,refused.example.com");

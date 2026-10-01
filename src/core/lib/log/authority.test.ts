@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { splitHostPort } from "./authority.ts";
+import { ruleHost, splitHostPort } from "./authority.ts";
 
 describe("splitHostPort", () => {
   it("reports no port as undefined", () => {
@@ -38,5 +38,17 @@ describe("splitHostPort", () => {
   // the whole thing is treated as the host rather than as a bare port.
   it("does not split on a leading colon", () => {
     expect(splitHostPort(":443")).toStrictEqual({ host: ":443", port: undefined });
+  });
+});
+
+describe("ruleHost", () => {
+  it("lowercases ASCII letters only", () => {
+    expect(ruleHost("Registry.NPMJS.org")).toBe("registry.npmjs.org");
+    expect(ruleHost("BÜCHER.example")).toBe("bÜcher.example");
+  });
+
+  it("drops one trailing dot", () => {
+    expect(ruleHost("example.com.")).toBe("example.com");
+    expect(ruleHost("example.com..")).toBe("example.com.");
   });
 });

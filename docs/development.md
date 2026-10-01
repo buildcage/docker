@@ -233,6 +233,8 @@ buildcage 1787471973000 [-] (HTTP) "-" - 0 ts=PR dst=198.19.255.1:22
 Fields: `buildcage <epoch-ms> [status] (rule) "domain:port" reason bytes`. The
 millisecond epoch orders the timeline and times each line against the startup
 marker; `bytes` is `%B`, the only per-connection detail a passthrough sees.
+The log keeps `domain` as sent; the report lowercases it, as the rules ignore
+case when matching it.
 
 A plaintext connection made through a name is relayed to a second frontend,
 `http_in`, whose lines also carry `ts`, HAProxy's termination state, and `dst`.

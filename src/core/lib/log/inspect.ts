@@ -21,7 +21,7 @@
 
 import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
 
-import { splitHostPort } from "./authority.ts";
+import { ruleHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
@@ -223,12 +223,6 @@ function urlOf(scheme: string, authority: string, target: string): string | unde
  *  scheme's default. RFC 9112 §3.3 builds it from the connection the same way. */
 function authorityOf(host: string, port: string, scheme: "http" | "https"): string {
   return port === DEFAULT_PORT[scheme] ? host : `${host}:${port}`;
-}
-
-/** A host as the rules match it: ASCII lowercased, as HAProxy's `lower` does,
- *  with one trailing dot dropped (see HOST_ONLY). */
-function ruleHost(host: string): string {
-  return host.replace(/[A-Z]/g, (c) => c.toLowerCase()).replace(/\.$/, "");
 }
 
 /**
