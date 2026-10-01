@@ -92,8 +92,9 @@ describe("parseIpRulesOrThrow", () => {
       "~^x:443$",
       "~^10\\.0\\.0\\.1:https$",
       "~^(?<n>10)\\.x:443$",
+      "~^例\\.jp:443$",
     ]) {
-      expect(() => parseIpRulesOrThrow(rule)).toThrow(/names a host/);
+      expect(() => parseIpRulesOrThrow(rule)).toThrow(/holds the letter "(.)", which no address/);
     }
   });
 

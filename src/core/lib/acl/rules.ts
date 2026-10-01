@@ -4,7 +4,7 @@ import { generateHaproxyConfig } from "./haproxy-config.ts";
 import { compileRuleSet, type RuleInputs } from "./haproxy-rules.ts";
 import { generateUniversalHaproxyConfig } from "./haproxy-universal-config.ts";
 import { isIpRuleAddress } from "./ipv4.ts";
-import { hasLiteralLetter } from "./partial-wildcard.ts";
+import { literalLetter } from "./partial-wildcard.ts";
 import { buildUrlRules, type UrlRule } from "./url-rules.ts";
 import { parseAndValidateKnownBlockedRules, parseAndValidateRules } from "./wildcard-rules.ts";
 
@@ -77,15 +77,6 @@ export function checkRulesCompileOrThrow(inputs: RuleInputs): void {
  */
 const IP_RULE_HOST = /^[0-9.*?/]+$/;
 
-function namesHostError(rule: string): InvalidRulesError {
-  return new InvalidRulesError(
-    `IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against ` +
-      `the address a connection goes to; allow a name with allowed_https_rules or ` +
-      `allowed_http_rules instead.`,
-    "INVALID_RULES",
-  );
-}
-
 /**
  * parseRulesOrThrow for `allowed_ip_rules`, which also refuses a rule that
  * names a host rather than an address.
@@ -94,13 +85,26 @@ export function parseIpRulesOrThrow(rulesInput: string | undefined): string[] {
   const rules = parseRulesOrThrow(rulesInput);
   for (const rule of rules) {
     if (rule.startsWith("~")) {
-      // An address and port are digits, so a letter outside every escape and
-      // class can only be part of a host name.
-      if (hasLiteralLetter(rule.slice(1))) throw namesHostError(rule);
+      const letter = literalLetter(rule.slice(1));
+      if (letter !== undefined) {
+        throw new InvalidRulesError(
+          `IP rule "${rule}" holds the letter "${letter}", which no address or port contains. ` +
+            `allowed_ip_rules is matched against the address and port a connection goes to; ` +
+            `allow a name with allowed_https_rules or allowed_http_rules instead.`,
+          "INVALID_RULES",
+        );
+      }
       continue;
     }
     const host = rule.slice(0, rule.lastIndexOf(":"));
-    if (!IP_RULE_HOST.test(host)) throw namesHostError(rule);
+    if (!IP_RULE_HOST.test(host)) {
+      throw new InvalidRulesError(
+        `IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against ` +
+          `the address a connection goes to; allow a name with allowed_https_rules or ` +
+          `allowed_http_rules instead.`,
+        "INVALID_RULES",
+      );
+    }
     if (!isIpRuleAddress(host)) {
       throw new InvalidRulesError(
         `IP rule "${rule}" is not an IPv4 address: write four octets, each a decimal from 0 to ` +

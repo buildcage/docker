@@ -129,15 +129,14 @@ function* regexChars(regex) {
 		yield [i, inClass], c === "\\" ? i++ : inClass ? c === "]" && (inClass = !1) : c === "[" && (inClass = !0);
 	}
 }
-function hasLiteralLetter(regex) {
+function literalLetter(regex) {
 	let nameEnd = 0;
 	for (let [i, inClass] of regexChars(regex)) {
 		if (inClass || i < nameEnd) continue;
-		let named = NAMED_GROUP.exec(regex.slice(i));
+		let named = regex[i] === "(" ? NAMED_GROUP.exec(regex.slice(i)) : null;
 		if (named) nameEnd = i + named[0].length;
-		else if (/[A-Za-z]/.test(regex[i])) return !0;
+		else if (/\p{L}/u.test(regex[i])) return regex[i];
 	}
-	return !1;
 }
 function hasTopLevelAlternation(regex) {
 	let depth = 0;
@@ -8255,18 +8254,16 @@ function checkRulesCompileOrThrow(inputs) {
 	}
 }
 const IP_RULE_HOST = /^[0-9.*?/]+$/;
-function namesHostError(rule) {
-	return new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against the address a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
-}
 function parseIpRulesOrThrow(rulesInput) {
 	let rules = parseRulesOrThrow(rulesInput);
 	for (let rule of rules) {
 		if (rule.startsWith("~")) {
-			if (hasLiteralLetter(rule.slice(1))) throw namesHostError(rule);
+			let letter = literalLetter(rule.slice(1));
+			if (letter !== void 0) throw new InvalidRulesError(`IP rule "${rule}" holds the letter "${letter}", which no address or port contains. allowed_ip_rules is matched against the address and port a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
 			continue;
 		}
 		let host = rule.slice(0, rule.lastIndexOf(":"));
-		if (!IP_RULE_HOST.test(host)) throw namesHostError(rule);
+		if (!IP_RULE_HOST.test(host)) throw new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against the address a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
 		if (!isIpRuleAddress(host)) throw new InvalidRulesError(`IP rule "${rule}" is not an IPv4 address: write four octets, each a decimal from 0 to 255 without a leading zero (10.0.0.1, not 010.0.0.1) or a wildcard (10.0.*.*, or 10.** across dots), and a CIDR prefix from 0 to 32.`, "INVALID_RULES");
 	}
 	return rules;

@@ -161,18 +161,18 @@ function* regexChars(regex: string): Generator<[number, boolean]> {
 }
 
 /**
- * True if `regex` holds a letter that matches itself: one outside every
+ * The first letter in `regex` that matches itself: one outside every
  * character class and escape, and not a group's name.
  */
-export function hasLiteralLetter(regex: string): boolean {
+export function literalLetter(regex: string): string | undefined {
   let nameEnd = 0;
   for (const [i, inClass] of regexChars(regex)) {
     if (inClass || i < nameEnd) continue;
-    const named = NAMED_GROUP.exec(regex.slice(i));
+    const named = regex[i] === "(" ? NAMED_GROUP.exec(regex.slice(i)) : null;
     if (named) nameEnd = i + named[0].length;
-    else if (/[A-Za-z]/.test(regex[i])) return true;
+    else if (/\p{L}/u.test(regex[i])) return regex[i];
   }
-  return false;
+  return undefined;
 }
 
 /** True if `regex` carries a `|` outside every group and character class. */
