@@ -25,10 +25,10 @@ import type { GenReportParameters, ReportData } from "#core/lib/report/types.ts"
 import { emitReportOutcomes } from "./emit.ts";
 import { buildReportParameters } from "./parameters.ts";
 
-/** Used when the script is run outside the action, as the tests and the
- *  Makefile's report targets do. */
+/** Used when the runner leaves these unset: outside Actions (the Makefile's
+ *  report targets) and for a local-path `uses: ./report`. */
 const DEFAULT_ACTION_REPOSITORY = "buildcage/docker";
-const DEFAULT_ACTION_REF = "v2";
+const DEFAULT_ACTION_REF = "v4";
 
 export interface ReportActionSpec {
   /** This image's engine. Only used to turn the version label back into the
@@ -44,12 +44,6 @@ export interface ReportActionSpec {
 
   /** Lines to print to the job log before the summary is written. */
   logSections?(report: ReportData): string[];
-
-  /**
-   * Whether this engine writes BUILDCAGE_TRAFFIC_FILE when the report action
-   * asks for it. Set once an engine produces a timeline to write.
-   */
-  writesTrafficFile?: boolean;
 }
 
 /** Injectable so a test doesn't need argv, a real Docker daemon or the
@@ -112,7 +106,7 @@ export async function runReportAction(
   // image and the file is written here instead. Its name is known before the
   // summary is written, so a truncated Communication details section can say
   // whether the full list is available as an artifact.
-  const trafficFile = spec.writesTrafficFile ? env.BUILDCAGE_TRAFFIC_FILE : undefined;
+  const trafficFile = env.BUILDCAGE_TRAFFIC_FILE;
   await writeStepSummary(
     truncateForStepSummary(markdown, trafficFile !== undefined),
     env.GITHUB_STEP_SUMMARY,
