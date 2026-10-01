@@ -21,8 +21,8 @@ export function readBuilderName(getInput: GetInput = core.getInput): string {
   return getInput("builder_name") || DEFAULT_BUILDER_NAME;
 }
 
-/** Not `getBooleanInput`, which cannot tell unset from misspelled. Only unset,
- *  as when a dev or test invocation skips action.yml's defaults, takes the default. */
+/** Not `getBooleanInput`: it cannot tell unset from misspelled. Unset (a dev or
+ *  test run without action.yml's defaults) takes the default. */
 function readBooleanInput(name: string, fallback: boolean, getInput: GetInput): boolean {
   const value = getInput(name);
   if (value === "") return fallback;
