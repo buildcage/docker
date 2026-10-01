@@ -2,11 +2,10 @@
  * The whole setup step, in the order its parts have to happen in.
  *
  * Its own module rather than the entry point's body because almost none of
- * this is wiring: the engine decides which image tag is resolved, which of
- * the two input reads runs first decides which error a doubly-misconfigured
- * workflow is told about, and the teardown before the start is what keeps a
- * previous run's builder from being inherited. Those orderings are only
- * visible from here, so this is where they are tested.
+ * this is wiring: the engine decides which image tag is resolved, every input
+ * is validated before the image is verified, and the teardown before the
+ * start is what keeps a previous run's builder from being inherited. Those
+ * orderings are only visible from here, so this is where they are tested.
  */
 
 import { execFileSync } from "node:child_process";
@@ -33,7 +32,7 @@ import {
   checkUrlAndTlsRuleSupport,
 } from "./engine-rule-support.ts";
 import { SetupError } from "./errors.ts";
-import { readBuilderName, readEngineInputs, readRuleInputs } from "./inputs.ts";
+import { readSetupInputs } from "./inputs.ts";
 import { readLocalImageOverride } from "./local-image.ts";
 
 // Resolved from the bundle's own location: dist/main.cjs sits one directory
@@ -52,9 +51,7 @@ export const COMPOSE_FILE = join(__dirname, "../docker/compose.action.yaml");
  * the next step, not the call.
  */
 export interface SetupStepDeps {
-  readEngineInputs: typeof readEngineInputs;
-  readRuleInputs: typeof readRuleInputs;
-  readBuilderName: typeof readBuilderName;
+  readSetupInputs: typeof readSetupInputs;
   readLocalImageOverride: typeof readLocalImageOverride;
   verifyImageDigestOrThrow: typeof verifyImageDigestOrThrow;
   checkUrlAndTlsRuleSupport: typeof checkUrlAndTlsRuleSupport;
@@ -80,9 +77,7 @@ const runDockerViaExec = (args: string[], env: NodeJS.ProcessEnv): void => {
 /* v8 ignore stop */
 
 const realDeps: SetupStepDeps = {
-  readEngineInputs,
-  readRuleInputs,
-  readBuilderName,
+  readSetupInputs,
   readLocalImageOverride,
   verifyImageDigestOrThrow,
   checkUrlAndTlsRuleSupport,
@@ -121,9 +116,7 @@ export async function runSetupStep(
   overrides: Partial<SetupStepDeps> = {},
 ): Promise<void> {
   const {
-    readEngineInputs,
-    readRuleInputs,
-    readBuilderName,
+    readSetupInputs,
     readLocalImageOverride,
     verifyImageDigestOrThrow,
     checkUrlAndTlsRuleSupport,
@@ -140,21 +133,9 @@ export async function runSetupStep(
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 
   // Read before the image: each engine has its own image tag.
-  const { proxyEngine } = readEngineInputs();
-  log(`Proxy engine: ${proxyEngine}`);
-
-  const localOverride = await readLocalImageOverride(env, log);
-  const { imageRef, pullPolicy } =
-    localOverride ??
-    (await resolveVerifiedImage(
-      { actionRef, actionRepo, proxyEngine },
-      { verifyImageDigestOrThrow, log },
-    ));
-  log(`buildcage: image: ${imageRef}`);
-
-  // Read after the image, not alongside the engine, so a run with both
-  // problems reports the image error (see inputs.ts).
   const {
+    proxyEngine,
+    builderName,
     proxyMode,
     failOnCaResidue,
     httpsRules,
@@ -163,7 +144,9 @@ export async function runSetupStep(
     urlRules,
     tlsRules,
     knownBlockedRules,
-  } = readRuleInputs();
+  } = readSetupInputs();
+  log(`Proxy engine: ${proxyEngine}`);
+
   // Before the builder starts, so a rule the engine cannot enforce is reported
   // once, up front, rather than silently not enforced.
   checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn);
@@ -185,7 +168,15 @@ export async function runSetupStep(
     logRules("Known blocked", knownBlockedRules);
   });
 
-  const builderName = readBuilderName();
+  const localOverride = await readLocalImageOverride(env, log);
+  const { imageRef, pullPolicy } =
+    localOverride ??
+    (await resolveVerifiedImage(
+      { actionRef, actionRepo, proxyEngine },
+      { verifyImageDigestOrThrow, log },
+    ));
+  log(`buildcage: image: ${imageRef}`);
+
   // So report can independently derive the same project name from its own
   // builder_name input and find this container via `docker ps --filter`.
   const projectName = deriveProjectName(builderName);

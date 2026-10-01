@@ -191,8 +191,8 @@ const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[
 RegExp(`^${OCTET}$`), RegExp(`^${IPV4}(?:/${PREFIX})?$`), RegExp(`^${IPV4}/${PREFIX}$`);
 //#endregion
 //#region src/lib/inputs.ts
-function readBuilderName(getInput$2 = getInput) {
-	return getInput$2("builder_name") || "buildcage";
+function readBuilderName(getInput$1 = getInput) {
+	return getInput$1("builder_name") || "buildcage";
 }
 //#endregion
 //#region src/lib/post-cleanup.ts

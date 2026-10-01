@@ -8037,11 +8037,8 @@ function resolveProxyEngine(input) {
 }
 //#endregion
 //#region src/lib/inputs.ts
-function readBuilderName(getInput$2 = getInput) {
-	return getInput$2("builder_name") || "buildcage";
-}
-function readEngineInputs(getInput$3 = getInput) {
-	return { proxyEngine: resolveProxyEngine(getInput$3("proxy_engine")) };
+function readBuilderName(getInput$1 = getInput) {
+	return getInput$1("builder_name") || "buildcage";
 }
 const PROXY_MODES = ["audit", "restrict"];
 function resolveProxyMode(input) {
@@ -8064,12 +8061,12 @@ function resolveFailOnCaResidue(input) {
 	if (FALSE_INPUTS.includes(trimmed)) return !1;
 	throw new SetupError(`Invalid fail_on_ca_residue: ${JSON.stringify(input)}. Must be true or false.`, "INVALID_FAIL_ON_CA_RESIDUE");
 }
-function readRuleInputs(getInput$1 = getInput) {
-	let proxyMode = resolveProxyMode(getInput$1("proxy_mode")), failOnCaResidue = resolveFailOnCaResidue(getInput$1("fail_on_ca_residue")), rules = buildACLRules({
-		httpsRulesInput: getInput$1("allowed_https_rules"),
-		httpRulesInput: getInput$1("allowed_http_rules"),
-		ipRulesInput: getInput$1("allowed_ip_rules")
-	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$1("known_blocked_rules")), urlRulesInput = getInput$1("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$1("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
+function readSetupInputs(getInput$2 = getInput) {
+	let proxyEngine = resolveProxyEngine(getInput$2("proxy_engine")), proxyMode = resolveProxyMode(getInput$2("proxy_mode")), failOnCaResidue = resolveFailOnCaResidue(getInput$2("fail_on_ca_residue")), rules = buildACLRules({
+		httpsRulesInput: getInput$2("allowed_https_rules"),
+		httpRulesInput: getInput$2("allowed_http_rules"),
+		ipRulesInput: getInput$2("allowed_ip_rules")
+	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$2("known_blocked_rules")), urlRulesInput = getInput$2("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$2("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
 	checkRulesCompileOrThrow({
 		...rules,
 		tlsRules,
@@ -8077,6 +8074,8 @@ function readRuleInputs(getInput$1 = getInput) {
 	});
 	let urlRules = compiledUrlRules.map((r) => r.raw);
 	return {
+		proxyEngine,
+		builderName: readBuilderName(getInput$2),
 		proxyMode,
 		failOnCaResidue,
 		httpsRules: rules.httpsRules,
@@ -8095,9 +8094,7 @@ async function readLocalImageOverride(env, log = console.log) {
 //#endregion
 //#region src/lib/setup-step.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml"), realDeps = {
-	readEngineInputs,
-	readRuleInputs,
-	readBuilderName,
+	readSetupInputs,
 	readLocalImageOverride,
 	verifyImageDigestOrThrow,
 	checkUrlAndTlsRuleSupport,
@@ -8129,22 +8126,11 @@ async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }, { ve
 	};
 }
 async function runSetupStep(env, overrides = {}) {
-	let { readEngineInputs, readRuleInputs, readBuilderName, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, log, warn } = {
+	let { readSetupInputs, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, log, warn } = {
 		...realDeps,
 		...overrides
-	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", { proxyEngine } = readEngineInputs();
-	log(`Proxy engine: ${proxyEngine}`);
-	let { imageRef, pullPolicy } = await readLocalImageOverride(env, log) ?? await resolveVerifiedImage({
-		actionRef,
-		actionRepo,
-		proxyEngine
-	}, {
-		verifyImageDigestOrThrow,
-		log
-	});
-	log(`buildcage: image: ${imageRef}`);
-	let { proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readRuleInputs();
-	checkUrlAndTlsRuleSupport({
+	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", { proxyEngine, builderName, proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readSetupInputs();
+	log(`Proxy engine: ${proxyEngine}`), checkUrlAndTlsRuleSupport({
 		proxyEngine,
 		proxyMode,
 		urlRules,
@@ -8156,7 +8142,16 @@ async function runSetupStep(env, overrides = {}) {
 	}, warn), withLogGroup("buildcage: Configured ACL Rules", () => {
 		logRules("HTTPS", httpsRules), logRules("HTTP", httpRules), logRules("IP", ipRules), logRules("URL", urlRules), logRules("TLS", tlsRules), logRules("Known blocked", knownBlockedRules);
 	});
-	let builderName = readBuilderName(), projectName = deriveProjectName(builderName), composeEnv = buildComposeEnv({
+	let { imageRef, pullPolicy } = await readLocalImageOverride(env, log) ?? await resolveVerifiedImage({
+		actionRef,
+		actionRepo,
+		proxyEngine
+	}, {
+		verifyImageDigestOrThrow,
+		log
+	});
+	log(`buildcage: image: ${imageRef}`);
+	let projectName = deriveProjectName(builderName), composeEnv = buildComposeEnv({
 		builderName,
 		proxyMode,
 		proxyEngine,
