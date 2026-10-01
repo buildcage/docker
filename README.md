@@ -511,9 +511,11 @@ reported as blocked; see
   RUN rm -rf /etc/ssl/certs/*      # fine
   ```
 
-  So is the `lib/security` directory of a JDK at `$JAVA_HOME` or on `PATH` with a keystore of its
-  own rather than a link to the distribution's, so a step cannot remove that JDK. Take it off `PATH`
-  and `JAVA_HOME` with `ENV` first.
+  The same goes for the directory holding the keystore of a JDK at `$JAVA_HOME` or on `PATH`, unless
+  it is inside the CA store's mount. A JDK with a keystore of its own has its `lib/security` mounted,
+  so a step cannot remove that JDK; take it off `PATH` and `JAVA_HOME` with `ENV` first. A
+  distribution JDK links to a shared keystore: Debian's is inside `/etc/ssl/certs` and adds no mount
+  point, while on RHEL, Fedora and their derivatives `/etc/pki/ca-trust/extracted/java` is one.
 
 - A custom CA path that is unexpectedly large (more than 20 MiB or 512 files) has injection skipped
   for that variable only, the same degradation as when no CA bundle is found at all. A system CA
