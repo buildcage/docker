@@ -52,17 +52,6 @@ func injectedAliasFor(i int) string {
 // the CA has to go into whichever exist, not cacerts alone.
 var jvmKeystoreNames = []string{"jssecacerts", "cacerts"}
 
-// Security directories tried when JAVA_HOME is unset. JAVA_HOME covers the Java
-// base images this is aimed at; these catch a JVM installed at a fixed location
-// without it. /etc/ssl/certs/java is Debian's ca-certificates-java output and
-// the /etc/pki ones are RHEL's, each a symlink resolveInRoot follows to the
-// real file.
-var knownJVMKeystoreDirs = []string{
-	"/etc/ssl/certs/java",
-	"/etc/pki/java",
-	"/etc/pki/ca-trust/extracted/java",
-}
-
 // securityDirs is where a JDK rooted at root keeps its keystores: lib/security
 // from JDK 9 on, jre/lib/security in a JDK 8.
 func securityDirs(root string) []string {
@@ -94,10 +83,11 @@ func javaOnPath(s *spec) []string {
 }
 
 // findJVMKeystores returns the resolved host paths of every JVM keystore inside
-// the rootfs: JAVA_HOME's first, then each java on PATH's, and the known fixed
-// directories. Each is deduplicated by where it resolves, so a symlinked one is
-// not injected twice. Other JDKs in the image are left alone: a keystore's
-// directory is a mount point for the step, so no later step could remove them.
+// the rootfs: JAVA_HOME's first, then each java on PATH's. Each is deduplicated
+// by where it resolves, so a distribution's JDKs, which link to one shared
+// keystore, have it injected once. Other JDKs in the image are left alone: a
+// keystore's directory is a mount point for the step, so no later step could
+// remove them.
 func findJVMKeystores(s *spec) []string {
 	var dirs []string
 	if home := s.env["JAVA_HOME"]; home != "" {
@@ -106,7 +96,6 @@ func findJVMKeystores(s *spec) []string {
 	for _, root := range javaOnPath(s) {
 		dirs = append(dirs, securityDirs(root)...)
 	}
-	dirs = append(dirs, knownJVMKeystoreDirs...)
 
 	var keystores []string
 	seen := map[string]bool{}
