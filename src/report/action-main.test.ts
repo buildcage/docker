@@ -89,7 +89,7 @@ describe("runReportAction", () => {
   });
 
   it("falls back to the published action's own repo and ref when the env has neither", async () => {
-    // An audit report carries a restrict example whose `uses:` line shows both.
+    // An audit report's restrict example prints the repo and ref in `uses:`.
     const audit = { ...universal, parameters: reportParams({ mode: "audit" }) };
     const lines = await run(spec({ build: () => audit }));
     expect(lines.join("\n")).toMatch(/uses: buildcage\/docker@v4 /);
