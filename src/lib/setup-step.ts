@@ -132,8 +132,7 @@ export async function runSetupStep(
   const actionRef = env.GITHUB_ACTION_REF ?? "";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 
-  // Read before the image: each engine has its own image tag, and a typo in
-  // any input should not wait for the verification's network round-trips.
+  // Read before the image: each engine has its own image tag.
   const {
     proxyEngine,
     builderName,
