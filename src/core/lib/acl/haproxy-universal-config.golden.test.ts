@@ -14,14 +14,12 @@ interface UniversalCase {
   httpsRules: string[];
   httpRules: string[];
   ipRules: string[];
-  /** Empty means /etc/resolv.conf. */
-  resolverAddress: string[];
 }
 
-const NONE = { httpsRules: [], httpRules: [], ipRules: [], resolverAddress: [] };
+const NONE = { httpsRules: [], httpRules: [], ipRules: [] };
 
 const CASES: Record<string, UniversalCase> = {
-  // Nothing allowed, resolving through /etc/resolv.conf.
+  // Nothing allowed.
   "restrict-empty": { mode: "restrict", ...NONE },
 
   // Every wildcard shape, a raw regex and a port wildcard on each rule kind,
@@ -45,7 +43,6 @@ const CASES: Record<string, UniversalCase> = {
       "10.**:80",
       "~^10\\.1\\.[0-9]+\\.[0-9]+:6379$",
     ],
-    resolverAddress: ["1.1.1.1", "8.8.8.8"],
   },
 
   // The same rules in audit, where they allow nothing more than audit already
@@ -55,11 +52,10 @@ const CASES: Record<string, UniversalCase> = {
     httpsRules: ["github.com:443", "*.example.com:443"],
     httpRules: ["deb.debian.org:80"],
     ipRules: ["10.0.0.0/8:443"],
-    resolverAddress: ["1.1.1.1"],
   },
 
-  // audit with no rules and the container's own resolver.
-  "audit-resolv-conf": { mode: "audit", ...NONE },
+  // audit with no rules.
+  "audit-empty": { mode: "audit", ...NONE },
 
   // One rule kind at a time, so an empty list beside a full one shows too.
   "restrict-https-only": {

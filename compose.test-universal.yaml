@@ -3,7 +3,6 @@ services:
     environment:
       - TEST_NET_ADDR=10.200.0.2/24
       - TEST_NET_SUBNET=${TEST_NET_SUBNET:-10.210.0.0/24}
-      - EXTERNAL_RESOLVER=10.200.0.53
       # These tests drive compose directly, so this stands in for what the
       # action computes. Nothing answers on it, so only the guard can block it.
       - HOST_ADDRESSES=10.200.0.199
@@ -19,6 +18,9 @@ services:
     entrypoint: ["/test-hooks/attach-test-net-addr.sh", "/init"]
     volumes:
       - ./test/test-net-addr/attach.sh:/test-hooks/attach-test-net-addr.sh:ro
+    # Docker's embedded DNS forwards here, so HAProxy and buildkitd reach the fixture
+    # resolver through resolv.conf, as they reach the runner's DNS in a job.
+    dns: [10.200.0.53]
     networks:
       default:
       test-net:

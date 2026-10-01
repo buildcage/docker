@@ -7304,7 +7304,6 @@ function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue,
 		ALLOWED_TLS_RULES: tlsRules.join("\n"),
 		KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
 		BUILDCAGE_IMAGE_REF: imageRef,
-		EXTERNAL_RESOLVER: "",
 		HOST_ADDRESSES: hostAddresses().join(" ")
 	};
 }
@@ -7908,13 +7907,13 @@ function preamble(spec) {
 		""
 	];
 }
-function resolversSection(resolvers) {
+function resolversSection() {
 	return [
 		"# Real resolution happens once a request has already passed the rule",
 		"# ACLs below; the build's own resolver (CoreDNS) never gives out a real",
 		"# answer, so this is the only place a name becomes an address.",
 		"resolvers buildcage",
-		...resolvers.length === 0 ? ["    parse-resolv-conf"] : resolvers.map((addr, i) => `    nameserver ns${i + 1} ${addr}:53`),
+		"    parse-resolv-conf",
 		"    hold valid 60s",
 		"    resolve_retries 4",
 		"    timeout retry 1s",
@@ -7968,7 +7967,7 @@ function generateHaproxyConfig(options) {
 				],
 				defaults: ["    timeout client 30s", "    timeout server 30s"]
 			}),
-			...resolversSection(opts.resolverAddress ?? []),
+			...resolversSection(),
 			...detectFrontend({
 				listenPort: opts.listenPort,
 				tlsStagePort: TLS_STAGE_PORT,
@@ -8035,7 +8034,7 @@ function generateUniversalHaproxyConfig(options) {
 			regex: convertRule(rule.raw)
 		}));
 	}
-	let decision = audit ? "AUDIT" : "ALLOWED", resolvers = options.resolverAddress ?? [], guard = {
+	let decision = audit ? "AUDIT" : "ALLOWED", guard = {
 		internalAddrs: [...INTERNAL_RANGES, PROXY_SUBNET],
 		hostAddressFile: options.hostAddressFile
 	};
@@ -8049,7 +8048,7 @@ function generateUniversalHaproxyConfig(options) {
 					"    timeout server 1m"
 				]
 			}),
-			...resolversSection(resolvers),
+			...resolversSection(),
 			"# --- Frontend ---",
 			"frontend outbound_proxy",
 			"    bind *:10024",

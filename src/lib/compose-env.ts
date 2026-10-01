@@ -55,10 +55,6 @@ export function buildComposeEnv(
     ALLOWED_TLS_RULES: tlsRules.join("\n"),
     KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
     BUILDCAGE_IMAGE_REF: imageRef,
-    // Pinned rather than inherited, like every other variable here: the
-    // resolver the builder uses is the action's choice, not whatever an earlier
-    // step left in the job environment.
-    EXTERNAL_RESOLVER: "",
     // Completed engine-side with the compose network's gateway, which does not
     // exist yet here. See lib/host-addresses.ts.
     HOST_ADDRESSES: hostAddresses().join(" "),

@@ -38,7 +38,6 @@ services:
       - ALLOWED_URL_RULES=${ALLOWED_URL_RULES:-}
       - ALLOWED_TLS_RULES=${ALLOWED_TLS_RULES:-}
       - KNOWN_BLOCKED_RULES=${KNOWN_BLOCKED_RULES:-}
-      - EXTERNAL_RESOLVER=${EXTERNAL_RESOLVER:-}
       # Runner addresses the engine refuses as a resolved destination.
       - HOST_ADDRESSES=${HOST_ADDRESSES:-}
       - PROXY_ENGINE=${PROXY_ENGINE:-inspect}

@@ -52,7 +52,6 @@ describe("buildComposeEnv", () => {
       ALLOWED_TLS_RULES: "*.example.com:443",
       KNOWN_BLOCKED_RULES: "telemetry.example.com:443",
       BUILDCAGE_IMAGE_REF: "ghcr.io/buildcage/docker@sha256:feedface",
-      EXTERNAL_RESOLVER: "",
       HOST_ADDRESSES: "10.0.0.4 172.17.0.1",
     });
   });
@@ -66,14 +65,6 @@ describe("buildComposeEnv", () => {
 
     expect(env.PATH).toBe("/usr/bin");
     expect(env.DOCKER_HOST).toBe("unix:///x.sock");
-  });
-
-  // A resolver left to the step environment would be a previous step's choice,
-  // not the action's.
-  it("pins EXTERNAL_RESOLVER rather than inheriting it", () => {
-    const env = buildComposeEnv(options(), { EXTERNAL_RESOLVER: "8.8.8.8" }, () => []);
-
-    expect(env.EXTERNAL_RESOLVER).toBe("");
   });
 
   // A URL rule contains a space, unlike the others, so no rule list can be

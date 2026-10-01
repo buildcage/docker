@@ -116,15 +116,7 @@ describe("audit", () => {
 });
 
 describe("resolver", () => {
-  it("uses the upstreams it is given", () => {
-    const config = gen({ resolverAddress: ["1.1.1.1", "8.8.8.8"] }).config;
-    expect(config.includes("    nameserver ns1 1.1.1.1:53\n    nameserver ns2 8.8.8.8:53\n")).toBe(
-      true,
-    );
-    expect(config.includes("parse-resolv-conf")).toBe(false);
-  });
-
-  it("reads /etc/resolv.conf when given none", () => {
+  it("resolves through the container's own /etc/resolv.conf", () => {
     const config = gen().config;
     expect(lines(config).includes("parse-resolv-conf")).toBe(true);
     expect(config.includes("nameserver")).toBe(false);
