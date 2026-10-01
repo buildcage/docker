@@ -8246,6 +8246,24 @@ function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 	};
 }
 //#endregion
+//#region src/core/lib/actions/inputs.ts
+var InvalidInputError = class extends ActionError {};
+function readBooleanInput(name, fallback, getInput) {
+	let value = getInput(name);
+	if (value === "") return fallback;
+	if ([
+		"true",
+		"True",
+		"TRUE"
+	].includes(value)) return !0;
+	if ([
+		"false",
+		"False",
+		"FALSE"
+	].includes(value)) return !1;
+	throw new InvalidInputError(`Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`, "INVALID_BOOLEAN_INPUT");
+}
+//#endregion
 //#region src/lib/engine.ts
 const ENGINES = ["universal", "inspect"];
 function resolveProxyEngine(input) {
@@ -8257,8 +8275,8 @@ function resolveProxyEngine(input) {
 }
 //#endregion
 //#region src/lib/inputs.ts
-function readBuilderName(getInput$1 = getInput) {
-	return getInput$1("builder_name") || "buildcage";
+function readBuilderName(getInput$2 = getInput) {
+	return getInput$2("builder_name") || "buildcage";
 }
 const PROXY_MODES = ["audit", "restrict"];
 function resolveProxyMode(input) {
@@ -8266,27 +8284,12 @@ function resolveProxyMode(input) {
 	if (!PROXY_MODES.includes(trimmed)) throw new SetupError(`Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`, "INVALID_PROXY_MODE");
 	return trimmed;
 }
-const TRUE_INPUTS = [
-	"true",
-	"True",
-	"TRUE"
-], FALSE_INPUTS = [
-	"false",
-	"False",
-	"FALSE"
-];
-function resolveFailOnCaResidue(input) {
-	let trimmed = input?.trim() ?? "";
-	if (trimmed === "" || TRUE_INPUTS.includes(trimmed)) return !0;
-	if (FALSE_INPUTS.includes(trimmed)) return !1;
-	throw new SetupError(`Invalid fail_on_ca_residue: ${JSON.stringify(input)}. Must be true or false.`, "INVALID_FAIL_ON_CA_RESIDUE");
-}
-function readSetupInputs(getInput$2 = getInput) {
-	let proxyEngine = resolveProxyEngine(getInput$2("proxy_engine")), proxyMode = resolveProxyMode(getInput$2("proxy_mode")), failOnCaResidue = resolveFailOnCaResidue(getInput$2("fail_on_ca_residue")), rules = buildACLRules({
-		httpsRulesInput: getInput$2("allowed_https_rules"),
-		httpRulesInput: getInput$2("allowed_http_rules"),
-		ipRulesInput: getInput$2("allowed_ip_rules")
-	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$2("known_blocked_rules")), urlRulesInput = getInput$2("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$2("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
+function readSetupInputs(getInput$1 = getInput) {
+	let proxyEngine = resolveProxyEngine(getInput$1("proxy_engine")), proxyMode = resolveProxyMode(getInput$1("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$1), rules = buildACLRules({
+		httpsRulesInput: getInput$1("allowed_https_rules"),
+		httpRulesInput: getInput$1("allowed_http_rules"),
+		ipRulesInput: getInput$1("allowed_ip_rules")
+	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$1("known_blocked_rules")), urlRulesInput = getInput$1("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$1("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
 	checkRulesCompileOrThrow({
 		...rules,
 		tlsRules,
@@ -8295,7 +8298,7 @@ function readSetupInputs(getInput$2 = getInput) {
 	let urlRules = compiledUrlRules.map((r) => r.raw);
 	return {
 		proxyEngine,
-		builderName: readBuilderName(getInput$2),
+		builderName: readBuilderName(getInput$1),
 		proxyMode,
 		failOnCaResidue,
 		httpsRules: rules.httpsRules,

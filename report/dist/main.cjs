@@ -10909,13 +10909,7 @@ var ExitCode, init_core = __esmMin((() => {
 	init_command(), init_utils$4(), init_oidc_utils(), init_summary(), init_platform(), (function(ExitCode) {
 		ExitCode[ExitCode.Success = 0] = "Success", ExitCode[ExitCode.Failure = 1] = "Failure";
 	})(ExitCode ||= {});
-}));
-//#endregion
-//#region report/src/lib/inputs.ts
-init_core();
-function readBuilderName(getInput$2 = getInput) {
-	return getInput$2("builder_name") || "buildcage";
-}
+})), InvalidInputError = class extends ActionError {};
 function readBooleanInput(name, fallback, getInput) {
 	let value = getInput(name);
 	if (value === "") return fallback;
@@ -10929,18 +10923,28 @@ function readBooleanInput(name, fallback, getInput) {
 		"False",
 		"FALSE"
 	].includes(value)) return !1;
-	throw new ReportError(`Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`, "INVALID_BOOLEAN_INPUT");
+	throw new InvalidInputError(`Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`, "INVALID_BOOLEAN_INPUT");
 }
-function checkFailOnBlocked(getInput$3 = getInput) {
-	readBooleanInput("fail_on_blocked", !0, getInput$3);
+function readRetentionDays(getInput) {
+	let days = getInput("traffic_artifact_retention_days");
+	if (days !== "") {
+		if (!/^[1-9]\d*$/.test(days)) throw new InvalidInputError(`Invalid traffic_artifact_retention_days: ${JSON.stringify(days)}. Must be a whole number of days above zero.`, "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS");
+		return Number(days);
+	}
 }
-function readTrafficArtifactInputs(getInput$1 = getInput) {
-	let wanted = readBooleanInput("upload_traffic_artifact", !1, getInput$1), days = getInput$1("traffic_artifact_retention_days");
-	if (days === "") return { wanted };
-	if (!/^[1-9]\d*$/.test(days)) throw new ReportError(`Invalid traffic_artifact_retention_days: ${JSON.stringify(days)}. Must be a whole number of days above zero.`, "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS");
+//#endregion
+//#region report/src/lib/inputs.ts
+init_core();
+function readBuilderName(getInput$3 = getInput) {
+	return getInput$3("builder_name") || "buildcage";
+}
+function checkFailOnBlocked(getInput$1 = getInput) {
+	readBooleanInput("fail_on_blocked", !0, getInput$1);
+}
+function readTrafficArtifactInputs(getInput$2 = getInput) {
 	return {
-		wanted,
-		retentionDays: Number(days)
+		wanted: readBooleanInput("upload_traffic_artifact", !1, getInput$2),
+		retentionDays: readRetentionDays(getInput$2)
 	};
 }
 //#endregion

@@ -12,6 +12,7 @@ import {
   parseKnownBlockedRulesOrThrow,
   parseRulesOrThrow,
 } from "#core/lib/acl/rules.ts";
+import { readBooleanInput } from "#core/lib/actions/inputs.ts";
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
 import { resolveProxyEngine, type ProxyEngine } from "./engine.ts";
@@ -42,29 +43,6 @@ export function resolveProxyMode(input: string | undefined): ProxyMode {
   return trimmed as ProxyMode;
 }
 
-/** The spellings @actions/core's own getBooleanInput accepts. */
-const TRUE_INPUTS = ["true", "True", "TRUE"];
-const FALSE_INPUTS = ["false", "False", "FALSE"];
-
-/**
- * Unset is true because dev and test runs bypass action.yml's default. Any
- * other non-boolean is refused: a typo read as false would silently leave the
- * CA in the image.
- */
-export function resolveFailOnCaResidue(input: string | undefined): boolean {
-  const trimmed = input?.trim() ?? "";
-  if (trimmed === "" || TRUE_INPUTS.includes(trimmed)) {
-    return true;
-  }
-  if (FALSE_INPUTS.includes(trimmed)) {
-    return false;
-  }
-  throw new SetupError(
-    `Invalid fail_on_ca_residue: ${JSON.stringify(input)}. Must be true or false.`,
-    "INVALID_FAIL_ON_CA_RESIDUE",
-  );
-}
-
 export interface SetupInputs {
   proxyEngine: ProxyEngine;
   builderName: string;
@@ -92,14 +70,14 @@ export interface SetupInputs {
  *
  * The statement order decides which error surfaces first.
  *
- * @throws {SetupError} if proxy_engine or proxy_mode is not a known value, or
- *   fail_on_ca_residue is not a boolean
+ * @throws {SetupError} if proxy_engine or proxy_mode is not a known value
+ * @throws {InvalidInputError} if fail_on_ca_residue is not a boolean
  * @throws {InvalidRulesError} if any rule is malformed
  */
 export function readSetupInputs(getInput: GetInput = core.getInput): SetupInputs {
   const proxyEngine = resolveProxyEngine(getInput("proxy_engine"));
   const proxyMode = resolveProxyMode(getInput("proxy_mode"));
-  const failOnCaResidue = resolveFailOnCaResidue(getInput("fail_on_ca_residue"));
+  const failOnCaResidue = readBooleanInput("fail_on_ca_residue", true, getInput);
   const rules = buildACLRules({
     httpsRulesInput: getInput("allowed_https_rules"),
     httpRulesInput: getInput("allowed_http_rules"),

@@ -2,12 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
-import {
-  readBuilderName,
-  readSetupInputs,
-  resolveFailOnCaResidue,
-  resolveProxyMode,
-} from "./inputs.ts";
+import { readBuilderName, readSetupInputs, resolveProxyMode } from "./inputs.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
 function inputs(values: Record<string, string> = {}): (name: string) => string {
@@ -28,23 +23,6 @@ describe("readBuilderName", () => {
   // to produce the same name the other two steps derive.
   it("treats an empty input as unset rather than as a builder named ''", () => {
     expect(readBuilderName(inputs({ builder_name: "" }))).toBe(DEFAULT_BUILDER_NAME);
-  });
-});
-
-describe("resolveFailOnCaResidue", () => {
-  it.each(["", "   ", undefined, "true", "True", "TRUE"])("reads %j as true", (input) => {
-    expect(resolveFailOnCaResidue(input)).toBe(true);
-  });
-
-  it.each(["false", "False", "FALSE", " false "])("reads %j as false", (input) => {
-    expect(resolveFailOnCaResidue(input)).toBe(false);
-  });
-
-  // A typo read as false would let a copy of the CA into the image unannounced.
-  it.each(["no", "0", "flase"])("refuses %j", (input) => {
-    expect(() => resolveFailOnCaResidue(input)).toThrow(
-      expect.objectContaining({ code: "INVALID_FAIL_ON_CA_RESIDUE" }),
-    );
   });
 });
 
@@ -75,6 +53,13 @@ describe("readSetupInputs", () => {
 
   it("reads fail_on_ca_residue", () => {
     expect(readSetupInputs(inputs({ fail_on_ca_residue: "false" })).failOnCaResidue).toBe(false);
+  });
+
+  // A typo read as false would let a copy of the CA into the image unannounced.
+  it("rejects a fail_on_ca_residue that is not a boolean", () => {
+    expect(() => readSetupInputs(inputs({ fail_on_ca_residue: "no" }))).toThrow(
+      'Invalid fail_on_ca_residue: "no". Must be true or false.',
+    );
   });
 
   it("defaults proxy_mode to restrict", () => {

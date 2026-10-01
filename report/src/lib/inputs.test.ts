@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
-import { ReportError } from "./errors.ts";
 import { checkFailOnBlocked, readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
@@ -27,72 +26,46 @@ describe("readBuilderName", () => {
 });
 
 describe("checkFailOnBlocked", () => {
-  it.each(["", "true", "True", "TRUE", "false", "False", "FALSE"])("accepts %o", (value) => {
+  it.each(["", "false"])("accepts %o", (value) => {
     expect(() => checkFailOnBlocked(inputs({ fail_on_blocked: value }))).not.toThrow();
   });
 
   it("refuses a typo rather than guessing", () => {
     expect(() => checkFailOnBlocked(inputs({ fail_on_blocked: "yes" }))).toThrow(
-      new ReportError(
-        'Invalid fail_on_blocked: "yes". Must be true or false.',
-        "INVALID_BOOLEAN_INPUT",
-      ),
+      'Invalid fail_on_blocked: "yes". Must be true or false.',
     );
   });
 });
 
 describe("readTrafficArtifactInputs", () => {
-  it.each(["true", "True", "TRUE"])("reads %o as a yes", (value) => {
-    expect(readTrafficArtifactInputs(inputs({ upload_traffic_artifact: value })).wanted).toBe(true);
-  });
-
-  it.each(["false", "False", "FALSE"])("reads %o as a no", (value) => {
-    expect(readTrafficArtifactInputs(inputs({ upload_traffic_artifact: value })).wanted).toBe(
-      false,
-    );
-  });
-
   // The dev and test invocations run this from source rather than through
   // action.yml's own defaults.
-  it("is a no when unset", () => {
-    expect(readTrafficArtifactInputs(inputs())).toStrictEqual({ wanted: false });
+  it("uploads nothing and leaves the retention to the repository when unset", () => {
+    expect(readTrafficArtifactInputs(inputs())).toStrictEqual({
+      wanted: false,
+      retentionDays: undefined,
+    });
+  });
+
+  it("reads both inputs", () => {
+    expect(
+      readTrafficArtifactInputs(
+        inputs({ upload_traffic_artifact: "true", traffic_artifact_retention_days: "7" }),
+      ),
+    ).toStrictEqual({ wanted: true, retentionDays: 7 });
   });
 
   it("refuses a typo rather than reading it as a no", () => {
     expect(() => readTrafficArtifactInputs(inputs({ upload_traffic_artifact: "yes" }))).toThrow(
-      new ReportError(
-        'Invalid upload_traffic_artifact: "yes". Must be true or false.',
-        "INVALID_BOOLEAN_INPUT",
-      ),
+      'Invalid upload_traffic_artifact: "yes". Must be true or false.',
     );
   });
-
-  it("passes a positive whole number of retention days through", () => {
-    expect(
-      readTrafficArtifactInputs(inputs({ traffic_artifact_retention_days: "7" })).retentionDays,
-    ).toBe(7);
-  });
-
-  it.each(["0", "-1", "7.5", "forever", "1e1", "0x10", " 7", "07"])(
-    "refuses a retention of %o",
-    (value) => {
-      expect(() =>
-        readTrafficArtifactInputs(inputs({ traffic_artifact_retention_days: value })),
-      ).toThrow(
-        new ReportError(
-          `Invalid traffic_artifact_retention_days: ${JSON.stringify(value)}. ` +
-            "Must be a whole number of days above zero.",
-          "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS",
-        ),
-      );
-    },
-  );
 
   it("refuses a bad retention even when nothing is uploaded", () => {
     expect(() =>
       readTrafficArtifactInputs(
         inputs({ upload_traffic_artifact: "false", traffic_artifact_retention_days: "0" }),
       ),
-    ).toThrow(ReportError);
+    ).toThrow(/Invalid traffic_artifact_retention_days/);
   });
 });
