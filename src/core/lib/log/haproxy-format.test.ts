@@ -1,15 +1,14 @@
-// Nothing else ties the universal template's log formats to this parser. Kept
-// out of haproxy-cfg-template.test.ts, which also runs under qjs.
-import { readFileSync } from "node:fs";
-
+// Nothing else ties the universal engine's log formats to this parser.
 import { describe, it, expect } from "vitest";
 
+import { generateUniversalHaproxyConfig } from "../acl/haproxy-universal-config.ts";
 import { scanHaproxyLog } from "./haproxy.ts";
+import { PROXY_ADDRESS } from "./proxy-address.ts";
 
-const TEMPLATE = readFileSync(
-  new URL("../../../../docker/universal/files/haproxy.cfg.template", import.meta.url),
-  "utf8",
-);
+const CONFIG = generateUniversalHaproxyConfig({
+  proxyAddress: PROXY_ADDRESS,
+  hostAddressFile: "/etc/haproxy/rules/host_addrs.lst",
+}).config;
 
 /** One representative value per format token. A token with no value here
  *  throws, so a new field cannot quietly go uncovered. */
@@ -27,8 +26,8 @@ const SAMPLES: Record<string, string> = {
 
 const TOKEN = /%(?:\[[^\]]*\]|[A-Za-z]+)/g;
 
-/** The log-format strings in the template, unquoted, in config order. */
-const FORMATS = TEMPLATE.split("\n")
+/** The log-format strings in the config, unquoted, in config order. */
+const FORMATS = CONFIG.split("\n")
   .filter((l) => l.trim().startsWith('log-format "'))
   .map((l) => l.slice(l.indexOf('"') + 1, l.lastIndexOf('"')).replaceAll('\\"', '"'));
 const [OUTBOUND, HTTP_IN] = FORMATS;
@@ -49,7 +48,7 @@ const NO_REQUEST = {
   "%B": "0",
 };
 
-describe("the universal template's log formats and this parser describe the same line", () => {
+describe("the universal config's log formats and this parser describe the same line", () => {
   it("has one format for outbound_proxy and one for http_in", () => {
     expect(FORMATS.length).toBe(2);
   });

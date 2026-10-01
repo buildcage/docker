@@ -73,7 +73,7 @@ jobs:
           proxy_mode: restrict
           proxy_engine: inspect
           allowed_url_rules: |
-            # apk package index and packages (haproxy, curl, gettext, ...)
+            # apk package index and packages (haproxy, curl, ...)
             GET https://dl-cdn.alpinelinux.org/alpine/**
 
             # CNI plugins and CoreDNS release binaries (github 302-redirects here)

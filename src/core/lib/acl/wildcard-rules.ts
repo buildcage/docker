@@ -34,10 +34,6 @@ export function splitRuleTokens(rulesInput: string | undefined): string[] {
   return tokens;
 }
 
-export function buildRules(rulesInput: string): string[] {
-  return splitRuleTokens(rulesInput).map(convertRule);
-}
-
 /**
  * Split+validate a whitespace-separated rules string, returning the raw
  * (unconverted) rule tokens, for callers that need the original wildcard or

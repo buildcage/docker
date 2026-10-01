@@ -1,6 +1,6 @@
 /**
- * Compiles buildcage's rule strings into the matchers the `inspect` engine's
- * haproxy.cfg is built from. Pure data: haproxy-config.ts turns the result
+ * Compiles buildcage's rule strings into the matchers both engines' haproxy.cfg
+ * and the Corefile are built from. Pure data: the generators turn the result
  * into config text, and this module knows nothing about that text.
  */
 
@@ -23,7 +23,8 @@ export const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`;
  * resolving to somewhere the proxy can reach but the build cannot, a cloud
  * metadata endpoint above all. Only never-public ranges; RFC1918 (and its v6
  * equivalent, fc00::/7 ULA) is allowed, since a name pointing at an internal
- * mirror is legitimate. An address named directly in a rule is exempt.
+ * mirror is legitimate. Under `inspect` an address named directly in a rule
+ * is exempt.
  *
  * A resolution produces an IPv4 address only, enforced by `dns-accept-family
  * ipv4` in the generated global section. ::1 and fe80::/10 are kept anyway, at

@@ -1,5 +1,5 @@
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
-import { PREAMBLE, resolversSection, originBackends } from "./haproxy-sections.ts";
+import { preamble, resolversSection, originBackends } from "./haproxy-sections.ts";
 
 function last(section: readonly string[]): string {
   return section[section.length - 1];
@@ -10,7 +10,7 @@ describe("section boundaries", () => {
     // generateHaproxyConfig joins the sections with nothing between them, so a
     // section stopping at its last directive would run that directive into the
     // next section's heading.
-    expect(last(PREAMBLE)).toBe("");
+    expect(last(preamble({ global: [], defaults: [] }))).toBe("");
     expect(last(resolversSection(["1.1.1.1"], false))).toBe("");
     expect(last(resolversSection([], true))).toBe("");
     expect(last(originBackends("/etc/ssl/certs/ca-certificates.crt"))).toBe("");

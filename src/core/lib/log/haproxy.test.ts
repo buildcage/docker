@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { scanHaproxyLog } from "./haproxy.ts";
 
-/** A decision line in the format the log-format template emits. */
+/** A decision line in the format the universal engine's log-format emits. */
 const line = (
   decision: string,
   ruleType: string,
@@ -82,7 +82,7 @@ describe("scanHaproxyLog", () => {
   });
 
   it("maps a rule kind it does not know to a tcp connection", async () => {
-    // The template overwrites its UNKNOWN default on every path that logs, so
+    // The config overwrites its UNKNOWN default on every path that logs, so
     // this guards the fallback rather than a line the proxy writes.
     const { events } = await scanHaproxyLog(
       [line("BLOCKED", "UNKNOWN", "10.0.0.9:1234", "-")],

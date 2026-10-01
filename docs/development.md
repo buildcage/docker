@@ -335,8 +335,7 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │       │                     # log/, report/, docker/, provenance/ and actions/ are Node-only,
 │       │                     # and test/test-shim.ts is the node:test-alike shim *.test.ts uses
 │       │                     # under either runtime
-│       └── scripts/          # QuickJS entry points, rolldown-bundled into
-│                             # /opt/buildcage/scripts/ at image build time
+│       └── scripts/          # The QuickJS test runner and qjs's type declarations
 ├── dist/                     # Bundled output (rolldown → CommonJS), committed. dist/qjs,
 │                             # dist/qjs-test and dist/report-action are gitignored scratch
 ├── docker/                   # proxy_engine build contexts
@@ -360,9 +359,11 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 ```
 
 Every engine directory carries a `scripts/` of its own. `report-action.node.ts` is in both, and
-runs under Node on the runner after the report action copies it out of the image. `inspect` also has
-a QuickJS entry point beside it (`gen-configs.qjs.ts`), so that directory is a second QuickJS build
-target alongside `src/core/scripts/`; `tsconfig.qjs.json` names both.
+runs under Node on the runner after the report action copies it out of the image. Beside it,
+`gen-configs.qjs.ts` runs under QuickJS when the container starts and writes haproxy.cfg and the
+Corefile from the rules, through the generators in `src/core/lib/acl/` (`haproxy-config.ts` for
+`inspect`, `haproxy-universal-config.ts` for `universal`). rolldown bundles it into
+`/opt/buildcage/scripts/` at image build time, and `tsconfig.qjs.json` type-checks it.
 
 `buildcage-runc` takes `go-pkcs12` from the
 [buildcage/go-pkcs12](https://github.com/buildcage/go-pkcs12) fork through a `replace` in its
