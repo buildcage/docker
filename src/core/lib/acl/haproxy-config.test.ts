@@ -593,11 +593,13 @@ describe("line length", () => {
   });
 });
 
-describe("rules that cannot be honoured", () => {
-  it("refuses an address pattern rather than approximating a range", () => {
+describe("address wildcards", () => {
+  it("matches the address as text rather than approximating a range", () => {
     const result = generateHaproxyConfig({ ipRules: ["10.0.0.*:5432"] });
-    expect(result.warnings.length).toBe(1);
-    expect(result.config.includes("ip0_dst")).toBe(false);
+    expect(result.warnings.length).toBe(0);
+    expect(
+      result.config.includes("acl ip0_dst var(txn.dst_str) -m reg ^10\\\\.0\\\\.0\\\\.[^.]+:5432$"),
+    ).toBe(true);
   });
 });
 

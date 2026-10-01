@@ -204,8 +204,8 @@ allowed_tls_rules: |
   repo.maven.apache.org:443
 ```
 
-`allowed_ip_rules` covers connections made straight to an address, which never go through DNS. Under
-`inspect` a rule may be an address or a CIDR block:
+`allowed_ip_rules` covers connections made straight to an address, which never go through DNS. A
+rule may be an address, a CIDR block or a wildcard, on either engine:
 
 ```yaml
 allowed_ip_rules: |
@@ -216,7 +216,7 @@ allowed_ip_rules: |
 ### Rules for the `universal` engine
 
 `universal` never decrypts, so rules name a host and a port. `allowed_https_rules` and
-`allowed_http_rules` split by scheme, and `allowed_ip_rules` takes an address or a wildcard:
+`allowed_http_rules` split by scheme, and `allowed_ip_rules` works as it does under `inspect`:
 
 ```yaml
 allowed_https_rules: |

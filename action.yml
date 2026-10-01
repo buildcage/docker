@@ -26,7 +26,7 @@ inputs:
     required: false
     default: ""
   allowed_ip_rules:
-    description: "IP address allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
+    description: "IP address allow rules (address, CIDR block, wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
     required: false
     default: ""
   allowed_url_rules:

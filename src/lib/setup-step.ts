@@ -29,7 +29,6 @@ import {
 import { builderStartError } from "./builder-diagnostics.ts";
 import { buildComposeEnv } from "./compose-env.ts";
 import {
-  checkIpRuleSupport,
   checkKnownBlockedUrlRuleSupport,
   checkUrlAndTlsRuleSupport,
 } from "./engine-rule-support.ts";
@@ -60,7 +59,6 @@ export interface SetupStepDeps {
   verifyImageDigestOrThrow: typeof verifyImageDigestOrThrow;
   checkUrlAndTlsRuleSupport: typeof checkUrlAndTlsRuleSupport;
   checkKnownBlockedUrlRuleSupport: typeof checkKnownBlockedUrlRuleSupport;
-  checkIpRuleSupport: typeof checkIpRuleSupport;
   logRules: typeof logRules;
   withLogGroup: typeof withLogGroup;
   builderStartError: typeof builderStartError;
@@ -89,7 +87,6 @@ const realDeps: SetupStepDeps = {
   verifyImageDigestOrThrow,
   checkUrlAndTlsRuleSupport,
   checkKnownBlockedUrlRuleSupport,
-  checkIpRuleSupport,
   logRules,
   withLogGroup,
   builderStartError,
@@ -131,7 +128,6 @@ export async function runSetupStep(
     verifyImageDigestOrThrow,
     checkUrlAndTlsRuleSupport,
     checkKnownBlockedUrlRuleSupport,
-    checkIpRuleSupport,
     logRules,
     withLogGroup,
     builderStartError,
@@ -179,7 +175,6 @@ export async function runSetupStep(
     },
     warn,
   );
-  checkIpRuleSupport({ proxyEngine, proxyMode, ipRules }, warn);
 
   withLogGroup("buildcage: Configured ACL Rules", () => {
     logRules("HTTPS", httpsRules);

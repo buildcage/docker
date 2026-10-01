@@ -248,34 +248,23 @@ Because a URL rule matches nothing on an engine that never sees a method or a pa
 
 Connections made straight to an address never go through DNS, so they are allowed separately from
 any domain. IPv4 only, in decimal without leading zeros (`10.0.0.1`, not `010.0.0.1`, which HAProxy
-reads as octal) and with a prefix length of 0 to 32; setup refuses anything else. What a rule may
-hold depends on the engine:
-
-| Engine      | A rule can be                                               | It cannot be       |
-| ----------- | ----------------------------------------------------------- | ------------------ |
-| `inspect`   | An address, a CIDR block (`10.0.0.0/8:443`), or a `~` regex | A wildcard pattern |
-| `universal` | An address, a wildcard, or a `~` regex                      | A CIDR block       |
+reads as octal) and with a prefix length of 0 to 32; setup refuses anything else. A rule can be an
+address, a CIDR block, a wildcard or a `~` regex, the same on both engines:
 
 ```yaml
-# inspect
 allowed_ip_rules: |
   192.168.1.10:443
   10.0.0.0/8:443
-  ~^172\.16\.\d+\.\d+:5432$
-
-# universal
-allowed_ip_rules: |
-  192.168.1.10:443
   192.168.1.*:443
+  ~^172\.16\.\d+\.\d+:5432$
 ```
 
 A rule is matched against the address the connection goes to, never a name the connection carries,
-so a rule naming a host is refused at setup, and so is a form the engine cannot match (a wildcard
-on `inspect`, a CIDR block on `universal`): `restrict` fails and `audit` warns. A range that covers
-the proxy's own address, which every name resolves to inside the cage, still leaves a connection
-made through a name to the domain rules. Either way the connection is tunnelled without
-inspection: once an `ip:port` pair is allowed, any TCP-based protocol can use that path. Prefer a
-domain rule where the destination has a stable name.
+so a rule naming a host is refused at setup. A range that covers the proxy's own address, which
+every name resolves to inside the cage, still leaves a connection made through a name to the domain
+rules. Either way the connection is tunnelled without inspection: once an `ip:port` pair is
+allowed, any TCP-based protocol can use that path. Prefer a domain rule where the destination has a
+stable name.
 
 ### TLS passthrough: `allowed_tls_rules`
 

@@ -68,7 +68,14 @@ describe("parseKnownBlockedRulesOrThrow", () => {
 
 describe("parseIpRulesOrThrow", () => {
   it("accepts an address, a wildcard, a CIDR block and a regex", () => {
-    const rules = ["10.0.0.5:443", "10.0.*.*:*", "10.0.0.1?:22", "10.0.0.0/8:443", "~^x:443$"];
+    const rules = [
+      "10.0.0.5:443",
+      "10.0.*.*:*",
+      "10.0.0.1?:22",
+      "10.**:443",
+      "10.0.0.0/8:443",
+      "~^x:443$",
+    ];
     expect(parseIpRulesOrThrow(rules.join(" "))).toStrictEqual(rules);
   });
 
@@ -92,6 +99,9 @@ describe("parseIpRulesOrThrow", () => {
     "10.0.0.0/08:443",
     "1.2.3:443",
     "10.0.*.010:443",
+    "10.0.*:443",
+    "*:443",
+    "10.0.0.*.1:443",
   ]) {
     it(`refuses ${rule}, which HAProxy would misread or reject`, () => {
       expect(codeOfThrown(() => parseIpRulesOrThrow(rule))).toBe("INVALID_RULES");
