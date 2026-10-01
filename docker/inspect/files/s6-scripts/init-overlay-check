@@ -1,0 +1,22 @@
+#!/command/with-contenv sh
+set -e
+
+# buildcage-runc reads each RUN step's layer back through its overlay upper
+# directory before BuildKit commits it, so the snapshotter must be overlayfs.
+# BuildKit itself only finds out at the first RUN step, with a bare "invalid
+# argument", so the same kind of mount is tried here first.
+root=/var/lib/buildkit
+mkdir -p "$root"
+probe=$(mktemp -d "$root/overlay-check.XXXXXX")
+trap 'umount "$probe/merged" 2>/dev/null; rm -rf "$probe" 2>/dev/null || true' EXIT
+mkdir "$probe/lower1" "$probe/lower2" "$probe/upper" "$probe/work" "$probe/merged"
+
+if ! reason=$(mount -t overlay overlay \
+  -o "lowerdir=$probe/lower2:$probe/lower1,upperdir=$probe/upper,workdir=$probe/work" \
+  "$probe/merged" 2>&1); then
+  echo "init-overlay-check: cannot mount overlayfs under $root: $reason" >&2
+  echo "init-overlay-check: the inspect engine needs overlayfs for BuildKit's snapshots, which Docker's data root cannot hold when it is itself on overlayfs (Docker-in-Docker without a volume for /var/lib/docker) or on XFS with ftype=0" >&2
+  exit 1
+fi
+
+echo "init-overlay-check: overlayfs mounts under $root"

@@ -20,12 +20,12 @@ and links here for the details.
 
 `buildcage/docker` starts the builder. Every input is optional.
 
-| Input                | Default     | Description                                                                                                                                                 |
-| -------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it.                                                                                       |
-| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                                             |
-| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                                              |
-| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA left in the image, or a layer that cannot be checked for one, into a warning. See [CA residue](#ca-residue). |
+| Input                | Default     | Description                                                                                                     |
+| -------------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it.                                           |
+| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                 |
+| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                  |
+| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA left in the image into a warning. See [CA residue](#ca-residue). |
 
 ```yaml
 - uses: buildcage/docker@b5459229d32c2aad72e4492fac98a192f85f75e0 # v4.0.4
@@ -683,19 +683,17 @@ reach, and what a step can't do to its CA store while it is mounted.
 
 ### CA residue
 
-Three things fail the build by default, pointing at `fail_on_ca_residue`:
+Two things fail the build by default, pointing at `fail_on_ca_residue`:
 
 - a copy of the CA the wrapper finds in the step's layer but cannot take out, such as one inside a
   binary, an uncompressed archive, a re-wrapped PEM or a JKS keystore sealed with a password other
   than `changeit` (see [Limitations](../README.md#limitations))
 - a `pkcs11.txt` in the step's layer that still names the CA's slot, or is too large to read (see
   [CA trust variables](#ca-trust-variables))
-- a step whose layer the wrapper cannot check, because BuildKit is not using its `overlayfs`
-  snapshotter (see [Security Details](./security.md#inspect-proxy-engine))
 
-With `fail_on_ca_residue: false` all three only warn: the copy or the slot stays in the image, and
-the unchecked layer is committed as it is. An error reading the layer back
-or restoring it fails the build either way.
+With `fail_on_ca_residue: false` both only warn, and the copy or the slot stays in the image. Whatever
+the setting, a step whose layer the wrapper cannot read back does not run, and an error reading the
+layer back or restoring it fails the build.
 
 The CA is valid for two days and unique to the run, so a copy left in an image trusts only a proxy
 that no longer exists. It still shows the image was built behind Buildcage.

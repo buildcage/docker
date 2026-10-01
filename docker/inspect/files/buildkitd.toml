@@ -8,7 +8,10 @@ searchDomains = ["."]
 
 [worker.oci]
 enabled = true
-snapshotter = "auto"
+# Not "auto", which falls back to native without saying so: buildcage-runc
+# reads each step's layer back through its overlay upper directory
+# (s6-scripts/init-overlay-check fails the start without one).
+snapshotter = "overlayfs"
 networkMode = "cni"
 cniConfigPath = "/etc/buildkit/cni.conflist"
 cniPoolSize = 16

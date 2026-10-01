@@ -38,7 +38,7 @@ inputs:
     required: false
     default: ""
   fail_on_ca_residue:
-    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when it leaves a copy of the proxy CA in its layer that cannot be removed, or has a layer that cannot be checked for one (a builder not using BuildKit's overlayfs snapshotter). With false, the copy stays in the image."
+    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when it leaves a copy of the proxy CA in its layer that cannot be removed. With false, the copy stays in the image."
     required: false
     default: "true"
   known_blocked_rules:
