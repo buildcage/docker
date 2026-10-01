@@ -1,2 +1,0 @@
-#!/bin/sh
-buildctl debug workers > /dev/null 2>&1

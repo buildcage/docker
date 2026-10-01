@@ -37,7 +37,7 @@ function writeFile(path: string, content: string): void {
 
 try {
   if (!proxyAddress) throw new Error("no proxy address given");
-  // init-haproxy-cfg always writes the file, so a missing path is a caller
+  // init-cfg always writes the file, so a missing path is a caller
   // mismatch rather than an empty address list.
   if (!hostAddressFile) throw new Error("no host address file given");
 

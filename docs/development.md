@@ -338,6 +338,8 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │   │                         # image ref), distinct from the top-level compose.yaml below
 │   ├── seccomp/              # The builder container's seccomp profile and gen-profile.mjs,
 │   │                         # read by the Docker client on the runner, not copied into an image
+│   ├── common/               # Image files both engines share: s6 services, init-iptables,
+│   │                         # cni.conflist
 │   ├── universal/            # proxy_engine: universal — BuildKit, HAProxy, CoreDNS, s6-overlay
 │   └── inspect/              # proxy_engine: inspect — HAProxy, CoreDNS, s6-overlay, and
 │                             # buildcage-runc/ (Go module: CA trust at exec time)
@@ -359,6 +361,11 @@ runs under Node on the runner after the report action copies it out of the image
 Corefile from the rules, through the generators in `src/core/lib/acl/` (`haproxy-config.ts` for
 `inspect`, `haproxy-universal-config.ts` for `universal`). rolldown bundles it into
 `/opt/buildcage/scripts/` at image build time, and `tsconfig.qjs.json` type-checks it.
+
+Each Dockerfile copies `docker/common/files/` first and the engine's own `files/` on top. An engine
+keeps only what differs: `THIRD_PARTY_LICENSES`, `buildkitd.toml`, the `init-cfg` script that
+generates its configs and, for `inspect`, the `init-overlay-check` service. A path in both would be
+settled silently by copy order, so `src/core/lib/docker/engine-files.test.ts` rejects one.
 
 `buildcage-runc` takes `go-pkcs12` from the
 [buildcage/go-pkcs12](https://github.com/buildcage/go-pkcs12) fork through a `replace` in its
