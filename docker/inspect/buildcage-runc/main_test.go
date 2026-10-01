@@ -270,7 +270,7 @@ func TestRunUndoesInjectionWhenRuncWillNotStart(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
 	useTempCAFile(t, string(testCA))
-	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	bundle, _ := newBundle(t, []string{"PATH=/usr/bin"})
 	realRuncWas := realRunc
 	realRunc = filepath.Join(t.TempDir(), "not-there")
 	t.Cleanup(func() { realRunc = realRuncWas })
@@ -278,8 +278,7 @@ func TestRunUndoesInjectionWhenRuncWillNotStart(t *testing.T) {
 	if code := run([]string{"run", "--bundle", bundle, "id"}); code != 1 {
 		t.Errorf("run exited %d, want 1", code)
 	}
-	ownCA := filepath.Join(rootfs, strings.TrimPrefix(ownCAPath, "/"))
-	if _, err := os.Stat(ownCA); !os.IsNotExist(err) {
-		t.Errorf("the own-CA file was left behind: %v", err)
+	if left, err := os.ReadDir(scratchRoot); err != nil || len(left) != 0 {
+		t.Errorf("scratch directories were left behind: %v %v", left, err)
 	}
 }

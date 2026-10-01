@@ -15,18 +15,9 @@ echo ""
 echo "=== No CA Residue In The Built Image ($IMAGE) ==="
 echo ""
 
-# The standalone file NODE_EXTRA_CA_CERTS/DENO_CERT were pointed at, only
-# created when the image had none of its own, removed again once the step
-# that needed it ends.
-if docker run --rm "$IMAGE" sh -c 'test -e /etc/buildcage-ca.pem'; then
-  fail "/etc/buildcage-ca.pem is present in the built image"
-else
-  pass "no standalone buildcage CA file in the built image"
-fi
-
 # The certificate appended to whichever system CA bundle the rootfs had,
-# removed by the same undo. The CA is generated per build, so a copy of it
-# anywhere in a bundle is one the undo failed to take back out.
+# taken back out when the step ends. The CA is generated per build, so a copy
+# of it anywhere in a bundle is one that was not taken back out.
 BUILDER="${BUILDER_NAME:-buildcage}"
 CA_LINE=$(docker exec "$BUILDER" cat /opt/buildcage/ca.pem 2>/dev/null \
   | awk '/-----BEGIN CERTIFICATE-----/{getline; print; exit}' || true)
