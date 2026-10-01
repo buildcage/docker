@@ -1,16 +1,16 @@
 /**
- * Corefile generator for the `inspect` engine.
+ * Corefile generator.
  *
  * Every name resolves locally to the proxy's own address, allowed or not, so
- * the build connects to the proxy and its full URL is recorded before being
- * denied, and a name that was only looked up still shows up in the log.
+ * the build connects to the proxy and what it asked for is recorded before
+ * being denied, and a name that was only looked up still shows up in the log.
  * Nothing is ever forwarded, so the query itself cannot leak what it asked
  * for.
  *
  * Real resolution happens once, in HAProxy, after a request has passed its
- * host, path and method check; see haproxy-config.ts. What this file decides
- * is only what gets logged as allowed or denied, and that has to match the
- * rules exactly, which is why the engine uses CoreDNS regex views over
+ * rule check; see haproxy-config.ts and haproxy-universal-config.ts. What this
+ * file decides is only what gets logged as allowed or denied, and that has to
+ * match the rules exactly, which is why it uses CoreDNS regex views over
  * dnsmasq suffix matching: the latter could only widen `abc*.amazonaws.com`
  * to `/amazonaws.com/`.
  *

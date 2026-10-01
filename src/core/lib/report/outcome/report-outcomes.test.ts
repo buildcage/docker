@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 import { reportParams } from "#core/lib/test/report-data.node.ts";
 
+import { buildUniversalReportData } from "../build/universal.ts";
 import type { InspectReportData, UniversalReportData } from "../types.ts";
 import { describeReportOutcomes } from "./report-outcomes.ts";
 
@@ -66,6 +67,22 @@ describe("describeReportOutcomes", () => {
     expect(blocked.level).toBe("none");
     expect(blocked.shouldFail).toBe(false);
     expect(rest).toStrictEqual([]);
+  });
+
+  it("names lookups in the count under universal too", async () => {
+    const report = await buildUniversalReportData(
+      ["buildcage haproxy starting 1787471970000"],
+      [
+        "2026-08-23 16:44:58.000000000  buildcage coredns starting",
+        "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=evil.example.com.",
+      ],
+      reportParams(),
+      0,
+    );
+    const [blocked] = describeReportOutcomes(report, options);
+    expect(blocked.message).toBe(
+      "1 blocked connection(s) and lookup(s) detected by buildcage proxy",
+    );
   });
 
   it("says nothing more for an empty timeline", () => {
