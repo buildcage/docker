@@ -698,9 +698,9 @@ Two things fail the build by default, pointing at `fail_on_ca_residue`:
 - a `pkcs11.txt` in the step's layer that still names the CA's slot, or is too large to read (see
   [CA trust variables](#ca-trust-variables))
 
-With `fail_on_ca_residue: false` both only warn, and the copy or the slot stays in the image. A step
-whose layer the wrapper cannot read back does not run, and an error reading the layer back or
-restoring it fails the build, either way.
+With `fail_on_ca_residue: false` both only warn, and the copy or the slot stays in the image. Whatever
+the setting, a step whose layer the wrapper cannot read back does not run, and an error reading the
+layer back or restoring it fails the build.
 
 The CA is valid for two days and unique to the run, so a copy left in an image trusts only a proxy
 that no longer exists. It still shows the image was built behind Buildcage.
