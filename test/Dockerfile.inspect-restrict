@@ -426,6 +426,14 @@ RUN echo "=== [Regex IP rule] ===" && \
     echo "$OUT" && \
     case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
 
+# The client sends nothing and waits for the server to speak, so the greeting
+# arrives within the 3s allowed here only if the passthrough does not wait for
+# the client's first bytes, as inspect-delay (5s) would.
+RUN echo "=== [Direct IP - allowed, server speaks first] ===" && \
+    OUT=$(sleep 4 | timeout 3 nc 10.200.0.100 2525 || true) && \
+    echo "$OUT" && \
+    case "$OUT" in 220\ *) echo "OK" ;; *) echo "FAILED: no greeting within 3s" && exit 1 ;; esac
+
 # Same address, a port only the URL rule's :80 default would cover, which proves
 # the ~regex ip rule's own literal port (9080) is enforced, not "any port".
 RUN echo "=== [Regex IP rule - other port not covered] ===" && \

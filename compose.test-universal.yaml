@@ -11,8 +11,9 @@ services:
       - ALLOWED_HTTPS_RULES=allowed.example.com:443 allowed.example.com:8443 *.wildcard.example.com:443 *.wildcard.example.com:8443 ~ok\.regex\.example\.com:443 ~^ports\.regex\.example\.com:(443|8443)$ ~^tlsany\.example\.com:.*$
       - ALLOWED_HTTP_RULES=allowed.example.com:80 allowed.example.com:8080 *.wildcard.example.com:80 *.wildcard.example.com:8080
       # 10.200.0.101 is left out, so a connection there that names this
-      # address in its SNI proves the rule sees the destination.
-      - ALLOWED_IP_RULES=10.200.0.100:8443
+      # address in its SNI proves the rule sees the destination. :2525 answers
+      # before the client speaks.
+      - ALLOWED_IP_RULES=10.200.0.100:8443 10.200.0.100:2525
     # Wrapped here rather than in the image: the builder is the product image
     # and carries no test-only setup.
     entrypoint: ["/test-hooks/attach-test-net-addr.sh", "/init"]

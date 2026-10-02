@@ -26,8 +26,9 @@ services:
       ALLOWED_TLS_RULES: "tlspass.example.com:443 ~^tlspass\\.example\\.com:8443$ ~^tlsany\\.example\\.com:.*$"
       # 9080 is distinct from the :80 the URL rule below already allows, so
       # reaching it proves this rule's own doing. 10.200.0.53:53 is the fixture
-      # resolver, for DNS over TCP to a resolver other than the gateway.
-      ALLOWED_IP_RULES: "~^10\\.200\\.0\\.\\d+:9080$ 10.200.0.53:53"
+      # resolver, for DNS over TCP to a resolver other than the gateway. :2525
+      # answers before the client speaks.
+      ALLOWED_IP_RULES: "~^10\\.200\\.0\\.\\d+:9080$ 10.200.0.53:53 10.200.0.100:2525"
       ALLOWED_URL_RULES: |
         GET https://allowed.example.com/public/**
         GET https://allowed.example.com:9443/public/**
