@@ -260,11 +260,12 @@ allowed_ip_rules: |
 ```
 
 A rule is matched against the address the connection goes to, never a name the connection carries,
-so a rule naming a host is refused at setup. A range that covers the proxy's own address, which
-every name resolves to inside the cage, still leaves a connection made through a name to the domain
-rules. Either way the connection is tunnelled without inspection: once an `ip:port` pair is
-allowed, any TCP-based protocol can use that path. Prefer a domain rule where the destination has a
-stable name.
+so a rule naming a host is refused at setup. A `~` rule is not checked for this: write it against
+the address and port as digits, since one that names a host matches nothing. A range that covers the
+proxy's own address, which every name resolves to inside the cage, still leaves a connection made
+through a name to the domain rules. Either way the connection is tunnelled without inspection: once
+an `ip:port` pair is allowed, any TCP-based protocol can use that path. Prefer a domain rule where
+the destination has a stable name.
 
 ### TLS passthrough: `allowed_tls_rules`
 
