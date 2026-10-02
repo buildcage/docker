@@ -189,8 +189,9 @@ describe("ip rules and the proxy's own address", () => {
   });
 
   it("declares nothing without an ip rule", () => {
-    expect(detect({ tlsRules: ["db.example.com:443"] }).includes("dns_routed")).toBe(false);
-    expect(detect({ tlsRules: ["db.example.com:443"] }).includes("ip_dst_internal")).toBe(false);
+    const result = detect({ tlsRules: FULL.tlsRules });
+    expect(result.includes("dns_routed")).toBe(false);
+    expect(result.includes("ip_dst_internal")).toBe(false);
   });
 
   it("refuses a passthrough to the proxy's own listener, and only there", () => {
