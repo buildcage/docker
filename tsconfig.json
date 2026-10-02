@@ -16,8 +16,7 @@
     "src/core/lib/**/*.ts",
     "src/**/*.ts",
     "report/src/**/*.ts",
-    "docker/*/scripts/*.node.ts",
-    "docker/lib/**/*.ts"
+    "docker/*/scripts/*.node.ts"
   ],
   "exclude": ["**/dist/**", "src/core/scripts/**"]
 }
