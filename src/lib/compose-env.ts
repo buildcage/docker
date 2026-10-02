@@ -1,4 +1,5 @@
-import type { ProxyEngine } from "./engine.ts";
+import type { ProxyEngine } from "#core/lib/actions/inputs.ts";
+
 import { listHostIpv4Addresses } from "./host-addresses.ts";
 
 export interface ComposeEnvOptions {

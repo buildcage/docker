@@ -15,6 +15,10 @@ import { fileURLToPath } from "node:url";
 import { isKnownBlockedUrlRule } from "#core/lib/acl/wildcard-rules.ts";
 import { annotate } from "#core/lib/actions/annotation.ts";
 import { describeDockerFailure } from "#core/lib/actions/docker-error.ts";
+import {
+  checkKnownBlockedUrlRuleSupport,
+  checkUrlAndTlsRuleSupport,
+} from "#core/lib/actions/engine-rule-support.ts";
 import { logRules, withLogGroup } from "#core/lib/actions/log.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
 import { deriveProjectName } from "#core/lib/docker/compose-project-name.ts";
@@ -27,10 +31,6 @@ import {
 
 import { builderStartError } from "./builder-diagnostics.ts";
 import { buildComposeEnv } from "./compose-env.ts";
-import {
-  checkKnownBlockedUrlRuleSupport,
-  checkUrlAndTlsRuleSupport,
-} from "./engine-rule-support.ts";
 import { SetupError } from "./errors.ts";
 import { readSetupInputs } from "./inputs.ts";
 import { readLocalImageOverride } from "./local-image.ts";
