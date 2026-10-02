@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import * as core from "@actions/core";
 import { describe, it, expect, vi } from "vitest";
 
 import type { Docker } from "#core/lib/docker/client.ts";
@@ -285,6 +286,8 @@ describe("runReportAction when a write fails", () => {
       process.exitCode = previous;
       log.mockRestore();
       vi.unstubAllEnvs();
+      // The failed write left what it was given in the shared buffer.
+      core.summary.emptyBuffer();
       rmSync(dir, { recursive: true, force: true });
     }
   });
