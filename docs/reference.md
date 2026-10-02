@@ -462,10 +462,10 @@ in neither host table. **Communication details** shows it with ⚠️ and how it
 ⚠️ 00:11.407: HTTPS untrusted-ca.example.com:443 -> client-timeout
 ```
 
-| Reason           | What happened                                                                   |
-| ---------------- | ------------------------------------------------------------------------------- |
-| `client-aborted` | the client finished the TLS handshake and then closed without sending a request |
-| `client-timeout` | it held the connection open instead, until the timeout expired                  |
+| Reason           | What happened                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `client-aborted` | the client closed without sending a request, after the TLS handshake if there was one |
+| `client-timeout` | it held the connection open instead, until the timeout expired                        |
 
 The commonest cause is a container with no `ca-certificates`: the client cannot verify the
 certificate the `inspect` engine signs with, so every HTTPS request to that host ends at the
@@ -480,6 +480,11 @@ so it is left out of Communication details as noise. The raw [traffic artifact](
 keeps every one either way. Neither kind fails the step, not even with `fail_on_blocked: true`: no
 rule refused it, so `known_blocked_rules` has nothing to match, and nothing reached an origin. A
 `::warning::` annotation gives the count of those shown.
+
+A protocol where the server speaks first (SMTP, MySQL, FTP) ends here too unless an
+`allowed_ip_rules` or `allowed_tls_rules` entry passes it through: the client waits for a greeting
+and the proxy waits for a request, so no rule is ever reached. Even to a destination nothing allows,
+such a connection is ⚠️ rather than 🚫 and does not fail the step.
 
 ### The ones Buildcage refused
 
@@ -497,9 +502,10 @@ and they fail the step under `fail_on_blocked: true` like any other refused conn
 | `bad-request`         | the build sent bytes that could not be read as an HTTP request at all  |
 | `missing-host-header` | a request parsed, and carried no `Host` for a rule to match or resolve |
 
-`bad-request` is most often a protocol that is not HTTP at all, a database or `git://` connection to
-a port no `allowed_ip_rules` or `allowed_tls_rules` entry covers: anything that is not a TLS
-handshake is handed to the plain-HTTP stage, which reads it as a request and refuses it. Both are
+`bad-request` is most often a protocol that is not HTTP at all and where the client speaks first,
+such as PostgreSQL or `git://`, on a port no `allowed_ip_rules` or `allowed_tls_rules` entry
+covers: anything that is not a TLS handshake is handed to the plain-HTTP stage, which reads it as a
+request and refuses it. Both are
 refused in `audit` mode too, as the same check is under `universal`, since a request naming no host
 has nothing to connect to whatever the rules say.
 
