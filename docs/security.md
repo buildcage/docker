@@ -89,7 +89,9 @@ A rule matches on the name the request carried, the SNI or the `Host` header. On
 the proxy resolves that name itself and rewrites the destination to the result (`do-resolve` and
 `set-dst`), so the address the build chose is discarded. A forged `Host`, a doctored `/etc/hosts`,
 or an SNI naming one host while the connection aims at another all reach the server the name belongs
-to: destination spoofing is removed rather than detected. A name with anything but letters, digits,
+to: destination spoofing is removed rather than detected. A connection an `allowed_ip_rules` entry
+covers is the one exception: that rule names the address itself, so the connection goes there
+whatever name it carries. A name with anything but letters, digits,
 `.`, `_` and `-` in it never reaches a rule, in `audit` too: `universal` refuses such an SNI
 (`invalid-sni`), and `inspect` never passes one through and refuses such a `Host` (`invalid-host`).
 A `:` in the name could otherwise let a `~` rule's port pattern match a name the proxy then looks up.

@@ -38,6 +38,7 @@ describe("passthrough", () => {
   it("logs the SNI only for a connection a tls rule passed", () => {
     const capture = "set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g)";
     // An ip rule's connection is accepted before it, so txn.pass means a tls rule.
+    expect(config.split(capture).length).toBe(2);
     expect(config.includes(`${capture} if { var(txn.pass) -m found }`)).toBe(true);
     expect(config.indexOf(capture) > config.indexOf("accept if { var(txn.pass) -m found }")).toBe(
       true,
@@ -111,6 +112,16 @@ describe("passthrough", () => {
       `tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
       `tcp-request content reject if ${self}`,
     ]);
+  });
+
+  it("leaves a connection an ip rule also covers to that rule, whatever SNI it carries", () => {
+    // The ip rule names the address itself, so the SNI neither redirects nor
+    // refuses it; the tls rule's resolution never runs for it.
+    const overlap = detect({ ipRules: ["10.0.0.0/8:443"], tlsRules: ["db.example.com:443"] });
+    const accept = overlap.indexOf("tcp-request content accept if { var(txn.pass) -m found }");
+    expect(accept).not.toBe(-1);
+    expect(overlap.indexOf("set-var(txn.pass) int(1) if tls0_sni") > accept).toBe(true);
+    expect(overlap.indexOf("tcp-request content do-resolve") > accept).toBe(true);
   });
 
   it("connects a passthrough where it resolved the SNI, not where the client aimed", () => {

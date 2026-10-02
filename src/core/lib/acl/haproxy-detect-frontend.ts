@@ -44,6 +44,7 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
     "",
   );
   if (hasPassthrough) {
+    const pass = "{ var(txn.pass) -m found }";
     l.push("    # Passed through untouched: judged before anything is decrypted.");
     if (ipRules.length > 0) {
       if (ipRules.some((rule) => rule.hostMatch === "hostPort")) {
@@ -71,10 +72,10 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
       // accepted here, ahead of every rule below that waits for the first
       // bytes: a client waiting for the server to speak first would otherwise
       // sit out the whole inspect-delay. It is logged as tcp whatever it
-      // carries, as under universal.
+      // carries, so the report lists it under the IP rule type, as universal's.
       // An IP rule wide enough to cover one of the proxy's own addresses would
       // pass a connection to this listener back into it, without end.
-      const self = `{ var(txn.pass) -m found } ip_dst_internal { dst_port ${listenPort} }`;
+      const self = `${pass} ip_dst_internal { dst_port ${listenPort} }`;
       l.push(
         "",
         // One line per rule, for the same word-limit reason as ruleBlock's deny.
@@ -82,11 +83,11 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
           (r) =>
             `    tcp-request content set-var(txn.pass) int(1) if ${r.id}_dst${r.port ? ` ${r.id}_port` : ""} !dns_routed`,
         ),
-        "    tcp-request content set-var(txn.proto) str(tcp) if { var(txn.pass) -m found }",
+        `    tcp-request content set-var(txn.proto) str(tcp) if ${pass}`,
         ...internalDstAcl("ip_dst_internal", spec, "dst"),
         `    tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
         `    tcp-request content reject if ${self}`,
-        "    tcp-request content accept if { var(txn.pass) -m found }",
+        `    tcp-request content accept if ${pass}`,
       );
     }
 
@@ -109,7 +110,6 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
       // count. Flagged before the rules below reject, so a refused passthrough
       // is logged too. An IP rule's connection is gone by now, so txn.pass
       // means a tls rule matched, on both its name and its port.
-      const pass = "{ var(txn.pass) -m found }";
       l.push(
         "",
         // One line per rule, for the same word-limit reason as ruleBlock's deny.
