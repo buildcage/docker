@@ -103,23 +103,35 @@ export async function runReportAction(
     { actionVersion: readActionVersion(docker, containerId, spec.proxyEngine) },
   );
 
+  emitReportOutcomes(report, {
+    failOnBlocked: deps.failOnBlocked ?? readFailOnBlocked(),
+    summaryFile: env.GITHUB_STEP_SUMMARY,
+  });
+
   // The report action uploads this file as an artifact if asked; the upload
   // client is large and needs the runner's credentials, so it stays out of the
   // image and the file is written here instead. Its name is known before the
   // summary is written, so a truncated Communication details section can say
   // whether the full list is available as an artifact.
   const trafficFile = env.BUILDCAGE_TRAFFIC_FILE;
-  await writeStepSummary(
-    truncateForStepSummary(markdown, trafficFile !== undefined),
-    env.GITHUB_STEP_SUMMARY,
-  );
-
+  // Both writes are tried; a failure in either is thrown once both have run.
+  const failures: unknown[] = [];
   if (trafficFile) {
-    writeTrafficFile(trafficFile, buildTrafficRecords(report.timeline, report.startedAt));
+    try {
+      writeTrafficFile(trafficFile, buildTrafficRecords(report.timeline, report.startedAt));
+    } catch (e) {
+      failures.push(e);
+    }
   }
-
-  emitReportOutcomes(report, {
-    failOnBlocked: deps.failOnBlocked ?? readFailOnBlocked(),
-    summaryFile: env.GITHUB_STEP_SUMMARY,
-  });
+  try {
+    await writeStepSummary(
+      truncateForStepSummary(markdown, trafficFile !== undefined),
+      env.GITHUB_STEP_SUMMARY,
+    );
+  } catch (e) {
+    failures.push(e);
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(failures, failures.map(errorMessage).join("; "));
+  }
 }

@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import * as core from "@actions/core";
 import { describe, it, expect, vi } from "vitest";
 
 import type { Docker } from "#core/lib/docker/client.ts";
@@ -256,5 +257,59 @@ describe("runReportAction's fail_on_blocked fallback", () => {
     expect(lines).toContain(
       `::warning::Invalid fail_on_blocked: "${value}". Must be true or false. Reading it as true.\n`,
     );
+  });
+});
+
+describe("runReportAction when a write fails", () => {
+  it("annotates, sets the exit code and writes the traffic file when the summary fails", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "buildcage-action-main-"));
+    const summary = join(dir, "missing", "summary.md");
+    const traffic = join(dir, "traffic.json");
+    vi.stubEnv("GITHUB_STEP_SUMMARY", summary);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const previous = process.exitCode;
+    try {
+      await expect(
+        runReportAction(spec({ build: () => blockedReport }), {
+          containerId: "abc123",
+          docker: fakeDocker(),
+          env: { GITHUB_STEP_SUMMARY: summary, BUILDCAGE_TRAFFIC_FILE: traffic },
+          failOnBlocked: true,
+        }),
+      ).rejects.toThrow();
+      expect(log.mock.calls.map((c) => String(c[0]))).toContainEqual(
+        expect.stringMatching(/^::error::.*blocked/),
+      );
+      expect(process.exitCode).toBe(1);
+      expect(readFileSync(traffic, "utf8")).toBeTruthy();
+    } finally {
+      process.exitCode = previous;
+      log.mockRestore();
+      vi.unstubAllEnvs();
+      // A failed write leaves its text in core.summary's shared buffer.
+      core.summary.emptyBuffer();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes the summary when the traffic file fails, then throws", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "buildcage-action-main-"));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await expect(
+        runReportAction(spec(), {
+          containerId: "abc123",
+          docker: fakeDocker(),
+          env: { BUILDCAGE_TRAFFIC_FILE: join(dir, "missing", "traffic.json") },
+          failOnBlocked: false,
+        }),
+      ).rejects.toThrow(/traffic\.json/);
+      expect(log.mock.calls.map((c) => String(c[0])).join("\n")).toMatch(
+        /## Outbound Traffic Report/,
+      );
+    } finally {
+      log.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
