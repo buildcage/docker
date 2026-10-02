@@ -345,35 +345,44 @@ func (b *dirBind) prepare(ca []byte) error {
 		return fmt.Errorf("mirroring %s: %w", b.hostDir, err)
 	}
 
+	return b.injectIntoMirror(func() error {
+		for _, name := range b.bundleFiles {
+			target := filepath.Join(b.scratchDir, name)
+			if b.keystore {
+				// A keystore that cannot be injected into (an unusual format, or a
+				// PKCS#12 under a password of its own) leaves the step's JVM not
+				// trusting the CA rather than failing the build.
+				original, err := insertIntoKeystore(target, ca)
+				if err != nil {
+					logf("cannot inject the CA into keystore %s: %v; leaving it untouched", name, err)
+					continue
+				}
+				b.rememberKeystore(target, original)
+				continue
+			}
+			if err := appendCA(target, ca); err != nil {
+				if errors.Is(err, errNotRegular) {
+					logf("cannot inject the CA into %s: %v; leaving it untouched", name, err)
+					continue
+				}
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// injectIntoMirror runs inject on the mirror, recording its state before and
+// after as original and baseline for finish.
+func (b *dirBind) injectIntoMirror(inject func() error) error {
 	original, err := captureManifest(b.scratchDir)
 	if err != nil {
 		return err
 	}
 	b.original = original
-
-	for _, name := range b.bundleFiles {
-		target := filepath.Join(b.scratchDir, name)
-		if b.keystore {
-			// A keystore that cannot be injected into (an unusual format, or a
-			// PKCS#12 under a password of its own) leaves the step's JVM not
-			// trusting the CA rather than failing the build.
-			original, err := insertIntoKeystore(target, ca)
-			if err != nil {
-				logf("cannot inject the CA into keystore %s: %v; leaving it untouched", name, err)
-				continue
-			}
-			b.rememberKeystore(target, original)
-			continue
-		}
-		if err := appendCA(target, ca); err != nil {
-			if errors.Is(err, errNotRegular) {
-				logf("cannot inject the CA into %s: %v; leaving it untouched", name, err)
-				continue
-			}
-			return err
-		}
+	if err := inject(); err != nil {
+		return err
 	}
-
 	baseline, err := captureManifest(b.scratchDir)
 	if err != nil {
 		return err

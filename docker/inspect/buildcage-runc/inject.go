@@ -179,6 +179,8 @@ type injection struct {
 	binds    []*dirBind
 	ownCADir string
 	created  createdDirs
+	// What the NSS mirror's pkcs11.txt gained, if there is one.
+	nssAppended []byte
 	// The step's layer as found when the injection began, kept rather than
 	// recomputed at finish: a transient mount-table read failure there would
 	// otherwise report no layer and commit the anchors' scattered copies unswept.
@@ -208,7 +210,7 @@ func (in *injection) finish() error {
 		removeScratchDir(in.ownCADir)
 	}
 	// After the write-back, whose own result lands in the layer.
-	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssAppended()))
+	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssAppended))
 	// After the sweep, which has by now emptied and removed the anchor files,
 	// so a directory the injection created is empty and can go.
 	removeCreatedDirs(in.rootfs, in.created)
@@ -219,16 +221,6 @@ func (in *injection) finish() error {
 		return firstErr
 	}
 	return sweepErr
-}
-
-// nssAppended is what the NSS mirror's pkcs11.txt gained, if there is one.
-func (in *injection) nssAppended() []byte {
-	for _, b := range in.binds {
-		if b.nssAppended != nil {
-			return b.nssAppended
-		}
-	}
-	return nil
 }
 
 // inject makes the step trust the proxy's CA, returning what finishes the
@@ -284,9 +276,11 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	}
 
 	// Chromium reads neither the store nor any variable (see nssdb.go).
+	var nssAppended []byte
 	nssMirror, nssCreated := placeNSSDB(s, bundle, ca)
 	if nssMirror != nil {
 		binds = append(binds, nssMirror)
+		nssAppended = nssMirror.nssAppended
 	}
 	created.add(nssCreated.dirs)
 
@@ -295,7 +289,10 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("cannot update the process spec: %v", err)
 	}
 
-	return &injection{rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created, upper: upper}, nil
+	return &injection{
+		rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
+		upper: upper, nssAppended: nssAppended,
+	}, nil
 }
 
 // bindTargets binds each group of CA targets, nested groups folded into the

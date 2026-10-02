@@ -214,23 +214,15 @@ func (b *dirBind) prepareNSS(exists bool, uid, gid int) error {
 			return fmt.Errorf("mirroring %s: %w", b.hostDir, err)
 		}
 	}
-	original, err := captureManifest(b.scratchDir)
-	if err != nil {
-		return err
-	}
-	b.original = original
-	appended, err := appendNSSSlot(filepath.Join(b.scratchDir, "pkcs11.txt"), uid, gid)
-	if err != nil {
-		return err
-	}
-	b.nssAppended = appended
-	_, b.nssHadTxt = entryFor(original, "pkcs11.txt")
-	baseline, err := captureManifest(b.scratchDir)
-	if err != nil {
-		return err
-	}
-	b.baseline = baseline
-	return nil
+	return b.injectIntoMirror(func() error {
+		appended, err := appendNSSSlot(filepath.Join(b.scratchDir, "pkcs11.txt"), uid, gid)
+		if err != nil {
+			return err
+		}
+		b.nssAppended = appended
+		_, b.nssHadTxt = entryFor(b.original, "pkcs11.txt")
+		return nil
+	})
 }
 
 // appendNSSSlot adds the slot to pkcs11.txt, creating it for the step's user
