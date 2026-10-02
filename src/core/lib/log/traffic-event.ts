@@ -35,7 +35,8 @@ export interface TrafficEvent {
   time: number;
   action: TrafficAction;
   protocol: TrafficProtocol;
-  /** The name asked for, or the address when there was no name. */
+  /** The name asked for, as ruleHost folds it, or the address when there was
+   *  no name. */
   host: string;
   /** Absent for dns, which connects to nothing. */
   port?: number;
@@ -57,9 +58,7 @@ export interface TrafficEvent {
   destination?: string;
 }
 
-/** The hosts a run connected to, for isRedundantDns. CoreDNS lowercases what it
- *  logs while HAProxy repeats the authority verbatim, so both sides are
- *  folded. */
+/** The hosts a run connected to, for isRedundantDns. */
 export interface ConnectedHosts {
   any: Set<string>;
   blocked: Set<string>;
@@ -84,13 +83,13 @@ export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent
   const completed = new Set<string>();
   for (const event of timeline) {
     if (event.protocol !== "dns" && event.action !== "incomplete" && event.host !== UNKNOWN_HOST) {
-      completed.add(event.host.toLowerCase());
+      completed.add(event.host);
     }
   }
   return (event) =>
     event.action === "incomplete" &&
     CLIENT_ENDED_REASONS.has(event.reason ?? "") &&
-    completed.has(event.host.toLowerCase());
+    completed.has(event.host);
 }
 
 /** Index a timeline once. The check below runs for every lookup, and rescanning
@@ -99,9 +98,8 @@ export function connectedHosts(timeline: TrafficEvent[]): ConnectedHosts {
   const connected: ConnectedHosts = { any: new Set(), blocked: new Set() };
   for (const event of timeline) {
     if (event.protocol === "dns") continue;
-    const host = event.host.toLowerCase();
-    connected.any.add(host);
-    if (event.action === "block") connected.blocked.add(host);
+    connected.any.add(event.host);
+    if (event.action === "block") connected.blocked.add(event.host);
   }
   return connected;
 }
@@ -120,6 +118,7 @@ export function connectedHosts(timeline: TrafficEvent[]): ConnectedHosts {
  */
 export function isRedundantDns(event: TrafficEvent, connected: ConnectedHosts): boolean {
   if (event.protocol !== "dns" || event.action === "discovery") return false;
-  const host = event.host.toLowerCase();
-  return event.action === "block" ? connected.blocked.has(host) : connected.any.has(host);
+  return event.action === "block"
+    ? connected.blocked.has(event.host)
+    : connected.any.has(event.host);
 }

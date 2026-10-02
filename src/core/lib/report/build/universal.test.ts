@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { reportParams } from "#core/lib/test/report-data.node.ts";
 
+import { buildRestrictExample } from "../render/build-example.ts";
 import { buildUniversalReportData } from "./universal.ts";
 
 const HAPROXY_START = "buildcage haproxy starting 1787471970000";
@@ -51,6 +52,23 @@ describe("buildUniversalReportData", () => {
       0,
     );
     expect(result.passed.map((r) => r.host)).toStrictEqual(["any.com"]);
+  });
+
+  it("folds a host spelled in different case into one row and one example rule", async () => {
+    const result = await buildUniversalReportData(
+      [
+        HAPROXY_START,
+        proxy("AUDIT", "HTTPS", "Example.com:443", "-", 10),
+        proxy("AUDIT", "HTTPS", "example.com:443", "-", 10),
+      ],
+      [DNS_START],
+      reportParams({ mode: "audit" }),
+      0,
+    );
+    expect(result.passed.map((r) => [r.host, r.count])).toStrictEqual([["example.com", 2]]);
+    expect(
+      buildRestrictExample(result.passed, "owner/repo").match(/example\.com:443/g),
+    ).toStrictEqual(["example.com:443"]);
   });
 
   it("tables a dns-failed connection apart from refusals", async () => {
