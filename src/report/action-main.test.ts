@@ -258,3 +258,34 @@ describe("runReportAction's fail_on_blocked fallback", () => {
     );
   });
 });
+
+describe("runReportAction when the summary cannot be written", () => {
+  it("has already annotated, set the exit code and written the traffic file", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "buildcage-action-main-"));
+    const summary = join(dir, "missing", "summary.md");
+    const traffic = join(dir, "traffic.json");
+    vi.stubEnv("GITHUB_STEP_SUMMARY", summary);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const previous = process.exitCode;
+    try {
+      await expect(
+        runReportAction(spec({ build: () => blockedReport }), {
+          containerId: "abc123",
+          docker: fakeDocker(),
+          env: { GITHUB_STEP_SUMMARY: summary, BUILDCAGE_TRAFFIC_FILE: traffic },
+          failOnBlocked: true,
+        }),
+      ).rejects.toThrow();
+      expect(log.mock.calls.map((c) => String(c[0]))).toContainEqual(
+        expect.stringMatching(/^::error::.*blocked/),
+      );
+      expect(process.exitCode).toBe(1);
+      expect(readFileSync(traffic, "utf8")).toBeTruthy();
+    } finally {
+      process.exitCode = previous;
+      log.mockRestore();
+      vi.unstubAllEnvs();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
