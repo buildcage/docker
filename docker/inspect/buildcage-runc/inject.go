@@ -86,6 +86,11 @@ func planCATrust(s *spec, bundle string, ca []byte, store systemStore) caPlan {
 	if store.found {
 		plan.targets[store.hostPath] = true
 	}
+	if dir, err := resolveInRoot(s.rootfs, suseCertDir); err == nil {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			plan.targets[filepath.Join(dir, suseCertName)] = true
+		}
+	}
 
 	// setOwnCA points variableName at ownCAPath, binding it once and sharing
 	// it across every variable that falls back to it.

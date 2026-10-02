@@ -40,6 +40,13 @@ var systemCertFiles = []string{
 	"/etc/ssl/cert.pem",
 }
 
+// SUSE's GnuTLS reads this directory (/etc/ssl/certs links to it), not the
+// store. It reads every file there, so the CA needs no hash link.
+const (
+	suseCertDir  = "/var/lib/ca-certificates/pem"
+	suseCertName = "buildcage.pem"
+)
+
 var (
 	errEscapesRoot     = errors.New("path escapes the rootfs")
 	errTooManySymlinks = errors.New("too many symlinks")

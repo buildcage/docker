@@ -325,11 +325,13 @@ redirected. `GIT_SSL_CAINFO`, `npm_config_cafile`, `AWS_CA_BUNDLE`, `CARGO_HTTP_
 CA nor the variables are left in the image layers, except a copy a step hides where it cannot be
 read (see [Limitations](#limitations)). The CA is also left in the
 distribution's own anchor directory, so a step that installs `ca-certificates` partway through keeps
-trusting it once `update-ca-certificates` has rebuilt the bundle from scratch. A JVM already in the
-base image reads none of those variables and only its own keystore, so the CA is added there too, to
-`$JAVA_HOME/lib/security/cacerts` and that of the first `java` on `PATH`, in whichever shape it ships
-(JKS or PKCS#12), for the step and taken back out before the layer is committed, letting `mvn`,
-`gradle` and `java` reach the proxy without `proxy_engine: universal`. Chromium, including the
+trusting it once `update-ca-certificates` has rebuilt the bundle from scratch. On SUSE, GnuTLS reads
+`/var/lib/ca-certificates/pem` instead of the bundle, so the CA goes into that directory for the
+step as well. A JVM already in the base image reads none of those variables and only its own
+keystore, so the CA is added there too, to `$JAVA_HOME/lib/security/cacerts` and that of the first
+`java` on `PATH`, in whichever shape it ships (JKS or PKCS#12), for the step and taken back out
+before the layer is committed, letting `mvn`, `gradle` and `java` reach the proxy without
+`proxy_engine: universal`. Chromium, including the
 `chrome-headless-shell` that Puppeteer, Playwright and Remotion download, reads only its compiled-in
 root store and the NSS database in `$HOME`, so for each step that database's `pkcs11.txt` gains a
 read-only slot on a database holding only the CA, taken back out before the layer is committed. The
