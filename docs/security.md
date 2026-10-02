@@ -142,14 +142,15 @@ Two consequences worth knowing:
 - The list is read once at startup, and on a containerised runner it holds that container's
   addresses rather than the real host's.
 
-This guard is about a _name_ landing somewhere it never should. A rule whose host is a literal
-address, such as `169.254.169.254:80`, exempts the requests it matches, in `audit` too, except
-in the proxy's own network (`198.19.255.0/24`) and on port `10024` of any internal address: a rule
-naming the proxy's listener would loop it into itself. A wildcard or regex that merely admits the
-address, `**:80` or `~^.*:80$`, is not. Reaching a cloud metadata endpoint directly, the way any
-AWS or GCP SDK does, is not what this is meant to stop, and `allowed_ip_rules` is the intended path
-for it. That path skips this guard except for the listener: a connection to port `10024` of an
-internal address is refused there too, whatever the IP rules say and in `audit` as well.
+This guard is about a _name_ landing somewhere it never should. Under `inspect`, a rule whose host
+is a literal address, such as `169.254.169.254:80`, exempts the requests it matches, in `audit` too,
+except in the proxy's own network (`198.19.255.0/24`) and on port `10024` of any internal address: a
+rule naming the proxy's listener would loop it into itself. A wildcard or regex that merely admits
+the address, `**:80` or `~^.*:80$`, is not. Under `universal`, no rule does. Reaching a cloud
+metadata endpoint directly, the way any AWS or GCP SDK does, is not what this is meant to stop, and
+`allowed_ip_rules` is the intended path for it. That path skips this guard except for the listener:
+a connection to port `10024` of an internal address is refused there too, whatever the IP rules say
+and in `audit` as well.
 
 ### Only TCP gets out
 

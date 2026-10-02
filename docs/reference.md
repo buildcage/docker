@@ -27,6 +27,9 @@ and links here for the details.
 | `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                  |
 | `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA left in the image into a warning. See [CA residue](#ca-residue). |
 
+`fail_on_ca_residue` takes `true` or `false`. Any other value fails the step before the builder
+starts.
+
 ```yaml
 - uses: buildcage/docker@b5459229d32c2aad72e4492fac98a192f85f75e0 # v4.0.4
   with:
