@@ -119,6 +119,22 @@ export function pathToRegexPartial(path: string): string {
 }
 
 /**
+ * A port written as a decimal from 1 to 65535, or `*`. The engines disagree on
+ * a leading zero: the inspect engine's `dst_port` reads `0443` as 443, while
+ * the universal engine matches the rule as text against `443` and never
+ * matches.
+ *
+ * @throws {Error} if the port is anything else
+ */
+export function checkPort(port: string, rule: string): void {
+  if (port === "*" || (/^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535)) return;
+  throw new Error(
+    `Invalid port in rule "${rule}": "${port}". Write a decimal from 1 to 65535 without a ` +
+      `leading zero (443, not 0443), or "*" for any port`,
+  );
+}
+
+/**
  * Convert a `<domain>:<port|*>` pattern to a regex string, without anchors.
  *
  * Mirrors wildcardToRegex's shape so callers can split the result on the last
@@ -133,6 +149,7 @@ export function wildcardToRegexPartial(pattern: string): string {
   const colonIndex = pattern.lastIndexOf(":");
   const domain = pattern.slice(0, colonIndex);
   const port = pattern.slice(colonIndex + 1);
+  checkPort(port, pattern);
   return `${domainToRegexPartial(domain)}:${port === "*" ? "\\d+" : port}`;
 }
 

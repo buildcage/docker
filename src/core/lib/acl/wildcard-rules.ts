@@ -8,6 +8,7 @@ import { IPV4_CIDR } from "./ipv4.ts";
 import {
   anchorRawRegex,
   checkHostLabel,
+  checkPort,
   endsAnchored,
   splitDomainFromPortPattern,
   splitRawRegexHost,
@@ -198,6 +199,7 @@ export function wildcardToRegex(pattern: string): string {
     throw new Error(`Invalid pattern "${pattern}"`);
   }
   const [domain, port] = pattern.split(":");
+  checkPort(port, pattern);
   const portRegex = port === "*" ? "\\d+" : port;
   return `${domainToRegex(domain)}:${portRegex}`;
 }

@@ -192,7 +192,8 @@ to an address goes by `allowed_ip_rules` only.
 
 #### Ports
 
-A port is required on every rule.
+A port is required on every rule. It is a decimal from 1 to 65535 without a leading zero (`443`,
+not `0443`), or `*` for any port, and a URL rule's port takes the same form.
 
 | Rule                 | Matches                                                       |
 | -------------------- | ------------------------------------------------------------- |

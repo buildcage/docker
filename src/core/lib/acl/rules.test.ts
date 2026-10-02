@@ -214,6 +214,28 @@ describe("checkRulesCompileOrThrow", () => {
     }
   });
 
+  // inspect reads a leading zero as decimal and universal matches it as text,
+  // so the same rule would allow on one engine and nothing on the other.
+  it("refuses a port with a leading zero or out of range, in every rule kind", () => {
+    const kinds: ((port: string) => unknown)[] = [
+      (p) => checkRulesCompileOrThrow({ httpsRules: parseRulesOrThrow(`a.com:${p}`) }),
+      (p) => checkRulesCompileOrThrow({ httpRules: parseRulesOrThrow(`a.com:${p}`) }),
+      (p) => checkRulesCompileOrThrow({ tlsRules: parseRulesOrThrow(`a.com:${p}`) }),
+      (p) => checkRulesCompileOrThrow({ ipRules: parseIpRulesOrThrow(`10.0.0.1:${p}`) }),
+      (p) => checkRulesCompileOrThrow({ ipRules: parseIpRulesOrThrow(`10.0.0.0/8:${p}`) }),
+      (p) => parseKnownBlockedRulesOrThrow(`a.com:${p}`),
+      (p) => buildUrlRulesOrThrow(`GET https://a.com:${p}/x`),
+    ];
+    for (const compile of kinds) {
+      for (const port of ["0443", "0", "65536"]) {
+        expect(() => compile(port)).toThrow(new RegExp(`Invalid port .*"${port}"`));
+      }
+      for (const port of ["1", "65535", "*"]) {
+        expect(() => compile(port)).not.toThrow();
+      }
+    }
+  });
+
   // Passes the setup parser, which lets a CIDR block through for IP rules, but
   // not the proxy's own host compiler.
   it("refuses, as INVALID_RULES, a rule only the container's compiler rejects", () => {
