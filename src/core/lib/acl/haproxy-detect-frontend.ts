@@ -104,54 +104,36 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
         );
         if (host.port) l.push(`    acl ${host.id}_port dst_port ${host.port}`);
       }
-      const tlsConds = tlsHosts.map(tlsCond);
       // A passthrough is never decrypted and so has no request line; its log
       // line is its only record, carrying the name, destination and byte
       // count. Flagged before the rules below reject, so a refused passthrough
-      // is logged too.
+      // is logged too. An IP rule's connection is gone by now, so txn.pass
+      // means a tls rule matched, on both its name and its port.
+      const pass = "{ var(txn.pass) -m found }";
       l.push(
         "",
-        ...tlsConds.map((cond) => `    tcp-request content set-var(txn.pass) int(1) if ${cond}`),
-        // Reduced to a safe charset, being attacker-controlled.
-        ...tlsConds.map(
-          (cond) =>
-            `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${cond}`,
+        // One line per rule, for the same word-limit reason as ruleBlock's deny.
+        ...tlsHosts.map(
+          (host) => `    tcp-request content set-var(txn.pass) int(1) if ${tlsCond(host)}`,
         ),
-        // Only a ClientHello matches a tls rule.
-        "    tcp-request content set-var(txn.proto) str(tls) if { var(txn.pass) -m found }",
-      );
-
-      // The SNI is resolved here and connected to, as on the inspected path:
-      // an SNI is not a destination, so a ClientHello with an allowed
-      // name must not become a tunnel to an address of the build's choosing.
-      // The flag variable is needed because HAProxy conditions have no
-      // grouping: `a or b !c` reads as `a or (b and !c)`.
-      l.push("");
-      for (const host of tlsHosts) {
-        // Ports scope a tls rule (see haproxy-rules.ts): without
-        // the port ACL here too, an SNI matching a port-scoped rule on some
-        // other port would still set txn.tlsrule, triggering an early
-        // do-resolve/set-dst that overwrites the connection's destination
-        // before the inspected path ever sees it, even though txn.pass
-        // (gated on sni+port together) correctly never fires for it.
-        l.push(`    tcp-request content set-var(txn.tlsrule) int(1) if ${tlsCond(host)}`);
-      }
-      l.push(
-        "    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower " +
-          "if { var(txn.tlsrule) -m found }",
-        "    tcp-request content set-var(txn.reason) str(dns-failed) " +
-          "if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }",
+        // Reduced to a safe charset, being attacker-controlled.
+        `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${pass}`,
+        `    tcp-request content set-var(txn.proto) str(tls) if ${pass}`,
+        "",
+        // The SNI is resolved here and connected to, as on the inspected path:
+        // an SNI is not a destination, so a ClientHello with an allowed
+        // name must not become a tunnel to an address of the build's choosing.
+        `    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if ${pass}`,
+        `    tcp-request content set-var(txn.reason) str(dns-failed) if ${pass} !{ var(txn.dst) -m found }`,
         // Falling through would connect to the address the client chose.
-        "    tcp-request content reject if { var(txn.tlsrule) -m found } " +
-          "!{ var(txn.dst) -m found }",
+        `    tcp-request content reject if ${pass} !{ var(txn.dst) -m found }`,
         // Before the internal-destination check below, not after, for the
         // same reason and with the same log-format consequence as the
         // inspected path; see the matching comment in haproxy-inspect-stage.ts.
         "    tcp-request content set-dst var(txn.dst) if { var(txn.dst) -m found }",
         ...internalDstAcl("pass_dst_internal", spec),
-        "    tcp-request content set-var(txn.reason) str(internal-address) " +
-          "if { var(txn.tlsrule) -m found } pass_dst_internal",
-        "    tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal",
+        `    tcp-request content set-var(txn.reason) str(internal-address) if ${pass} pass_dst_internal`,
+        `    tcp-request content reject if ${pass} pass_dst_internal`,
       );
     }
 

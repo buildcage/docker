@@ -188,13 +188,25 @@ describe("an IP rule's connection", () => {
   for (const mode of ["restrict", "audit"] as const) {
     it(`is accepted in ${mode} without waiting for the client to speak`, () => {
       // A rule reading the request buffer holds evaluation until bytes arrive
-      // or inspect-delay runs out, which a server-first client never ends.
+      // or inspect-delay runs out, which a server-first client never ends. So
+      // what runs before this accept is exactly what an IP rule needs.
       const rules = lines(gen({ mode, ipRules: IP })).filter((l) =>
         l.startsWith("tcp-request content"),
       );
       const accept = rules.indexOf("tcp-request content accept if !is_dns_routed is_ip_match");
-      expect(accept).not.toBe(-1);
-      expect(rules.slice(0, accept).some((l) => /req[._]|is_tls|has_sni/.test(l))).toBe(false);
+      const self = "!is_dns_routed is_ip_match ip_dst_internal { dst_port 10024 }";
+      expect(rules.slice(0, accept)).toStrictEqual([
+        `tcp-request content set-var(txn.decision) str(BLOCKED)`,
+        "tcp-request content set-var(txn.reason) str(-)",
+        "tcp-request content set-var-fmt(txn.target) %[dst]:%[dst_port]",
+        "tcp-request content set-var(txn.rule_type) str(UNKNOWN)",
+        "tcp-request content set-var(txn.dns_routed) str(true) if is_dns_routed",
+        "tcp-request content set-var-fmt(txn.dst_target) %[dst]:%[dst_port]",
+        "tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
+        `tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
+        `tcp-request content reject if ${self}`,
+        `tcp-request content set-var(txn.decision) str(${mode === "audit" ? "AUDIT" : "ALLOWED"}) if !is_dns_routed is_ip_match`,
+      ]);
     });
   }
 });

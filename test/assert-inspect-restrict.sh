@@ -252,12 +252,21 @@ else
 fi
 echo ""
 
+echo "[Server speaks first] an ip rule's passthrough the client sent nothing on:"
+if grep -qE "^buildcage [0-9]+ pass tcp [0-9]+ ts=\S+ reason=\S+ dst=10\.200\.0\.100:2525 sni=-$" <<< "$LOGS"; then
+  pass "recorded as a tcp passthrough"
+else
+  fail "no tcp passthrough was recorded for 10.200.0.100:2525"
+fi
+echo ""
+
 # Everything not passed through is recorded by the frontend that terminates it,
 # so nothing else may appear at the tcp stage or it would be counted twice.
 # The count is not asserted: a reused container's log spans several builds.
 OTHER=$(grep -E "^buildcage [0-9]+ pass " <<< "$LOGS" \
   | grep -v "sni=tlspass\.example\.com" \
   | grep -v "dst=10\.200\.0\.53:53" \
+  | grep -v "dst=10\.200\.0\.100:2525" \
   | grep -cv "dst=10\.200\.0\.100:9080" || true)
 if [ "$OTHER" -eq 0 ]; then
   pass "only the passthrough is logged at the tcp stage"

@@ -168,7 +168,7 @@ describe("resolving, which only a request the rules already admitted reaches", (
   it("does the same for a passthrough, which logs its own destination too", () => {
     const setDst = FULL_CONFIG.indexOf("tcp-request content set-dst var(txn.dst)");
     const internalReject = FULL_CONFIG.indexOf(
-      "reject if { var(txn.tlsrule) -m found } pass_dst_internal",
+      "reject if { var(txn.pass) -m found } pass_dst_internal",
     );
     expect(setDst).not.toBe(-1);
     expect(internalReject).not.toBe(-1);
@@ -177,10 +177,11 @@ describe("resolving, which only a request the rules already admitted reaches", (
 
   it("gates the passthrough's do-resolve on the same SNI match that admits it", () => {
     // Not just ordering: a passthrough rule has no path or method, so this
-    // flag, set only when an SNI already matched, is the entire rule
-    // check do-resolve sits behind. A request no rule admits must never reach
-    // it, which is the same invariant as the host+path+method check above.
-    const tlsRuleSet = FULL_CONFIG.indexOf("set-var(txn.tlsrule)");
+    // flag, set only when an SNI already matched (an IP rule's connection is
+    // accepted before this), is the entire rule check do-resolve sits behind.
+    // A request no rule admits must never reach it, which is the same
+    // invariant as the host+path+method check above.
+    const tlsRuleSet = FULL_CONFIG.indexOf("set-var(txn.pass) int(1) if tls0_sni");
     const resolveLine = FULL_CONFIG.split("\n").find((l) =>
       l.includes("do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni"),
     )!;
@@ -188,7 +189,7 @@ describe("resolving, which only a request the rules already admitted reaches", (
     expect(tlsRuleSet).not.toBe(-1);
     expect(resolveLine).toBeTruthy();
     expect(tlsRuleSet < resolve).toBe(true);
-    expect(resolveLine.includes("if { var(txn.tlsrule) -m found }")).toBe(true);
+    expect(resolveLine.includes("if { var(txn.pass) -m found }")).toBe(true);
   });
 
   it("resolves on both listeners rather than trusting the client", () => {
@@ -310,7 +311,7 @@ describe("the internal-address guard", () => {
     expect(withTls.includes("acl pass_dst_internal var(txn.dst) -m ip")).toBe(true);
     expect(
       withTls.includes(
-        "tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal",
+        "tcp-request content reject if { var(txn.pass) -m found } pass_dst_internal",
       ),
     ).toBe(true);
   });
