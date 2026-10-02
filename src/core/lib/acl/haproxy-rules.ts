@@ -5,7 +5,13 @@
  */
 
 import { IPV4_OR_CIDR, OCTET, isIpRuleAddress } from "./ipv4.ts";
-import { anchorRawRegex, domainToRegexPartial, splitRawRegexHost } from "./partial-wildcard.ts";
+import {
+  anchorRawRegex,
+  checkPort,
+  domainToRegexPartial,
+  isRulePort,
+  splitRawRegexHost,
+} from "./partial-wildcard.ts";
 import type { UrlRule } from "./url-rules.ts";
 import { convertRule } from "./wildcard-rules.ts";
 
@@ -131,8 +137,8 @@ export interface CompiledRuleSet {
 /**
  * Split a `host:port` rule at its port separator.
  *
- * @throws {Error} if the rule names no port, names one that is neither a
- *   number nor `*`, or leaves a `:` in the host half
+ * @throws {Error} if the rule names no port, names one checkPort refuses, or
+ *   leaves a `:` in the host half
  */
 function splitHostRule(pattern: string): { host: string; port: string } {
   const colonIndex = pattern.lastIndexOf(":");
@@ -140,9 +146,7 @@ function splitHostRule(pattern: string): { host: string; port: string } {
     throw new Error(`Invalid rule "${pattern}": missing port`);
   }
   const port = pattern.slice(colonIndex + 1);
-  if (!/^(?:\d+|\*)$/.test(port)) {
-    throw new Error(`Invalid port in rule "${pattern}": "${port}"`);
-  }
+  checkPort(port, pattern);
   const host = pattern.slice(0, colonIndex);
   if (host.includes(":")) {
     throw new Error(
@@ -284,6 +288,13 @@ function compileIpRules(rules: string[] | undefined, warnings: string[]): Compil
       warnings.push(
         `IP rule ${JSON.stringify(rule)} is not an address, CIDR block or address wildcard, ` +
           `which is all that can be tunnelled without inspection. It is ignored.`,
+      );
+      return;
+    }
+    if (!isRulePort(port)) {
+      warnings.push(
+        `IP rule ${JSON.stringify(rule)} has a port that is not a decimal from 1 to 65535 or ` +
+          `"*". It is ignored.`,
       );
       return;
     }

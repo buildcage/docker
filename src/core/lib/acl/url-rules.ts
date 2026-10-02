@@ -31,6 +31,7 @@
 import { stripLineComment, rejectGluedHash } from "../line-comments.ts";
 import {
   anchorRawRegex,
+  checkPort,
   checkRawRegexHalf,
   pathToRegexPartial,
   splitDomainFromPortPattern,
@@ -307,9 +308,7 @@ function compileUrl(
   if (host === "") {
     throw new Error(`Invalid URL in rule "${rule}": missing host`);
   }
-  if (port !== "" && !/^(?:\d+|\*)$/.test(port)) {
-    throw new Error(`Invalid port in rule "${rule}": "${port}"`);
-  }
+  if (port !== "") checkPort(port, rule);
 
   // Compile the host through the host-rule entry point so the two rule forms
   // can never drift: wildcardToRegexPartial takes `host:port` and returns
