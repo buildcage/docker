@@ -38,11 +38,11 @@ inputs:
     required: false
     default: ""
   fail_on_ca_residue:
-    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when it leaves a copy of the proxy CA in its layer that cannot be removed. With false, the copy stays in the image."
+    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when a copy of the proxy CA, or its NSS slot, stays in the step's layer. See docs/reference.md#ca-residue."
     required: false
     default: "true"
   known_blocked_rules:
-    description: "Domains expected to be blocked intentionally (wildcard or ~regex), separated by whitespace. A rule that names no port matches any port, a refused name having none. Blocked connections matching these rules don't fail the report step even when fail_on_blocked is true; only unmatched (unexpected) blocked connections do. e.g., 'known-noisy.example.com:443'"
+    description: "Traffic expected to be blocked, one rule per line: a host rule (wildcard or ~regex) or, under proxy_engine: inspect, a URL rule. Blocked traffic matching one doesn't fail the report step even when fail_on_blocked is true. See docs/reference.md#blocked-rules-known_blocked_rules."
     required: false
     default: ""
 

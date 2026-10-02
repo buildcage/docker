@@ -22,8 +22,9 @@ if [ ! -f /etc/haproxy/ca.pem ]; then
     cp /tmp/ca.crt /opt/buildcage/ca.pem
 
     # Chromium trusts only its built-in roots and the NSS database in $HOME, so
-    # this CA-only database is mounted over the workload's own. NSS_TRUST_TYPE=NSS
-    # keeps the trust where older NSS (Debian 12, Ubuntu 24.04) can read it.
+    # this CA-only database is bound read-only at /dev/buildcage-nssdb and named
+    # by a slot added to the $HOME database's pkcs11.txt. NSS_TRUST_TYPE=NSS keeps
+    # the trust where older NSS (Debian 12, Ubuntu 24.04) can read it.
     rm -rf /opt/buildcage/nssdb
     mkdir -p /opt/buildcage/nssdb
     NSS_TRUST_TYPE=NSS certutil -N -d sql:/opt/buildcage/nssdb --empty-password
