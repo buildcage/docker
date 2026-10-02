@@ -135,9 +135,12 @@ func TestMirrorWritesBackAroundACopyItCannotStripWhenAskedTo(t *testing.T) {
 
 	readStderr := captureStderr(t)
 	err = in.finish()
-	readStderr()
+	stderr := readStderr()
 	if err != nil {
 		t.Fatalf("got %v, want only a warning", err)
+	}
+	if n := strings.Count(stderr, "store.bin"); n != 1 {
+		t.Errorf("the copy is warned about %d times, want once:\n%s", n, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(rootfs, "etc", "ssl", "certs", "store.bin")); err != nil {
 		t.Errorf("the step's change was not written back: %v", err)
@@ -220,5 +223,55 @@ func TestRunDoesNotHintAtFailOnCAResidueForOtherFailures(t *testing.T) {
 	run([]string{"run", "--bundle", bundle, "id"})
 	if stderr := readStderr(); strings.Contains(stderr, "fail_on_ca_residue") {
 		t.Errorf("a failed write-back hinted at fail_on_ca_residue:\n%s", stderr)
+	}
+}
+
+// A copy the sweep cannot strip does not stop the slot being cut from a copy
+// of the home in the same layer, and the result names each residue once:
+// it fails the build by default and only warns under fail_on_ca_residue: false.
+func TestStripLayerGoesOnPastACopyItCannotStrip(t *testing.T) {
+	own := "library=\nname=NSS Internal PKCS #11 Module\n\n"
+	for _, fail := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
+			useTempLog(t)
+			old := failOnCAResidue
+			failOnCAResidue = fail
+			t.Cleanup(func() { failOnCAResidue = old })
+			rootfs := t.TempDir()
+			mustWriteFile(t, filepath.Join(rootfs, "bundle.tar"), "ustar\x00"+string(testCA))
+			home := filepath.Join(rootfs, "backup", nssDBPath)
+			mustMkdirAll(t, home)
+			mustWriteFile(t, filepath.Join(home, "pkcs11.txt"), own+string(nssSlot))
+			big := filepath.Join(rootfs, "big")
+			mustMkdirAll(t, big)
+			mustWriteFile(t, filepath.Join(big, "pkcs11.txt"), string(nssSlot)+strings.Repeat("#", maxPKCS11TxtBytes))
+
+			err := stripLayer(rootfs, rootfs, testCA, nil)
+			if !errors.Is(err, errUnstrippableCA) || !errors.Is(err, errNSSSlotLeftInLayer) || errors.Is(err, errCALeftInLayer) {
+				t.Fatalf("got %v, want the copy and the unread slot reported, the copy once", err)
+			}
+			if n := strings.Count(err.Error(), "/bundle.tar"); n != 1 {
+				t.Errorf("the copy is named %d times, want once: %v", n, err)
+			}
+			if got := mustRead(t, filepath.Join(home, "pkcs11.txt")); got != own {
+				t.Errorf("the copied home holds %q, want the slot cut", got)
+			}
+			readStderr := captureStderr(t)
+			tolerated := tolerateResidue(err)
+			readStderr()
+			if fail != (tolerated != nil) {
+				t.Errorf("got %v under fail_on_ca_residue %v", tolerated, fail)
+			}
+		})
+	}
+}
+
+// A failure that is not residue still ends the sweep there.
+func TestStripLayerStopsOnAFailedSweep(t *testing.T) {
+	useTempLog(t)
+	rootfs := t.TempDir()
+	failWalkOn(t, rootfs, 1)
+	if err := stripLayer(rootfs, rootfs, testCA, nil); !errors.Is(err, errBrokenWalk) || isCAResidue(err) {
+		t.Fatalf("got %v, want the failed walk alone", err)
 	}
 }

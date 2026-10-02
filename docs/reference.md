@@ -679,9 +679,10 @@ on a database holding only this CA, bound at `/dev/buildcage-nssdb`. NSS loads e
 keys and writes stay in its own database. After the step, the slot's bytes are taken back out of
 `pkcs11.txt` and whatever the step changed is written back. The slot is also cut out of every other
 `pkcs11.txt` in the layer, such as one in a copy of the home, and one left holding nothing else is
-removed. One that still names `/dev/buildcage-nssdb` afterwards, or is over 1 MiB and so is not
-read, counts as CA residue. A database the step's user cannot write takes no slot, and the step
-warns that Chromium will not trust the proxy there. `HOME` comes from the step's environment, or
+removed. A `pkcs11.txt` that is a symlink has the slot cut out of the file it leads to, when the
+step wrote that file too. A file that still names `/dev/buildcage-nssdb` afterwards, or is over
+1 MiB and so is not read, counts as CA residue. A database the step's user cannot write takes no
+slot, and the step warns that Chromium will not trust the proxy there. `HOME` comes from the step's environment, or
 from the image's `/etc/passwd` when that is empty, as runc does, and is read once as the step
 starts: a `HOME` the step changes, or another user it switches to, gets no slot.
 

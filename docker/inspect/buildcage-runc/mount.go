@@ -413,8 +413,9 @@ func (b *dirBind) finish() error {
 	// the step's writes land here rather than in the overlay's upper
 	// directory, so a copy the step left beside the bundle is not in the layer
 	// for stripLayer to find: it only gets there when the write-back below
-	// copies it up.
-	if _, err := sweepDir(b.scratchDir, b.scratchDir, b.ca, caMarksOf(b.ca)); tolerateResidue(err) != nil {
+	// copies it up. A copy it cannot strip goes back with the rest, for
+	// stripLayer to report once.
+	if _, err := sweepDir(b.scratchDir, b.scratchDir, b.ca, caMarksOf(b.ca)); err != nil && !errors.Is(err, errUnstrippableCA) {
 		return err
 	}
 

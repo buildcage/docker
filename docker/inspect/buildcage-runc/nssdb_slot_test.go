@@ -678,3 +678,107 @@ func TestStripLayerReportsAPkcs11TxtTheRootfsDoesNotReach(t *testing.T) {
 		})
 	}
 }
+
+// A step that renames pkcs11.txt and leaves a symlink in its place has the
+// slot cut from the file the link leads to, which NSS still reads.
+func TestNSSDBSlotComesOutOfARenamedPkcs11Txt(t *testing.T) {
+	own := "library=\nname=NSS Internal PKCS #11 Module"
+	in, _, rootfs, mirror := injectSlot(t, ptr(own))
+	if err := os.Rename(filepath.Join(mirror, "pkcs11.txt"), filepath.Join(mirror, "p.txt")); err != nil {
+		t.Fatal(err)
+	}
+	mustSymlink(t, "p.txt", filepath.Join(mirror, "pkcs11.txt"))
+
+	if err := in.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustRead(t, filepath.Join(rootfs, "root", nssDBPath, "p.txt")); got != own {
+		t.Fatalf("the renamed file holds %q, want %q", got, own)
+	}
+}
+
+// A pkcs11.txt symlink into the layer has the file it leads to cut, once
+// however many links lead there.
+func TestStripLayerFollowsAPkcs11TxtSymlink(t *testing.T) {
+	own := "library=\nname=NSS Internal PKCS #11 Module\n\n"
+	for name, link := range map[string]string{
+		"beside it":                 "p.txt",
+		"elsewhere in the layer":    "/elsewhere/p.txt",
+		"to another pkcs11.txt too": "/elsewhere/pkcs11.txt",
+	} {
+		t.Run(name, func(t *testing.T) {
+			useTempLog(t)
+			rootfs := t.TempDir()
+			target := filepath.Join(rootfs, "backup", link)
+			if filepath.IsAbs(link) {
+				target = filepath.Join(rootfs, link)
+			}
+			mustMkdirAll(t, filepath.Join(rootfs, "backup"))
+			mustMkdirAll(t, filepath.Dir(target))
+			mustWriteFile(t, target, own+string(nssSlot))
+			mustSymlink(t, link, filepath.Join(rootfs, "backup", "pkcs11.txt"))
+
+			if err := stripLayer(rootfs, rootfs, testCA, nil); err != nil {
+				t.Fatal(err)
+			}
+			if got := mustRead(t, target); got != own {
+				t.Fatalf("the linked file holds %q, want %q", got, own)
+			}
+		})
+	}
+}
+
+// A slot left in a linked file is reported once, under the file's own path.
+func TestStripLayerReportsALinkedPkcs11TxtOnce(t *testing.T) {
+	useTempLog(t)
+	rootfs := t.TempDir()
+	mustMkdirAll(t, filepath.Join(rootfs, "elsewhere"))
+	mustMkdirAll(t, filepath.Join(rootfs, "backup"))
+	mustWriteFile(t, filepath.Join(rootfs, "elsewhere", "pkcs11.txt"), string(nssSlot)+strings.Repeat("#", maxPKCS11TxtBytes))
+	mustSymlink(t, "/elsewhere/pkcs11.txt", filepath.Join(rootfs, "backup", "pkcs11.txt"))
+
+	err := stripLayer(rootfs, rootfs, testCA, nil)
+	if !errors.Is(err, errNSSSlotLeftInLayer) || strings.Count(err.Error(), "/elsewhere/pkcs11.txt") != 1 {
+		t.Fatalf("got %v, want the linked file reported once", err)
+	}
+}
+
+// A pkcs11.txt symlink that leads nowhere NSS could read, or to a file the step
+// did not write, is left alone, and so is a pkcs11.txt that is not a file.
+func TestStripLayerLeavesAPkcs11TxtSymlinkOutOfTheLayer(t *testing.T) {
+	for name, lay := range map[string]func(t *testing.T, rootfs, upper string){
+		"to a file below the layer": func(t *testing.T, rootfs, upper string) {
+			mustMkdirAll(t, filepath.Join(rootfs, "lower"))
+			mustWriteFile(t, filepath.Join(rootfs, "lower", "p.txt"), string(nssSlot))
+			for _, dir := range []string{rootfs, upper} {
+				mustSymlink(t, "/lower/p.txt", filepath.Join(dir, "backup", "pkcs11.txt"))
+			}
+		},
+		"in a loop": func(t *testing.T, rootfs, upper string) {
+			for _, dir := range []string{rootfs, upper} {
+				mustSymlink(t, "pkcs11.txt", filepath.Join(dir, "backup", "pkcs11.txt"))
+			}
+		},
+		"a directory": func(t *testing.T, _, upper string) {
+			mustMkdirAll(t, filepath.Join(upper, "backup", "pkcs11.txt"))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			useTempLog(t)
+			root := t.TempDir()
+			rootfs, upper := filepath.Join(root, "rootfs"), filepath.Join(root, "upper")
+			mustMkdirAll(t, filepath.Join(rootfs, "backup"))
+			mustMkdirAll(t, filepath.Join(upper, "backup"))
+			lay(t, rootfs, upper)
+
+			if err := stripLayer(rootfs, upper, testCA, nil); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(rootfs, "lower", "p.txt")); err == nil {
+				if got := mustRead(t, filepath.Join(rootfs, "lower", "p.txt")); got != string(nssSlot) {
+					t.Fatalf("the file below the layer was changed to %q", got)
+				}
+			}
+		})
+	}
+}
