@@ -26,11 +26,6 @@ export interface UniversalHaproxyConfigOptions {
   hostAddressFile: string;
 }
 
-export interface GeneratedUniversalHaproxyConfig {
-  config: string;
-  warnings: string[];
-}
-
 /** A rule list's regexes, each with the rule it came from for a comment. */
 interface Pattern {
   raw: string | null;
@@ -65,13 +60,10 @@ function aclLines(name: string, fetch: string, patterns: Pattern[]): string[] {
 /**
  * Generate the `universal` engine's haproxy.cfg.
  *
- * @throws {Error} if a host rule has invalid wildcard syntax
+ * @throws {Error} if a rule is malformed
  */
-export function generateUniversalHaproxyConfig(
-  options: UniversalHaproxyConfigOptions,
-): GeneratedUniversalHaproxyConfig {
+export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOptions): string {
   const audit = options.mode === "audit";
-  const warnings: string[] = [];
   let https = MATCH_ANYTHING;
   let http = MATCH_ANYTHING;
   let ip = MATCH_ANYTHING;
@@ -81,7 +73,6 @@ export function generateUniversalHaproxyConfig(
     // engine's grammar does not.
     [...(options.httpsRules ?? []), ...(options.httpRules ?? [])].forEach(convertRule);
     const compiled = compileRuleSet(options);
-    warnings.push(...compiled.warnings);
     https = compiled.https.map((rule) => ({ raw: rule.raw, regex: hostPortRegex(rule) }));
     http = compiled.http.map((rule) => ({ raw: rule.raw, regex: hostPortRegex(rule) }));
     // The address is matched as text, so a CIDR block becomes the regex over
@@ -272,5 +263,5 @@ export function generateUniversalHaproxyConfig(
     "",
   ];
 
-  return { config: config.join("\n"), warnings };
+  return config.join("\n");
 }

@@ -74,7 +74,7 @@ describe("generateHaproxyConfig golden files", () => {
   for (const [name, options] of Object.entries(CASES)) {
     it(`matches __fixtures__/haproxy/${name}.cfg`, () => {
       expectMatchesGolden(
-        generateHaproxyConfig(options).config,
+        generateHaproxyConfig(options),
         new URL(`./__fixtures__/haproxy/${name}.cfg`, import.meta.url),
       );
     });

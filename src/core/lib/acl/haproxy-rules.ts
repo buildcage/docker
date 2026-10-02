@@ -9,13 +9,10 @@ import {
   anchorRawRegex,
   checkPort,
   domainToRegexPartial,
-  isRulePort,
   splitRawRegexHost,
 } from "./partial-wildcard.ts";
 import type { UrlRule } from "./url-rules.ts";
 import { convertRule } from "./wildcard-rules.ts";
-
-export { IPV4_OR_CIDR };
 
 /**
  * A dotted quad matched against a Host header. Strict about octets: whatever
@@ -126,12 +123,6 @@ export interface CompiledRuleSet {
    * a name.
    */
   resolverHosts: string[];
-  /**
-   * Rules that could not be honoured in full, for the caller to surface. Only
-   * IP rules reach this list: a host, TLS or URL rule that will not compile
-   * throws instead, which stops the proxy from starting at all.
-   */
-  warnings: string[];
 }
 
 /**
@@ -261,7 +252,11 @@ function compileSchemeRules(
   return out;
 }
 
-function compileIpRules(rules: string[] | undefined, warnings: string[]): CompiledIpRule[] {
+/**
+ * @throws {Error} if a rule names no port, names one checkPort refuses, or is
+ *   not an address, CIDR block or address wildcard
+ */
+function compileIpRules(rules: string[] | undefined): CompiledIpRule[] {
   const out: CompiledIpRule[] = [];
   (rules ?? []).forEach((rule, index) => {
     if (rule.startsWith("~")) {
@@ -279,25 +274,17 @@ function compileIpRules(rules: string[] | undefined, warnings: string[]): Compil
     }
     const colonIndex = rule.lastIndexOf(":");
     if (colonIndex === -1) {
-      warnings.push(`IP rule ${JSON.stringify(rule)} has no port. It is ignored.`);
-      return;
+      throw new Error(`Invalid rule "${rule}": missing port`);
     }
     const address = rule.slice(0, colonIndex);
     const port = rule.slice(colonIndex + 1);
     if (!isIpRuleAddress(address)) {
-      warnings.push(
-        `IP rule ${JSON.stringify(rule)} is not an address, CIDR block or address wildcard, ` +
-          `which is all that can be tunnelled without inspection. It is ignored.`,
+      throw new Error(
+        `Invalid address in rule "${rule}": not an address, CIDR block or address wildcard, ` +
+          `which is all that can be tunnelled without inspection`,
       );
-      return;
     }
-    if (!isRulePort(port)) {
-      warnings.push(
-        `IP rule ${JSON.stringify(rule)} has a port that is not a decimal from 1 to 65535 or ` +
-          `"*". It is ignored.`,
-      );
-      return;
-    }
+    checkPort(port, rule);
     if (!IPV4_OR_CIDR.test(address)) {
       // `dst` takes no wildcard, so the address is matched as text the way
       // the `universal` engine matches every IP rule.
@@ -322,24 +309,21 @@ function compileIpRules(rules: string[] | undefined, warnings: string[]): Compil
 }
 
 /**
- * Compile every rule input into matchers, collecting warnings for rules that
- * cannot be honoured in full.
+ * Compile every rule input into matchers.
  *
- * @throws {Error} if a host rule has invalid wildcard syntax
+ * @throws {Error} if a rule is malformed
  */
 export function compileRuleSet(inputs: RuleInputs): CompiledRuleSet {
-  const warnings: string[] = [];
   return {
     https: compileSchemeRules(inputs.httpsRules, inputs.urlRules, "https"),
     http: compileSchemeRules(inputs.httpRules, inputs.urlRules, "http"),
-    ip: compileIpRules(inputs.ipRules, warnings),
+    ip: compileIpRules(inputs.ipRules),
     tls: (inputs.tlsRules ?? []).map((pattern, index) => ({
       id: `tls${index}`,
       ...hostRuleToMatcher(pattern),
       raw: pattern,
     })),
     resolverHosts: resolverHosts(inputs),
-    warnings,
   };
 }
 

@@ -58,14 +58,8 @@ try {
     mode: proxyMode,
   });
 
-  // A warning means a rule cannot be honoured in full, so surface it in the
-  // build log.
-  for (const warning of [...haproxy.warnings, ...coredns.warnings]) {
-    std.err.puts(`buildcage: warning: ${warning}\n`);
-  }
-
-  writeFile(haproxyOut, haproxy.config);
-  writeFile(corefileOut, coredns.config);
+  writeFile(haproxyOut, haproxy);
+  writeFile(corefileOut, coredns);
 } catch (e) {
   // Fail closed: without both files the proxy would either not start or
   // start without an allowlist.

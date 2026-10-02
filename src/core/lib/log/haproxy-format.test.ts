@@ -8,7 +8,7 @@ import { PROXY_ADDRESS } from "./proxy-address.ts";
 const CONFIG = generateUniversalHaproxyConfig({
   proxyAddress: PROXY_ADDRESS,
   hostAddressFile: "/etc/haproxy/rules/host_addrs.lst",
-}).config;
+});
 
 /** One representative value per format token. A token with no value here
  *  throws, so a new field cannot quietly go uncovered. */

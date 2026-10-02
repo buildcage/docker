@@ -61,17 +61,12 @@ const DEFAULTS = {
 const TLS_STAGE_PORT = 10025;
 const PLAIN_STAGE_PORT = 10026;
 
-export interface GeneratedHaproxyConfig {
-  config: string;
-  warnings: string[];
-}
-
 /**
  * Generate a haproxy.cfg from buildcage's rules.
  *
- * @throws {Error} if a host rule has invalid wildcard syntax
+ * @throws {Error} if a rule is malformed
  */
-export function generateHaproxyConfig(options: HaproxyConfigOptions): GeneratedHaproxyConfig {
+export function generateHaproxyConfig(options: HaproxyConfigOptions): string {
   const opts = { ...DEFAULTS, ...options };
   const mode = opts.mode ?? "restrict";
   const {
@@ -79,7 +74,6 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions): GeneratedH
     http: httpRules,
     ip: ipRules,
     tls: tlsHosts,
-    warnings,
   } = compileRuleSet(options);
 
   const shared = {
@@ -134,5 +128,5 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions): GeneratedH
     ...originBackends(opts.systemCaFile),
   ];
 
-  return { config: config.join("\n"), warnings };
+  return config.join("\n");
 }

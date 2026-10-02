@@ -62,7 +62,7 @@ function render(
   });
 }
 
-const FORMATS = logFormats(generateHaproxyConfig(OPTIONS).config);
+const FORMATS = logFormats(generateHaproxyConfig(OPTIONS));
 const [PASSTHROUGH, HTTPS, HTTP] = [
   FORMATS.find((f) => f.includes(" pass ")) ?? "",
   FORMATS.find((f) => f.includes(" https ")) ?? "",

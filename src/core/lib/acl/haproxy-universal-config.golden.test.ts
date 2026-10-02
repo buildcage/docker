@@ -73,7 +73,7 @@ describe("universal haproxy.cfg golden files", () => {
           ...c,
           proxyAddress: PROXY_ADDRESS,
           hostAddressFile: "/etc/haproxy/rules/host_addrs.lst",
-        }).config,
+        }),
         new URL(`./__fixtures__/haproxy-universal/${name}.cfg`, import.meta.url),
       );
     });

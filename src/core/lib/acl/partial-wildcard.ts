@@ -119,17 +119,14 @@ export function pathToRegexPartial(path: string): string {
 }
 
 /**
- * True if `port` is a decimal from 1 to 65535, or `*`. With a leading zero a
+ * A port written as a decimal from 1 to 65535, or `*`. With a leading zero a
  * rule would differ by engine: inspect's `dst_port` reads `0443` as 443, while
  * universal matches the rule as text against `443` and never matches.
+ *
+ * @throws {Error} if the port is anything else
  */
-export function isRulePort(port: string): boolean {
-  return port === "*" || (/^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535);
-}
-
-/** @throws {Error} if isRulePort refuses `port` */
 export function checkPort(port: string, rule: string): void {
-  if (isRulePort(port)) return;
+  if (port === "*" || (/^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535)) return;
   throw new Error(
     `Invalid port in rule "${rule}": "${port}". Write a decimal from 1 to 65535 without a ` +
       `leading zero (443, not 0443), or "*" for any port`,
