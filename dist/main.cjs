@@ -457,6 +457,59 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
 }
 //#endregion
+//#region src/core/lib/actions/inputs.ts
+var InvalidInputError = class extends ActionError {};
+function readBooleanInput(name, fallback, getInput) {
+	let value = getInput(name);
+	if (value === "") return fallback;
+	if ([
+		"true",
+		"True",
+		"TRUE"
+	].includes(value)) return !0;
+	if ([
+		"false",
+		"False",
+		"FALSE"
+	].includes(value)) return !1;
+	throw new InvalidInputError(`Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`, "INVALID_BOOLEAN_INPUT");
+}
+const ENGINES = ["universal", "inspect"];
+function resolveProxyEngine$1(input) {
+	let trimmed = input?.trim() || "inspect";
+	if (trimmed === "transparent") throw new InvalidInputError("proxy_engine: transparent has been renamed. Use proxy_engine: universal.", "INVALID_PROXY_ENGINE");
+	if (!ENGINES.includes(trimmed)) throw new InvalidInputError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`, "INVALID_PROXY_ENGINE");
+	return trimmed;
+}
+const PROXY_MODES = ["audit", "restrict"];
+function resolveProxyMode(input) {
+	let trimmed = input?.trim() || "restrict";
+	if (!PROXY_MODES.includes(trimmed)) throw new InvalidInputError(`Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`, "INVALID_PROXY_MODE");
+	return trimmed;
+}
+//#endregion
+//#region src/core/lib/actions/engine-rule-support.ts
+function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn) {
+	if (proxyEngine === "inspect") return;
+	let unsupported = [];
+	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allowed_tls_rules"), unsupported.length === 0) return;
+	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy_engine: ${proxyEngine}, which only sees the host and port, never a method or a path.`;
+	if (proxyMode === "audit") {
+		warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
+		return;
+	}
+	throw new InvalidInputError(`${reason} In restrict mode that means ${list} would not actually be enforced, so the step would look protected but isn't. Switch to proxy_engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
+}
+function checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedUrlRules }, warn) {
+	if (proxyEngine === "inspect" || knownBlockedUrlRules.length === 0) return;
+	let reason = `known_blocked_rules contains URL rules (a method and a URL) that need proxy_engine: inspect, which alone sees a method or a path; proxy_engine: ${proxyEngine} sees only the host and port, so these rules match no blocked connection and acknowledge nothing.`;
+	if (proxyMode === "audit") {
+		warn(`${reason} They are ignored for this run. Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`);
+		return;
+	}
+	throw new InvalidInputError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`, "INVALID_PROXY_ENGINE");
+}
+//#endregion
 //#region src/core/lib/actions/log.ts
 function logRules(label, rules) {
 	console.log(`${label} rules:${rules.length === 0 ? " (none)" : ""}`);
@@ -7333,28 +7386,6 @@ function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue,
 	};
 }
 //#endregion
-//#region src/lib/engine-rule-support.ts
-function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn) {
-	if (proxyEngine === "inspect") return;
-	let unsupported = [];
-	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allowed_tls_rules"), unsupported.length === 0) return;
-	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy_engine: ${proxyEngine}, which only sees the host and port, never a method or a path.`;
-	if (proxyMode === "audit") {
-		warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
-		return;
-	}
-	throw new SetupError(`${reason} In restrict mode that means ${list} would not actually be enforced, so the build would look protected but isn't. Switch to proxy_engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
-}
-function checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedUrlRules }, warn) {
-	if (proxyEngine === "inspect" || knownBlockedUrlRules.length === 0) return;
-	let reason = `known_blocked_rules contains URL rules (a method and a URL) that need proxy_engine: inspect, which alone sees a method or a path; proxy_engine: ${proxyEngine} sees only the host and port, so these rules match no blocked connection and acknowledge nothing.`;
-	if (proxyMode === "audit") {
-		warn(`${reason} They are ignored for this run. Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`);
-		return;
-	}
-	throw new SetupError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`, "INVALID_PROXY_ENGINE");
-}
-//#endregion
 //#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/summary.js
 var __awaiter$6 = function(thisArg, _arguments, P, generator) {
 	function adopt(value) {
@@ -8275,50 +8306,13 @@ function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 	};
 }
 //#endregion
-//#region src/core/lib/actions/inputs.ts
-var InvalidInputError = class extends ActionError {};
-function readBooleanInput(name, fallback, getInput) {
-	let value = getInput(name);
-	if (value === "") return fallback;
-	if ([
-		"true",
-		"True",
-		"TRUE"
-	].includes(value)) return !0;
-	if ([
-		"false",
-		"False",
-		"FALSE"
-	].includes(value)) return !1;
-	throw new InvalidInputError(`Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`, "INVALID_BOOLEAN_INPUT");
-}
-//#endregion
-//#region src/lib/engine.ts
-const ENGINES = ["universal", "inspect"];
-function resolveProxyEngine(input) {
-	let trimmed = input?.trim() || "inspect";
-	if (trimmed === "explicit") throw new SetupError("proxy_engine: explicit has been removed. Use proxy_engine: universal (network-level SNI/Host inspection) or inspect (TLS-terminating URL enforcement).", "INVALID_PROXY_ENGINE");
-	if (trimmed === "transparent") throw new SetupError("proxy_engine: transparent has been renamed. Use proxy_engine: universal.", "INVALID_PROXY_ENGINE");
-	if (!ENGINES.includes(trimmed)) throw new SetupError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`, "INVALID_PROXY_ENGINE");
-	return trimmed;
-}
-//#endregion
-//#region src/lib/inputs.ts
-function readBuilderName(getInput$2 = getInput) {
-	return getInput$2("builder_name") || "buildcage";
-}
-const PROXY_MODES = ["audit", "restrict"];
-function resolveProxyMode(input) {
-	let trimmed = input?.trim() || "restrict";
-	if (!PROXY_MODES.includes(trimmed)) throw new SetupError(`Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`, "INVALID_PROXY_MODE");
-	return trimmed;
-}
-function readSetupInputs(getInput$1 = getInput) {
-	let proxyEngine = resolveProxyEngine(getInput$1("proxy_engine")), proxyMode = resolveProxyMode(getInput$1("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$1), rules = buildACLRules({
-		httpsRulesInput: getInput$1("allowed_https_rules"),
-		httpRulesInput: getInput$1("allowed_http_rules"),
-		ipRulesInput: getInput$1("allowed_ip_rules")
-	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$1("known_blocked_rules")), urlRulesInput = getInput$1("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$1("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
+//#region src/core/lib/actions/rule-inputs.ts
+function readRuleInputs(getInput$3 = getInput) {
+	let proxyMode = resolveProxyMode(getInput$3("proxy_mode")), rules = buildACLRules({
+		httpsRulesInput: getInput$3("allowed_https_rules"),
+		httpRulesInput: getInput$3("allowed_http_rules"),
+		ipRulesInput: getInput$3("allowed_ip_rules")
+	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$3("known_blocked_rules")), urlRulesInput = getInput$3("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$3("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
 	checkRulesCompileOrThrow({
 		...rules,
 		tlsRules,
@@ -8326,16 +8320,33 @@ function readSetupInputs(getInput$1 = getInput) {
 	});
 	let urlRules = compiledUrlRules.map((r) => r.raw);
 	return {
-		proxyEngine,
-		builderName: readBuilderName(getInput$1),
 		proxyMode,
-		failOnCaResidue,
 		httpsRules: rules.httpsRules,
 		httpRules: rules.httpRules,
 		ipRules: rules.ipRules,
 		urlRules,
 		tlsRules,
 		knownBlockedRules
+	};
+}
+//#endregion
+//#region src/lib/engine.ts
+function resolveProxyEngine(input) {
+	if (input?.trim() === "explicit") throw new InvalidInputError("proxy_engine: explicit has been removed. Use proxy_engine: universal (network-level SNI/Host inspection) or inspect (TLS-terminating URL enforcement).", "INVALID_PROXY_ENGINE");
+	return resolveProxyEngine$1(input);
+}
+//#endregion
+//#region src/lib/inputs.ts
+function readBuilderName(getInput$1 = getInput) {
+	return getInput$1("builder_name") || "buildcage";
+}
+function readSetupInputs(getInput$2 = getInput) {
+	let proxyEngine = resolveProxyEngine(getInput$2("proxy_engine")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$2);
+	return {
+		proxyEngine,
+		builderName: readBuilderName(getInput$2),
+		failOnCaResidue,
+		...readRuleInputs(getInput$2)
 	};
 }
 //#endregion

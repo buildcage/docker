@@ -4,7 +4,7 @@ import {
   checkKnownBlockedUrlRuleSupport,
   checkUrlAndTlsRuleSupport,
 } from "./engine-rule-support.ts";
-import { SetupError } from "./errors.ts";
+import { InvalidInputError } from "./inputs.ts";
 
 describe("checkUrlAndTlsRuleSupport", () => {
   it("does nothing on inspect, regardless of mode or rules", () => {
@@ -46,7 +46,7 @@ describe("checkUrlAndTlsRuleSupport", () => {
         },
         warn,
       ),
-    ).toThrow(SetupError);
+    ).toThrow(InvalidInputError);
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -137,7 +137,7 @@ describe("checkKnownBlockedUrlRuleSupport", () => {
         },
         warn,
       ),
-    ).toThrow(SetupError);
+    ).toThrow(InvalidInputError);
     expect(warn).not.toHaveBeenCalled();
   });
 

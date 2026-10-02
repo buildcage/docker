@@ -1,17 +1,15 @@
-import type { ProxyEngine } from "./engine.ts";
-import { SetupError } from "./errors.ts";
+import { InvalidInputError, type ProxyEngine } from "./inputs.ts";
 
 /**
  * Only `inspect` terminates TLS, so it's the only engine that can see an HTTP
  * method or a path, which makes `allowed_url_rules` and `allowed_tls_rules`
- * no-ops on `universal`. Called once at setup, before the
- * container starts, so a mismatch is caught immediately instead of silently
- * not enforcing.
+ * no-ops on `universal`. Called once at setup, before the proxy starts, so a
+ * mismatch is caught immediately instead of silently not enforcing.
  *
  * In `restrict` mode this is an error: a rule that looks like it protects the
- * build but can't actually be enforced is worse than no rule at all. In
- * `audit` mode nothing is enforced anyway, so it's a warning: the build
- * still runs, with these rules ignored.
+ * step but can't actually be enforced is worse than no rule at all. In
+ * `audit` mode nothing is enforced anyway, so it's a warning: the step still
+ * runs, with these rules ignored.
  */
 export function checkUrlAndTlsRuleSupport(
   {
@@ -48,9 +46,9 @@ export function checkUrlAndTlsRuleSupport(
     return;
   }
 
-  throw new SetupError(
+  throw new InvalidInputError(
     `${reason} In restrict mode that means ${list} would not actually be enforced, so the ` +
-      `build would look protected but isn't. Switch to proxy_engine: inspect, or remove ` +
+      `step would look protected but isn't. Switch to proxy_engine: inspect, or remove ` +
       `${list} from your workflow.`,
     "INVALID_PROXY_ENGINE",
   );
@@ -95,7 +93,7 @@ export function checkKnownBlockedUrlRuleSupport(
     return;
   }
 
-  throw new SetupError(
+  throw new InvalidInputError(
     `${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: ` +
       `inspect.`,
     "INVALID_PROXY_ENGINE",

@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { InvalidInputError, readBooleanInput, readRetentionDays } from "./inputs.ts";
+import {
+  InvalidInputError,
+  readBooleanInput,
+  readRetentionDays,
+  resolveProxyEngine,
+  resolveProxyMode,
+} from "./inputs.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
 function inputs(values: Record<string, string> = {}): (name: string) => string {
@@ -54,5 +60,52 @@ describe("readRetentionDays", () => {
           "Must be a whole number of days above zero.",
       }),
     );
+  });
+});
+
+describe("resolveProxyEngine", () => {
+  it("defaults to inspect for undefined or an empty string", () => {
+    expect(resolveProxyEngine(undefined)).toBe("inspect");
+    expect(resolveProxyEngine("")).toBe("inspect");
+  });
+
+  it("accepts each engine that has an image of its own", () => {
+    expect(resolveProxyEngine("universal")).toBe("universal");
+    expect(resolveProxyEngine("inspect")).toBe("inspect");
+  });
+
+  it("refuses a value that is not an engine, casing included", () => {
+    for (const engine of ["restrict", "Inspect"]) {
+      expect(() => resolveProxyEngine(engine)).toThrow(
+        expect.objectContaining({ name: InvalidInputError.name, code: "INVALID_PROXY_ENGINE" }),
+      );
+    }
+  });
+
+  it("rejects the removed transparent alias, naming universal", () => {
+    expect(() => resolveProxyEngine("transparent")).toThrowError(
+      /transparent has been renamed.*proxy_engine: universal/,
+    );
+  });
+});
+
+describe("resolveProxyMode", () => {
+  it("defaults to restrict when unset or blank", () => {
+    expect(resolveProxyMode(undefined)).toBe("restrict");
+    expect(resolveProxyMode("  ")).toBe("restrict");
+  });
+
+  it("accepts both modes", () => {
+    expect(resolveProxyMode("audit")).toBe("audit");
+    expect(resolveProxyMode("restrict")).toBe("restrict");
+  });
+
+  // Anything else would enforce a run meant only to record.
+  it("rejects anything else, a differently cased mode included", () => {
+    for (const mode of ["Audit", "RESTRICT", "enforce"]) {
+      expect(() => resolveProxyMode(mode)).toThrow(
+        expect.objectContaining({ name: InvalidInputError.name, code: "INVALID_PROXY_MODE" }),
+      );
+    }
   });
 });

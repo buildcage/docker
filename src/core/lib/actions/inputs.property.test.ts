@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, it, expect } from "vitest";
 
-import { resolveProxyEngine } from "./engine.ts";
+import { resolveProxyEngine } from "./inputs.ts";
 
 describe("resolveProxyEngine: properties", () => {
   it("always returns one of the two canonical engine names, or throws", () => {

@@ -1,8 +1,11 @@
 import { ActionError } from "#core/lib/errors.ts";
 
-/** A boolean or retention-days input whose value is malformed. */
+/** An input whose value is malformed, or names something the step cannot do. */
 export class InvalidInputError extends ActionError<
-  "INVALID_BOOLEAN_INPUT" | "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS"
+  | "INVALID_BOOLEAN_INPUT"
+  | "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS"
+  | "INVALID_PROXY_MODE"
+  | "INVALID_PROXY_ENGINE"
 > {}
 
 /** `core.getInput`, narrowed so a test can pass a plain lookup. */
@@ -33,4 +36,46 @@ export function readRetentionDays(getInput: GetInput): number | undefined {
     );
   }
   return Number(days);
+}
+
+/**
+ * Each accepted value maps to a separately published, separately tagged
+ * Docker image (see provenance/image-tag.ts's imageTagFromRef).
+ */
+const ENGINES = ["universal", "inspect"] as const;
+export type ProxyEngine = (typeof ENGINES)[number];
+
+export function resolveProxyEngine(input: string | undefined): ProxyEngine {
+  const trimmed = input?.trim() || "inspect";
+  if (trimmed === "transparent") {
+    throw new InvalidInputError(
+      "proxy_engine: transparent has been renamed. Use proxy_engine: universal.",
+      "INVALID_PROXY_ENGINE",
+    );
+  }
+  if (!(ENGINES as readonly string[]).includes(trimmed)) {
+    throw new InvalidInputError(
+      `Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`,
+      "INVALID_PROXY_ENGINE",
+    );
+  }
+  return trimmed as ProxyEngine;
+}
+
+const PROXY_MODES = ["audit", "restrict"] as const;
+export type ProxyMode = (typeof PROXY_MODES)[number];
+
+/**
+ * Anything but the two modes is refused rather than read as `restrict`, which
+ * would enforce a run its author meant only to record.
+ */
+export function resolveProxyMode(input: string | undefined): ProxyMode {
+  const trimmed = input?.trim() || "restrict";
+  if (!(PROXY_MODES as readonly string[]).includes(trimmed)) {
+    throw new InvalidInputError(
+      `Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`,
+      "INVALID_PROXY_MODE",
+    );
+  }
+  return trimmed as ProxyMode;
 }
