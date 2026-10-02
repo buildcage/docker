@@ -16,6 +16,7 @@ import * as core from "@actions/core";
 import { writeStepSummary } from "#core/lib/actions/write-step-summary.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
+import { errorMessage } from "#core/lib/errors.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
 import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
@@ -102,8 +103,6 @@ export async function runReportAction(
     { actionVersion: readActionVersion(docker, containerId, spec.proxyEngine) },
   );
 
-  // Before the summary, so a summary that cannot be written still leaves the
-  // annotations, the exit code and the traffic file behind.
   emitReportOutcomes(report, {
     failOnBlocked: deps.failOnBlocked ?? readFailOnBlocked(),
     summaryFile: env.GITHUB_STEP_SUMMARY,
@@ -115,12 +114,24 @@ export async function runReportAction(
   // summary is written, so a truncated Communication details section can say
   // whether the full list is available as an artifact.
   const trafficFile = env.BUILDCAGE_TRAFFIC_FILE;
+  // Both writes are tried even when one fails, and the failure is thrown after.
+  const failures: unknown[] = [];
   if (trafficFile) {
-    writeTrafficFile(trafficFile, buildTrafficRecords(report.timeline, report.startedAt));
+    try {
+      writeTrafficFile(trafficFile, buildTrafficRecords(report.timeline, report.startedAt));
+    } catch (e) {
+      failures.push(e);
+    }
   }
-
-  await writeStepSummary(
-    truncateForStepSummary(markdown, trafficFile !== undefined),
-    env.GITHUB_STEP_SUMMARY,
-  );
+  try {
+    await writeStepSummary(
+      truncateForStepSummary(markdown, trafficFile !== undefined),
+      env.GITHUB_STEP_SUMMARY,
+    );
+  } catch (e) {
+    failures.push(e);
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(failures, failures.map(errorMessage).join("; "));
+  }
 }

@@ -259,8 +259,8 @@ describe("runReportAction's fail_on_blocked fallback", () => {
   });
 });
 
-describe("runReportAction when the summary cannot be written", () => {
-  it("has already annotated, set the exit code and written the traffic file", async () => {
+describe("runReportAction when a write fails", () => {
+  it("still annotates, sets the exit code and writes the traffic file without the summary", async () => {
     const dir = mkdtempSync(join(tmpdir(), "buildcage-action-main-"));
     const summary = join(dir, "missing", "summary.md");
     const traffic = join(dir, "traffic.json");
@@ -285,6 +285,27 @@ describe("runReportAction when the summary cannot be written", () => {
       process.exitCode = previous;
       log.mockRestore();
       vi.unstubAllEnvs();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("still writes the summary without the traffic file, then fails", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "buildcage-action-main-"));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await expect(
+        runReportAction(spec(), {
+          containerId: "abc123",
+          docker: fakeDocker(),
+          env: { BUILDCAGE_TRAFFIC_FILE: join(dir, "missing", "traffic.json") },
+          failOnBlocked: false,
+        }),
+      ).rejects.toThrow(/traffic\.json/);
+      expect(log.mock.calls.map((c) => String(c[0])).join("\n")).toMatch(
+        /## Outbound Traffic Report/,
+      );
+    } finally {
+      log.mockRestore();
       rmSync(dir, { recursive: true, force: true });
     }
   });
