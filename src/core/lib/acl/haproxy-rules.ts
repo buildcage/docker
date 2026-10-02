@@ -280,8 +280,8 @@ function compileIpRules(rules: string[] | undefined): CompiledIpRule[] {
     const port = rule.slice(colonIndex + 1);
     if (!isIpRuleAddress(address)) {
       throw new Error(
-        `IP rule "${rule}" is not an address, CIDR block or address wildcard, which is all ` +
-          `that can be tunnelled without inspection`,
+        `Invalid address in rule "${rule}": not an address, CIDR block or address wildcard, ` +
+          `which is all that can be tunnelled without inspection`,
       );
     }
     checkPort(port, rule);

@@ -60,7 +60,7 @@ function aclLines(name: string, fetch: string, patterns: Pattern[]): string[] {
 /**
  * Generate the `universal` engine's haproxy.cfg.
  *
- * @throws {Error} if a host rule has invalid wildcard syntax
+ * @throws {Error} if a rule is malformed
  */
 export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOptions): string {
   const audit = options.mode === "audit";

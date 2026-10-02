@@ -114,11 +114,11 @@ describe("ip rule compilation", () => {
   });
 
   it("refuses a host name, which no connection's address is", () => {
-    expect(() => compileRuleSet({ ipRules: ["db-primary:5432"] })).toThrow(/is not an address/);
+    expect(() => compileRuleSet({ ipRules: ["db-primary:5432"] })).toThrow(/Invalid address/);
   });
 
   it("refuses a wildcard with too few octets, which no address matches", () => {
-    expect(() => compileRuleSet({ ipRules: ["10.0.*:5432"] })).toThrow(/is not an address/);
+    expect(() => compileRuleSet({ ipRules: ["10.0.*:5432"] })).toThrow(/Invalid address/);
   });
 
   it("accepts a CIDR block", () => {
@@ -127,7 +127,7 @@ describe("ip rule compilation", () => {
 
   for (const rule of ["010.0.0.0/8:5432", "999.1.1.1:443", "10.0.0.0/33:443"]) {
     it(`refuses ${rule}, which HAProxy would misread or reject`, () => {
-      expect(() => compileRuleSet({ ipRules: [rule] })).toThrow(/is not an address/);
+      expect(() => compileRuleSet({ ipRules: [rule] })).toThrow(/Invalid address/);
     });
   }
 

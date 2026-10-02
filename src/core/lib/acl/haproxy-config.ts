@@ -64,7 +64,7 @@ const PLAIN_STAGE_PORT = 10026;
 /**
  * Generate a haproxy.cfg from buildcage's rules.
  *
- * @throws {Error} if a host rule has invalid wildcard syntax
+ * @throws {Error} if a rule is malformed
  */
 export function generateHaproxyConfig(options: HaproxyConfigOptions): string {
   const opts = { ...DEFAULTS, ...options };

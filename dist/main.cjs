@@ -7798,7 +7798,7 @@ function compileIpRules(rules) {
 		let colonIndex = rule.lastIndexOf(":");
 		if (colonIndex === -1) throw Error(`Invalid rule "${rule}": missing port`);
 		let address = rule.slice(0, colonIndex), port = rule.slice(colonIndex + 1);
-		if (!isIpRuleAddress(address)) throw Error(`IP rule "${rule}" is not an address, CIDR block or address wildcard, which is all that can be tunnelled without inspection`);
+		if (!isIpRuleAddress(address)) throw Error(`Invalid address in rule "${rule}": not an address, CIDR block or address wildcard, which is all that can be tunnelled without inspection`);
 		if (checkPort(port, rule), !IPV4_OR_CIDR.test(address)) {
 			out.push({
 				id: `ip${index}`,
