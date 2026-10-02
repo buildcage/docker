@@ -117,7 +117,7 @@ describe("passthrough", () => {
   it("leaves a connection an ip rule also covers to that rule, whatever SNI it carries", () => {
     // The ip rule names the address itself, so the SNI neither redirects nor
     // refuses it; the tls rule's resolution never runs for it.
-    const overlap = detect({ ipRules: ["10.0.0.0/8:443"], tlsRules: ["db.example.com:443"] });
+    const overlap = detect({ ...FULL, ipRules: ["10.0.0.0/8:443"] });
     const accept = overlap.indexOf("tcp-request content accept if { var(txn.pass) -m found }");
     expect(accept).not.toBe(-1);
     expect(overlap.indexOf("set-var(txn.pass) int(1) if tls0_sni") > accept).toBe(true);
