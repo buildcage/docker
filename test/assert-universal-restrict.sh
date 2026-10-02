@@ -21,6 +21,7 @@ assert_log_contains ALLOWED "ok.regex.example.com:443" "-"
 assert_log_contains ALLOWED "ports.regex.example.com:443" "-"
 assert_log_contains ALLOWED "ports.regex.example.com:8443" "-"
 assert_log_contains ALLOWED "10.200.0.100:8443" "-"
+assert_log_contains ALLOWED "10.200.0.100:2525" "-"
 echo ""
 
 echo "[BLOCKED] expected:"

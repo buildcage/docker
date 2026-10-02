@@ -92,6 +92,14 @@ RUN echo "=== [Direct IP - allowed, SNI names a host] ===" && \
 RUN echo "=== [Direct IP - blocked, SNI names an allowed address] ===" && \
     if node --no-deprecation -e 'require("tls").connect({ host: process.argv[1], port: 8443, servername: process.argv[2], rejectUnauthorized: false }, () => process.exit(0)).on("error", () => process.exit(1)).setTimeout(5000, () => process.exit(1))' 10.200.0.101 10.200.0.100; then echo "✗ 10.200.0.101:8443: ALLOWED (unexpected)" && exit 1; else echo "✓ 10.200.0.101:8443: BLOCKED (expected)"; fi
 
+# The client sends nothing and waits for the server to speak. The greeting
+# arrives within 3s only if the passthrough does not wait out inspect-delay
+# (5s) for the client's first bytes.
+RUN echo "=== [Direct IP - allowed, server speaks first] ===" && \
+    OUT=$(sleep 4 | timeout 3 nc 10.200.0.100 2525 || true) && \
+    echo "$OUT" && \
+    case "$OUT" in 220\ *) echo "OK" ;; *) echo "FAILED: no greeting within 3s" && exit 1 ;; esac
+
 RUN echo "=== [HTTPS - dns-failed] ===" && \
     echo "Testing nxdomain.wildcard.example.com (HTTPS, should be blocked by dns failure)..." && \
     (wget --no-check-certificate -q -O /dev/null --timeout=5 https://nxdomain.wildcard.example.com/ && echo "✗ nxdomain.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ nxdomain.wildcard.example.com: BLOCKED (expected)"

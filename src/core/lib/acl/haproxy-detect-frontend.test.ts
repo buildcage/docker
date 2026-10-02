@@ -37,8 +37,12 @@ describe("passthrough", () => {
 
   it("logs the SNI only for a connection a tls rule passed", () => {
     const capture = "set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g)";
-    expect(config.includes(`${capture} if tls0_sni tls0_port`)).toBe(true);
+    // An ip rule's connection is accepted before it, so txn.pass means a tls rule.
     expect(config.split(capture).length).toBe(2);
+    expect(config.includes(`${capture} if { var(txn.pass) -m found }`)).toBe(true);
+    expect(config.indexOf(capture) > config.indexOf("accept if { var(txn.pass) -m found }")).toBe(
+      true,
+    );
     expect(detect({ ipRules: ["10.0.0.5:5432"] }).includes("set-var(txn.sni)")).toBe(false);
   });
 
@@ -66,7 +70,16 @@ describe("passthrough", () => {
   });
 
   it("also scopes the early do-resolve trigger by port, not just the backend selection", () => {
-    expect(config.includes("set-var(txn.tlsrule) int(1) if tls0_sni tls0_port")).toBe(true);
+    // An SNI allowed on another port must not have its destination replaced
+    // before the inspected path sees it.
+    expect(config.includes("set-var(txn.pass) int(1) if tls0_sni tls0_port sni_is_name")).toBe(
+      true,
+    );
+    expect(
+      config.includes(
+        "do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.pass) -m found }",
+      ),
+    ).toBe(true);
   });
 
   it("runs every content rule before the accept that ends the content rules' evaluation", () => {
@@ -74,8 +87,41 @@ describe("passthrough", () => {
     // set-var or do-resolve placed after it never runs, silently, with the
     // passthrough still working but going to the client's own address.
     const resolve = config.indexOf("tcp-request content do-resolve");
-    const accept = config.indexOf("tcp-request content accept");
+    const accept = config.indexOf("tcp-request content accept if { req.ssl_hello_type 1 }");
     expect(resolve !== -1 && resolve < accept).toBe(true);
+  });
+
+  it("passes an ip rule's connection through without waiting for the client to speak", () => {
+    // HAProxy holds a rule that reads the request buffer until bytes arrive or
+    // inspect-delay runs out, and a server-first client sends none. So only
+    // what an ip rule needs may run before this accept.
+    const rules = detect({
+      ...FULL,
+      ipRules: ["10.0.0.5:5432", "~^10\\.1\\.0\\.\\d+:6379$"],
+    })
+      .split("\n")
+      .filter((l) => l.includes("tcp-request content"))
+      .map((l) => l.trim());
+    const accept = rules.indexOf("tcp-request content accept if { var(txn.pass) -m found }");
+    const self = "{ var(txn.pass) -m found } ip_dst_internal { dst_port 10024 }";
+    expect(rules.slice(0, accept)).toStrictEqual([
+      "tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]",
+      "tcp-request content set-var(txn.pass) int(1) if ip0_dst ip0_port !dns_routed",
+      "tcp-request content set-var(txn.pass) int(1) if ip1_dst !dns_routed",
+      "tcp-request content set-var(txn.proto) str(tcp) if { var(txn.pass) -m found }",
+      `tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
+      `tcp-request content reject if ${self}`,
+    ]);
+  });
+
+  it("leaves a connection an ip rule also covers to that rule, whatever SNI it carries", () => {
+    // The ip rule names the address itself, so the SNI neither redirects nor
+    // refuses it; the tls rule's resolution never runs for it.
+    const overlap = detect({ ...FULL, ipRules: ["10.0.0.0/8:443"] });
+    const accept = overlap.indexOf("tcp-request content accept if { var(txn.pass) -m found }");
+    expect(accept).not.toBe(-1);
+    expect(overlap.indexOf("set-var(txn.pass) int(1) if tls0_sni") > accept).toBe(true);
+    expect(overlap.indexOf("tcp-request content do-resolve") > accept).toBe(true);
   });
 
   it("connects a passthrough where it resolved the SNI, not where the client aimed", () => {
@@ -85,13 +131,13 @@ describe("passthrough", () => {
     // choosing.
     expect(
       config.includes(
-        "tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.tlsrule) -m found }",
+        "tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.pass) -m found }",
       ),
     ).toBe(true);
     expect(config.includes("tcp-request content set-dst var(txn.dst)")).toBe(true);
     expect(
       config.includes(
-        "tcp-request content reject if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }",
+        "tcp-request content reject if { var(txn.pass) -m found } !{ var(txn.dst) -m found }",
       ),
     ).toBe(true);
   });
@@ -144,9 +190,9 @@ describe("passthrough", () => {
 
   // The port ACL is what keeps an allowed SNI on a different port from setting
   // the flag; a rule covering every port has none to gate on.
-  it("gates the tlsrule flag on the SNI alone", () => {
+  it("gates the pass flag on the SNI alone for a rule covering every port", () => {
     const anyPort = detect({ tlsRules: ["db.example.com:*"] });
-    expect(anyPort).toMatch(/set-var\(txn\.tlsrule\) int\(1\) if tls0_sni sni_is_name\n/);
+    expect(anyPort).toMatch(/set-var\(txn\.pass\) int\(1\) if tls0_sni sni_is_name\n/);
   });
 });
 
@@ -162,8 +208,6 @@ describe("an SNI that is not a hostname", () => {
   it("neither passes through nor resolves, whichever form the rule takes", () => {
     for (const cond of ["tls0_sni sni_is_name", "tls1_sni tls1_port sni_is_name"]) {
       expect(result.includes(`set-var(txn.pass) int(1) if ${cond}\n`)).toBe(true);
-      expect(result.includes(`set-var(txn.tlsrule) int(1) if ${cond}\n`)).toBe(true);
-      expect(result.includes(`,regsub([^A-Za-z0-9._-],_,g) if ${cond}\n`)).toBe(true);
     }
   });
 

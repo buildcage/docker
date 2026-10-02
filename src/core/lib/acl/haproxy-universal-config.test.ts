@@ -184,6 +184,33 @@ describe("outbound_proxy", () => {
   });
 });
 
+describe("an IP rule's connection", () => {
+  for (const mode of ["restrict", "audit"] as const) {
+    it(`is accepted in ${mode} without waiting for the client to speak`, () => {
+      // HAProxy holds a rule that reads the request buffer until bytes arrive
+      // or inspect-delay runs out, and a server-first client sends none. So
+      // only what an IP rule needs may run before this accept.
+      const rules = lines(gen({ mode, ipRules: IP })).filter((l) =>
+        l.startsWith("tcp-request content"),
+      );
+      const accept = rules.indexOf("tcp-request content accept if !is_dns_routed is_ip_match");
+      const self = "!is_dns_routed is_ip_match ip_dst_internal { dst_port 10024 }";
+      expect(rules.slice(0, accept)).toStrictEqual([
+        `tcp-request content set-var(txn.decision) str(BLOCKED)`,
+        "tcp-request content set-var(txn.reason) str(-)",
+        "tcp-request content set-var-fmt(txn.target) %[dst]:%[dst_port]",
+        "tcp-request content set-var(txn.rule_type) str(UNKNOWN)",
+        "tcp-request content set-var(txn.dns_routed) str(true) if is_dns_routed",
+        "tcp-request content set-var-fmt(txn.dst_target) %[dst]:%[dst_port]",
+        "tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
+        `tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
+        `tcp-request content reject if ${self}`,
+        `tcp-request content set-var(txn.decision) str(${mode === "audit" ? "AUDIT" : "ALLOWED"}) if !is_dns_routed is_ip_match`,
+      ]);
+    });
+  }
+});
+
 describe("plaintext request timeout", () => {
   it("ends a silent client's wait before outbound_proxy's client timeout does", () => {
     // outbound_proxy's clock starts at the connection, http_in's only after the

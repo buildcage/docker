@@ -7686,19 +7686,17 @@ function tlsCond(host) {
 function detectFrontend(spec) {
 	let { listenPort, tlsStagePort, plainStagePort, ipRules, tlsHosts, proxyAddress } = spec, hasPassthrough = ipRules.length > 0 || tlsHosts.length > 0, l = [];
 	if (l.push("# One listener for everything redirected here. The first bytes say whether", "# this is a handshake or a plain request, so no port has to be declared as", "# one or the other in advance.", "frontend detect", `    bind *:${listenPort}`, "    mode tcp", "    tcp-request inspect-delay 5s", ""), hasPassthrough) {
-		l.push("    # Passed through untouched: judged before anything is decrypted."), ipRules.some((rule) => rule.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]"), tlsHosts.some((host) => host.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]"), ipRules.length > 0 && l.push("    # dst is the proxy only when the name went through this container's DNS.", `    acl dns_routed dst ${proxyAddress}`);
-		for (let rule of ipRules) l.push(`    # ${rule.raw}`), l.push(rule.hostMatch === "hostPort" ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${escapeForHaproxy(rule.address)}` : `    acl ${rule.id}_dst dst ${rule.address}`), rule.port && l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
-		tlsHosts.length > 0 && l.push(`    acl sni_is_name req.ssl_sni -m reg ${HOSTNAME_CHARSET}`);
-		for (let host of tlsHosts) l.push(`    # ${host.raw}`), l.push(host.hostMatch === "hostPort" ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${escapeForHaproxy(host.hostRegex)}` : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${escapeForHaproxy(host.hostRegex)}`), host.port && l.push(`    acl ${host.id}_port dst_port ${host.port}`);
-		let tlsConds = tlsHosts.map(tlsCond), conds = [...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""} !dns_routed`), ...tlsConds];
-		if (l.push("", ...conds.map((cond) => `    tcp-request content set-var(txn.pass) int(1) if ${cond}`), ...tlsConds.map((cond) => `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${cond}`), "    tcp-request content set-var(txn.proto) str(tls) if { req.ssl_hello_type 1 }", "    tcp-request content set-var(txn.proto) str(tcp) unless { req.ssl_hello_type 1 }"), tlsHosts.length > 0) {
-			l.push("");
-			for (let host of tlsHosts) l.push(`    tcp-request content set-var(txn.tlsrule) int(1) if ${tlsCond(host)}`);
-			l.push("    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.tlsrule) -m found }", "    tcp-request content set-var(txn.reason) str(dns-failed) if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content reject if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content set-dst var(txn.dst) if { var(txn.dst) -m found }", ...internalDstAcl("pass_dst_internal", spec), "    tcp-request content set-var(txn.reason) str(internal-address) if { var(txn.tlsrule) -m found } pass_dst_internal", "    tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal");
+		let pass = "{ var(txn.pass) -m found }";
+		if (l.push("    # Passed through untouched: judged before anything is decrypted."), ipRules.length > 0) {
+			ipRules.some((rule) => rule.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]"), l.push("    # dst is the proxy only when the name went through this container's DNS.", `    acl dns_routed dst ${proxyAddress}`);
+			for (let rule of ipRules) l.push(`    # ${rule.raw}`), l.push(rule.hostMatch === "hostPort" ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${escapeForHaproxy(rule.address)}` : `    acl ${rule.id}_dst dst ${rule.address}`), rule.port && l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
+			let self = `${pass} ip_dst_internal { dst_port ${listenPort} }`;
+			l.push("", ...ipRules.map((r) => `    tcp-request content set-var(txn.pass) int(1) if ${r.id}_dst${r.port ? ` ${r.id}_port` : ""} !dns_routed`), `    tcp-request content set-var(txn.proto) str(tcp) if ${pass}`, ...internalDstAcl("ip_dst_internal", spec, "dst"), `    tcp-request content set-var(txn.reason) str(internal-address) if ${self}`, `    tcp-request content reject if ${self}`, `    tcp-request content accept if ${pass}`);
 		}
-		if (ipRules.length > 0) {
-			let self = `{ var(txn.pass) -m found } ip_dst_internal { dst_port ${listenPort} }`;
-			l.push("", ...internalDstAcl("ip_dst_internal", spec, "dst"), `    tcp-request content set-var(txn.reason) str(internal-address) if ${self}`, `    tcp-request content reject if ${self}`);
+		if (tlsHosts.length > 0) {
+			tlsHosts.some((host) => host.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]"), l.push("", `    acl sni_is_name req.ssl_sni -m reg ${HOSTNAME_CHARSET}`);
+			for (let host of tlsHosts) l.push(`    # ${host.raw}`), l.push(host.hostMatch === "hostPort" ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${escapeForHaproxy(host.hostRegex)}` : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${escapeForHaproxy(host.hostRegex)}`), host.port && l.push(`    acl ${host.id}_port dst_port ${host.port}`);
+			l.push("", ...tlsHosts.map((host) => `    tcp-request content set-var(txn.pass) int(1) if ${tlsCond(host)}`), `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${pass}`, `    tcp-request content set-var(txn.proto) str(tls) if ${pass}`, "", `    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if ${pass}`, `    tcp-request content set-var(txn.reason) str(dns-failed) if ${pass} !{ var(txn.dst) -m found }`, `    tcp-request content reject if ${pass} !{ var(txn.dst) -m found }`, "    tcp-request content set-dst var(txn.dst) if { var(txn.dst) -m found }", ...internalDstAcl("pass_dst_internal", spec), `    tcp-request content set-var(txn.reason) str(internal-address) if ${pass} pass_dst_internal`, `    tcp-request content reject if ${pass} pass_dst_internal`);
 		}
 		l.push("", "    tcp-request content set-log-level silent unless { var(txn.pass) -m found }", "    log-format \"buildcage %[date(0,ms)] pass %[var(txn.proto)] %B ts=%ts reason=%[var(txn.reason)] dst=%[dst]:%[dst_port] sni=%[var(txn.sni)]\"", "");
 	}
@@ -8108,13 +8106,6 @@ function generateUniversalHaproxyConfig(options) {
 		"    tcp-request content set-var-fmt(txn.dst_target) %[dst]:%[dst_port]",
 		...aclLines("is_ip_match", "var(txn.dst_target)", ip),
 		"",
-		"    tcp-request content set-var(txn.sni) req_ssl_sni,regsub(\\.$,) if is_tls",
-		"    tcp-request content set-var-fmt(txn.sni_port) %[var(txn.sni)]:%[dst_port] if is_tls",
-		"    tcp-request content set-var(txn.sni_log) var(txn.sni),regsub([^A-Za-z0-9._-],_,g) if is_tls has_sni",
-		"",
-		...aclLines("is_https_allowed", "var(txn.sni_port)", https),
-		`    acl sni_is_name var(txn.sni) -m reg ${HOSTNAME_CHARSET}`,
-		"",
 		"    # ---------------------------------------------------------",
 		"    # 1. IP direct access (non DNS-routed)",
 		"    # ---------------------------------------------------------",
@@ -8128,6 +8119,13 @@ function generateUniversalHaproxyConfig(options) {
 		...audit ? ["    tcp-request content accept if !is_dns_routed !is_ip_match"] : [],
 		"    tcp-request content set-var(txn.reason) str(ip-not-allowed) if !is_dns_routed !is_ip_match",
 		"    tcp-request content reject if !is_dns_routed !is_ip_match",
+		"",
+		"    tcp-request content set-var(txn.sni) req_ssl_sni,regsub(\\.$,) if is_tls",
+		"    tcp-request content set-var-fmt(txn.sni_port) %[var(txn.sni)]:%[dst_port] if is_tls",
+		"    tcp-request content set-var(txn.sni_log) var(txn.sni),regsub([^A-Za-z0-9._-],_,g) if is_tls has_sni",
+		"",
+		...aclLines("is_https_allowed", "var(txn.sni_port)", https),
+		`    acl sni_is_name var(txn.sni) -m reg ${HOSTNAME_CHARSET}`,
 		"",
 		"    tcp-request content set-var-fmt(txn.target) %[var(txn.sni_log)]:%[dst_port] if is_tls has_sni",
 		"",
