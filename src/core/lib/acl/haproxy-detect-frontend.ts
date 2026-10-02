@@ -141,6 +141,19 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
         "    tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal",
       );
     }
+    if (ipRules.length > 0) {
+      // An IP rule wide enough to cover one of the proxy's own addresses would
+      // pass a connection to this listener back into it, without end. A tls
+      // rule's destination was replaced above, so only an IP rule's is left
+      // as the client chose it.
+      const self = `{ var(txn.pass) -m found } ip_dst_internal { dst_port ${listenPort} }`;
+      l.push(
+        "",
+        ...internalDstAcl("ip_dst_internal", spec, "dst"),
+        `    tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
+        `    tcp-request content reject if ${self}`,
+      );
+    }
 
     // Only passthroughs log here; the inspected frontends log the request, so
     // logging it here too would double it.

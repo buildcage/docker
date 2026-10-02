@@ -141,6 +141,24 @@ describe("internal-address guard", () => {
   }
 });
 
+describe("a connection to the proxy's own listener", () => {
+  // In audit an unmatched IP connection is passed through too, so the guard
+  // cannot wait for a rule to match.
+  for (const mode of ["restrict", "audit"] as const) {
+    it(`is refused in ${mode} on an internal address, whatever the IP rules say`, () => {
+      const all = lines(gen({ mode, ipRules: ["0.0.0.0/0:*"] }));
+      const self = "!is_dns_routed ip_dst_internal { dst_port 10024 }";
+      const reject = all.indexOf(`tcp-request content reject if ${self}`);
+      expect(all.includes(`acl ip_dst_internal dst -m ip -f ${HOST_FILE}`)).toBe(true);
+      expect(all[reject - 1]).toBe(
+        `tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
+      );
+      const accept = all.findIndex((l) => l.includes("accept if !is_dns_routed"));
+      expect(reject !== -1 && reject < accept).toBe(true);
+    });
+  }
+});
+
 describe("outbound_proxy", () => {
   const all = lines(gen());
 

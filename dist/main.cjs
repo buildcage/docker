@@ -7613,8 +7613,8 @@ function generateCorednsConfig(rules, options) {
 const PROXY_SUBNET = "198.19.255.0/24";
 //#endregion
 //#region src/core/lib/acl/haproxy-internal-dst.ts
-function internalDstAcl(name, opts) {
-	return [`    acl ${name} var(txn.dst) -m ip ${opts.internalAddrs.join(" ")}`, ...opts.hostAddressFile ? [`    acl ${name} var(txn.dst) -m ip -f ${opts.hostAddressFile}`] : []];
+function internalDstAcl(name, opts, fetch = "var(txn.dst)") {
+	return [`    acl ${name} ${fetch} -m ip ${opts.internalAddrs.join(" ")}`, ...opts.hostAddressFile ? [`    acl ${name} ${fetch} -m ip -f ${opts.hostAddressFile}`] : []];
 }
 //#endregion
 //#region src/core/lib/acl/haproxy-matchers.ts
@@ -7663,6 +7663,10 @@ function detectFrontend(spec) {
 			l.push("");
 			for (let host of tlsHosts) l.push(`    tcp-request content set-var(txn.tlsrule) int(1) if ${tlsCond(host)}`);
 			l.push("    tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.tlsrule) -m found }", "    tcp-request content set-var(txn.reason) str(dns-failed) if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content reject if { var(txn.tlsrule) -m found } !{ var(txn.dst) -m found }", "    tcp-request content set-dst var(txn.dst) if { var(txn.dst) -m found }", ...internalDstAcl("pass_dst_internal", spec), "    tcp-request content set-var(txn.reason) str(internal-address) if { var(txn.tlsrule) -m found } pass_dst_internal", "    tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal");
+		}
+		if (ipRules.length > 0) {
+			let self = `{ var(txn.pass) -m found } ip_dst_internal { dst_port ${listenPort} }`;
+			l.push("", ...internalDstAcl("ip_dst_internal", spec, "dst"), `    tcp-request content set-var(txn.reason) str(internal-address) if ${self}`, `    tcp-request content reject if ${self}`);
 		}
 		l.push("", "    tcp-request content set-log-level silent unless { var(txn.pass) -m found }", "    log-format \"buildcage %[date(0,ms)] pass %[var(txn.proto)] %B ts=%ts reason=%[var(txn.reason)] dst=%[dst]:%[dst_port] sni=%[var(txn.sni)]\"", "");
 	}
@@ -8083,6 +8087,9 @@ function generateUniversalHaproxyConfig(options) {
 		"    # 1. IP direct access (non DNS-routed)",
 		"    # ---------------------------------------------------------",
 		"    tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
+		...internalDstAcl("ip_dst_internal", guard, "dst"),
+		"    tcp-request content set-var(txn.reason) str(internal-address) if !is_dns_routed ip_dst_internal { dst_port 10024 }",
+		"    tcp-request content reject if !is_dns_routed ip_dst_internal { dst_port 10024 }",
 		`    tcp-request content set-var(txn.decision) str(${decision}) if !is_dns_routed is_ip_match`,
 		"    tcp-request content accept if !is_dns_routed is_ip_match",
 		"",

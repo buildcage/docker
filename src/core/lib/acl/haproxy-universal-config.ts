@@ -135,6 +135,11 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    # 1. IP direct access (non DNS-routed)",
     "    # ---------------------------------------------------------",
     "    tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
+    // The proxy's own listener, on an address an IP rule (or audit) would pass
+    // the connection through to, would take it back in without end.
+    ...internalDstAcl("ip_dst_internal", guard, "dst"),
+    "    tcp-request content set-var(txn.reason) str(internal-address) if !is_dns_routed ip_dst_internal { dst_port 10024 }",
+    "    tcp-request content reject if !is_dns_routed ip_dst_internal { dst_port 10024 }",
     `    tcp-request content set-var(txn.decision) str(${decision}) if !is_dns_routed is_ip_match`,
     "    tcp-request content accept if !is_dns_routed is_ip_match",
     "",

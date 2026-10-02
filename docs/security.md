@@ -137,7 +137,7 @@ DNAT'd, so it answers on every one of them.
 Two consequences worth knowing:
 
 - **An internal mirror running on the runner itself is no longer reachable by name.** Name it with
-  `allowed_ip_rules` instead, which never goes through this guard. The same applies to a public name
+  `allowed_ip_rules` instead, which skips this guard. The same applies to a public name
   that resolves to the runner's own public address, which a self-hosted runner may well have.
 - The list is read once at startup, and on a containerised runner it holds that container's
   addresses rather than the real host's.
@@ -148,7 +148,8 @@ in the proxy's own network (`198.19.255.0/24`) and on port `10024` of any intern
 naming the proxy's listener would loop it into itself. A wildcard or regex that merely admits the
 address, `**:80` or `~^.*:80$`, is not. Reaching a cloud metadata endpoint directly, the way any
 AWS or GCP SDK does, is not what this is meant to stop, and `allowed_ip_rules` is the intended path
-for it.
+for it. That path skips this guard except for the listener: a connection to port `10024` of an
+internal address is refused there too, whatever the IP rules say and in `audit` as well.
 
 ### Only TCP gets out
 
