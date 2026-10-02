@@ -214,8 +214,6 @@ describe("checkRulesCompileOrThrow", () => {
     }
   });
 
-  // inspect reads a leading zero as decimal and universal matches it as text,
-  // so the same rule would allow on one engine and nothing on the other.
   it("refuses a port with a leading zero or out of range, in every rule kind", () => {
     const kinds: ((port: string) => unknown)[] = [
       (p) => checkRulesCompileOrThrow({ httpsRules: parseRulesOrThrow(`a.com:${p}`) }),

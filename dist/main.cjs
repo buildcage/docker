@@ -117,13 +117,16 @@ function domainToRegexPartial(domain) {
 function pathToRegexPartial(path) {
 	return path === "" ? "" : path.split("/").map((segment) => atomToRegex(segment, PATH)).join("/");
 }
+function isRulePort(port) {
+	return port === "*" || /^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535;
+}
 function checkPort(port, rule) {
-	if (!(port === "*" || /^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535)) throw Error(`Invalid port in rule "${rule}": "${port}". Write a decimal from 1 to 65535 without a leading zero (443, not 0443), or "*" for any port`);
+	if (!isRulePort(port)) throw Error(`Invalid port in rule "${rule}": "${port}". Write a decimal from 1 to 65535 without a leading zero (443, not 0443), or "*" for any port`);
 }
 function wildcardToRegexPartial(pattern) {
 	if (!/^[^:]+:(?:\d+|\*)$/.test(pattern)) throw Error(`Invalid pattern "${pattern}"`);
 	let colonIndex = pattern.lastIndexOf(":"), domain = pattern.slice(0, colonIndex), port = pattern.slice(colonIndex + 1);
-	return checkPort(port, pattern), `${domainToRegexPartial(domain)}:${port === "*" ? "\\d+" : port}`;
+	return `${domainToRegexPartial(domain)}:${port === "*" ? "\\d+" : port}`;
 }
 function* regexChars(regex) {
 	let inClass = !1;
@@ -431,7 +434,7 @@ function domainToRegex(domain) {
 	}).join("\\.");
 }
 function wildcardToRegex(pattern) {
-	if (!/^[^:]+:(?:\d+|\*)$/.test(pattern)) throw Error(`Invalid pattern "${pattern}"`);
+	if (!/^[^:]+:[^:]*$/.test(pattern)) throw Error(`Invalid pattern "${pattern}"`);
 	let [domain, port] = pattern.split(":");
 	checkPort(port, pattern);
 	let portRegex = port === "*" ? "\\d+" : port;
@@ -7809,6 +7812,10 @@ function compileIpRules(rules, warnings) {
 		let address = rule.slice(0, colonIndex), port = rule.slice(colonIndex + 1);
 		if (!isIpRuleAddress(address)) {
 			warnings.push(`IP rule ${JSON.stringify(rule)} is not an address, CIDR block or address wildcard, which is all that can be tunnelled without inspection. It is ignored.`);
+			return;
+		}
+		if (!isRulePort(port)) {
+			warnings.push(`IP rule ${JSON.stringify(rule)} has a port that is not a decimal from 1 to 65535 or "*". It is ignored.`);
 			return;
 		}
 		if (!IPV4_OR_CIDR.test(address)) {

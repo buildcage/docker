@@ -9,6 +9,7 @@ import {
   anchorRawRegex,
   checkPort,
   domainToRegexPartial,
+  isRulePort,
   splitRawRegexHost,
 } from "./partial-wildcard.ts";
 import type { UrlRule } from "./url-rules.ts";
@@ -287,6 +288,13 @@ function compileIpRules(rules: string[] | undefined, warnings: string[]): Compil
       warnings.push(
         `IP rule ${JSON.stringify(rule)} is not an address, CIDR block or address wildcard, ` +
           `which is all that can be tunnelled without inspection. It is ignored.`,
+      );
+      return;
+    }
+    if (!isRulePort(port)) {
+      warnings.push(
+        `IP rule ${JSON.stringify(rule)} has a port that is not a decimal from 1 to 65535 or ` +
+          `"*". It is ignored.`,
       );
       return;
     }

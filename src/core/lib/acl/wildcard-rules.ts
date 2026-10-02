@@ -195,7 +195,7 @@ function domainToRegex(domain: string): string {
  * Convert a wildcard pattern (`<domain>:<port|*>`) to a regex string (without anchors).
  */
 export function wildcardToRegex(pattern: string): string {
-  if (!/^[^:]+:(?:\d+|\*)$/.test(pattern)) {
+  if (!/^[^:]+:[^:]*$/.test(pattern)) {
     throw new Error(`Invalid pattern "${pattern}"`);
   }
   const [domain, port] = pattern.split(":");

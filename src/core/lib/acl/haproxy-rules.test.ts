@@ -188,10 +188,17 @@ describe("tls rule compilation", () => {
 });
 
 describe("port validation", () => {
-  it('refuses a port that is neither digits nor "*"', () => {
-    expect(() => compileRuleSet({ httpsRules: ["example.com:https"] })).toThrow(
-      /Invalid port in rule/,
-    );
+  it('refuses a port that is not a decimal from 1 to 65535, or "*"', () => {
+    for (const port of ["https", "0443", "0", "65536"]) {
+      expect(() => compileRuleSet({ httpsRules: [`a.com:${port}`] })).toThrow(/Invalid port/);
+      expect(() => compileRuleSet({ tlsRules: [`a.com:${port}`] })).toThrow(/Invalid port/);
+    }
+  });
+
+  it("warns and drops an IP rule with such a port", () => {
+    const set = compileRuleSet({ ipRules: ["10.0.0.1:0443", "10.0.0.*:0", "10.0.0.0/8:65536"] });
+    expect(set.ip.length).toBe(0);
+    expect(set.warnings.length).toBe(3);
   });
 
   // The rule was split at its last colon, so anything before it belongs to a
