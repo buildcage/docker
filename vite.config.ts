@@ -79,6 +79,9 @@ export default defineConfig({
         // Test scaffolding: the QuickJS shims and the QuickJS test runner.
         "src/core/lib/test/**",
         "src/core/scripts/test/**",
+        // QuickJS entry points, which vitest cannot run. What they call is
+        // measured where it lives.
+        "**/*.qjs.ts",
       ],
       // text goes to the CI log; the file copy is what the workflow pastes
       // into the job summary.
