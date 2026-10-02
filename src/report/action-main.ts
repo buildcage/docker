@@ -13,9 +13,11 @@
  */
 import * as core from "@actions/core";
 
+import { readBooleanInput } from "#core/lib/actions/inputs.ts";
 import { writeStepSummary } from "#core/lib/actions/write-step-summary.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
+import { errorMessage } from "#core/lib/errors.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
 import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
@@ -61,14 +63,13 @@ export interface ReportActionDeps {
 /** Anything other than a false spelling fails closed, and a typo says so. The
  *  report action refuses a typo first; this covers direct runs and an older action. */
 function readFailOnBlocked(): boolean {
-  const value = core.getInput("fail_on_blocked");
-  if (["false", "False", "FALSE"].includes(value)) return false;
-  if (value !== "" && !["true", "True", "TRUE"].includes(value)) {
-    core.warning(
-      `fail_on_blocked must be true or false, not ${JSON.stringify(value)}. Reading it as true.`,
-    );
+  try {
+    return readBooleanInput("fail_on_blocked", true, core.getInput);
+  } catch (e) {
+    // readBooleanInput throws only for a value it does not know.
+    core.warning(`${errorMessage(e)} Reading it as true.`);
+    return true;
   }
-  return true;
 }
 
 export async function runReportAction(

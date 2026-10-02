@@ -45,7 +45,7 @@ beforeEach(() => {
   delete process.env.BUILDCAGE_BUILD_TEST_HOOKS;
   vi.resetAllMocks();
   mocks.readBuilderName.mockReturnValue("buildcage");
-  mocks.readTrafficArtifactInputs.mockReturnValue({ wanted: false });
+  mocks.readTrafficArtifactInputs.mockReturnValue({ upload: false });
   mocks.createDocker.mockReturnValue({ docker: true });
   mocks.findReportSourceContainer.mockReturnValue(CONTAINER);
   mocks.makeScratchDir.mockReturnValue(SCRATCH);
@@ -135,7 +135,7 @@ describe("the traffic artifact", () => {
   });
 
   it("names a file inside the scratch dir, so only what this step created is uploaded", async () => {
-    mocks.readTrafficArtifactInputs.mockReturnValue({ wanted: true, retentionDays: 7 });
+    mocks.readTrafficArtifactInputs.mockReturnValue({ upload: true, retentionDays: 7 });
     await runReportStep({}, deps);
     expect(mocks.runReportScript.mock.calls[0][2].trafficFile).toBe(`${SCRATCH}/traffic.json`);
     expect(mocks.uploadTrafficArtifact).toHaveBeenCalledWith(
@@ -147,7 +147,7 @@ describe("the traffic artifact", () => {
   });
 
   it("uploads before the scratch dir is removed, since the file lives inside it", async () => {
-    mocks.readTrafficArtifactInputs.mockReturnValue({ wanted: true });
+    mocks.readTrafficArtifactInputs.mockReturnValue({ upload: true });
     const order: string[] = [];
     mocks.uploadTrafficArtifact.mockImplementation(async () => void order.push("upload"));
     mocks.removeScratchDir.mockImplementation(() => void order.push("remove"));
@@ -156,7 +156,7 @@ describe("the traffic artifact", () => {
   });
 
   it("still uploads when the report script throws, since the run that failed wants it most", async () => {
-    mocks.readTrafficArtifactInputs.mockReturnValue({ wanted: true });
+    mocks.readTrafficArtifactInputs.mockReturnValue({ upload: true });
     mocks.runReportScript.mockImplementation(() => {
       throw new ReportError("node is not on PATH", "REPORT_SCRIPT_FAILED");
     });

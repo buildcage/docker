@@ -254,7 +254,7 @@ describe("runReportAction's fail_on_blocked fallback", () => {
     const { exitCode, lines } = await runReadingInput(value);
     expect(exitCode).toBe(1);
     expect(lines).toContain(
-      `::warning::fail_on_blocked must be true or false, not "${value}". Reading it as true.\n`,
+      `::warning::Invalid fail_on_blocked: "${value}". Must be true or false. Reading it as true.\n`,
     );
   });
 });

@@ -13,13 +13,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { annotate } from "#core/lib/actions/annotation.ts";
+import { readTrafficArtifactInputs } from "#core/lib/actions/inputs.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
 import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
 import { REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
 
 import { copyFromContainerImage } from "./copy-from-image.ts";
 import { findReportSourceContainer } from "./find-report-source.ts";
-import { checkFailOnBlocked, readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
+import { checkFailOnBlocked, readBuilderName } from "./inputs.ts";
 import { runReportScript } from "./run-report-script.ts";
 import { uploadTrafficArtifact } from "./traffic-artifact.ts";
 
@@ -112,7 +113,7 @@ export async function runReportStep(
   const scratchDir = makeScratchDir();
   // The path is handed to the script, so only a file this step created is
   // ever uploaded.
-  const trafficFile = trafficArtifact.wanted ? join(scratchDir, "traffic.json") : undefined;
+  const trafficFile = trafficArtifact.upload ? join(scratchDir, "traffic.json") : undefined;
   try {
     const reportActionPath = join(scratchDir, "report-action.js");
     copyFromContainerImage(containerId, REPORT_ACTION_SCRIPT_PATH, reportActionPath);

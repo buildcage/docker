@@ -10,7 +10,7 @@
  */
 import * as core from "@actions/core";
 
-import { readBooleanInput, readRetentionDays } from "#core/lib/actions/inputs.ts";
+import { readBooleanInput } from "#core/lib/actions/inputs.ts";
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
 /** Narrowed to what this module needs, so a test can pass a plain lookup. */
@@ -24,21 +24,4 @@ export function readBuilderName(getInput: GetInput = core.getInput): string {
  *  refuses a typo before anything runs. */
 export function checkFailOnBlocked(getInput: GetInput = core.getInput): void {
   readBooleanInput("fail_on_blocked", true, getInput);
-}
-
-export interface TrafficArtifactInputs {
-  wanted: boolean;
-  /** Undefined leaves the retention to the repository's own default. */
-  retentionDays?: number;
-}
-
-/** The retention is checked even when nothing is uploaded: a bad value is a
- *  mistake either way. */
-export function readTrafficArtifactInputs(
-  getInput: GetInput = core.getInput,
-): TrafficArtifactInputs {
-  return {
-    wanted: readBooleanInput("upload_traffic_artifact", false, getInput),
-    retentionDays: readRetentionDays(getInput),
-  };
 }

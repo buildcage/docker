@@ -1,3 +1,5 @@
+import * as core from "@actions/core";
+
 import { ActionError } from "#core/lib/errors.ts";
 
 /** An input whose value is malformed, or names something the step cannot do. */
@@ -36,6 +38,23 @@ export function readRetentionDays(getInput: GetInput): number | undefined {
     );
   }
   return Number(days);
+}
+
+export interface TrafficArtifactInputs {
+  upload: boolean;
+  /** Undefined leaves the retention to the repository's own default. */
+  retentionDays?: number;
+}
+
+/** The retention is checked even when nothing is uploaded: a bad value is a
+ *  mistake either way. */
+export function readTrafficArtifactInputs(
+  getInput: GetInput = core.getInput,
+): TrafficArtifactInputs {
+  return {
+    upload: readBooleanInput("upload_traffic_artifact", false, getInput),
+    retentionDays: readRetentionDays(getInput),
+  };
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   InvalidInputError,
   readBooleanInput,
   readRetentionDays,
+  readTrafficArtifactInputs,
   resolveProxyEngine,
   resolveProxyMode,
 } from "./inputs.ts";
@@ -60,6 +61,39 @@ describe("readRetentionDays", () => {
           "Must be a whole number of days above zero.",
       }),
     );
+  });
+});
+
+describe("readTrafficArtifactInputs", () => {
+  // The dev and test invocations run this from source rather than through
+  // action.yml's own defaults.
+  it("uploads nothing and leaves the retention to the repository when unset", () => {
+    expect(readTrafficArtifactInputs(inputs())).toStrictEqual({
+      upload: false,
+      retentionDays: undefined,
+    });
+  });
+
+  it("reads both inputs", () => {
+    expect(
+      readTrafficArtifactInputs(
+        inputs({ upload_traffic_artifact: "true", traffic_artifact_retention_days: "7" }),
+      ),
+    ).toStrictEqual({ upload: true, retentionDays: 7 });
+  });
+
+  it("refuses a typo rather than reading it as a no", () => {
+    expect(() => readTrafficArtifactInputs(inputs({ upload_traffic_artifact: "yes" }))).toThrow(
+      'Invalid upload_traffic_artifact: "yes". Must be true or false.',
+    );
+  });
+
+  it("refuses a bad retention even when nothing is uploaded", () => {
+    expect(() =>
+      readTrafficArtifactInputs(
+        inputs({ upload_traffic_artifact: "false", traffic_artifact_retention_days: "0" }),
+      ),
+    ).toThrow(/Invalid traffic_artifact_retention_days/);
   });
 });
 
