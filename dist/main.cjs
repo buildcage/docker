@@ -7504,7 +7504,7 @@ function printBuilderLog({ composeFile, projectName, composeEnv }, { printDocker
 	});
 }
 //#endregion
-//#region src/lib/host-addresses.ts
+//#region src/core/lib/docker/host-addresses.ts
 function listHostIpv4Addresses({ networkInterfaces: list = node_os.networkInterfaces } = {}) {
 	let found = new Set();
 	for (let infos of Object.values(list())) for (let info of infos ?? []) (info.family === "IPv4" || info.family === 4) && (info.internal || found.add(info.address));
