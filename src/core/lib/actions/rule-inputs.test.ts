@@ -8,9 +8,8 @@ function inputs(values: Record<string, string> = {}): (name: string) => string {
 }
 
 describe("readRuleInputs", () => {
-  it("returns restrict and empty rule lists when nothing is set", () => {
+  it("returns empty rule lists when nothing is set", () => {
     expect(readRuleInputs(inputs())).toStrictEqual({
-      proxyMode: "restrict",
       httpsRules: [],
       httpRules: [],
       ipRules: [],
@@ -24,7 +23,6 @@ describe("readRuleInputs", () => {
   it("parses every rule kind, URL rules as their raw text", () => {
     const parsed = readRuleInputs(
       inputs({
-        proxy_mode: "audit",
         allowed_https_rules: "a.example.com:443",
         allowed_http_rules: "b.example.com:80",
         allowed_ip_rules: "10.0.0.5:5432",
@@ -34,7 +32,6 @@ describe("readRuleInputs", () => {
       }),
     );
     expect(parsed).toStrictEqual({
-      proxyMode: "audit",
       httpsRules: ["a.example.com:443"],
       httpRules: ["b.example.com:80"],
       ipRules: ["10.0.0.5:5432"],
@@ -42,12 +39,6 @@ describe("readRuleInputs", () => {
       tlsRules: ["db.example.com:443"],
       knownBlockedRules: ["*.sury.org:*"],
     });
-  });
-
-  it("rejects an unknown proxy_mode before any rule", () => {
-    expect(() =>
-      readRuleInputs(inputs({ proxy_mode: "Audit", allowed_https_rules: "no-port" })),
-    ).toThrow(/Invalid proxy_mode/);
   });
 
   it("rejects a malformed rule rather than passing it to the proxy", () => {

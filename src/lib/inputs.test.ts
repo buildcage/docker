@@ -51,6 +51,14 @@ describe("readSetupInputs", () => {
     expect(readSetupInputs(inputs({ builder_name: "mine" })).builderName).toBe("mine");
   });
 
+  it("rejects an unknown proxy_mode before fail_on_ca_residue and any rule", () => {
+    expect(() =>
+      readSetupInputs(
+        inputs({ proxy_mode: "Audit", fail_on_ca_residue: "no", allowed_https_rules: "no-port" }),
+      ),
+    ).toThrow(/Invalid proxy_mode/);
+  });
+
   it("reads fail_on_ca_residue", () => {
     expect(readSetupInputs(inputs({ fail_on_ca_residue: "false" })).failOnCaResidue).toBe(false);
   });

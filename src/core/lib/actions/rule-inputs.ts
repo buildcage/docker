@@ -8,10 +8,9 @@ import {
   parseRulesOrThrow,
 } from "#core/lib/acl/rules.ts";
 
-import { resolveProxyMode, type GetInput, type ProxyMode } from "./inputs.ts";
+import type { GetInput } from "./inputs.ts";
 
 export interface RuleInputs {
-  proxyMode: ProxyMode;
   httpsRules: string[];
   httpRules: string[];
   ipRules: string[];
@@ -23,7 +22,7 @@ export interface RuleInputs {
 }
 
 /**
- * Parse and validate proxy_mode and every rule input.
+ * Parse and validate every rule input.
  *
  * URL and TLS rules are compiled here even on an engine that ignores them,
  * purely so a typo fails before the proxy starts rather than silently inside
@@ -33,11 +32,9 @@ export interface RuleInputs {
  * The statement order is the order a malformed-rule error surfaces in, so it
  * is deliberate rather than incidental.
  *
- * @throws {InvalidInputError} if proxy_mode is neither mode
  * @throws {InvalidRulesError} if any rule is malformed
  */
 export function readRuleInputs(getInput: GetInput = core.getInput): RuleInputs {
-  const proxyMode = resolveProxyMode(getInput("proxy_mode"));
   const rules = buildACLRules({
     httpsRulesInput: getInput("allowed_https_rules"),
     httpRulesInput: getInput("allowed_http_rules"),
@@ -51,7 +48,6 @@ export function readRuleInputs(getInput: GetInput = core.getInput): RuleInputs {
   const urlRules = compiledUrlRules.map((r) => r.raw);
 
   return {
-    proxyMode,
     httpsRules: rules.httpsRules,
     httpRules: rules.httpRules,
     ipRules: rules.ipRules,

@@ -8308,7 +8308,7 @@ function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 //#endregion
 //#region src/core/lib/actions/rule-inputs.ts
 function readRuleInputs(getInput$3 = getInput) {
-	let proxyMode = resolveProxyMode(getInput$3("proxy_mode")), rules = buildACLRules({
+	let rules = buildACLRules({
 		httpsRulesInput: getInput$3("allowed_https_rules"),
 		httpRulesInput: getInput$3("allowed_http_rules"),
 		ipRulesInput: getInput$3("allowed_ip_rules")
@@ -8320,7 +8320,6 @@ function readRuleInputs(getInput$3 = getInput) {
 	});
 	let urlRules = compiledUrlRules.map((r) => r.raw);
 	return {
-		proxyMode,
 		httpsRules: rules.httpsRules,
 		httpRules: rules.httpRules,
 		ipRules: rules.ipRules,
@@ -8337,16 +8336,17 @@ function resolveProxyEngine(input) {
 }
 //#endregion
 //#region src/lib/inputs.ts
-function readBuilderName(getInput$1 = getInput) {
-	return getInput$1("builder_name") || "buildcage";
+function readBuilderName(getInput$2 = getInput) {
+	return getInput$2("builder_name") || "buildcage";
 }
-function readSetupInputs(getInput$2 = getInput) {
-	let proxyEngine = resolveProxyEngine(getInput$2("proxy_engine")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$2);
+function readSetupInputs(getInput$1 = getInput) {
+	let proxyEngine = resolveProxyEngine(getInput$1("proxy_engine")), proxyMode = resolveProxyMode(getInput$1("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$1);
 	return {
 		proxyEngine,
-		builderName: readBuilderName(getInput$2),
+		builderName: readBuilderName(getInput$1),
+		proxyMode,
 		failOnCaResidue,
-		...readRuleInputs(getInput$2)
+		...readRuleInputs(getInput$1)
 	};
 }
 //#endregion

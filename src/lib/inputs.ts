@@ -5,7 +5,12 @@
  */
 import * as core from "@actions/core";
 
-import { readBooleanInput, type ProxyEngine } from "#core/lib/actions/inputs.ts";
+import {
+  readBooleanInput,
+  resolveProxyMode,
+  type ProxyEngine,
+  type ProxyMode,
+} from "#core/lib/actions/inputs.ts";
 import { readRuleInputs, type RuleInputs } from "#core/lib/actions/rule-inputs.ts";
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
@@ -21,6 +26,7 @@ export function readBuilderName(getInput: GetInput = core.getInput): string {
 export interface SetupInputs extends RuleInputs {
   proxyEngine: ProxyEngine;
   builderName: string;
+  proxyMode: ProxyMode;
   /** Whether CA residue in a layer fails the build rather than only warning. */
   failOnCaResidue: boolean;
 }
@@ -31,15 +37,17 @@ export interface SetupInputs extends RuleInputs {
  *
  * The statement order decides which error surfaces first.
  *
- * @throws {InvalidInputError} if proxy_engine, fail_on_ca_residue or proxy_mode is malformed
+ * @throws {InvalidInputError} if proxy_engine, proxy_mode or fail_on_ca_residue is malformed
  * @throws {InvalidRulesError} if any rule is malformed
  */
 export function readSetupInputs(getInput: GetInput = core.getInput): SetupInputs {
   const proxyEngine = resolveProxyEngine(getInput("proxy_engine"));
+  const proxyMode = resolveProxyMode(getInput("proxy_mode"));
   const failOnCaResidue = readBooleanInput("fail_on_ca_residue", true, getInput);
   return {
     proxyEngine,
     builderName: readBuilderName(getInput),
+    proxyMode,
     failOnCaResidue,
     ...readRuleInputs(getInput),
   };
