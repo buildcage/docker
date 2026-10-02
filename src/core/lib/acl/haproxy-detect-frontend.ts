@@ -45,69 +45,82 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
   );
   if (hasPassthrough) {
     l.push("    # Passed through untouched: judged before anything is decrypted.");
-    if (ipRules.some((rule) => rule.hostMatch === "hostPort")) {
-      // dst is IP-typed; a ~ rule's own regex covers address and port
-      // together, so dst is stringified with the real port to match it.
-      l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]");
-    }
-    if (tlsHosts.some((host) => host.hostMatch === "hostPort")) {
-      l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]");
-    }
-    // Every name resolves to the proxy's own address, so an IP rule covering it
-    // (`198.18.0.0/15:443`) would pass every named connection through
-    // uninspected, to an origin that is the proxy itself.
     if (ipRules.length > 0) {
+      if (ipRules.some((rule) => rule.hostMatch === "hostPort")) {
+        // dst is IP-typed; a ~ rule's own regex covers address and port
+        // together, so dst is stringified with the real port to match it.
+        l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]");
+      }
+      // Every name resolves to the proxy's own address, so an IP rule covering it
+      // (`198.18.0.0/15:443`) would pass every named connection through
+      // uninspected, to an origin that is the proxy itself.
       l.push(
         "    # dst is the proxy only when the name went through this container's DNS.",
         `    acl dns_routed dst ${proxyAddress}`,
       );
-    }
-    for (const rule of ipRules) {
-      l.push(`    # ${rule.raw}`);
+      for (const rule of ipRules) {
+        l.push(`    # ${rule.raw}`);
+        l.push(
+          rule.hostMatch === "hostPort"
+            ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${escapeForHaproxy(rule.address)}`
+            : `    acl ${rule.id}_dst dst ${rule.address}`,
+        );
+        if (rule.port) l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
+      }
+      // An IP rule reads no byte from the client, so its passthrough is
+      // accepted here, ahead of every rule below that waits for the first
+      // bytes: a client waiting for the server to speak first would otherwise
+      // sit out the whole inspect-delay. It is logged as tcp whatever it
+      // carries, as under universal.
+      // An IP rule wide enough to cover one of the proxy's own addresses would
+      // pass a connection to this listener back into it, without end.
+      const self = `{ var(txn.pass) -m found } ip_dst_internal { dst_port ${listenPort} }`;
       l.push(
-        rule.hostMatch === "hostPort"
-          ? `    acl ${rule.id}_dst var(txn.dst_str) -m reg ${escapeForHaproxy(rule.address)}`
-          : `    acl ${rule.id}_dst dst ${rule.address}`,
+        "",
+        // One line per rule, for the same word-limit reason as ruleBlock's deny.
+        ...ipRules.map(
+          (r) =>
+            `    tcp-request content set-var(txn.pass) int(1) if ${r.id}_dst${r.port ? ` ${r.id}_port` : ""} !dns_routed`,
+        ),
+        "    tcp-request content set-var(txn.proto) str(tcp) if { var(txn.pass) -m found }",
+        ...internalDstAcl("ip_dst_internal", spec, "dst"),
+        `    tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
+        `    tcp-request content reject if ${self}`,
+        "    tcp-request content accept if { var(txn.pass) -m found }",
       );
-      if (rule.port) l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
     }
-    if (tlsHosts.length > 0) {
-      l.push(`    acl sni_is_name req.ssl_sni -m reg ${HOSTNAME_CHARSET}`);
-    }
-    for (const host of tlsHosts) {
-      l.push(`    # ${host.raw}`);
-      l.push(
-        host.hostMatch === "hostPort"
-          ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${escapeForHaproxy(host.hostRegex)}`
-          : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${escapeForHaproxy(host.hostRegex)}`,
-      );
-      if (host.port) l.push(`    acl ${host.id}_port dst_port ${host.port}`);
-    }
-    const tlsConds = tlsHosts.map(tlsCond);
-    const conds = [
-      ...ipRules.map((r) => `${r.id}_dst${r.port ? ` ${r.id}_port` : ""} !dns_routed`),
-      ...tlsConds,
-    ];
-
-    // A passthrough is never decrypted and so has no request line; this line
-    // is its only record, carrying the name, destination and byte count.
-    // Flagged before the rules below reject, so a refused passthrough is
-    // logged too.
-    l.push(
-      "",
-      // One line per rule, for the same word-limit reason as ruleBlock's deny.
-      ...conds.map((cond) => `    tcp-request content set-var(txn.pass) int(1) if ${cond}`),
-      // Only a tls rule judges the name; under an ip rule the SNI is just the
-      // client's claim. Reduced to a safe charset, being attacker-controlled.
-      ...tlsConds.map(
-        (cond) =>
-          `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${cond}`,
-      ),
-      "    tcp-request content set-var(txn.proto) str(tls) if { req.ssl_hello_type 1 }",
-      "    tcp-request content set-var(txn.proto) str(tcp) unless { req.ssl_hello_type 1 }",
-    );
 
     if (tlsHosts.length > 0) {
+      if (tlsHosts.some((host) => host.hostMatch === "hostPort")) {
+        l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]");
+      }
+      l.push("", `    acl sni_is_name req.ssl_sni -m reg ${HOSTNAME_CHARSET}`);
+      for (const host of tlsHosts) {
+        l.push(`    # ${host.raw}`);
+        l.push(
+          host.hostMatch === "hostPort"
+            ? `    acl ${host.id}_sni var(txn.sni_port) -m reg -i ${escapeForHaproxy(host.hostRegex)}`
+            : `    acl ${host.id}_sni req.ssl_sni -m reg -i ${escapeForHaproxy(host.hostRegex)}`,
+        );
+        if (host.port) l.push(`    acl ${host.id}_port dst_port ${host.port}`);
+      }
+      const tlsConds = tlsHosts.map(tlsCond);
+      // A passthrough is never decrypted and so has no request line; its log
+      // line is its only record, carrying the name, destination and byte
+      // count. Flagged before the rules below reject, so a refused passthrough
+      // is logged too.
+      l.push(
+        "",
+        ...tlsConds.map((cond) => `    tcp-request content set-var(txn.pass) int(1) if ${cond}`),
+        // Reduced to a safe charset, being attacker-controlled.
+        ...tlsConds.map(
+          (cond) =>
+            `    tcp-request content set-var(txn.sni) req.ssl_sni,regsub([^A-Za-z0-9._-],_,g) if ${cond}`,
+        ),
+        // Only a ClientHello matches a tls rule.
+        "    tcp-request content set-var(txn.proto) str(tls) if { var(txn.pass) -m found }",
+      );
+
       // The SNI is resolved here and connected to, as on the inspected path:
       // an SNI is not a destination, so a ClientHello with an allowed
       // name must not become a tunnel to an address of the build's choosing.
@@ -139,19 +152,6 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
         "    tcp-request content set-var(txn.reason) str(internal-address) " +
           "if { var(txn.tlsrule) -m found } pass_dst_internal",
         "    tcp-request content reject if { var(txn.tlsrule) -m found } pass_dst_internal",
-      );
-    }
-    if (ipRules.length > 0) {
-      // An IP rule wide enough to cover one of the proxy's own addresses would
-      // pass a connection to this listener back into it, without end. A tls
-      // rule's passthrough also sets txn.pass, but its destination was
-      // replaced and checked above.
-      const self = `{ var(txn.pass) -m found } ip_dst_internal { dst_port ${listenPort} }`;
-      l.push(
-        "",
-        ...internalDstAcl("ip_dst_internal", spec, "dst"),
-        `    tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
-        `    tcp-request content reject if ${self}`,
       );
     }
 

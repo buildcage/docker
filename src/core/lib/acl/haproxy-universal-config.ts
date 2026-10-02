@@ -120,6 +120,25 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    tcp-request content set-var-fmt(txn.dst_target) %[dst]:%[dst_port]",
     ...aclLines("is_ip_match", "var(txn.dst_target)", ip),
     "",
+    "    # ---------------------------------------------------------",
+    "    # 1. IP direct access (non DNS-routed)",
+    "    # ---------------------------------------------------------",
+    // Ahead of every rule that reads the client's first bytes: an IP rule needs
+    // none, and a client waiting for the server to speak first would otherwise
+    // sit out the whole inspect-delay.
+    "    tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
+    // A passthrough to the proxy's own listener comes straight back in, without
+    // end. audit's IP list matches anything, so this covers it too.
+    ...internalDstAcl("ip_dst_internal", guard, "dst"),
+    `    tcp-request content set-var(txn.reason) str(internal-address) if ${toSelf}`,
+    `    tcp-request content reject if ${toSelf}`,
+    `    tcp-request content set-var(txn.decision) str(${decision}) if !is_dns_routed is_ip_match`,
+    "    tcp-request content accept if !is_dns_routed is_ip_match",
+    "",
+    ...(audit ? ["    tcp-request content accept if !is_dns_routed !is_ip_match"] : []),
+    "    tcp-request content set-var(txn.reason) str(ip-not-allowed) if !is_dns_routed !is_ip_match",
+    "    tcp-request content reject if !is_dns_routed !is_ip_match",
+    "",
     // A trailing dot denotes the same DNS name, so it must not affect
     // matching, resolution or logging. Stripped once here, upstream of every
     // other use.
@@ -133,22 +152,6 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "",
     ...aclLines("is_https_allowed", "var(txn.sni_port)", https),
     `    acl sni_is_name var(txn.sni) -m reg ${HOSTNAME_CHARSET}`,
-    "",
-    "    # ---------------------------------------------------------",
-    "    # 1. IP direct access (non DNS-routed)",
-    "    # ---------------------------------------------------------",
-    "    tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
-    // A passthrough to the proxy's own listener comes straight back in, without
-    // end. audit's IP list matches anything, so this covers it too.
-    ...internalDstAcl("ip_dst_internal", guard, "dst"),
-    `    tcp-request content set-var(txn.reason) str(internal-address) if ${toSelf}`,
-    `    tcp-request content reject if ${toSelf}`,
-    `    tcp-request content set-var(txn.decision) str(${decision}) if !is_dns_routed is_ip_match`,
-    "    tcp-request content accept if !is_dns_routed is_ip_match",
-    "",
-    ...(audit ? ["    tcp-request content accept if !is_dns_routed !is_ip_match"] : []),
-    "    tcp-request content set-var(txn.reason) str(ip-not-allowed) if !is_dns_routed !is_ip_match",
-    "    tcp-request content reject if !is_dns_routed !is_ip_match",
     "",
     // Only after the IP section, so an IP row logs the address it went to.
     "    tcp-request content set-var-fmt(txn.target) %[var(txn.sni_log)]:%[dst_port] if is_tls has_sni",

@@ -184,6 +184,21 @@ describe("outbound_proxy", () => {
   });
 });
 
+describe("an IP rule's connection", () => {
+  for (const mode of ["restrict", "audit"] as const) {
+    it(`is accepted in ${mode} without waiting for the client to speak`, () => {
+      // A rule reading the request buffer holds evaluation until bytes arrive
+      // or inspect-delay runs out, which a server-first client never ends.
+      const rules = lines(gen({ mode, ipRules: IP })).filter((l) =>
+        l.startsWith("tcp-request content"),
+      );
+      const accept = rules.indexOf("tcp-request content accept if !is_dns_routed is_ip_match");
+      expect(accept).not.toBe(-1);
+      expect(rules.slice(0, accept).some((l) => /req[._]|is_tls|has_sni/.test(l))).toBe(false);
+    });
+  }
+});
+
 describe("plaintext request timeout", () => {
   it("ends a silent client's wait before outbound_proxy's client timeout does", () => {
     // outbound_proxy's clock starts at the connection, http_in's only after the

@@ -74,8 +74,23 @@ describe("passthrough", () => {
     // set-var or do-resolve placed after it never runs, silently, with the
     // passthrough still working but going to the client's own address.
     const resolve = config.indexOf("tcp-request content do-resolve");
-    const accept = config.indexOf("tcp-request content accept");
+    const accept = config.indexOf("tcp-request content accept if { req.ssl_hello_type 1 }");
     expect(resolve !== -1 && resolve < accept).toBe(true);
+  });
+
+  it("passes an ip rule's connection through without waiting for the client to speak", () => {
+    // A rule reading the request buffer holds evaluation until bytes arrive or
+    // inspect-delay runs out, which a server-first client never ends.
+    const rules = config.split("\n").filter((l) => l.includes("tcp-request content"));
+    const accept = rules.indexOf("    tcp-request content accept if { var(txn.pass) -m found }");
+    expect(accept).not.toBe(-1);
+    const before = rules.slice(0, accept);
+    expect(before.some((l) => /req[._]|tls0_|sni_is_name/.test(l))).toBe(false);
+    expect(
+      before.includes(
+        "    tcp-request content set-var(txn.proto) str(tcp) if { var(txn.pass) -m found }",
+      ),
+    ).toBe(true);
   });
 
   it("connects a passthrough where it resolved the SNI, not where the client aimed", () => {

@@ -269,8 +269,10 @@ so a rule naming a host is refused at setup. A `~` rule is not checked for this:
 the address and port as digits, since one that names a host matches nothing. A range that covers the
 proxy's own address, which every name resolves to inside the cage, still leaves a connection made
 through a name to the domain rules. Either way the connection is tunnelled without inspection: once
-an `ip:port` pair is allowed, any TCP-based protocol can use that path. Prefer a domain rule where
-the destination has a stable name.
+an `ip:port` pair is allowed, any TCP-based protocol can use that path. It is connected as soon as
+it arrives, without waiting for the client to send anything, so a protocol where the server speaks
+first (SMTP, MySQL) works too, and the report records it as `TCP` whatever it carries. Prefer a
+domain rule where the destination has a stable name.
 
 ### TLS passthrough: `allowed_tls_rules`
 
