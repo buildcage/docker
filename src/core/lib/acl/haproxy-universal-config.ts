@@ -34,6 +34,8 @@ interface Pattern {
 
 const MATCH_ANYTHING: Pattern[] = [{ raw: null, regex: ".*" }];
 
+const LISTEN_PORT = 10024;
+
 /**
  * A host rule as one regex over `name:port`, which is how this engine matches
  * it. A `~` rule's own regex already covers the port.
@@ -64,6 +66,7 @@ function aclLines(name: string, fetch: string, patterns: Pattern[]): string[] {
  */
 export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOptions): string {
   const audit = options.mode === "audit";
+  const toSelf = `!is_dns_routed is_ip_match ip_dst_internal { dst_port ${LISTEN_PORT} }`;
   let https = MATCH_ANYTHING;
   let http = MATCH_ANYTHING;
   let ip = MATCH_ANYTHING;
@@ -94,7 +97,7 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     ...resolversSection(),
     "# --- Frontend ---",
     "frontend outbound_proxy",
-    "    bind *:10024",
+    `    bind *:${LISTEN_PORT}`,
     "    tcp-request inspect-delay 5s",
     "",
     // Any reject leaves txn.decision at BLOCKED; only a connection that
@@ -135,11 +138,11 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    # 1. IP direct access (non DNS-routed)",
     "    # ---------------------------------------------------------",
     "    tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
-    // The proxy's own listener, on an address an IP rule (or audit) would pass
-    // the connection through to, would take it back in without end.
+    // A passthrough to the proxy's own listener comes straight back in, without
+    // end. audit's IP list matches anything, so this covers it too.
     ...internalDstAcl("ip_dst_internal", guard, "dst"),
-    "    tcp-request content set-var(txn.reason) str(internal-address) if !is_dns_routed ip_dst_internal { dst_port 10024 }",
-    "    tcp-request content reject if !is_dns_routed ip_dst_internal { dst_port 10024 }",
+    `    tcp-request content set-var(txn.reason) str(internal-address) if ${toSelf}`,
+    `    tcp-request content reject if ${toSelf}`,
     `    tcp-request content set-var(txn.decision) str(${decision}) if !is_dns_routed is_ip_match`,
     "    tcp-request content accept if !is_dns_routed is_ip_match",
     "",

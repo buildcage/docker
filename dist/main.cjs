@@ -8020,7 +8020,7 @@ function generateHaproxyConfig(options) {
 const MATCH_ANYTHING = [{
 	raw: null,
 	regex: ".*"
-}];
+}], LISTEN_PORT = 10024;
 function hostPortRegex(rule) {
 	return rule.hostMatch === "hostPort" ? rule.hostRegex : `${rule.hostRegex.slice(0, -1)}:${rule.port ?? "\\d+"}$`;
 }
@@ -8028,7 +8028,7 @@ function aclLines(name, fetch, patterns) {
 	return patterns.length === 0 ? [`    acl ${name} always_false`] : patterns.flatMap(({ raw, regex }) => [...raw === null ? [] : [`    # ${raw}`], `    acl ${name} ${fetch} -m reg -i ${escapeForHaproxy(regex)}`]);
 }
 function generateUniversalHaproxyConfig(options) {
-	let audit = options.mode === "audit", https = MATCH_ANYTHING, http = MATCH_ANYTHING, ip = MATCH_ANYTHING;
+	let audit = options.mode === "audit", toSelf = `!is_dns_routed is_ip_match ip_dst_internal { dst_port ${LISTEN_PORT} }`, https = MATCH_ANYTHING, http = MATCH_ANYTHING, ip = MATCH_ANYTHING;
 	if (!audit) {
 		[...options.httpsRules ?? [], ...options.httpRules ?? []].forEach(convertRule);
 		let compiled = compileRuleSet(options);
@@ -8059,7 +8059,7 @@ function generateUniversalHaproxyConfig(options) {
 		...resolversSection(),
 		"# --- Frontend ---",
 		"frontend outbound_proxy",
-		"    bind *:10024",
+		`    bind *:${LISTEN_PORT}`,
 		"    tcp-request inspect-delay 5s",
 		"",
 		"    tcp-request content set-var(txn.decision) str(BLOCKED)",
@@ -8088,8 +8088,8 @@ function generateUniversalHaproxyConfig(options) {
 		"    # ---------------------------------------------------------",
 		"    tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
 		...internalDstAcl("ip_dst_internal", guard, "dst"),
-		"    tcp-request content set-var(txn.reason) str(internal-address) if !is_dns_routed ip_dst_internal { dst_port 10024 }",
-		"    tcp-request content reject if !is_dns_routed ip_dst_internal { dst_port 10024 }",
+		`    tcp-request content set-var(txn.reason) str(internal-address) if ${toSelf}`,
+		`    tcp-request content reject if ${toSelf}`,
 		`    tcp-request content set-var(txn.decision) str(${decision}) if !is_dns_routed is_ip_match`,
 		"    tcp-request content accept if !is_dns_routed is_ip_match",
 		"",

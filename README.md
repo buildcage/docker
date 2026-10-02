@@ -533,7 +533,7 @@ reported as blocked; see
 An allowlisted name that resolves to cloud metadata, to loopback, or to an address the runner itself
 holds is refused, so a compromised name cannot turn the proxy into a route back into the runner. A
 mirror or registry running on the runner is therefore not reachable by name: allow it with
-`allowed_ip_rules`, which never goes through that guard. See
+`allowed_ip_rules`, which skips that guard. See
 [A name may not resolve inward](./docs/security.md#a-name-may-not-resolve-inward).
 
 ### What the audit allowlist covers

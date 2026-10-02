@@ -144,8 +144,8 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
     if (ipRules.length > 0) {
       // An IP rule wide enough to cover one of the proxy's own addresses would
       // pass a connection to this listener back into it, without end. A tls
-      // rule's destination was replaced above, so only an IP rule's is left
-      // as the client chose it.
+      // rule's passthrough also sets txn.pass, but its destination was
+      // replaced and checked above.
       const self = `{ var(txn.pass) -m found } ip_dst_internal { dst_port ${listenPort} }`;
       l.push(
         "",
