@@ -28,7 +28,7 @@ let node_url = require("node:url"), node_fs = require("node:fs");
 node_fs = __toESM(node_fs, 1);
 let node_os = require("node:os");
 node_os = __toESM(node_os, 1);
-let node_path = require("node:path"), node_child_process = require("node:child_process"), node_events = require("node:events"), node_readline = require("node:readline"), node_crypto = require("node:crypto"), os = require("os");
+let node_path = require("node:path"), os = require("os");
 os = __toESM(os, 1);
 let crypto = require("crypto");
 crypto = __toESM(crypto, 1);
@@ -50,11 +50,11 @@ let node_buffer = require("node:buffer");
 node_buffer = __toESM(node_buffer, 1);
 let node_util = require("node:util");
 node_util = __toESM(node_util, 1);
-let node_zlib = require("node:zlib");
+let node_events = require("node:events"), node_zlib = require("node:zlib");
 node_zlib = __toESM(node_zlib, 1);
-let child_process = require("child_process");
+let node_crypto = require("node:crypto"), child_process = require("child_process");
 child_process = __toESM(child_process, 1), require("timers");
-let node_process = require("node:process");
+let node_child_process = require("node:child_process"), node_readline = require("node:readline"), node_process = require("node:process");
 node_process = __toESM(node_process, 1);
 let node_https = require("node:https");
 node_https = __toESM(node_https, 1);
@@ -101,211 +101,6 @@ function exitOnFatalError(context) {
 	return (err) => {
 		err instanceof ActionError ? annotate.error(err.message) : annotate.error(`Unexpected error in ${context}: ${errorMessage(err)}`), process.exit(1);
 	};
-}
-//#endregion
-//#region src/core/lib/docker/args.ts
-function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
-	return [
-		"cp",
-		`${containerName}:${containerPath}`,
-		hostPath
-	];
-}
-//#endregion
-//#region src/core/lib/docker/container-env.ts
-function parseDockerInspectEnv(inspectOutput) {
-	let entries = JSON.parse(inspectOutput), env = {};
-	for (let entry of entries) {
-		let i = entry.indexOf("=");
-		i !== -1 && (env[entry.slice(0, i)] = entry.slice(i + 1));
-	}
-	return env;
-}
-function parseDockerInspectLabels(inspectOutput) {
-	return JSON.parse(inspectOutput) ?? {};
-}
-//#endregion
-//#region src/core/lib/docker/client.ts
-function parseContainerIds(psOutput) {
-	return psOutput.split("\n").map((s) => s.trim()).filter(Boolean);
-}
-function defaultRunCommand(args) {
-	return (0, node_child_process.execFileSync)("docker", args, {
-		encoding: "utf8",
-		stdio: [
-			"ignore",
-			"pipe",
-			"pipe"
-		],
-		maxBuffer: 67108864
-	});
-}
-function defaultSpawnCommand(args) {
-	return (0, node_child_process.spawn)("docker", args, { stdio: [
-		"ignore",
-		"pipe",
-		"pipe"
-	] });
-}
-async function* streamDockerLines(spawnDocker, args, operation) {
-	let child = spawnDocker(args), spawnError;
-	child.on("error", (err) => {
-		spawnError = err;
-	});
-	let closed = (0, node_events.once)(child, "close").then(([code, signal]) => ({
-		code,
-		signal
-	}), () => ({
-		code: null,
-		signal: null
-	})), stderr = "";
-	child.stderr?.setEncoding("utf8"), child.stderr?.on("data", (chunk) => {
-		stderr += chunk;
-	});
-	let rl = (0, node_readline.createInterface)({
-		input: child.stdout,
-		crlfDelay: Infinity
-	}), exhausted = !1;
-	try {
-		for await (let line of rl) yield line;
-		exhausted = !0;
-	} finally {
-		rl.close(), !exhausted && child.exitCode === null && child.signalCode === null && child.kill();
-	}
-	let { code, signal } = await closed;
-	if (spawnError) throw spawnError;
-	if (code !== 0) throw Object.assign(Error(`${operation} exited with code ${code}${signal ? ` (signal ${signal})` : ""}: ${stderr.trim()}`), {
-		status: code ?? void 0,
-		stderr
-	});
-}
-function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand) {
-	return {
-		findContainers(filters) {
-			let args = ["ps"];
-			for (let filter of filters) args.push("--filter", filter);
-			return args.push("--format", "{{.ID}}"), parseContainerIds(run(args));
-		},
-		copyFromContainer(containerId, containerPath, hostPath) {
-			run(buildDockerCpArgs({
-				containerName: containerId,
-				containerPath,
-				hostPath
-			}));
-		},
-		readFileLines(containerId, path) {
-			return streamDockerLines(spawnDocker, [
-				"exec",
-				containerId,
-				"cat",
-				path
-			], `docker exec cat ${path}`);
-		},
-		readEnv(containerId) {
-			return parseDockerInspectEnv(run([
-				"inspect",
-				containerId,
-				"--format",
-				"{{json .Config.Env}}"
-			]));
-		},
-		readLabels(containerId) {
-			return parseDockerInspectLabels(run([
-				"inspect",
-				containerId,
-				"--format",
-				"{{json .Config.Labels}}"
-			]));
-		},
-		exec(containerId, args) {
-			return run([
-				"exec",
-				containerId,
-				...args
-			]);
-		}
-	};
-}
-//#endregion
-//#region src/core/lib/docker/compose-project-name.ts
-function deriveProjectName(containerName) {
-	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
-}
-function resolveProjectName(builderName, composeProjectNameOverride) {
-	return composeProjectNameOverride || deriveProjectName(builderName);
-}
-function capturedStderr(e) {
-	let err = e && typeof e == "object" ? e : {};
-	return typeof err.stderr == "string" ? err.stderr.trim() : "";
-}
-function describeDockerFailure(e, { operation = "docker", env = process.env, exists = node_fs.existsSync } = {}) {
-	let err = e && typeof e == "object" ? e : {}, slimNote = isLikelySlimRunner(env, exists) ? " Detected a container-based GitHub-hosted runner image (e.g. \"ubuntu-slim\"): these ship a Docker client with no daemon and are not supported for this action." : "", whatHappened;
-	if (err.code === "ENOENT") whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
-	else {
-		let captured = capturedStderr(e);
-		whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
-	}
-	return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner, on Docker Engine 25.0 or later with Compose v2.20.2 or later. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action. Use "ubuntu-latest", or another runner with a full Docker install, instead. See README.md and docs/security.md for details.`;
-}
-function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
-	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
-}
-//#endregion
-//#region report/src/lib/errors.ts
-var ReportError = class extends ActionError {};
-//#endregion
-//#region report/src/lib/copy-from-image.ts
-const runDocker = (args) => (0, node_child_process.execFileSync)("docker", args, {
-	encoding: "utf8",
-	stdio: [
-		"ignore",
-		"pipe",
-		"pipe"
-	]
-});
-function copyFromContainerImage(containerId, containerPath, hostPath, run = runDocker) {
-	let imageId = step("docker inspect (resolving the builder's image)", () => run([
-		"inspect",
-		containerId,
-		"--format",
-		"{{.Image}}"
-	]).trim());
-	if (!imageId) throw new ReportError(`docker inspect reported no image for container ${containerId}`, "DOCKER_UNAVAILABLE");
-	let scratchId = step("docker create (making a scratch container from the builder's image)", () => run(["create", imageId]).trim());
-	try {
-		step(`docker cp (fetching ${containerPath} from the builder image)`, () => run([
-			"cp",
-			`${scratchId}:${containerPath}`,
-			hostPath
-		]));
-	} finally {
-		try {
-			run([
-				"rm",
-				"-f",
-				scratchId
-			]);
-		} catch {}
-	}
-}
-function step(operation, call) {
-	try {
-		return call();
-	} catch (e) {
-		throw new ReportError(describeDockerFailure(e, { operation }), "DOCKER_UNAVAILABLE");
-	}
-}
-//#endregion
-//#region report/src/lib/find-report-source.ts
-function findReportSourceContainer(docker, projectName, builderName) {
-	let ids;
-	try {
-		ids = docker.findContainers([`label=com.docker.compose.project=${projectName}`, "label=io.github.buildcage.report-source=true"]);
-	} catch (e) {
-		throw new ReportError(describeDockerFailure(e, { operation: "docker ps" }), "DOCKER_UNAVAILABLE");
-	}
-	if (ids.length !== 1) throw new ReportError(`Expected exactly one buildcage container for builder_name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder_name?`, "CONTAINER_NOT_FOUND");
-	return ids[0];
 }
 //#endregion
 //#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/utils.js
@@ -10909,7 +10704,11 @@ var ExitCode, init_core = __esmMin((() => {
 	init_command(), init_utils$4(), init_oidc_utils(), init_summary(), init_platform(), (function(ExitCode) {
 		ExitCode[ExitCode.Success = 0] = "Success", ExitCode[ExitCode.Failure = 1] = "Failure";
 	})(ExitCode ||= {});
-})), InvalidInputError = class extends ActionError {};
+}));
+//#endregion
+//#region src/core/lib/actions/inputs.ts
+init_core();
+var InvalidInputError = class extends ActionError {};
 function readBooleanInput(name, fallback, getInput) {
 	let value = getInput(name);
 	if (value === "") return fallback;
@@ -10932,20 +10731,225 @@ function readRetentionDays(getInput) {
 		return Number(days);
 	}
 }
+function readTrafficArtifactInputs(getInput$3 = getInput) {
+	return {
+		upload: readBooleanInput("upload_traffic_artifact", !1, getInput$3),
+		retentionDays: readRetentionDays(getInput$3)
+	};
+}
+//#endregion
+//#region src/core/lib/docker/args.ts
+function buildDockerCpArgs({ containerName, containerPath, hostPath }) {
+	return [
+		"cp",
+		`${containerName}:${containerPath}`,
+		hostPath
+	];
+}
+//#endregion
+//#region src/core/lib/docker/container-env.ts
+function parseDockerInspectEnv(inspectOutput) {
+	let entries = JSON.parse(inspectOutput), env = {};
+	for (let entry of entries) {
+		let i = entry.indexOf("=");
+		i !== -1 && (env[entry.slice(0, i)] = entry.slice(i + 1));
+	}
+	return env;
+}
+function parseDockerInspectLabels(inspectOutput) {
+	return JSON.parse(inspectOutput) ?? {};
+}
+//#endregion
+//#region src/core/lib/docker/client.ts
+function parseContainerIds(psOutput) {
+	return psOutput.split("\n").map((s) => s.trim()).filter(Boolean);
+}
+function defaultRunCommand(args) {
+	return (0, node_child_process.execFileSync)("docker", args, {
+		encoding: "utf8",
+		stdio: [
+			"ignore",
+			"pipe",
+			"pipe"
+		],
+		maxBuffer: 67108864
+	});
+}
+function defaultSpawnCommand(args) {
+	return (0, node_child_process.spawn)("docker", args, { stdio: [
+		"ignore",
+		"pipe",
+		"pipe"
+	] });
+}
+async function* streamDockerLines(spawnDocker, args, operation) {
+	let child = spawnDocker(args), spawnError;
+	child.on("error", (err) => {
+		spawnError = err;
+	});
+	let closed = (0, node_events.once)(child, "close").then(([code, signal]) => ({
+		code,
+		signal
+	}), () => ({
+		code: null,
+		signal: null
+	})), stderr = "";
+	child.stderr?.setEncoding("utf8"), child.stderr?.on("data", (chunk) => {
+		stderr += chunk;
+	});
+	let rl = (0, node_readline.createInterface)({
+		input: child.stdout,
+		crlfDelay: Infinity
+	}), exhausted = !1;
+	try {
+		for await (let line of rl) yield line;
+		exhausted = !0;
+	} finally {
+		rl.close(), !exhausted && child.exitCode === null && child.signalCode === null && child.kill();
+	}
+	let { code, signal } = await closed;
+	if (spawnError) throw spawnError;
+	if (code !== 0) throw Object.assign(Error(`${operation} exited with code ${code}${signal ? ` (signal ${signal})` : ""}: ${stderr.trim()}`), {
+		status: code ?? void 0,
+		stderr
+	});
+}
+function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand) {
+	return {
+		findContainers(filters) {
+			let args = ["ps"];
+			for (let filter of filters) args.push("--filter", filter);
+			return args.push("--format", "{{.ID}}"), parseContainerIds(run(args));
+		},
+		copyFromContainer(containerId, containerPath, hostPath) {
+			run(buildDockerCpArgs({
+				containerName: containerId,
+				containerPath,
+				hostPath
+			}));
+		},
+		readFileLines(containerId, path) {
+			return streamDockerLines(spawnDocker, [
+				"exec",
+				containerId,
+				"cat",
+				path
+			], `docker exec cat ${path}`);
+		},
+		readEnv(containerId) {
+			return parseDockerInspectEnv(run([
+				"inspect",
+				containerId,
+				"--format",
+				"{{json .Config.Env}}"
+			]));
+		},
+		readLabels(containerId) {
+			return parseDockerInspectLabels(run([
+				"inspect",
+				containerId,
+				"--format",
+				"{{json .Config.Labels}}"
+			]));
+		},
+		exec(containerId, args) {
+			return run([
+				"exec",
+				containerId,
+				...args
+			]);
+		}
+	};
+}
+//#endregion
+//#region src/core/lib/docker/compose-project-name.ts
+function deriveProjectName(containerName) {
+	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
+}
+function resolveProjectName(builderName, composeProjectNameOverride) {
+	return composeProjectNameOverride || deriveProjectName(builderName);
+}
+function capturedStderr(e) {
+	let err = e && typeof e == "object" ? e : {};
+	return typeof err.stderr == "string" ? err.stderr.trim() : "";
+}
+function describeDockerFailure(e, { operation = "docker", env = process.env, exists = node_fs.existsSync } = {}) {
+	let err = e && typeof e == "object" ? e : {}, slimNote = isLikelySlimRunner(env, exists) ? " Detected a container-based GitHub-hosted runner image (e.g. \"ubuntu-slim\"): these ship a Docker client with no daemon and are not supported for this action." : "", whatHappened;
+	if (err.code === "ENOENT") whatHappened = `The "docker" command was not found on this runner's PATH while running ${operation}.`;
+	else {
+		let captured = capturedStderr(e);
+		whatHappened = `${operation} failed${captured ? `: ${captured}` : " (see the Docker output above for the underlying error)"}.`;
+	}
+	return `${whatHappened}${slimNote} Buildcage requires a working Docker installation (client and daemon) on the runner, on Docker Engine 25.0 or later with Compose v2.20.2 or later. Lightweight runner images such as GitHub-hosted "ubuntu-slim" ship a Docker client but no daemon and are not supported for this action. Use "ubuntu-latest", or another runner with a full Docker install, instead. See README.md and docs/security.md for details.`;
+}
+function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
+	return _env.ImageOS === "Linux" && _exists("/run/.containerenv");
+}
+//#endregion
+//#region report/src/lib/errors.ts
+var ReportError = class extends ActionError {};
+//#endregion
+//#region report/src/lib/copy-from-image.ts
+const runDocker = (args) => (0, node_child_process.execFileSync)("docker", args, {
+	encoding: "utf8",
+	stdio: [
+		"ignore",
+		"pipe",
+		"pipe"
+	]
+});
+function copyFromContainerImage(containerId, containerPath, hostPath, run = runDocker) {
+	let imageId = step("docker inspect (resolving the builder's image)", () => run([
+		"inspect",
+		containerId,
+		"--format",
+		"{{.Image}}"
+	]).trim());
+	if (!imageId) throw new ReportError(`docker inspect reported no image for container ${containerId}`, "DOCKER_UNAVAILABLE");
+	let scratchId = step("docker create (making a scratch container from the builder's image)", () => run(["create", imageId]).trim());
+	try {
+		step(`docker cp (fetching ${containerPath} from the builder image)`, () => run([
+			"cp",
+			`${scratchId}:${containerPath}`,
+			hostPath
+		]));
+	} finally {
+		try {
+			run([
+				"rm",
+				"-f",
+				scratchId
+			]);
+		} catch {}
+	}
+}
+function step(operation, call) {
+	try {
+		return call();
+	} catch (e) {
+		throw new ReportError(describeDockerFailure(e, { operation }), "DOCKER_UNAVAILABLE");
+	}
+}
+//#endregion
+//#region report/src/lib/find-report-source.ts
+function findReportSourceContainer(docker, projectName, builderName) {
+	let ids;
+	try {
+		ids = docker.findContainers([`label=com.docker.compose.project=${projectName}`, "label=io.github.buildcage.report-source=true"]);
+	} catch (e) {
+		throw new ReportError(describeDockerFailure(e, { operation: "docker ps" }), "DOCKER_UNAVAILABLE");
+	}
+	if (ids.length !== 1) throw new ReportError(`Expected exactly one buildcage container for builder_name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder_name?`, "CONTAINER_NOT_FOUND");
+	return ids[0];
+}
 //#endregion
 //#region report/src/lib/inputs.ts
 init_core();
-function readBuilderName(getInput$3 = getInput) {
-	return getInput$3("builder_name") || "buildcage";
+function readBuilderName(getInput$2 = getInput) {
+	return getInput$2("builder_name") || "buildcage";
 }
 function checkFailOnBlocked(getInput$1 = getInput) {
 	readBooleanInput("fail_on_blocked", !0, getInput$1);
-}
-function readTrafficArtifactInputs(getInput$2 = getInput) {
-	return {
-		wanted: readBooleanInput("upload_traffic_artifact", !1, getInput$2),
-		retentionDays: readRetentionDays(getInput$2)
-	};
 }
 //#endregion
 //#region report/src/lib/run-report-script.ts
@@ -56391,7 +56395,7 @@ async function runReportStep(env, overrides = {}) {
 		...overrides
 	}, builderName = readBuilderName();
 	checkFailOnBlocked();
-	let trafficArtifact = readTrafficArtifactInputs(), projectName = resolveProjectName(builderName, void 0), containerId = findReportSourceContainer(createDocker(), projectName, builderName), scratchDir = makeScratchDir(), trafficFile = trafficArtifact.wanted ? (0, node_path.join)(scratchDir, "traffic.json") : void 0;
+	let trafficArtifact = readTrafficArtifactInputs(), projectName = resolveProjectName(builderName, void 0), containerId = findReportSourceContainer(createDocker(), projectName, builderName), scratchDir = makeScratchDir(), trafficFile = trafficArtifact.upload ? (0, node_path.join)(scratchDir, "traffic.json") : void 0;
 	try {
 		let reportActionPath = (0, node_path.join)(scratchDir, "report-action.js");
 		copyFromContainerImage(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath), process.exitCode = runReportScript(reportActionPath, containerId, { trafficFile });

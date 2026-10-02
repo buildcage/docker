@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
 
-import { checkFailOnBlocked, readBuilderName, readTrafficArtifactInputs } from "./inputs.ts";
+import { checkFailOnBlocked, readBuilderName } from "./inputs.ts";
 
 /** Stands in for core.getInput, which returns "" for anything unset. */
 function inputs(values: Record<string, string> = {}): (name: string) => string {
@@ -34,38 +34,5 @@ describe("checkFailOnBlocked", () => {
     expect(() => checkFailOnBlocked(inputs({ fail_on_blocked: "yes" }))).toThrow(
       'Invalid fail_on_blocked: "yes". Must be true or false.',
     );
-  });
-});
-
-describe("readTrafficArtifactInputs", () => {
-  // The dev and test invocations run this from source rather than through
-  // action.yml's own defaults.
-  it("uploads nothing and leaves the retention to the repository when unset", () => {
-    expect(readTrafficArtifactInputs(inputs())).toStrictEqual({
-      wanted: false,
-      retentionDays: undefined,
-    });
-  });
-
-  it("reads both inputs", () => {
-    expect(
-      readTrafficArtifactInputs(
-        inputs({ upload_traffic_artifact: "true", traffic_artifact_retention_days: "7" }),
-      ),
-    ).toStrictEqual({ wanted: true, retentionDays: 7 });
-  });
-
-  it("refuses a typo rather than reading it as a no", () => {
-    expect(() => readTrafficArtifactInputs(inputs({ upload_traffic_artifact: "yes" }))).toThrow(
-      'Invalid upload_traffic_artifact: "yes". Must be true or false.',
-    );
-  });
-
-  it("refuses a bad retention even when nothing is uploaded", () => {
-    expect(() =>
-      readTrafficArtifactInputs(
-        inputs({ upload_traffic_artifact: "false", traffic_artifact_retention_days: "0" }),
-      ),
-    ).toThrow(/Invalid traffic_artifact_retention_days/);
   });
 });
