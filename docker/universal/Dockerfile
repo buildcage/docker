@@ -36,7 +36,7 @@ RUN apk add --no-cache curl util-linux-misc && \
     tar -C /usr/local/bin -xz -f /tmp/coredns.tgz coredns
 
 # Bundle the Docker-image scripts (rolldown; see rolldown.scripts.config.js):
-# gen-configs.qjs.ts and report-action.node.ts. Architecture-independent
+# gen-configs-universal.qjs.ts and report-action.node.ts. Architecture-independent
 # output, so pinned to --platform=$BUILDPLATFORM (no QEMU).
 FROM --platform=$BUILDPLATFORM ghcr.io/pnpm/pnpm:11@sha256:e26f380828856f205feaaf42abd157df9ce41bc8e17b662eeaa3379a9638dee0 AS scripts-build
 WORKDIR /build
@@ -108,7 +108,7 @@ COPY docker/common/files/cni.conflist      /etc/buildkit/cni.conflist
 RUN mkdir -p /etc/haproxy/rules /var/log/haproxy
 
 # Writes haproxy.cfg and the Corefile at startup (see init-cfg).
-COPY --from=scripts-build /build/dist/qjs/docker/universal/scripts/gen-configs.js /opt/buildcage/scripts/gen-configs.js
+COPY --from=scripts-build /build/dist/qjs/src/core/scripts/gen-configs-universal.js /opt/buildcage/scripts/gen-configs.js
 
 # Never run inside the image: the report action `docker cp`s it out and runs
 # it on the runner (see report-action.node.ts).

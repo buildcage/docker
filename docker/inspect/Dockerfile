@@ -129,7 +129,7 @@ COPY docker/inspect/files/buildkitd.toml /etc/buildkit/buildkitd.toml
 COPY docker/common/files/cni.conflist    /etc/buildkit/cni.conflist
 
 # Writes haproxy.cfg and the Corefile at startup, both from one rule set in a single run.
-COPY --from=scripts-build /build/dist/qjs/docker/inspect/scripts/gen-configs.js /opt/buildcage/scripts/gen-configs.js
+COPY --from=scripts-build /build/dist/qjs/src/core/scripts/gen-configs-inspect.js /opt/buildcage/scripts/gen-configs.js
 
 # Never run inside the image: the report action `docker cp`s it out and runs
 # it on the runner (see report-action.node.ts).

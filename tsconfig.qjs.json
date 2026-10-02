@@ -12,12 +12,6 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": [
-    "src/core/scripts/**/*.ts",
-    "src/core/lib/acl/**/*.ts",
-    "src/core/lib/test/**/*.ts",
-    "docker/inspect/scripts/**/*.ts",
-    "docker/universal/scripts/**/*.ts"
-  ],
+  "include": ["src/core/scripts/**/*.ts", "src/core/lib/acl/**/*.ts", "src/core/lib/test/**/*.ts"],
   "exclude": ["**/*.property.test.ts", "**/*.golden.test.ts", "**/*.node.ts"]
 }

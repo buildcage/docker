@@ -332,7 +332,8 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │       │                     # log/, report/, docker/, provenance/ and actions/ are Node-only,
 │       │                     # and test/test-shim.ts is the node:test-alike shim *.test.ts uses
 │       │                     # under either runtime
-│       └── scripts/          # The QuickJS test runner and qjs's type declarations
+│       └── scripts/          # QuickJS only: each engine's config generator, the test runner
+│                             # and qjs's type declarations
 ├── dist/                     # Bundled output (rolldown → CommonJS), committed. dist/qjs,
 │                             # dist/qjs-test and dist/report-action are gitignored scratch
 ├── docker/                   # proxy_engine build contexts
@@ -357,12 +358,13 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 └── Makefile                  # Operational commands
 ```
 
-Every engine directory carries a `scripts/` of its own. `report-action.node.ts` is in both, and
-runs under Node on the runner after the report action copies it out of the image. Beside it,
-`gen-configs.qjs.ts` runs under QuickJS when the container starts and writes haproxy.cfg and the
-Corefile from the rules, through the generators in `src/core/lib/acl/` (`haproxy-config.ts` for
-`inspect`, `haproxy-universal-config.ts` for `universal`). rolldown bundles it into
-`/opt/buildcage/scripts/` at image build time, and `tsconfig.qjs.json` type-checks it.
+Every engine directory carries a `scripts/report-action.node.ts`, which runs under Node on the
+runner after the report action copies it out of the image. Each engine's config generator is
+`src/core/scripts/gen-configs-<engine>.qjs.ts`: it runs under QuickJS when the container starts and
+writes haproxy.cfg and the Corefile from the rules, through the generators in `src/core/lib/acl/`
+(`haproxy-config.ts` for `inspect`, `haproxy-universal-config.ts` for `universal`). rolldown bundles
+it into `/opt/buildcage/scripts/gen-configs.js` at image build time, and `tsconfig.qjs.json`
+type-checks it.
 
 Each Dockerfile copies `docker/common/files/` first and the engine's own `files/` on top. An engine
 keeps only what differs: `THIRD_PARTY_LICENSES`, `buildkitd.toml`, the `init-cfg` script that
