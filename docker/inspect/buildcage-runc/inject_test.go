@@ -1037,8 +1037,8 @@ func newSUSEBundle(t *testing.T, withBundle bool) (bundle, rootfs string) {
 	return bundle, rootfs
 }
 
-// The CA goes into SUSE's GnuTLS directory as a file of its own, in the
-// store's mirror, and is gone once the step is over.
+// The CA goes into SUSE's GnuTLS directory through the store's mirror, and is
+// gone once the step is over.
 func TestInjectAddsTheCAToSUSEsCertDir(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newSUSEBundle(t, true)

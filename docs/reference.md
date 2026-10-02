@@ -671,8 +671,8 @@ runc gives every container, so it never reaches a layer. A step that already mou
 that path gets none of the variables that would point there.
 
 On SUSE, GnuTLS reads the certificate directory `/var/lib/ca-certificates/pem` instead of the
-bundle. When the image has that directory, the CA is added to it as a file of its own for the step,
-the same mirrored way as the store, and is gone again before the layer is committed.
+bundle. When the image has it, the CA is added there for the step and taken back out before the
+layer is committed.
 
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
 Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read
