@@ -125,7 +125,7 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    # ---------------------------------------------------------",
     // Ahead of every rule that reads the client's first bytes: an IP rule needs
     // none, and a client waiting for the server to speak first would otherwise
-    // sit out the whole inspect-delay.
+    // sit out inspect-delay.
     "    tcp-request content set-var(txn.rule_type) str(IP) if !is_dns_routed",
     // A passthrough to the proxy's own listener comes straight back in, without
     // end. audit's IP list matches anything, so this covers it too.

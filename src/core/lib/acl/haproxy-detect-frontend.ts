@@ -68,11 +68,11 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
         );
         if (rule.port) l.push(`    acl ${rule.id}_port dst_port ${rule.port}`);
       }
-      // An IP rule reads no byte from the client, so its passthrough is
-      // accepted here, ahead of every rule below that waits for the first
-      // bytes: a client waiting for the server to speak first would otherwise
-      // sit out the whole inspect-delay. It is logged as tcp whatever it
-      // carries, so the report lists it under the IP rule type, as universal's.
+      // An IP rule needs no byte from the client, so its connection is
+      // accepted here, before any rule that waits for one: a client waiting
+      // for the server to speak first would otherwise sit out inspect-delay.
+      // Logged as tcp whatever it carries, so the report lists it under the
+      // IP rule type, as it does under universal.
       // An IP rule wide enough to cover one of the proxy's own addresses would
       // pass a connection to this listener back into it, without end.
       const self = `${pass} ip_dst_internal { dst_port ${listenPort} }`;
@@ -108,8 +108,8 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
       // A passthrough is never decrypted and so has no request line; its log
       // line is its only record, carrying the name, destination and byte
       // count. Flagged before the rules below reject, so a refused passthrough
-      // is logged too. An IP rule's connection is gone by now, so txn.pass
-      // means a tls rule matched, on both its name and its port.
+      // is logged too. IP rule connections were accepted above, so txn.pass
+      // here means a tls rule matched, on both its name and its port.
       l.push(
         "",
         // One line per rule, for the same word-limit reason as ruleBlock's deny.

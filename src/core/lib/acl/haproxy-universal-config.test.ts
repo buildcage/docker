@@ -187,9 +187,9 @@ describe("outbound_proxy", () => {
 describe("an IP rule's connection", () => {
   for (const mode of ["restrict", "audit"] as const) {
     it(`is accepted in ${mode} without waiting for the client to speak`, () => {
-      // A rule reading the request buffer holds evaluation until bytes arrive
-      // or inspect-delay runs out, which a server-first client never ends. So
-      // what runs before this accept is exactly what an IP rule needs.
+      // HAProxy holds a rule that reads the request buffer until bytes arrive
+      // or inspect-delay runs out, and a server-first client sends none. So
+      // only what an IP rule needs may run before this accept.
       const rules = lines(gen({ mode, ipRules: IP })).filter((l) =>
         l.startsWith("tcp-request content"),
       );

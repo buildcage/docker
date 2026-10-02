@@ -271,9 +271,9 @@ proxy's own address, which every name resolves to inside the cage, still leaves 
 through a name to the domain rules. Either way the connection is tunnelled without inspection: once
 an `ip:port` pair is allowed, any TCP-based protocol can use that path. It is connected as soon as
 it arrives, without waiting for the client to send anything, so a protocol where the server speaks
-first (SMTP, MySQL) works too. It goes to the address it was made to whatever name it carries,
-under `inspect` even one an `allowed_tls_rules` entry names, and the report lists it under the `IP`
-rule type. Prefer a domain rule where the destination has a stable name.
+first (SMTP, MySQL) works too. It goes to the address the client connected to whatever name it
+carries (under `inspect`, even one an `allowed_tls_rules` entry names), and the report lists it
+under the `IP` rule type. Prefer a domain rule where the destination has a stable name.
 
 ### TLS passthrough: `allowed_tls_rules`
 

@@ -92,9 +92,9 @@ describe("passthrough", () => {
   });
 
   it("passes an ip rule's connection through without waiting for the client to speak", () => {
-    // A rule reading the request buffer holds evaluation until bytes arrive or
-    // inspect-delay runs out, which a server-first client never ends. So what
-    // runs before this accept is exactly what an ip rule needs, and no more.
+    // HAProxy holds a rule that reads the request buffer until bytes arrive or
+    // inspect-delay runs out, and a server-first client sends none. So only
+    // what an ip rule needs may run before this accept.
     const rules = detect({
       ...FULL,
       ipRules: ["10.0.0.5:5432", "~^10\\.1\\.0\\.\\d+:6379$"],
