@@ -1,6 +1,5 @@
 import type { ProxyEngine } from "#core/lib/actions/inputs.ts";
-
-import { listHostIpv4Addresses } from "./host-addresses.ts";
+import { listHostIpv4Addresses } from "#core/lib/docker/host-addresses.ts";
 
 export interface ComposeEnvOptions {
   builderName: string;
@@ -57,7 +56,7 @@ export function buildComposeEnv(
     KNOWN_BLOCKED_RULES: knownBlockedRules.join("\n"),
     BUILDCAGE_IMAGE_REF: imageRef,
     // Completed engine-side with the compose network's gateway, which does not
-    // exist yet here. See lib/host-addresses.ts.
+    // exist yet here. See core/lib/docker/host-addresses.ts.
     HOST_ADDRESSES: hostAddresses().join(" "),
   };
 }

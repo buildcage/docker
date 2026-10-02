@@ -25,7 +25,7 @@ function fake(interfaces: Interfaces): typeof networkInterfaces {
 
 describe("listHostIpv4Addresses", () => {
   it("collects every bridge and the runner's own LAN address", () => {
-    // Blocking the builder's own gateway alone would leave docker0 as an
+    // Blocking the compose network's own gateway alone would leave docker0 as an
     // equivalent route to the same published ports.
     const addresses = listHostIpv4Addresses({
       networkInterfaces: fake({
