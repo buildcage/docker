@@ -189,7 +189,21 @@ describe("ip rules and the proxy's own address", () => {
   });
 
   it("declares nothing without an ip rule", () => {
-    expect(detect({ tlsRules: ["db.example.com:443"] }).includes("dns_routed")).toBe(false);
+    const result = detect({ tlsRules: FULL.tlsRules });
+    expect(result.includes("dns_routed")).toBe(false);
+    expect(result.includes("ip_dst_internal")).toBe(false);
+  });
+
+  it("refuses a passthrough to the proxy's own listener, and only there", () => {
+    // 0.0.0.0/0 covers the proxy's other addresses, which would loop it into
+    // itself; an outside host's 10024 is still the rule's to allow.
+    const result = detect({ ipRules: ["0.0.0.0/0:*"] });
+    expect(result.includes(`acl ip_dst_internal dst -m ip ${INTERNAL_RANGES.join(" ")}`)).toBe(
+      true,
+    );
+    const self = "{ var(txn.pass) -m found } ip_dst_internal { dst_port 10024 }";
+    expect(result.includes(`set-var(txn.reason) str(internal-address) if ${self}\n`)).toBe(true);
+    expect(result.includes(`tcp-request content reject if ${self}\n`)).toBe(true);
   });
 });
 

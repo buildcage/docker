@@ -27,6 +27,19 @@ describe("the internal-destination acl", () => {
       "    acl dst_internal var(txn.dst) -m ip -f /run/hosts.lst",
     ]);
   });
+
+  it("reads another fetch when given one", () => {
+    expect(
+      internalDstAcl(
+        "ip_dst_internal",
+        { internalAddrs: ADDRS, hostAddressFile: "/run/h.lst" },
+        "dst",
+      ),
+    ).toStrictEqual([
+      "    acl ip_dst_internal dst -m ip 127.0.0.0/8 169.254.0.0/16 198.19.255.1",
+      "    acl ip_dst_internal dst -m ip -f /run/h.lst",
+    ]);
+  });
 });
 
 reportResults();
