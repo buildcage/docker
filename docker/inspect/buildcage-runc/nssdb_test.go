@@ -321,6 +321,11 @@ func TestNSSDBIsLeftAloneWhenItCannotBePlaced(t *testing.T) {
 		"a HOME escaping the rootfs": {env: []string{"HOME=/up"}, template: true, arrange: func(t *testing.T, _, rootfs string) {
 			mustSymlink(t, "../../../../..", filepath.Join(rootfs, "up"))
 		}},
+		"a passwd that is a FIFO": {home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
+			if err := syscall.Mkfifo(filepath.Join(rootfs, "etc/passwd"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}},
 		"a passwd escaping the rootfs": {home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
 			if err := os.RemoveAll(filepath.Join(rootfs, "etc")); err != nil {
 				t.Fatal(err)

@@ -505,6 +505,8 @@ func readNSSTemplate() (map[string][]byte, error) {
 }
 
 // homeOf follows runc: an empty HOME comes from /etc/passwd, falling back to /.
+// The file is opened the way appendCA opens a bundle, so a FIFO an earlier step
+// left there cannot block the wrapper before the step starts.
 func homeOf(s *spec, uid int) string {
 	if home := s.env["HOME"]; home != "" {
 		return home
@@ -513,12 +515,15 @@ func homeOf(s *spec, uid int) string {
 	if err != nil {
 		return "/"
 	}
-	f, err := os.Open(path)
+	f, err := openBundle(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return "/"
 	}
 	defer f.Close()
-	scanner := bufio.NewScanner(io.LimitReader(f, maxPasswdBytes))
+	if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
+		return "/"
+	}
+	scanner := bufio.NewScanner(io.NewSectionReader(f, 0, maxPasswdBytes))
 	for scanner.Scan() {
 		fields := strings.Split(scanner.Text(), ":")
 		if len(fields) != 7 {
