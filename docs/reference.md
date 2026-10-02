@@ -481,10 +481,13 @@ keeps every one either way. Neither kind fails the step, not even with `fail_on_
 rule refused it, so `known_blocked_rules` has nothing to match, and nothing reached an origin. A
 `::warning::` annotation gives the count of those shown.
 
-A protocol where the server speaks first (SMTP, MySQL, FTP) ends here too unless an
-`allowed_ip_rules` or `allowed_tls_rules` entry passes it through: the client waits for a greeting
-and the proxy waits for a request, so no rule is ever reached. Even to a destination nothing allows,
-such a connection is ⚠️ rather than 🚫 and does not fail the step.
+A protocol where the server speaks first (SMTP, MySQL, FTP) ends here too once it reaches the
+plain-HTTP stage: the client waits for a greeting and the proxy waits for a request, so no rule is
+ever reached. Every such connection through a name gets there, and under `inspect` so does one to an
+address no `allowed_ip_rules` entry covers. It is ⚠️ rather than 🚫 even where nothing allows the
+destination, and does not fail the step. With no TLS handshake it never matches
+`allowed_tls_rules`; connecting to the address under an `allowed_ip_rules` entry is what passes it
+through.
 
 ### The ones Buildcage refused
 
