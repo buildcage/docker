@@ -670,6 +670,10 @@ The file holding only this CA is bound read-only at `/dev/buildcage-ca.pem`, on 
 runc gives every container, so it never reaches a layer. A step that already mounts something at
 that path gets none of the variables that would point there.
 
+On SUSE, GnuTLS reads the certificate directory `/var/lib/ca-certificates/pem` instead of the
+bundle. When the image has that directory, the CA is added to it as a file of its own for the step,
+the same mirrored way as the store, and is gone again before the layer is committed.
+
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
 Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read
 `~/.local/share/pki/nssdb` when it does not, so the database is the first of those that exists, or a

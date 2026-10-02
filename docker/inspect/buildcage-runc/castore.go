@@ -40,6 +40,15 @@ var systemCertFiles = []string{
 	"/etc/ssl/cert.pem",
 }
 
+// SUSE's GnuTLS reads its trusted roots from this directory, which
+// /etc/ssl/certs links to, rather than from the store or the anchors. The CA
+// goes in as a file of its own: GnuTLS reads every file there, so it needs no
+// hash link.
+const (
+	suseCertDir  = "/var/lib/ca-certificates/pem"
+	suseCertName = "buildcage.pem"
+)
+
 var (
 	errEscapesRoot     = errors.New("path escapes the rootfs")
 	errTooManySymlinks = errors.New("too many symlinks")

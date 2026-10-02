@@ -1019,3 +1019,95 @@ func TestFinishReportsAFailedLayerSweep(t *testing.T) {
 		t.Error("the anchor directories were left behind")
 	}
 }
+
+// newSUSEBundle lays out SUSE's store: the bundle under /var/lib/ca-certificates,
+// linked from /etc/ssl, beside the certificate directory GnuTLS reads.
+func newSUSEBundle(t *testing.T, withBundle bool) (bundle, rootfs string) {
+	t.Helper()
+	bundle, rootfs = newBundleNoStore(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	pem := filepath.Join(rootfs, "var/lib/ca-certificates/pem")
+	mustMkdirAll(t, pem)
+	mustWriteFile(t, filepath.Join(pem, "root.pem"), "ORIGINAL-ROOT\n")
+	if withBundle {
+		mustWriteFile(t, filepath.Join(rootfs, "var/lib/ca-certificates/ca-bundle.pem"), "ORIGINAL-ROOTS\n")
+		mustMkdirAll(t, filepath.Join(rootfs, "etc/ssl"))
+		mustSymlink(t, "/var/lib/ca-certificates/ca-bundle.pem", filepath.Join(rootfs, "etc/ssl/ca-bundle.pem"))
+	}
+	return bundle, rootfs
+}
+
+// The CA goes into SUSE's GnuTLS directory as a file of its own, in the
+// store's mirror, and is gone once the step is over.
+func TestInjectAddsTheCAToSUSEsCertDir(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newSUSEBundle(t, true)
+
+	in, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mounts := loadMounts(t, bundle)
+	if hasMount(mounts, "/var/lib/ca-certificates/pem") {
+		t.Error("the directory got a mount of its own inside the store's")
+	}
+	scratch, _ := findMount(t, mounts, "/var/lib/ca-certificates")["source"].(string)
+	if got := mustRead(t, filepath.Join(scratch, "pem", suseCertName)); got != string(testCA) {
+		t.Fatalf("the directory's copy holds %q, want the CA alone", got)
+	}
+	if err := in.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(rootfs, "var/lib/ca-certificates/pem", suseCertName)); !os.IsNotExist(err) {
+		t.Fatalf("got %v, want no CA file left in the directory", err)
+	}
+}
+
+// A step that rebuilds the store with update-ca-certificates leaves neither
+// the CA nor a hash link to it in the directory.
+func TestSUSEsCertDirIsCleanAfterARebuild(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newSUSEBundle(t, true)
+
+	in, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratch, _ := findMount(t, loadMounts(t, bundle), "/var/lib/ca-certificates")["source"].(string)
+	pem := filepath.Join(scratch, "pem")
+	if err := os.Remove(filepath.Join(pem, suseCertName)); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(pem, "buildcage_proxy_CA.pem"), string(testCA))
+	mustSymlink(t, "buildcage_proxy_CA.pem", filepath.Join(pem, "0123abcd.0"))
+	mustWriteFile(t, filepath.Join(scratch, "ca-bundle.pem"), "ORIGINAL-ROOTS\n"+string(testCA))
+
+	if err := in.finish(); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(rootfs, "var/lib/ca-certificates/pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "root.pem" {
+		t.Fatalf("the directory holds %v, want only its own root", entries)
+	}
+	if got := mustRead(t, filepath.Join(rootfs, "var/lib/ca-certificates/ca-bundle.pem")); got != "ORIGINAL-ROOTS\n" {
+		t.Fatalf("the bundle holds %q", got)
+	}
+}
+
+// Without a store to fold it into, the directory is mirrored on its own.
+func TestInjectBindsSUSEsCertDirWithoutAStore(t *testing.T) {
+	useFakeRsync(t)
+	bundle, _ := newSUSEBundle(t, false)
+
+	if _, err := inject(bundle, testCA); err != nil {
+		t.Fatal(err)
+	}
+	scratch, _ := findMount(t, loadMounts(t, bundle), "/var/lib/ca-certificates/pem")["source"].(string)
+	if got := mustRead(t, filepath.Join(scratch, suseCertName)); got != string(testCA) {
+		t.Fatalf("the directory's copy holds %q, want the CA alone", got)
+	}
+}
