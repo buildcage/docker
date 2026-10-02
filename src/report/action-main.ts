@@ -114,7 +114,7 @@ export async function runReportAction(
   // summary is written, so a truncated Communication details section can say
   // whether the full list is available as an artifact.
   const trafficFile = env.BUILDCAGE_TRAFFIC_FILE;
-  // Both writes are tried even when one fails, and the failure is thrown after.
+  // Both writes are tried; a failure in either is thrown once both have run.
   const failures: unknown[] = [];
   if (trafficFile) {
     try {

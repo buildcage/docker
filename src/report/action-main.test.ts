@@ -261,7 +261,7 @@ describe("runReportAction's fail_on_blocked fallback", () => {
 });
 
 describe("runReportAction when a write fails", () => {
-  it("still annotates, sets the exit code and writes the traffic file without the summary", async () => {
+  it("annotates, sets the exit code and writes the traffic file when the summary fails", async () => {
     const dir = mkdtempSync(join(tmpdir(), "buildcage-action-main-"));
     const summary = join(dir, "missing", "summary.md");
     const traffic = join(dir, "traffic.json");
@@ -286,13 +286,13 @@ describe("runReportAction when a write fails", () => {
       process.exitCode = previous;
       log.mockRestore();
       vi.unstubAllEnvs();
-      // The failed write left what it was given in the shared buffer.
+      // A failed write leaves its text in core.summary's shared buffer.
       core.summary.emptyBuffer();
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("still writes the summary without the traffic file, then fails", async () => {
+  it("writes the summary when the traffic file fails, then throws", async () => {
     const dir = mkdtempSync(join(tmpdir(), "buildcage-action-main-"));
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     try {
