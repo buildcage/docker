@@ -67,7 +67,7 @@ describe("generateCorednsConfig golden files", () => {
         generateCorednsConfig(compileRuleSet({ httpsRules, httpRules, tlsRules, urlRules }), {
           ...options,
           proxyAddress: options.proxyAddress ?? PROXY,
-        }).config,
+        }),
         new URL(`./__fixtures__/coredns/${name}.conf`, import.meta.url),
       );
     });

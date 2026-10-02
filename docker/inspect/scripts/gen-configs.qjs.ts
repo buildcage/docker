@@ -72,14 +72,8 @@ try {
     { proxyAddress, mode: mode === "audit" ? "audit" : "restrict" },
   );
 
-  // A warning here means a rule cannot be honoured in full, so it has to be
-  // visible in the build log rather than only in a file nobody reads.
-  for (const warning of [...haproxy.warnings, ...coredns.warnings]) {
-    std.err.puts(`buildcage: warning: ${warning}\n`);
-  }
-
-  writeFile(haproxyOut, haproxy.config);
-  writeFile(corefileOut, coredns.config);
+  writeFile(haproxyOut, haproxy);
+  writeFile(corefileOut, coredns);
 } catch (e) {
   // Failing closed: without both files the proxy would either not start or
   // start without an allowlist.

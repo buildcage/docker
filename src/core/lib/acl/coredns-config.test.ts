@@ -9,18 +9,14 @@ import { buildUrlRules } from "./url-rules.ts";
 
 const BASE = { proxyAddress: "198.19.255.1" };
 
-/** Rules and Corefile options in one bag, split apart by `generate` below. */
+/** Rules and Corefile options in one bag, split apart by `gen` below. */
 type CaseOptions = RuleInputs & Partial<CorednsConfigOptions>;
 
-function generate({ httpsRules, httpRules, tlsRules, urlRules, ...options }: CaseOptions = {}) {
+function gen({ httpsRules, httpRules, tlsRules, urlRules, ...options }: CaseOptions = {}) {
   return generateCorednsConfig(compileRuleSet({ httpsRules, httpRules, tlsRules, urlRules }), {
     ...BASE,
     ...options,
   });
-}
-
-function gen(options: CaseOptions = {}): string {
-  return generate(options).config;
 }
 
 /** The allowlist view's CEL expression line, as it would reach CoreDNS. */
@@ -145,11 +141,10 @@ describe("allowlist scope", () => {
   });
 
   it("takes the host from an http url rule, which still has to resolve", () => {
-    const result = generate({
+    const result = gen({
       urlRules: buildUrlRules("GET http://a.example.com/x"),
     });
-    expect(exprLine(result.config).includes("a\\\\.example\\\\.com")).toBe(true);
-    expect(result.warnings.length).toBe(0);
+    expect(exprLine(result).includes("a\\\\.example\\\\.com")).toBe(true);
   });
 
   it("takes the host from a tls rule, which resolves though it is not inspected", () => {
@@ -161,18 +156,17 @@ describe("allowlist scope", () => {
   });
 
   it("takes the host from a ~regex host rule instead of mangling it as a wildcard", () => {
-    const result = generate({
+    const result = gen({
       tlsRules: ["~^.*\\.example\\.com:8443$"],
     });
-    expect(exprLine(result.config).includes(".*\\\\.example\\\\.com")).toBe(true);
+    expect(exprLine(result).includes(".*\\\\.example\\\\.com")).toBe(true);
   });
 
   it("takes the host from a ~regex url rule, with its port stripped from the host match", () => {
-    const result = generate({
+    const result = gen({
       urlRules: buildUrlRules("GET ~^https://a\\.com:8443/x$"),
     });
-    expect(exprLine(result.config).includes("a\\\\.com")).toBe(true);
-    expect(result.warnings.length).toBe(0);
+    expect(exprLine(result).includes("a\\\\.com")).toBe(true);
   });
 });
 

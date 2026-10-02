@@ -41,7 +41,7 @@ const HTTP = ["deb.debian.org:80", "*.ubuntu.com:*"];
 const IP = ["10.0.0.5:5432", "172.16.0.0/12:*", "192.168.*.*:22", "~^10\\.1\\.[0-9]+:6379$"];
 
 describe("rule lists", () => {
-  const config = gen({ httpsRules: HTTPS, httpRules: HTTP, ipRules: IP }).config;
+  const config = gen({ httpsRules: HTTPS, httpRules: HTTP, ipRules: IP });
 
   it("matches each rule with the regex convertRule gives it", () => {
     // Setup validates rules with convertRule, so this is the regex each rule
@@ -68,7 +68,7 @@ describe("rule lists", () => {
   });
 
   it("matches nothing for a list with no rules", () => {
-    const empty = lines(gen().config);
+    const empty = lines(gen());
     for (const name of ["is_ip_match", "is_https_allowed", "is_http_allowed"]) {
       expect(empty.filter((l) => l.startsWith(`acl ${name} `))).toStrictEqual([
         `acl ${name} always_false`,
@@ -80,16 +80,13 @@ describe("rule lists", () => {
     expect(() => gen({ httpsRules: ["a*b.example.com:443"] })).toThrow("mixes");
   });
 
-  it("ignores an IP rule it cannot match, with a warning", () => {
-    const { config: withBad, warnings } = gen({ ipRules: ["10.0.0.1", "10.0.0.2:22"] });
-    expect(patterns(withBad, "is_ip_match")).toStrictEqual(["^10\\.0\\.0\\.2:22$"]);
-    expect(warnings.length).toBe(1);
-    expect(warnings[0]).toMatch("has no port");
+  it("refuses an IP rule with no port, as setup does", () => {
+    expect(() => gen({ ipRules: ["10.0.0.1"] })).toThrow("missing port");
   });
 });
 
 describe("audit", () => {
-  const { config, warnings } = gen({
+  const config = gen({
     mode: "audit",
     httpsRules: ["a*b.example.com:443"],
     ipRules: ["10.0.0.1"],
@@ -99,25 +96,24 @@ describe("audit", () => {
     for (const name of ["is_ip_match", "is_https_allowed", "is_http_allowed"]) {
       expect(patterns(config, name)).toStrictEqual([".*"]);
     }
-    expect(warnings).toStrictEqual([]);
   });
 
   it("logs AUDIT where restrict logs ALLOWED", () => {
     expect(config.includes("str(ALLOWED)")).toBe(false);
     expect(lines(config).filter((l) => l.includes("str(AUDIT)")).length).toBe(3);
-    expect(lines(gen().config).filter((l) => l.includes("str(ALLOWED)")).length).toBe(3);
+    expect(lines(gen()).filter((l) => l.includes("str(ALLOWED)")).length).toBe(3);
   });
 
   it("accepts an unmatched IP connection only in audit", () => {
     const accept = "tcp-request content accept if !is_dns_routed !is_ip_match";
     expect(lines(config).includes(accept)).toBe(true);
-    expect(lines(gen().config).includes(accept)).toBe(false);
+    expect(lines(gen()).includes(accept)).toBe(false);
   });
 });
 
 describe("resolver", () => {
   it("resolves through the container's own /etc/resolv.conf", () => {
-    const config = gen().config;
+    const config = gen();
     expect(lines(config).includes("parse-resolv-conf")).toBe(true);
     expect(config.includes("nameserver")).toBe(false);
   });
@@ -125,7 +121,7 @@ describe("resolver", () => {
   it("retries a failed resolution on the path no inspect-delay caps", () => {
     // Without the second call one transient miss refuses a name the rules
     // allow; without its guard a destination already found is re-resolved.
-    const resolves = lines(gen().config).filter((l) => l.startsWith("http-request do-resolve("));
+    const resolves = lines(gen()).filter((l) => l.startsWith("http-request do-resolve("));
     expect(resolves.length).toBe(2);
     expect(resolves[1].endsWith("unless { var(txn.dst) -m found }")).toBe(true);
   });
@@ -133,7 +129,7 @@ describe("resolver", () => {
 
 describe("internal-address guard", () => {
   // An IP rule naming a metadata address must not open it to a name.
-  const config = gen({ ipRules: ["169.254.169.254:80"] }).config;
+  const config = gen({ ipRules: ["169.254.169.254:80"] });
 
   for (const name of ["dst_internal", "dst_internal_http"]) {
     it(`${name} covers INTERNAL_RANGES, the proxy's network and the runner's addresses`, () => {
@@ -146,7 +142,7 @@ describe("internal-address guard", () => {
 });
 
 describe("outbound_proxy", () => {
-  const all = lines(gen().config);
+  const all = lines(gen());
 
   it("recognises a connection that came through a name by the proxy's address", () => {
     expect(all.includes(`acl is_dns_routed dst ${PROXY_ADDRESS}`)).toBe(true);
@@ -176,7 +172,7 @@ describe("plaintext request timeout", () => {
   it("ends a silent client's wait before outbound_proxy's client timeout does", () => {
     // outbound_proxy's clock starts at the connection, http_in's only after the
     // hand-off.
-    const config = gen().config;
+    const config = gen();
     const seconds = (directive: string, text = config) => {
       const [, n, unit] = new RegExp(`${directive} (\\d+)(s|m)\\n`).exec(text)!;
       return Number(n) * (unit === "m" ? 60 : 1);

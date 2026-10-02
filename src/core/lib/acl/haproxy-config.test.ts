@@ -5,7 +5,7 @@ import { buildUrlRules } from "./url-rules.ts";
 const PROXY_ADDRESS = "198.19.255.1";
 
 function gen(options: Partial<HaproxyConfigOptions> = {}): string {
-  return generateHaproxyConfig({ proxyAddress: PROXY_ADDRESS, ...options }).config;
+  return generateHaproxyConfig({ proxyAddress: PROXY_ADDRESS, ...options });
 }
 
 /** HAProxy's own per-line word cap (MAX_LINE_ARGS); it refuses to start past this. */
@@ -557,13 +557,12 @@ describe("line length", () => {
 
 describe("address wildcards", () => {
   it("matches the address as text rather than approximating a range", () => {
-    const result = generateHaproxyConfig({
+    const config = generateHaproxyConfig({
       ipRules: ["10.0.0.*:5432"],
       proxyAddress: PROXY_ADDRESS,
     });
-    expect(result.warnings.length).toBe(0);
     expect(
-      result.config.includes("acl ip0_dst var(txn.dst_str) -m reg ^10\\\\.0\\\\.0\\\\.[^.]+:5432$"),
+      config.includes("acl ip0_dst var(txn.dst_str) -m reg ^10\\\\.0\\\\.0\\\\.[^.]+:5432$"),
     ).toBe(true);
   });
 });
