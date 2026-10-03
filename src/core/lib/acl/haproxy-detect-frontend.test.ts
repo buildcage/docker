@@ -263,4 +263,16 @@ describe("ip rules and the proxy's own address", () => {
   });
 });
 
+describe("the detect frontend's own log", () => {
+  it("is off without a passthrough rule, which is all it logs", () => {
+    expect(detect().includes("\n    no log\n")).toBe(true);
+  });
+
+  it("logs passthroughs when there is a rule for one", () => {
+    const result = detect(FULL);
+    expect(result.includes("no log")).toBe(false);
+    expect(result.includes("set-log-level silent unless { var(txn.pass) -m found }")).toBe(true);
+  });
+});
+
 reportResults();

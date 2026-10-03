@@ -43,6 +43,11 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
     "    tcp-request inspect-delay 5s",
     "",
   );
+  if (!hasPassthrough) {
+    // Without the passthroughs' log-format below, HAProxy would log every
+    // connection in its default format.
+    l.push("    no log", "");
+  }
   if (hasPassthrough) {
     const pass = "{ var(txn.pass) -m found }";
     l.push("    # Passed through untouched: judged before anything is decrypted.");
