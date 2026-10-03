@@ -231,6 +231,10 @@ Besides the wildcards, a label holds letters, digits, `-` and `_`, and nothing e
 internationalized name in its punycode form (`xn--mnchen-3ya.de`, not `münchen.de`), the form a
 connection carries. A leading, trailing or doubled dot is refused.
 
+A `Host` header ending in a dot (`example.com.`) matches as the name without it. An SNI may not end
+in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, and
+`allowed_https_rules` under `universal`), only `**` or a `~` rule matches such a name.
+
 `**` alone matches an address too: under `**:443`, a request that reaches the proxy through a name
 with `Host: 10.0.0.5` goes to that private address (see
 [A name may not resolve inward](./security.md#a-name-may-not-resolve-inward)). A connection straight

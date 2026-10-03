@@ -1,5 +1,5 @@
 /** Log parsing library for HAProxy's buildcage decision log. */
-import { ruleHost, splitHostPort } from "./authority.ts";
+import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
@@ -56,9 +56,11 @@ const PROTOCOL: Record<string, TrafficProtocol> = {
  */
 const FAILURE_REASONS = new Set(["dns-failed"]);
 
-/** Every name resolves to the proxy's own address, so that one names no host. */
-function hostOf(address: string): string {
-  return address === PROXY_ADDRESS ? UNKNOWN_HOST : ruleHost(address);
+/** Every name resolves to the proxy's own address, so that one names no host.
+ *  An HTTPS line names the SNI. */
+function hostOf(address: string, ruleType?: string): string {
+  if (address === PROXY_ADDRESS) return UNKNOWN_HOST;
+  return ruleType === "HTTPS" ? sniHost(address) : ruleHost(address);
 }
 
 /**
@@ -84,7 +86,7 @@ export async function scanHaproxyLog(
       const [, ms, decision, ruleType, target, reason, bytes] = m;
       if (decision !== passedDecision && decision !== "BLOCKED") continue;
       const { host: address, port } = splitHostPort(target);
-      const host = hostOf(address);
+      const host = hostOf(address, ruleType);
       const failed = decision === "BLOCKED" && FAILURE_REASONS.has(reason);
       const refused = decision === "BLOCKED" && !failed;
       const event: TrafficEvent = {

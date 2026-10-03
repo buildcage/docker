@@ -139,10 +139,9 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    tcp-request content set-var(txn.reason) str(ip-not-allowed) if !is_dns_routed !is_ip_match",
     "    tcp-request content reject if !is_dns_routed !is_ip_match",
     "",
-    // A trailing dot denotes the same DNS name, so it must not affect
-    // matching, resolution or logging. Stripped once here, upstream of every
-    // other use.
-    "    tcp-request content set-var(txn.sni) req_ssl_sni,regsub(\\.$,) if is_tls",
+    // Kept with any trailing dot: RFC 6066 forbids one in an SNI, so such a
+    // name does not match a rule naming the host without it.
+    "    tcp-request content set-var(txn.sni) req_ssl_sni if is_tls",
     "    tcp-request content set-var-fmt(txn.sni_port) %[var(txn.sni)]:%[dst_port] if is_tls",
     // The SNI is attacker-chosen raw bytes that HAProxy copies into
     // log-format verbatim, and +E would only escape " \ ], never LF. So the
@@ -244,7 +243,7 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty",
     '    http-request deny deny_status 400 content-type "text/plain" string "Bad Request: Missing Host Header" if !has_host or !host_not_empty',
     "",
-    // A trailing dot denotes the same DNS name, as for the SNI.
+    // A trailing dot denotes the same DNS name, and HTTP allows one in Host.
     "    http-request set-var(txn.host_only) hdr(host),regsub(:.*$,),regsub(\\.$,)",
     "    http-request set-var-fmt(txn.host_port) %[var(txn.host_only)]:%[dst_port]",
     "",

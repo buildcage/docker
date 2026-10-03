@@ -31,7 +31,8 @@ describe("scanHaproxyLog: properties", () => {
           const line = `buildcage 1787471970000 [${d}] (${rt}) "${h}:${p}" ${r} ${b}`;
           const { events } = await scanHaproxyLog([line], audit);
           const passedDecision = audit ? "AUDIT" : "ALLOWED";
-          const folded = h.toLowerCase().replace(/\.$/, "");
+          // An HTTPS line names the SNI, which keeps its trailing dot.
+          const folded = rt === "HTTPS" ? h.toLowerCase() : h.toLowerCase().replace(/\.$/, "");
 
           if (d === "BLOCKED") {
             expect(events.length).toBe(1);

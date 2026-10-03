@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { ruleHost, splitHostPort } from "./authority.ts";
+import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 
 describe("splitHostPort", () => {
   it("reports no port as undefined", () => {
@@ -50,5 +50,11 @@ describe("ruleHost", () => {
   it("drops one trailing dot", () => {
     expect(ruleHost("example.com.")).toBe("example.com");
     expect(ruleHost("example.com..")).toBe("example.com.");
+  });
+});
+
+describe("sniHost", () => {
+  it("lowercases ASCII and keeps a trailing dot", () => {
+    expect(sniHost("Registry.NPMJS.org.")).toBe("registry.npmjs.org.");
   });
 });
