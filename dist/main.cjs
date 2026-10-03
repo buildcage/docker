@@ -12775,12 +12775,12 @@ function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 }
 //#endregion
 //#region src/core/lib/actions/rule-inputs.ts
-function readRuleInputs(getInput$3 = getInput) {
+function readRuleInputs(getInput$4 = getInput) {
 	let rules = buildACLRules({
-		httpsRulesInput: getInput$3("allowed_https_rules"),
-		httpRulesInput: getInput$3("allowed_http_rules"),
-		ipRulesInput: getInput$3("allowed_ip_rules")
-	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$3("known_blocked_rules")), urlRulesInput = getInput$3("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$3("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
+		httpsRulesInput: getInput$4("allowed_https_rules"),
+		httpRulesInput: getInput$4("allowed_http_rules"),
+		ipRulesInput: getInput$4("allowed_ip_rules")
+	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$4("known_blocked_rules")), urlRulesInput = getInput$4("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$4("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
 	checkRulesCompileOrThrow({
 		...rules,
 		tlsRules,
@@ -12804,17 +12804,17 @@ function resolveProxyEngine(input) {
 }
 //#endregion
 //#region src/lib/inputs.ts
-function readBuilderName(getInput$2 = getInput) {
-	return getInput$2("builder_name") || "buildcage";
+function readBuilderName(getInput$3 = getInput) {
+	return getInput$3("builder_name") || "buildcage";
 }
-function readSetupInputs(getInput$1 = getInput) {
-	let proxyEngine = resolveProxyEngine(getInput$1("proxy_engine")), proxyMode = resolveProxyMode(getInput$1("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$1);
+function readSetupInputs(getInput$2 = getInput) {
+	let proxyEngine = resolveProxyEngine(getInput$2("proxy_engine")), proxyMode = resolveProxyMode(getInput$2("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$2);
 	return {
 		proxyEngine,
-		builderName: readBuilderName(getInput$1),
+		builderName: readBuilderName(getInput$2),
 		proxyMode,
 		failOnCaResidue,
-		...readRuleInputs(getInput$1)
+		...readRuleInputs(getInput$2)
 	};
 }
 //#endregion
