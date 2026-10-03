@@ -64,6 +64,11 @@
       "enabled": false
     },
     {
+      "description": "CoreDNS still publishes its 2016-2017 tags v001 to v011, which Renovate ranks as majors 1 to 11, so only x.y.z releases are candidates.",
+      "matchPackageNames": ["coredns/coredns"],
+      "allowedVersions": "/^v?\\d+\\.\\d+\\.\\d+$/"
+    },
+    {
       "description": "buildcage-runc builds this fork through a replace. The fork also has upstream's tags, which semver ranks above the -buildcage.N prereleases, so only those are candidates. The tags are ours, so no release-age wait.",
       "matchDatasources": ["go"],
       "matchPackageNames": ["github.com/buildcage/go-pkcs12"],
