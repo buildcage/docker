@@ -91,6 +91,14 @@ describe("passthrough", () => {
     expect(resolve !== -1 && resolve < accept).toBe(true);
   });
 
+  it("waits for a ClientHello split across segments before accepting plaintext", () => {
+    // In one rule, `{ req.len gt 0 }` matches the first segment of a
+    // ClientHello and sends TLS down the plaintext path.
+    const tls = config.indexOf("tcp-request content accept if { req.ssl_hello_type 1 }\n");
+    const plain = config.indexOf("tcp-request content accept if { req.len gt 0 }\n");
+    expect(tls !== -1 && tls < plain).toBe(true);
+  });
+
   it("passes an ip rule's connection through without waiting for the client to speak", () => {
     // HAProxy holds a rule that reads the request buffer until bytes arrive or
     // inspect-delay runs out, and a server-first client sends none. So only
