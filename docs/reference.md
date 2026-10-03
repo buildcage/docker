@@ -101,9 +101,11 @@ known_blocked_rules: |
   rules are added to the workflow's.
 - The path is relative to `$GITHUB_WORKSPACE` and must stay inside it, through symlinks too. The
   repository has to be checked out by an earlier step.
-- `config_file` fails the step on `pull_request_target`, and on `workflow_run` triggered by a pull
-  request event: the workspace there can hold the pull request's own code, which could rewrite the
-  file. Set the inputs in the workflow on those events.
+- `config_file` fails the step on `pull_request_target` and `issue_comment`, and on a
+  `workflow_run` triggered by one of them, by any pull request event, or by another `workflow_run`:
+  the workspace there can hold the pull request's own code, which could rewrite the file. Set the
+  inputs in the workflow on those events. On any other event, don't use `config_file` in a workflow
+  that checks out a pull request's ref given as an input.
 
 The rules belong to the builder, not to a Dockerfile: several builds on one builder share them. Give
 a Dockerfile that needs its own policy its own `builder_name` and file.

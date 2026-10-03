@@ -28,8 +28,9 @@ Three things sit outside that model by design.
 
 - **Whoever writes the Dockerfile and the workflow.** The allowlist is configured alongside them, by
   the same people, so Buildcage is not a control against them. A `config_file` is no different. On
-  `pull_request_target`, and `workflow_run` triggered by a pull request, the workspace may hold the
-  pull request's own code, so `config_file` is refused there.
+  `pull_request_target`, `issue_comment`, and a `workflow_run` triggered by a pull request, an issue
+  comment or another `workflow_run`, the workspace may hold the pull request's own code, so
+  `config_file` is refused there.
 - **What buildkitd fetches for itself**, [below](#what-buildkitd-fetches-itself).
 - **Another step in the same job.** Running between `setup` and `report`, an untrusted step can
   reach the proxy container through `docker exec` or `docker cp`, or the host filesystem directly on

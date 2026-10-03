@@ -4972,18 +4972,21 @@ var require_identity = __commonJSMin(((exports) => {
 function inputEnvName(name) {
 	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
 }
+const UNTRUSTED_EVENTS = ["pull_request_target", "issue_comment"];
 function refuseUntrustedEvent(env) {
-	let event = env.GITHUB_EVENT_NAME, triggeredBy;
+	let event = env.GITHUB_EVENT_NAME ?? "", what = event;
 	if (event === "workflow_run") {
+		let runEvent;
 		try {
-			let runEvent = JSON.parse((0, node_fs.readFileSync)(env.GITHUB_EVENT_PATH ?? "", "utf8")).workflow_run?.event;
-			triggeredBy = typeof runEvent == "string" ? runEvent : void 0;
+			runEvent = JSON.parse((0, node_fs.readFileSync)(env.GITHUB_EVENT_PATH ?? "", "utf8")).workflow_run?.event;
 		} catch (e) {
 			throw new ConfigFileError(`config_file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`, "CONFIG_FILE_UNTRUSTED_EVENT");
 		}
-		if (!triggeredBy?.startsWith("pull_request")) return;
-	} else if (event !== "pull_request_target") return;
-	throw new ConfigFileError(`config_file cannot be used on ${triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event}: the workspace may hold a pull request's code, which could then rewrite its own rules. Set the inputs in the workflow instead.`, "CONFIG_FILE_UNTRUSTED_EVENT");
+		if (typeof runEvent != "string") what = "workflow_run with no triggering event";
+		else if (runEvent.startsWith("pull_request") || runEvent === "workflow_run" || UNTRUSTED_EVENTS.includes(runEvent)) what = `workflow_run triggered by ${runEvent}`;
+		else return;
+	} else if (!UNTRUSTED_EVENTS.includes(event)) return;
+	throw new ConfigFileError(`config_file cannot be used on ${what}: the workspace may hold a pull request's code, which could then rewrite its own rules. Set the inputs in the workflow instead.`, "CONFIG_FILE_UNTRUSTED_EVENT");
 }
 function isOutside(root, path) {
 	let inside = (0, node_path.relative)(root, path);

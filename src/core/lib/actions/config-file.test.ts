@@ -150,11 +150,11 @@ describe("applyConfigFile", () => {
   });
 
   describe("on an untrusted event", () => {
-    it("refuses pull_request_target", () => {
+    it.each(["pull_request_target", "issue_comment"])("refuses %s", (event) => {
       expectError(
-        envFor(writeConfig("proxy_mode: audit\n"), { GITHUB_EVENT_NAME: "pull_request_target" }),
+        envFor(writeConfig("proxy_mode: audit\n"), { GITHUB_EVENT_NAME: event }),
         "CONFIG_FILE_UNTRUSTED_EVENT",
-        "config_file cannot be used on pull_request_target: the workspace may hold a pull " +
+        `config_file cannot be used on ${event}: the workspace may hold a pull ` +
           "request's code, which could then rewrite its own rules. Set the inputs in the " +
           "workflow instead.",
       );
@@ -169,24 +169,34 @@ describe("applyConfigFile", () => {
       });
     }
 
-    it.each(["pull_request", "pull_request_target", "pull_request_review"])(
-      "refuses workflow_run triggered by %s",
-      (event) => {
-        expectError(
-          workflowRun(JSON.stringify({ workflow_run: { event } })),
-          "CONFIG_FILE_UNTRUSTED_EVENT",
-          new RegExp(`^config_file cannot be used on workflow_run triggered by ${event}: `),
-        );
-      },
-    );
+    it.each([
+      "pull_request",
+      "pull_request_target",
+      "pull_request_review",
+      "issue_comment",
+      "workflow_run",
+    ])("refuses workflow_run triggered by %s", (event) => {
+      expectError(
+        workflowRun(JSON.stringify({ workflow_run: { event } })),
+        "CONFIG_FILE_UNTRUSTED_EVENT",
+        new RegExp(`^config_file cannot be used on workflow_run triggered by ${event}: `),
+      );
+    });
 
     it.each([
-      ["push", JSON.stringify({ workflow_run: { event: "push" } })],
       ["no trigger event", JSON.stringify({ workflow_run: {} })],
       ["a non-string trigger event", JSON.stringify({ workflow_run: { event: 1 } })],
       ["no workflow_run", "{}"],
-    ])("allows workflow_run with %s", (_, payload) => {
-      const env = workflowRun(payload);
+    ])("refuses workflow_run with %s", (_, payload) => {
+      expectError(
+        workflowRun(payload),
+        "CONFIG_FILE_UNTRUSTED_EVENT",
+        /^config_file cannot be used on workflow_run with no triggering event: /,
+      );
+    });
+
+    it("allows workflow_run triggered by push", () => {
+      const env = workflowRun(JSON.stringify({ workflow_run: { event: "push" } }));
       applyConfigFile(env, INPUTS);
       expect(env.INPUT_PROXY_MODE).toBe("audit");
     });
@@ -199,8 +209,8 @@ describe("applyConfigFile", () => {
       );
     });
 
-    it("allows pull_request", () => {
-      const env = envFor(writeConfig("proxy_mode: audit\n"), { GITHUB_EVENT_NAME: "pull_request" });
+    it.each(["pull_request", "workflow_dispatch"])("allows %s", (event) => {
+      const env = envFor(writeConfig("proxy_mode: audit\n"), { GITHUB_EVENT_NAME: event });
       applyConfigFile(env, INPUTS);
       expect(env.INPUT_PROXY_MODE).toBe("audit");
     });

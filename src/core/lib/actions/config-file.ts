@@ -36,34 +36,45 @@ function inputEnvName(name: string): string {
 }
 
 /**
- * On these events the workflow comes from the default branch, so its own
- * inputs are out of a pull request's reach, but a checkout of the pull
+ * On these events anyone can start a run of the default branch's workflow, so
+ * its own inputs are out of a pull request's reach, but a checkout of the pull
  * request's head would put the file in it: a pull request could then allow
  * whatever it wanted. What the workspace holds can't be told from here, so
- * the event alone decides. The workflow_run test follows actions/checkout's
- * own refusal to check out a pull request there.
+ * the event alone decides. A workflow_run triggered by another workflow_run
+ * is refused too, as the payload doesn't say what started the chain.
  */
+const UNTRUSTED_EVENTS = ["pull_request_target", "issue_comment"];
+
 function refuseUntrustedEvent(env: NodeJS.ProcessEnv): void {
-  const event = env.GITHUB_EVENT_NAME;
-  let triggeredBy: string | undefined;
+  const event = env.GITHUB_EVENT_NAME ?? "";
+  let what = event;
   if (event === "workflow_run") {
+    let runEvent: unknown;
     try {
       const payload = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH ?? "", "utf8")) as {
         workflow_run?: { event?: unknown };
       };
-      const runEvent = payload.workflow_run?.event;
-      triggeredBy = typeof runEvent === "string" ? runEvent : undefined;
+      runEvent = payload.workflow_run?.event;
     } catch (e) {
       throw new ConfigFileError(
         `config_file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`,
         "CONFIG_FILE_UNTRUSTED_EVENT",
       );
     }
-    if (!triggeredBy?.startsWith("pull_request")) return;
-  } else if (event !== "pull_request_target") {
+    if (typeof runEvent !== "string") {
+      what = "workflow_run with no triggering event";
+    } else if (
+      runEvent.startsWith("pull_request") ||
+      runEvent === "workflow_run" ||
+      UNTRUSTED_EVENTS.includes(runEvent)
+    ) {
+      what = `workflow_run triggered by ${runEvent}`;
+    } else {
+      return;
+    }
+  } else if (!UNTRUSTED_EVENTS.includes(event)) {
     return;
   }
-  const what = triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event;
   throw new ConfigFileError(
     `config_file cannot be used on ${what}: the workspace may hold a pull request's ` +
       `code, which could then rewrite its own rules. Set the inputs in the workflow instead.`,
