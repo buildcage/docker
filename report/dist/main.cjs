@@ -42304,7 +42304,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 })), require_brace_expansion = __commonJSMin(((exports, module) => {
 	var balanced = require_balanced_match();
 	module.exports = expandTop;
-	var escSlash = "\0SLASH" + Math.random() + "\0", escOpen = "\0OPEN" + Math.random() + "\0", escClose = "\0CLOSE" + Math.random() + "\0", escComma = "\0COMMA" + Math.random() + "\0", escPeriod = "\0PERIOD" + Math.random() + "\0", EXPANSION_MAX = 1e5, EXPANSION_MAX_LENGTH = 4e6;
+	var escSlash = "\0SLASH" + Math.random() + "\0", escOpen = "\0OPEN" + Math.random() + "\0", escClose = "\0CLOSE" + Math.random() + "\0", escComma = "\0COMMA" + Math.random() + "\0", escPeriod = "\0PERIOD" + Math.random() + "\0", EXPANSION_MAX = 1e5, EXPANSION_MAX_LENGTH = 4e6, EXPANSION_MAX_DEPTH = 1e3, EXPANSION_MAX_REWRITES = 1e3;
 	function numeric(str) {
 		return parseInt(str, 10) == str ? parseInt(str, 10) : str.charCodeAt(0);
 	}
@@ -42314,20 +42314,26 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	function unescapeBraces(str) {
 		return str.split(escSlash).join("\\").split(escOpen).join("{").split(escClose).join("}").split(escComma).join(",").split(escPeriod).join(".");
 	}
+	function pushAll(target, items) {
+		for (var i = 0; i < items.length; i++) target.push(items[i]);
+	}
 	function parseCommaParts(str) {
-		if (!str) return [""];
-		var parts = [], m = balanced("{", "}", str);
-		if (!m) return str.split(",");
-		var pre = m.pre, body = m.body, post = m.post, p = pre.split(",");
-		p[p.length - 1] += "{" + body + "}";
-		var postParts = parseCommaParts(post);
-		return post.length && (p[p.length - 1] += postParts.shift(), p.push.apply(p, postParts)), parts.push.apply(parts, p), parts;
+		for (var parts = [], carry = "";;) {
+			var m = balanced("{", "}", str);
+			if (!m) {
+				var tail = str.split(",");
+				return tail[0] = carry + tail[0], pushAll(parts, tail), parts;
+			}
+			var pre = m.pre, body = m.body, post = m.post, p = pre.split(",");
+			if (p[0] = carry + p[0], p[p.length - 1] += "{" + body + "}", !post.length) return pushAll(parts, p), parts;
+			carry = p.pop(), pushAll(parts, p), str = post;
+		}
 	}
 	function expandTop(str, options) {
 		if (!str) return [];
 		options ||= {};
-		var max = options.max == null ? EXPANSION_MAX : options.max, maxLength = options.maxLength == null ? EXPANSION_MAX_LENGTH : options.maxLength;
-		return str.substr(0, 2) === "{}" && (str = "\\{\\}" + str.substr(2)), expand(escapeBraces(str), max, maxLength, !0).map(unescapeBraces);
+		var max = options.max == null ? EXPANSION_MAX : options.max, maxLength = options.maxLength == null ? EXPANSION_MAX_LENGTH : options.maxLength, maxDepth = options.maxDepth == null ? EXPANSION_MAX_DEPTH : options.maxDepth, maxRewrites = options.maxRewrites == null ? EXPANSION_MAX_REWRITES : options.maxRewrites;
+		return str.substr(0, 2) === "{}" && (str = "\\{\\}" + str.substr(2)), expand(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, !0).map(unescapeBraces);
 	}
 	function embrace(str) {
 		return "{" + str + "}";
@@ -42372,8 +42378,9 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		}
 		return N;
 	}
-	function expand(str, max, maxLength, isTop) {
-		for (var acc = [""], dropEmpties = !1, firstGroup = !0;;) {
+	function expand(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
+		if (depth > maxDepth) return [str];
+		for (var acc = [""], rewrites = 0, dropEmpties = !1, firstGroup = !0;;) {
 			let m = balanced("{", "}", str);
 			if (!m) return combine(acc, str, [""], max, maxLength, dropEmpties);
 			let pre = m.pre;
@@ -42384,8 +42391,8 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			}
 			var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body), isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body), isSequence = isNumericSequence || isAlphaSequence, isOptions = m.body.indexOf(",") >= 0;
 			if (!isSequence && !isOptions) {
-				if (m.post.match(/,(?!,).*\}/)) {
-					str = m.pre + "{" + m.body + escClose + m.post, isTop = !0;
+				if (rewrites < maxRewrites && m.post.match(/,(?!,).*\}/)) {
+					rewrites++, str = m.pre + "{" + m.body + escClose + m.post, isTop = !0;
 					continue;
 				}
 				return combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties);
@@ -42395,7 +42402,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			if (isSequence) values = expandSequence(m.body, isAlphaSequence, max, maxLength);
 			else {
 				var n = parseCommaParts(m.body);
-				if (n.length === 1 && n[0] !== void 0 && (n = expand(n[0], max, maxLength, !1).map(embrace), n.length === 1)) {
+				if (n.length === 1 && n[0] !== void 0 && (n = expand(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, !1).map(embrace), n.length === 1)) {
 					if (acc = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
 					str = m.post;
 					continue;
@@ -42403,7 +42410,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 				for (var dropsEmpties = dropEmpties && !m.post.length && !pre, d = 0; dropsEmpties && d < acc.length; d++) acc[d] && (dropsEmpties = !1);
 				values = [];
 				var valuesLength = 0;
-				outer: for (var j = 0; j < n.length; j++) for (var expanded = expand(n[j], max, maxLength, !1), k = 0; k < expanded.length; k++) {
+				outer: for (var j = 0; j < n.length; j++) for (var expanded = expand(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, !1), k = 0; k < expanded.length; k++) {
 					var v = expanded[k];
 					if (!dropsEmpties || v) {
 						if (values.length >= max || valuesLength + v.length > maxLength) break outer;
@@ -53766,6 +53773,9 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 	function toString(buffer, encoding, start, end) {
 		return toBuffer(buffer).toString(encoding, start, end);
 	}
+	function toHex(buffer, start, end) {
+		return toBuffer(buffer).toString("hex", start, end);
+	}
 	function write(buffer, string, offset, length, encoding) {
 		return toBuffer(buffer).write(string, offset, length, encoding);
 	}
@@ -53838,6 +53848,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 		swap64,
 		toBuffer,
 		toString,
+		toHex,
 		write,
 		readDoubleBE,
 		readDoubleLE,
@@ -56452,7 +56463,7 @@ var DEFAULTS, urlVariableRegex, endpoint, init_dist_bundle$5 = __esmMin((() => {
 	}, urlVariableRegex = /\{[^{}}]+\}/g, endpoint = withDefaults$2(null, DEFAULTS);
 }));
 //#endregion
-//#region node_modules/.pnpm/content-type@3.1.0/node_modules/content-type/dist/index.js
+//#region node_modules/.pnpm/content-type@3.1.1/node_modules/content-type/dist/index.js
 function parse(header, options) {
 	let stopFlags = SEMI_FLAG | (options?.comma === !0 ? COMMA_FLAG : 0), len = header.length, valueStart = options?.start ?? 0;
 	for (; (CHAR_MAP[header.charCodeAt(valueStart)] & OWS) !== 0;) valueStart++;
