@@ -9,7 +9,7 @@
 
 import { PROXY_SUBNET } from "../log/proxy-address.ts";
 import { internalDstAcl, type InternalDstOptions } from "./haproxy-internal-dst.ts";
-import { escapeForHaproxy, HOSTNAME_CHARSET } from "./haproxy-matchers.ts";
+import { escapeForHaproxy, HOST_ONLY, HOSTNAME_CHARSET } from "./haproxy-matchers.ts";
 import { compileRuleSet, INTERNAL_RANGES, type CompiledRule } from "./haproxy-rules.ts";
 import { preamble, resolversSection } from "./haproxy-sections.ts";
 import { convertRule } from "./wildcard-rules.ts";
@@ -243,13 +243,18 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty",
     '    http-request deny deny_status 400 content-type "text/plain" string "Bad Request: Missing Host Header" if !has_host or !host_not_empty',
     "",
-    // A trailing dot denotes the same DNS name, and HTTP allows one in Host.
-    "    http-request set-var(txn.host_only) hdr(host),regsub(:.*$,),regsub(\\.$,)",
+    `    http-request set-var(txn.host_only) hdr(host),${HOST_ONLY}`,
     "    http-request set-var-fmt(txn.host_port) %[var(txn.host_only)]:%[dst_port]",
     "",
     // The Host header is attacker-chosen too.
     "    http-request set-var(txn.host_log) var(txn.host_only),regsub([^A-Za-z0-9._-],_,g)",
     "    http-request set-var-fmt(txn.target) %[var(txn.host_log)]:%[dst_port]",
+    "",
+    // A `:` left in the name could let a `~` rule's port pattern match it.
+    // Refused in `audit` too.
+    `    acl host_is_name var(txn.host_only) -m reg ${HOSTNAME_CHARSET}`,
+    "    http-request set-var(txn.reason) str(invalid-host) if !host_is_name",
+    '    http-request deny deny_status 400 content-type "text/plain" string "Bad Request: Invalid Host Header" if !host_is_name',
     "",
     ...aclLines("is_http_allowed", "var(txn.host_port)", http),
     "    http-request set-var(txn.reason) str(not-allowed) if !is_http_allowed",

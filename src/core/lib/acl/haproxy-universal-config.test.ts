@@ -215,6 +215,24 @@ describe("an IP rule's connection", () => {
   }
 });
 
+describe("a plaintext request's Host", () => {
+  const deny = "http-request deny deny_status 400";
+  for (const mode of ["restrict", "audit"] as const) {
+    it(`is refused in ${mode} when it is not a hostname, before the allowlist or the resolver`, () => {
+      const all = lines(gen({ mode, httpRules: HTTP }));
+      const reject = all.findIndex((l) => l.startsWith(deny) && l.endsWith(" if !host_is_name"));
+      expect(reject !== -1).toBe(true);
+      expect(reject < all.findIndex((l) => l.includes("if !is_http_allowed"))).toBe(true);
+      expect(reject < all.findIndex((l) => l.startsWith("http-request do-resolve"))).toBe(true);
+    });
+  }
+
+  it("is checked once its port is gone, as inspect checks it", () => {
+    const set = "http-request set-var(txn.host_only) hdr(host),host_only,regsub(\\.$,)";
+    expect(lines(gen()).includes(set)).toBe(true);
+  });
+});
+
 describe("plaintext request timeout", () => {
   it("ends a silent client's wait before outbound_proxy's client timeout does", () => {
     // outbound_proxy's clock starts at the connection, http_in's only after the
