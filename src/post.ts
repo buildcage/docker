@@ -2,7 +2,9 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { planPostCleanup } from "./lib/post-cleanup.ts";
+import * as core from "@actions/core";
+
+import { BUILDER_NAME_STATE, planPostCleanup } from "./lib/post-cleanup.ts";
 
 // Untested by design, down to the end of the file: planPostCleanup decides the
 // arguments, and running them is docker's own.
@@ -17,6 +19,7 @@ function main(): void {
     join(__dirname, "../docker/compose.action.yaml"),
     PROJECT_NAME_OVERRIDE_ENABLED ? process.env.COMPOSE_PROJECT_NAME : undefined,
     process.env,
+    { savedBuilderName: core.getState(BUILDER_NAME_STATE) },
   );
   execFileSync("docker", args, { stdio: "inherit", env });
 }

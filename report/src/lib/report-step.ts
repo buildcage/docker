@@ -13,10 +13,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { annotate } from "#core/lib/actions/annotation.ts";
+import { applyConfigFile } from "#core/lib/actions/config-file.ts";
 import { readTrafficArtifactInputs } from "#core/lib/actions/inputs.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
 import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
-import { REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
+import { CONFIG_FILE_INPUTS, REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
 
 import { copyFromContainerImage } from "./copy-from-image.ts";
 import { findReportSourceContainer } from "./find-report-source.ts";
@@ -34,6 +35,7 @@ import { uploadTrafficArtifact } from "./traffic-artifact.ts";
  * not the call.
  */
 export interface ReportStepDeps {
+  applyConfigFile: typeof applyConfigFile;
   readBuilderName: typeof readBuilderName;
   checkFailOnBlocked: typeof checkFailOnBlocked;
   readTrafficArtifactInputs: typeof readTrafficArtifactInputs;
@@ -59,6 +61,7 @@ const removeScratchDirTree = (dir: string): void => rmSync(dir, { recursive: tru
 /* v8 ignore stop */
 
 const realDeps: ReportStepDeps = {
+  applyConfigFile,
   readBuilderName,
   checkFailOnBlocked,
   readTrafficArtifactInputs,
@@ -82,6 +85,7 @@ export async function runReportStep(
   overrides: Partial<ReportStepDeps> = {},
 ): Promise<void> {
   const {
+    applyConfigFile,
     readBuilderName,
     checkFailOnBlocked,
     readTrafficArtifactInputs,
@@ -95,6 +99,9 @@ export async function runReportStep(
     warn,
   } = { ...realDeps, ...overrides };
 
+  // Before any input is read, and before report-action.js inherits this
+  // environment: it reads fail_on_blocked itself.
+  applyConfigFile(env, CONFIG_FILE_INPUTS);
   const builderName = readBuilderName();
   checkFailOnBlocked();
   const trafficArtifact = readTrafficArtifactInputs();
@@ -118,7 +125,7 @@ export async function runReportStep(
     const reportActionPath = join(scratchDir, "report-action.js");
     copyFromContainerImage(containerId, REPORT_ACTION_SCRIPT_PATH, reportActionPath);
 
-    process.exitCode = runReportScript(reportActionPath, containerId, { trafficFile });
+    process.exitCode = runReportScript(reportActionPath, containerId, { trafficFile, env });
   } finally {
     // Uploaded from here so every path that ran the script keeps the file:
     // a failing run is when it is most wanted.

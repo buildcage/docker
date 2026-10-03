@@ -24,7 +24,8 @@
     "@actions/core": "^3.0.1",
     "@sigstore/bundle": "^5.0.0",
     "@sigstore/tuf": "^5.0.0",
-    "@sigstore/verify": "^4.1.0"
+    "@sigstore/verify": "^4.1.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

@@ -12,8 +12,11 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import * as core from "@actions/core";
+
 import { isKnownBlockedUrlRule } from "#core/lib/acl/wildcard-rules.ts";
 import { annotate } from "#core/lib/actions/annotation.ts";
+import { applyConfigFile } from "#core/lib/actions/config-file.ts";
 import { describeDockerFailure } from "#core/lib/actions/docker-error.ts";
 import {
   checkKnownBlockedUrlRuleSupport,
@@ -28,12 +31,14 @@ import {
   type VerifyImageDigestOptions,
   type ResolvedImage,
 } from "#core/lib/provenance/verify-image.ts";
+import { CONFIG_FILE_INPUTS } from "#report/report-source.ts";
 
 import { builderStartError } from "./builder-diagnostics.ts";
 import { buildComposeEnv } from "./compose-env.ts";
 import { SetupError } from "./errors.ts";
 import { readSetupInputs } from "./inputs.ts";
 import { readLocalImageOverride } from "./local-image.ts";
+import { BUILDER_NAME_STATE } from "./post-cleanup.ts";
 
 // Resolved from the bundle's own location: dist/main.cjs sits one directory
 // above docker/.
@@ -51,6 +56,7 @@ export const COMPOSE_FILE = join(__dirname, "../docker/compose.action.yaml");
  * the next step, not the call.
  */
 export interface SetupStepDeps {
+  applyConfigFile: typeof applyConfigFile;
   readSetupInputs: typeof readSetupInputs;
   readLocalImageOverride: typeof readLocalImageOverride;
   verifyImageDigestOrThrow: typeof verifyImageDigestOrThrow;
@@ -62,6 +68,7 @@ export interface SetupStepDeps {
   /** `docker <args>` with stdio inherited: compose's own progress output is
    *  what the job log wants to show. */
   runDocker: (args: string[], env: NodeJS.ProcessEnv) => void;
+  saveState: (name: string, value: string) => void;
   log: (message: string) => void;
   /** The rule-support warning goes to the always-on emitter: this action has no
    *  report of its own to suppress it alongside. */
@@ -77,6 +84,7 @@ const runDockerViaExec = (args: string[], env: NodeJS.ProcessEnv): void => {
 /* v8 ignore stop */
 
 const realDeps: SetupStepDeps = {
+  applyConfigFile,
   readSetupInputs,
   readLocalImageOverride,
   verifyImageDigestOrThrow,
@@ -86,6 +94,7 @@ const realDeps: SetupStepDeps = {
   withLogGroup,
   builderStartError,
   runDocker: runDockerViaExec,
+  saveState: core.saveState,
   log: console.log,
   warn: annotate.warning,
 };
@@ -116,6 +125,7 @@ export async function runSetupStep(
   overrides: Partial<SetupStepDeps> = {},
 ): Promise<void> {
   const {
+    applyConfigFile,
     readSetupInputs,
     readLocalImageOverride,
     verifyImageDigestOrThrow,
@@ -125,12 +135,16 @@ export async function runSetupStep(
     withLogGroup,
     builderStartError,
     runDocker,
+    saveState,
     log,
     warn,
   } = { ...realDeps, ...overrides };
 
   const actionRef = env.GITHUB_ACTION_REF ?? "";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
+
+  // Before any input is read: it rewrites what they all read.
+  for (const line of applyConfigFile(env, CONFIG_FILE_INPUTS)?.summary ?? []) log(line);
 
   // Read before the image: each engine has its own image tag.
   const {
@@ -146,6 +160,9 @@ export async function runSetupStep(
     knownBlockedRules,
   } = readSetupInputs();
   log(`Proxy engine: ${proxyEngine}`);
+  // For post; see planPostCleanup. Without the runner's state file there is
+  // no post step.
+  if (env.GITHUB_STATE) saveState(BUILDER_NAME_STATE, builderName);
 
   // Before the builder starts, so a rule the engine cannot enforce is reported
   // once, up front, rather than silently not enforced.

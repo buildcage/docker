@@ -10,6 +10,7 @@ import { runReportStep, type ReportStepDeps } from "./report-step.ts";
 // the order they run in, what each one is handed, and which of them still run
 // when an earlier step fails.
 const mocks = {
+  applyConfigFile: vi.fn(),
   readBuilderName: vi.fn(),
   checkFailOnBlocked: vi.fn(),
   readTrafficArtifactInputs: vi.fn(),
@@ -60,6 +61,19 @@ afterEach(() => {
 });
 
 describe("runReportStep", () => {
+  it("applies config_file to the env the script inherits, before reading any input", async () => {
+    const env = { INPUT_CONFIG_FILE: "c.yml" };
+    await runReportStep(env, deps);
+    expect(mocks.applyConfigFile).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ known: expect.arrayContaining(["fail_on_blocked"]) }),
+    );
+    expect(mocks.applyConfigFile.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.readBuilderName.mock.invocationCallOrder[0]!,
+    );
+    expect(mocks.runReportScript.mock.calls[0][2].env).toBe(env);
+  });
+
   it("finds the container by the project name derived from the builder name", async () => {
     await runReportStep({}, deps);
     expect(mocks.findReportSourceContainer).toHaveBeenCalledWith(

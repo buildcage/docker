@@ -13,8 +13,8 @@ export class InvalidInputError extends ActionError<
 /** `core.getInput`, narrowed so a test can pass a plain lookup. */
 export type GetInput = (name: string) => string;
 
-/** Not `getBooleanInput`: it cannot tell unset from misspelled. Unset (a dev or
- *  test run without action.yml's defaults) takes the fallback. */
+/** Not `getBooleanInput`: it cannot tell unset from misspelled. Unset takes the
+ *  fallback: action.yml declares no default, so config_file can tell unset from set. */
 export function readBooleanInput(name: string, fallback: boolean, getInput: GetInput): boolean {
   const value = getInput(name);
   if (value === "") return fallback;
