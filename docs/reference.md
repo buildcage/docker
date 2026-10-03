@@ -104,6 +104,9 @@ known_blocked_rules: |
 - `config_file` fails the step on `pull_request_target`, and on `workflow_run` triggered by a pull
   request event: the workspace there can hold the pull request's own code, which could rewrite the
   file. Set the inputs in the workflow on those events.
+- On any other event the file is read as the workflow checked it out, so whoever can write that
+  copy sets its rules. A workflow that checks out a pull request's code on `issue_comment`, for
+  example, takes the rules from the pull request.
 
 The rules belong to the builder, not to a Dockerfile: several builds on one builder share them. Give
 a Dockerfile that needs its own policy its own `builder_name` and file.
