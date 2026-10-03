@@ -32,6 +32,17 @@ describe("scanHaproxyLog", () => {
     ]);
   });
 
+  it("keeps the trailing dot of an SNI and drops a Host's", async () => {
+    const { events } = await scanHaproxyLog(
+      [
+        line("BLOCKED", "HTTPS", "Example.com.:443", "not-allowed"),
+        line("ALLOWED", "HTTP", "Example.com.:80", "-"),
+      ],
+      false,
+    );
+    expect(events.map((e) => e.host)).toStrictEqual(["example.com.", "example.com"]);
+  });
+
   it("reads an AUDIT line as an audited event when isAudit is true", async () => {
     const { events } = await scanHaproxyLog([line("AUDIT", "HTTP", "any.com:80", "-", 42)], true);
     expect(events[0].action).toBe("audit");

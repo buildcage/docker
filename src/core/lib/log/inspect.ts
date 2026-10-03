@@ -21,7 +21,7 @@
 
 import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
 
-import { ruleHost, splitHostPort } from "./authority.ts";
+import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
@@ -312,7 +312,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
       time: Number(pass[1]) / 1000,
       action: actionFor(reason, isAudit),
       protocol: pass[2] as "tls" | "tcp",
-      host: sni === "-" ? pass[6] : ruleHost(sni),
+      host: sni === "-" ? pass[6] : sniHost(sni),
       port: Number(pass[7]),
       destination: `${pass[6]}:${pass[7]}`,
     };

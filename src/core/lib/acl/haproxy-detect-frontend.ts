@@ -93,7 +93,11 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
 
     if (tlsHosts.length > 0) {
       if (tlsHosts.some((host) => host.hostMatch === "hostPort")) {
-        l.push("    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]");
+        // The condition makes HAProxy wait for a ClientHello split across
+        // segments; an acl on the variable alone would judge the first one.
+        l.push(
+          "    tcp-request content set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port] if { req.ssl_sni -m found }",
+        );
       }
       l.push("", `    acl sni_is_name req.ssl_sni -m reg ${HOSTNAME_CHARSET}`);
       for (const host of tlsHosts) {

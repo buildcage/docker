@@ -65,6 +65,13 @@ describe("scanInspectLog", () => {
     expect(e.host).toBe("db.example.com");
   });
 
+  it("keeps a passthrough SNI's trailing dot", async () => {
+    const [e] = await parse([
+      "buildcage 1 pass tls 10 ts=-- reason=- dst=10.0.0.9:5432 sni=db.example.com.",
+    ]);
+    expect(e.host).toBe("db.example.com.");
+  });
+
   it("names a request that never came by its SNI, spelled the same way", async () => {
     const [e] = await parse([
       "buildcage 1 https <BADREQ> 400 0 ts=CR reason=- tlserr=- dst=198.19.255.1:443 sni=API.Example.com host=- -",

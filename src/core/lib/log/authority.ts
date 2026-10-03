@@ -41,5 +41,11 @@ export function splitHostPort(authority: string): HostPort {
  *  logs are folded to it, so one host is one row whatever case it was spelled
  *  in. */
 export function ruleHost(host: string): string {
-  return host.replace(/[A-Z]/g, (c) => c.toLowerCase()).replace(/\.$/, "");
+  return sniHost(host).replace(/\.$/, "");
+}
+
+/** An SNI as the rules match it: ASCII lowercased, trailing dot kept. Folding
+ *  the dot would list a refusal under a host the rules allow. */
+export function sniHost(sni: string): string {
+  return sni.replace(/[A-Z]/g, (c) => c.toLowerCase());
 }

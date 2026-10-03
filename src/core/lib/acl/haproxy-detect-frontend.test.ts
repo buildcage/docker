@@ -59,7 +59,11 @@ describe("passthrough", () => {
 
   it("matches a ~regex tls rule's host and port as one expression against the SNI stringified", () => {
     const result = detect({ tlsRules: ["~^.*\\.example\\.com:(5432|5433)$"] });
-    expect(result.includes("set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port]")).toBe(true);
+    expect(
+      result.includes(
+        "set-var-fmt(txn.sni_port) %[req.ssl_sni]:%[dst_port] if { req.ssl_sni -m found }\n",
+      ),
+    ).toBe(true);
     expect(
       result.includes(
         "acl tls0_sni var(txn.sni_port) -m reg -i ^.*\\\\.example\\\\.com:(5432|5433)$",

@@ -35,8 +35,8 @@ export interface TrafficEvent {
   time: number;
   action: TrafficAction;
   protocol: TrafficProtocol;
-  /** The name asked for, as ruleHost folds it, or the address when there was
-   *  no name. */
+  /** The name asked for, as ruleHost (or sniHost, for an SNI the rules
+   *  judged) folds it, or the address when there was no name. */
   host: string;
   /** Absent for dns, which connects to nothing. */
   port?: number;

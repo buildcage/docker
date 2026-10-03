@@ -172,6 +172,10 @@ describe("outbound_proxy", () => {
     ]);
   });
 
+  it("matches the SNI as sent, so a trailing dot is not dropped", () => {
+    expect(all.includes("tcp-request content set-var(txn.sni) req_ssl_sni if is_tls")).toBe(true);
+  });
+
   it("refuses an SNI that is not a hostname before the allowlist or the resolver acts on it", () => {
     const reject = all.indexOf("tcp-request content reject if is_tls has_sni !sni_is_name");
     expect(reject !== -1).toBe(true);
