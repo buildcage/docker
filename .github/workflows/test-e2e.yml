@@ -52,6 +52,7 @@ jobs:
               - *workflow
               - 'src/**'
               - 'report/**'
+              - 'action.yml'
 
   # Exercises the real setup/report actions end-to-end (uses: ./,
   # uses: ./report) against an image built from this branch, no registry
