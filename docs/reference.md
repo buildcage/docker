@@ -7,6 +7,7 @@ and links here for the details.
 ## Contents
 
 - [Setup action inputs](#setup-action-inputs)
+- [Config file](#config-file)
 - [Operation modes](#operation-modes)
 - [Rule syntax](#rule-syntax)
 - [Report action inputs](#report-action-inputs)
@@ -22,6 +23,7 @@ and links here for the details.
 
 | Input                | Default     | Description                                                                                                                     |
 | -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `config_file`        | empty       | A YAML file, relative to the workspace, that sets the other inputs. See [Config file](#config-file).                            |
 | `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it.                                                           |
 | `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                 |
 | `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                  |
@@ -64,6 +66,47 @@ method and any path.
 Setting a rule the engine can't act on is caught before the build starts: `restrict` fails, since a
 rule that looks like it protects the build but cannot be enforced is worse than none, and `audit`
 warns and ignores it.
+
+## Config file
+
+`config_file` names a YAML file in the repository that sets the inputs of the setup and report
+actions, so the policy can sit beside the Dockerfile whose `RUN` steps it governs:
+
+```yaml
+# app/buildcage.yml
+proxy_engine: inspect
+allowed_url_rules: |
+  GET https://registry.npmjs.org/**
+known_blocked_rules: |
+  telemetry.example.com
+```
+
+```yaml
+- uses: actions/checkout@<sha>
+- uses: buildcage/docker@<sha>
+  with:
+    config_file: app/buildcage.yml
+# ... the build ...
+- uses: buildcage/docker/report@<sha>
+  if: always()
+  with:
+    config_file: app/buildcage.yml
+```
+
+- Each key is an input name of either action and each value is written as it would be under
+  `with:`. A key that is neither action's input, a list or a nested mapping fails the step.
+- Give the same file to the report action, which reads `builder_name`, `fail_on_blocked` and the
+  traffic artifact inputs from it when it runs, so leave the file as it is until then.
+- An input the workflow sets wins over the file. The rule inputs are the exception: the file's
+  rules are added to the workflow's.
+- The path is relative to `$GITHUB_WORKSPACE` and must stay inside it, through symlinks too. The
+  repository has to be checked out by an earlier step.
+- `config_file` fails the step on `pull_request_target`, and on `workflow_run` triggered by a pull
+  request event: the workspace there can hold the pull request's own code, which could rewrite the
+  file. Set the inputs in the workflow on those events.
+
+The rules belong to the builder, not to a Dockerfile: several builds on one builder share them. Give
+a Dockerfile that needs its own policy its own `builder_name` and file.
 
 ## Operation modes
 
@@ -382,6 +425,7 @@ optionally fails the job when blocked connections are found. Every input is opti
 
 | Input                             | Default     | Description                                                                                        |
 | --------------------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `config_file`                     | empty       | The file given to the setup action. See [Config file](#config-file).                               |
 | `builder_name`                    | `buildcage` | Name of the builder container                                                                      |
 | `fail_on_blocked`                 | `true`      | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode)      |
 | `upload_traffic_artifact`         | `false`     | Upload the observed traffic as a JSON artifact named `buildcage-traffic`; both engines write it    |

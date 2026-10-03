@@ -65,8 +65,6 @@ describe("readRetentionDays", () => {
 });
 
 describe("readTrafficArtifactInputs", () => {
-  // The dev and test invocations run this from source rather than through
-  // action.yml's own defaults.
   it("uploads nothing and leaves the retention to the repository when unset", () => {
     expect(readTrafficArtifactInputs(inputs())).toStrictEqual({
       upload: false,

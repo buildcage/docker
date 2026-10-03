@@ -161,6 +161,9 @@ in [Rule syntax](./docs/reference.md#rule-syntax).
 The builder is named `buildcage` unless `builder_name` says otherwise, and the Buildx `endpoint` has
 to match whatever it is named.
 
+The inputs can also live in a YAML file next to the Dockerfile, named by `config_file`. See
+[Config file](./docs/reference.md#config-file).
+
 ### Operation modes
 
 `proxy_mode: audit` logs every destination the build reaches and blocks nothing. `restrict`, the

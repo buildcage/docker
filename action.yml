@@ -5,18 +5,19 @@ branding:
   color: blue
 
 inputs:
-  builder_name:
-    description: "Name of the builder container"
+  config_file:
+    description: "YAML file, relative to the workspace, setting any input of this action or report. An input the workflow sets wins; rule lists are combined. Pass the same file to report. See docs/reference.md#config-file."
     required: false
-    default: "buildcage"
+    default: ""
+  builder_name:
+    description: "Name of the builder container. Default buildcage."
+    required: false
   proxy_mode:
     description: "Traffic policy: audit records every destination the build reaches and blocks nothing (allowed_*_rules have no effect in this mode), or restrict (default) allows only what the rules match and blocks the rest. Run audit once, take the allowlist from its report, then switch to restrict."
     required: false
-    default: "restrict"
   proxy_engine:
     description: "Network enforcement engine: inspect (default, terminates TLS to enforce on method and URL) or universal (network-level proxy, needs no CA trust)"
     required: false
-    default: "inspect"
   allowed_https_rules:
     description: "HTTPS allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '*.example.com:443 ~^custom\\.pattern:443$'"
     required: false
@@ -40,7 +41,6 @@ inputs:
   fail_on_ca_residue:
     description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when a copy of the proxy CA, or its NSS slot, stays in the step's layer. See docs/reference.md#ca-residue."
     required: false
-    default: "true"
   known_blocked_rules:
     description: "Traffic expected to be blocked, one rule per line: a host rule (wildcard or ~regex) or, under proxy_engine: inspect, a URL rule. Blocked traffic matching one doesn't fail the report step even when fail_on_blocked is true. See docs/reference.md#blocked-rules-known_blocked_rules."
     required: false

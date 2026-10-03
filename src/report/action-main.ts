@@ -54,9 +54,8 @@ export interface ReportActionDeps {
   containerId?: string;
   docker?: Docker;
   env?: NodeJS.ProcessEnv;
-  /** Several test/dev invocations run the script directly without setting
-   *  fail_on_blocked, unlike the real `report` action where action.yml's own
-   *  default always supplies it, so fall back to that same default. */
+  /** Read from the input when unset, which the report action has already
+   *  merged with config_file. */
   failOnBlocked?: boolean;
 }
 

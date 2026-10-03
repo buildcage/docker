@@ -7,6 +7,7 @@ import { runSetupStep, COMPOSE_FILE, type SetupStepDeps } from "./setup-step.ts"
 // the order they run in, what each one is handed, and which of them still run
 // when an earlier step fails.
 const mocks = {
+  applyConfigFile: vi.fn(),
   readSetupInputs: vi.fn(),
   readLocalImageOverride: vi.fn(),
   verifyImageDigestOrThrow: vi.fn(),
@@ -16,6 +17,7 @@ const mocks = {
   withLogGroup: vi.fn(),
   builderStartError: vi.fn(),
   runDocker: vi.fn(),
+  saveState: vi.fn(),
   log: vi.fn(),
   warn: vi.fn(),
 };
@@ -77,6 +79,38 @@ function dockerArgs(n: number): string[] {
 }
 
 describe("runSetupStep", () => {
+  it("saves the builder name for post before starting the builder", async () => {
+    mocks.readSetupInputs.mockReturnValue(inputsWith({ builderName: "from-file" }));
+
+    await runSetupStep({ ...ENV, GITHUB_STATE: "/tmp/state" }, deps);
+
+    expect(mocks.saveState).toHaveBeenCalledWith("builder_name", "from-file");
+    expect(orderOf(mocks.saveState)).toBeLessThan(orderOf(mocks.runDocker));
+  });
+
+  it("saves nothing when the runner set no state file", async () => {
+    await runSetupStep(ENV, deps);
+
+    expect(mocks.saveState).not.toHaveBeenCalled();
+  });
+
+  it("applies config_file to the step's env before reading any input, and logs it", async () => {
+    mocks.applyConfigFile.mockReturnValue({
+      path: "/home/runner/work/repo/repo/c.yml",
+      summary: ["Inputs read from config_file c.yml:", "  proxy_mode"],
+    });
+
+    await runSetupStep(ENV, deps);
+
+    expect(mocks.applyConfigFile).toHaveBeenCalledWith(
+      ENV,
+      expect.objectContaining({ known: expect.arrayContaining(["builder_name"]) }),
+    );
+    expect(orderOf(mocks.applyConfigFile)).toBeLessThan(orderOf(mocks.readSetupInputs));
+    expect(mocks.log).toHaveBeenCalledWith("Inputs read from config_file c.yml:");
+    expect(mocks.log).toHaveBeenCalledWith("  proxy_mode");
+  });
+
   // The image tag is per-engine, so the engine has to be known before
   // anything resolves an image.
   it("reads the engine before it resolves the image", async () => {

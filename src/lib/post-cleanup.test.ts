@@ -15,25 +15,37 @@ describe("planPostCleanup", () => {
       COMPOSE_FILE,
       undefined,
       { PATH: "/usr/bin" },
-      inputs({ builder_name: "second" }),
+      { getInput: inputs({ builder_name: "second" }) },
     );
 
     expect(args).toStrictEqual(["compose", "-f", COMPOSE_FILE, "-p", expect.any(String), "down"]);
     expect(env).toStrictEqual({ PATH: "/usr/bin", BUILDER_NAME: "second" });
   });
 
-  // action.yml's own default covers the normal case; this covers running the
-  // built script outside the Actions runtime.
+  it("takes the name setup saved over the input, which config_file may have set", () => {
+    const { env } = planPostCleanup(
+      COMPOSE_FILE,
+      undefined,
+      {},
+      {
+        savedBuilderName: "saved",
+        getInput: inputs({ builder_name: "second" }),
+      },
+    );
+
+    expect(env.BUILDER_NAME).toBe("saved");
+  });
+
   it("falls back to the default builder name when the input is unset", () => {
-    const { env } = planPostCleanup(COMPOSE_FILE, undefined, {}, inputs());
+    const { env } = planPostCleanup(COMPOSE_FILE, undefined, {}, { getInput: inputs() });
 
     expect(env.BUILDER_NAME).toBe("buildcage");
   });
 
   it("derives the same project name main.ts and report do for one builder", () => {
     const getInput = inputs({ builder_name: "second" });
-    const first = planPostCleanup(COMPOSE_FILE, undefined, {}, getInput);
-    const second = planPostCleanup(COMPOSE_FILE, undefined, {}, getInput);
+    const first = planPostCleanup(COMPOSE_FILE, undefined, {}, { getInput });
+    const second = planPostCleanup(COMPOSE_FILE, undefined, {}, { getInput });
 
     expect(first.args).toStrictEqual(second.args);
   });
@@ -43,7 +55,7 @@ describe("planPostCleanup", () => {
       COMPOSE_FILE,
       "buildcage-e2e",
       {},
-      inputs({ builder_name: "second" }),
+      { getInput: inputs({ builder_name: "second" }) },
     );
 
     expect(args).toStrictEqual(["compose", "-f", COMPOSE_FILE, "-p", "buildcage-e2e", "down"]);
