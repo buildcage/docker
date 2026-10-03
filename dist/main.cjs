@@ -12174,7 +12174,7 @@ function tlsCond(host) {
 }
 function detectFrontend(spec) {
 	let { listenPort, tlsStagePort, plainStagePort, ipRules, tlsHosts, proxyAddress } = spec, hasPassthrough = ipRules.length > 0 || tlsHosts.length > 0, l = [];
-	if (l.push("# One listener for everything redirected here. The first bytes say whether", "# this is a handshake or a plain request, so no port has to be declared as", "# one or the other in advance.", "frontend detect", `    bind *:${listenPort}`, "    mode tcp", "    tcp-request inspect-delay 5s", ""), hasPassthrough) {
+	if (l.push("# One listener for everything redirected here. The first bytes say whether", "# this is a handshake or a plain request, so no port has to be declared as", "# one or the other in advance.", "frontend detect", `    bind *:${listenPort}`, "    mode tcp", "    tcp-request inspect-delay 5s", ""), hasPassthrough || l.push("    no log", ""), hasPassthrough) {
 		let pass = "{ var(txn.pass) -m found }";
 		if (l.push("    # Passed through untouched: judged before anything is decrypted."), ipRules.length > 0) {
 			ipRules.some((rule) => rule.hostMatch === "hostPort") && l.push("    tcp-request content set-var-fmt(txn.dst_str) %[dst]:%[dst_port]"), l.push("    # dst is the proxy only when the name went through this container's DNS.", `    acl dns_routed dst ${proxyAddress}`);
