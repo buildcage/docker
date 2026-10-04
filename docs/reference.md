@@ -197,9 +197,10 @@ pattern that doesn't widen more than intended.
 
 A rule may name an address rather than a name. Nothing is loosened by that: the rules still match
 against the `Host` header and still decide, and an address reached this way stays inspected, so
-method and path rules apply to it. Over HTTPS the origin's certificate has to be valid for the
-address, which needs an IP SAN, so in practice an address is a plaintext or a passthrough
-destination.
+method and path rules apply to it. Only plaintext `http` gets through, though. A client connecting
+to an address sends no SNI, so the proxy answers with a default certificate valid for no name, and
+the proxy's own check of the origin's certificate never accepts an IP SAN either. Pass TLS to an
+address through with `allowed_ip_rules` instead.
 
 ### Host rules: `allowed_https_rules`, `allowed_http_rules`, `allowed_ip_rules`, `known_blocked_rules`
 
