@@ -87,8 +87,8 @@ func TestLoadSpecRefusesABundleItCannotRead(t *testing.T) {
 	}
 }
 
-// An absolute root.path is taken as written, so a trailing separator would
-// otherwise reach every path computed from the rootfs.
+// Nothing requires root.path to be clean, and a trailing separator would reach
+// every path computed from the rootfs.
 func TestLoadSpecCleansAnAbsoluteRootPath(t *testing.T) {
 	bundle := newSpecBundle(t, `{"root": {"path": "/run/bundle/rootfs/"}}`)
 
