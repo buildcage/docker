@@ -41,7 +41,9 @@ func loadSpec(bundle string) (*spec, error) {
 			rootfs = p
 		}
 	}
-	if !filepath.IsAbs(rootfs) {
+	if filepath.IsAbs(rootfs) {
+		rootfs = filepath.Clean(rootfs)
+	} else {
 		rootfs = filepath.Join(bundle, rootfs)
 	}
 
