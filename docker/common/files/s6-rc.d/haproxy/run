@@ -7,5 +7,6 @@ exec 2>&1
 echo "buildcage haproxy starting $(qjs -e 'console.log(Date.now())')"
 # A stalled s6-log fills the default 64KB pipe within seconds. Without -c,
 # pipesz starts haproxy even if it cannot resize; a dropped line is still counted.
+# -n 0 checks until ready; S6_CMD_WAIT_FOR_SERVICES_MAXTIME bounds the wait.
 exec pipesz -o -s 1048576 -- \
-  s6-notifyoncheck -d -w 250 -n 12 haproxy -f /etc/haproxy/haproxy.cfg -db
+  s6-notifyoncheck -d -w 250 -n 0 haproxy -f /etc/haproxy/haproxy.cfg -db
