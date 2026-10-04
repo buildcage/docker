@@ -24,9 +24,9 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 	enumerable: !0
 }) : target, mod));
 //#endregion
-let node_url = require("node:url"), node_fs = require("node:fs");
+let node_fs = require("node:fs");
 node_fs = __toESM(node_fs, 1);
-let node_os = require("node:os");
+let node_url = require("node:url"), node_os = require("node:os");
 node_os = __toESM(node_os, 1);
 let node_path = require("node:path"), buffer = require("buffer"), os = require("os");
 os = __toESM(os, 1);
@@ -60851,5 +60851,5 @@ async function runReportStep(env, overrides = {}) {
 }
 //#endregion
 //#region report/src/main.ts
-process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && runReportStep(process.env).catch(exitOnFatalError("report"));
+process.argv[1] && (0, node_fs.realpathSync)(process.argv[1]) === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && runReportStep(process.env).catch(exitOnFatalError("report"));
 //#endregion

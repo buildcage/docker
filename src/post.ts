@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,7 +28,9 @@ function main(): void {
   }
   execFileSync("docker", plan.args, { stdio: "inherit", env: plan.env });
 }
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// Node resolves symlinks in import.meta.url but not in argv, and the runner
+// may reach the checkout through one.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main();
 }
 /* v8 ignore stop */
