@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -178,14 +179,31 @@ func TestCreateCARefusesAnExistingPath(t *testing.T) {
 }
 
 // createCA resolves inside the rootfs like every other write, so a symlink in
-// the path that climbs out is refused rather than followed onto the host.
-func TestCreateCARefusesAPathThatEscapesTheRoot(t *testing.T) {
-	rootfs := t.TempDir()
+// the path that climbs past the root stops there instead of reaching the host.
+func TestCreateCAKeepsAClimbingLinkInsideTheRoot(t *testing.T) {
+	parent := t.TempDir()
+	rootfs := filepath.Join(parent, "rootfs")
 	mustMkdirAll(t, filepath.Join(rootfs, "usr", "local"))
 	mustSymlink(t, "../../../../../../outside", filepath.Join(rootfs, "usr", "local", "share"))
 
-	if _, err := createCA(rootfs, filepath.Join("/usr/local/share/ca-certificates", anchorName), testCA); err == nil {
-		t.Fatal("expected an escaping path to be refused")
+	if _, err := createCA(rootfs, filepath.Join("/usr/local/share/ca-certificates", anchorName), testCA); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(rootfs, "outside", "ca-certificates", anchorName)); err != nil {
+		t.Errorf("the anchor is not at the root's /outside: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(parent, "outside")); !os.IsNotExist(err) {
+		t.Errorf("something was created outside the rootfs: %v", err)
+	}
+}
+
+func TestCreateCAReportsAPathThatDoesNotResolve(t *testing.T) {
+	rootfs := t.TempDir()
+	mustMkdirAll(t, filepath.Join(rootfs, "usr", "local"))
+	mustSymlink(t, "share", filepath.Join(rootfs, "usr", "local", "share"))
+
+	if _, err := createCA(rootfs, filepath.Join("/usr/local/share/ca-certificates", anchorName), testCA); !errors.Is(err, errTooManySymlinks) {
+		t.Fatalf("got %v, want the symlink loop reported", err)
 	}
 }
 

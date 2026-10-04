@@ -318,19 +318,19 @@ func TestNSSDBIsLeftAloneWhenItCannotBePlaced(t *testing.T) {
 			mustWriteFile(t, filepath.Join(rootfs, "home/app"), "")
 		}},
 		"HOME above the root": {env: []string{"HOME=/../../.."}, template: true},
-		"a HOME escaping the rootfs": {env: []string{"HOME=/up"}, template: true, arrange: func(t *testing.T, _, rootfs string) {
-			mustSymlink(t, "../../../../..", filepath.Join(rootfs, "up"))
+		"a HOME behind a symlink loop": {env: []string{"HOME=/loop"}, template: true, arrange: func(t *testing.T, _, rootfs string) {
+			mustSymlink(t, "loop", filepath.Join(rootfs, "loop"))
 		}},
 		"a passwd that is a FIFO": {home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
 			if err := syscall.Mkfifo(filepath.Join(rootfs, "etc/passwd"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}},
-		"a passwd escaping the rootfs": {home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
+		"a passwd behind a symlink loop": {home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
 			if err := os.RemoveAll(filepath.Join(rootfs, "etc")); err != nil {
 				t.Fatal(err)
 			}
-			mustSymlink(t, "../../../../..", filepath.Join(rootfs, "etc"))
+			mustSymlink(t, "etc", filepath.Join(rootfs, "etc"))
 		}},
 		"a ~/.pki that is a file": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
 			mustWriteFile(t, filepath.Join(rootfs, "root/.pki"), "")
@@ -341,9 +341,6 @@ func TestNSSDBIsLeftAloneWhenItCannotBePlaced(t *testing.T) {
 		"a database that is a file": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
 			mustMkdirAll(t, filepath.Join(rootfs, "root/.pki"))
 			mustWriteFile(t, filepath.Join(rootfs, "root/.pki/nssdb"), "")
-		}},
-		"a database under a symlink out of the rootfs": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, _, rootfs string) {
-			mustSymlink(t, "../../../../../..", filepath.Join(rootfs, "root/.pki"))
 		}},
 		"a mount over the home": {env: []string{"HOME=/root"}, home: "/root", template: true, arrange: func(t *testing.T, bundle, _ string) {
 			mountAt(t, bundle, "/root")

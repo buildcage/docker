@@ -22,24 +22,43 @@ func TestResolveInRootRefusesToEscape(t *testing.T) {
 	outside := filepath.Join(t.TempDir(), "host-secret")
 	mustWriteFile(t, outside, "x")
 	mustMkdirAll(t, filepath.Join(root, "etc"))
+	mustSymlink(t, outside, filepath.Join(root, "etc", "ca.pem"))
 
-	cases := map[string]string{
-		"symlink to an absolute host path": outside,
-		"symlink climbing out with ..":     "../../../../../../etc/passwd",
+	// The property that matters is that nothing outside the rootfs is ever
+	// returned. Refusing outright and failing to find a path that only exists
+	// on the host are both acceptable.
+	resolved, err := resolveInRoot(root, "/etc/ca.pem")
+	if err == nil && !strings.HasPrefix(resolved, root+string(os.PathSeparator)) {
+		t.Fatalf("resolved outside the rootfs: %s", resolved)
 	}
-	for name, target := range cases {
+	if resolved == outside {
+		t.Fatal("resolved to the host file")
+	}
+}
+
+// ".." at the root of the rootfs stays there, as it does for the kernel inside
+// the container, so a relative link with more ".." than it is deep still lands
+// on the file the container sees.
+func TestResolveInRootStopsDotDotAtTheRoot(t *testing.T) {
+	for name, c := range map[string]struct{ link, target, path, want string }{
+		"a file link":      {"etc/ssl/certs/ca-certificates.crt", "../../../../../real/ca.crt", "/etc/ssl/certs/ca-certificates.crt", "real/ca.crt"},
+		"a directory link": {"etc/ssl/certs", "../../../../../real", "/etc/ssl/certs/ca.crt", "real/ca.crt"},
+		"a host path":      {"etc/ca.pem", "../../../../../../etc/passwd", "/etc/ca.pem", "etc/passwd"},
+	} {
 		t.Run(name, func(t *testing.T) {
-			link := filepath.Join(root, "etc", "ca.pem")
-			mustSymlink(t, target, link)
-			// The property that matters is that nothing outside the rootfs is
-			// ever returned. Refusing outright and failing to find a path that
-			// only exists on the host are both acceptable.
-			resolved, err := resolveInRoot(root, "/etc/ca.pem")
-			if err == nil && !strings.HasPrefix(resolved, root+string(os.PathSeparator)) {
-				t.Fatalf("resolved outside the rootfs: %s", resolved)
+			root := t.TempDir()
+			mustMkdirAll(t, filepath.Join(root, filepath.Dir(c.link)))
+			mustSymlink(t, c.target, filepath.Join(root, c.link))
+			want := filepath.Join(root, c.want)
+			mustMkdirAll(t, filepath.Dir(want))
+			mustWriteFile(t, want, "x")
+
+			resolved, err := resolveInRoot(root, c.path)
+			if err != nil {
+				t.Fatal(err)
 			}
-			if resolved == outside {
-				t.Fatal("resolved to the host file")
+			if resolved != want {
+				t.Fatalf("resolved to %s, want %s", resolved, want)
 			}
 		})
 	}

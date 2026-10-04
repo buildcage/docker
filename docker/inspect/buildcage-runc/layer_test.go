@@ -532,41 +532,40 @@ func TestSweepDirReportsALinkItCannotRemove(t *testing.T) {
 }
 
 // The link's own directory is resolved inside the rootfs, and a rootfs where
-// that directory is a symlink climbing out is refused rather than followed.
-func TestSweepDirReportsALinkWhoseDirectoryEscapes(t *testing.T) {
+// that directory cannot be resolved fails the sweep.
+func TestSweepDirReportsALinkWhoseDirectoryCannotBeResolved(t *testing.T) {
 	root, upper := t.TempDir(), t.TempDir()
 	// A copy the file pass empties and removes, so the link pass is reached.
 	mustWriteFile(t, filepath.Join(upper, "buildcage.pem"), string(testCA))
 	mustHardLink(t, filepath.Join(upper, "buildcage.pem"), filepath.Join(root, "buildcage.pem"))
 	// The listing has a real subdirectory with a link in it, so the walk
 	// reaches the link and its readlink succeeds.
-	mustMkdirAll(t, filepath.Join(upper, "sub"))
-	mustSymlink(t, "x", filepath.Join(upper, "sub", "hash.0"))
-	// The rootfs resolves that subdirectory to a symlink climbing out of it.
-	mustSymlink(t, "../../../../../../outside", filepath.Join(root, "sub"))
+	mustMkdirAll(t, filepath.Join(upper, "sub", "inner"))
+	mustSymlink(t, "x", filepath.Join(upper, "sub", "inner", "hash.0"))
+	// In the rootfs, a file stands where that subdirectory's parent should be.
+	mustWriteFile(t, filepath.Join(root, "sub"), "")
 
-	if _, err := sweepDir(upper, root, testCA, caMarksOf(testCA)); !errors.Is(err, errEscapesRoot) {
-		t.Fatalf("got %v, want the escaping link directory to be refused", err)
+	if _, err := sweepDir(upper, root, testCA, caMarksOf(testCA)); !errors.Is(err, syscall.ENOTDIR) {
+		t.Fatalf("got %v, want the unresolvable link directory to be reported", err)
 	}
 }
 
-// A link pointing out of the rootfs resolves to nothing inside it, so it is
-// not pointing at anything the sweep removed and is left alone rather than
-// failing the build.
-func TestSweepDirLeavesALinkPointingOutOfTheRoot(t *testing.T) {
+// A link whose target does not resolve inside the rootfs is not pointing at
+// anything the sweep removed, so it is left alone rather than failing the
+// build.
+func TestSweepDirLeavesALinkWhoseTargetDoesNotResolve(t *testing.T) {
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "buildcage.pem"), string(testCA))
-	// A directory in the target's path is itself a symlink climbing out of the
-	// root, so resolving the target escapes. The link's own directory still
-	// resolves, so only its target is out of bounds.
-	mustSymlink(t, "../../../../../../outside", filepath.Join(dir, "out"))
-	mustSymlink(t, "out/bundle.pem", filepath.Join(dir, "escape.0"))
+	// A directory in the target's path is a symlink loop. The link's own
+	// directory still resolves, so only its target fails.
+	mustSymlink(t, "loop", filepath.Join(dir, "loop"))
+	mustSymlink(t, "loop/bundle.pem", filepath.Join(dir, "unresolvable.0"))
 
 	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
-		t.Fatalf("an out-of-root link should be left alone, got %v", err)
+		t.Fatalf("an unresolvable link should be left alone, got %v", err)
 	}
-	if _, err := os.Lstat(filepath.Join(dir, "escape.0")); err != nil {
-		t.Fatalf("the out-of-root link was taken away: %v", err)
+	if _, err := os.Lstat(filepath.Join(dir, "unresolvable.0")); err != nil {
+		t.Fatalf("the unresolvable link was taken away: %v", err)
 	}
 }
 
