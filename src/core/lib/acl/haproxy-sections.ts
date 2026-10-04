@@ -81,8 +81,12 @@ export function resolversSection(): string[] {
   ];
 }
 
-/** The `origin_tls` and `origin_plain` backends. */
+/** A gRPC stream can stay silent longer than the 30s inactivity timeouts. */
+export const GRPC_REQUEST = "{ req.hdr(content-type) -m beg application/grpc }";
+
+/** The `origin_tls`, `origin_tls_h2` and `origin_plain` backends. */
 export function originBackends(systemCaFile: string): string[] {
+  const server = `    server origin 0.0.0.0 ssl verify required ca-file ${systemCaFile} sni var(txn.host)`;
   return [
     "# The only place a request reaches the origin, so where its certificate is",
     "# checked; a refused request never gets here. The SNI is the port-free",
@@ -90,7 +94,15 @@ export function originBackends(systemCaFile: string): string[] {
     "# not a name and port.",
     "backend origin_tls",
     "    mode http",
-    `    server origin 0.0.0.0 ssl verify required ca-file ${systemCaFile} sni var(txn.host)`,
+    server,
+    "",
+    "# Only an h2 client's request is offered h2: one from HTTP/1.1 would reach",
+    "# the origin with no :authority, which some origins refuse. A WebSocket",
+    "# still goes over HTTP/1.1 (`ws auto`), as few origins support RFC 8441.",
+    "backend origin_tls_h2",
+    "    mode http",
+    `    http-request set-timeout server 1h if ${GRPC_REQUEST}`,
+    `${server} alpn h2,http/1.1`,
     "",
     "backend origin_plain",
     "    mode http",

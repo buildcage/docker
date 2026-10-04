@@ -9,6 +9,7 @@ import {
 } from "./haproxy-matchers.ts";
 import { deniesEverything, ruleBlock } from "./haproxy-rule-block.ts";
 import { HOST_IS_ADDRESS, type CompiledRule } from "./haproxy-rules.ts";
+import { GRPC_REQUEST } from "./haproxy-sections.ts";
 
 /** One inspected frontend; the pair differs only in these. */
 export interface InspectStageSpec {
@@ -20,6 +21,8 @@ export interface InspectStageSpec {
   scheme: "https" | "http";
   rules: CompiledRule[];
   backend: string;
+  /** Where a client that negotiated h2 goes instead of `backend`. */
+  h2Backend?: string;
 }
 
 /** What both frontends share. */
@@ -105,7 +108,7 @@ const PLAIN_REQUEST_TIMEOUTS = [
  * rules decide, and only then resolves the Host and connects there.
  */
 export function inspectStage(
-  { name, port, bindExtra, scheme, rules, backend }: InspectStageSpec,
+  { name, port, bindExtra, scheme, rules, backend, h2Backend }: InspectStageSpec,
   ctx: InspectStageContext,
 ): string[] {
   const { mode } = ctx;
@@ -219,6 +222,12 @@ export function inspectStage(
       ...internalDstAcl("dst_internal", ctx),
       ...internalGuard(rules, ctx.listenPort),
     );
+    if (h2Backend !== undefined) {
+      l.push(`    http-request set-timeout client 1h if ${GRPC_REQUEST}`);
+    }
+  }
+  if (h2Backend !== undefined) {
+    l.push(`    use_backend ${h2Backend} if { ssl_fc_alpn -m str h2 }`);
   }
   l.push(`    default_backend ${backend}`, "");
   return l;

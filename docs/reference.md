@@ -328,13 +328,12 @@ carries (under `inspect`, even one an `allowed_tls_rules` entry names), and the 
 under the `IP` rule type. Prefer a domain rule where the destination has a stable name.
 
 A connection passed through this way or by `allowed_tls_rules`, any allowed HTTPS connection under
-`universal`, and an upgraded WebSocket are closed after an hour with nothing sent either way, so an
-idle ssh session or pooled database connection stays open until then.
+`universal`, an upgraded WebSocket and a gRPC call are closed after an hour with nothing sent either
+way, so an idle ssh session or pooled database connection stays open until then.
 
 ### TLS passthrough: `allowed_tls_rules`
 
-For TLS traffic that isn't HTTPS, and for HTTPS that must not be decrypted, such as gRPC under
-`inspect`, which answers no ALPN and so fails a client that requires HTTP/2. The SNI and port are
+For TLS traffic that isn't HTTPS, and for HTTPS that must not be decrypted. The SNI and port are
 checked and the connection passes through undecrypted, so the build validates the origin's own
 certificate:
 

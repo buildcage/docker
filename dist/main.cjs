@@ -12366,50 +12366,6 @@ function resolverHosts(inputs) {
 	return hosts;
 }
 //#endregion
-//#region src/core/lib/acl/haproxy-inspect-stage.ts
-function clientTlsFields(scheme) {
-	return scheme === "https" ? " fcerr=%[fc_err_name] sni=%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]" : "";
-}
-function addressRules(rules) {
-	let isAddress = new RegExp(HOST_IS_ADDRESS);
-	return rules.filter((rule) => {
-		if (rule.hostMatch !== "wildcard") return !1;
-		let { op, pattern } = hostMatcher(rule.hostRegex);
-		return op === "-m str" && isAddress.test(pattern);
-	});
-}
-function internalGuard(rules, listenPort) {
-	let named = addressRules(rules);
-	if (named.length === 0) return [
-		"    http-request set-var(txn.reason) str(internal-address) if dst_internal",
-		"    http-request deny deny_status 403 if dst_internal",
-		""
-	];
-	let lines = ["    # An address a rule names as its host is exempt where that rule matches."];
-	for (let rule of named) {
-		let path = pathMatcher(rule.pathRegex), conds = [
-			`{ var(txn.host) -m str ${hostMatcher(rule.hostRegex).pattern} }`,
-			...rule.port ? [`{ dst_port ${rule.port} }`] : [],
-			`{ path ${path.op} ${escapeForHaproxy(path.pattern)} }`,
-			...rule.methods ? [`{ method ${rule.methods.join(" ")} }`] : []
-		];
-		lines.push(`    # ${rule.raw}`, `    http-request set-var(txn.named_address) bool(true) if ${conds.join(" ")}`);
-	}
-	return lines.push("    acl named_address var(txn.named_address) -m bool", `    acl dst_proxy_self var(txn.dst) -m ip ${PROXY_SUBNET}`, `    acl dst_proxy_self dst_port ${listenPort}`, "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address or dst_internal dst_proxy_self", "    http-request deny deny_status 403 if dst_internal !named_address or dst_internal dst_proxy_self", ""), lines;
-}
-const PLAIN_REQUEST_TIMEOUTS = [
-	"    # detect's client timeout runs from the connection, this frontend's from",
-	"    # the hand-off after detect's 5s inspect-delay. Ending a silent client's",
-	"    # wait here first logs it as a timeout rather than a close. The",
-	"    # keep-alive wait stays at the client timeout.",
-	"    timeout http-request 20s",
-	"    timeout http-keep-alive 30s"
-];
-function inspectStage({ name, port, bindExtra, scheme, rules, backend }, ctx) {
-	let { mode } = ctx, logFormat = `"buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${clientTlsFields(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`, l = [];
-	return l.push(`frontend ${name}`, `    bind 127.0.0.1:${port} accept-proxy${bindExtra}`, "    mode http", ...scheme === "http" ? PLAIN_REQUEST_TIMEOUTS : [], "    http-request set-var(txn.host_log) 'req.hdr(host),regsub(\"[\\s\\\"[:cntrl:]]\",_,g)'", "", "    # Decode before stripping `..`: `.` is unreserved, so `%2e%2e` is not", "    # a dot-dot segment until decoded, and stripping first would miss it.", "    http-request normalize-uri percent-decode-unreserved", "    http-request normalize-uri path-strip-dotdot", "", "    # pathq, not %HU: %HU is the target as sent (a path over HTTP/1.1, an", "    # absolute URI over HTTP/2), and pathq is not readable at log time.", "    # Set after normalization, so the log shows the path the rules matched.", "    http-request set-var(txn.pathq) 'pathq,regsub(\"[\\\"[:cntrl:]]\",_,g)'", "", "    # A request with no Host names nothing: the rules match on it, the", "    # origin is resolved from it, and the log's URL is built from it. Named", "    # here rather than left to the log's own empty fields, which a Host the", "    # client chose can imitate. Refused in `audit` too, as the same check", "    # in the universal engine is: there is nothing to connect to either way.", "    # Ahead of the path denies below, so that a request carrying neither a", "    # Host nor a legal path is named by the one the report can act on: the", "    # other leaves a row named for the `-` the log prints in its place.", "    acl has_host hdr(host) -m found", "    acl host_not_empty hdr_len(host) gt 0", "    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty", "    http-request deny deny_status 400 if !has_host or !host_not_empty", "", "    # The one Host every later step reads. An acl on req.hdr(host) scans", "    # every value while a fetch takes the last, so reading the header twice", "    # could judge one value and connect to another.", `    http-request set-var(txn.host) req.hdr(host),lower,${HOST_ONLY}`, "    # A `:` left in the name could let a `~` rule's port pattern match it.", "    # Refused in `audit` too.", `    acl host_is_name var(txn.host) -m reg ${HOSTNAME_CHARSET}`, "    http-request set-var(txn.reason) str(invalid-host) if !host_is_name", "    http-request deny deny_status 400 if !host_is_name", "", "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may", "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a", "    # valid path char at all. None is stripped, so each is refused. A lone", "    # encoded separator stays legal (e.g. npm's `/@scope%2fpackage`).", "    # `;` (or `%3b`) ends a segment too: Tomcat and Jetty drop what follows", "    # as a path parameter, so they read `..;/` as `../`.", "    # `\\\\` is one literal backslash: HAProxy's parser takes the pair as one.", "    http-request deny deny_status 403 if { path -m reg -i (^|/|%2f|%5c)\\.\\.($|/|;|%2f|%5c|%3b) }", "    http-request deny deny_status 403 if { path -m sub \\\\ }", "", `    log-format ${logFormat}`, ...scheme === "https" ? [`    error-log-format ${logFormat}`] : [], ""), l.push(...ruleBlock(rules, mode, scheme)), deniesEverything(rules, mode) || l.push("    # Connect to the address this proxy resolves the Host to, discarding", "    # the client's address, so a forged Host or doctored /etc/hosts cannot", "    # choose the target.", "    # txn.host has already dropped the port a header carries, which is not", "    # part of the name. An address is taken as-is: no resolver can answer", "    # one, and the rules above already decided, so nothing is loosened.", `    acl host_is_address var(txn.host) -m reg ${HOST_IS_ADDRESS}`, "    http-request set-var(txn.dst) var(txn.host) if host_is_address", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address", "    # A fresh attempt, not a replay: nothing cached the failure.", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address or { var(txn.dst) -m found }", "    http-request set-var(txn.reason) str(dns-failed) unless { var(txn.dst) -m found }", "    http-request deny deny_status 502 unless { var(txn.dst) -m found }", "", "    # Set before the internal-destination check below, not after: %[dst] in", "    # the log-format is this, and a refusal must show the address that", "    # tripped it, not whatever the client's own (fake, unresolved) address", "    # was: CoreDNS never hands out a real one; see coredns-config.ts.", "    http-request set-dst var(txn.dst)", "", "    # A resolved destination may not be internal; see INTERNAL_RANGES.", ...internalDstAcl("dst_internal", ctx), ...internalGuard(rules, ctx.listenPort)), l.push(`    default_backend ${backend}`, ""), l;
-}
-//#endregion
 //#region src/core/lib/acl/haproxy-sections.ts
 function preamble(spec) {
 	return [
@@ -12454,7 +12410,9 @@ function resolversSection() {
 		""
 	];
 }
+const GRPC_REQUEST = "{ req.hdr(content-type) -m beg application/grpc }";
 function originBackends(systemCaFile) {
+	let server = `    server origin 0.0.0.0 ssl verify required ca-file ${systemCaFile} sni var(txn.host)`;
 	return [
 		"# The only place a request reaches the origin, so where its certificate is",
 		"# checked; a refused request never gets here. The SNI is the port-free",
@@ -12462,13 +12420,65 @@ function originBackends(systemCaFile) {
 		"# not a name and port.",
 		"backend origin_tls",
 		"    mode http",
-		`    server origin 0.0.0.0 ssl verify required ca-file ${systemCaFile} sni var(txn.host)`,
+		server,
+		"",
+		"# Only an h2 client's request is offered h2: one from HTTP/1.1 would reach",
+		"# the origin with no :authority, which some origins refuse. A WebSocket",
+		"# still goes over HTTP/1.1 (`ws auto`), as few origins support RFC 8441.",
+		"backend origin_tls_h2",
+		"    mode http",
+		`    http-request set-timeout server 1h if ${GRPC_REQUEST}`,
+		`${server} alpn h2,http/1.1`,
 		"",
 		"backend origin_plain",
 		"    mode http",
 		"    server origin 0.0.0.0",
 		""
 	];
+}
+//#endregion
+//#region src/core/lib/acl/haproxy-inspect-stage.ts
+function clientTlsFields(scheme) {
+	return scheme === "https" ? " fcerr=%[fc_err_name] sni=%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]" : "";
+}
+function addressRules(rules) {
+	let isAddress = new RegExp(HOST_IS_ADDRESS);
+	return rules.filter((rule) => {
+		if (rule.hostMatch !== "wildcard") return !1;
+		let { op, pattern } = hostMatcher(rule.hostRegex);
+		return op === "-m str" && isAddress.test(pattern);
+	});
+}
+function internalGuard(rules, listenPort) {
+	let named = addressRules(rules);
+	if (named.length === 0) return [
+		"    http-request set-var(txn.reason) str(internal-address) if dst_internal",
+		"    http-request deny deny_status 403 if dst_internal",
+		""
+	];
+	let lines = ["    # An address a rule names as its host is exempt where that rule matches."];
+	for (let rule of named) {
+		let path = pathMatcher(rule.pathRegex), conds = [
+			`{ var(txn.host) -m str ${hostMatcher(rule.hostRegex).pattern} }`,
+			...rule.port ? [`{ dst_port ${rule.port} }`] : [],
+			`{ path ${path.op} ${escapeForHaproxy(path.pattern)} }`,
+			...rule.methods ? [`{ method ${rule.methods.join(" ")} }`] : []
+		];
+		lines.push(`    # ${rule.raw}`, `    http-request set-var(txn.named_address) bool(true) if ${conds.join(" ")}`);
+	}
+	return lines.push("    acl named_address var(txn.named_address) -m bool", `    acl dst_proxy_self var(txn.dst) -m ip ${PROXY_SUBNET}`, `    acl dst_proxy_self dst_port ${listenPort}`, "    http-request set-var(txn.reason) str(internal-address) if dst_internal !named_address or dst_internal dst_proxy_self", "    http-request deny deny_status 403 if dst_internal !named_address or dst_internal dst_proxy_self", ""), lines;
+}
+const PLAIN_REQUEST_TIMEOUTS = [
+	"    # detect's client timeout runs from the connection, this frontend's from",
+	"    # the hand-off after detect's 5s inspect-delay. Ending a silent client's",
+	"    # wait here first logs it as a timeout rather than a close. The",
+	"    # keep-alive wait stays at the client timeout.",
+	"    timeout http-request 20s",
+	"    timeout http-keep-alive 30s"
+];
+function inspectStage({ name, port, bindExtra, scheme, rules, backend, h2Backend }, ctx) {
+	let { mode } = ctx, logFormat = `"buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${clientTlsFields(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`, l = [];
+	return l.push(`frontend ${name}`, `    bind 127.0.0.1:${port} accept-proxy${bindExtra}`, "    mode http", ...scheme === "http" ? PLAIN_REQUEST_TIMEOUTS : [], "    http-request set-var(txn.host_log) 'req.hdr(host),regsub(\"[\\s\\\"[:cntrl:]]\",_,g)'", "", "    # Decode before stripping `..`: `.` is unreserved, so `%2e%2e` is not", "    # a dot-dot segment until decoded, and stripping first would miss it.", "    http-request normalize-uri percent-decode-unreserved", "    http-request normalize-uri path-strip-dotdot", "", "    # pathq, not %HU: %HU is the target as sent (a path over HTTP/1.1, an", "    # absolute URI over HTTP/2), and pathq is not readable at log time.", "    # Set after normalization, so the log shows the path the rules matched.", "    http-request set-var(txn.pathq) 'pathq,regsub(\"[\\\"[:cntrl:]]\",_,g)'", "", "    # A request with no Host names nothing: the rules match on it, the", "    # origin is resolved from it, and the log's URL is built from it. Named", "    # here rather than left to the log's own empty fields, which a Host the", "    # client chose can imitate. Refused in `audit` too, as the same check", "    # in the universal engine is: there is nothing to connect to either way.", "    # Ahead of the path denies below, so that a request carrying neither a", "    # Host nor a legal path is named by the one the report can act on: the", "    # other leaves a row named for the `-` the log prints in its place.", "    acl has_host hdr(host) -m found", "    acl host_not_empty hdr_len(host) gt 0", "    http-request set-var(txn.reason) str(missing-host-header) if !has_host or !host_not_empty", "    http-request deny deny_status 400 if !has_host or !host_not_empty", "", "    # The one Host every later step reads. An acl on req.hdr(host) scans", "    # every value while a fetch takes the last, so reading the header twice", "    # could judge one value and connect to another.", `    http-request set-var(txn.host) req.hdr(host),lower,${HOST_ONLY}`, "    # A `:` left in the name could let a `~` rule's port pattern match it.", "    # Refused in `audit` too.", `    acl host_is_name var(txn.host) -m reg ${HOSTNAME_CHARSET}`, "    http-request set-var(txn.reason) str(invalid-host) if !host_is_name", "    http-request deny deny_status 400 if !host_is_name", "", "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may", "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a", "    # valid path char at all. None is stripped, so each is refused. A lone", "    # encoded separator stays legal (e.g. npm's `/@scope%2fpackage`).", "    # `;` (or `%3b`) ends a segment too: Tomcat and Jetty drop what follows", "    # as a path parameter, so they read `..;/` as `../`.", "    # `\\\\` is one literal backslash: HAProxy's parser takes the pair as one.", "    http-request deny deny_status 403 if { path -m reg -i (^|/|%2f|%5c)\\.\\.($|/|;|%2f|%5c|%3b) }", "    http-request deny deny_status 403 if { path -m sub \\\\ }", "", `    log-format ${logFormat}`, ...scheme === "https" ? [`    error-log-format ${logFormat}`] : [], ""), l.push(...ruleBlock(rules, mode, scheme)), deniesEverything(rules, mode) || (l.push("    # Connect to the address this proxy resolves the Host to, discarding", "    # the client's address, so a forged Host or doctored /etc/hosts cannot", "    # choose the target.", "    # txn.host has already dropped the port a header carries, which is not", "    # part of the name. An address is taken as-is: no resolver can answer", "    # one, and the rules above already decided, so nothing is loosened.", `    acl host_is_address var(txn.host) -m reg ${HOST_IS_ADDRESS}`, "    http-request set-var(txn.dst) var(txn.host) if host_is_address", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address", "    # A fresh attempt, not a replay: nothing cached the failure.", "    http-request do-resolve(txn.dst,buildcage,ipv4) var(txn.host) unless host_is_address or { var(txn.dst) -m found }", "    http-request set-var(txn.reason) str(dns-failed) unless { var(txn.dst) -m found }", "    http-request deny deny_status 502 unless { var(txn.dst) -m found }", "", "    # Set before the internal-destination check below, not after: %[dst] in", "    # the log-format is this, and a refusal must show the address that", "    # tripped it, not whatever the client's own (fake, unresolved) address", "    # was: CoreDNS never hands out a real one; see coredns-config.ts.", "    http-request set-dst var(txn.dst)", "", "    # A resolved destination may not be internal; see INTERNAL_RANGES.", ...internalDstAcl("dst_internal", ctx), ...internalGuard(rules, ctx.listenPort)), h2Backend !== void 0 && l.push(`    http-request set-timeout client 1h if ${GRPC_REQUEST}`)), h2Backend !== void 0 && l.push(`    use_backend ${h2Backend} if { ssl_fc_alpn -m str h2 }`), l.push(`    default_backend ${backend}`, ""), l;
 }
 //#endregion
 //#region src/core/lib/acl/haproxy-config.ts
@@ -12520,7 +12530,8 @@ function generateHaproxyConfig(options) {
 			bindExtra: ` ssl crt ${opts.defaultCertFile} generate-certificates ca-sign-file ${opts.caSignFile}`,
 			scheme: "https",
 			rules: httpsRules,
-			backend: "origin_tls"
+			backend: "origin_tls",
+			h2Backend: "origin_tls_h2"
 		}, {
 			mode,
 			listenPort: opts.listenPort,

@@ -25,6 +25,8 @@ ENV C='curl -sS -o /dev/null -w %{http_code} --max-time 10'
 #     GET https://allowed.example.com:9443/public/**
 #     GET|POST https://api.example.com/v1/*
 #     GET https://*.wildcard.example.com/public/**
+#     POST https://grpc.example.com/grpc.health.v1.Health/Check
+#     POST https://grpc.example.com/grpc.health.v1.Health/Watch
 #   allowed_https_rules: sub.wildcard.example.com:443 absent.example.com:443
 #                        v6only.example.com:443 metadata.example.com:443
 #                        runner.example.com:443 impostor.example.com:443
@@ -499,5 +501,28 @@ RUN echo "=== [A copy of the store outside it] ===" && \
     mkdir -p /app && \
     cp /etc/ssl/certs/ca-certificates.crt /app/bundle.pem && \
     echo "OK: copied"
+
+# gRPC needs HTTP/2 to the client and to the origin, and grpc-go refuses a
+# connection where ALPN did not choose it.
+RUN --mount=type=bind,source=test-grpc-inspect/bin,target=/grpc \
+    echo "=== [gRPC - method allowed] ===" && \
+    OUT=$(/grpc/grpc-fixture check) && \
+    echo "$OUT" && \
+    [ "$OUT" = "SERVING" ] || (echo "FAILED" && exit 1)
+
+# Unimplemented would mean the call reached the origin.
+RUN --mount=type=bind,source=test-grpc-inspect/bin,target=/grpc \
+    echo "=== [gRPC - method not allowed] ===" && \
+    OUT=$(/grpc/grpc-fixture invoke -method /grpc.health.v1.Health/Absent) && \
+    echo "$OUT" && \
+    [ "$OUT" = "PermissionDenied" ] || (echo "FAILED: expected PermissionDenied" && exit 1)
+
+# The origin is silent for 35s between its two messages, past the 30s client
+# and server timeouts.
+RUN --mount=type=bind,source=test-grpc-inspect/bin,target=/grpc \
+    echo "=== [gRPC - stream silent past the timeouts] ===" && \
+    OUT=$(/grpc/grpc-fixture watch) && \
+    echo "$OUT" && \
+    [ "$OUT" = "messages=2" ] || (echo "FAILED" && exit 1)
 
 RUN echo "=== End of test ==="
