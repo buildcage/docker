@@ -96,7 +96,8 @@ to: destination spoofing is removed rather than detected. A connection an `allow
 covers is the one exception: that rule names the address itself, so the connection goes there
 whatever name it carries. A name with anything but letters, digits,
 `.`, `_` and `-` in it never reaches a rule, in `audit` too: `universal` refuses such an SNI
-(`invalid-sni`), and `inspect` never passes one through and refuses such a `Host` (`invalid-host`).
+(`invalid-sni`) or plaintext `Host` (`invalid-host`), and `inspect` never passes one through and
+refuses such a `Host` (`invalid-host`).
 A `:` in the name could otherwise let a `~` rule's port pattern match a name the proxy then looks up.
 
 That order is an invariant, not an optimisation. Reversed, resolution would become the exfiltration

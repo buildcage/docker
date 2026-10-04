@@ -16,7 +16,7 @@ assert_log_contains ALLOWED "allowed.example.com:80" "-"
 assert_log_contains ALLOWED "allowed.example.com:8443" "-"
 assert_log_contains ALLOWED "allowed.example.com:8080" "-"
 assert_log_contains ALLOWED "ALLOWED.example.com:443" "-"
-assert_log_contains ALLOWED "ALLOWED.example.com:80" "-"
+# host_only lowercases a plaintext Host, so that request logs as allowed.example.com:80.
 assert_log_contains ALLOWED "ok.regex.example.com:443" "-"
 assert_log_contains ALLOWED "ports.regex.example.com:443" "-"
 assert_log_contains ALLOWED "ports.regex.example.com:8443" "-"
@@ -52,6 +52,10 @@ echo ""
 
 echo "[BLOCKED] an SNI holding a colon, before a ~ rule's port pattern can match it:"
 assert_log_contains BLOCKED "tlsany.example.com_x.evil.example.net:443" "invalid-sni"
+echo ""
+
+echo "[BLOCKED] a plaintext Host holding a colon, likewise:"
+assert_log_contains BLOCKED "tlsany.example.com_x.evil.example.net:80" "invalid-host"
 echo ""
 
 echo "[keep-alive] txn.decision/txn.reason must not leak across requests on one connection:"
