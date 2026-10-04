@@ -82,7 +82,11 @@ export function buildComposeLogsArgs({
   ];
 }
 
-/** Build the `docker compose ... down` argv; see buildComposeUpArgs above. */
+/**
+ * Build the `docker compose ... down` argv; see buildComposeUpArgs above.
+ * `-v` removes the anonymous volume an image's VOLUME gets on each `up`
+ * (moby/buildkit's /var/lib/buildkit), which would otherwise pile up.
+ */
 export function buildComposeDownArgs({ composeFile, projectName }: ComposeArgsOptions): string[] {
-  return ["compose", "-f", composeFile, "-p", projectName, "down"];
+  return ["compose", "-f", composeFile, "-p", projectName, "down", "-v"];
 }

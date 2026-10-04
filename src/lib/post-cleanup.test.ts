@@ -25,7 +25,15 @@ describe("planPostCleanup", () => {
       { getInput: inputs({ builder_name: "second" }) },
     );
 
-    expect(args).toStrictEqual(["compose", "-f", COMPOSE_FILE, "-p", expect.any(String), "down"]);
+    expect(args).toStrictEqual([
+      "compose",
+      "-f",
+      COMPOSE_FILE,
+      "-p",
+      expect.any(String),
+      "down",
+      "-v",
+    ]);
     expect(env).toStrictEqual({ PATH: "/usr/bin", BUILDER_NAME: "second" });
   });
 
@@ -89,6 +97,14 @@ describe("planPostCleanup", () => {
       { getInput: inputs({ builder_name: "second" }) },
     );
 
-    expect(args).toStrictEqual(["compose", "-f", COMPOSE_FILE, "-p", "buildcage-e2e", "down"]);
+    expect(args).toStrictEqual([
+      "compose",
+      "-f",
+      COMPOSE_FILE,
+      "-p",
+      "buildcage-e2e",
+      "down",
+      "-v",
+    ]);
   });
 });

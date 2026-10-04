@@ -68,7 +68,7 @@ describe("buildComposeLogsArgs", () => {
 });
 
 describe("buildComposeDownArgs", () => {
-  it("always includes -p <projectName> alongside -f <composeFile>", () => {
+  it("includes -p <projectName> alongside -f <composeFile>, and removes volumes", () => {
     const args = buildComposeDownArgs({
       composeFile: "/path/to/compose.yaml",
       projectName: "buildcage-proxy-abcd1234",
@@ -80,6 +80,7 @@ describe("buildComposeDownArgs", () => {
       "-p",
       "buildcage-proxy-abcd1234",
       "down",
+      "-v",
     ]);
   });
 });
