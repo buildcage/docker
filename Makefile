@@ -226,12 +226,18 @@ test_integration_buildkit_universal_restrict_no_traffic: ## Run universal-engine
 	@node src/post.ts
 	@$(MAKE) clean_buildkit
 
+# Built outside the cage, which would refuse the module downloads.
+.PHONY: grpc_fixture_client
+grpc_fixture_client:
+	@docker build -q --platform $(TEST_PLATFORM) --target client \
+	  --output type=local,dest=test/test-grpc-inspect/bin test/test-grpc-inspect >/dev/null
+
 # The Alpine build the CA-residue and layer-bloat guards run against. Every
 # inspect build injects the same CA the same way, so the other Alpine image
 # (Dockerfile.inspect-audit, built by the round trip) would prove nothing more.
 # Dockerfile.inspect-python checks the CA under Python 3.13's strict verification.
 .PHONY: test_integration_buildkit_inspect_restrict
-test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode tests
+test_integration_buildkit_inspect_restrict: grpc_fixture_client ## Run inspect-engine restrict mode tests
 	@echo "Running inspect-engine restrict mode tests..."
 	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
 	  $(MAKE) setup_buildkit_inspect_restrict

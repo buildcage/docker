@@ -35,6 +35,11 @@ services:
         GET|POST https://api.example.com/v1/*
         GET http://10.200.0.100/pub-by-addr/**
 
+        # gRPC names a method by path, so a URL rule can allow one and not
+        # another on the same host.
+        POST https://grpc.example.com/grpc.health.v1.Health/Check
+        POST https://grpc.example.com/grpc.health.v1.Health/Watch
+
         # The one real, non-fixture host: apt has to bootstrap ca-certificates
         # over the real archive before it has anything of its own to reuse the
         # fixture with (see Dockerfile.inspect-debian).
@@ -107,6 +112,19 @@ services:
       - NET_ADMIN
     environment:
       - TEST_NET_ADDR=10.200.0.101/24
+    networks:
+      test-net:
+
+  # A gRPC origin, which only an HTTP/2 connection from the proxy can reach.
+  test-grpc:
+    build: test/test-grpc-inspect
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - TEST_NET_ADDR=10.200.0.103/24
+    volumes:
+      - ./test/test-server-inspect/cert.pem:/certs/cert.pem:ro
+      - ./test/test-server-inspect/key.pem:/certs/key.pem:ro
     networks:
       test-net:
 

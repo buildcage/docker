@@ -116,6 +116,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions): string {
         scheme: "https",
         rules: httpsRules,
         backend: "origin_tls",
+        h2Backend: "origin_tls_h2",
       },
       { mode, listenPort: opts.listenPort, ...shared },
     ),

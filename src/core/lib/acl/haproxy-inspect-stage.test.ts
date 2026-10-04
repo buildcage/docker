@@ -18,6 +18,21 @@ function plainStage(inputs: RuleInputs, mode: "restrict" | "audit" = "restrict")
   ).join("\n");
 }
 
+function tlsStage(): string[] {
+  return inspectStage(
+    {
+      name: "https_in",
+      port: 10025,
+      bindExtra: "",
+      scheme: "https",
+      rules: compileRuleSet({}).https,
+      backend: "origin_tls",
+      h2Backend: "origin_tls_h2",
+    },
+    { mode: "audit", internalAddrs: INTERNAL_RANGES, listenPort: 10024 },
+  );
+}
+
 describe("inspect stage", () => {
   it("refuses a request with no Host before it judges the path", () => {
     // Both are refusals, so only the reason turns on the order, and one of the
@@ -98,6 +113,20 @@ describe("inspect stage", () => {
     expect(plain.includes("txn.allowed")).toBe(false);
     expect(plain.includes("-m str 169.254.169.254 } { dst_port 80 }")).toBe(true);
     expect(plain.includes("deny deny_status 403 if dst_internal !named_address")).toBe(true);
+  });
+
+  it("sends a client that negotiated h2 to the h2 backend, and only that one", () => {
+    expect(tlsStage().slice(-3, -1)).toStrictEqual([
+      "    use_backend origin_tls_h2 if { ssl_fc_alpn -m str h2 }",
+      "    default_backend origin_tls",
+    ]);
+    expect(plainStage({}).includes("use_backend")).toBe(false);
+  });
+
+  it("lets a gRPC call outlast the client timeout", () => {
+    const timeout =
+      "    http-request set-timeout client 1h if { req.hdr(content-type) -m beg application/grpc }";
+    expect(tlsStage().includes(timeout)).toBe(true);
   });
 });
 

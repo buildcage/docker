@@ -29,7 +29,17 @@ describe("the origin backends", () => {
     expect(originBackends("/tmp/other-ca.pem").filter((l) => l.includes("ca-file"))).toStrictEqual([
       "    server origin 0.0.0.0 ssl verify required ca-file /tmp/other-ca.pem " +
         "sni var(txn.host)",
+      "    server origin 0.0.0.0 ssl verify required ca-file /tmp/other-ca.pem " +
+        "sni var(txn.host) alpn h2,http/1.1",
     ]);
+  });
+
+  it("lets a gRPC call outlast the server timeout on the h2 backend", () => {
+    const backends = originBackends("/etc/ssl/certs/ca-certificates.crt");
+    const h2 = backends.slice(backends.indexOf("backend origin_tls_h2"));
+    expect(h2[2]).toBe(
+      "    http-request set-timeout server 1h if { req.hdr(content-type) -m beg application/grpc }",
+    );
   });
 });
 

@@ -4,3 +4,4 @@ node_modules
 /dist/qjs-test
 /dist/report-action
 /coverage
+/test/test-grpc-inspect/bin
