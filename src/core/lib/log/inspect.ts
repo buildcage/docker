@@ -177,6 +177,20 @@ function reasonFor(
 const REQUESTLESS_REASONS = new Set(["bad-request", "missing-host-header"]);
 
 /**
+ * The errors haproxy sets on a client connection during the TLS handshake.
+ * After one completes, a broken record sets `SSL_FATAL` instead; that client
+ * trusted the CA, so the termination state names how it ended.
+ */
+const CLIENT_HANDSHAKE_ERRORS = new Set([
+  "SSL_EMPTY",
+  "SSL_ABORT",
+  "SSL_TIMEOUT",
+  "SSL_HANDSHAKE",
+  "SSL_HANDSHAKE_HB",
+  "SSL_KILLED_HB",
+]);
+
+/**
  * The failures that are not this proxy's own: an origin that answered nothing
  * usable or broke off mid-transfer, one no passthrough could reach, and a name
  * the upstream resolver could not answer for a host the rules had already
@@ -229,6 +243,8 @@ function authorityOf(host: string, port: string, scheme: "http" | "https"): stri
 /**
  * The host of a connection that never delivered a whole request: its SNI, the
  * only name such a line carries, or failing that the address it was sent to.
+ * The SNI keeps a trailing dot, since the allowed_tls_rules entry that would
+ * pass the connection through is matched on it.
  *
  * The address names nothing where it is the proxy's own: CoreDNS answers every
  * name with it, so the connection was name-based and its name is gone. Any
@@ -239,7 +255,7 @@ function hostBeforeRequest(
   sni: string | undefined,
   address: string,
 ): { host: string; byAddress: boolean } {
-  if (sni !== undefined && sni !== "-") return { host: ruleHost(sni), byAddress: false };
+  if (sni !== undefined && sni !== "-") return { host: sniHost(sni), byAddress: false };
   if (address === PROXY_ADDRESS) return { host: UNKNOWN_HOST, byAddress: false };
   return { host: address, byAddress: true };
 }
@@ -251,7 +267,8 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
   const request = REQUEST.exec(trimmed);
   if (request) {
     // Its termination state reads as this proxy's refusal, which it is not.
-    const tlsFailed = request[3] === BAD_REQUEST_METHOD && request[11]?.startsWith("SSL_") === true;
+    const tlsFailed =
+      request[3] === BAD_REQUEST_METHOD && CLIENT_HANDSHAKE_ERRORS.has(request[11] ?? "");
     const incomplete = tlsFailed ? "client-tls-failed" : incompleteReason(request[6], request[3]);
     // Only the https stage connects with `ssl verify required`; the plain one
     // logs the field all the same and has no certificate behind it. See
