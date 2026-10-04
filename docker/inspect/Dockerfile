@@ -1,11 +1,15 @@
-# renovate: datasource=github-releases depName=containernetworking/plugins
+# renovate: datasource=github-release-attachments depName=containernetworking/plugins
 ARG CNI_VERSION=v1.9.1
+# renovate: datasource=github-release-attachments depName=containernetworking/plugins digestVersion=v1.9.1
 ARG CNI_SHA256_AMD64=b98f74a0f8522f0a83867178729c1aa70f2158f90c45a2ca8fa791db1c76b303
+# renovate: datasource=github-release-attachments depName=containernetworking/plugins digestVersion=v1.9.1
 ARG CNI_SHA256_ARM64=56171987d3947707c3563db2f4001bccaf50fd63468611b9f3cbecb1375ee7ec
 
-# renovate: datasource=github-releases depName=coredns/coredns
-ARG COREDNS_VERSION=1.14.7
+# renovate: datasource=github-release-attachments depName=coredns/coredns
+ARG COREDNS_VERSION=v1.14.7
+# renovate: datasource=github-release-attachments depName=coredns/coredns digestVersion=v1.14.7
 ARG COREDNS_SHA256_AMD64=9a09356438c6d9591cb80011a2a7a52f87fc3a113f6690e41f243f98b98faac9
+# renovate: datasource=github-release-attachments depName=coredns/coredns digestVersion=v1.14.7
 ARG COREDNS_SHA256_ARM64=bf26782d19b5340e3e6cb50f1ed6df72f58e4a30932c79d167f0f0a8b1e92e16
 
 # The BuildKit base is a release behind and carries HAProxy 3.2, whose resolver
@@ -30,7 +34,7 @@ RUN apk add --no-cache curl util-linux-misc && \
     echo "${CNI_SHA}  /tmp/cni.tgz" | sha256sum -c && \
     tar -C /opt/cni/bin -xz -f /tmp/cni.tgz ./bridge ./host-local ./loopback && \
     COREDNS_SHA=$([ "$ARCH" = "amd64" ] && echo "$COREDNS_SHA256_AMD64" || echo "$COREDNS_SHA256_ARM64") && \
-    curl -fsSL "https://github.com/coredns/coredns/releases/download/v${COREDNS_VERSION}/coredns_${COREDNS_VERSION}_linux_${ARCH}.tgz" \
+    curl -fsSL "https://github.com/coredns/coredns/releases/download/${COREDNS_VERSION}/coredns_${COREDNS_VERSION#v}_linux_${ARCH}.tgz" \
       -o /tmp/coredns.tgz && \
     echo "${COREDNS_SHA}  /tmp/coredns.tgz" | sha256sum -c && \
     tar -C /usr/local/bin -xz -f /tmp/coredns.tgz coredns
