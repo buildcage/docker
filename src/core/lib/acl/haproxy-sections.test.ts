@@ -16,6 +16,12 @@ describe("section boundaries", () => {
   });
 });
 
+describe("defaults", () => {
+  it("keeps an idle tunnel open past the client and server timeouts", () => {
+    expect(preamble({ global: [], defaults: [] }).includes("    timeout tunnel 1h")).toBe(true);
+  });
+});
+
 describe("the origin backends", () => {
   it("verifies against the CA file it is given, not one of its own", () => {
     // Every test that goes through generateHaproxyConfig runs with the default

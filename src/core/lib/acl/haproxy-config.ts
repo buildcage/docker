@@ -91,7 +91,12 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions): string {
         "    expose-experimental-directives",
         "    tune.ssl.default-dh-param 2048",
       ],
-      defaults: ["    timeout client 30s", "    timeout server 30s"],
+      defaults: [
+        "    timeout client 30s",
+        "    timeout server 30s",
+        "    timeout client-fin 30s",
+        "    timeout server-fin 30s",
+      ],
     }),
     ...resolversSection(),
     ...detectFrontend({

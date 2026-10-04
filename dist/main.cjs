@@ -12426,6 +12426,7 @@ function preamble(spec) {
 		"defaults",
 		"    log global",
 		"    timeout connect 5s",
+		"    timeout tunnel 1h",
 		...spec.defaults,
 		"",
 		"# Readiness for s6-notifyoncheck, and the dropped-log count for the report.",
@@ -12496,7 +12497,12 @@ function generateHaproxyConfig(options) {
 				"    expose-experimental-directives",
 				"    tune.ssl.default-dh-param 2048"
 			],
-			defaults: ["    timeout client 30s", "    timeout server 30s"]
+			defaults: [
+				"    timeout client 30s",
+				"    timeout server 30s",
+				"    timeout client-fin 30s",
+				"    timeout server-fin 30s"
+			]
 		}),
 		...resolversSection(),
 		...detectFrontend({
@@ -12573,7 +12579,9 @@ function generateUniversalHaproxyConfig(options) {
 			defaults: [
 				"    mode tcp",
 				"    timeout client 1m",
-				"    timeout server 1m"
+				"    timeout server 1m",
+				"    timeout client-fin 1m",
+				"    timeout server-fin 1m"
 			]
 		}),
 		...resolversSection(),

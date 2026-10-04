@@ -603,4 +603,13 @@ describe("audit mode", () => {
   });
 });
 
+describe("idle timeouts", () => {
+  it("closes a half-closed connection at the client and server timeouts, not the tunnel's", () => {
+    const value = (name: string) =>
+      new RegExp(`\\n    timeout ${name} (\\S+)\\n`).exec(FULL_CONFIG)![1];
+    expect(value("client-fin")).toBe(value("client"));
+    expect(value("server-fin")).toBe(value("server"));
+  });
+});
+
 reportResults();

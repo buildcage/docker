@@ -33,6 +33,10 @@ export function preamble(spec: PreambleSpec): string[] {
     "defaults",
     "    log global",
     "    timeout connect 5s",
+    // Lets an idle ssh session, pooled DB connection or WebSocket outlive the
+    // client/server timeouts. Each engine's client-fin/server-fin keep closing a
+    // half-closed one at those.
+    "    timeout tunnel 1h",
     ...spec.defaults,
     "",
     // A unix socket rather than a port, so the readiness check reaching it
