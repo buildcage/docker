@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { connectedHosts, isRedundantDns, type TrafficEvent } from "./traffic-event.ts";
+import {
+  clientEndedNoise,
+  connectedHosts,
+  isRedundantDns,
+  type TrafficEvent,
+} from "./traffic-event.ts";
 
 function event(
   partial: Partial<TrafficEvent> & Pick<TrafficEvent, "protocol" | "action" | "host">,
@@ -101,5 +106,18 @@ describe("connectedHosts", () => {
     ]);
     expect([...connected.any].sort().join(",")).toBe("allowed.example.com,refused.example.com");
     expect([...connected.blocked].join(",")).toBe("refused.example.com");
+  });
+});
+
+describe("clientEndedNoise", () => {
+  it("treats a close named by an SNI with a trailing dot as its host's noise", () => {
+    const request = event({ protocol: "https", action: "allow", host: "a.example.com" });
+    const close = event({
+      protocol: "https",
+      action: "incomplete",
+      host: "a.example.com.",
+      reason: "client-aborted",
+    });
+    expect(clientEndedNoise([request, close])(close)).toBe(true);
   });
 });

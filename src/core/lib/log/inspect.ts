@@ -177,18 +177,11 @@ function reasonFor(
 const REQUESTLESS_REASONS = new Set(["bad-request", "missing-host-header"]);
 
 /**
- * The errors haproxy sets on a client connection during the TLS handshake.
- * After one completes, a broken record sets `SSL_FATAL` instead; that client
- * trusted the CA, so the termination state names how it ended.
+ * The client-connection error haproxy sets for a broken record after the TLS
+ * handshake completed. That client trusted the CA, so the termination state
+ * names how it ended. Every other `SSL_*` one is set before then.
  */
-const CLIENT_HANDSHAKE_ERRORS = new Set([
-  "SSL_EMPTY",
-  "SSL_ABORT",
-  "SSL_TIMEOUT",
-  "SSL_HANDSHAKE",
-  "SSL_HANDSHAKE_HB",
-  "SSL_KILLED_HB",
-]);
+const POST_HANDSHAKE_ERROR = "SSL_FATAL";
 
 /**
  * The failures that are not this proxy's own: an origin that answered nothing
@@ -267,8 +260,11 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
   const request = REQUEST.exec(trimmed);
   if (request) {
     // Its termination state reads as this proxy's refusal, which it is not.
+    const fcerr = request[11] ?? "";
     const tlsFailed =
-      request[3] === BAD_REQUEST_METHOD && CLIENT_HANDSHAKE_ERRORS.has(request[11] ?? "");
+      request[3] === BAD_REQUEST_METHOD &&
+      fcerr.startsWith("SSL_") &&
+      fcerr !== POST_HANDSHAKE_ERROR;
     const incomplete = tlsFailed ? "client-tls-failed" : incompleteReason(request[6], request[3]);
     // Only the https stage connects with `ssl verify required`; the plain one
     // logs the field all the same and has no certificate behind it. See

@@ -84,13 +84,14 @@ export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent
   const completed = new Set<string>();
   for (const event of timeline) {
     if (event.protocol !== "dns" && event.action !== "incomplete" && event.host !== UNKNOWN_HOST) {
-      completed.add(event.host);
+      completed.add(ruleHost(event.host));
     }
   }
+  // A close is named by its SNI, which may keep a dot the request's Host lost.
   return (event) =>
     event.action === "incomplete" &&
     CLIENT_ENDED_REASONS.has(event.reason ?? "") &&
-    completed.has(event.host);
+    completed.has(ruleHost(event.host));
 }
 
 /** Index a timeline once. The check below runs for every lookup, and rescanning
@@ -98,8 +99,8 @@ export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent
 export function connectedHosts(timeline: TrafficEvent[]): ConnectedHosts {
   const connected: ConnectedHosts = { any: new Set(), blocked: new Set() };
   for (const event of timeline) {
-    // A host whose every connection ended before a request, as from a client
-    // that cannot trust the CA, has nothing else in a table.
+    // Where these are all a host left, as from a client that cannot trust the
+    // CA, its lookup is the only row a table has for it.
     if (event.protocol === "dns" || event.action === "incomplete") continue;
     // The resolver logs every name without the dot an SNI may keep.
     const host = ruleHost(event.host);

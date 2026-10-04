@@ -110,6 +110,18 @@ describe("the generated log-format and this parser describe the same line", () =
     expect(e.reason).toBe("client-aborted");
   });
 
+  it("never reads the proxy's own TLS trouble as a refusal", async () => {
+    const line = render(HTTPS, {
+      "%HM": "<BADREQ>",
+      "%ST": "0",
+      "%B": "0",
+      "%ts": "PR",
+      "%[fc_err_name]": "SSL_TOO_MANY",
+    });
+    const [e] = (await scanInspectLog([line])).events;
+    expect(e.action).toBe("incomplete");
+  });
+
   it("keeps the trailing dot of the SNI that names a failed handshake", async () => {
     const line = render(HTTPS, {
       "%HM": "<BADREQ>",
