@@ -537,6 +537,9 @@ instead. The build's own output says so first, as a certificate verification err
 `ca-certificates`, or otherwise letting the client trust the CA, is what lets the requests through.
 An `allowed_https_rules` entry changes nothing, the host having resolved and been dialled already.
 
+Under `inspect`, an HTTP/2 client that sends no readable request is also `client-aborted`, not
+`bad-request`. Go's HTTP/2 client does this with each spare connection it opens.
+
 A `client-aborted` or `client-timeout` is shown only where its host completed no other connection.
 Where the same host also completed one, the close is a keepalive pool cleaning up after its work
 rather than a failure, so it is left out of Communication details as noise. A `client-tls-failed` is

@@ -244,6 +244,18 @@ function hostBeforeRequest(
   return { host: address, byAddress: true };
 }
 
+/** HAProxy's h2 side logs a client that left as `<BADREQ> 0 ts=PR`, not `CR`.
+ *  Go does this with every spare connection. */
+function h2ClientSentNoRequest(request: RegExpExecArray): boolean {
+  return (
+    request[2] === "https" &&
+    request[3] === BAD_REQUEST_METHOD &&
+    request[4] === "0" &&
+    request[6] === "PR" &&
+    request[7] === "-"
+  );
+}
+
 /** Parse one proxy-log line, or null if it is not one of ours. */
 function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
   const trimmed = line.trim();
@@ -252,7 +264,11 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
   if (request) {
     // Its termination state reads as this proxy's refusal, which it is not.
     const tlsFailed = request[11]?.startsWith("SSL_") === true;
-    const incomplete = tlsFailed ? "client-tls-failed" : incompleteReason(request[6], request[3]);
+    const incomplete = tlsFailed
+      ? "client-tls-failed"
+      : h2ClientSentNoRequest(request)
+        ? "client-aborted"
+        : incompleteReason(request[6], request[3]);
     // Only the https stage connects with `ssl verify required`; the plain one
     // logs the field all the same and has no certificate behind it. See
     // reasonFor for what that changes.
