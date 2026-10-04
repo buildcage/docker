@@ -96,7 +96,8 @@ known_blocked_rules: |
 - Each key is an input name of either action and each value is written as it would be under
   `with:`. A key that is neither action's input, a list or a nested mapping fails the step.
 - Give the same file to the report action, which reads `builder_name`, `fail_on_blocked` and the
-  traffic artifact inputs from it when it runs, so leave the file as it is until then.
+  traffic artifact inputs from it when it runs, so leave the file as it is until then,
+  out of the way of a build's `--output type=local` export too.
 - An input the workflow sets wins over the file. The rule inputs are the exception: the file's
   rules are added to the workflow's.
 - The path is relative to `$GITHUB_WORKSPACE` and must stay inside it, through symlinks too. The
