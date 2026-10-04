@@ -87,6 +87,20 @@ func TestLoadSpecRefusesABundleItCannotRead(t *testing.T) {
 	}
 }
 
+// An absolute root.path is taken as written, so a trailing separator would
+// otherwise reach every path computed from the rootfs.
+func TestLoadSpecCleansAnAbsoluteRootPath(t *testing.T) {
+	bundle := newSpecBundle(t, `{"root": {"path": "/run/bundle/rootfs/"}}`)
+
+	s, err := loadSpec(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "/run/bundle/rootfs"; s.rootfs != want {
+		t.Errorf("rootfs = %q, want %q", s.rootfs, want)
+	}
+}
+
 // process.env is a JSON array, so nothing stops it holding something that is
 // not a string. Such an entry is skipped rather than taken as an empty name.
 func TestLoadSpecSkipsEnvEntriesThatAreNotStrings(t *testing.T) {
