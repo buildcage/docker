@@ -62,7 +62,7 @@ export function renderReportMarkdown(
   if (report.blocked.length > 0) {
     if (report.passed.length > 0) markdown += "\n";
     // A folded row names its rule; the hosts it stands for are in the
-    // Communication details section, which both engines now emit.
+    // Communication details section.
     const blocked = foldExpectedBlockedRows(report.blocked);
     markdown +=
       "### 🚫 Blocked Hosts\n\n" +

@@ -205,3 +205,11 @@ CVE-2026-53614
 CVE-2026-76642
 CVE-2026-78408
 CVE-2026-78410
+
+# pcre2: out-of-bounds write when an attacker controls the regular expression
+# and it runs under JIT. HAProxy compiles only the patterns in its generated
+# config, which come from the workflow's own rules; a RUN step supplies the
+# strings matched, never a pattern. git, the other user, runs no regex taken
+# from a RUN step. Fixed in pcre2 10.49, but moby/buildkit v0.33.1 still ships
+# 10.48, so no base bump is available yet.
+CVE-2026-103111

@@ -144,6 +144,22 @@ func TestContainerPathOfRefusesAnythingButAPathInsideTheRootfs(t *testing.T) {
 	}
 }
 
+// The result becomes a mount destination, which runc needs as an absolute
+// path. A rootfs of "/" or one ending in a separator leaves no leading slash.
+func TestContainerPathOfAlwaysReturnsAnAbsolutePath(t *testing.T) {
+	cases := map[string]struct{ rootfs, resolved string }{
+		"rootfs is /":                {"/", "/etc/ssl"},
+		"rootfs ends in a separator": {"/run/bundle/rootfs/", "/run/bundle/rootfs/etc/ssl"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := containerPathOf(c.rootfs, c.resolved); got != "/etc/ssl" {
+				t.Errorf("containerPathOf(%q, %q) = %q, want %q", c.rootfs, c.resolved, got, "/etc/ssl")
+			}
+		})
+	}
+}
+
 func TestManifestsEqualIgnoresMtimeButNotContent(t *testing.T) {
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "a"), "same")

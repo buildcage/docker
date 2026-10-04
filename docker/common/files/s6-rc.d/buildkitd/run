@@ -1,2 +1,3 @@
 #!/command/with-contenv sh
-exec s6-notifyoncheck -d -w 500 -n 120 buildkitd --oci-worker-net=cni
+# -n 0 checks until ready; S6_CMD_WAIT_FOR_SERVICES_MAXTIME bounds the wait.
+exec s6-notifyoncheck -d -w 500 -n 0 buildkitd --oci-worker-net=cni

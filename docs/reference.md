@@ -238,8 +238,9 @@ connection carries. A leading, trailing or doubled dot is refused.
 
 A `Host` header ending in a dot (`example.com.`) matches as the name without it. An SNI may not end
 in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, and
-`allowed_https_rules` under `universal`), only a rule whose name ends in `**`, or a `~` rule
-written to allow the dot, matches such a name.
+`allowed_https_rules` under `universal`), only a rule whose `**` can take in the dot
+(`example.**` or `**`, not `example.com.**`), or a `~` rule written to allow the dot, matches such a
+name.
 
 `**` alone matches an address too: under `**:443`, a request that reaches the proxy through a name
 with `Host: 10.0.0.5` goes to that private address (see
@@ -461,18 +462,18 @@ names one endpoint leaves the host's other blocked requests to fail the step. On
 `known_blocked_rules` is set, the Blocked Hosts table gains an **Expected** column (✅) on the
 matched rows.
 
-Under `inspect` the matched rows are also folded into one row per rule, named after
-the rule and counting the hosts behind it (`*.example.com:* (12 hosts)`), below the rows nothing
-matched. A rule covering noisy traffic then costs the table one line however many hosts it names,
-which matters most when the noise puts its payload in the name itself and every request brings a new
-long hostname. The individual hosts stay in **Communication details**, so `universal`, whose report
-has no such section, folds nothing.
+The matched rows are also folded into one row per rule, named after the rule and counting the
+hosts behind it (`*.example.com:* (12 hosts)`), below the rows nothing matched. A rule covering
+noisy traffic then costs the table one line however many hosts it names, which matters most when the
+noise puts its payload in the name itself and every request brings a new long hostname. The
+individual hosts stay in **Communication details**.
 
 A name the build looked up and never connected to gets a row of its own, with `DNS` as the rule kind
 and no port (folded like any other row when a `known_blocked_rules` rule matches it). Under
 `inspect` that is the only trace of a name the build reached for and did not use, which is how a
-rule wider than the build needs shows up. A name that was connected to has no such row: the request
-is already there.
+rule wider than the build needs shows up. A name that was connected to has no such row: the
+connection is already there. One whose every connection ended before a request keeps it, as the
+[ones nobody decided](#the-ones-nobody-decided) reach no table.
 
 ## Blocked service names
 
@@ -576,9 +577,8 @@ and they fail the step under `fail_on_blocked: true` like any other refused conn
 `bad-request` is most often a protocol that is not HTTP at all and where the client speaks first,
 such as PostgreSQL or `git://`, on a port no `allowed_ip_rules` or `allowed_tls_rules` entry
 covers: anything that is not a TLS handshake is handed to the plain-HTTP stage, which reads it as a
-request and refuses it. Both are
-refused in `audit` mode too, as the same check is under `universal`, since a request naming no host
-has nothing to connect to whatever the rules say.
+request and refuses it. Both are refused in `audit` mode too, as the same check is under
+`universal`, since a request naming no host has nothing to connect to whatever the rules say.
 
 What clears one is a rule, though not a host rule. For traffic that is not HTTP, add the port to
 `allowed_ip_rules` or the name to `allowed_tls_rules`, and the connection is passed through
@@ -596,8 +596,7 @@ server to speak first (SMTP, FTP) ends as one nobody decided. No rule on the nam
 
 A request no rule refused can still come to nothing: the origin answers nothing usable, breaks off
 mid-transfer, or its name resolves nowhere. The report tables those apart from what the rules did
-refuse, under **⚠️ Failed Connections**. Under `inspect`, **Communication details** shows each with
-⚠️ too:
+refuse, under **⚠️ Failed Connections**. **Communication details** shows each with ⚠️ too:
 
 ```
 ⚠️ 00:12.004: GET https://registry.npmjs.org/big.tgz -> origin-aborted
@@ -655,10 +654,10 @@ resolver saying no rule allows the name, and it does fail the step.
 `upload_traffic_artifact: true` uploads the report's timeline as a `traffic.json` inside an artifact
 named `buildcage-traffic` (`buildcage-traffic-<builder_name>` when the builder is not the default
 one). It carries every name lookup, including the ones the summary folds into the request that
-followed them, and service-discovery lookups with the record type that was asked for. Both engines
-produce one; `universal` sees neither the request nor where a name resolved, so under it `method`,
-`url`, `status` and `destination` are absent and the rows are name lookups and a connection-level
-view (host, port and bytes).
+followed them, and service-discovery lookups with the record type that was asked for. `universal`
+sees neither the request nor where a name resolved, so under it `method`, `url`, `status` and
+`destination` are absent and the rows are name lookups and a connection-level view (host, port and
+bytes).
 
 | Field         | Always | Notes                                                                                    |
 | ------------- | ------ | ---------------------------------------------------------------------------------------- |
@@ -769,9 +768,9 @@ keys and writes stay in its own database. After the step, the slot's bytes are t
 removed. A `pkcs11.txt` that is a symlink has the slot cut out of the file it leads to, when the
 step wrote that file too. A file that still names `/dev/buildcage-nssdb` afterwards, or is over
 1 MiB and so is not read, counts as CA residue. A database the step's user cannot write takes no
-slot, and the step warns that Chromium will not trust the proxy there. `HOME` comes from the step's environment, or
-from the image's `/etc/passwd` when that is empty, as runc does, and is read once as the step
-starts: a `HOME` the step changes, or another user it switches to, gets no slot.
+slot, and the step warns that Chromium will not trust the proxy there. `HOME` comes from the step's
+environment, or from the image's `/etc/passwd` when that is empty, as runc does, and is read once as
+the step starts: a `HOME` the step changes, or another user it switches to, gets no slot.
 
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't

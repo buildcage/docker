@@ -607,10 +607,8 @@ func containerPathOf(rootfs, resolved string) string {
 	if !withinRoot(rootfs, resolved) {
 		return "/"
 	}
-	if rel := strings.TrimPrefix(resolved, rootfs); rel != "" {
-		return rel
-	}
-	return "/"
+	// A rootfs of "/" takes the leading slash with it.
+	return "/" + strings.TrimPrefix(strings.TrimPrefix(resolved, rootfs), "/")
 }
 
 // systemStore is the container's own CA bundle: where the wrapper reaches it
