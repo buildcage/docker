@@ -478,9 +478,9 @@ else
   pass "the aborted connection is in neither host table"
 fi
 if grep -qE "⚠️ .*: HTTPS abandoned\.example\.com:443 -> client-tls-failed$" <<< "$REPORT_MARKDOWN"; then
-  pass "a handshake the client gave up is in the timeline, named by its SNI"
+  pass "a failed client handshake is in the timeline, named by its SNI"
 else
-  fail "the abandoned handshake is missing from the timeline"
+  fail "the failed client handshake is missing from the timeline"
 fi
 # No rule takes the row above away, so the refused lookup for the same name has
 # to survive: it is the only row a reader can act on.

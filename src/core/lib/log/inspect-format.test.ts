@@ -96,6 +96,13 @@ describe("the generated log-format and this parser describe the same line", () =
     expect(e.host).toBe("registry.npmjs.org");
   });
 
+  it("reads a request it parsed by its own outcome, whatever the connection error", async () => {
+    const line = render(HTTPS, { "%[fc_err_name]": "SSL_HANDSHAKE" });
+    const [e] = (await scanInspectLog([line])).events;
+    expect(e.action).toBe("allow");
+    expect(e.reason).toBeUndefined();
+  });
+
   it("still reads an unreadable request after a completed handshake as a refusal", async () => {
     const line = render(HTTPS, { "%HM": "<BADREQ>", "%ST": "400", "%B": "0", "%ts": "PR" });
     const [e] = (await scanInspectLog([line])).events;

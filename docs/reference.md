@@ -96,8 +96,8 @@ known_blocked_rules: |
 - Each key is an input name of either action and each value is written as it would be under
   `with:`. A key that is neither action's input, a list or a nested mapping fails the step.
 - Give the same file to the report action, which reads `builder_name`, `fail_on_blocked` and the
-  traffic artifact inputs from it when it runs, so leave the file as it is until then,
-  out of the way of a build's `--output type=local` export too.
+  traffic artifact inputs from it when it runs. Leave the file as it is until then, and keep it out
+  of the way of a build's `--output type=local` export.
 - An input the workflow sets wins over the file. The rule inputs are the exception: the file's
   rules are added to the workflow's.
 - The path is relative to `$GITHUB_WORKSPACE` and must stay inside it, through symlinks too. The
@@ -238,7 +238,8 @@ connection carries. A leading, trailing or doubled dot is refused.
 
 A `Host` header ending in a dot (`example.com.`) matches as the name without it. An SNI may not end
 in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, and
-`allowed_https_rules` under `universal`), only `**` or a `~` rule matches such a name.
+`allowed_https_rules` under `universal`), only a rule whose name ends in `**`, or a `~` rule
+written to allow the dot, matches such a name.
 
 `**` alone matches an address too: under `**:443`, a request that reaches the proxy through a name
 with `Host: 10.0.0.5` goes to that private address (see
@@ -441,7 +442,7 @@ optionally fails the job when blocked connections are found. Every input is opti
 | `config_file`                     | empty       | The file given to the setup action. See [Config file](#config-file).                               |
 | `builder_name`                    | `buildcage` | Name of the builder container                                                                      |
 | `fail_on_blocked`                 | `true`      | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode)      |
-| `upload_traffic_artifact`         | `false`     | Upload the observed traffic as a JSON artifact named `buildcage-traffic`; both engines write it    |
+| `upload_traffic_artifact`         | `false`     | Upload the observed traffic as a JSON artifact named `buildcage-traffic`                           |
 | `traffic_artifact_retention_days` | empty       | How long to keep that artifact, as a whole number of days; empty uses the repository's own default |
 
 `fail_on_blocked` and `upload_traffic_artifact` take `true` or `false`. Any other value, or a
@@ -526,7 +527,7 @@ in neither host table. **Communication details** shows it with ⚠️ and how it
 | Reason              | What happened                                                                         |
 | ------------------- | ------------------------------------------------------------------------------------- |
 | `client-aborted`    | the client closed without sending a request, after the TLS handshake if there was one |
-| `client-tls-failed` | the client gave up the TLS handshake itself (`inspect` only)                          |
+| `client-tls-failed` | the TLS handshake with the client failed (`inspect` only)                             |
 | `client-timeout`    | it held the connection open instead, until the timeout expired                        |
 
 The commonest cause is a container with no `ca-certificates`: the client cannot verify the

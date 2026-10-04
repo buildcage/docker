@@ -144,7 +144,9 @@ func resolveInRoot(rootfs, path string) (string, error) {
 }
 
 func withinRoot(rootfs, path string) bool {
-	return path == rootfs || strings.HasPrefix(path, rootfs+string(os.PathSeparator))
+	// "/" is the one clean path that already ends in the separator.
+	sep := string(os.PathSeparator)
+	return path == rootfs || strings.HasPrefix(path, strings.TrimSuffix(rootfs, sep)+sep)
 }
 
 // asNotRegular folds the open() failures O_NOFOLLOW/O_NONBLOCK produce for a
