@@ -411,6 +411,9 @@ reported as blocked; see
 - A tool that pins a specific certificate, or ships a bundled trust store it never lets the system
   update, still needs `proxy_engine: universal` or an `allowed_tls_rules` passthrough: `inspect`
   re-signs the connection, and a pinned or bundled store will not accept the new certificate.
+- A client that insists on HTTP/2 through ALPN, as gRPC clients do (grpc-go since 1.67, for one),
+  fails to connect: `inspect` answers no ALPN. Pass its host through with `allowed_tls_rules`,
+  which judges the SNI and port only. A client that falls back to HTTP/1.1, such as curl, works.
 - The JVM (Java, Kotlin, Scala) reads only its own keystore rather than the CA-trust variables. A
   JDK already in the image at `$JAVA_HOME` or behind the first `java` on `PATH` is handled: the CA is
   added to its keystore for the step and removed before the layer is committed. A keystore sealed

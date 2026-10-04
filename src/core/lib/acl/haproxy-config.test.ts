@@ -342,7 +342,7 @@ describe("plaintext request timeout", () => {
 describe("what a log line records", () => {
   it("records the path in a form that does not depend on the HTTP version", () => {
     // %HU is the request target as sent: a path over HTTP/1.1, an absolute URI
-    // over HTTP/2, which every TLS client negotiates by default.
+    // over HTTP/2.
     expect(FULL_CONFIG.includes("host=%[var(txn.host_log)] %HU")).toBe(false);
     expect(FULL_CONFIG.includes("host=%[var(txn.host_log)] %[var(txn.pathq)]")).toBe(true);
     expect(FULL_CONFIG.includes("http-request set-var(txn.pathq) 'pathq,regsub(")).toBe(true);
