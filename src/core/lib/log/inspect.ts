@@ -251,7 +251,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
   const request = REQUEST.exec(trimmed);
   if (request) {
     // Its termination state reads as this proxy's refusal, which it is not.
-    const tlsFailed = request[11]?.startsWith("SSL_") === true;
+    const tlsFailed = request[3] === BAD_REQUEST_METHOD && request[11]?.startsWith("SSL_") === true;
     const incomplete = tlsFailed ? "client-tls-failed" : incompleteReason(request[6], request[3]);
     // Only the https stage connects with `ssl verify required`; the plain one
     // logs the field all the same and has no certificate behind it. See
