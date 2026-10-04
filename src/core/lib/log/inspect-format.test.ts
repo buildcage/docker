@@ -96,6 +96,45 @@ describe("the generated log-format and this parser describe the same line", () =
     expect(e.host).toBe("registry.npmjs.org");
   });
 
+  it("reads a client that broke off after a completed handshake by how it ended", async () => {
+    // haproxy's own words for a corrupt record once the handshake is done.
+    const line = render(HTTPS, {
+      "%HM": "<BADREQ>",
+      "%ST": "400",
+      "%B": "0",
+      "%ts": "CR",
+      "%[fc_err_name]": "SSL_FATAL",
+    });
+    const [e] = (await scanInspectLog([line])).events;
+    expect(e.action).toBe("incomplete");
+    expect(e.reason).toBe("client-aborted");
+  });
+
+  it("never reads the proxy's own TLS trouble as a refusal", async () => {
+    const line = render(HTTPS, {
+      "%HM": "<BADREQ>",
+      "%ST": "0",
+      "%B": "0",
+      "%ts": "PR",
+      "%[fc_err_name]": "SSL_TOO_MANY",
+    });
+    const [e] = (await scanInspectLog([line])).events;
+    expect(e.action).toBe("incomplete");
+  });
+
+  it("keeps the trailing dot of the SNI that names a failed handshake", async () => {
+    const line = render(HTTPS, {
+      "%HM": "<BADREQ>",
+      "%ST": "0",
+      "%B": "0",
+      "%ts": "PR",
+      "%[fc_err_name]": "SSL_HANDSHAKE",
+      "%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]": "Registry.npmjs.org.",
+    });
+    const [e] = (await scanInspectLog([line])).events;
+    expect(e.host).toBe("registry.npmjs.org.");
+  });
+
   it("reads a request it parsed by its own outcome, whatever the connection error", async () => {
     const line = render(HTTPS, { "%[fc_err_name]": "SSL_HANDSHAKE" });
     const [e] = (await scanInspectLog([line])).events;

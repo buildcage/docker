@@ -14,10 +14,6 @@ interface ExpectedGroup {
  * rule, below the rows nothing matched. A rule covering noisy traffic then
  * costs the table one line however many hosts it names, and the rows a reader
  * has to act on come first.
- *
- * Only for engines whose report lists the individual requests as well, since a
- * folded row names its rule rather than its hosts (see
- * render-report-markdown.ts).
  */
 export function foldExpectedBlockedRows(rows: HostTableRow[]): HostTableRow[] {
   const unmatched: HostTableRow[] = [];
