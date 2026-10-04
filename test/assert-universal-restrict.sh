@@ -16,7 +16,6 @@ assert_log_contains ALLOWED "allowed.example.com:80" "-"
 assert_log_contains ALLOWED "allowed.example.com:8443" "-"
 assert_log_contains ALLOWED "allowed.example.com:8080" "-"
 assert_log_contains ALLOWED "ALLOWED.example.com:443" "-"
-# host_only lowercases a plaintext Host, so that request logs as allowed.example.com:80.
 assert_log_contains ALLOWED "ok.regex.example.com:443" "-"
 assert_log_contains ALLOWED "ports.regex.example.com:443" "-"
 assert_log_contains ALLOWED "ports.regex.example.com:8443" "-"

@@ -18,7 +18,7 @@ inputs:
       whoever turns out to want it: a later job in the same run via actions/download-artifact, or
       anyone else via the API, subject to the retention period below. It keeps every URL verbatim,
       including any credential a build embedded in a query or a path, so treat it as sensitive.
-      Both proxy engines write it. Default false.
+      Default false.
     required: false
   traffic_artifact_retention_days:
     description: >-

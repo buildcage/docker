@@ -251,14 +251,16 @@ jobs:
   # Separate job from test_action: known_blocked_rules is a setup input, so it
   # has to be named when the builder starts, and test_action's own report step
   # turns fail_on_blocked off. Here fail_on_blocked stays at its default and
-  # the step has to pass anyway, which is what the input is for.
+  # the step has to pass anyway, which is what the input is for. The inputs
+  # come from config_file, whose builder_name the report has to read back to
+  # find the builder.
   test_action_known_blocked:
     needs: changes
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test_action == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    name: "e2e: test (action, known_blocked_rules)"
+    name: "e2e: test (action, known_blocked_rules, config_file)"
 
     steps:
       - name: Checkout
@@ -280,21 +282,31 @@ jobs:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
         run: vp run build
 
+      - name: Write the config file
+        run: |
+          mkdir -p e2e-config
+          cat > e2e-config/buildcage.yml <<'YAML'
+          builder_name: buildcage-from-file
+          proxy_mode: restrict
+          allowed_https_rules: |
+            registry.npmjs.org:443
+          known_blocked_rules: |
+            example.com:443
+          YAML
+
       - name: Start Buildcage builder via the real setup action
         uses: ./
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
         with:
-          proxy_mode: restrict
-          allowed_https_rules: registry.npmjs.org:443
-          known_blocked_rules: example.com:443
+          config_file: e2e-config/buildcage.yml
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           driver: remote
-          # Matches action.yml's default builder_name; update together.
-          endpoint: docker-container://buildcage
+          # The builder_name the config file sets.
+          endpoint: docker-container://buildcage-from-file
 
       - name: Create test Dockerfile
         run: |
@@ -326,6 +338,8 @@ jobs:
       # every blocked connection matched known_blocked_rules.
       - name: Show proxy report
         uses: ./report
+        with:
+          config_file: e2e-config/buildcage.yml
 
   # Single, stably-named required status check for branch protection: the
   # jobs above vary their own names by matrix entry (e2e: test (action,
