@@ -37,7 +37,7 @@ echo ""
 echo "[traversal] the path is normalized before the rules see it:"
 # Whether the proxy logs the raw or the normalized path, what must never appear
 # is a 200: that would mean the origin served /private/ for a /public/ rule.
-if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+ sni=\S+ host=allowed\.example\.com /(public/\.\./)?private/secret$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=\S+ host=allowed\.example\.com /(public/\.\./)?private/secret$" <<< "$LOGS"; then
   pass "GET /public/../private/secret was refused"
 else
   fail "GET /public/../private/secret -- no 403 recorded"
@@ -49,7 +49,7 @@ echo "[target is not a path] the host is the one the request carried:"
 # onto the host it would read back as `allowed.example.com-`, a name nothing
 # resolves and no rule can be written for, in a table the report asks the
 # reader to act on.
-if grep -qE "^buildcage [0-9]+ https OPTIONS 403 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=\S+ sni=\S+ host=allowed\.example\.com -$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https OPTIONS 403 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=\S+ host=allowed\.example\.com -$" <<< "$LOGS"; then
   pass "OPTIONS * was refused and recorded against allowed.example.com"
 else
   fail "no such line for the asterisk-form request"
@@ -64,7 +64,7 @@ echo "[client left first] the connection is named by its SNI, the only name it g
 # holds because haproxy writes `-` for the empty Host capture and the unset
 # path alike. A version writing them as nothing would leave `host= `, which
 # the parser cannot read and so counts as a failed step. Caught here.
-if grep -qE "^buildcage [0-9]+ https <BADREQ> [0-9-]+ [0-9]+ ts=[Cc]R reason=\S+ tlserr=\S+ dst=\S+ sni=aborted\.example\.com host=- -$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https <BADREQ> [0-9-]+ [0-9]+ ts=[Cc]R reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=aborted\.example\.com host=- -$" <<< "$LOGS"; then
   pass "recorded with the handshake's SNI"
 else
   fail "no such line for aborted.example.com"
@@ -100,7 +100,7 @@ echo ""
 
 echo "[long URL] a URL the size a signed one really is, recorded whole:"
 # The marker is the last thing on the line, so finding it proves nothing was cut.
-if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=\S+ sni=\S+ host=blocked\.example\.com /exfil\?pad=A+&end=TAIL-MARKER$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=\S+ host=blocked\.example\.com /exfil\?pad=A+&end=TAIL-MARKER$" <<< "$LOGS"; then
   pass "the whole ~1.3KB line was recorded, tail included"
 else
   fail "the long URL was cut or dropped"
@@ -117,7 +117,7 @@ fi
 echo ""
 
 echo "[non-standard port] the original port survives to the origin connection:"
-if grep -qE "^buildcage [0-9]+ https GET 200 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=10\.200\.0\.100:9443 sni=\S+ host=allowed\.example\.com:9443 /public/pkg\.tgz$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET 200 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=10\.200\.0\.100:9443 fcerr=\S+ sni=\S+ host=allowed\.example\.com:9443 /public/pkg\.tgz$" <<< "$LOGS"; then
   pass "reached 10.200.0.100:9443, not the listener's own port"
 else
   fail "9443 did not survive to the origin connection"
@@ -126,7 +126,7 @@ fi
 echo ""
 
 echo "[forged Host] the destination came from our resolution, not the client's:"
-if grep -qE "^buildcage [0-9]+ https GET 200 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=10\.200\.0\.100:443 sni=\S+ host=allowed\.example\.com /public/pkg\.tgz$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET 200 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=10\.200\.0\.100:443 fcerr=\S+ sni=\S+ host=allowed\.example\.com /public/pkg\.tgz$" <<< "$LOGS"; then
   pass "connected to 10.200.0.100, the address we resolved"
 else
   fail "no request recorded as reaching the resolved address"
@@ -143,14 +143,14 @@ echo ""
 # A numeric tlserr is the assertion: it is what names the certificate as the
 # reason, where a connection that never got that far leaves `-`.
 echo "[origin CA] a certificate the proxy cannot verify is refused by name:"
-if grep -qE "^buildcage [0-9]+ https GET 503 [0-9]+ ts=SC\S* reason=\S+ tlserr=[0-9]+ dst=10\.200\.0\.101:443 sni=impostor\.example\.com host=impostor\.example\.com /$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET 503 [0-9]+ ts=SC\S* reason=\S+ tlserr=[0-9]+ dst=10\.200\.0\.101:443 fcerr=\S+ sni=impostor\.example\.com host=impostor\.example\.com /$" <<< "$LOGS"; then
   pass "the refusal names the TLS error the handshake failed with"
 else
   fail "no line recorded a failed origin handshake for impostor.example.com"
 fi
 # The same phase with no TLS error at all. It reads like an outage and is
 # refused anyway: nothing on this connection was ever authenticated.
-if grep -qE "^buildcage [0-9]+ https GET 503 [0-9]+ ts=[sS]C\S* reason=\S+ tlserr=\S+ dst=10\.200\.0\.102:443 sni=deadend\.example\.com host=deadend\.example\.com /$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET 503 [0-9]+ ts=[sS]C\S* reason=\S+ tlserr=\S+ dst=10\.200\.0\.102:443 fcerr=\S+ sni=deadend\.example\.com host=deadend\.example\.com /$" <<< "$LOGS"; then
   pass "a connection that never completed was recorded on its own"
 else
   fail "no line recorded a connection that never completed for deadend.example.com"
@@ -158,7 +158,7 @@ fi
 echo ""
 
 echo "[SSRF] an allowlisted name resolving inward is refused before connecting:"
-if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=PR reason=internal-address tlserr=\S+ dst=169\.254\.169\.254:443 sni=\S+ host=metadata\.example\.com /latest/meta-data$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=PR reason=internal-address tlserr=\S+ dst=169\.254\.169\.254:443 fcerr=\S+ sni=\S+ host=metadata\.example\.com /latest/meta-data$" <<< "$LOGS"; then
   pass "the name passed the rules but the resolved metadata address was refused"
 else
   fail "the internal-destination guard did not fire"
@@ -167,7 +167,7 @@ fi
 echo ""
 
 echo "[SSRF] an allowlisted name resolving back to the runner is refused too:"
-if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=PR reason=internal-address tlserr=\S+ dst=10\.200\.0\.199:443 sni=\S+ host=runner\.example\.com /$" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=PR reason=internal-address tlserr=\S+ dst=10\.200\.0\.199:443 fcerr=\S+ sni=\S+ host=runner\.example\.com /$" <<< "$LOGS"; then
   pass "the resolved runner address was refused despite being RFC1918"
 else
   fail "the runner's own addresses did not reach the internal-destination guard"
@@ -475,6 +475,11 @@ if grep -qF "| aborted.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN"; then
   fail "the aborted connection was put in one of the host tables"
 else
   pass "the aborted connection is in neither host table"
+fi
+if grep -qE "⚠️ .*: HTTPS abandoned\.example\.com:443 -> client-tls-failed$" <<< "$REPORT_MARKDOWN"; then
+  pass "a handshake the client gave up is in the timeline, named by its SNI"
+else
+  fail "the abandoned handshake is missing from the timeline"
 fi
 # No rule takes the row above away, so the refused lookup for the same name has
 # to survive: it is the only row a reader can act on.

@@ -147,6 +147,23 @@ describe("describeReportOutcomes", () => {
     expect(outcomes[0].level).toBe("none");
   });
 
+  it("counts a failed client handshake even where the host completed a connection", () => {
+    // Another client reaching the host does not mean this one trusts the CA.
+    const completed: TrafficEvent = {
+      time: 1787471974,
+      action: "allow",
+      protocol: "https",
+      host: incomplete.host,
+      port: 443,
+      status: 200,
+      bytes: 10,
+    };
+    const tlsFailed: TrafficEvent = { ...incomplete, reason: "client-tls-failed" };
+    const outcomes = describeReportOutcomes(inspect([completed, tlsFailed]), options);
+    expect(outcomes.length).toBe(2);
+    expect(outcomes[1].level).toBe("warning");
+  });
+
   it("never fails the step over one: no rule refused it and none can clear it", () => {
     const outcomes = describeReportOutcomes(inspect([incomplete]), options);
     expect(outcomes.every((outcome) => !outcome.shouldFail)).toBe(true);

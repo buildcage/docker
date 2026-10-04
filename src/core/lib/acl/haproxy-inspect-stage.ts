@@ -29,11 +29,14 @@ export interface InspectStageContext extends InternalDstOptions {
   listenPort: number;
 }
 
-/** The SNI field, for the stage that terminates TLS. It names the host of a
+/** The fields of the stage that terminates TLS. fcerr names a failed client
+ *  handshake (`SSL_HANDSHAKE` and the like). The SNI names the host of a
  *  connection that ended before its request, where `%HM` and the logged Host
- *  are both empty. Client-controlled, hence the detect frontend's charset. */
-function sniField(scheme: "https" | "http"): string {
-  return scheme === "https" ? " sni=%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]" : "";
+ *  are both empty; client-controlled, hence the detect frontend's charset. */
+function clientTlsFields(scheme: "https" | "http"): string {
+  return scheme === "https"
+    ? " fcerr=%[fc_err_name] sni=%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]"
+    : "";
 }
 
 function addressRules(rules: CompiledRule[]): CompiledRule[] {
@@ -106,6 +109,7 @@ export function inspectStage(
   ctx: InspectStageContext,
 ): string[] {
   const { mode } = ctx;
+  const logFormat = `"buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${clientTlsFields(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`;
   const l: string[] = [];
   l.push(
     `frontend ${name}`,
@@ -174,7 +178,10 @@ export function inspectStage(
     // a CONNECT's authority), the log-format prints an empty sample as `-`,
     // and log/inspect.ts would read the joined-up
     // `https://registry.npmjs.org-` as a host no rule can be written for.
-    `    log-format "buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${sniField(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`,
+    `    log-format ${logFormat}`,
+    // A failed client handshake otherwise logs only HAProxy's own line. Sharing
+    // the format leaves the parser one https line to read.
+    ...(scheme === "https" ? [`    error-log-format ${logFormat}`] : []),
     "",
   );
   // The rules decide first, on the request alone (host, path, method): none

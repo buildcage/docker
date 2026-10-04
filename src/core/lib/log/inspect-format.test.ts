@@ -34,17 +34,18 @@ const SAMPLES: Record<string, string> = {
   "%[var(txn.proto)]": "tls",
   "%[var(txn.sni)]": "db.example.com",
   "%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]": "registry.npmjs.org",
+  "%[fc_err_name]": "-",
 };
 
 // The inner alternative is the character class a regsub argument carries, so
 // the `]` closing it does not end the token.
 const TOKEN = /%(?:\[(?:[^[\]]|\[[^[\]]*\])*\]|[A-Za-z]+)/g;
 
-/** The log-format strings the generator emits, unquoted, in config order. */
-function logFormats(config: string): string[] {
+/** The strings the generator emits for one directive, unquoted, in config order. */
+function logFormats(config: string, directive = "log-format"): string[] {
   return config
     .split("\n")
-    .filter((line) => line.includes('log-format "buildcage'))
+    .filter((line) => line.trim().startsWith(`${directive} "buildcage`))
     .map((line) => line.slice(line.indexOf('"') + 1, line.lastIndexOf('"')));
 }
 
@@ -75,6 +76,32 @@ describe("the generated log-format and this parser describe the same line", () =
     expect(PASSTHROUGH === "").toBe(false);
     expect(HTTPS === "").toBe(false);
     expect(HTTP === "").toBe(false);
+  });
+
+  it("writes a failed client handshake in the https line's own format", () => {
+    expect(logFormats(generateHaproxyConfig(OPTIONS), "error-log-format")).toStrictEqual([HTTPS]);
+  });
+
+  it("reads a failed client handshake as undecided, named by its SNI", async () => {
+    const line = render(HTTPS, {
+      "%HM": "<BADREQ>",
+      "%ST": "0",
+      "%B": "0",
+      "%ts": "PR",
+      "%[fc_err_name]": "SSL_HANDSHAKE",
+    });
+    const [e] = (await scanInspectLog([line])).events;
+    expect(e.action).toBe("incomplete");
+    expect(e.reason).toBe("client-tls-failed");
+    expect(e.host).toBe("registry.npmjs.org");
+  });
+
+  it("still reads an unreadable request after a completed handshake as a refusal", async () => {
+    // HTTP/2 framing the proxy could not read logs the same way, minus fcerr.
+    const line = render(HTTPS, { "%HM": "<BADREQ>", "%ST": "0", "%B": "0", "%ts": "PR" });
+    const [e] = (await scanInspectLog([line])).events;
+    expect(e.action).toBe("block");
+    expect(e.reason).toBe("bad-request");
   });
 
   it("reads every field of a request line back out of where it was written", async () => {

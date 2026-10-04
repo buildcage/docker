@@ -367,7 +367,8 @@ describe("what a log line records", () => {
     const formats = FULL_CONFIG.split("\n").filter((line) =>
       line.includes('log-format "buildcage'),
     );
-    expect(formats.length).toBe(3);
+    // error-log-format included.
+    expect(formats.length).toBe(4);
     expect(
       formats.every(
         (line) => line.endsWith('%[var(txn.pathq)]"') || line.endsWith('sni=%[var(txn.sni)]"'),

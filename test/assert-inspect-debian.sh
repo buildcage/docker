@@ -34,7 +34,7 @@ fi
 echo ""
 
 echo "[apt over HTTPS] the fixture reached on the CA the wrapper injected:"
-if grep -qE "^buildcage [0-9]+ https GET [0-9-]+ [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+ sni=\S+ host=allowed\.example\.com /public/debian" <<< "$LOGS"; then
+if grep -qE "^buildcage [0-9]+ https GET [0-9-]+ [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=\S+ host=allowed\.example\.com /public/debian" <<< "$LOGS"; then
   pass "reached the fixture over TLS"
 else
   fail "no HTTPS request to the fixture was recorded"
@@ -47,7 +47,7 @@ echo ""
 OUTSIDE_REQUEST="host=allowed\.example\.com /private/debian"
 # The status sits ahead of the host and the target on the line, so the two
 # halves are matched as one pattern rather than as a prefix.
-outside() { printf '%s' "^buildcage [0-9]+ https GET $1 [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+ sni=\S+ $OUTSIDE_REQUEST"; }
+outside() { printf '%s' "^buildcage [0-9]+ https GET $1 [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=\S+ $OUTSIDE_REQUEST"; }
 echo "[apt outside the rules] the request $MODE should have produced:"
 if [ "$MODE" = "restrict" ]; then
   if grep -qE "$(outside 403)" <<< "$LOGS"; then

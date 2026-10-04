@@ -2,7 +2,7 @@
  * Parsers for the `inspect` engine's two logs, whose formats are emitted by
  * haproxy-config.ts and coredns-config.ts. Seven kinds of line:
  *
- *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> sni=<name|-> host=<authority|-> <target|->
+ *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> fcerr=<name|-> sni=<name|-> host=<authority|-> <target|->
  *   buildcage <ms> http <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> host=<authority|-> <target|->
  *   buildcage <ms> pass <tls|tcp> <bytes> ts=<st> reason=<r> dst=<addr>:<port> sni=<name|->
  *   <timestamp>  [INFO] buildcage dns <allowed|denied> name=<name>.
@@ -16,7 +16,8 @@
  *
  * The passthrough line is the only record of undecrypted traffic; the dns line
  * the only record of a refused name, which never reaches the proxy. Only the
- * https line carries an SNI, since only that stage terminates TLS.
+ * https line carries an SNI, since only that stage terminates TLS. A client
+ * handshake that failed writes that line too, with fcerr naming the failure.
  */
 
 import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
@@ -42,7 +43,7 @@ export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-eve
 // would parse with `sni=<name>` read as the authority instead of counting as
 // unreadable.
 const REQUEST =
-  /^buildcage (\d+) (https?) (\S+) (-?\d+) (\d+) ts=(\S*) reason=(\S+) tlserr=(\S+) dst=(\S+):(\d+) (?:sni=(\S+) )?host=(\S+) (\S+)$/;
+  /^buildcage (\d+) (https?) (\S+) (-?\d+) (\d+) ts=(\S*) reason=(\S+) tlserr=(\S+) dst=(\S+):(\d+) (?:fcerr=(\S+) )?(?:sni=(\S+) )?host=(\S+) (\S+)$/;
 const PASSTHROUGH =
   /^buildcage (\d+) pass (tls|tcp) (\d+) ts=(\S*) reason=(\S+) dst=(\S+):(\d+) sni=(\S+)$/;
 // CoreDNS escapes a space in a label as `\ `. Names stay escaped, as the
@@ -249,7 +250,9 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
 
   const request = REQUEST.exec(trimmed);
   if (request) {
-    const incomplete = incompleteReason(request[6], request[3]);
+    // Its termination state reads as this proxy's refusal, which it is not.
+    const tlsFailed = request[11]?.startsWith("SSL_") === true;
+    const incomplete = tlsFailed ? "client-tls-failed" : incompleteReason(request[6], request[3]);
     // Only the https stage connects with `ssl verify required`; the plain one
     // logs the field all the same and has no certificate behind it. See
     // reasonFor for what that changes.
@@ -268,10 +271,10 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
     const scheme = request[2] as "http" | "https";
     // Spelled as the rules saw it, like the logged path, so one host sent two
     // ways is one row and a known_blocked rule matches either spelling.
-    const sent = splitHostPort(request[12]);
+    const sent = splitHostPort(request[13]);
     const host = ruleHost(sent.host);
     const authority = sent.port === undefined ? host : `${host}:${sent.port}`;
-    const unnamed = namedByHandshake ? hostBeforeRequest(request[11], request[9]) : undefined;
+    const unnamed = namedByHandshake ? hostBeforeRequest(request[12], request[9]) : undefined;
     const event: TrafficEvent = {
       // <ms> is milliseconds; TrafficEvent.time is seconds.
       time: Number(request[1]) / 1000,
@@ -288,7 +291,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
       const url = urlOf(
         scheme,
         unnamed ? authorityOf(unnamed.host, request[10], scheme) : authority,
-        request[13],
+        request[14],
       );
       if (url !== undefined) event.url = url;
     }
