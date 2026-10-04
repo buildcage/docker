@@ -1,0 +1,6 @@
+# http-cache-semantics has no fixed release yet. It is reached only through the
+# generate-license-file devDependency and never ships in dist/.
+[[IgnoredVulns]]
+id = "GHSA-ch52-4w7c-c8xp"
+ignoreUntil = 2027-01-05
+reason = "Dev-only through generate-license-file; not bundled into dist/."
