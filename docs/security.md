@@ -32,7 +32,7 @@ Three things sit outside that model by design.
   pull request's own code, so `config_file` is refused there. On other events it is read from
   whatever the workflow checked out, so whoever can write that copy sets the rules. The report action
   reads the file again after the build, so a build whose `--output type=local` lands on the file can
-  rewrite the report inputs it sets, `fail_on_blocked` among them.
+  set any report input the workflow leaves unset, `fail_on_blocked` among them.
 - **What buildkitd fetches for itself**, [below](#what-buildkitd-fetches-itself).
 - **Another step in the same job.** Running between `setup` and `report`, an untrusted step can
   reach the proxy container through `docker exec` or `docker cp`, or the host filesystem directly on
