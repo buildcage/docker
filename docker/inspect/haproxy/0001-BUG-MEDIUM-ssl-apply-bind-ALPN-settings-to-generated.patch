@@ -1,0 +1,277 @@
+From 432f55fd20dd2842f00155c757e9f229ad141a4e Mon Sep 17 00:00:00 2001
+From: Christopher Faulet <cfaulet@haproxy.com>
+Date: Mon, 21 Sep 2026 11:42:41 +0200
+Subject: [PATCH] BUG/MEDIUM: ssl: apply bind ALPN settings to generated
+ certificates
+
+Generated certificates use a freshly allocated SSL_CTX which bypasses the
+normal context preparation. After SSL_set_SSL_CTX() selects it, no ALPN
+callback is available. TCP connections therefore negotiate no application
+protocol, while QUIC connections fail to establish.
+
+Extract the existing ALPN/NPN callback setup into a shared helper and call
+it when creating generated contexts. Use only the bind configuration for
+these contexts, preserving certificate-specific overrides for static
+certificates and avoiding full context preparation during a handshake.
+
+Add TCP and QUIC regression tests covering generated contexts and cache
+hits, with TCP checks for certificate-specific overrides and no-alpn. Both
+new tests fail before the fix. They and the existing ALPN and certificate
+generation tests pass after it. Direct TLS 1.2 and TLS 1.3 probes also pass
+with the generated certificate cache enabled and disabled.
+
+This patch should fix GitHub issue #3492. It should be backported to all
+supported branches.
+---
+ include/haproxy/ssl_sock.h                    |  1 +
+ .../quic/ssl_generate_certificate_alpn.vtc    | 52 +++++++++++++
+ .../ssl/ssl_generate_certificate_alpn.vtc     | 75 +++++++++++++++++++
+ src/ssl_gencert.c                             |  5 ++
+ src/ssl_sock.c                                | 48 +++++++-----
+ 5 files changed, 162 insertions(+), 19 deletions(-)
+ create mode 100644 reg-tests/quic/ssl_generate_certificate_alpn.vtc
+ create mode 100644 reg-tests/ssl/ssl_generate_certificate_alpn.vtc
+
+diff --git a/include/haproxy/ssl_sock.h b/include/haproxy/ssl_sock.h
+index 66675636d..60b3636ff 100644
+--- a/include/haproxy/ssl_sock.h
++++ b/include/haproxy/ssl_sock.h
+@@ -61,6 +61,7 @@ extern struct list openssl_providers;
+ extern struct stats_module ssl_stats_module;
+ 
+ uint64_t ssl_sock_sni_hash(const struct ist sni);
++void ssl_sock_prepare_ctx_protos(struct bind_conf *bind_conf, struct ssl_bind_conf *ssl_conf, SSL_CTX *ctx);
+ int ssl_sock_prep_ctx_and_inst(struct bind_conf *bind_conf, struct ssl_bind_conf *ssl_conf,
+ 			       SSL_CTX *ctx, struct ckch_inst *ckch_inst, char **err);
+ int ssl_sock_prep_srv_ctx_and_inst(const struct server *srv, SSL_CTX *ctx,
+diff --git a/reg-tests/quic/ssl_generate_certificate_alpn.vtc b/reg-tests/quic/ssl_generate_certificate_alpn.vtc
+new file mode 100644
+index 000000000..06e07a5eb
+--- /dev/null
++++ b/reg-tests/quic/ssl_generate_certificate_alpn.vtc
+@@ -0,0 +1,52 @@
++#REGTEST_TYPE=bug
++
++varnishtest "QUIC ALPN with generated certificates"
++# QUIC backends are not supported with USE_QUIC_OPENSSL_COMPAT.
++feature cmd "$HAPROXY_PROGRAM -cc 'feature(QUIC) && !feature(QUIC_OPENSSL_COMPAT) && !feature(OPENSSL_WOLFSSL)'"
++feature ignore_unknown_macro
++
++haproxy h1 -conf {
++    global
++        expose-experimental-directives
++    .if feature(THREAD)
++        thread-groups 1
++    .endif
++        tune.ssl.ssl-ctx-cache-size 10
++
++    defaults
++        mode http
++        option httplog
++        log stderr local0 debug err
++        timeout connect "${HAPROXY_TEST_TIMEOUT-5s}"
++        timeout client  "${HAPROXY_TEST_TIMEOUT-5s}"
++        timeout server  "${HAPROXY_TEST_TIMEOUT-5s}"
++
++    listen clear
++        bind "fd@${clear}"
++        option http-server-close
++        http-reuse never
++        http-request set-var(txn.sni) req.hdr(x-sni)
++        server s1 "quic+${h1_quic_sock}" ssl verify none no-ssl-reuse alpn h3 sni var(txn.sni)
++
++    frontend quic
++        bind "quic+fd@${quic}" ssl crt ${testdir}/certs/generate_certificates/gen_cert_server.pem generate-certificates ca-sign-file ${testdir}/certs/generate_certificates/gen_cert_ca.pem alpn h3
++        http-request return status 200 hdr x-alpn %[ssl_fc_alpn] hdr x-cn %[ssl_f_s_dn(CN)] hdr x-sni %[ssl_fc_sni]
++} -start
++
++client c1 -connect ${h1_clear_sock} {
++    txreq -hdr "x-sni: server.ecdsa.com"
++    rxresp
++    expect resp.status == 200
++    expect resp.http.x-alpn == "h3"
++    expect resp.http.x-cn == "server.ecdsa.com"
++} -run
++
++# Test both a newly generated context and cache hits on new connections.
++client c2 -repeat 3 -connect ${h1_clear_sock} {
++    txreq -hdr "x-sni: generated.example.com"
++    rxresp
++    expect resp.status == 200
++    expect resp.http.x-alpn == "h3"
++    expect resp.http.x-cn == "ECDSA CA"
++    expect resp.http.x-sni == "generated.example.com"
++} -run
+diff --git a/reg-tests/ssl/ssl_generate_certificate_alpn.vtc b/reg-tests/ssl/ssl_generate_certificate_alpn.vtc
+new file mode 100644
+index 000000000..5a82db7b7
+--- /dev/null
++++ b/reg-tests/ssl/ssl_generate_certificate_alpn.vtc
+@@ -0,0 +1,75 @@
++#REGTEST_TYPE=bug
++
++# Generated contexts must use the bind's ALPN settings, not those of the
++# default certificate whose key is used to generate the new certificate.
++varnishtest "ALPN with generated certificates"
++feature cmd "$HAPROXY_PROGRAM -cc 'feature(OPENSSL) && openssl_version_atleast(1.0.2) && !ssllib_name_startswith(wolfSSL)'"
++feature ignore_unknown_macro
++
++shell {
++    printf '%s [alpn http/1.1] server.ecdsa.com\n' "${testdir}/certs/generate_certificates/gen_cert_server.pem" > "${tmpdir}/crt-list"
++}
++
++haproxy h1 -conf {
++    global
++    .if feature(THREAD)
++        thread-groups 1
++    .endif
++        tune.ssl.ssl-ctx-cache-size 10
++
++    defaults
++        mode http
++        option httplog
++        log stderr local0 debug err
++        timeout connect "${HAPROXY_TEST_TIMEOUT-5s}"
++        timeout client  "${HAPROXY_TEST_TIMEOUT-5s}"
++        timeout server  "${HAPROXY_TEST_TIMEOUT-5s}"
++
++    listen clear
++        bind "fd@${clear}"
++        # Force a fresh TLS handshake for each request, including cache hits.
++        option http-server-close
++        http-reuse never
++        http-request set-var(txn.sni) req.hdr(x-sni)
++        default-server ssl verify none no-ssl-reuse alpn h2,http/1.1 sni var(txn.sni)
++        use-server alpn unless { path /noalpn }
++        use-server noalpn if { path /noalpn }
++        server alpn "${h1_alpn_sock}"
++        server noalpn "${h1_noalpn_sock}"
++
++    frontend tls
++        bind "fd@${alpn}" ssl crt-list "${tmpdir}/crt-list" generate-certificates ca-sign-file ${testdir}/certs/generate_certificates/gen_cert_ca.pem alpn h2,http/1.1
++        bind "fd@${noalpn}" ssl crt ${testdir}/certs/generate_certificates/gen_cert_server.pem generate-certificates ca-sign-file ${testdir}/certs/generate_certificates/gen_cert_ca.pem no-alpn
++        http-request return status 200 hdr x-alpn _%[ssl_fc_alpn] hdr x-cn %[ssl_f_s_dn(CN)] hdr x-sni %[ssl_fc_sni]
++} -start
++
++# A static certificate retains its certificate-specific ALPN override.
++client c1 -connect ${h1_clear_sock} {
++    txreq -hdr "x-sni: server.ecdsa.com"
++    rxresp
++    expect resp.status == 200
++    expect resp.http.x-alpn == "_http/1.1"
++    expect resp.http.x-cn == "server.ecdsa.com"
++} -run
++
++# First generate a certificate, then reuse its cached context on new connections.
++# The generated subject starts with the CA's CN instead of the static cert's CN.
++client c2 -repeat 3 -connect ${h1_clear_sock} {
++    txreq -hdr "x-sni: generated.example.com"
++    rxresp
++    expect resp.status == 200
++    expect resp.http.x-alpn == "_h2"
++    expect resp.http.x-cn == "ECDSA CA"
++    expect resp.http.x-sni == "generated.example.com"
++} -run
++
++# A different bind must not advertise ALPN when it is disabled, even when the
++# same CA file and SNI are used to generate the certificate.
++client c3 -repeat 2 -connect ${h1_clear_sock} {
++    txreq -url /noalpn -hdr "x-sni: generated.example.com"
++    rxresp
++    expect resp.status == 200
++    expect resp.http.x-alpn == "_"
++    expect resp.http.x-cn == "ECDSA CA"
++    expect resp.http.x-sni == "generated.example.com"
++} -run
+diff --git a/src/ssl_gencert.c b/src/ssl_gencert.c
+index 4bff2d2d8..a20d345be 100644
+--- a/src/ssl_gencert.c
++++ b/src/ssl_gencert.c
+@@ -272,6 +272,11 @@ static SSL_CTX *ssl_sock_do_create_cert(const char *servername, struct bind_conf
+ 	}
+ #endif
+ 
++	/* The generated context replaces the initial one, so it must also carry
++	 * the bind's protocol negotiation callbacks.
++	 */
++	ssl_sock_prepare_ctx_protos(bind_conf, NULL, ssl_ctx);
++
+ 	if (newcrt) X509_free(newcrt);
+ 
+ #ifndef OPENSSL_NO_DH
+diff --git a/src/ssl_sock.c b/src/ssl_sock.c
+index aa5f0f0ee..938aaaa60 100644
+--- a/src/ssl_sock.c
++++ b/src/ssl_sock.c
+@@ -4910,6 +4910,34 @@ static void SSL_CTX_keylog(const SSL *ssl, const char *line)
+ }
+ #endif
+ 
++/* Set up protocol negotiation callbacks using the certificate-specific
++ * configuration when present, or the bind configuration otherwise. Generated
++ * certificates use the bind configuration only (ssl_conf is NULL).
++ */
++void ssl_sock_prepare_ctx_protos(struct bind_conf *bind_conf, struct ssl_bind_conf *ssl_conf, SSL_CTX *ctx)
++{
++	struct ssl_bind_conf __maybe_unused *ssl_conf_cur;
++
++#if defined(OPENSSL_NPN_NEGOTIATED) && !defined(OPENSSL_NO_NEXTPROTONEG)
++	ssl_conf_cur = NULL;
++	if (ssl_conf && ssl_conf->npn_str)
++		ssl_conf_cur = ssl_conf;
++	else if (bind_conf->ssl_conf.npn_str)
++		ssl_conf_cur = &bind_conf->ssl_conf;
++	if (ssl_conf_cur)
++		SSL_CTX_set_next_protos_advertised_cb(ctx, ssl_sock_advertise_npn_protos, ssl_conf_cur);
++#endif
++#ifdef TLSEXT_TYPE_application_layer_protocol_negotiation
++	ssl_conf_cur = NULL;
++	if (ssl_conf && ssl_conf->alpn_str)
++		ssl_conf_cur = ssl_conf;
++	else if (bind_conf->ssl_conf.alpn_str)
++		ssl_conf_cur = &bind_conf->ssl_conf;
++	if (ssl_conf_cur && ssl_conf_cur->alpn_len)
++		SSL_CTX_set_alpn_select_cb(ctx, ssl_sock_advertise_alpn_protos, ssl_conf_cur);
++#endif
++}
++
+ /*
+  * This function applies the SSL configuration on a SSL_CTX
+  * It returns an error code and fills the <err> buffer
+@@ -4920,7 +4948,6 @@ static int ssl_sock_prepare_ctx(struct bind_conf *bind_conf, struct ssl_bind_con
+ 	struct proxy *curproxy = bind_conf->frontend;
+ 	int cfgerr = 0;
+ 	int verify = SSL_VERIFY_NONE;
+-	struct ssl_bind_conf __maybe_unused *ssl_conf_cur;
+ 	const char *conf_ciphers;
+ #ifdef HAVE_SSL_CTX_SET_CIPHERSUITES
+ 	const char *conf_ciphersuites;
+@@ -5085,24 +5112,7 @@ static int ssl_sock_prepare_ctx(struct bind_conf *bind_conf, struct ssl_bind_con
+ 		SSL_CTX_set_keylog_callback(ctx, SSL_CTX_keylog);
+ #endif
+ 
+-#if defined(OPENSSL_NPN_NEGOTIATED) && !defined(OPENSSL_NO_NEXTPROTONEG)
+-	ssl_conf_cur = NULL;
+-	if (ssl_conf && ssl_conf->npn_str)
+-		ssl_conf_cur = ssl_conf;
+-	else if (bind_conf->ssl_conf.npn_str)
+-		ssl_conf_cur = &bind_conf->ssl_conf;
+-	if (ssl_conf_cur)
+-		SSL_CTX_set_next_protos_advertised_cb(ctx, ssl_sock_advertise_npn_protos, ssl_conf_cur);
+-#endif
+-#ifdef TLSEXT_TYPE_application_layer_protocol_negotiation
+-	ssl_conf_cur = NULL;
+-	if (ssl_conf && ssl_conf->alpn_str)
+-		ssl_conf_cur = ssl_conf;
+-	else if (bind_conf->ssl_conf.alpn_str)
+-		ssl_conf_cur = &bind_conf->ssl_conf;
+-	if (ssl_conf_cur && ssl_conf_cur->alpn_len)
+-		SSL_CTX_set_alpn_select_cb(ctx, ssl_sock_advertise_alpn_protos, ssl_conf_cur);
+-#endif
++	ssl_sock_prepare_ctx_protos(bind_conf, ssl_conf, ctx);
+ #if defined(SSL_CTX_set1_curves_list)
+ 	conf_curves = (ssl_conf && ssl_conf->curves) ? ssl_conf->curves : bind_conf->ssl_conf.curves;
+ 	if (conf_curves) {
+-- 
+2.55.0
+
