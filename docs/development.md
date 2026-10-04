@@ -270,9 +270,8 @@ dot, as the rules do before matching it.
 `ts` is HAProxy's termination state and `reason` the refusal reason where the rule that refused
 knew one the line could not otherwise show. `tlserr` carries haproxy's own error from the handshake
 with the origin, which is what tells a connection the proxy would not make from one it could not
-make; the passthrough stage terminates no TLS and logs no such field. `fcerr` names a failed
-handshake with the client (`SSL_HANDSHAKE` and the like), which the report shows as
-`client-tls-failed`.
+make; the passthrough stage terminates no TLS and logs no such field. `fcerr` is haproxy's error
+on the client connection; an `SSL_*` one on a line with no request is shown as `client-tls-failed`.
 
 What the report makes of those is in
 [Requests that never arrived whole](./reference.md#requests-that-never-arrived-whole), for a
@@ -383,7 +382,9 @@ iterations is left unread instead of stalling the build. Its `vX.Y.Z-buildcage.N
 The CNI plugins and CoreDNS are downloaded at a pinned version and checked against one SHA256 per
 architecture, both set as `ARG`s in each engine's Dockerfile. Renovate updates the version and the
 SHA256 lines together, taking the digests from the release's own checksum files; each SHA256 line's
-`digestVersion` names the release its digest belongs to. A bump by hand changes all three lines.
+`digestVersion` names the release its digest belongs to. A bump by hand changes the version line,
+each SHA256 line, and the `digestVersion` in the comment above each SHA256 line. One left on the old
+release has Renovate look for the next digest there.
 
 ## Troubleshooting
 
