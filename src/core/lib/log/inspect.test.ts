@@ -79,6 +79,18 @@ describe("scanInspectLog", () => {
     expect(e.host).toBe("api.example.com");
   });
 
+  it("reads an h2 client that left before any request as client-aborted", async () => {
+    const lines = [
+      "buildcage 1 https <BADREQ> 0 0 ts=PR reason=- tlserr=- dst=198.19.255.1:443 fcerr=- sni=proxy.golang.org host=- -",
+      "buildcage 2 https <BADREQ> 0 0 ts=PR reason=- tlserr=- dst=198.19.255.1:443 fcerr=ERESET sni=proxy.golang.org host=- -",
+    ];
+    for (const e of await parse(lines)) {
+      expect(e.action).toBe("incomplete");
+      expect(e.reason).toBe("client-aborted");
+      expect(e.host).toBe("proxy.golang.org");
+    }
+  });
+
   it("keeps the query string, where an exfiltration payload would be", async () => {
     expect((await parse([REFUSED]))[0].url).toBe("https://evil.example.com/exfil?d=SECRET");
   });

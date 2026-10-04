@@ -97,11 +97,17 @@ describe("the generated log-format and this parser describe the same line", () =
   });
 
   it("still reads an unreadable request after a completed handshake as a refusal", async () => {
-    // HTTP/2 framing the proxy could not read logs the same way, minus fcerr.
-    const line = render(HTTPS, { "%HM": "<BADREQ>", "%ST": "0", "%B": "0", "%ts": "PR" });
+    const line = render(HTTPS, { "%HM": "<BADREQ>", "%ST": "400", "%B": "0", "%ts": "PR" });
     const [e] = (await scanInspectLog([line])).events;
     expect(e.action).toBe("block");
     expect(e.reason).toBe("bad-request");
+  });
+
+  it("reads h2 with no readable request as client-aborted", async () => {
+    const line = render(HTTPS, { "%HM": "<BADREQ>", "%ST": "0", "%B": "0", "%ts": "PR" });
+    const [e] = (await scanInspectLog([line])).events;
+    expect(e.action).toBe("incomplete");
+    expect(e.reason).toBe("client-aborted");
   });
 
   it("reads every field of a request line back out of where it was written", async () => {
