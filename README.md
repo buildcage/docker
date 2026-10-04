@@ -133,7 +133,7 @@ Each pair builds the same Dockerfile with and without rules:
 `proxy_engine` sets how closely a build's traffic is read. `inspect` is the default; `universal` has
 to be set explicitly.
 
-`inspect` terminates TLS and re-signs it with a CA generated each time the builder starts. Rules
+`inspect` terminates TLS and re-signs it with a CA generated for each builder container. Rules
 match on method and URL, so `GET|HEAD https://registry.npmjs.org/**` allows a fetch while refusing a
 publish on the same host, and the report names every request with its URL. The build has to trust
 that CA: Buildcage adds it to the system store, to the CA-trust variables, to a JVM already in the
@@ -316,8 +316,8 @@ runs where and what it decides.
 
 ## CA trust and compatibility
 
-`proxy_engine: inspect` terminates TLS and re-signs it with a CA generated each time the builder
-starts, whose private key never leaves the builder container
+`proxy_engine: inspect` terminates TLS and re-signs it with a CA generated for each builder
+container, whose private key never leaves that container
 ([details](docs/security.md#the-ca-and-its-private-key)), so the build has to trust that CA. As each
 `RUN` step starts, Buildcage points the variables the common toolchains read at a store that holds
 it: `NODE_EXTRA_CA_CERTS`, `DENO_CERT`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `PIP_CERT`.

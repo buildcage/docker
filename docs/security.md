@@ -271,7 +271,7 @@ more than intended.
 
 #### The CA and its private key
 
-The CA and its key are generated fresh each time the builder container starts. The CA is valid for
+The CA and its key are generated fresh when the builder container is created. The CA is valid for
 two days, so a copy that escapes cleanup soon stops being trusted. Its private key never leaves the
 container: HAProxy signs each per-SNI certificate with it, and only the certificate is published to
 the steps. The post step's `docker compose down` removes the container, and the key with it.
