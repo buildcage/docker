@@ -106,6 +106,19 @@ jobs:
             type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }},suffix=-${{ matrix.engine }}
             type=raw,value=sha-${{ steps.version.outputs.sha }}-${{ matrix.engine }},priority=100
 
+      # Each engine's Dockerfile sets its own title, description and licenses,
+      # which metadata-action's repository-wide values would replace.
+      - name: Keep the Dockerfile's own labels
+        id: labels
+        env:
+          LABELS: ${{ steps.meta.outputs.labels }}
+        run: |
+          {
+            echo 'labels<<EOF'
+            grep -vE '^org\.opencontainers\.image\.(title|description|licenses)=' <<<"$LABELS"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -126,7 +139,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: ${{ steps.labels.outputs.labels }}
 
       - name: Show proxy report
         if: always()
