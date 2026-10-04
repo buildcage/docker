@@ -339,7 +339,7 @@ func TestNSSDBIsSkippedWhenTheXDGPathCannotBeResolved(t *testing.T) {
 	useNSSTemplate(t)
 	uid, gid := stepUser()
 	bundle, rootfs := newNSSBundle(t, []string{"HOME=/root"}, uid, gid, "/root")
-	mustSymlink(t, "../../../../../..", filepath.Join(rootfs, "root/.local"))
+	mustWriteFile(t, filepath.Join(rootfs, "root/.local"), "")
 	readStderr := captureStderr(t)
 
 	in, err := inject(bundle, testCA)
@@ -660,8 +660,8 @@ func TestStripNSSSlotCopyReportsAFileItCannotRemove(t *testing.T) {
 func TestStripLayerReportsAPkcs11TxtTheRootfsDoesNotReach(t *testing.T) {
 	for name, lay := range map[string]func(t *testing.T, rootfs string){
 		"not there": func(*testing.T, string) {},
-		"behind a symlink out of the rootfs": func(t *testing.T, rootfs string) {
-			mustSymlink(t, "../../../../../../outside", filepath.Join(rootfs, "backup"))
+		"behind a symlink loop": func(t *testing.T, rootfs string) {
+			mustSymlink(t, "backup", filepath.Join(rootfs, "backup"))
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

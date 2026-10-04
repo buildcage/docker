@@ -91,8 +91,9 @@ func resolveInRoot(rootfs, path string) (string, error) {
 		}
 		next := filepath.Join(current, name)
 		if !withinRoot(rootfs, next) {
-			// ".." climbing above the rootfs lands here.
-			return "", errEscapesRoot
+			// ".." at the root stays there, as the kernel resolves it.
+			current = rootfs
+			continue
 		}
 
 		info, err := os.Lstat(next)

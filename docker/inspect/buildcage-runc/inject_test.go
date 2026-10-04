@@ -872,13 +872,12 @@ func TestInjectLeavesAMountAtTheOwnCAPathAlone(t *testing.T) {
 	}
 }
 
-// A variable pointing outside the rootfs is left as the author wrote it: the
-// wrapper runs as root on the host, so following it is what resolveInRoot
-// exists to refuse.
+// A variable whose path does not resolve inside the rootfs is left as the
+// author wrote it.
 func TestInjectLeavesAnUnresolvableVariableAlone(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"DENO_CERT=/custom/roots.pem"})
-	mustSymlink(t, "../../../../outside", filepath.Join(rootfs, "custom"))
+	mustSymlink(t, "custom", filepath.Join(rootfs, "custom"))
 
 	restore, err := inject(bundle, testCA)
 	if err != nil {

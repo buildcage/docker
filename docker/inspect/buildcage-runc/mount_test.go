@@ -613,9 +613,9 @@ func TestPrepareLeavesABundleFileItCannotOpen(t *testing.T) {
 }
 
 // The write-back target is re-resolved before anything is written. A
-// destination that now points outside the rootfs fails the step rather than
-// being followed, since the wrapper runs as root on the host.
-func TestFinishRefusesATargetThatNowEscapesTheRootfs(t *testing.T) {
+// destination that now climbs past the rootfs lands on another directory in
+// it, and fails the step rather than being written to.
+func TestFinishRefusesATargetThatNowClimbsPastTheRootfs(t *testing.T) {
 	useFakeRsync(t)
 	b, rootfs := newCAStoreBind(t)
 	mustWriteFile(t, filepath.Join(b.scratchDir, "ca-certificates.crt"), "REGENERATED\n")
@@ -626,8 +626,26 @@ func TestFinishRefusesATargetThatNowEscapesTheRootfs(t *testing.T) {
 
 	calls := countRsync(t)
 	err := b.finish()
-	if !errors.Is(err, errEscapesRoot) {
-		t.Fatalf("got %v, want it to name errEscapesRoot", err)
+	if err == nil || !strings.Contains(err.Error(), "now resolves to "+filepath.Join(rootfs, "etc/certs")) {
+		t.Fatalf("got %v, want the moved target to be refused", err)
+	}
+	if *calls != 0 {
+		t.Errorf("got %d rsync invocations, want none before the target is verified", *calls)
+	}
+}
+
+func TestFinishReportsATargetThatNoLongerResolves(t *testing.T) {
+	useFakeRsync(t)
+	b, rootfs := newCAStoreBind(t)
+	mustWriteFile(t, filepath.Join(b.scratchDir, "ca-certificates.crt"), "REGENERATED\n")
+	if err := os.RemoveAll(filepath.Join(rootfs, "etc/ssl")); err != nil {
+		t.Fatal(err)
+	}
+	mustSymlink(t, "ssl", filepath.Join(rootfs, "etc/ssl"))
+
+	calls := countRsync(t)
+	if err := b.finish(); !errors.Is(err, errTooManySymlinks) {
+		t.Fatalf("got %v, want the symlink loop reported", err)
 	}
 	if *calls != 0 {
 		t.Errorf("got %d rsync invocations, want none before the target is verified", *calls)

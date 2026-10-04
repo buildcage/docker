@@ -110,8 +110,8 @@ func TestFindJVMKeystoresNoneFound(t *testing.T) {
 }
 
 // A java on PATH is followed through its symlinks to the JDK it belongs to,
-// JDK 9 on and JDK 8 alike. A relative PATH entry, or one leading out of the
-// rootfs, is passed over.
+// JDK 9 on and JDK 8 alike. A relative PATH entry, or one that does not
+// resolve, is passed over.
 func TestFindJVMKeystoresFollowsJavaOnPath(t *testing.T) {
 	for name, c := range map[string]struct{ java, cacerts string }{
 		"JDK 21": {"opt/jdk-21/bin/java", "opt/jdk-21/lib/security/cacerts"},
@@ -119,8 +119,8 @@ func TestFindJVMKeystoresFollowsJavaOnPath(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			rootfs := t.TempDir()
-			s := &spec{rootfs: rootfs, env: map[string]string{"PATH": "relative:/escape:/usr/local/bin"}}
-			mustSymlink(t, "../../../../../../../../outside", filepath.Join(rootfs, "escape"))
+			s := &spec{rootfs: rootfs, env: map[string]string{"PATH": "relative:/loop:/usr/local/bin"}}
+			mustSymlink(t, "loop", filepath.Join(rootfs, "loop"))
 			mustMkdirAll(t, filepath.Join(rootfs, filepath.Dir(c.java)))
 			writeJava(t, filepath.Join(rootfs, c.java))
 			mustMkdirAll(t, filepath.Join(rootfs, "usr/local/bin"))
