@@ -463,6 +463,10 @@ reported as blocked; see
   RUN go build                                                      # fine
   ```
 
+- Chromium's HTTP cache stores each response's certificate chain, the proxy CA included, so a
+  profile the image keeps (`--user-data-dir`, Playwright's `launchPersistentContext`, Puppeteer's
+  `userDataDir`) fails the build as a copy that cannot be taken out. Use a temporary profile, or
+  delete the profile's `Default/Cache` in the same `RUN` step.
 - A copy of the CA left in a step's layer is removed. One that cannot be, such as in a JKS keystore
   sealed with a password other than `changeit`, fails the build (`fail_on_ca_residue: false` makes it
   a warning, see [CA residue](./docs/reference.md#ca-residue)). A copy that cannot be read, in a compressed archive or a keystore encrypted under a password other than
