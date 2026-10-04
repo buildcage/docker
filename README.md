@@ -292,8 +292,8 @@ are in [Reference](./docs/reference.md#report-action-inputs).
 
 `upload_traffic_artifact: true` uploads the whole timeline as a `traffic.json`, one row per request
 and per name lookup, with the method, URL, status, size and the address it resolved to. It is
-uploaded even when the build fails. Both engines produce one; under `universal` it omits the method,
-URL, status and resolved address that only `inspect` sees. The fields are listed in
+uploaded even when the build fails. Under `universal` it omits the method, URL, status and resolved
+address that only `inspect` sees. The fields are listed in
 [Reference](./docs/reference.md#traffic-artifact).
 
 ## How it works
@@ -539,7 +539,7 @@ reported as blocked; see
 An allowlisted name that resolves to cloud metadata, to loopback, or to an address the runner itself
 holds is refused, so a compromised name cannot turn the proxy into a route back into the runner. A
 mirror or registry running on the runner is therefore not reachable by name: allow it with
-`allowed_ip_rules`, which skips that guard. See
+`allowed_ip_rules`, which skips that guard except for the proxy's own port. See
 [A name may not resolve inward](./docs/security.md#a-name-may-not-resolve-inward).
 
 ### What the audit allowlist covers
