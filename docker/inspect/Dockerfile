@@ -18,6 +18,7 @@ ARG COREDNS_SHA256_ARM64=bf26782d19b5340e3e6cb50f1ed6df72f58e4a30932c79d167f0f0a
 ARG HAPROXY_ALPINE_BRANCH=3.24
 ARG HAPROXY_BRANCH=3.4
 # Built from source by haproxy-build until a 3.4 release carries its patches.
+# renovate: datasource=custom.alpine-3-24-haproxy depName=haproxy
 ARG HAPROXY_VERSION=3.4.6
 ARG HAPROXY_SHA512=04d20bca04dc6d5b18181c002997fc68e87dfdf2ff309753c7cf3383355ebcfce2d2b62a20f4d0e49bd75d25aa12da8d33f4b39a23b618199787cd1468fc0fe9
 
@@ -114,9 +115,14 @@ RUN apk add --no-cache \
 # own. Drop the repository once the base's Alpine carries this branch.
 ARG HAPROXY_ALPINE_BRANCH
 ARG HAPROXY_BRANCH
+ARG HAPROXY_VERSION
+# Fails once Alpine ships a newer release, whose fixes the binary below would
+# otherwise silently drop.
 RUN apk add --no-cache \
       --repository https://dl-cdn.alpinelinux.org/alpine/v${HAPROXY_ALPINE_BRANCH}/main \
-      "haproxy~${HAPROXY_BRANCH}"
+      "haproxy~${HAPROXY_BRANCH}" && \
+    case "$(apk info -e -v haproxy)" in "haproxy-${HAPROXY_VERSION}-r"*) ;; \
+      *) echo "Alpine's $(apk info -e -v haproxy) is not HAPROXY_VERSION ${HAPROXY_VERSION}" >&2; exit 1 ;; esac
 # The package still provides the haproxy user and the libraries.
 COPY --from=haproxy-build /out/haproxy /usr/sbin/haproxy
 

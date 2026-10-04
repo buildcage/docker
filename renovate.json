@@ -16,12 +16,22 @@
   "minimumReleaseAge": "14 days",
   "lockFileMaintenance": { "enabled": true, "schedule": ["* * * * 6"] },
   "internalChecksFilter": "strict",
+  "customDatasources": {
+    "alpine-3-24-haproxy": {
+      "description": "The haproxy version Alpine 3.24 ships, from Repology's API.",
+      "defaultRegistryUrlTemplate": "https://repology.org/api/v1/project/{{packageName}}",
+      "transformTemplates": [
+        "{ \"releases\": [$[repo = \"alpine_3_24\" and srcname = \"haproxy\"][0].{ \"version\": version }] }"
+      ]
+    }
+  },
   "customManagers": [
     {
       "customType": "regex",
       "managerFilePatterns": ["/^docker/universal/Dockerfile$/", "/^docker/inspect/Dockerfile$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG [A-Z]+_VERSION=(?<currentValue>v[\\d.]+)\\n",
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG HAPROXY_VERSION=(?<currentValue>[\\d.]+)\\n",
         "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+) digestVersion=(?<currentValue>v[\\d.]+)\\nARG [A-Z]+_SHA256_[A-Z0-9]+=(?<currentDigest>[a-f0-9]{64})\\n",
         "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\nARG HAPROXY_ALPINE_BRANCH=(?<currentValue>[\\d.]+)"
       ]
@@ -52,6 +62,14 @@
     }
   ],
   "packageRules": [
+    {
+      "description": "HAPROXY_VERSION is the patched HAProxy built over Alpine's package, and the image build fails once Alpine's is newer, so its update has no release-age wait or schedule. Renovate cannot update HAPROXY_SHA512: fill it in on the PR.",
+      "matchDatasources": ["custom.alpine-3-24-haproxy"],
+      "matchPackageNames": ["haproxy"],
+      "allowedVersions": "/^3\\.4\\./",
+      "minimumReleaseAge": "0 days",
+      "schedule": ["at any time"]
+    },
     {
       "description": "Actions from the buildcage org are exempt from minimumReleaseAge and from the weekly schedule, so a new release lands right away.",
       "matchPackageNames": ["/^buildcage\\//"],
