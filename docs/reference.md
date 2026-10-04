@@ -518,27 +518,31 @@ in neither host table. **Communication details** shows it with ⚠️ and how it
 
 ```
 ⚠️ 00:09.123: HTTPS untrusted-ca.example.com:443 -> client-aborted
+⚠️ 00:10.250: HTTPS untrusted-ca.example.com:443 -> client-tls-failed
 ⚠️ 00:11.407: HTTPS untrusted-ca.example.com:443 -> client-timeout
 ```
 
-| Reason           | What happened                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| `client-aborted` | the client closed without sending a request, after the TLS handshake if there was one |
-| `client-timeout` | it held the connection open instead, until the timeout expired                        |
+| Reason              | What happened                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `client-aborted`    | the client closed without sending a request, after the TLS handshake if there was one |
+| `client-tls-failed` | the client gave up the TLS handshake itself (`inspect` only)                          |
+| `client-timeout`    | it held the connection open instead, until the timeout expired                        |
 
 The commonest cause is a container with no `ca-certificates`: the client cannot verify the
 certificate the `inspect` engine signs with, so every HTTPS request to that host ends at the
-handshake before a request arrives. The build's own output says so first, as a certificate
-verification error; installing `ca-certificates`, or otherwise letting the client trust the CA, is
-what lets the requests through. An `allowed_https_rules` entry changes nothing, the host having
-resolved and been dialled already.
+handshake: as `client-tls-failed`, or as `client-aborted` from a client that closes just after it
+instead. The build's own output says so first, as a certificate verification error; installing
+`ca-certificates`, or otherwise letting the client trust the CA, is what lets the requests through.
+An `allowed_https_rules` entry changes nothing, the host having resolved and been dialled already.
 
-A close like this is shown only where its host completed no other connection. Where the same host
-also completed one, the close is a keepalive pool cleaning up after its work rather than a failure,
-so it is left out of Communication details as noise. The raw [traffic artifact](#traffic-artifact)
-keeps every one either way. Neither kind fails the step, not even with `fail_on_blocked: true`: no
-rule refused it, so `known_blocked_rules` has nothing to match, and nothing reached an origin. A
-`::warning::` annotation gives the count of those shown.
+A `client-aborted` or `client-timeout` is shown only where its host completed no other connection.
+Where the same host also completed one, the close is a keepalive pool cleaning up after its work
+rather than a failure, so it is left out of Communication details as noise. A `client-tls-failed` is
+always shown, since another client reaching the host says nothing of whether this one trusts the CA.
+The raw [traffic artifact](#traffic-artifact) keeps every one either way. None of them fails the
+step, not even with `fail_on_blocked: true`: no rule refused it, so `known_blocked_rules` has
+nothing to match, and nothing reached an origin. A `::warning::` annotation gives the count of those
+shown.
 
 A protocol where the server speaks first (SMTP, MySQL, FTP) ends here too once it reaches the
 plain-HTTP stage: the client waits for a greeting and the proxy waits for a request, so no rule is

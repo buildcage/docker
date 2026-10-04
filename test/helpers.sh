@@ -145,8 +145,8 @@ assert_logged() {
   # A URL written with no path is still sent with one, so the logged target
   # always opens with a slash.
   [[ "$target" == /* ]] || target="/$target"
-  # sni= is optional: only the stage that terminates TLS has one to log.
-  if grep -qE "^buildcage [0-9]+ https? ${method} ${status} [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+( sni=\S+)? host=$(esc "$authority") $(esc "$target")$" <<< "$LOGS"; then
+  # fcerr= and sni= are optional: only the stage that terminates TLS logs them.
+  if grep -qE "^buildcage [0-9]+ https? ${method} ${status} [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+( fcerr=\S+ sni=\S+)? host=$(esc "$authority") $(esc "$target")$" <<< "$LOGS"; then
     pass "[$status] $method $url"
   else
     fail "[$status] $method $url -- no such line in the proxy log"
