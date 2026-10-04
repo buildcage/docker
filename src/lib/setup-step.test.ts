@@ -274,6 +274,7 @@ describe("runSetupStep", () => {
         "-p",
         PROJECT_NAME,
         "down",
+        "-v",
       ]);
       expect(dockerArgs(1)[5]).toBe("up");
     });

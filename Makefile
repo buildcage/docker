@@ -197,8 +197,9 @@ test_integration_buildkit_universal_audit: ## Run universal-engine audit mode te
 	@node report/src/main.ts
 	@./test/assert-universal-audit.sh
 	@./test/assert-step-port-isolation.sh
-	@node src/post.ts
-	@./test/assert-post.sh
+	@volume=$$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/buildkit"}}{{.Name}}{{end}}{{end}}' "$$BUILDER_NAME") && \
+	  node src/post.ts && \
+	  BUILDKIT_VOLUME="$$volume" ./test/assert-post.sh
 	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_universal_restrict
