@@ -86,9 +86,8 @@ describe("readiness", () => {
 
 describe("allowlist scope", () => {
   it("logs only names matching the rule as allowed, not the whole parent domain", () => {
-    // `*` is one label, so the resolver must not degrade to a suffix match the
-    // way dnsmasq's `/amazonaws.com/` would: that would misreport, as allowed,
-    // every name beneath it.
+    // `*` is one label, so the resolver must not degrade to a suffix match on
+    // `amazonaws.com`: that would misreport, as allowed, every name beneath it.
     const config = gen({ urlRules: buildUrlRules("GET https://*.amazonaws.com/x") });
     const regex = regexOf(exprLine(config));
     expect(regex.test("a.amazonaws.com.")).toBe(true);

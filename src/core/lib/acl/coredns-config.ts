@@ -10,9 +10,9 @@
  * Real resolution happens once, in HAProxy, after a request has passed its
  * rule check; see haproxy-config.ts and haproxy-universal-config.ts. What this
  * file decides is only what gets logged as allowed or denied, and that has to
- * match the rules exactly, which is why it uses CoreDNS regex views over
- * dnsmasq suffix matching: the latter could only widen `abc*.amazonaws.com`
- * to `/amazonaws.com/`.
+ * match the rules exactly, which is why it uses regex views rather than suffix
+ * matching: the latter could only widen `abc*.amazonaws.com` to all of
+ * `amazonaws.com`.
  *
  * Reverse lookups and service-discovery names are the exceptions; see
  * reverseZoneLines and discoveryZoneLines.
@@ -88,9 +88,8 @@ const REVERSE_NAME_REGEX =
   "^(([0-9]{1,3}[.]){1,4}in-addr[.]arpa|([0-9a-fA-F][.]){1,32}ip6[.]arpa)[.]$";
 
 /**
- * The reverse zones, where a PTR query is answered NXDOMAIN. Nothing inside
- * the cage has a name to give back, and NXDOMAIN matches what dnsmasq gives
- * the universal engine for the same addresses through bogus-priv.
+ * The reverse zones, where a PTR query is answered NXDOMAIN: nothing inside
+ * the cage has a name to give back.
  *
  * Recorded under a verb of its own: no rule can name an address read
  * backwards, so reporting one as denied would put a row in the report that no
