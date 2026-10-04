@@ -4,9 +4,11 @@ run-name: Test / Integration (${{ github.ref_name }})
 on:
   workflow_dispatch:
 
+  # epic/ branches gather a large change before it lands on main.
   pull_request:
     branches:
       - main
+      - "epic/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
