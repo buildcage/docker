@@ -10,7 +10,7 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 	enumerable: !0
 }) : target, mod));
 //#endregion
-let node_url = require("node:url"), node_child_process = require("node:child_process"), node_path = require("node:path");
+let node_fs = require("node:fs"), node_url = require("node:url"), node_child_process = require("node:child_process"), node_path = require("node:path");
 node_path = __toESM(node_path, 1);
 let os = require("os");
 os = __toESM(os, 1);
@@ -24,7 +24,7 @@ let events = require("events");
 events = __toESM(events, 1);
 let node_crypto = require("node:crypto"), child_process = require("child_process");
 child_process = __toESM(child_process, 1), require("timers");
-let node_fs = require("node:fs"), node_os = require("node:os");
+let node_os = require("node:os");
 node_os = __toESM(node_os, 1);
 let node_fs_promises = require("node:fs/promises");
 //#region src/core/lib/errors.ts
@@ -12937,5 +12937,5 @@ async function runSetupStep(env, overrides = {}) {
 }
 //#endregion
 //#region src/main.ts
-process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && runSetupStep(process.env).catch(exitOnFatalError("setup"));
+process.argv[1] && (0, node_fs.realpathSync)(process.argv[1]) === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && runSetupStep(process.env).catch(exitOnFatalError("setup"));
 //#endregion

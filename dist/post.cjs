@@ -10,7 +10,7 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 	enumerable: !0
 }) : target, mod));
 //#endregion
-let node_child_process = require("node:child_process"), node_path = require("node:path"), node_url = require("node:url"), os = require("os");
+let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_path = require("node:path"), node_url = require("node:url"), os = require("os");
 os = __toESM(os, 1);
 let fs = require("fs");
 fs = __toESM(fs, 1);
@@ -230,5 +230,5 @@ function main() {
 		env: plan.env
 	});
 }
-process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main();
+process.argv[1] && (0, node_fs.realpathSync)(process.argv[1]) === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main();
 //#endregion
