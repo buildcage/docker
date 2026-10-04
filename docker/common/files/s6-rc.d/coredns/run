@@ -2,4 +2,5 @@
 exec 2>&1
 # Guaranteed non-decision line for report's head check (see log/inspect.ts).
 echo "buildcage coredns starting"
-exec s6-notifyoncheck -d -w 250 -n 12 s6-setuidgid coredns coredns -conf /etc/coredns/Corefile
+# -n 0 checks until ready; S6_CMD_WAIT_FOR_SERVICES_MAXTIME bounds the wait.
+exec s6-notifyoncheck -d -w 250 -n 0 s6-setuidgid coredns coredns -conf /etc/coredns/Corefile

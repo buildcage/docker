@@ -1,2 +1,3 @@
 #!/bin/sh
-curl -sf http://127.0.0.1:8080/health > /dev/null 2>&1
+# --max-time: a check that hangs would keep s6-notifyoncheck from trying again.
+curl -sf --max-time 2 http://127.0.0.1:8080/health > /dev/null 2>&1
