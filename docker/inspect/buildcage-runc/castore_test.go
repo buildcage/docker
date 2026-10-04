@@ -490,6 +490,24 @@ func TestResolveInRootResolvesTheRootItself(t *testing.T) {
 	}
 }
 
+func TestWithinRoot(t *testing.T) {
+	for _, c := range []struct {
+		rootfs, path string
+		want         bool
+	}{
+		{"/bundle/rootfs", "/bundle/rootfs", true},
+		{"/bundle/rootfs", "/bundle/rootfs/etc", true},
+		{"/bundle/rootfs", "/bundle/rootfs2/etc", false},
+		{"/bundle/rootfs", "/bundle", false},
+		{"/", "/", true},
+		{"/", "/etc", true},
+	} {
+		if got := withinRoot(c.rootfs, c.path); got != c.want {
+			t.Errorf("withinRoot(%q, %q) = %v, want %v", c.rootfs, c.path, got, c.want)
+		}
+	}
+}
+
 // A chain long enough to be a loop is refused rather than followed: the rootfs
 // comes from an image the build chose, and following it is work done as root on
 // the host.
