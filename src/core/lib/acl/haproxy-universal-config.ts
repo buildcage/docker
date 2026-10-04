@@ -92,7 +92,13 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
   const config = [
     ...preamble({
       global: ["    maxconn 2048"],
-      defaults: ["    mode tcp", "    timeout client 1m", "    timeout server 1m"],
+      defaults: [
+        "    mode tcp",
+        "    timeout client 1m",
+        "    timeout server 1m",
+        "    timeout client-fin 1m",
+        "    timeout server-fin 1m",
+      ],
     }),
     ...resolversSection(),
     "# --- Frontend ---",
