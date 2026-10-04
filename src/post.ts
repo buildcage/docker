@@ -15,13 +15,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_NAME_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1";
 
 function main(): void {
-  const { args, env } = planPostCleanup(
+  const plan = planPostCleanup(
     join(__dirname, "../docker/compose.action.yaml"),
     PROJECT_NAME_OVERRIDE_ENABLED ? process.env.COMPOSE_PROJECT_NAME : undefined,
     process.env,
     { savedBuilderName: core.getState(BUILDER_NAME_STATE) },
   );
-  execFileSync("docker", args, { stdio: "inherit", env });
+  if (!plan) {
+    core.info("No builder to remove: the setup step stopped before it named one.");
+    return;
+  }
+  execFileSync("docker", plan.args, { stdio: "inherit", env: plan.env });
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();

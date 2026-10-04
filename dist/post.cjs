@@ -166,6 +166,9 @@ function getInput(name, options) {
 	if (options && options.required && !val) throw Error(`Input required and not supplied: ${name}`);
 	return options && options.trimWhitespace === !1 ? val : val.trim();
 }
+function info(message) {
+	process.stdout.write(message + os.EOL);
+}
 function getState(name) {
 	return process.env[`STATE_${name}`] || "";
 }
@@ -195,11 +198,12 @@ const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[
 RegExp(`^${OCTET}$`), RegExp(`^${IPV4}(?:/${PREFIX})?$`), RegExp(`^${IPV4}/${PREFIX}$`);
 //#endregion
 //#region src/lib/inputs.ts
-function readBuilderName(getInput$2 = getInput) {
-	return getInput$2("builder_name") || "buildcage";
+function readBuilderName(getInput$3 = getInput) {
+	return getInput$3("builder_name") || "buildcage";
 }
-function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderName, getInput } = {}) {
-	let builderName = savedBuilderName || readBuilderName(getInput);
+function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderName, getInput: getInput$1 = getInput } = {}) {
+	if (!savedBuilderName && getInput$1("config_file")) return;
+	let builderName = savedBuilderName || readBuilderName(getInput$1);
 	return {
 		args: buildComposeDownArgs({
 			composeFile,
@@ -215,10 +219,14 @@ function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderNa
 //#region src/post.ts
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
 function main() {
-	let { args, env } = planPostCleanup((0, node_path.join)(__dirname$1, "../docker/compose.action.yaml"), void 0, process.env, { savedBuilderName: getState("builder_name") });
-	(0, node_child_process.execFileSync)("docker", args, {
+	let plan = planPostCleanup((0, node_path.join)(__dirname$1, "../docker/compose.action.yaml"), void 0, process.env, { savedBuilderName: getState("builder_name") });
+	if (!plan) {
+		info("No builder to remove: the setup step stopped before it named one.");
+		return;
+	}
+	(0, node_child_process.execFileSync)("docker", plan.args, {
 		stdio: "inherit",
-		env
+		env: plan.env
 	});
 }
 process.argv[1] === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main();
