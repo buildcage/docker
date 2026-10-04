@@ -381,10 +381,9 @@ iterations is left unread instead of stalling the build. Its `vX.Y.Z-buildcage.N
 
 The CNI plugins and CoreDNS are downloaded at a pinned version and checked against one SHA256 per
 architecture, both set as `ARG`s in each engine's Dockerfile. Renovate updates the version and the
-SHA256 lines together, taking the digests from the release's own checksum files; each SHA256 line's
-`digestVersion` names the release its digest belongs to. A bump by hand changes the version line,
-each SHA256 line, and the `digestVersion` in the comment above each SHA256 line. One left on the old
-release has Renovate look for the next digest there.
+SHA256 lines together, taking the digests from the release's own checksum files; the `digestVersion`
+in the comment above each SHA256 line tells it which release that digest belongs to. A bump by hand
+changes all of them: the version line, each SHA256 line and each `digestVersion`.
 
 ## Troubleshooting
 
