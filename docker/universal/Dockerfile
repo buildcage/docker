@@ -55,7 +55,7 @@ FROM moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3
 
 LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
-      org.opencontainers.image.licenses="MIT AND GPL-2.0-or-later" \
+      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-2.0-or-later AND GPL-1.0-or-later AND curl AND ISC" \
       org.opencontainers.image.source="https://github.com/buildcage/docker" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/report/report-source.ts.

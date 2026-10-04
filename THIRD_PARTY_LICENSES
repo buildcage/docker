@@ -1,9 +1,20 @@
 Third-Party Licenses
 ====================
 
-The Buildcage Docker image includes the following third-party software.
-Each component retains its original license. The Buildcage source code
-itself is licensed under the MIT License (see LICENSE file).
+The Buildcage Docker images (docker/{universal,inspect}/Dockerfile) include
+the following third-party software. Each component retains its original
+license. The Buildcage source code itself is licensed under the MIT License
+(see LICENSE file).
+
+------------------------------------------------------------------------------
+
+BuildKit (base image: moby/buildkit)
+  Website : https://github.com/moby/buildkit
+  License : Apache License 2.0 (Apache-2.0)
+  Source  : https://github.com/moby/buildkit
+  Note    : The base image also carries the software BuildKit ships with, such
+            as its runc and QEMU emulators, under the licenses its own image
+            states.
 
 ------------------------------------------------------------------------------
 
@@ -14,10 +25,61 @@ HAProxy
 
 ------------------------------------------------------------------------------
 
-BuildKit (base image: moby/buildkit)
-  Website : https://github.com/moby/buildkit
+iptables
+  Website : https://www.netfilter.org/projects/iptables/
+  License : GNU General Public License v2.0 or later (GPL-2.0-or-later)
+  Source  : https://git.netfilter.org/iptables/ or via Alpine Linux source
+            packages
+
+------------------------------------------------------------------------------
+
+util-linux (pipesz only, at /usr/bin/pipesz)
+  Website : https://github.com/util-linux/util-linux
+  License : GNU General Public License (GPL); pipesz.c names no version
+  Source  : https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git or
+            via Alpine Linux source packages
+  Note    : Only this binary, copied from Alpine Linux's util-linux-misc
+            package.
+
+------------------------------------------------------------------------------
+
+curl
+  Website : https://curl.se/
+  License : curl License (curl)
+  Source  : https://github.com/curl/curl or via Alpine Linux source packages
+
+------------------------------------------------------------------------------
+
+rsync (inspect only)
+  Website : https://rsync.samba.org/
+  License : GNU General Public License v3.0 or later (GPL-3.0-or-later)
+  Source  : https://github.com/RsyncProject/rsync or via Alpine Linux source
+            packages
+
+------------------------------------------------------------------------------
+
+OpenSSL (inspect only)
+  Website : https://www.openssl.org/
   License : Apache License 2.0 (Apache-2.0)
-  Source  : https://github.com/moby/buildkit
+  Source  : https://github.com/openssl/openssl or via Alpine Linux source
+            packages
+
+------------------------------------------------------------------------------
+
+NSS tools (certutil, via Alpine Linux's nss-tools package) (inspect only)
+  Website : https://firefox-source-docs.mozilla.org/security/nss/
+  License : Mozilla Public License 2.0 (MPL-2.0)
+  Source  : https://hg.mozilla.org/projects/nss or via Alpine Linux source
+            packages
+
+------------------------------------------------------------------------------
+
+CoreDNS
+  Website : https://coredns.io/
+  License : Apache License 2.0 (Apache-2.0)
+  Source  : https://github.com/coredns/coredns
+  Note    : Official pre-built release binary, checksum-pinned in each
+            engine's Dockerfile.
 
 ------------------------------------------------------------------------------
 
@@ -25,34 +87,51 @@ CNI Plugins
   Website : https://github.com/containernetworking/plugins
   License : Apache License 2.0 (Apache-2.0)
   Source  : https://github.com/containernetworking/plugins
-
-------------------------------------------------------------------------------
-
-CoreDNS (used by both proxy engine images, docker/{universal,inspect}/Dockerfile)
-  Website : https://coredns.io/
-  License : Apache License 2.0 (Apache-2.0)
-  Source  : https://github.com/coredns/coredns
+  Note    : Official pre-built release, checksum-pinned in each engine's
+            Dockerfile.
 
 ------------------------------------------------------------------------------
 
 s6-overlay
   Website : https://github.com/just-containers/s6-overlay
-  License : ISC License
-  Source  : https://github.com/just-containers/s6-overlay
+  License : ISC License (ISC)
+  Source  : https://github.com/just-containers/s6-overlay or via Alpine Linux
+            source packages
 
 ------------------------------------------------------------------------------
 
-QuickJS
-  Website : https://bellard.org/quickjs/
-  License : MIT License
-  Source  : https://bellard.org/quickjs/ or via Alpine Linux source packages
+QuickJS-ng
+  Website : https://quickjs-ng.github.io/quickjs/
+  License : MIT License (MIT)
+  Source  : https://github.com/quickjs-ng/quickjs or via Alpine Linux source
+            packages
 
 ------------------------------------------------------------------------------
 
 @actions/core (bundled into /opt/buildcage/scripts/report-action.js)
   Website : https://github.com/actions/toolkit/tree/main/packages/core
-  License : MIT License
+  License : MIT License (MIT)
   Source  : https://github.com/actions/toolkit
+
+------------------------------------------------------------------------------
+
+Go modules linked into /opt/buildcage/bin/buildcage-runc (inspect only)
+
+  go-pkcs12, modified
+    License : BSD 3-Clause License (BSD-3-Clause)
+    Source  : https://github.com/buildcage/go-pkcs12
+              (fork of SSLMate/go-pkcs12)
+
+  golang.org/x/crypto
+    License : BSD 3-Clause License (BSD-3-Clause)
+    Source  : https://cs.opensource.google/go/x/crypto
+
+  Go standard library
+    License : BSD 3-Clause License (BSD-3-Clause)
+    Source  : https://go.dev/src/
+
+  Compiled from source at image build time; no Go toolchain remains in
+  the published image.
 
 ------------------------------------------------------------------------------
 
@@ -71,19 +150,26 @@ docker/seccomp/builder.json
 
 ------------------------------------------------------------------------------
 
-Note on GPL components (HAProxy):
+Libraries these packages pull in, and the rest of the base image's packages,
+keep the licenses their own packages declare; `apk list -I` inside the image
+lists them.
 
-These components are installed from the Alpine Linux official package
-repository. Their source code is available through:
+------------------------------------------------------------------------------
+
+Note on GPL components (HAProxy, iptables, util-linux, rsync):
+
+These components come from the Alpine Linux official package repository;
+pipesz is copied out of the util-linux-misc package. Their source code is
+available through:
 
   1. The upstream project repositories listed above
   2. Alpine Linux source packages:
      https://pkgs.alpinelinux.org/packages
 
-The Buildcage source code (MIT License) is not derived from, linked to,
-or combined with the GPL-licensed components. They are independent programs
-distributed together in a Docker image as an aggregate work, consistent
-with GPL v2 Section 2.
+The Buildcage source code (MIT License) is not derived from, linked to, or
+combined with the GPL-licensed components. They are independent programs
+distributed together in a Docker image as an aggregate work, consistent with
+GPL v2 Section 2 and GPL v3 Section 5.
 
 ------------------------------------------------------------------------------
 
