@@ -271,7 +271,8 @@ dot, as the rules do before matching it.
 knew one the line could not otherwise show. `tlserr` carries haproxy's own error from the handshake
 with the origin, which is what tells a connection the proxy would not make from one it could not
 make; the passthrough stage terminates no TLS and logs no such field. `fcerr` is haproxy's error
-on the client connection; an `SSL_*` one on a line with no request is shown as `client-tls-failed`.
+on the client connection; an `SSL_*` one on a line with no request is shown as `client-tls-failed`,
+except `SSL_FATAL`, a broken record after the handshake.
 
 What the report makes of those is in
 [Requests that never arrived whole](./reference.md#requests-that-never-arrived-whole), for a

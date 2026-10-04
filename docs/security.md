@@ -30,15 +30,19 @@ Three things sit outside that model by design.
   the same people, so Buildcage is not a control against them. A `config_file` is no different. On
   `pull_request_target`, and `workflow_run` triggered by a pull request, the workspace may hold the
   pull request's own code, so `config_file` is refused there. On other events it is read from
-  whatever the workflow checked out, so whoever can write that copy sets the rules. The report action
-  reads the file again after the build, so a build whose `--output type=local` lands on the file can
-  set any report input the workflow leaves unset, `fail_on_blocked` among them.
+  whatever the workflow checked out, so whoever can write that copy sets the rules.
 - **What buildkitd fetches for itself**, [below](#what-buildkitd-fetches-itself).
 - **Another step in the same job.** Running between `setup` and `report`, an untrusted step can
   reach the proxy container through `docker exec` or `docker cp`, or the host filesystem directly on
   a passwordless-sudo runner, and rewrite the traffic log. `report` refuses a log that doesn't start
   where a real proxy run would, which catches wholesale erasure, but not a format-aware forgery.
   The defense here is procedural: don't place an untrusted step between `setup` and `report`.
+
+One gap does sit inside the model. The report action reads `config_file` again after the build, so
+when a build's `--output type=local` export lands on the file, a `RUN` step decides what the report
+reads and can set any report input the workflow leaves unset, `fail_on_blocked: false` among them.
+Set those inputs in the workflow, or keep the export away from the file (see [Config
+file](./reference.md#config-file)).
 
 There is also a structural limit no rule set fixes. An allowlist decides destinations, so it cannot
 tell a legitimate use of an allowed destination from an abusive one, and anything leaving through a

@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { connectedHosts, isRedundantDns, type TrafficEvent } from "./traffic-event.ts";
+import {
+  clientEndedNoise,
+  connectedHosts,
+  isRedundantDns,
+  type TrafficEvent,
+} from "./traffic-event.ts";
 
 function event(
   partial: Partial<TrafficEvent> & Pick<TrafficEvent, "protocol" | "action" | "host">,
@@ -47,6 +52,24 @@ describe("isRedundantDns", () => {
     expect(redundant(dns, [dns, request])).toBe(true);
   });
 
+  it("keeps a lookup whose only connection ended before a request", () => {
+    // What a client that cannot trust the CA leaves, and no table lists it.
+    const dns = event({ protocol: "dns", action: "allow", host: "a.example.com" });
+    const ended = event({
+      protocol: "https",
+      action: "incomplete",
+      host: "a.example.com",
+      reason: "client-tls-failed",
+    });
+    expect(redundant(dns, [dns, ended])).toBe(false);
+  });
+
+  it("drops a lookup once a connection sent its name with a trailing dot", () => {
+    const dns = event({ protocol: "dns", action: "allow", host: "a.example.com" });
+    const pass = event({ protocol: "tls", action: "allow", host: "a.example.com." });
+    expect(redundant(dns, [dns, pass])).toBe(true);
+  });
+
   it("ignores a second DNS record for the same host", () => {
     // Two records for one name (the plain name and a search-domain variant of
     // it, say) do not make each other redundant. Only a connection does.
@@ -83,5 +106,18 @@ describe("connectedHosts", () => {
     ]);
     expect([...connected.any].sort().join(",")).toBe("allowed.example.com,refused.example.com");
     expect([...connected.blocked].join(",")).toBe("refused.example.com");
+  });
+});
+
+describe("clientEndedNoise", () => {
+  it("treats a close named by an SNI with a trailing dot as its host's noise", () => {
+    const request = event({ protocol: "https", action: "allow", host: "a.example.com" });
+    const close = event({
+      protocol: "https",
+      action: "incomplete",
+      host: "a.example.com.",
+      reason: "client-aborted",
+    });
+    expect(clientEndedNoise([request, close])(close)).toBe(true);
   });
 });

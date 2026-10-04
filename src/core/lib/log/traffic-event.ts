@@ -3,6 +3,7 @@
  * the log parser (inspect.ts) and consumed by the report layer.
  */
 
+import { ruleHost } from "./authority.ts";
 import { UNKNOWN_HOST } from "./proxy-address.ts";
 
 /**
@@ -35,8 +36,8 @@ export interface TrafficEvent {
   time: number;
   action: TrafficAction;
   protocol: TrafficProtocol;
-  /** The name asked for, as ruleHost (or sniHost, for an SNI the rules
-   *  judged) folds it, or the address when there was no name. */
+  /** The name asked for, as ruleHost (or sniHost, for a name from the SNI)
+   *  folds it, or the address when there was no name. */
   host: string;
   /** Absent for dns, which connects to nothing. */
   port?: number;
@@ -83,13 +84,14 @@ export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent
   const completed = new Set<string>();
   for (const event of timeline) {
     if (event.protocol !== "dns" && event.action !== "incomplete" && event.host !== UNKNOWN_HOST) {
-      completed.add(event.host);
+      completed.add(ruleHost(event.host));
     }
   }
+  // A close is named by its SNI, which may keep a dot the request's Host lost.
   return (event) =>
     event.action === "incomplete" &&
     CLIENT_ENDED_REASONS.has(event.reason ?? "") &&
-    completed.has(event.host);
+    completed.has(ruleHost(event.host));
 }
 
 /** Index a timeline once. The check below runs for every lookup, and rescanning
@@ -97,17 +99,21 @@ export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent
 export function connectedHosts(timeline: TrafficEvent[]): ConnectedHosts {
   const connected: ConnectedHosts = { any: new Set(), blocked: new Set() };
   for (const event of timeline) {
-    if (event.protocol === "dns") continue;
-    connected.any.add(event.host);
-    if (event.action === "block") connected.blocked.add(event.host);
+    // Where these are all a host left, as from a client that cannot trust the
+    // CA, its lookup is the only row a table has for it.
+    if (event.protocol === "dns" || event.action === "incomplete") continue;
+    // The resolver logs every name without the dot an SNI may keep.
+    const host = ruleHost(event.host);
+    connected.any.add(host);
+    if (event.action === "block") connected.blocked.add(host);
   }
   return connected;
 }
 
 /**
  * A lookup is the sole trace of a name the build never connected to, and worth
- * keeping for that. Once a connection to the same name also appears, it says
- * nothing that connection does not and only doubles the row.
+ * keeping for that. Once a connection to the same name also reaches a host
+ * table, it says nothing that connection does not and only doubles the row.
  *
  * A refused lookup takes a refused connection to cover it. An allowed request
  * for a name the resolver refused would mean the two disagreed about that host,

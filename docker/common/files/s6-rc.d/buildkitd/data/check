@@ -1,2 +1,3 @@
 #!/bin/sh
-buildctl debug workers > /dev/null 2>&1
+# timeout: a check that hangs would keep s6-notifyoncheck from trying again.
+timeout 2 buildctl debug workers > /dev/null 2>&1
