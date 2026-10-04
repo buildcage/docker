@@ -347,7 +347,8 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │   │                         # cni.conflist
 │   ├── universal/            # proxy_engine: universal — BuildKit, HAProxy, CoreDNS, s6-overlay
 │   └── inspect/              # proxy_engine: inspect — HAProxy, CoreDNS, s6-overlay, and
-│                             # buildcage-runc/ (Go module: CA trust at exec time)
+│                             # buildcage-runc/ (Go module: CA trust at exec time);
+│                             # haproxy/ holds the patches its HAProxy is built with
 ├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode}, plus the fixture
 │                             # containers. helpers.sh carries what every assert script shares
 ├── compose.test-*.yaml       # Test override config, one per engine

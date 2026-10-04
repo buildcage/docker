@@ -21,7 +21,8 @@ BuildKit (base image: moby/buildkit)
 HAProxy
   Website : https://www.haproxy.org/
   License : GNU General Public License v2.0 or later (GPL-2.0-or-later)
-  Source  : https://git.haproxy.org/ or via Alpine Linux source packages
+  Source  : https://www.haproxy.org/download/, with the patches in
+            docker/inspect/haproxy/ of https://github.com/buildcage/docker
 
 ------------------------------------------------------------------------------
 

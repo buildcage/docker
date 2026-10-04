@@ -64,7 +64,8 @@ echo "[client left first] the connection is named by its SNI, the only name it g
 # holds because haproxy writes `-` for the empty Host capture and the unset
 # path alike. A version writing them as nothing would leave `host= `, which
 # the parser cannot read and so counts as a failed step. Caught here.
-if grep -qE "^buildcage [0-9]+ https <BADREQ> [0-9-]+ [0-9]+ ts=[Cc]R reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=aborted\.example\.com host=- -$" <<< "$LOGS"; then
+# An HTTP/2 client that leaves is logged as `0 0 ts=PR`.
+if grep -qE "^buildcage [0-9]+ https <BADREQ> ([0-9-]+ [0-9]+ ts=[Cc]R|0 0 ts=PR) reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=aborted\.example\.com host=- -$" <<< "$LOGS"; then
   pass "recorded with the handshake's SNI"
 else
   fail "no such line for aborted.example.com"
