@@ -26,7 +26,7 @@ import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
-import type { TrafficAction, TrafficEvent } from "./traffic-event.ts";
+import { CLIENT_ENDED_REASONS, type TrafficAction, type TrafficEvent } from "./traffic-event.ts";
 
 export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 
@@ -399,7 +399,40 @@ export async function scanInspectLog(
     // the stamp would leave the marker bare, which is not a missing event.
     if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
   }
+  refuseUnpassedAddresses(events);
   return { events, startedAt, headIntact: headIntact ?? false, unparsed };
+}
+
+/**
+ * Refuse a connection sent straight to an address that ended before its
+ * request, as `universal` does in restrict mode.
+ *
+ * No allowed_ip_rules entry covers the address, or the connection would have
+ * been passed through. Its client sent no SNI, so the certificate this proxy
+ * answered with names nothing and no client that checks it gets further.
+ *
+ * A client close is left alone where a request to the same address and port
+ * was read, as a keepalive pool's cleanup. A passthrough proves no such thing,
+ * and neither does a request on another port.
+ */
+function refuseUnpassedAddresses(events: TrafficEvent[]): void {
+  // A proxy line always carries a destination.
+  const served = new Set<string | undefined>();
+  for (const event of events) {
+    if (
+      (event.protocol === "http" || event.protocol === "https") &&
+      event.action !== "incomplete"
+    ) {
+      served.add(event.destination);
+    }
+  }
+  for (const event of events) {
+    // Only hostBeforeRequest's address fallback makes an incomplete line tcp.
+    if (event.action !== "incomplete" || event.protocol !== "tcp") continue;
+    if (CLIENT_ENDED_REASONS.has(event.reason) && served.has(event.destination)) continue;
+    event.action = "block";
+    event.reason = "ip-not-allowed";
+  }
 }
 
 /**
