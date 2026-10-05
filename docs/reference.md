@@ -237,8 +237,8 @@ internationalized name in its punycode form (`xn--mnchen-3ya.de`, not `münchen.
 connection carries. A leading, trailing or doubled dot is refused.
 
 A `Host` header ending in a dot (`example.com.`) matches as the name without it. An SNI may not end
-in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, and
-`allowed_https_rules` under `universal`), only a rule whose `**` can take in the dot
+in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`,
+`allowed_https_rules` under `universal`, and [`sni-not-allowed`](#the-ones-buildcage-refused)), only a rule whose `**` can take in the dot
 (`example.**` or `**`, not `example.com.**`), or a `~` rule written to allow the dot, matches such a
 name.
 
@@ -602,7 +602,8 @@ against, so the passthrough rule is the only way to clear that one.
 
 `sni-not-allowed` is the same kind of connection carrying an SNI. Its host is the name from the
 SNI, judged the way the resolver judges a name looked up through DNS: against the host of every rule
-except `allowed_ip_rules`, on any port. Through DNS, the same attempt is refused as
+except `allowed_ip_rules`, on any port. A trailing dot is kept, as wherever a rule is judged on the
+SNI. Through DNS, the same attempt is refused as
 `dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through DNS; the usual
 cause is a client that does not trust the CA, with the name pointed at an address by `/etc/hosts` or
 `curl --resolve`. `audit` refuses no name, so it refuses no SNI. A rule allowing the host clears
