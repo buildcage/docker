@@ -367,11 +367,29 @@ function checkGroups(text: string, label: string, rule: string): void {
 }
 
 /**
+ * A quantifier as JavaScript and RE2 read one. PCRE2 also reads `{,3}` and
+ * `{ 1,3}` as quantifiers, where the other two match the text literally.
+ */
+const QUANTIFIER = /^\{\d+(?:,\d*)?\}/;
+
+function checkBraces(text: string, label: string, rule: string): void {
+  for (const [i, inClass] of regexChars(text)) {
+    if (inClass || text[i] !== "{" || QUANTIFIER.test(text.slice(i))) continue;
+    throw new Error(
+      `Invalid regex in rule "${rule}": the ${label} "${text}" has a "{" that does not open a ` +
+        `quantifier such as {2} or {1,3}. The proxy's PCRE2 reads some such braces, "{,3}" ` +
+        `among them, as a quantifier where setup reads text; write a literal brace as "\\{"`,
+    );
+  }
+}
+
+/**
  * Check part of a `~` rule against what the rule syntax can represent.
  *
  * @throws {Error} if the text holds class syntax checkClasses refuses, uses an
  *   escape outside PORTABLE_ESCAPE or one checkPortableEscape refuses, holds
- *   group syntax checkGroups refuses, carries a top-level `|`, or a host half
+ *   group syntax checkGroups refuses, a `{` checkBraces refuses, carries a
+ *   top-level `|`, or a host half
  *   holds a character no hostname can or text the resolver's config cannot
  *   quote
  */
@@ -384,6 +402,7 @@ export function checkRawRegexHalf(
   checkClasses(text, label, rule);
   checkEscapes(text, label, rule);
   checkGroups(text, label, rule);
+  checkBraces(text, label, rule);
   if (hostHalf) checkResolverRegexSyntax(text, label, rule);
   if (hasTopLevelAlternation(text)) {
     throw new Error(

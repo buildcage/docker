@@ -401,8 +401,12 @@ function checkGroups(text, label, rule) {
 		}
 	}
 }
+const QUANTIFIER = /^\{\d+(?:,\d*)?\}/;
+function checkBraces(text, label, rule) {
+	for (let [i, inClass] of regexChars(text)) if (!(inClass || text[i] !== "{" || QUANTIFIER.test(text.slice(i)))) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a "{" that does not open a quantifier such as {2} or {1,3}. The proxy's PCRE2 reads some such braces, "{,3}" among them, as a quantifier where setup reads text; write a literal brace as "\\{"`);
+}
 function checkRawRegexHalf(text, label, rule, hostHalf) {
-	if (checkClasses(text, label, rule), checkEscapes(text, label, rule), checkGroups(text, label, rule), hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
+	if (checkClasses(text, label, rule), checkEscapes(text, label, rule), checkGroups(text, label, rule), checkBraces(text, label, rule), hostHalf && checkResolverRegexSyntax(text, label, rule), hasTopLevelAlternation(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" has a top-level "|". Anchors bind to its first and last branch rather than to the whole ${label}, so write one rule per alternative, or put the "|" inside a group, as in "(a|b)\\.example\\.com"`);
 	if (hostHalf && HOST_LITERAL_ILLEGAL.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a character no hostname can, so the ":" this rule was split at is not its port separator. An IPv6 address is not supported here, in a "~" rule any more than in a literal one`);
 	if (hostHalf && COREFILE_UNSAFE.test(text)) throw Error(`Invalid regex in rule "${rule}": the ${label} "${text}" holds a "'", a backtick, "{$" or "{%". No hostname contains one, and the resolver's config cannot quote it`);
 }
