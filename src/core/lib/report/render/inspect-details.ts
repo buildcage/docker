@@ -69,6 +69,7 @@ const CREDENTIAL_PARAMS = new Set([
   "apikey",
   "apitoken",
   "auth",
+  "authorization",
   "authtoken",
   "clientsecret",
   "code",
@@ -77,10 +78,12 @@ const CREDENTIAL_PARAMS = new Set([
   "key",
   "passwd",
   "password",
+  "pat",
   "privatetoken",
   "pwd",
   "refreshtoken",
   "secret",
+  "session",
   "sessiontoken",
   "sig",
   "signature",
@@ -98,6 +101,26 @@ function credentialName(name: string): string {
 }
 
 /**
+ * A parameter name within one `&`-separated part: at its start, after the `;`
+ * some servers split on too, or after a later `?`, which opens the query of a
+ * URL carried in a value.
+ */
+const PARAM_NAME = /(^|[;?])([^;?=]*)=/g;
+
+/**
+ * One `&`-separated part with its first credential's value replaced through to
+ * the part's end, since a `;` or `?` after it may be part of the secret.
+ */
+function redactPart(part: string): string {
+  for (const match of part.matchAll(PARAM_NAME)) {
+    if (!CREDENTIAL_PARAMS.has(credentialName(match[2]))) continue;
+    const value = match.index + match[0].length;
+    return value === part.length ? part : `${part.slice(0, value)}***`;
+  }
+  return part;
+}
+
+/**
  * The URL with those values replaced and everything else left alone, so the
  * host, the path and the parameter names still read as they were sent. An
  * empty value stays empty rather than becoming `***`, which would claim a
@@ -112,12 +135,7 @@ function redactCredentialQuery(url: string): string {
   const query = url
     .slice(start + 1, end)
     .split("&")
-    .map((param) => {
-      const eq = param.indexOf("=");
-      if (eq === -1 || eq === param.length - 1) return param;
-      const name = param.slice(0, eq);
-      return CREDENTIAL_PARAMS.has(credentialName(name)) ? `${name}=***` : param;
-    })
+    .map(redactPart)
     .join("&");
 
   return url.slice(0, start + 1) + query + url.slice(end);
