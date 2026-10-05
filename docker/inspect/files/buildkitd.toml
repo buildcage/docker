@@ -15,7 +15,6 @@ snapshotter = "overlayfs"
 networkMode = "cni"
 cniConfigPath = "/etc/buildkit/cni.conflist"
 cniPoolSize = 16
-cniPortForward = true
 # Replaces buildkit-runc with buildcage's wrapper, which makes each step trust
 # the proxy's CA and puts the trust store back before the snapshot is committed.
 binary = "/opt/buildcage/bin/buildcage-runc"
