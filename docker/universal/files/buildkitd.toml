@@ -10,7 +10,6 @@ snapshotter = "auto"
 networkMode = "cni"
 cniConfigPath = "/etc/buildkit/cni.conflist"
 cniPoolSize = 16
-cniPortForward = true
 
 [[worker.oci.gcpolicy]]
 all = true
