@@ -10,6 +10,8 @@ export interface GenReportParameters {
   allowedHttpRules: string[];
   allowedIpRules: string[];
   allowedTlsRules: string[];
+  /** One rule per entry, as written. */
+  allowedUrlRules: string[];
   /** Also drives whether the "Expected" column is shown (length > 0). */
   knownBlockedRules: string[];
 }

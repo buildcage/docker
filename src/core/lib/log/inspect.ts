@@ -374,10 +374,13 @@ export interface InspectLogScan {
  * The report needs both, and the log arrives as a stream that can only be
  * consumed once, so it cannot be two separate passes. `for await` also
  * accepts a plain array, so callers with the lines already in memory pass one.
+ *
+ * Without `allowsName`, no SNI is judged; see refuseUnallowedNames.
  */
 export async function scanInspectLog(
   lines: AsyncIterable<string> | Iterable<string>,
   isAudit = false,
+  allowsName?: (name: string) => boolean,
 ): Promise<InspectLogScan> {
   const events: TrafficEvent[] = [];
   let startedAt: number | undefined;
@@ -400,6 +403,7 @@ export async function scanInspectLog(
     if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
   }
   refuseUnpassedAddresses(events);
+  if (allowsName) refuseUnallowedNames(events, allowsName);
   return { events, startedAt, headIntact: headIntact ?? false, unparsed };
 }
 
@@ -432,6 +436,25 @@ function refuseUnpassedAddresses(events: TrafficEvent[]): void {
     if (CLIENT_ENDED_REASONS.has(event.reason) && served.has(event.destination)) continue;
     event.action = "block";
     event.reason = "ip-not-allowed";
+  }
+}
+
+/**
+ * Refuse a connection sent straight to an address that ended before its
+ * request, where its SNI names a host the resolver would refuse.
+ *
+ * Through DNS, that attempt is refused on its dns line, which a connection to
+ * an address never has. A name the rules allow stays undecided, as it does
+ * through DNS. One sent to the proxy's own address came through DNS.
+ */
+function refuseUnallowedNames(events: TrafficEvent[], allowsName: (name: string) => boolean): void {
+  for (const event of events) {
+    // Only hostBeforeRequest's SNI makes an incomplete https line name a host.
+    if (event.action !== "incomplete" || event.protocol !== "https") continue;
+    if (event.host === UNKNOWN_HOST || allowsName(event.host)) continue;
+    if (event.destination?.startsWith(`${PROXY_ADDRESS}:`)) continue;
+    event.action = "block";
+    event.reason = "sni-not-allowed";
   }
 }
 

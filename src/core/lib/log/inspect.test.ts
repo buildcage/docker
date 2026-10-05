@@ -358,6 +358,43 @@ describe("a connection sent straight to an address that ended before its request
   });
 });
 
+describe("a connection sent straight to an address with an SNI that ended before its request", () => {
+  const named = (sni: string, ts = "CR", dst = "203.0.113.9:8443") =>
+    `buildcage 1 https <BADREQ> 0 0 ts=${ts} reason=- tlserr=- dst=${dst} fcerr=ERESET sni=${sni} host=- -`;
+  const allowsName = (name: string) => name === "registry.npmjs.org";
+  const judge = async (lines: string[]) => (await scanInspectLog(lines, false, allowsName)).events;
+
+  it("is refused where the resolver would have refused the name, however it ended", async () => {
+    const events = await judge([
+      named("exfil.attacker.example"),
+      named("exfil.attacker.example", "cR"),
+    ]);
+    for (const e of events) {
+      expect(`${e.action} ${e.protocol} ${e.host} ${e.reason}`).toBe(
+        "block https exfil.attacker.example sni-not-allowed",
+      );
+    }
+  });
+
+  it("stays undecided where the name is allowed, as it would through DNS", async () => {
+    const [e] = await judge([named("registry.npmjs.org")]);
+    expect(e.action).toBe("incomplete");
+    expect(e.reason).toBe("client-aborted");
+  });
+
+  it("leaves one sent to the proxy's own address to the resolver's own line", async () => {
+    const [e] = await judge([named("exfil.attacker.example", "CR", "198.19.255.1:443")]);
+    expect(e.action).toBe("incomplete");
+  });
+
+  it("judges no SNI where a request was read, the rules having judged its Host", async () => {
+    const served =
+      "buildcage 1 https GET 200 5 ts=-- reason=- tlserr=- dst=203.0.113.9:443 fcerr=- sni=exfil.attacker.example host=registry.npmjs.org /x";
+    const [e] = await judge([served]);
+    expect(e.action).toBe("allow");
+  });
+});
+
 describe("hasProxyStarted", () => {
   it("tells a proxy that saw nothing from one that never ran", () => {
     expect(hasProxyStarted(["buildcage haproxy starting"])).toBe(true);
