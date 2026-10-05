@@ -339,6 +339,16 @@ describe("a connection sent straight to an address that ended before its request
     expect(close.reason).toBe("client-timeout");
   });
 
+  it("refuses the close all the same where only another port or a passthrough was served", async () => {
+    const otherPort =
+      "buildcage 1 http GET 200 5 ts=-- reason=- tlserr=- dst=10.0.0.5:80 host=10.0.0.5 /x";
+    const passed = "buildcage 1 pass tcp 900 ts=-- reason=- dst=10.0.0.5:8080 sni=-";
+    for (const served of [otherPort, passed]) {
+      const [, close] = await parse([served, plainClose]);
+      expect(close.action).toBe("block");
+    }
+  });
+
   it("leaves one sent to the proxy's own address or named by its SNI undecided", async () => {
     const events = await parse([
       closed("CR", "ERESET", "198.19.255.1:443"),

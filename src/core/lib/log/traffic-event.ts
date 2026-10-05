@@ -67,7 +67,8 @@ export interface ConnectedHosts {
   blocked: Set<string>;
 }
 
-const CLIENT_ENDED_REASONS = new Set(["client-aborted", "client-timeout"]);
+/** What a client ending a connection before its request is logged as. */
+export const CLIENT_ENDED_REASONS = new Set(["client-aborted", "client-timeout"]);
 
 /**
  * Given a whole timeline, which client-ended `incomplete` connections

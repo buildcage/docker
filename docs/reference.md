@@ -584,8 +584,9 @@ request and refuses it. Both are refused in `audit` mode too, as the same check 
 `ip-not-allowed` is a connection to an address such as `203.0.113.9:8443` that ended before its
 request: a client that does not trust the CA, or one waiting for the server to speak first. A client
 sends no SNI to an address, so the certificate the proxy answers with matches no name, and nothing
-that checks it gets further, in `audit` too. `universal` refuses the same connection on arrival. A
-close on an address that also had a request read is a keepalive close and stays out of the report.
+that checks it gets further, in `audit` too. `universal` in `restrict` refuses the same connection
+on arrival. A close on an address and port that also had a request read is a keepalive close and
+stays out of the report.
 Plain HTTP sent to an address with a `Host` naming some other host is the exception: the log records
 where that request went, not the address, so its keepalive close is counted here.
 
