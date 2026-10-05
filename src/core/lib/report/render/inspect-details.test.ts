@@ -486,6 +486,11 @@ describe("renderInspectDetails credential parameters", () => {
     expect(subjectOf("https://h/v1?a=1;token=t&b=2")).toBe("GET https://h/v1?a=1;token=***&b=2");
   });
 
+  it("hides a credential's value up to the next `&`, whatever it holds", () => {
+    expect(subjectOf("https://h/v1?password=p;ss?w&x=1")).toBe("GET https://h/v1?password=***&x=1");
+    expect(subjectOf("https://h/v1?token=;s&x=1")).toBe("GET https://h/v1?token=***&x=1");
+  });
+
   it("reads the query of a URL carried in a value", () => {
     expect(subjectOf("https://h/login?next=/cb?token=t&page=2")).toBe(
       "GET https://h/login?next=/cb?token=***&page=2",

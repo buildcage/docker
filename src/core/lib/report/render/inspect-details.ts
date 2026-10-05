@@ -101,10 +101,25 @@ function credentialName(name: string): string {
 }
 
 /**
- * Where a parameter starts: `&`, the `;` some servers split on too, and a
- * later `?`, which opens the query of a URL carried in a value.
+ * A parameter name within one `&`-separated part: at its start, after the `;`
+ * some servers split on too, or after a later `?`, which opens the query of a
+ * URL carried in a value.
  */
-const PARAM_SEPARATOR = /([&;?])/;
+const PARAM_NAME = /(^|[;?])([^;?=]*)=/g;
+
+/**
+ * One `&`-separated part with a credential's value replaced up to the next
+ * `&`: a `;` or `?` inside a secret is part of it, so only the name can start
+ * after one.
+ */
+function redactPart(part: string): string {
+  for (const match of part.matchAll(PARAM_NAME)) {
+    if (!CREDENTIAL_PARAMS.has(credentialName(match[2]))) continue;
+    const value = match.index + match[0].length;
+    return value === part.length ? part : `${part.slice(0, value)}***`;
+  }
+  return part;
+}
 
 /**
  * The URL with those values replaced and everything else left alone, so the
@@ -120,14 +135,9 @@ function redactCredentialQuery(url: string): string {
 
   const query = url
     .slice(start + 1, end)
-    .split(PARAM_SEPARATOR)
-    .map((param) => {
-      const eq = param.indexOf("=");
-      if (eq === -1 || eq === param.length - 1) return param;
-      const name = param.slice(0, eq);
-      return CREDENTIAL_PARAMS.has(credentialName(name)) ? `${name}=***` : param;
-    })
-    .join("");
+    .split("&")
+    .map(redactPart)
+    .join("&");
 
   return url.slice(0, start + 1) + query + url.slice(end);
 }
