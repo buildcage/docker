@@ -570,7 +570,6 @@ and they fail the step under `fail_on_blocked: true` like any other refused conn
 🚫 00:15.880: HTTP (unknown):5432 -> bad-request
 🚫 00:16.204: TCP 10.0.0.9:5432 -> bad-request
 🚫 00:17.031: TCP 203.0.113.9:8443 -> ip-not-allowed
-🚫 00:18.420: HTTPS exfil.example.net:8443 -> sni-not-allowed
 ```
 
 | Reason                | What happened                                                                                               |
