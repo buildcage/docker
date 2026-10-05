@@ -296,6 +296,11 @@ read — carries no method or path, so it is matched by a host rule, never a URL
 follows each form: a host rule with no port reads as `:*`, a URL rule with no port as the scheme's
 default (`443`/`80`), exactly as in the allow inputs.
 
+grpc-go looks up a TXT record at `_grpc_config.<host>` when it resolves the host. The resolver
+refuses that name, so the step fails under `fail_on_blocked` although the call itself succeeds. List
+`_grpc_config.<host>` here, or set `GRPC_ENABLE_TXT_SERVICE_CONFIG=false` for the client to skip the
+lookup. Buildcage never returns a TXT record, so neither changes what the client gets.
+
 Because a URL rule matches nothing on an engine that never sees a method or a path, a URL line under
 `proxy_engine: universal` is refused in `restrict` mode and warned about in `audit`, the same split
 `allowed_url_rules` gets. A host line works on every engine.
