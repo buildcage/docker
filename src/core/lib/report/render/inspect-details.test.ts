@@ -476,6 +476,22 @@ describe("renderInspectDetails credential parameters", () => {
     );
   });
 
+  it("redacts the names a session or a personal access token goes by", () => {
+    expect(subjectOf("https://h/v1?Authorization=a&session=b&pat=c")).toBe(
+      "GET https://h/v1?Authorization=***&session=***&pat=***",
+    );
+  });
+
+  it("splits parameters at `;` too, keeping the separator sent", () => {
+    expect(subjectOf("https://h/v1?a=1;token=t&b=2")).toBe("GET https://h/v1?a=1;token=***&b=2");
+  });
+
+  it("reads the query of a URL carried in a value", () => {
+    expect(subjectOf("https://h/login?next=/cb?token=t&page=2")).toBe(
+      "GET https://h/login?next=/cb?token=***&page=2",
+    );
+  });
+
   it("does not match a name that only contains one it knows", () => {
     expect(subjectOf("https://h/v1?tokenizer=x&keys=y")).toBe(
       "GET https://h/v1?tokenizer=x&keys=y",

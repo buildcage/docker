@@ -367,11 +367,12 @@ workflow secrets, which leaves the ones it does not: a presigned URL's signature
 during the build, or a secret whose URL-encoded form no longer matches what was registered.
 
 The value of a query parameter named `access_key`, `access_token`, `api_key`, `api_token`, `auth`,
-`auth_token`, `client_secret`, `code`, `id_token`, `jwt`, `key`, `passwd`, `password`,
-`private_token`, `pwd`, `refresh_token`, `secret`, `session_token`, `sig`, `signature`,
-`subscription-key`, `token`, `x-amz-security-token`, `x-amz-signature`, `x-api-key` or
-`x-goog-signature` is therefore replaced. The name is matched ignoring case, `-` and `_`, so
-`api_key`, `api-key`, `apiKey` and `APIKEY` are one name:
+`authorization`, `auth_token`, `client_secret`, `code`, `id_token`, `jwt`, `key`, `passwd`,
+`password`, `pat`, `private_token`, `pwd`, `refresh_token`, `secret`, `session`, `session_token`,
+`sig`, `signature`, `subscription-key`, `token`, `x-amz-security-token`, `x-amz-signature`,
+`x-api-key` or `x-goog-signature` is therefore replaced. The name is matched ignoring case, `-` and
+`_`, so `api_key`, `api-key`, `apiKey` and `APIKEY` are one name. A parameter starts after `&`, `;`
+or any `?`, so one in a URL carried inside another's value is replaced too:
 
 ```
 ✅ 00:04.212: GET https://cdn.example.com/x.tar.gz?X-Amz-Signature=***&X-Amz-Expires=3600 -> 200 (4.1MB)
