@@ -108,9 +108,8 @@ function credentialName(name: string): string {
 const PARAM_NAME = /(^|[;?])([^;?=]*)=/g;
 
 /**
- * One `&`-separated part with a credential's value replaced up to the next
- * `&`: a `;` or `?` inside a secret is part of it, so only the name can start
- * after one.
+ * One `&`-separated part with its first credential's value replaced through to
+ * the part's end, since a `;` or `?` after it may be part of the secret.
  */
 function redactPart(part: string): string {
   for (const match of part.matchAll(PARAM_NAME)) {

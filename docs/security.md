@@ -372,8 +372,8 @@ The value of a query parameter named `access_key`, `access_token`, `api_key`, `a
 `sig`, `signature`, `subscription-key`, `token`, `x-amz-security-token`, `x-amz-signature`,
 `x-api-key` or `x-goog-signature` is therefore replaced. The name is matched ignoring case, `-` and
 `_`, so `api_key`, `api-key`, `apiKey` and `APIKEY` are one name. A parameter starts after `&`, `;`
-or any `?`, so one in a URL carried inside another's value is replaced too, and the value replaced
-runs to the next `&`:
+or any `?`, so one in a URL carried inside another's value is replaced too. The replaced value runs
+to the next `&`, so a `;` or `?` inside a secret does not leave the rest of it showing:
 
 ```
 ✅ 00:04.212: GET https://cdn.example.com/x.tar.gz?X-Amz-Signature=***&X-Amz-Expires=3600 -> 200 (4.1MB)
