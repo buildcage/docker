@@ -383,7 +383,9 @@ single-digit backreference such as `\1`, all of which the two read alike. Any ot
 after a backslash is refused. So are a backreference to a group the pattern lacks (in a URL rule,
 one outside its own half), `\B` inside a character class, a `]` right after `[` or `[^`, and a
 POSIX class such as `[:alpha:]`, each of which PCRE2 either reads differently or refuses. Escape
-the bracket (`[\]a]`) or write a range (`[a-z]`) instead. Other syntax only JavaScript accepts,
+the bracket (`[\]a]`) or write a range (`[a-z]`) instead. A `{` must open a quantifier such as
+`{2}` or `{1,3}`, since PCRE2 reads `{,3}` and `{ 1,3}` as quantifiers where JavaScript and RE2 read
+text; write a literal brace as `\{`. Other syntax only JavaScript accepts,
 such as `[\d-z]`, passes setup and then stops the proxy from starting.
 
 The proxy image generates its configuration with QuickJS, which refuses two group forms Node
