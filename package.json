@@ -28,6 +28,7 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@sigstore/protobuf-specs": "^0.5.2",
     "@types/node": "^24.13.3",
     "@vitest/coverage-v8": "4.1.11",
     "fast-check": "^4.9.0",
