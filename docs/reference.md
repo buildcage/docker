@@ -522,7 +522,8 @@ with the port where it is not the scheme's default.
 A connection the client ended before it sent a whole request reached no rule and no origin, so it is
 in neither host table. **Communication details** shows it with ⚠️ and how it ended. Under `inspect`,
 one sent straight to an address is the exception, refused as
-[`ip-not-allowed`](#the-ones-buildcage-refused) instead.
+[`ip-not-allowed`](#the-ones-buildcage-refused) instead, or as `sni-not-allowed` where its SNI names
+a host no rule allows.
 
 ```
 ⚠️ 00:09.123: HTTPS untrusted-ca.example.com:443 -> client-aborted
@@ -569,6 +570,7 @@ and they fail the step under `fail_on_blocked: true` like any other refused conn
 🚫 00:15.880: HTTP (unknown):5432 -> bad-request
 🚫 00:16.204: TCP 10.0.0.9:5432 -> bad-request
 🚫 00:17.031: TCP 203.0.113.9:8443 -> ip-not-allowed
+🚫 00:18.420: HTTPS exfil.example.net:8443 -> sni-not-allowed
 ```
 
 | Reason                | What happened                                                                                               |
@@ -576,6 +578,7 @@ and they fail the step under `fail_on_blocked: true` like any other refused conn
 | `bad-request`         | the build sent bytes that could not be read as an HTTP request at all                                       |
 | `missing-host-header` | a request parsed, and carried no `Host` for a rule to match or resolve                                      |
 | `ip-not-allowed`      | a connection straight to an address no `allowed_ip_rules` entry covers ended before its request (`inspect`) |
+| `sni-not-allowed`     | the same, with an SNI naming a host no rule allows (`inspect`, `restrict` only)                             |
 
 `bad-request` is most often a protocol that is not HTTP at all and where the client speaks first,
 such as PostgreSQL or `git://`, on a port no `allowed_ip_rules` or `allowed_tls_rules` entry
@@ -597,6 +600,14 @@ What clears one is a rule, though not a host rule. For traffic that is not HTTP,
 undecrypted instead of being read as a request. `known_blocked_rules` can mark a row whose host is a
 name from the SNI or an address; a row reading `(unknown)` names nothing a rule can be written
 against, so the passthrough rule is the only way to clear that one.
+
+`sni-not-allowed` is the same kind of connection carrying an SNI. Its host is the name from the
+SNI, judged the way the resolver judges a name looked up through DNS: against the host of every rule
+except `allowed_ip_rules`, on any port. Through DNS, the same attempt is refused as
+`dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through DNS; the usual
+cause is a client that does not trust the CA, with the name pointed at an address by `/etc/hosts` or
+`curl --resolve`. `audit` refuses no name, so it refuses no SNI. A rule allowing the host clears
+one, as does a `known_blocked_rules` entry.
 
 Under `universal`, a connection through a name that is not a TLS handshake is also read as HTTP. ssh
 or `git://` to a name is refused as `bad-request`, in `audit` too, and a client waiting for the

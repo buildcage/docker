@@ -1,7 +1,24 @@
+import { compileRuleSet } from "#core/lib/acl/haproxy-rules.ts";
+import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
 import { scanInspectLog, scanInspectDnsLog } from "#core/lib/log/inspect.ts";
 
 import type { GenReportParameters, InspectReportData } from "../types.ts";
 import { reduceTimeline } from "./aggregate.ts";
+
+/**
+ * Whether the resolver allows a name: the same host regexes its Corefile is
+ * generated from, matched case-insensitively as it matches them.
+ */
+function resolverAllows(parameters: GenReportParameters): (name: string) => boolean {
+  const { resolverHosts } = compileRuleSet({
+    httpsRules: parameters.allowedHttpsRules,
+    httpRules: parameters.allowedHttpRules,
+    tlsRules: parameters.allowedTlsRules,
+    urlRules: buildUrlRules(parameters.allowedUrlRules.join("\n")),
+  });
+  const allowed = resolverHosts.map((regex) => new RegExp(`^(?:${regex})$`, "i"));
+  return (name) => allowed.some((regex) => regex.test(name));
+}
 
 /**
  * Build the report data from the proxy and resolver logs. Pure: the caller
@@ -25,7 +42,8 @@ export async function buildInspectReportData(
     { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed },
     { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed },
   ] = await Promise.all([
-    scanInspectLog(proxyLines, isAudit),
+    // audit's resolver allows every name.
+    scanInspectLog(proxyLines, isAudit, isAudit ? undefined : resolverAllows(parameters)),
     scanInspectDnsLog(dnsLines, isAudit),
   ]);
 

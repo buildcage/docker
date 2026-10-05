@@ -374,10 +374,15 @@ export interface InspectLogScan {
  * The report needs both, and the log arrives as a stream that can only be
  * consumed once, so it cannot be two separate passes. `for await` also
  * accepts a plain array, so callers with the lines already in memory pass one.
+ *
+ * `allowsName` is the resolver's verdict on a name; see refuseUnallowedNames.
+ * Without it, as in audit, where the resolver allows every name, no SNI is
+ * judged.
  */
 export async function scanInspectLog(
   lines: AsyncIterable<string> | Iterable<string>,
   isAudit = false,
+  allowsName?: (name: string) => boolean,
 ): Promise<InspectLogScan> {
   const events: TrafficEvent[] = [];
   let startedAt: number | undefined;
@@ -400,6 +405,7 @@ export async function scanInspectLog(
     if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
   }
   refuseUnpassedAddresses(events);
+  if (allowsName) refuseUnallowedNames(events, allowsName);
   return { events, startedAt, headIntact: headIntact ?? false, unparsed };
 }
 
@@ -432,6 +438,27 @@ function refuseUnpassedAddresses(events: TrafficEvent[]): void {
     if (CLIENT_ENDED_REASONS.has(event.reason) && served.has(event.destination)) continue;
     event.action = "block";
     event.reason = "ip-not-allowed";
+  }
+}
+
+/**
+ * Refuse a connection sent straight to an address that ended before its
+ * request, where the name its SNI gave is one the resolver would have refused.
+ *
+ * Through DNS, the same attempt leaves a refused dns line. Sent to an address,
+ * it leaves only this one, so the SNI is judged as the resolver would judge
+ * the name. A name the rules allow stays undecided, as it does through DNS:
+ * the client did not trust the CA, or ended a keepalive connection. One sent
+ * to the proxy's own address came through DNS and was judged there already.
+ */
+function refuseUnallowedNames(events: TrafficEvent[], allowsName: (name: string) => boolean): void {
+  for (const event of events) {
+    // Only hostBeforeRequest's SNI makes an incomplete https line name a host.
+    if (event.action !== "incomplete" || event.protocol !== "https") continue;
+    if (event.host === UNKNOWN_HOST || allowsName(event.host)) continue;
+    if (event.destination?.startsWith(`${PROXY_ADDRESS}:`)) continue;
+    event.action = "block";
+    event.reason = "sni-not-allowed";
   }
 }
 
