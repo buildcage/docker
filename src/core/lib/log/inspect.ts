@@ -26,7 +26,7 @@ import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
-import type { TrafficAction, TrafficEvent } from "./traffic-event.ts";
+import { clientEndedNoise, type TrafficAction, type TrafficEvent } from "./traffic-event.ts";
 
 export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 
@@ -399,7 +399,31 @@ export async function scanInspectLog(
     // the stamp would leave the marker bare, which is not a missing event.
     if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
   }
+  refuseUnpassedAddresses(events);
   return { events, startedAt, headIntact: headIntact ?? false, unparsed };
+}
+
+/**
+ * Turn a connection sent straight to an address that ended before its request
+ * into a refusal, as `universal` refuses the same connection.
+ *
+ * No allowed_ip_rules entry covers that address, or it would have been passed
+ * through rather than reach a stage, and that rule is the one thing that can
+ * pass it. Such a client sends no SNI, so the certificate this proxy answers
+ * with is valid for no name and a client that verifies it cannot get further,
+ * CA or no CA. Left `incomplete`, it would pass under fail_on_blocked.
+ *
+ * A keepalive close on an address that also had a request read stays as it
+ * was, as clientEndedNoise reads it.
+ */
+function refuseUnpassedAddresses(events: TrafficEvent[]): void {
+  const isNoise = clientEndedNoise(events);
+  for (const event of events) {
+    // Only hostBeforeRequest's address fallback makes an incomplete line tcp.
+    if (event.action !== "incomplete" || event.protocol !== "tcp" || isNoise(event)) continue;
+    event.action = "block";
+    event.reason = "ip-not-allowed";
+  }
 }
 
 /**

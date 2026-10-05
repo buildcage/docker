@@ -183,6 +183,18 @@ describe("buildInspectReportData", () => {
     ).toStrictEqual(["8.8.8.8:53 IP bad-request"]);
   });
 
+  it("counts a client that dropped a connection sent straight to an address", async () => {
+    // A client that would not trust the certificate, with no ip rule for the
+    // address: fail_on_blocked has to see it, as it would under universal.
+    const dropped =
+      "buildcage 1787471976000 https <BADREQ> 0 0 ts=CR reason=- tlserr=- dst=203.0.113.9:8443 fcerr=ERESET sni=- host=- -";
+    const r = await buildInspectReportData([START, dropped], [], reportParams(), 0);
+    expect(r.blockedCount).toBe(1);
+    expect(
+      r.blocked.map((row) => `${row.host}:${row.port} ${row.ruleType} ${row.reason}`),
+    ).toStrictEqual(["203.0.113.9:8443 IP ip-not-allowed"]);
+  });
+
   it("still blocks a refusal whose request did name a host", async () => {
     // Same termination state as the two above, told apart by the reason and
     // by the method haproxy logs where a request never parsed.

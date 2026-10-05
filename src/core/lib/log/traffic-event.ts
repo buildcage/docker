@@ -19,8 +19,10 @@ import { UNKNOWN_HOST } from "./proxy-address.ts";
  *
  * A request this proxy refused before one had wholly arrived is a `block` like
  * any other, though: it refused rather than stood by, and a rule does clear it
- * (see the bad-request remedy in docs/reference.md). `incomplete` is only what
- * the client or the proxy's own machinery ended.
+ * (see the bad-request remedy in docs/reference.md). So is one sent straight to
+ * an address no ip rule covers that ended before its request; see
+ * refuseUnpassedAddresses in inspect.ts. `incomplete` is only what the client
+ * or the proxy's own machinery ended.
  *
  * `failed` alone names a host worth tabulating: the rules passed on it and the
  * name is the one the build asked for, so it gets a table where the other two
