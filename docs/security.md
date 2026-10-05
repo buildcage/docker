@@ -88,8 +88,8 @@ buildkitd's own API is unreachable from a step. An `INPUT` rule likewise restric
 listening port to that same bridge. Steps cannot reach one another across it either: the bridge
 isolates each step's port itself, whether or not the host passes bridged traffic through iptables. A
 step can still announce another step's address over ARP, and the gateway may then send that step's
-replies to it while both run. That exposes plaintext HTTP responses and can disrupt the other step's
-connections, but it neither gets past the proxy nor reads TLS traffic.
+replies to it while both run. That exposes DNS answers and plaintext HTTP responses and can disrupt
+the other step's connections, but it neither gets past the proxy nor reads TLS traffic.
 
 Nothing in the build has to be told about a proxy: interception is at the network level, so the
 `HTTP_PROXY` family of variables is not what puts a request in front of the rules, and ignoring them
