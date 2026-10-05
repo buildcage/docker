@@ -237,10 +237,10 @@ internationalized name in its punycode form (`xn--mnchen-3ya.de`, not `münchen.
 connection carries. A leading, trailing or doubled dot is refused.
 
 A `Host` header ending in a dot (`example.com.`) matches as the name without it. An SNI may not end
-in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`,
-`allowed_https_rules` under `universal`, and [`sni-not-allowed`](#the-ones-buildcage-refused)), only a rule whose `**` can take in the dot
-(`example.**` or `**`, not `example.com.**`), or a `~` rule written to allow the dot, matches such a
-name.
+in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, `allowed_https_rules`
+under `universal`, and [`sni-not-allowed`](#the-ones-buildcage-refused)), only a rule whose `**` can
+take in the dot (`example.**` or `**`, not `example.com.**`), or a `~` rule written to allow the
+dot, matches such a name.
 
 `**` alone matches an address too: under `**:443`, a request that reaches the proxy through a name
 with `Host: 10.0.0.5` goes to that private address (see
@@ -600,14 +600,13 @@ undecrypted instead of being read as a request. `known_blocked_rules` can mark a
 name from the SNI or an address; a row reading `(unknown)` names nothing a rule can be written
 against, so the passthrough rule is the only way to clear that one.
 
-`sni-not-allowed` is the same kind of connection carrying an SNI. Its host is the name from the
-SNI, judged the way the resolver judges a name looked up through DNS: against the host of every rule
-except `allowed_ip_rules`, on any port. A trailing dot is kept, as wherever a rule is judged on the
-SNI. Through DNS, the same attempt is refused as
-`dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through DNS; the usual
-cause is a client that does not trust the CA, with the name pointed at an address by `/etc/hosts` or
-`curl --resolve`. `audit` refuses no name, so it refuses no SNI. A rule allowing the host clears
-one, as does a `known_blocked_rules` entry.
+`sni-not-allowed` is the same kind of connection carrying an SNI. The name is judged as the
+resolver judges one looked up through DNS, against the host of every rule except `allowed_ip_rules`
+on any port, except that a trailing dot is kept. Through DNS, the same attempt is refused as
+`dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through DNS: usually a
+client that does not trust the CA, pointed at an address by `/etc/hosts` or `curl --resolve`.
+`audit` refuses no name, so it refuses no SNI. A rule allowing the host clears one, as does a
+`known_blocked_rules` entry.
 
 Under `universal`, a connection through a name that is not a TLS handshake is also read as HTTP. ssh
 or `git://` to a name is refused as `bad-request`, in `audit` too, and a client waiting for the

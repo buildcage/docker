@@ -5,10 +5,8 @@ import { scanInspectLog, scanInspectDnsLog } from "#core/lib/log/inspect.ts";
 import type { GenReportParameters, InspectReportData } from "../types.ts";
 import { reduceTimeline } from "./aggregate.ts";
 
-/**
- * Whether the resolver allows a name: the same host regexes its Corefile is
- * generated from, matched case-insensitively as it matches them.
- */
+/** Whether the resolver allows a name, by the host regexes its Corefile is
+ *  generated from. Case-insensitive, like the Corefile's `(?i)`. */
 function resolverAllows(parameters: GenReportParameters): (name: string) => boolean {
   const { resolverHosts } = compileRuleSet({
     httpsRules: parameters.allowedHttpsRules,

@@ -375,9 +375,7 @@ export interface InspectLogScan {
  * consumed once, so it cannot be two separate passes. `for await` also
  * accepts a plain array, so callers with the lines already in memory pass one.
  *
- * `allowsName` is the resolver's verdict on a name; see refuseUnallowedNames.
- * Without it, as in audit, where the resolver allows every name, no SNI is
- * judged.
+ * Without `allowsName`, no SNI is judged; see refuseUnallowedNames.
  */
 export async function scanInspectLog(
   lines: AsyncIterable<string> | Iterable<string>,
@@ -443,13 +441,11 @@ function refuseUnpassedAddresses(events: TrafficEvent[]): void {
 
 /**
  * Refuse a connection sent straight to an address that ended before its
- * request, where the name its SNI gave is one the resolver would have refused.
+ * request, where its SNI names a host the resolver would refuse.
  *
- * Through DNS, the same attempt leaves a refused dns line. Sent to an address,
- * it leaves only this one, so the SNI is judged as the resolver would judge
- * the name. A name the rules allow stays undecided, as it does through DNS:
- * the client did not trust the CA, or ended a keepalive connection. One sent
- * to the proxy's own address came through DNS and was judged there already.
+ * Through DNS, that attempt is refused on its dns line, which a connection to
+ * an address never has. A name the rules allow stays undecided, as it does
+ * through DNS. One sent to the proxy's own address came through DNS.
  */
 function refuseUnallowedNames(events: TrafficEvent[], allowsName: (name: string) => boolean): void {
   for (const event of events) {
