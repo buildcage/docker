@@ -33,7 +33,7 @@ and links here for the details.
 starts.
 
 ```yaml
-- uses: buildcage/docker@b5459229d32c2aad72e4492fac98a192f85f75e0 # v4.0.4
+- uses: buildcage/docker@fb8ec1accd272b4a9c38483989af89dbb23161a6 # v4.1.0
   with:
     builder_name: buildcage
     proxy_mode: restrict
