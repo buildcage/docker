@@ -416,20 +416,20 @@ export async function scanInspectLog(
  * and neither does a request on another port.
  */
 function refuseUnpassedAddresses(events: TrafficEvent[]): void {
-  const served = new Set<string>();
+  // A proxy line always carries a destination.
+  const served = new Set<string | undefined>();
   for (const event of events) {
     if (
       (event.protocol === "http" || event.protocol === "https") &&
       event.action !== "incomplete"
     ) {
-      served.add(event.destination ?? "");
+      served.add(event.destination);
     }
   }
   for (const event of events) {
     // Only hostBeforeRequest's address fallback makes an incomplete line tcp.
     if (event.action !== "incomplete" || event.protocol !== "tcp") continue;
-    const reason = event.reason ?? "";
-    if (CLIENT_ENDED_REASONS.has(reason) && served.has(event.destination ?? "")) continue;
+    if (CLIENT_ENDED_REASONS.has(event.reason) && served.has(event.destination)) continue;
     event.action = "block";
     event.reason = "ip-not-allowed";
   }

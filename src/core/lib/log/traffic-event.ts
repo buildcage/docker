@@ -68,7 +68,10 @@ export interface ConnectedHosts {
 }
 
 /** What a client ending a connection before its request is logged as. */
-export const CLIENT_ENDED_REASONS = new Set(["client-aborted", "client-timeout"]);
+export const CLIENT_ENDED_REASONS: ReadonlySet<string | undefined> = new Set([
+  "client-aborted",
+  "client-timeout",
+]);
 
 /**
  * Given a whole timeline, which client-ended `incomplete` connections
@@ -93,7 +96,7 @@ export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent
   // A close is named by its SNI, which may keep a dot the request's Host lost.
   return (event) =>
     event.action === "incomplete" &&
-    CLIENT_ENDED_REASONS.has(event.reason ?? "") &&
+    CLIENT_ENDED_REASONS.has(event.reason) &&
     completed.has(ruleHost(event.host));
 }
 
