@@ -70,7 +70,6 @@ jobs:
       - name: Start Buildcage builder
         uses: buildcage/docker@fb8ec1accd272b4a9c38483989af89dbb23161a6 # v4.1.0
         with:
-          # Set here, since an input the workflow sets wins over the file.
           proxy_mode: restrict
           proxy_engine: inspect
           config_file: .github/buildcage-release.yml
