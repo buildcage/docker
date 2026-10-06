@@ -73,6 +73,8 @@ const CREDENTIAL_PARAMS = new Set([
   "authtoken",
   "clientsecret",
   "code",
+  "credential",
+  "credentials",
   "idtoken",
   "jwt",
   "key",
