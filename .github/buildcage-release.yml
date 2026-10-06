@@ -1,0 +1,18 @@
+# The release build's allowlist, read by the Buildcage builder and report in docker-publish.yml.
+allowed_url_rules: |
+  # apk package index and packages (haproxy, curl, ...)
+  GET https://dl-cdn.alpinelinux.org/alpine/**
+
+  # CNI plugins and CoreDNS release binaries (github 302-redirects here)
+  GET https://github.com/containernetworking/plugins/releases/download/**
+  GET https://github.com/coredns/coredns/releases/download/**
+  GET https://release-assets.githubusercontent.com/**
+
+  # HAProxy source tarball for the inspect image
+  GET https://www.haproxy.org/download/**
+
+  # Node.js runtime for the QuickJS scripts build stage
+  GET https://nodejs.org/download/release/**
+
+  # npm registry: dev deps bundled into the qjs scripts
+  GET|HEAD https://registry.npmjs.org/**
