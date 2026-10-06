@@ -482,6 +482,12 @@ describe("renderInspectDetails credential parameters", () => {
     );
   });
 
+  it("redacts a credential or credentials parameter", () => {
+    expect(subjectOf("https://h/v1?credential=a&Credentials=b")).toBe(
+      "GET https://h/v1?credential=***&Credentials=***",
+    );
+  });
+
   it("splits parameters at `;` too, keeping the separator sent", () => {
     expect(subjectOf("https://h/v1?a=1;token=t&b=2")).toBe("GET https://h/v1?a=1;token=***&b=2");
   });
