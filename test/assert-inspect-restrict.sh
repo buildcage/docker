@@ -593,10 +593,8 @@ if [ "$REUSE_COUNT" -eq 6 ]; then
 else
   fail "$REUSE_COUNT of the 6 requests reached the origin"
 fi
-# sni= and host= are the 2nd and 3rd fields; the prefixes are cut off before
-# comparing.
-MISMATCHED=$(awk '$1 != "HTTP/2.0" || substr($2, 5) != substr($3, 6)' <<< "$REUSE_LOG")
-if [ -z "$MISMATCHED" ]; then
+MISMATCHED=$(grep -vE '^HTTP/2\.0 sni=([^ ]+) host=\1 ' <<< "$REUSE_LOG" || true)
+if [ -n "$REUSE_LOG" ] && [ -z "$MISMATCHED" ]; then
   pass "each arrived over h2 with an SNI that matches its Host"
 else
   fail "a request arrived under another name's SNI, or not over h2"

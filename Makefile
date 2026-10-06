@@ -236,6 +236,7 @@ grpc_fixture_client:
 # inspect build injects the same CA the same way, so the other Alpine image
 # (Dockerfile.inspect-audit, built by the round trip) would prove nothing more.
 # Dockerfile.inspect-python checks the CA under Python 3.13's strict verification.
+# It is built before assert-inspect-restrict.sh, which reads its request at the origin.
 .PHONY: test_integration_buildkit_inspect_restrict
 test_integration_buildkit_inspect_restrict: grpc_fixture_client ## Run inspect-engine restrict mode tests
 	@echo "Running inspect-engine restrict mode tests..."
