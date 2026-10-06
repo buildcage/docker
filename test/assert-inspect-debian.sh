@@ -40,7 +40,7 @@ if grep -qE "^buildcage [0-9]+ https GET [0-9-]+ [0-9]+ ts=\S* reason=\S+ tlserr
 else
   fail "no HTTPS request to the fixture was recorded"
 fi
-# apt speaks only HTTP/1.1, so the origin must hear the same.
+# apt speaks only HTTP/1.1.
 assert_origin_protocol HTTP/1.1 allowed.example.com '/public/debian/\S*'
 echo ""
 

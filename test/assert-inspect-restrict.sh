@@ -579,7 +579,7 @@ echo ""
 echo "[origin protocol] the origin is spoken to in the client's version:"
 assert_origin_protocol HTTP/2.0 allowed.example.com /public/proto-h2
 assert_origin_protocol HTTP/1.1 allowed.example.com /public/proto-h1
-# apk names the architecture in the path itself.
+# apk puts the architecture in the path.
 assert_origin_protocol HTTP/1.1 allowed.example.com '/public/[^/ ]+/APKINDEX\.tar\.gz'
 # Built by Dockerfile.inspect-python ahead of this script.
 assert_origin_protocol HTTP/1.1 allowed.example.com /public/probe
@@ -600,8 +600,7 @@ else
   fail "a request arrived under another name's SNI, or not over h2"
   sed 's/^/    /' <<< "$MISMATCHED"
 fi
-# Without a connection serving two of them, nothing above was reused and the
-# check proves nothing.
+# Otherwise nothing was reused and the SNI check above proves nothing.
 if [ -n "$(awk '{ print $4 }' <<< "$REUSE_LOG" | sort | uniq -d)" ]; then
   pass "an origin connection carried more than one of them"
 else
