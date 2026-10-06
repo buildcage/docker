@@ -245,13 +245,13 @@ test_integration_buildkit_inspect_restrict: grpc_fixture_client ## Run inspect-e
 	  --load -t $(TEST_IMAGE)
 	@./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@./test/assert-inspect-no-layer-bloat.sh $(TEST_IMAGE)
+	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-python test/ \
+	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts || true
 	@./test/assert-inspect-restrict.sh
 	@BUILDER_NAME=$(BUILDER_NAME) TEST_PLATFORM=$(TEST_PLATFORM) \
 	  ./test/assert-inspect-refuses-embedded-bundle.sh
 	@./test/assert-step-port-isolation.sh
-	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-python test/ \
-	  --load -t $(TEST_IMAGE)
 	@node src/post.ts
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 

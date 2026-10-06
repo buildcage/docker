@@ -20,6 +20,7 @@ case "$MODE" in
 esac
 
 LOGS=$(builder_log haproxy)
+ORIGIN_LOG=$(origin_log)
 
 echo ""
 echo "=== Inspect Proxy Engine Assertions (Debian/apt, $MODE) ==="
@@ -39,6 +40,8 @@ if grep -qE "^buildcage [0-9]+ https GET [0-9-]+ [0-9]+ ts=\S* reason=\S+ tlserr
 else
   fail "no HTTPS request to the fixture was recorded"
 fi
+# apt speaks only HTTP/1.1, so the origin must hear the same.
+assert_origin_protocol HTTP/1.1 allowed.example.com '/public/debian/\S*'
 echo ""
 
 # /private/** is outside allowed_url_rules (see compose.test-inspect.yaml),

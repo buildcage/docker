@@ -152,3 +152,22 @@ assert_logged() {
     fail "[$status] $method $url -- no such line in the proxy log"
   fi
 }
+
+# The inspect fixture origin's own log (see test-server-inspect/nginx.conf):
+# what the proxy sent it, where the lines above record what the proxy decided.
+origin_log() {
+  docker compose -f compose.yaml -f compose.test-inspect.yaml logs --no-log-prefix test-server 2>/dev/null |
+    grep '^HTTP/' || true
+}
+
+# Reads $ORIGIN_LOG. The path is a grep -E pattern, for a client that picks
+# part of it itself.
+assert_origin_protocol() {
+  local protocol="$1" host="$2" path="$3"
+  if grep -qE "^$(esc "$protocol") sni=\S+ host=$(esc "$host") conn=[0-9]+ GET $path " <<< "$ORIGIN_LOG"; then
+    pass "$protocol to the origin for $host $path"
+  else
+    fail "$protocol to the origin for $host $path -- no such line in the origin log"
+    grep -E " GET $path " <<< "$ORIGIN_LOG" || echo "    (no request for it at all)"
+  fi
+}
