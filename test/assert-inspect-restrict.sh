@@ -4,6 +4,7 @@ source "$(dirname "$0")/helpers.sh"
 
 LOGS=$(builder_log haproxy)
 DNS_LOG=$(builder_log coredns)
+ORIGIN_LOG=$(origin_log)
 
 echo ""
 echo "=== Inspect Proxy Engine Assertions (restrict) ==="
@@ -573,6 +574,39 @@ else
   fail "the traffic artifact is missing or malformed"
 fi
 rm -rf "$SCRATCH_DIR"
+echo ""
+
+echo "[origin protocol] the origin is spoken to in the client's version:"
+assert_origin_protocol HTTP/2.0 allowed.example.com /public/proto-h2
+assert_origin_protocol HTTP/1.1 allowed.example.com /public/proto-h1
+# apk puts the architecture in the path.
+assert_origin_protocol HTTP/1.1 allowed.example.com '/public/[^/ ]+/APKINDEX\.tar\.gz'
+# Built by Dockerfile.inspect-python ahead of this script.
+assert_origin_protocol HTTP/1.1 allowed.example.com /public/probe
+echo ""
+
+echo "[origin connection reuse] each request reached the origin under its own name:"
+REUSE_LOG=$(grep -E ' GET /(public|v1)/reuse-[0-9]+ ' <<< "$ORIGIN_LOG" || true)
+REUSE_COUNT=$(grep -c . <<< "$REUSE_LOG" || true)
+if [ "$REUSE_COUNT" -eq 6 ]; then
+  pass "all 6 requests reached the origin"
+else
+  fail "$REUSE_COUNT of the 6 requests reached the origin"
+fi
+MISMATCHED=$(grep -vE '^HTTP/2\.0 sni=([^ ]+) host=\1 ' <<< "$REUSE_LOG" || true)
+if [ -n "$REUSE_LOG" ] && [ -z "$MISMATCHED" ]; then
+  pass "each arrived over h2 with an SNI that matches its Host"
+else
+  fail "a request arrived under another name's SNI, or not over h2"
+  sed 's/^/    /' <<< "$MISMATCHED"
+fi
+# Otherwise nothing was reused and the SNI check above proves nothing.
+if [ -n "$(awk '{ print $4 }' <<< "$REUSE_LOG" | sort | uniq -d)" ]; then
+  pass "an origin connection carried more than one of them"
+else
+  fail "every request had an origin connection of its own, so none was reused"
+  sed 's/^/    /' <<< "$REUSE_LOG"
+fi
 echo ""
 
 assert_results
