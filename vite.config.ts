@@ -59,7 +59,7 @@ export default defineConfig({
   },
   staged: {
     "*.{ts,tsx,js,jsx,json,jsonc,yaml,yml,md}": "vp check --fix",
-    "{dist,report/dist}/*.cjs": "sh .github/actions/verify-dist/check-test-hooks.sh",
+    "{dist,report/dist}/**/*.cjs": "sh .github/actions/verify-dist/check-test-hooks.sh",
     "docker/inspect/buildcage-runc/**/*.go": "gofmt -w",
     "test/covfilter/**/*.go": "gofmt -w",
   },

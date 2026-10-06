@@ -27,4 +27,4 @@ runs:
 
     - name: Check dist is free of the test hooks
       shell: bash
-      run: "$GITHUB_ACTION_PATH/check-test-hooks.sh"
+      run: '"$GITHUB_ACTION_PATH/check-test-hooks.sh"'
