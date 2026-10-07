@@ -309,8 +309,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
       );
       if (url !== undefined) event.url = url;
     }
-    // The reason restrict would have logged, set by audit alone, and kept
-    // whatever else became of the request.
+    // Set in audit only, and kept even where the request then failed.
     const wouldRefuse = request[11];
     if (wouldRefuse !== undefined && wouldRefuse !== "-") event.wouldRefuse = wouldRefuse;
     if (reason !== undefined) event.reason = reason;
