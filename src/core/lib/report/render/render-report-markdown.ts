@@ -3,14 +3,15 @@ import { buildRestrictExample } from "./build-example.ts";
 import {
   COMMUNICATION_DETAILS_CLOSE,
   COMMUNICATION_DETAILS_OPEN,
+  communicationTruncationNote,
 } from "./communication-section.ts";
 import { joinSummaryBlocks, type SummaryBlock } from "./fit-step-summary.ts";
 import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
-import { renderHostTable } from "./host-table.ts";
+import { hostTableTruncationNote, renderHostTable } from "./host-table.ts";
 import { renderInspectDetailsBody } from "./inspect-details.ts";
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
-import type { ExampleStepOptions } from "./restrict-example.ts";
+import { restrictExampleTruncationNote, type ExampleStepOptions } from "./restrict-example.ts";
 
 export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /** Heading text. May carry untrusted input: the heading escapes it. */
@@ -39,6 +40,13 @@ export const TRAFFIC_BLOCK = {
   passed: "traffic-passed",
   log: "traffic-log",
 } as const;
+
+/** The notice each traffic block gives in place of what a cut dropped. */
+export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): string {
+  if (block.id === TRAFFIC_BLOCK.example) return restrictExampleTruncationNote(artifactAvailable);
+  if (block.id === TRAFFIC_BLOCK.log) return communicationTruncationNote(artifactAvailable);
+  return hostTableTruncationNote(artifactAvailable);
+}
 
 // A table with the text before and after it, cut row by row: its heading,
 // header row and separator stay or the whole table gives way.

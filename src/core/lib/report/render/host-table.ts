@@ -47,3 +47,11 @@ export function renderHostTable(
 
   return markdownTable(formats, tableRows);
 }
+
+/** What a traffic report says where the Job Summary's size limit cut a host table. */
+export function hostTableTruncationNote(artifactAvailable: boolean): string {
+  const rest = artifactAvailable
+    ? "the buildcage-traffic artifact uploaded for this run has every request"
+    : "set upload_traffic_artifact: true to get every request as a downloadable artifact";
+  return `_…truncated: the host tables exceeded GitHub's Job Summary size limit; ${rest}._\n\n`;
+}

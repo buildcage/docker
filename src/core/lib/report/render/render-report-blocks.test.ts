@@ -6,7 +6,8 @@ import { reportParams } from "#core/lib/test/report-data.node.ts";
 import type { ReportData, UniversalReportData } from "../types.ts";
 import { communicationTruncationNote } from "./communication-section.ts";
 import { fitStepSummary, withNotices } from "./fit-step-summary.ts";
-import { renderReportBlocks, TRAFFIC_BLOCK } from "./render-report-markdown.ts";
+import { hostTableTruncationNote } from "./host-table.ts";
+import { renderReportBlocks, trafficNotice } from "./render-report-markdown.ts";
 import { restrictExampleTruncationNote } from "./restrict-example.ts";
 
 const LIMIT = 16 * 1024;
@@ -37,11 +38,7 @@ function report(overrides: Partial<UniversalReportData>): UniversalReportData {
 
 function fit(r: ReportData): string {
   return fitStepSummary(
-    withNotices(renderReportBlocks(r, "owner/repo", "v1"), (b) =>
-      b.id === TRAFFIC_BLOCK.example
-        ? restrictExampleTruncationNote(false)
-        : communicationTruncationNote(false),
-    ),
+    withNotices(renderReportBlocks(r, "owner/repo", "v1"), (b) => trafficNotice(b, false)),
     { limitBytes: LIMIT },
   );
 }
@@ -61,7 +58,20 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).toContain("none of them fails the step");
     expect(out).toContain("ok0.example.com");
     expect(out).not.toContain("ok1999.example.com");
-    expect(out).toContain("truncated: the full communication log");
+    expect(out).toContain(hostTableTruncationNote(false));
+  });
+
+  it("gives a cut communication log the log's own notice", () => {
+    const timeline: TrafficEvent[] = Array.from({ length: 1000 }, (_, i) => ({
+      time: 1 + i,
+      action: "allow",
+      protocol: "https",
+      host: `h${i}.example.com`,
+      port: 443,
+    }));
+    const out = fit(report({ timeline }));
+    expect(out).toContain(communicationTruncationNote(false));
+    expect(out).not.toContain(hostTableTruncationNote(false));
   });
 
   it("keeps the example whole ahead of the tables in audit mode", () => {
