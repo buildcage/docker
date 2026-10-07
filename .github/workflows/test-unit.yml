@@ -102,7 +102,10 @@ jobs:
           make seccomp_profile
           git diff --exit-code -- docker/seccomp/builder.json
 
+      # A test stuck in a synchronous loop never yields to vitest's own timeout,
+      # so the step limit is what turns a hang into a failure.
       - name: Run unit tests (with coverage)
+        timeout-minutes: 5
         run: make test_unit_coverage
 
       - name: Publish the coverage summary
@@ -116,6 +119,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run unit tests under QuickJS
+        timeout-minutes: 5
         run: make test_unit_qjs
 
   # Single, stably-named required status check for branch protection: the

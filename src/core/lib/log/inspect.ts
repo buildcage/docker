@@ -26,7 +26,7 @@ import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
-import type { TrafficAction, TrafficEvent } from "./traffic-event.ts";
+import { CLIENT_ENDED_REASONS, type TrafficAction, type TrafficEvent } from "./traffic-event.ts";
 
 export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 
@@ -390,10 +390,13 @@ export interface InspectLogScan {
  * The report needs both, and the log arrives as a stream that can only be
  * consumed once, so it cannot be two separate passes. `for await` also
  * accepts a plain array, so callers with the lines already in memory pass one.
+ *
+ * Without `allowsName`, no SNI is judged; see refuseUnallowedNames.
  */
 export async function scanInspectLog(
   lines: AsyncIterable<string> | Iterable<string>,
   isAudit = false,
+  allowsName?: (name: string) => boolean,
 ): Promise<InspectLogScan> {
   const events: TrafficEvent[] = [];
   let startedAt: number | undefined;
@@ -415,7 +418,60 @@ export async function scanInspectLog(
     // the stamp would leave the marker bare, which is not a missing event.
     if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
   }
+  refuseUnpassedAddresses(events);
+  if (allowsName) refuseUnallowedNames(events, allowsName);
   return { events, startedAt, headIntact: headIntact ?? false, unparsed };
+}
+
+/**
+ * Refuse a connection sent straight to an address that ended before its
+ * request, as `universal` does in restrict mode.
+ *
+ * No allowed_ip_rules entry covers the address, or the connection would have
+ * been passed through. Its client sent no SNI, so the certificate this proxy
+ * answered with names nothing and no client that checks it gets further.
+ *
+ * A client close is left alone where a request to the same address and port
+ * was read, as a keepalive pool's cleanup. A passthrough proves no such thing,
+ * and neither does a request on another port.
+ */
+function refuseUnpassedAddresses(events: TrafficEvent[]): void {
+  // A proxy line always carries a destination.
+  const served = new Set<string | undefined>();
+  for (const event of events) {
+    if (
+      (event.protocol === "http" || event.protocol === "https") &&
+      event.action !== "incomplete"
+    ) {
+      served.add(event.destination);
+    }
+  }
+  for (const event of events) {
+    // Only hostBeforeRequest's address fallback makes an incomplete line tcp.
+    if (event.action !== "incomplete" || event.protocol !== "tcp") continue;
+    if (CLIENT_ENDED_REASONS.has(event.reason) && served.has(event.destination)) continue;
+    event.action = "block";
+    event.reason = "ip-not-allowed";
+  }
+}
+
+/**
+ * Refuse a connection sent straight to an address that ended before its
+ * request, where its SNI names a host the resolver would refuse.
+ *
+ * Through DNS, that attempt is refused on its dns line, which a connection to
+ * an address never has. A name the rules allow stays undecided, as it does
+ * through DNS. One sent to the proxy's own address came through DNS.
+ */
+function refuseUnallowedNames(events: TrafficEvent[], allowsName: (name: string) => boolean): void {
+  for (const event of events) {
+    // Only hostBeforeRequest's SNI makes an incomplete https line name a host.
+    if (event.action !== "incomplete" || event.protocol !== "https") continue;
+    if (event.host === UNKNOWN_HOST || allowsName(event.host)) continue;
+    if (event.destination?.startsWith(`${PROXY_ADDRESS}:`)) continue;
+    event.action = "block";
+    event.reason = "sni-not-allowed";
+  }
 }
 
 /**

@@ -19,8 +19,11 @@ import { UNKNOWN_HOST } from "./proxy-address.ts";
  *
  * A request this proxy refused before one had wholly arrived is a `block` like
  * any other, though: it refused rather than stood by, and a rule does clear it
- * (see the bad-request remedy in docs/reference.md). `incomplete` is only what
- * the client or the proxy's own machinery ended.
+ * (see the bad-request remedy in docs/reference.md). So is one sent straight to
+ * an address no ip rule covers that ended before its request, unless its SNI
+ * names a host the rules allow; see refuseUnpassedAddresses and
+ * refuseUnallowedNames in inspect.ts. `incomplete` is only what the client or
+ * the proxy's own machinery ended.
  *
  * `failed` alone names a host worth tabulating: the rules passed on it and the
  * name is the one the build asked for, so it gets a table where the other two
@@ -65,7 +68,11 @@ export interface ConnectedHosts {
   blocked: Set<string>;
 }
 
-const CLIENT_ENDED_REASONS = new Set(["client-aborted", "client-timeout"]);
+/** What a client ending a connection before its request is logged as. */
+export const CLIENT_ENDED_REASONS: ReadonlySet<string | undefined> = new Set([
+  "client-aborted",
+  "client-timeout",
+]);
 
 /**
  * Given a whole timeline, which client-ended `incomplete` connections
@@ -90,7 +97,7 @@ export function clientEndedNoise(timeline: TrafficEvent[]): (event: TrafficEvent
   // A close is named by its SNI, which may keep a dot the request's Host lost.
   return (event) =>
     event.action === "incomplete" &&
-    CLIENT_ENDED_REASONS.has(event.reason ?? "") &&
+    CLIENT_ENDED_REASONS.has(event.reason) &&
     completed.has(ruleHost(event.host));
 }
 

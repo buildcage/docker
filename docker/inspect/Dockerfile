@@ -46,7 +46,7 @@ RUN apk add --no-cache curl util-linux-misc && \
 # Build the runc wrapper (statically linked). --platform=$BUILDPLATFORM keeps
 # the Go toolchain on the build host's own architecture; GOOS/GOARCH then
 # cross-compile for the target.
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:4cb7ac979db5fcc41cae44b2227ba5ab8a51e8807f40d9ba4dee20a0ad960b5b AS runc-wrapper-build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS runc-wrapper-build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
@@ -87,7 +87,7 @@ RUN case "$HAPROXY_VERSION" in "$HAPROXY_BRANCH".*) ;; *) echo "HAPROXY_VERSION 
     install -D -m 755 haproxy /out/haproxy
 
 # Final image
-FROM moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+FROM moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
 
 LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
       org.opencontainers.image.description="Secure Docker build environment enforcing on method, URL and path" \
