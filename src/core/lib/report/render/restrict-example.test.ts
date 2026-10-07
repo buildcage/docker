@@ -5,7 +5,12 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { exampleStepHead, restrictExampleBlock, usesLine } from "./restrict-example.ts";
+import {
+  exampleStepHead,
+  restrictExampleBlock,
+  restrictExampleTruncationNote,
+  usesLine,
+} from "./restrict-example.ts";
 
 const REPO = "owner/repo";
 
@@ -61,5 +66,15 @@ describe("restrictExampleBlock", () => {
     expect(restrictExampleBlock("x\n", { footnote: "only the host is checked" })).toContain(
       "```\n\n<sub>*only the host is checked*</sub>\n\n</details>\n",
     );
+  });
+});
+
+describe("restrictExampleTruncationNote", () => {
+  it("points at the artifact when one was uploaded", () => {
+    expect(restrictExampleTruncationNote(true)).toContain("buildcage-traffic artifact");
+  });
+
+  it("suggests turning the artifact on when none was uploaded", () => {
+    expect(restrictExampleTruncationNote(false)).toContain("upload_traffic_artifact: true");
   });
 });

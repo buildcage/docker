@@ -77,3 +77,11 @@ export function restrictExampleBlock(
   md += "</details>\n";
   return md;
 }
+
+/** What a traffic report says in place of an example too large to print. */
+export function restrictExampleTruncationNote(artifactAvailable: boolean): string {
+  const rest = artifactAvailable
+    ? "the buildcage-traffic artifact uploaded for this run has every request to write the rules from"
+    : "set upload_traffic_artifact: true to get every request to write the rules from as a downloadable artifact";
+  return `_…omitted: the example restrict step is too large for GitHub's Job Summary size limit; ${rest}._\n\n`;
+}

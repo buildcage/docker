@@ -22,6 +22,15 @@ export function renderInspectDetails(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
 ): string {
+  const body = renderInspectDetailsBody(timeline, startedAt);
+  return body ? wrapCommunicationDetails(body) : "";
+}
+
+/** The section's body alone, a fenced block, or "" if nothing is shown. */
+export function renderInspectDetailsBody(
+  timeline: TrafficEvent[],
+  startedAt: number | undefined,
+): string {
   // The keepalive noise clientEndedNoise marks is dropped here, before
   // connectedHosts, so a hidden close cannot mask a name's other rows.
   const isNoise = clientEndedNoise(timeline);
@@ -32,7 +41,7 @@ export function renderInspectDetails(
 
   const body = shown.map((event) => renderEvent(event, startedAt)).join("\n") + "\n";
   // A fenced block, so URLs need no markdown escaping and stay copy-pastable.
-  return wrapCommunicationDetails(`\`\`\`\n${body}\`\`\`\n\n`);
+  return `\`\`\`\n${body}\`\`\`\n\n`;
 }
 
 // ⚠️ covers both of the outcomes no rule decided that went wrong: a request

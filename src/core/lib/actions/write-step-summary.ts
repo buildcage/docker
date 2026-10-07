@@ -7,7 +7,7 @@ import * as core from "@actions/core";
  *
  * `markdown` is written as it stands. A report too large for GitHub's own
  * per-step limit is cut by its caller, which is the one that knows what may
- * be cut; see report/render/truncate-communication-details.ts.
+ * be cut; see report/render/fit-step-summary.ts.
  */
 export async function writeStepSummary(
   markdown: string,
