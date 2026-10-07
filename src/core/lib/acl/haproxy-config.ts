@@ -23,7 +23,7 @@
 
 import { PROXY_SUBNET } from "../log/proxy-address.ts";
 import { detectFrontend } from "./haproxy-detect-frontend.ts";
-import { inspectStage } from "./haproxy-inspect-stage.ts";
+import { inspectStage, type InspectStageExtension } from "./haproxy-inspect-stage.ts";
 import { compileRuleSet, INTERNAL_RANGES, type RuleInputs } from "./haproxy-rules.ts";
 import { preamble, resolversSection, originBackends } from "./haproxy-sections.ts";
 
@@ -49,6 +49,8 @@ export interface HaproxyConfigOptions extends RuleInputs {
   caSignFile?: string;
   defaultCertFile?: string;
   systemCaFile?: string;
+  /** An action's own check on top of the URL rules; see InspectStageExtension. */
+  extension?: InspectStageExtension;
 }
 
 const DEFAULTS = {
@@ -117,7 +119,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions): string {
         rules: httpsRules,
         backend: "origin_tls",
       },
-      { mode, listenPort: opts.listenPort, ...shared },
+      { mode, listenPort: opts.listenPort, extension: opts.extension, ...shared },
     ),
     ...inspectStage(
       {
@@ -128,7 +130,7 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions): string {
         rules: httpRules,
         backend: "origin_plain",
       },
-      { mode, listenPort: opts.listenPort, ...shared },
+      { mode, listenPort: opts.listenPort, extension: opts.extension, ...shared },
     ),
     ...originBackends(opts.systemCaFile),
   ];

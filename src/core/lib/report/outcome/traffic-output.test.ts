@@ -93,6 +93,18 @@ describe("buildTrafficRecords", () => {
     expect("destination" in blocked).toBe(false);
   });
 
+  it("carries the refusal restrict would have made, and only where there was one", () => {
+    const [noted, plain] = buildTrafficRecords(
+      [
+        { ...EVENTS[1], action: "audit", wouldRefuse: "example-refusal" },
+        { ...EVENTS[1], action: "audit" },
+      ],
+      t,
+    );
+    expect(noted.wouldRefuse).toBe("example-refusal");
+    expect("wouldRefuse" in plain).toBe(false);
+  });
+
   it("keeps millisecond precision, not just whole seconds", () => {
     const [r] = buildTrafficRecords([{ ...EVENTS[1], time: t + 0.123 }], t);
     expect(r.time).toBe("2026-08-23T07:59:35.123Z");

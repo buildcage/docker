@@ -58,6 +58,7 @@ export function buildTrafficRecords(
       if (e.bytes !== undefined) record.bytes = e.bytes;
       if (e.reason !== undefined) record.reason = e.reason;
       if (e.destination !== undefined) record.destination = e.destination;
+      if (e.wouldRefuse !== undefined) record.wouldRefuse = e.wouldRefuse;
       return record;
     });
 }

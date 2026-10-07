@@ -27,6 +27,20 @@ export interface InspectStageContext extends InternalDstOptions {
   mode: "restrict" | "audit";
   /** The detect frontend's port, bound on every address the proxy holds. */
   listenPort: number;
+  extension?: InspectStageExtension;
+}
+
+/**
+ * Rules an action adds to both inspected frontends, for a check of its own on
+ * top of the URL rules. In `restrict` its request rules refuse by setting
+ * txn.reason and denying; in `audit` they set txn.would_refuse to the reason
+ * `restrict` would have logged, which the log carries as `wr=`.
+ */
+export interface InspectStageExtension {
+  /** Run once the URL rules have allowed a request, before its name resolves. */
+  requestRules(mode: "restrict" | "audit"): string[];
+  /** Run on the TLS stage alone, whose origin certificate was checked. */
+  responseRules(): string[];
 }
 
 /** The fields of the stage that terminates TLS. fcerr names a failed client
@@ -108,8 +122,9 @@ export function inspectStage(
   { name, port, bindExtra, scheme, rules, backend }: InspectStageSpec,
   ctx: InspectStageContext,
 ): string[] {
-  const { mode } = ctx;
-  const logFormat = `"buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${clientTlsFields(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`;
+  const { mode, extension } = ctx;
+  const extensionField = extension ? " wr=%[var(txn.would_refuse)]" : "";
+  const logFormat = `"buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${extensionField}${clientTlsFields(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`;
   const l: string[] = [];
   l.push(
     `frontend ${name}`,
@@ -193,6 +208,12 @@ export function inspectStage(
   // Skipped entirely when the block above denies unconditionally: HAProxy
   // would never reach these rules, and warns that they are NOOP.
   if (!deniesEverything(rules, mode)) {
+    // After the rules, so a request they refuse keeps their reason, and ahead
+    // of the resolve, so one the extension refuses triggers no DNS query.
+    if (extension) {
+      l.push(...extension.requestRules(mode));
+      if (scheme === "https") l.push(...extension.responseRules());
+    }
     l.push(
       "    # Connect to the address this proxy resolves the Host to, discarding",
       "    # the client's address, so a forged Host or doctored /etc/hosts cannot",

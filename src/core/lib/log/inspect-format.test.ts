@@ -35,6 +35,7 @@ const SAMPLES: Record<string, string> = {
   "%[var(txn.sni)]": "db.example.com",
   "%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]": "registry.npmjs.org",
   "%[fc_err_name]": "-",
+  "%[var(txn.would_refuse)]": "-",
 };
 
 // The inner alternative is the character class a regsub argument carries, so
@@ -64,6 +65,12 @@ function render(
 }
 
 const FORMATS = logFormats(generateHaproxyConfig(OPTIONS));
+const EXTENDED_FORMATS = logFormats(
+  generateHaproxyConfig({
+    ...OPTIONS,
+    extension: { requestRules: () => [], responseRules: () => [] },
+  }),
+);
 const [PASSTHROUGH, HTTPS, HTTP] = [
   FORMATS.find((f) => f.includes(" pass ")) ?? "",
   FORMATS.find((f) => f.includes(" https ")) ?? "",
@@ -465,5 +472,46 @@ describe("the generated log-format and this parser describe the same line", () =
 
   it("refuses to render a field it has never been shown", () => {
     expect(() => render("buildcage %[var(txn.unknown)]")).toThrow("no sample");
+  });
+
+  describe("with an extension", () => {
+    const [https, http] = [
+      EXTENDED_FORMATS.find((f) => f.includes(" https ")) ?? "",
+      EXTENDED_FORMATS.find((f) => f.includes(" http ")) ?? "",
+    ];
+
+    it("adds its field to both request formats and nothing else", () => {
+      expect(EXTENDED_FORMATS.length).toBe(3);
+      expect(EXTENDED_FORMATS.filter((f) => f.includes(" wr=")).length).toBe(2);
+    });
+
+    it("still reads the rest of the line where it was", async () => {
+      for (const format of [https, http]) {
+        const [e] = (await scanInspectLog([render(format)])).events;
+        expect(e.action).toBe("allow");
+        expect(e.host).toBe("registry.npmjs.org");
+        expect(e.wouldRefuse).toBe(undefined);
+      }
+    });
+
+    it("names the refusal restrict made", async () => {
+      const line = render(
+        https,
+        { "%ST": "403", "%B": "0", "%ts": "PR" },
+        { reason: "example-refusal" },
+      );
+      const [e] = (await scanInspectLog([line])).events;
+      expect(e.action).toBe("block");
+      expect(e.reason).toBe("example-refusal");
+      expect(e.wouldRefuse).toBe(undefined);
+    });
+
+    it("notes the refusal restrict would have made of a request audit let through", async () => {
+      const line = render(https, { "%[var(txn.would_refuse)]": "example-refusal" });
+      const [e] = (await scanInspectLog([line], true)).events;
+      expect(e.action).toBe("audit");
+      expect(e.status).toBe(200);
+      expect(e.wouldRefuse).toBe("example-refusal");
+    });
   });
 });
