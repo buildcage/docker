@@ -6,8 +6,7 @@
  * otherwise vanish rather than degrade.
  *
  * The summary arrives as blocks in the order they print. When they do not all
- * fit, they are given room by priority instead, so the parts that matter most
- * survive and the long logs give way first.
+ * fit, they get room in priority order instead.
  */
 
 export const STEP_SUMMARY_LIMIT_BYTES = 1024 * 1024;
@@ -67,17 +66,16 @@ export interface FitStepSummaryOptions {
   usedBytes?: number;
   /**
    * GitHub's limit. A test passes its own only to say what "too large" means
-   * without building something that large: every branch below is reached by
-   * the ratio of input to limit, not by the absolute size.
+   * without building something that large: every branch of the fit is reached
+   * by the ratio of input to limit, not by the absolute size.
    */
   limitBytes?: number;
 }
 
 /**
  * Returns the blocks joined as they are when they fit. Otherwise gives each
- * room in priority order (document order among equals) out of what is left
- * after `usedBytes` already in the summary, cutting the first that does not
- * fit and every later one that does not either.
+ * room in priority order (document order among equals) and cuts any that
+ * does not fit.
  */
 export function fitStepSummary(
   blocks: SummaryBlock[],

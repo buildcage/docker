@@ -78,10 +78,9 @@ const frame = (text: string): SummaryBlock => ({
 
 /**
  * The report as blocks for fitStepSummary, in print order. The frame (title,
- * notes, footer) is kept whole; then the example, the blocked, failed and
- * allowed tables, and the communication details get room in that order, so
- * what explains a failed step outlasts what merely lists traffic. Their
- * notices are the caller's to set, by TRAFFIC_BLOCK id.
+ * notes, footer) is kept whole; the example, the blocked, failed and allowed
+ * tables and the communication details get room in that order. Their notices
+ * are the caller's to pick, by TRAFFIC_BLOCK id.
  */
 export function renderReportBlocks(
   report: ReportData,

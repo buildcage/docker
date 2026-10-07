@@ -8,7 +8,7 @@ export function wrapCommunicationDetails(body: string): string {
   return `\n${COMMUNICATION_DETAILS_OPEN}${body}${COMMUNICATION_DETAILS_CLOSE}`;
 }
 
-/** What a traffic report says where the Job Summary's size limit cut it. */
+/** What a traffic report says where the Job Summary's size limit cut its communication log. */
 export function communicationTruncationNote(artifactAvailable: boolean): string {
   const rest = artifactAvailable
     ? "the buildcage-traffic artifact uploaded for this run has the rest"
