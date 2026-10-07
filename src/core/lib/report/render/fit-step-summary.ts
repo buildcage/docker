@@ -62,20 +62,26 @@ export function joinSummaryBlocks(blocks: SummaryBlock[]): string {
   return blocks.map(whole).join("");
 }
 
+export interface FitStepSummaryOptions {
+  /** What the summary already holds, which counts against the limit too. */
+  usedBytes?: number;
+  /**
+   * GitHub's limit. A test passes its own only to say what "too large" means
+   * without building something that large: every branch below is reached by
+   * the ratio of input to limit, not by the absolute size.
+   */
+  limitBytes?: number;
+}
+
 /**
  * Returns the blocks joined as they are when they fit. Otherwise gives each
  * room in priority order (document order among equals) out of what is left
  * after `usedBytes` already in the summary, cutting the first that does not
  * fit and every later one that does not either.
- *
- * `limitBytes` is GitHub's limit. A caller passes its own only to say what
- * "too large" means without building something that large: every branch below
- * is reached by the ratio of input to limit, not by the absolute size.
  */
 export function fitStepSummary(
   blocks: SummaryBlock[],
-  limitBytes: number = STEP_SUMMARY_LIMIT_BYTES,
-  usedBytes = 0,
+  { usedBytes = 0, limitBytes = STEP_SUMMARY_LIMIT_BYTES }: FitStepSummaryOptions = {},
 ): string {
   const full = blocks.map(whole);
   const all = full.join("");
@@ -126,8 +132,9 @@ function cutBlock(b: SummaryBlock, budget: number): string {
     count++;
     if (line.trim().startsWith("```")) fenceOpen = !fenceOpen;
   }
+  // A heading over no rows would read as an empty list, not a cut one.
   const head = b.head ?? 0;
-  if (count < head) return notice;
+  if (head > 0 && count <= head) return notice;
   // A cut mid-fence would otherwise turn everything after it (the notice, a
   // closing tag, the rest of the summary) into literal code-block text.
   if (fenceOpen) kept += "```\n";

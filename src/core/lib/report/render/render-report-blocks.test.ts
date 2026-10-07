@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 
+import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 import { reportParams } from "#core/lib/test/report-data.node.ts";
 
-import type { UniversalReportData } from "../types.ts";
+import type { ReportData, UniversalReportData } from "../types.ts";
 import { communicationTruncationNote } from "./communication-section.ts";
 import { fitStepSummary, withNotices } from "./fit-step-summary.ts";
 import { renderReportBlocks, TRAFFIC_BLOCK } from "./render-report-markdown.ts";
@@ -34,14 +35,14 @@ function report(overrides: Partial<UniversalReportData>): UniversalReportData {
   };
 }
 
-function fit(r: UniversalReportData): string {
+function fit(r: ReportData): string {
   return fitStepSummary(
     withNotices(renderReportBlocks(r, "owner/repo", "v1"), (b) =>
       b.id === TRAFFIC_BLOCK.example
         ? restrictExampleTruncationNote(false)
         : communicationTruncationNote(false),
     ),
-    LIMIT,
+    { limitBytes: LIMIT },
   );
 }
 
@@ -70,6 +71,27 @@ describe("renderReportBlocks under a limit", () => {
     // The example lists every host the table does.
     expect(out).toContain("ok119.example.com:443");
     expect(out).not.toContain("example restrict step is too large");
+  });
+
+  it("still prints the communication log when the example is replaced", () => {
+    // The example lists every host the timeline reached, so a few hundred of
+    // them outgrow the limit while the host table, built apart, stays short.
+    const timeline: TrafficEvent[] = Array.from({ length: 400 }, (_, i) => ({
+      time: 1 + i,
+      action: "allow",
+      protocol: "https",
+      host: `${"h".repeat(40)}${i}.example.com`,
+      port: 443,
+      method: "GET",
+      url: `https://${"h".repeat(40)}${i}.example.com/`,
+      status: 200,
+    }));
+    const out = fit({
+      ...report({ parameters: reportParams({ mode: "audit" }), passed: rows("api", 1), timeline }),
+      engine: "inspect",
+    });
+    expect(out).toContain(restrictExampleTruncationNote(false));
+    expect(out).toContain("Communication details");
   });
 
   it("gives an example too large to print its own notice", () => {

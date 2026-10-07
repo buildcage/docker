@@ -64,7 +64,7 @@ describe("fitStepSummary", () => {
 
   it("leaves oversized input unchanged when nothing in it may be cut", () => {
     const blocks = [frame(HEADER), frame("x".repeat(SMALL_LIMIT)), frame(FOOTER)];
-    expect(fitStepSummary(blocks, SMALL_LIMIT)).toBe(joined(blocks));
+    expect(fitStepSummary(blocks, { limitBytes: SMALL_LIMIT })).toBe(joined(blocks));
   });
 
   // At GitHub's real limit, not a small one: what keeps a report under 1 MiB is
@@ -92,7 +92,9 @@ describe("fitStepSummary", () => {
   });
 
   it("closes a fence left open by the cut, so nothing after it renders as code", () => {
-    const truncated = fitStepSummary(withCommunicationDetails(logLines(200)), SMALL_LIMIT);
+    const truncated = fitStepSummary(withCommunicationDetails(logLines(200)), {
+      limitBytes: SMALL_LIMIT,
+    });
 
     // Without this the check below would also hold for input that was never
     // cut, which has its fences balanced already.
@@ -105,26 +107,32 @@ describe("fitStepSummary", () => {
   });
 
   it("points at the artifact when one was uploaded", () => {
-    const truncated = fitStepSummary(withCommunicationDetails(logLines(200), true), SMALL_LIMIT);
+    const truncated = fitStepSummary(withCommunicationDetails(logLines(200), true), {
+      limitBytes: SMALL_LIMIT,
+    });
     expect(truncated.includes("buildcage-traffic artifact")).toBe(true);
   });
 
   it("suggests turning the artifact on when none was uploaded", () => {
-    const truncated = fitStepSummary(withCommunicationDetails(logLines(200)), SMALL_LIMIT);
+    const truncated = fitStepSummary(withCommunicationDetails(logLines(200)), {
+      limitBytes: SMALL_LIMIT,
+    });
     expect(truncated.includes("upload_traffic_artifact: true")).toBe(true);
   });
 
   it("still fits and still notes the cut even when the fixed parts alone leave no budget", () => {
     const blocks = [frame("x".repeat(SMALL_LIMIT)), ...withCommunicationDetails(["one line"])];
-    const truncated = fitStepSummary(blocks, SMALL_LIMIT);
+    const truncated = fitStepSummary(blocks, { limitBytes: SMALL_LIMIT });
     expect(truncated.includes("truncated")).toBe(true);
     expect(truncated.endsWith(FOOTER)).toBe(true);
   });
 
   it("counts what is already in the summary against the limit", () => {
     const blocks = withCommunicationDetails(logLines(10));
-    expect(fitStepSummary(blocks, SMALL_LIMIT)).toBe(joined(blocks));
-    expect(fitStepSummary(blocks, SMALL_LIMIT, SMALL_LIMIT)).toContain("truncated");
+    expect(fitStepSummary(blocks, { limitBytes: SMALL_LIMIT })).toBe(joined(blocks));
+    expect(fitStepSummary(blocks, { limitBytes: SMALL_LIMIT, usedBytes: SMALL_LIMIT })).toContain(
+      "truncated",
+    );
   });
 });
 
@@ -150,35 +158,41 @@ describe("fitStepSummary: priorities, levels and sections", () => {
   });
 
   it("gives a later, higher-priority block room before an earlier, lower one", () => {
-    const out = fitStepSummary([log(500, "a"), table(3, "b")], SMALL_LIMIT);
+    const out = fitStepSummary([log(500, "a"), table(3, "b")], { limitBytes: SMALL_LIMIT });
     expect(out).toContain("| host2.example.com |");
     expect(out).toContain("_log cut a_");
   });
 
   it("cuts a table by rows, keeps its header, and ends it before the notice", () => {
-    const out = fitStepSummary([table(1000)], SMALL_LIMIT);
+    const out = fitStepSummary([table(1000)], { limitBytes: SMALL_LIMIT });
     expect(out.startsWith("### Hosts\n\n| Host |\n| --- |\n| host0.example.com |\n")).toBe(true);
     expect(out).toMatch(/\|\n\n_cut a_\n$/);
     expect(Buffer.byteLength(out, "utf8") <= SMALL_LIMIT).toBe(true);
   });
 
   it("gives a table wholly to its notice when not even its header fits", () => {
-    const out = fitStepSummary([frame("x".repeat(SMALL_LIMIT)), table(3)], SMALL_LIMIT);
+    const out = fitStepSummary([frame("x".repeat(SMALL_LIMIT)), table(3)], {
+      limitBytes: SMALL_LIMIT,
+    });
     expect(out.endsWith("_cut a_\n")).toBe(true);
     expect(out).not.toContain("| Host |");
   });
 
   it("silences the deeper blocks of a cut section, not those of another", () => {
-    const out = fitStepSummary(
-      [table(1000, "a"), log(1, "a"), table(1, "b"), log(1, "b")],
-      SMALL_LIMIT,
-    );
+    const out = fitStepSummary([table(1000, "a"), log(1, "a"), table(1, "b"), log(1, "b")], {
+      limitBytes: SMALL_LIMIT,
+    });
     expect(out).toContain("_cut a_");
     expect(out).not.toContain("_log cut a_");
     // Every row of section a that fits went before section b's table, so b's
     // table gives way too, and its log with it, with no notice of its own.
     expect(out).toContain("_cut b_");
     expect(out).not.toContain("_log cut b_");
+  });
+
+  it("gives a table wholly to its notice when its header fits but no row does", () => {
+    const wide: SummaryBlock = { ...table(0), text: `${table(0).text}| ${"x".repeat(5000)} |\n` };
+    expect(fitStepSummary([wide], { limitBytes: SMALL_LIMIT })).toBe("_cut a_\n");
   });
 
   it("replaces an atomic block whole rather than cutting it", () => {
@@ -190,11 +204,13 @@ describe("fitStepSummary: priorities, levels and sections", () => {
       text: "x\n".repeat(SMALL_LIMIT),
       notice: "_example cut_\n",
     };
-    expect(fitStepSummary([frame("# T\n"), example], SMALL_LIMIT)).toBe("# T\n_example cut_\n");
+    expect(fitStepSummary([frame("# T\n"), example], { limitBytes: SMALL_LIMIT })).toBe(
+      "# T\n_example cut_\n",
+    );
   });
 
   it("prints a cut block with no notice of its own as just what fits", () => {
-    const out = fitStepSummary([{ ...log(500), notice: undefined }], SMALL_LIMIT);
+    const out = fitStepSummary([{ ...log(500), notice: undefined }], { limitBytes: SMALL_LIMIT });
     expect(out.endsWith("```\n")).toBe(true);
   });
 });

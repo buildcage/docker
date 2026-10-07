@@ -125,7 +125,9 @@ export function renderReportBlocks(
       id: TRAFFIC_BLOCK.example,
       priority: 2,
       level: 2,
-      section: SECTION,
+      // Its own section: it stands beside the tables and the log, not above
+      // them, so its notice must not silence theirs.
+      section: `${SECTION}-example`,
       cut: "atomic",
       text:
         report.engine === "inspect"
