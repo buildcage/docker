@@ -125,23 +125,15 @@ export function renderReportBlocks(
   }
   if (report.failed.length > 0) {
     const gap = report.passed.length > 0 || report.blocked.length > 0 ? "\n" : "";
+    // The note follows the rows, so a cut table drops it with them.
     blocks.push(
       tableBlock(
         `${gap}### ⚠️ Failed Connections\n\n`,
         renderHostTable(report.failed, { showReason: true }),
-        "\n",
+        "\n\n<sub>*Note: no rule refused these; the connection itself did not complete, so no rule " +
+          "can change the outcome and none of them fails the step.*</sub>\n",
       ),
     );
-    // Its own block, one level down, so a cut table drops it with the rows.
-    blocks.push({
-      priority: 3,
-      level: 3,
-      section: SECTION,
-      cut: "atomic",
-      text:
-        "\n<sub>*Note: no rule refused these; the connection itself did not complete, so no rule " +
-        "can change the outcome and none of them fails the step.*</sub>\n",
-    });
   }
 
   let bottom = "";

@@ -73,8 +73,9 @@ export function fitStepSummary(
   usedBytes = 0,
 ): string {
   const full = blocks.map(whole);
+  const all = full.join("");
   let budget = limitBytes - SAFETY_MARGIN_BYTES - usedBytes;
-  if (bytes(full.join("")) <= budget) return full.join("");
+  if (bytes(all) <= budget) return all;
 
   const out = blocks.map(() => "");
   const cutAt = new Map<string, number>(); // section -> shallowest level cut
