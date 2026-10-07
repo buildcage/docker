@@ -60,6 +60,9 @@ export interface TrafficEvent {
   reason?: string;
   /** Address it was actually sent to. Absent for dns. */
   destination?: string;
+  /** The reason restrict mode would have refused a request audit let through
+   *  for, where an action's own check says so. Set only then. */
+  wouldRefuse?: string;
 }
 
 /** The hosts a run connected to, for isRedundantDns. */
