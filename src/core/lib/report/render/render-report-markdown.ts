@@ -31,11 +31,27 @@ export function renderReportMarkdown(
 
 const SECTION = "traffic";
 
+/** The ids renderReportBlocks gives its blocks, for picking their notices. */
+export const TRAFFIC_BLOCK = {
+  example: "traffic-example",
+  blocked: "traffic-blocked",
+  failed: "traffic-failed",
+  passed: "traffic-passed",
+  log: "traffic-log",
+} as const;
+
 // A table with the text before and after it, cut row by row: its heading,
 // header row and separator stay or the whole table gives way.
-function tableBlock(before: string, table: string, after: string): SummaryBlock {
+function tableBlock(
+  id: string,
+  priority: number,
+  before: string,
+  table: string,
+  after: string,
+): SummaryBlock {
   return {
-    priority: 3,
+    id,
+    priority,
     level: 2,
     section: SECTION,
     text: before + table + after,
@@ -53,10 +69,11 @@ const frame = (text: string): SummaryBlock => ({
 });
 
 /**
- * The report as blocks for fitStepSummary, in print order: the frame (title,
- * notes, footer) is kept whole, the tables and the example give way before
- * it, and the communication details before those. Their notices are the
- * caller's to set.
+ * The report as blocks for fitStepSummary, in print order. The frame (title,
+ * notes, footer) is kept whole; then the example, the blocked, failed and
+ * allowed tables, and the communication details get room in that order, so
+ * what explains a failed step outlasts what merely lists traffic. Their
+ * notices are the caller's to set, by TRAFFIC_BLOCK id.
  */
 export function renderReportBlocks(
   report: ReportData,
@@ -88,7 +105,15 @@ export function renderReportBlocks(
   blocks.push(frame(top));
 
   if (report.passed.length > 0) {
-    blocks.push(tableBlock(`### ${heading}\n\n`, renderHostTable(report.passed), "\n"));
+    blocks.push(
+      tableBlock(
+        TRAFFIC_BLOCK.passed,
+        5,
+        `### ${heading}\n\n`,
+        renderHostTable(report.passed),
+        "\n",
+      ),
+    );
   }
   if (isAudit) {
     // inspect saw the method and the path of every request, so its example
@@ -97,7 +122,8 @@ export function renderReportBlocks(
     // it again, so leaving it out would write rules that break that run.
     // Whole or not at all: a cut example would read as a complete allowlist.
     blocks.push({
-      priority: 3,
+      id: TRAFFIC_BLOCK.example,
+      priority: 2,
       level: 2,
       section: SECTION,
       cut: "atomic",
@@ -117,6 +143,8 @@ export function renderReportBlocks(
     const blocked = foldExpectedBlockedRows(report.blocked);
     blocks.push(
       tableBlock(
+        TRAFFIC_BLOCK.blocked,
+        3,
         `${report.passed.length > 0 ? "\n" : ""}### 🚫 Blocked Hosts\n\n`,
         renderHostTable(blocked, { showReason: true, showExpected }),
         "\n",
@@ -128,6 +156,8 @@ export function renderReportBlocks(
     // The note follows the rows, so a cut table drops it with them.
     blocks.push(
       tableBlock(
+        TRAFFIC_BLOCK.failed,
+        4,
         `${gap}### ⚠️ Failed Connections\n\n`,
         renderHostTable(report.failed, { showReason: true }),
         "\n\n<sub>*Note: no rule refused these; the connection itself did not complete, so no rule " +
@@ -153,7 +183,8 @@ export function renderReportBlocks(
   const details = renderInspectDetailsBody(report.timeline, report.startedAt);
   if (details) {
     blocks.push({
-      priority: 4,
+      id: TRAFFIC_BLOCK.log,
+      priority: 6,
       level: 3,
       section: SECTION,
       cut: "lines",

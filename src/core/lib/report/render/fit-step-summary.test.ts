@@ -5,7 +5,12 @@ import {
   COMMUNICATION_DETAILS_OPEN,
   communicationTruncationNote,
 } from "./communication-section.ts";
-import { fitStepSummary, joinSummaryBlocks, type SummaryBlock } from "./fit-step-summary.ts";
+import {
+  fitStepSummary,
+  joinSummaryBlocks,
+  withNotices,
+  type SummaryBlock,
+} from "./fit-step-summary.ts";
 
 const HEADER = "## Outbound Traffic Report (restrict mode)\n\n### ✅ Allowed Hosts\n\n";
 const FOOTER = "\n*Reported by [owner/repo](https://github.com/owner/repo)*\n";
@@ -191,5 +196,20 @@ describe("fitStepSummary: priorities, levels and sections", () => {
   it("prints a cut block with no notice of its own as just what fits", () => {
     const out = fitStepSummary([{ ...log(500), notice: undefined }], SMALL_LIMIT);
     expect(out.endsWith("```\n")).toBe(true);
+  });
+});
+
+describe("withNotices", () => {
+  it("sets the notice it picks on each block a cut can reach, never on a kept one", () => {
+    const blocks: SummaryBlock[] = [
+      frame("# T\n"),
+      { id: "x", priority: 2, level: 2, section: "a", cut: "lines", text: "x\n" },
+      { id: "y", priority: 2, level: 2, section: "a", cut: "atomic", text: "y\n" },
+    ];
+    expect(withNotices(blocks, (b) => `notice ${b.id}`).map((b) => b.notice)).toEqual([
+      undefined,
+      "notice x",
+      "notice y",
+    ]);
   });
 });

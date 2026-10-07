@@ -21,8 +21,12 @@ import { errorMessage } from "#core/lib/errors.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
 import { communicationTruncationNote } from "#core/lib/report/render/communication-section.ts";
-import { fitStepSummary, withNotice } from "#core/lib/report/render/fit-step-summary.ts";
-import { renderReportBlocks } from "#core/lib/report/render/render-report-markdown.ts";
+import { fitStepSummary, withNotices } from "#core/lib/report/render/fit-step-summary.ts";
+import {
+  renderReportBlocks,
+  TRAFFIC_BLOCK,
+} from "#core/lib/report/render/render-report-markdown.ts";
+import { restrictExampleTruncationNote } from "#core/lib/report/render/restrict-example.ts";
 import type { GenReportParameters, ReportData } from "#core/lib/report/types.ts";
 
 import { emitReportOutcomes } from "./emit.ts";
@@ -125,7 +129,13 @@ export async function runReportAction(
   }
   try {
     await writeStepSummary(
-      fitStepSummary(withNotice(blocks, communicationTruncationNote(trafficFile !== undefined))),
+      fitStepSummary(
+        withNotices(blocks, (b) =>
+          b.id === TRAFFIC_BLOCK.example
+            ? restrictExampleTruncationNote(trafficFile !== undefined)
+            : communicationTruncationNote(trafficFile !== undefined),
+        ),
+      ),
       env.GITHUB_STEP_SUMMARY,
     );
   } catch (e) {

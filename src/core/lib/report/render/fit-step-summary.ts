@@ -16,6 +16,8 @@ export const STEP_SUMMARY_LIMIT_BYTES = 1024 * 1024;
 const SAFETY_MARGIN_BYTES = 8 * 1024;
 
 export interface SummaryBlock {
+  /** Names the block for its caller, which picks its notice by it. */
+  id?: string;
   /** Lower is given room first when the summary has to be cut. */
   priority: number;
   /**
@@ -47,9 +49,12 @@ const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
 
 const whole = (b: SummaryBlock): string => (b.open ?? "") + b.text + (b.close ?? "");
 
-/** The blocks with `notice` on every one a cut can reach. */
-export function withNotice(blocks: SummaryBlock[], notice: string): SummaryBlock[] {
-  return blocks.map((b) => (b.cut === "keep" ? b : { ...b, notice }));
+/** The blocks with the notice `noticeFor` picks on every one a cut can reach. */
+export function withNotices(
+  blocks: SummaryBlock[],
+  noticeFor: (block: SummaryBlock) => string | undefined,
+): SummaryBlock[] {
+  return blocks.map((b) => (b.cut === "keep" ? b : { ...b, notice: noticeFor(b) }));
 }
 
 /** The blocks printed whole, as they read with no limit to fit. */
