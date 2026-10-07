@@ -17,7 +17,10 @@ const SAFETY_MARGIN_BYTES = 8 * 1024;
 export interface SummaryBlock {
   /** Names the block for its caller, which picks its notice by it. */
   id?: string;
-  /** Lower is given room first when the summary has to be cut. */
+  /**
+   * Lower is given room first when the summary has to be cut. A `keep` block
+   * is given room before all others whatever its priority.
+   */
   priority: number;
   /**
    * Depth within its section. Once a block is cut, the deeper blocks of its
@@ -45,6 +48,8 @@ export interface SummaryBlock {
 }
 
 const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
+
+const rank = (b: SummaryBlock): number => (b.cut === "keep" ? -Infinity : b.priority);
 
 const whole = (b: SummaryBlock): string => (b.open ?? "") + b.text + (b.close ?? "");
 
@@ -88,9 +93,7 @@ export function fitStepSummary(
 
   const out = blocks.map(() => "");
   const cutAt = new Map<string, number>(); // section -> shallowest level cut
-  const order = blocks
-    .map((_, i) => i)
-    .sort((a, b) => blocks[a].priority - blocks[b].priority || a - b);
+  const order = blocks.map((_, i) => i).sort((a, b) => rank(blocks[a]) - rank(blocks[b]) || a - b);
   for (const i of order) {
     const b = blocks[i];
     if ((cutAt.get(b.section) ?? Infinity) < b.level) continue;

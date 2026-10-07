@@ -27,7 +27,7 @@ export function renderReportMarkdown(
   actionRef: string,
   options: RenderReportMarkdownOptions = {},
 ): string {
-  return joinSummaryBlocks(renderReportBlocks(report, actionRepo, actionRef, options));
+  return joinSummaryBlocks(renderReportBlocks(report, actionRepo, actionRef, JOINED, options));
 }
 
 const SECTION = "traffic";
@@ -41,11 +41,34 @@ export const TRAFFIC_BLOCK = {
   log: "traffic-log",
 } as const;
 
-/** The notice each traffic block gives in place of what a cut dropped. */
-export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): string {
-  if (block.id === TRAFFIC_BLOCK.example) return restrictExampleTruncationNote(artifactAvailable);
-  if (block.id === TRAFFIC_BLOCK.log) return communicationTruncationNote(artifactAvailable);
-  return hostTableTruncationNote(artifactAvailable);
+export type TrafficBlockId = (typeof TRAFFIC_BLOCK)[keyof typeof TRAFFIC_BLOCK];
+
+/** The priority of each block that can be cut; see SummaryBlock.priority. */
+export type TrafficPriorities = Record<TrafficBlockId, number>;
+
+// Joined whole, the report never compares priorities.
+const JOINED = Object.fromEntries(
+  Object.values(TRAFFIC_BLOCK).map((id) => [id, 0]),
+) as TrafficPriorities;
+
+/**
+ * The notice each traffic block gives in place of what a cut dropped, or
+ * undefined for a block that is not one of renderReportBlocks', so a block
+ * handed to the wrong picker prints no misleading notice.
+ */
+export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): string | undefined {
+  switch (block.id) {
+    case TRAFFIC_BLOCK.example:
+      return restrictExampleTruncationNote(artifactAvailable);
+    case TRAFFIC_BLOCK.log:
+      return communicationTruncationNote(artifactAvailable);
+    case TRAFFIC_BLOCK.blocked:
+    case TRAFFIC_BLOCK.failed:
+    case TRAFFIC_BLOCK.passed:
+      return hostTableTruncationNote(artifactAvailable);
+    default:
+      return undefined;
+  }
 }
 
 // A table with the text before and after it, cut row by row: its heading,
@@ -69,7 +92,7 @@ function tableBlock(
 }
 
 const frame = (text: string): SummaryBlock => ({
-  priority: 1,
+  priority: 0,
   level: 1,
   section: SECTION,
   text,
@@ -78,14 +101,15 @@ const frame = (text: string): SummaryBlock => ({
 
 /**
  * The report as blocks for fitStepSummary, in print order. The frame (title,
- * notes, footer) is kept whole; the example, the blocked, failed and allowed
- * tables and the communication details get room in that order. Their notices
- * are the caller's to pick, by TRAFFIC_BLOCK id.
+ * notes, footer) is kept whole; every other block takes its priority from
+ * `priorities`, and its notice is the caller's to pick with withNotices, both
+ * by TRAFFIC_BLOCK id.
  */
 export function renderReportBlocks(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
+  priorities: TrafficPriorities,
   { title = "Outbound Traffic Report", ...step }: RenderReportMarkdownOptions = {},
 ): SummaryBlock[] {
   const isAudit = report.parameters.mode === "audit";
@@ -115,7 +139,7 @@ export function renderReportBlocks(
     blocks.push(
       tableBlock(
         TRAFFIC_BLOCK.passed,
-        5,
+        priorities[TRAFFIC_BLOCK.passed],
         `### ${heading}\n\n`,
         renderHostTable(report.passed),
         "\n",
@@ -130,7 +154,7 @@ export function renderReportBlocks(
     // Whole or not at all: a cut example would read as a complete allowlist.
     blocks.push({
       id: TRAFFIC_BLOCK.example,
-      priority: 2,
+      priority: priorities[TRAFFIC_BLOCK.example],
       level: 2,
       // Its own section: it stands beside the tables and the log, not above
       // them, so its notice must not silence theirs.
@@ -153,7 +177,7 @@ export function renderReportBlocks(
     blocks.push(
       tableBlock(
         TRAFFIC_BLOCK.blocked,
-        3,
+        priorities[TRAFFIC_BLOCK.blocked],
         `${report.passed.length > 0 ? "\n" : ""}### 🚫 Blocked Hosts\n\n`,
         renderHostTable(blocked, { showReason: true, showExpected }),
         "\n",
@@ -166,7 +190,7 @@ export function renderReportBlocks(
     blocks.push(
       tableBlock(
         TRAFFIC_BLOCK.failed,
-        4,
+        priorities[TRAFFIC_BLOCK.failed],
         `${gap}### ⚠️ Failed Connections\n\n`,
         renderHostTable(report.failed, { showReason: true }),
         "\n\n<sub>*Note: no rule refused these; the connection itself did not complete, so no rule " +
@@ -193,7 +217,7 @@ export function renderReportBlocks(
   if (details) {
     blocks.push({
       id: TRAFFIC_BLOCK.log,
-      priority: 6,
+      priority: priorities[TRAFFIC_BLOCK.log],
       level: 3,
       section: SECTION,
       cut: "lines",

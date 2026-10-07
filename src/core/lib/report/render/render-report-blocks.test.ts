@@ -7,10 +7,23 @@ import type { ReportData, UniversalReportData } from "../types.ts";
 import { communicationTruncationNote } from "./communication-section.ts";
 import { fitStepSummary, withNotices } from "./fit-step-summary.ts";
 import { hostTableTruncationNote } from "./host-table.ts";
-import { renderReportBlocks, trafficNotice } from "./render-report-markdown.ts";
+import {
+  renderReportBlocks,
+  TRAFFIC_BLOCK,
+  trafficNotice,
+  type TrafficPriorities,
+} from "./render-report-markdown.ts";
 import { restrictExampleTruncationNote } from "./restrict-example.ts";
 
 const LIMIT = 16 * 1024;
+
+const PRIORITIES: TrafficPriorities = {
+  [TRAFFIC_BLOCK.example]: 2,
+  [TRAFFIC_BLOCK.blocked]: 3,
+  [TRAFFIC_BLOCK.failed]: 4,
+  [TRAFFIC_BLOCK.passed]: 5,
+  [TRAFFIC_BLOCK.log]: 6,
+};
 
 const rows = (prefix: string, n: number, reason = "-") =>
   Array.from({ length: n }, (_, i) => ({
@@ -38,7 +51,9 @@ function report(overrides: Partial<UniversalReportData>): UniversalReportData {
 
 function fit(r: ReportData): string {
   return fitStepSummary(
-    withNotices(renderReportBlocks(r, "owner/repo", "v1"), (b) => trafficNotice(b, false)),
+    withNotices(renderReportBlocks(r, "owner/repo", "v1", PRIORITIES), (b) =>
+      trafficNotice(b, false),
+    ),
     { limitBytes: LIMIT },
   );
 }
@@ -110,5 +125,17 @@ describe("renderReportBlocks under a limit", () => {
     );
     expect(out).toContain(restrictExampleTruncationNote(false));
     expect(out).not.toContain("ok1999.example.com:443");
+  });
+
+  it("picks no notice for a block that is not the traffic report's", () => {
+    const block = {
+      id: "filesystem-log",
+      priority: 1,
+      level: 1,
+      section: "fs",
+      text: "",
+      cut: "lines" as const,
+    };
+    expect(trafficNotice(block, true)).toBeUndefined();
   });
 });

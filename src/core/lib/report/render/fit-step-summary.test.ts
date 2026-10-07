@@ -195,6 +195,13 @@ describe("fitStepSummary: priorities, levels and sections", () => {
     expect(fitStepSummary([wide], { limitBytes: SMALL_LIMIT })).toBe("_cut a_\n");
   });
 
+  it("gives a kept block room before the others whatever its priority", () => {
+    const footer = { ...frame("*footer*\n"), priority: 99 };
+    const out = fitStepSummary([log(500), footer], { limitBytes: SMALL_LIMIT });
+    expect(out.endsWith("_log cut a_\n*footer*\n")).toBe(true);
+    expect(Buffer.byteLength(out, "utf8") <= SMALL_LIMIT).toBe(true);
+  });
+
   it("replaces an atomic block whole rather than cutting it", () => {
     const example: SummaryBlock = {
       priority: 3,
