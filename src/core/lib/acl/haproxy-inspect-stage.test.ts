@@ -141,7 +141,11 @@ describe("extension", () => {
 
   it("logs what restrict would refuse ahead of the host", () => {
     const plain = plainStage(rules, "restrict", EXTENSION);
-    expect(plain.includes("dst=%[dst]:%[dst_port] wr=%[var(txn.would_refuse)] host=")).toBe(true);
+    expect(
+      plain.includes(
+        "dst=%[dst]:%[dst_port] wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)] host=",
+      ),
+    ).toBe(true);
   });
 
   it("runs after the rules and before the name is resolved, told the mode", () => {

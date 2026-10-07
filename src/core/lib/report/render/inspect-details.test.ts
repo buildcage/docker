@@ -72,6 +72,17 @@ describe("renderInspectDetails", () => {
     );
   });
 
+  it("says what restrict would have refused after a reason too", () => {
+    const failed: TrafficEvent = {
+      ...TIMELINE[2],
+      action: "failed",
+      reason: "dns-failed",
+      wouldRefuse: "example-refusal",
+    };
+    const line = (renderInspectDetails([failed], t).split("```")[1] ?? "").trim();
+    expect(line.endsWith("-> dns-failed (restrict would refuse: example-refusal)")).toBe(true);
+  });
+
   it("names the reason after the arrow instead of a status", () => {
     // 403, 502 and 503 mean different things; the number does not say which.
     expect(md.includes("-> not-allowed")).toBe(true);

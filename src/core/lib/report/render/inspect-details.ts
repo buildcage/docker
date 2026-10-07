@@ -57,7 +57,9 @@ const MARK: Record<string, string> = {
 
 function renderEvent(event: TrafficEvent, startedAt: number | undefined): string {
   const mark = MARK[event.action] ?? "✅";
-  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event)}`;
+  const note =
+    event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${event.wouldRefuse})`;
+  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event)}${note}`;
 }
 
 /**
@@ -187,7 +189,7 @@ function outcome(event: TrafficEvent): string {
   const parts: string[] = [];
   if (event.status !== undefined) parts.push(String(event.status));
   if (event.bytes !== undefined) parts.push(`(${formatBytes(event.bytes)})`);
-  if (event.wouldRefuse !== undefined) parts.push(`(restrict would refuse: ${event.wouldRefuse})`);
+
   // A name that resolved has neither, and saying so is the whole entry.
   return parts.length > 0 ? parts.join(" ") : "resolved";
 }

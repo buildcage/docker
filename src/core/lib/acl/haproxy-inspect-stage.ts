@@ -37,7 +37,8 @@ export interface InspectStageContext extends InternalDstOptions {
  * `restrict` would have logged, which the log carries as `wr=`.
  */
 export interface InspectStageExtension {
-  /** Run once the URL rules have allowed a request, before its name resolves. */
+  /** Run before a request's name resolves: in `restrict` once the URL rules
+   *  have allowed it, in `audit`, which applies none, on every request. */
   requestRules(mode: "restrict" | "audit"): string[];
   /** Run on the TLS stage alone, whose origin certificate was checked. */
   responseRules(): string[];
@@ -123,7 +124,10 @@ export function inspectStage(
   ctx: InspectStageContext,
 ): string[] {
   const { mode, extension } = ctx;
-  const extensionField = extension ? " wr=%[var(txn.would_refuse)]" : "";
+  // Folded to one token like the SNI, whatever the extension wrote.
+  const extensionField = extension
+    ? " wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]"
+    : "";
   const logFormat = `"buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${extensionField}${clientTlsFields(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`;
   const l: string[] = [];
   l.push(
@@ -210,6 +214,7 @@ export function inspectStage(
   if (!deniesEverything(rules, mode)) {
     // After the rules, so a request they refuse keeps their reason, and ahead
     // of the resolve, so one the extension refuses triggers no DNS query.
+    // Response rules run in their own phase; where they sit here is moot.
     if (extension) {
       l.push(...extension.requestRules(mode));
       if (scheme === "https") l.push(...extension.responseRules());

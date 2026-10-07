@@ -35,7 +35,7 @@ const SAMPLES: Record<string, string> = {
   "%[var(txn.sni)]": "db.example.com",
   "%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]": "registry.npmjs.org",
   "%[fc_err_name]": "-",
-  "%[var(txn.would_refuse)]": "-",
+  "%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]": "-",
 };
 
 // The inner alternative is the character class a regsub argument carries, so
@@ -506,8 +506,26 @@ describe("the generated log-format and this parser describe the same line", () =
       expect(e.wouldRefuse).toBe(undefined);
     });
 
+    it("keeps the refusal restrict would have made where the request came to nothing", async () => {
+      const line = render(
+        https,
+        {
+          "%ST": "502",
+          "%B": "0",
+          "%ts": "PR",
+          "%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]": "example-refusal",
+        },
+        { reason: "dns-failed" },
+      );
+      const [e] = (await scanInspectLog([line], true)).events;
+      expect(e.reason).toBe("dns-failed");
+      expect(e.wouldRefuse).toBe("example-refusal");
+    });
+
     it("notes the refusal restrict would have made of a request audit let through", async () => {
-      const line = render(https, { "%[var(txn.would_refuse)]": "example-refusal" });
+      const line = render(https, {
+        "%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]": "example-refusal",
+      });
       const [e] = (await scanInspectLog([line], true)).events;
       expect(e.action).toBe("audit");
       expect(e.status).toBe(200);
