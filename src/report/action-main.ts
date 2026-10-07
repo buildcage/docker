@@ -20,8 +20,9 @@ import { createDocker } from "#core/lib/docker/client.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
-import { renderReportMarkdown } from "#core/lib/report/render/render-report-markdown.ts";
-import { truncateForStepSummary } from "#core/lib/report/render/truncate-communication-details.ts";
+import { communicationTruncationNote } from "#core/lib/report/render/communication-section.ts";
+import { fitStepSummary, withNotice } from "#core/lib/report/render/fit-step-summary.ts";
+import { renderReportBlocks } from "#core/lib/report/render/render-report-markdown.ts";
 import type { GenReportParameters, ReportData } from "#core/lib/report/types.ts";
 
 import { emitReportOutcomes } from "./emit.ts";
@@ -95,7 +96,7 @@ export async function runReportAction(
     console.log(line);
   }
 
-  const markdown = renderReportMarkdown(
+  const blocks = renderReportBlocks(
     report,
     env.GITHUB_ACTION_REPOSITORY || DEFAULT_ACTION_REPOSITORY,
     env.GITHUB_ACTION_REF || DEFAULT_ACTION_REF,
@@ -124,7 +125,7 @@ export async function runReportAction(
   }
   try {
     await writeStepSummary(
-      truncateForStepSummary(markdown, trafficFile !== undefined),
+      fitStepSummary(withNotice(blocks, communicationTruncationNote(trafficFile !== undefined))),
       env.GITHUB_STEP_SUMMARY,
     );
   } catch (e) {

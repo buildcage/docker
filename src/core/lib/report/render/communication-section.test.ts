@@ -17,8 +17,7 @@ describe("wrapCommunicationDetails", () => {
     expect(wrapCommunicationDetails("x").startsWith("\n<details>")).toBe(true);
   });
 
-  it("is found again by searching for the opening text, which is how it is cut", () => {
-    // Writer and truncator have to agree byte for byte.
+  it("is found again by searching for the opening text", () => {
     const report = `## A report\n${wrapCommunicationDetails("a line\n")}\n*footer*\n`;
     const openAt = report.indexOf(COMMUNICATION_DETAILS_OPEN);
     expect(openAt).not.toBe(-1);
