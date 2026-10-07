@@ -33,7 +33,7 @@ and links here for the details.
 starts.
 
 ```yaml
-- uses: buildcage/docker@b5459229d32c2aad72e4492fac98a192f85f75e0 # v4.0.4
+- uses: buildcage/docker@fb8ec1accd272b4a9c38483989af89dbb23161a6 # v4.1.0
   with:
     builder_name: buildcage
     proxy_mode: restrict
@@ -237,10 +237,10 @@ internationalized name in its punycode form (`xn--mnchen-3ya.de`, not `münchen.
 connection carries. A leading, trailing or doubled dot is refused.
 
 A `Host` header ending in a dot (`example.com.`) matches as the name without it. An SNI may not end
-in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, and
-`allowed_https_rules` under `universal`), only a rule whose `**` can take in the dot
-(`example.**` or `**`, not `example.com.**`), or a `~` rule written to allow the dot, matches such a
-name.
+in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, `allowed_https_rules`
+under `universal`, and [`sni-not-allowed`](#the-ones-buildcage-refused)), only a rule whose `**` can
+take in the dot (`example.**` or `**`, not `example.com.**`), or a `~` rule written to allow the
+dot, matches such a name.
 
 `**` alone matches an address too: under `**:443`, a request that reaches the proxy through a name
 with `Host: 10.0.0.5` goes to that private address (see
@@ -387,7 +387,9 @@ single-digit backreference such as `\1`, all of which the two read alike. Any ot
 after a backslash is refused. So are a backreference to a group the pattern lacks (in a URL rule,
 one outside its own half), `\B` inside a character class, a `]` right after `[` or `[^`, and a
 POSIX class such as `[:alpha:]`, each of which PCRE2 either reads differently or refuses. Escape
-the bracket (`[\]a]`) or write a range (`[a-z]`) instead. Other syntax only JavaScript accepts,
+the bracket (`[\]a]`) or write a range (`[a-z]`) instead. A `{` must open a quantifier such as
+`{2}` or `{1,3}`, since PCRE2 reads `{,3}` and `{ 1,3}` as quantifiers where JavaScript and RE2 read
+text; write a literal brace as `\{`. Other syntax only JavaScript accepts,
 such as `[\d-z]`, passes setup and then stops the proxy from starting.
 
 The proxy image generates its configuration with QuickJS, which refuses two group forms Node
@@ -522,7 +524,10 @@ with the port where it is not the scheme's default.
 ### The ones nobody decided
 
 A connection the client ended before it sent a whole request reached no rule and no origin, so it is
-in neither host table. **Communication details** shows it with ⚠️ and how it ended:
+in neither host table. **Communication details** shows it with ⚠️ and how it ended. Under `inspect`,
+one sent straight to an address is the exception, refused as
+[`ip-not-allowed`](#the-ones-buildcage-refused) instead, or as `sni-not-allowed` where its SNI names
+a host no rule allows.
 
 ```
 ⚠️ 00:09.123: HTTPS untrusted-ca.example.com:443 -> client-aborted
@@ -557,9 +562,8 @@ shown.
 
 A protocol where the server speaks first (SMTP, MySQL, FTP) ends here too once it reaches the
 plain-HTTP stage: the client waits for a greeting and the proxy waits for a request, so no rule is
-ever reached. Every such connection through a name gets there, and under `inspect` so does one to an
-address no `allowed_ip_rules` entry covers. It is ⚠️ rather than 🚫 even where nothing allows the
-destination, and does not fail the step. With no TLS handshake it never matches
+ever reached. Every such connection through a name gets there, and is ⚠️ rather than 🚫 even where
+nothing allows the destination, so it does not fail the step. With no TLS handshake it never matches
 `allowed_tls_rules`; connecting to the address under an `allowed_ip_rules` entry is what passes it
 through.
 
@@ -572,12 +576,15 @@ and they fail the step under `fail_on_blocked: true` like any other refused conn
 🚫 00:14.002: GET http://10.0.0.9/pkg.tgz?token=*** -> missing-host-header
 🚫 00:15.880: HTTP (unknown):5432 -> bad-request
 🚫 00:16.204: TCP 10.0.0.9:5432 -> bad-request
+🚫 00:17.031: TCP 203.0.113.9:8443 -> ip-not-allowed
 ```
 
-| Reason                | What happened                                                          |
-| --------------------- | ---------------------------------------------------------------------- |
-| `bad-request`         | the build sent bytes that could not be read as an HTTP request at all  |
-| `missing-host-header` | a request parsed, and carried no `Host` for a rule to match or resolve |
+| Reason                | What happened                                                                                               |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `bad-request`         | the build sent bytes that could not be read as an HTTP request at all                                       |
+| `missing-host-header` | a request parsed, and carried no `Host` for a rule to match or resolve                                      |
+| `ip-not-allowed`      | a connection straight to an address no `allowed_ip_rules` entry covers ended before its request (`inspect`) |
+| `sni-not-allowed`     | the same, with an SNI naming a host no rule allows (`inspect`, `restrict` only)                             |
 
 `bad-request` is most often a protocol that is not HTTP at all and where the client speaks first,
 such as PostgreSQL or `git://`, on a port no `allowed_ip_rules` or `allowed_tls_rules` entry
@@ -585,11 +592,28 @@ covers: anything that is not a TLS handshake is handed to the plain-HTTP stage, 
 request and refuses it. Both are refused in `audit` mode too, as the same check is under
 `universal`, since a request naming no host has nothing to connect to whatever the rules say.
 
+`ip-not-allowed` is a connection to an address such as `203.0.113.9:8443` that ended before its
+request: a client that does not trust the CA, or one waiting for the server to speak first. A client
+sends no SNI to an address, so the certificate the proxy answers with matches no name, and nothing
+that checks it gets further, in `audit` too. `universal` in `restrict` refuses the same connection
+on arrival. A close on an address and port that also had a request read is a keepalive close and
+stays out of the report.
+Plain HTTP sent to an address with a `Host` naming some other host is the exception: the log records
+where that request went, not the address, so its keepalive close is counted here.
+
 What clears one is a rule, though not a host rule. For traffic that is not HTTP, add the port to
 `allowed_ip_rules` or the name to `allowed_tls_rules`, and the connection is passed through
 undecrypted instead of being read as a request. `known_blocked_rules` can mark a row whose host is a
 name from the SNI or an address; a row reading `(unknown)` names nothing a rule can be written
 against, so the passthrough rule is the only way to clear that one.
+
+`sni-not-allowed` is the same kind of connection carrying an SNI. The name is judged as the
+resolver judges one looked up through DNS, against the host of every rule except `allowed_ip_rules`
+on any port, except that a trailing dot is kept. Through DNS, the same attempt is refused as
+`dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through DNS: usually a
+client that does not trust the CA, pointed at an address by `/etc/hosts` or `curl --resolve`.
+`audit` refuses no name, so it refuses no SNI. A rule allowing the host clears one, as does a
+`known_blocked_rules` entry.
 
 Under `universal`, a connection through a name that is not a TLS handshake is also read as HTTP. ssh
 or `git://` to a name is refused as `bad-request`, in `audit` too, and a client waiting for the

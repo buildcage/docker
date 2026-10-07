@@ -50,8 +50,10 @@ const PLACEHOLDER_PROXY_ADDRESS = "192.0.2.1";
 
 /**
  * Compile already-parsed rules the way the proxy does when it starts, so a
- * rule its compilers refuse fails here rather than stopping the container.
- * Runs every engine's compiler regardless of proxy_engine.
+ * rule its config generators refuse fails here rather than stopping the
+ * container. A regex only HAProxy's PCRE2 or the resolver's RE2 refuses, such
+ * as `[\d-z]`, still stops it. Runs every engine's compiler regardless of
+ * proxy_engine.
  *
  * @throws {InvalidRulesError} if any compiler refuses a rule
  */

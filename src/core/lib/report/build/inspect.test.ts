@@ -183,6 +183,57 @@ describe("buildInspectReportData", () => {
     ).toStrictEqual(["8.8.8.8:53 IP bad-request"]);
   });
 
+  it("counts a client that dropped a connection sent straight to an address", async () => {
+    // A client that would not trust the certificate, with no ip rule for the
+    // address: fail_on_blocked has to see it, as it would under universal.
+    const dropped =
+      "buildcage 1787471976000 https <BADREQ> 0 0 ts=CR reason=- tlserr=- dst=203.0.113.9:8443 fcerr=ERESET sni=- host=- -";
+    const r = await buildInspectReportData([START, dropped], [], reportParams(), 0);
+    expect(r.blockedCount).toBe(1);
+    expect(
+      r.blocked.map((row) => `${row.host}:${row.port} ${row.ruleType} ${row.reason}`),
+    ).toStrictEqual(["203.0.113.9:8443 IP ip-not-allowed"]);
+  });
+
+  describe("a client that dropped a connection sent straight to an address with an SNI", () => {
+    const named = (sni: string) =>
+      `buildcage 1787471976000 https <BADREQ> 0 0 ts=CR reason=- tlserr=- dst=203.0.113.9:8443 fcerr=ERESET sni=${sni} host=- -`;
+    const params = reportParams({
+      allowedHttpsRules: ["registry.npmjs.org:443"],
+      allowedUrlRules: ["GET https://*.github.com/repos/**"],
+    });
+
+    it("is counted where no rule allows the name, whatever port the rule names", async () => {
+      const r = await buildInspectReportData(
+        [START, named("EXFIL.attacker.example")],
+        [],
+        params,
+        0,
+      );
+      expect(r.blockedCount).toBe(1);
+      expect(
+        r.blocked.map((row) => `${row.host}:${row.port} ${row.ruleType} ${row.reason}`),
+      ).toStrictEqual(["exfil.attacker.example:8443 HTTPS sni-not-allowed"]);
+    });
+
+    it("is left undecided where a host or URL rule allows the name, as through DNS", async () => {
+      for (const sni of ["registry.npmjs.org", "API.github.com"]) {
+        const r = await buildInspectReportData([START, named(sni)], [], params, 0);
+        expect(r.blockedCount).toBe(0);
+      }
+    });
+
+    it("is left undecided in audit mode, whose resolver allows every name", async () => {
+      const r = await buildInspectReportData(
+        [START, named("exfil.attacker.example")],
+        [],
+        reportParams({ mode: "audit" }),
+        0,
+      );
+      expect(r.blockedCount).toBe(0);
+    });
+  });
+
   it("still blocks a refusal whose request did name a host", async () => {
     // Same termination state as the two above, told apart by the reason and
     // by the method haproxy logs where a request never parsed.

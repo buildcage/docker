@@ -68,24 +68,11 @@ jobs:
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Start Buildcage builder
-        uses: buildcage/docker@b5459229d32c2aad72e4492fac98a192f85f75e0 # v4.0.4
+        uses: buildcage/docker@fb8ec1accd272b4a9c38483989af89dbb23161a6 # v4.1.0
         with:
           proxy_mode: restrict
           proxy_engine: inspect
-          allowed_url_rules: |
-            # apk package index and packages (haproxy, curl, ...)
-            GET https://dl-cdn.alpinelinux.org/alpine/**
-
-            # CNI plugins and CoreDNS release binaries (github 302-redirects here)
-            GET https://github.com/containernetworking/plugins/releases/download/**
-            GET https://github.com/coredns/coredns/releases/download/**
-            GET https://release-assets.githubusercontent.com/**
-
-            # Node.js runtime for the QuickJS scripts build stage
-            GET https://nodejs.org/download/release/**
-
-            # npm registry: dev deps bundled into the qjs scripts
-            GET|HEAD https://registry.npmjs.org/**
+          config_file: .github/buildcage-release.yml
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -143,8 +130,9 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@b5459229d32c2aad72e4492fac98a192f85f75e0 # v4.0.4
+        uses: buildcage/docker/report@fb8ec1accd272b4a9c38483989af89dbb23161a6 # v4.1.0
         with:
+          config_file: .github/buildcage-release.yml
           fail_on_blocked: true
 
       - name: Record the digest under this engine's own key

@@ -20,7 +20,10 @@ if [ ! -f /etc/haproxy/ca.pem ]; then
       -subj "/CN=buildcage proxy CA/serialNumber=$(openssl rand -hex 16)" \
       -addext "basicConstraints=critical,CA:TRUE" \
       -addext "keyUsage=critical,keyCertSign,cRLSign" 2>/dev/null
-    cat /tmp/ca.crt /tmp/ca.key > /etc/haproxy/ca.pem
+    # Private from the start rather than from the chmod below. The umask stays
+    # in a subshell, since the NSS database and the published certificate must
+    # stay readable.
+    (umask 077 && cat /tmp/ca.crt /tmp/ca.key > /etc/haproxy/ca.pem)
     cp /tmp/ca.crt /opt/buildcage/ca.pem
 
     # Chromium trusts only its built-in roots and the NSS database in $HOME, so
@@ -39,7 +42,7 @@ if [ ! -f /etc/haproxy/ca.pem ]; then
       -subj "/CN=buildcage-default" 2>/dev/null
     openssl x509 -req -in /tmp/d.csr -CA /tmp/ca.crt -CAkey /tmp/ca.key \
       -CAcreateserial -days 2 -out /tmp/d.crt 2>/dev/null
-    cat /tmp/d.crt /tmp/d.key > /etc/haproxy/default.pem
+    (umask 077 && cat /tmp/d.crt /tmp/d.key > /etc/haproxy/default.pem)
     rm -f /tmp/ca.key /tmp/d.key /tmp/d.csr
 fi
 chmod 600 /etc/haproxy/ca.pem /etc/haproxy/default.pem

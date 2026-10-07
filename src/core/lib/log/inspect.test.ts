@@ -314,6 +314,99 @@ describe("scanInspectLog", () => {
   });
 });
 
+describe("a connection sent straight to an address that ended before its request", () => {
+  // No ip rule passed it, and no SNI went with it. The ERESET is a client that
+  // would not trust the certificate.
+  const closed = (ts: string, fcerr = "ERESET", dst = "203.0.113.9:8443") =>
+    `buildcage 1 https <BADREQ> 0 0 ts=${ts} reason=- tlserr=- dst=${dst} fcerr=${fcerr} sni=- host=- -`;
+  const plainClose =
+    "buildcage 2 http <BADREQ> 408 0 ts=cR reason=- tlserr=- dst=10.0.0.5:8080 host=- -";
+
+  it("is refused as an address no ip rule covers, however it ended", async () => {
+    const events = await parse([
+      closed("CR"),
+      closed("PR", "SSL_HANDSHAKE"),
+      closed("cR"),
+      closed("RR"),
+      plainClose,
+    ]);
+    for (const e of events) {
+      expect(`${e.action} ${e.protocol} ${e.reason}`).toBe("block tcp ip-not-allowed");
+    }
+    expect(events[0].host).toBe("203.0.113.9");
+    expect(events[0].destination).toBe("203.0.113.9:8443");
+  });
+
+  it("is refused in audit mode too, where nothing would have let it through", async () => {
+    const [e] = await parse([closed("CR")], true);
+    expect(e.action).toBe("block");
+  });
+
+  it("stays a keepalive close where the address had a request read", async () => {
+    // A rule may name an address for plain http; its pool closes the same way.
+    const served =
+      "buildcage 1 http GET 200 5 ts=-- reason=- tlserr=- dst=10.0.0.5:8080 host=10.0.0.5:8080 /x";
+    const [, close] = await parse([served, plainClose]);
+    expect(close.action).toBe("incomplete");
+    expect(close.reason).toBe("client-timeout");
+  });
+
+  it("refuses the close all the same where only another port or a passthrough was served", async () => {
+    const otherPort =
+      "buildcage 1 http GET 200 5 ts=-- reason=- tlserr=- dst=10.0.0.5:80 host=10.0.0.5 /x";
+    const passed = "buildcage 1 pass tcp 900 ts=-- reason=- dst=10.0.0.5:8080 sni=-";
+    for (const served of [otherPort, passed]) {
+      const [, close] = await parse([served, plainClose]);
+      expect(close.action).toBe("block");
+    }
+  });
+
+  it("leaves one sent to the proxy's own address or named by its SNI undecided", async () => {
+    const events = await parse([
+      closed("CR", "ERESET", "198.19.255.1:443"),
+      closed("CR").replace("sni=-", "sni=untrusted-ca.example.com"),
+    ]);
+    expect(events.map((e) => e.action)).toStrictEqual(["incomplete", "incomplete"]);
+  });
+});
+
+describe("a connection sent straight to an address with an SNI that ended before its request", () => {
+  const named = (sni: string, ts = "CR", dst = "203.0.113.9:8443") =>
+    `buildcage 1 https <BADREQ> 0 0 ts=${ts} reason=- tlserr=- dst=${dst} fcerr=ERESET sni=${sni} host=- -`;
+  const allowsName = (name: string) => name === "registry.npmjs.org";
+  const judge = async (lines: string[]) => (await scanInspectLog(lines, false, allowsName)).events;
+
+  it("is refused where the resolver would have refused the name, however it ended", async () => {
+    const events = await judge([
+      named("exfil.attacker.example"),
+      named("exfil.attacker.example", "cR"),
+    ]);
+    for (const e of events) {
+      expect(`${e.action} ${e.protocol} ${e.host} ${e.reason}`).toBe(
+        "block https exfil.attacker.example sni-not-allowed",
+      );
+    }
+  });
+
+  it("stays undecided where the name is allowed, as it would through DNS", async () => {
+    const [e] = await judge([named("registry.npmjs.org")]);
+    expect(e.action).toBe("incomplete");
+    expect(e.reason).toBe("client-aborted");
+  });
+
+  it("leaves one sent to the proxy's own address to the resolver's own line", async () => {
+    const [e] = await judge([named("exfil.attacker.example", "CR", "198.19.255.1:443")]);
+    expect(e.action).toBe("incomplete");
+  });
+
+  it("judges no SNI where a request was read, the rules having judged its Host", async () => {
+    const served =
+      "buildcage 1 https GET 200 5 ts=-- reason=- tlserr=- dst=203.0.113.9:443 fcerr=- sni=exfil.attacker.example host=registry.npmjs.org /x";
+    const [e] = await judge([served]);
+    expect(e.action).toBe("allow");
+  });
+});
+
 describe("hasProxyStarted", () => {
   it("tells a proxy that saw nothing from one that never ran", () => {
     expect(hasProxyStarted(["buildcage haproxy starting"])).toBe(true);

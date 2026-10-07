@@ -14,6 +14,7 @@ export function reportParams(overrides: Partial<GenReportParameters> = {}): GenR
     allowedHttpRules: [],
     allowedIpRules: [],
     allowedTlsRules: [],
+    allowedUrlRules: [],
     knownBlockedRules: [],
     ...overrides,
   };

@@ -11,6 +11,7 @@ describe("buildReportParameters", () => {
         ALLOWED_HTTP_RULES: "c.com:80",
         ALLOWED_IP_RULES: "",
         ALLOWED_TLS_RULES: "d.example.com:8443",
+        ALLOWED_URL_RULES: "GET https://e.example.com/x\nPOST https://f.example.com/y",
         KNOWN_BLOCKED_RULES: "noisy.example.com:443",
       }),
     ).toStrictEqual({
@@ -19,6 +20,7 @@ describe("buildReportParameters", () => {
       allowedHttpRules: ["c.com:80"],
       allowedIpRules: [],
       allowedTlsRules: ["d.example.com:8443"],
+      allowedUrlRules: ["GET https://e.example.com/x", "POST https://f.example.com/y"],
       knownBlockedRules: ["noisy.example.com:443"],
     });
   });
@@ -33,6 +35,7 @@ describe("buildReportParameters", () => {
     expect(params.allowedHttpRules).toStrictEqual([]);
     expect(params.allowedIpRules).toStrictEqual([]);
     expect(params.allowedTlsRules).toStrictEqual([]);
+    expect(params.allowedUrlRules).toStrictEqual([]);
     expect(params.knownBlockedRules).toStrictEqual([]);
   });
 });

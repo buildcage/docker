@@ -288,8 +288,8 @@ describe("checkRawRegexHalf", () => {
     // are Corefile environment substitution.
     expect(() => check("a'b\\.com", true)).toThrow(/cannot quote/);
     expect(() => check("a`b\\.com", true)).toThrow(/cannot quote/);
-    expect(() => check("a{$HOME}\\.com", true)).toThrow(/cannot quote/);
-    expect(() => check("a{%HOME%}\\.com", true)).toThrow(/cannot quote/);
+    expect(() => check("a\\{$HOME}\\.com", true)).toThrow(/cannot quote/);
+    expect(() => check("a\\{%HOME%}\\.com", true)).toThrow(/cannot quote/);
   });
 
   it("keeps a quantifier brace, which is not substitution", () => {
@@ -348,6 +348,15 @@ describe("checkRawRegexHalf", () => {
 
   it("reads a digit escape in a class as the octal both engines take it for", () => {
     expect(() => check("/[\\1]", false)).not.toThrow();
+  });
+
+  it("refuses a `{` that opens no quantifier, which PCRE2 may read as one", () => {
+    for (const text of ["a{,3}\\.com:443", "/a{ 1,3}", "/a{1, 3}", "/a{1}{", "/{x}"]) {
+      expect(() => check(text, false)).toThrow(/"\{" that does not open a quantifier/);
+    }
+    for (const text of ["a{2}\\.com:443", "/a{1,}", "/a{1,3}?", "/a\\{,3}", "/[{]", "/a}"]) {
+      expect(() => check(text, false)).not.toThrow();
+    }
   });
 
   it("refuses `\\B` in a class, which PCRE2 does not accept", () => {
