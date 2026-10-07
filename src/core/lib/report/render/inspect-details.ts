@@ -48,6 +48,8 @@ export function renderInspectDetailsBody(
 // that never arrived whole, and a connection the origin broke. The reason
 // tells them apart. `discovery` keeps ℹ️: a lookup nothing can answer is
 // harmless.
+// 🚨 is a request audit let through that restrict would refuse; one that
+// came to nothing anyway keeps its own mark.
 const MARK: Record<string, string> = {
   block: "🚫",
   discovery: "ℹ️",
@@ -56,7 +58,10 @@ const MARK: Record<string, string> = {
 };
 
 function renderEvent(event: TrafficEvent, startedAt: number | undefined): string {
-  const mark = MARK[event.action] ?? "✅";
+  const mark =
+    event.action === "audit" && event.wouldRefuse !== undefined
+      ? "🚨"
+      : (MARK[event.action] ?? "✅");
   const note =
     event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${event.wouldRefuse})`;
   return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event)}${note}`;

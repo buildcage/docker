@@ -68,7 +68,7 @@ describe("renderInspectDetails", () => {
     };
     const line = (renderInspectDetails([audited], t).split("```")[1] ?? "").trim();
     expect(line).toBe(
-      "✅ 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would refuse: example-refusal)",
+      "🚨 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would refuse: example-refusal)",
     );
   });
 
