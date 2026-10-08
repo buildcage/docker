@@ -179,7 +179,7 @@ describe("renderReportBlocks under a limit", () => {
       fit(
         report({
           parameters: audit,
-          blocked: rows("bad", 1, "not-allowed"),
+          blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
           blockedCount: 1,
           failed: rows("down", 1, "conn-reset"),
         }),
@@ -210,7 +210,7 @@ describe("renderReportBlocks under a limit", () => {
     const out = fit({
       ...report({
         parameters: audit,
-        blocked: rows("bad", 1, "not-allowed"),
+        blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
         blockedCount: 1,
         timeline,
       }),
