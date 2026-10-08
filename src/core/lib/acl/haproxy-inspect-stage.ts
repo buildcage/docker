@@ -42,6 +42,8 @@ export interface InspectStageExtension {
   requestRules(mode: "restrict" | "audit"): string[];
   /** Run on the TLS stage alone, whose origin certificate was checked. */
   responseRules(): string[];
+  /** Lines the `global` section takes, such as a buffer the rules ask for. */
+  global?: string[];
 }
 
 /** The fields of the stage that terminates TLS. fcerr names a failed client

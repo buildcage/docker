@@ -37,6 +37,18 @@ const FULL = {
 const FULL_CONFIG = gen(FULL);
 
 describe("the proxy's own process and listeners", () => {
+  it("takes an extension's global lines, and none without one", () => {
+    const extension = {
+      requestRules: () => [],
+      responseRules: () => [],
+      global: ["    # extension global line"],
+    };
+    const config = gen({ ...FULL, extension });
+    const line = config.indexOf("    # extension global line");
+    expect(line > config.indexOf("\nglobal\n") && line < config.indexOf("\ndefaults\n")).toBe(true);
+    expect(FULL_CONFIG.includes("extension global line")).toBe(false);
+  });
+
   it("exposes readiness on a unix socket, out of reach of the firewall", () => {
     // s6-notifyoncheck polls this; a TCP health port would depend on what
     // init-iptables allows, and a blocked check never signals ready.
