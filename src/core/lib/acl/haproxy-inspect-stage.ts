@@ -44,6 +44,41 @@ export interface InspectStageExtension {
   responseRules(): string[];
   /** Lines the `global` section takes, such as a buffer the rules ask for. */
   global?: string[];
+  logFields?: InspectLogFields;
+}
+
+/**
+ * Values an extension logs with each request, which the log parser reads back
+ * as one object named `name` on the event. Each field names the txn variable
+ * holding its value. A field whose variable is unset is left out, and so is
+ * the whole object when none is set.
+ */
+export interface InspectLogFields {
+  name: string;
+  /** Field name to variable, such as `{ key: "txn.aws_log_key" }`. */
+  fields: Record<string, string>;
+}
+
+// What log/inspect.ts reads as an object or field name, and a variable name
+// HAProxy takes without quoting.
+const LOG_FIELD_NAME = /^[a-z][A-Za-z0-9]*$/;
+const LOG_FIELD_VAR = /^txn\.[a-z0-9_]+$/;
+
+/** One `<name>.<field>=<value>` token per field, folded to the SNI's charset. */
+function logFieldTokens({ name, fields }: InspectLogFields): string {
+  const entries = Object.entries(fields);
+  for (const [field, variable] of entries) {
+    if (
+      !LOG_FIELD_NAME.test(name) ||
+      !LOG_FIELD_NAME.test(field) ||
+      !LOG_FIELD_VAR.test(variable)
+    ) {
+      throw new Error(`invalid log field: ${name}.${field} from ${variable}`);
+    }
+  }
+  return entries
+    .map(([field, variable]) => ` ${name}.${field}=%[var(${variable}),regsub([^A-Za-z0-9._-],_,g)]`)
+    .join("");
 }
 
 /** The fields of the stage that terminates TLS. fcerr names a failed client
@@ -128,7 +163,8 @@ export function inspectStage(
   const { mode, extension } = ctx;
   // Folded to one token like the SNI, whatever the extension wrote.
   const extensionField = extension
-    ? " wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]"
+    ? " wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]" +
+      (extension.logFields ? logFieldTokens(extension.logFields) : "")
     : "";
   const logFormat = `"buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${extensionField}${clientTlsFields(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`;
   const l: string[] = [];

@@ -2,8 +2,8 @@
  * Parsers for the `inspect` engine's two logs, whose formats are emitted by
  * haproxy-config.ts and coredns-config.ts. Seven kinds of line:
  *
- *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wr=<r|->] fcerr=<name|-> sni=<name|-> host=<authority|-> <target|->
- *   buildcage <ms> http <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wr=<r|->] host=<authority|-> <target|->
+ *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wr=<r|-> [<name>.<field>=<v|-> ...]] fcerr=<name|-> sni=<name|-> host=<authority|-> <target|->
+ *   buildcage <ms> http <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wr=<r|-> [<name>.<field>=<v|-> ...]] host=<authority|-> <target|->
  *   buildcage <ms> pass <tls|tcp> <bytes> ts=<st> reason=<r> dst=<addr>:<port> sni=<name|->
  *   <timestamp>  [INFO] buildcage dns <allowed|denied> name=<name>.
  *   <timestamp>  [INFO] buildcage dns discovery name=<name>. type=<qtype>
@@ -38,13 +38,14 @@ export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-eve
 // The trailing field stays \S+ rather than .+: two lines joined by a
 // half-written write would otherwise parse as one event instead of counting
 // as unparsed.
-// wr= is there only where an action extends the stage; see InspectStageExtension.
+// wr= and the fields named <name>.<field>= are there only where an action
+// extends the stage; see InspectStageExtension.
 // sni= is optional: the plain stage terminates no TLS and logs no such field.
 // `host=` is a named field for that reason, or a line cut right after the SNI
 // would parse with `sni=<name>` read as the authority instead of counting as
 // unreadable.
 const REQUEST =
-  /^buildcage (\d+) (https?) (\S+) (-?\d+) (\d+) ts=(\S*) reason=(\S+) tlserr=(\S+) dst=(\S+):(\d+) (?:wr=(\S+) )?(?:fcerr=(\S+) )?(?:sni=(\S+) )?host=(\S+) (\S+)$/;
+  /^buildcage (\d+) (https?) (\S+) (-?\d+) (\d+) ts=(\S*) reason=(\S+) tlserr=(\S+) dst=(\S+):(\d+) (?:wr=(\S+) )?((?:[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*=\S+ )*)(?:fcerr=(\S+) )?(?:sni=(\S+) )?host=(\S+) (\S+)$/;
 const PASSTHROUGH =
   /^buildcage (\d+) pass (tls|tcp) (\d+) ts=(\S*) reason=(\S+) dst=(\S+):(\d+) sni=(\S+)$/;
 // CoreDNS escapes a space in a label as `\ `. Names stay escaped, as the
@@ -254,6 +255,19 @@ function hostBeforeRequest(
   return { host: address, byAddress: true };
 }
 
+/** The `<name>.<field>=<value>` tokens as objects by name, leaving out the
+ *  fields logged empty and any object with none left. */
+function extensionFields(tokens: string): Record<string, Record<string, string>> | undefined {
+  let objects: Record<string, Record<string, string>> | undefined;
+  for (const token of tokens.split(" ")) {
+    const match = /^([^.]+)\.([^=]+)=(.*)$/.exec(token);
+    if (!match || match[3] === "-") continue;
+    objects ??= {};
+    (objects[match[1]] ??= {})[match[2]] = match[3];
+  }
+  return objects;
+}
+
 /** Parse one proxy-log line, or null if it is not one of ours. */
 function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
   const trimmed = line.trim();
@@ -261,7 +275,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
   const request = REQUEST.exec(trimmed);
   if (request) {
     // Its termination state reads as this proxy's refusal, which it is not.
-    const fcerr = request[12] ?? "";
+    const fcerr = request[13] ?? "";
     const tlsFailed =
       request[3] === BAD_REQUEST_METHOD &&
       fcerr.startsWith("SSL_") &&
@@ -285,10 +299,10 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
     const scheme = request[2] as "http" | "https";
     // Spelled as the rules saw it, like the logged path, so one host sent two
     // ways is one row and a known_blocked rule matches either spelling.
-    const sent = splitHostPort(request[14]);
+    const sent = splitHostPort(request[15]);
     const host = ruleHost(sent.host);
     const authority = sent.port === undefined ? host : `${host}:${sent.port}`;
-    const unnamed = namedByHandshake ? hostBeforeRequest(request[13], request[9]) : undefined;
+    const unnamed = namedByHandshake ? hostBeforeRequest(request[14], request[9]) : undefined;
     const event: TrafficEvent = {
       // <ms> is milliseconds; TrafficEvent.time is seconds.
       time: Number(request[1]) / 1000,
@@ -305,13 +319,15 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
       const url = urlOf(
         scheme,
         unnamed ? authorityOf(unnamed.host, request[10], scheme) : authority,
-        request[15],
+        request[16],
       );
       if (url !== undefined) event.url = url;
     }
     // Set in audit only, and kept even where the request then failed.
     const wouldRefuse = request[11];
     if (wouldRefuse !== undefined && wouldRefuse !== "-") event.wouldRefuse = wouldRefuse;
+    const extensions = extensionFields(request[12]);
+    if (extensions) event.extensions = extensions;
     if (reason !== undefined) event.reason = reason;
     else {
       event.status = Number(request[4]);
