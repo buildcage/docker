@@ -194,7 +194,7 @@ export function renderReportBlocks(
   const wouldRefuse = renderWouldRefuseBody(report.timeline, report.startedAt);
   if (wouldRefuse) {
     const before = `${report.passed.length > 0 || report.blocked.length > 0 ? "\n" : ""}### 🚨 Restrict Would Refuse\n\n`;
-    // Cut row by row like a table, its heading and opening fence standing for the head.
+    // Cut row by row like a table, whose head here is the heading and opening fence.
     blocks.push({
       id: TRAFFIC_BLOCK.wouldRefuse,
       priority: priorities[TRAFFIC_BLOCK.wouldRefuse],

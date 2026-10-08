@@ -63,7 +63,7 @@ function fenced(events: TrafficEvent[], startedAt: number | undefined): string {
   return `\`\`\`\n${body}\`\`\`\n`;
 }
 
-/** What a traffic report says where the Job Summary's size limit cut its requests restrict would refuse. */
+/** What a traffic report says where the Job Summary's size limit cut its list of requests restrict would refuse. */
 export function wouldRefuseTruncationNote(artifactAvailable: boolean): string {
   const rest = artifactAvailable
     ? "the buildcage-traffic artifact uploaded for this run has every one"

@@ -56,7 +56,7 @@ function describeWouldRefuse(report: ReportData): OutcomeEmission | undefined {
     shouldFail: false,
     message:
       `${count} request(s) restrict mode would refuse. ` +
-      "The 🚨 Restrict Would Refuse section lists each with the reason.",
+      "The 🚨 Restrict Would Refuse section lists them with the reason.",
   };
 }
 
