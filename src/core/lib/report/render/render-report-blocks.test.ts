@@ -173,6 +173,69 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).toContain("```\n\n" + wouldRefuseTruncationNote(false));
   });
 
+  it("ends the example with a blank line before whatever follows it", () => {
+    const audit = reportParams({ mode: "audit" });
+    expect(
+      fit(
+        report({
+          parameters: audit,
+          blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
+          blockedCount: 1,
+          failed: rows("down", 1, "conn-reset"),
+        }),
+      ),
+    ).toContain("</details>\n\n### 🚫 Blocked Hosts");
+    expect(fit(report({ parameters: audit, failed: rows("down", 1, "conn-reset") }))).toContain(
+      "</details>\n\n### ⚠️ Failed Connections",
+    );
+    // A TLS rule alone writes an example for a run that reached nothing.
+    expect(
+      fit({
+        ...report({
+          parameters: reportParams({ mode: "audit", allowedTlsRules: ["example.com"] }),
+        }),
+        engine: "inspect",
+      }),
+    ).toContain("</details>\n\n_(no communication)_");
+    // The would-refuse list takes the room first, so the blocked table after
+    // the example is left with only its notice.
+    const timeline: TrafficEvent[] = [
+      {
+        time: 0,
+        action: "allow",
+        protocol: "https",
+        host: "api.example.com",
+        port: 443,
+        method: "GET",
+        url: "https://api.example.com/",
+        status: 200,
+      },
+      ...Array.from({ length: 1000 }, (_, i) => ({
+        time: 1 + i,
+        action: "audit" as const,
+        protocol: "https" as const,
+        host: `h${i}.example.com`,
+        port: 443,
+        wouldRefuse: "example-refusal",
+      })),
+    ];
+    const out = fit({
+      ...report({
+        parameters: audit,
+        blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
+        blockedCount: 1,
+        timeline,
+      }),
+      engine: "inspect",
+    });
+    expect(out).toContain("</details>\n\n" + hostTableTruncationNote(false));
+    const alone = fit({
+      ...report({ parameters: audit, timeline: timeline.slice(0, 2) }),
+      engine: "inspect",
+    });
+    expect(alone).toContain("</details>\n\n### 🚨 Restrict Would Refuse");
+  });
+
   it("prints no list of the requests restrict would refuse when there are none", () => {
     const out = fit(report({ parameters: reportParams({ mode: "audit" }), passed: rows("ok", 1) }));
     expect(out).not.toContain("Restrict Would Refuse");
