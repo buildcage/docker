@@ -69,6 +69,7 @@ export interface SetupStepDeps {
    *  what the job log wants to show. */
   runDocker: (args: string[], env: NodeJS.ProcessEnv) => void;
   saveState: (name: string, value: string) => void;
+  setOutput: (name: string, value: string) => void;
   log: (message: string) => void;
   /** The rule-support warning goes to the always-on emitter: this action has no
    *  report of its own to suppress it alongside. */
@@ -95,6 +96,7 @@ const realDeps: SetupStepDeps = {
   builderStartError,
   runDocker: runDockerViaExec,
   saveState: core.saveState,
+  setOutput: core.setOutput,
   log: console.log,
   warn: annotate.warning,
 };
@@ -136,6 +138,7 @@ export async function runSetupStep(
     builderStartError,
     runDocker,
     saveState,
+    setOutput,
     log,
     warn,
   } = { ...realDeps, ...overrides };
@@ -239,4 +242,8 @@ export async function runSetupStep(
       composeEnv,
     });
   }
+
+  // The name may come from config_file, so a workflow cannot always know it
+  // for the Buildx endpoint without asking.
+  setOutput("builder_name", builderName);
 }

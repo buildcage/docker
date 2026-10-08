@@ -261,6 +261,10 @@ function getInput(name, options) {
 	if (options && options.required && !val) throw Error(`Input required and not supplied: ${name}`);
 	return options && options.trimWhitespace === !1 ? val : val.trim();
 }
+function setOutput(name, value) {
+	if (process.env.GITHUB_OUTPUT) return issueFileCommand("OUTPUT", prepareKeyValueMessage(name, value));
+	process.stdout.write(os.EOL), issueCommand("set-output", { name }, toCommandValue(value));
+}
 function saveState(name, value) {
 	if (process.env.GITHUB_STATE) return issueFileCommand("STATE", prepareKeyValueMessage(name, value));
 	issueCommand("save-state", { name }, toCommandValue(value));
@@ -12861,6 +12865,7 @@ const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("
 		});
 	},
 	saveState,
+	setOutput,
 	log: console.log,
 	warn: annotate.warning
 };
@@ -12879,7 +12884,7 @@ async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }, { ve
 	};
 }
 async function runSetupStep(env, overrides = {}) {
-	let { applyConfigFile, readSetupInputs, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, saveState, log, warn } = {
+	let { applyConfigFile, readSetupInputs, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, saveState, setOutput, log, warn } = {
 		...realDeps,
 		...overrides
 	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
@@ -12941,6 +12946,7 @@ async function runSetupStep(env, overrides = {}) {
 			composeEnv
 		});
 	}
+	setOutput("builder_name", builderName);
 }
 //#endregion
 //#region src/main.ts

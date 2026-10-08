@@ -18,6 +18,7 @@ const mocks = {
   builderStartError: vi.fn(),
   runDocker: vi.fn(),
   saveState: vi.fn(),
+  setOutput: vi.fn(),
   log: vi.fn(),
   warn: vi.fn(),
 };
@@ -92,6 +93,15 @@ describe("runSetupStep", () => {
     await runSetupStep(ENV, deps);
 
     expect(mocks.saveState).not.toHaveBeenCalled();
+  });
+
+  it("outputs the builder name once the builder is up", async () => {
+    mocks.readSetupInputs.mockReturnValue(inputsWith({ builderName: "from-file" }));
+
+    await runSetupStep(ENV, deps);
+
+    expect(mocks.setOutput).toHaveBeenCalledWith("builder_name", "from-file");
+    expect(mocks.runDocker.mock.invocationCallOrder[1]).toBeLessThan(orderOf(mocks.setOutput));
   });
 
   it("applies config_file to the step's env before reading any input, and logs it", async () => {
@@ -318,6 +328,7 @@ describe("runSetupStep", () => {
         projectName: PROJECT_NAME,
         builderName: "buildcage",
       });
+      expect(mocks.setOutput).not.toHaveBeenCalled();
     });
   });
 });
