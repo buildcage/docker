@@ -159,7 +159,7 @@ defaults and the engines each input applies to, is in
 in [Rule syntax](./docs/reference.md#rule-syntax).
 
 The builder is named `buildcage` unless `builder_name` says otherwise, and the Buildx `endpoint` has
-to match whatever it is named.
+to match whatever it is named. The setup action's `builder_name` output holds the name it used.
 
 The inputs can also live in a YAML file next to the Dockerfile, named by `config_file`. See
 [Config file](./docs/reference.md#config-file).

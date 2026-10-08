@@ -69,6 +69,7 @@ export interface SetupStepDeps {
    *  what the job log wants to show. */
   runDocker: (args: string[], env: NodeJS.ProcessEnv) => void;
   saveState: (name: string, value: string) => void;
+  setOutput: (name: string, value: string) => void;
   log: (message: string) => void;
   /** The rule-support warning goes to the always-on emitter: this action has no
    *  report of its own to suppress it alongside. */
@@ -95,6 +96,7 @@ const realDeps: SetupStepDeps = {
   builderStartError,
   runDocker: runDockerViaExec,
   saveState: core.saveState,
+  setOutput: core.setOutput,
   log: console.log,
   warn: annotate.warning,
 };
@@ -136,6 +138,7 @@ export async function runSetupStep(
     builderStartError,
     runDocker,
     saveState,
+    setOutput,
     log,
     warn,
   } = { ...realDeps, ...overrides };
@@ -163,6 +166,10 @@ export async function runSetupStep(
   // For post; see planPostCleanup. Without the runner's state file there is
   // no post step.
   if (env.GITHUB_STATE) saveState(BUILDER_NAME_STATE, builderName);
+  // The name may come from config_file, so a workflow cannot always know it
+  // for the Buildx endpoint without asking. Set before the builder starts so a
+  // step that runs after a failed setup still gets it.
+  setOutput("builder_name", builderName);
 
   // Before the builder starts, so a rule the engine cannot enforce is reported
   // once, up front, rather than silently not enforced.

@@ -7,6 +7,7 @@ and links here for the details.
 ## Contents
 
 - [Setup action inputs](#setup-action-inputs)
+- [Setup action outputs](#setup-action-outputs)
 - [Config file](#config-file)
 - [Operation modes](#operation-modes)
 - [Rule syntax](#rule-syntax)
@@ -24,7 +25,7 @@ and links here for the details.
 | Input                | Default     | Description                                                                                                                     |
 | -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `config_file`        | empty       | A YAML file, relative to the workspace, that sets the other inputs. See [Config file](#config-file).                            |
-| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it.                                                           |
+| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it; see [outputs](#setup-action-outputs).                     |
 | `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                 |
 | `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                  |
 | `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA or its NSS slot left in the image into a warning. See [CA residue](#ca-residue). |
@@ -66,6 +67,26 @@ method and any path.
 Setting a rule the engine can't act on is caught before the build starts: `restrict` fails, since a
 rule that looks like it protects the build but cannot be enforced is worse than none, and `audit`
 warns and ignores it.
+
+## Setup action outputs
+
+| Output         | Description                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| `builder_name` | Name of the builder container, whether the workflow, `config_file` or the default set it |
+
+A workflow shared across repositories cannot always know the name in advance, since `config_file`
+may set it. Take the Buildx `endpoint` from the output instead:
+
+```yaml
+- id: buildcage
+  uses: buildcage/docker@<sha>
+  with:
+    config_file: app/buildcage.yml
+- uses: docker/setup-buildx-action@<sha>
+  with:
+    driver: remote
+    endpoint: docker-container://${{ steps.buildcage.outputs.builder_name }}
+```
 
 ## Config file
 

@@ -46,6 +46,10 @@ inputs:
     required: false
     default: ""
 
+outputs:
+  builder_name:
+    description: "Name of the builder container, for the Buildx endpoint. See docs/reference.md#setup-action-outputs."
+
 runs:
   using: node24
   main: dist/main.cjs
