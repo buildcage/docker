@@ -115,7 +115,10 @@ export function fitStepSummary(
  */
 function cutBlock(b: SummaryBlock, budget: number): string {
   const notice = b.notice ?? "";
-  if (b.cut === "atomic") return notice;
+  // A notice standing alone keeps the blank line the block opened with, or it
+  // would run on into the table or </details> above it.
+  const alone = (/^\n*/.exec(b.text)?.[0] ?? "") + notice;
+  if (b.cut === "atomic") return alone;
   const open = b.open ?? "";
   const close = b.close ?? "";
   const room = budget - bytes(open) - bytes(close) - bytes(notice);
@@ -135,7 +138,7 @@ function cutBlock(b: SummaryBlock, budget: number): string {
   }
   // A heading over no rows would read as an empty list, not a cut one.
   const head = b.head ?? 0;
-  if (head > 0 && count <= head) return notice;
+  if (head > 0 && count <= head) return alone;
   // A cut mid-fence would otherwise turn everything after it (the notice, a
   // closing tag, the rest of the summary) into literal code-block text.
   if (fenceOpen) kept += "```\n";

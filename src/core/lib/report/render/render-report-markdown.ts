@@ -141,6 +141,10 @@ export function renderReportBlocks(
       "> made as long as a request can be.\n\n";
   }
   blocks.push(frame(top));
+  // Each block after the first opens with a blank line, which ends the table
+  // or the </details> before it.
+  let wrote = false;
+  const gap = () => (wrote ? "\n" : "");
 
   if (report.passed.length > 0) {
     blocks.push(
@@ -152,6 +156,7 @@ export function renderReportBlocks(
         "\n",
       ),
     );
+    wrote = true;
   }
   if (isAudit) {
     // inspect saw the method and the path of every request, so its example
@@ -159,6 +164,14 @@ export function renderReportBlocks(
     // failed is kept either way: nothing refused it and the next run asks for
     // it again, so leaving it out would write rules that break that run.
     // Whole or not at all: a cut example would read as a complete allowlist.
+    const example =
+      report.engine === "inspect"
+        ? buildInspectRestrictExample(report.timeline, actionRepo, actionRef, {
+            ...step,
+            allowedIpRules: report.parameters.allowedIpRules,
+            allowedTlsRules: report.parameters.allowedTlsRules,
+          })
+        : buildRestrictExample([...report.passed, ...report.failed], actionRepo, actionRef, step);
     blocks.push({
       id: TRAFFIC_BLOCK.example,
       priority: priorities[TRAFFIC_BLOCK.example],
@@ -167,15 +180,9 @@ export function renderReportBlocks(
       // them, so its notice must not silence theirs.
       section: `${SECTION}-example`,
       cut: "atomic",
-      text:
-        report.engine === "inspect"
-          ? buildInspectRestrictExample(report.timeline, actionRepo, actionRef, {
-              ...step,
-              allowedIpRules: report.parameters.allowedIpRules,
-              allowedTlsRules: report.parameters.allowedTlsRules,
-            })
-          : buildRestrictExample([...report.passed, ...report.failed], actionRepo, actionRef, step),
+      text: example,
     });
+    wrote ||= example !== "";
   }
   if (report.blocked.length > 0) {
     // A folded row names its rule; the hosts it stands for are in the
@@ -185,15 +192,16 @@ export function renderReportBlocks(
       tableBlock(
         TRAFFIC_BLOCK.blocked,
         priorities[TRAFFIC_BLOCK.blocked],
-        `${report.passed.length > 0 ? "\n" : ""}### 🚫 Blocked Hosts\n\n`,
+        `${gap()}### 🚫 Blocked Hosts\n\n`,
         renderHostTable(blocked, { showReason: true, showExpected }),
         "\n",
       ),
     );
+    wrote = true;
   }
   const wouldRefuse = renderWouldRefuseBody(report.timeline, report.startedAt);
   if (wouldRefuse) {
-    const before = `${report.passed.length > 0 || report.blocked.length > 0 ? "\n" : ""}### 🚨 Restrict Would Refuse\n\n`;
+    const before = `${gap()}### 🚨 Restrict Would Refuse\n\n`;
     // Cut row by row like a table, whose head here is the heading and opening fence.
     blocks.push({
       id: TRAFFIC_BLOCK.wouldRefuse,
@@ -204,15 +212,15 @@ export function renderReportBlocks(
       cut: "lines",
       head: before.split("\n").length,
     });
+    wrote = true;
   }
   if (report.failed.length > 0) {
-    const gap = report.passed.length > 0 || report.blocked.length > 0 || wouldRefuse ? "\n" : "";
     // The note follows the rows, so a cut table drops it with them.
     blocks.push(
       tableBlock(
         TRAFFIC_BLOCK.failed,
         priorities[TRAFFIC_BLOCK.failed],
-        `${gap}### ⚠️ Failed Connections\n\n`,
+        `${gap()}### ⚠️ Failed Connections\n\n`,
         renderHostTable(report.failed, { showReason: true }),
         "\n\n<sub>*Note: no rule refused these; the connection itself did not complete, so no rule " +
           "can change the outcome and none of them fails the step.*</sub>\n",

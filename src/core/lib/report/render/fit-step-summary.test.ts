@@ -216,6 +216,18 @@ describe("fitStepSummary: priorities, levels and sections", () => {
     );
   });
 
+  it("keeps the blank line a block opens with when only its notice is left", () => {
+    const opened = (b: SummaryBlock): SummaryBlock => ({ ...b, text: `\n${b.text}` });
+    const t = { ...opened(table(3)), head: 5 };
+    expect(
+      fitStepSummary([frame("x".repeat(SMALL_LIMIT)), t], { limitBytes: SMALL_LIMIT }),
+    ).toMatch(/x\n_cut a_\n$/);
+    const example = opened({ ...log(500), cut: "atomic", notice: "_example cut_\n" });
+    expect(fitStepSummary([frame("# T\n"), example], { limitBytes: SMALL_LIMIT })).toBe(
+      "# T\n\n_example cut_\n",
+    );
+  });
+
   it("prints a cut block with no notice of its own as just what fits", () => {
     const out = fitStepSummary([{ ...log(500), notice: undefined }], { limitBytes: SMALL_LIMIT });
     expect(out.endsWith("```\n")).toBe(true);
