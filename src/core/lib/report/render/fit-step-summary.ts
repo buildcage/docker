@@ -117,7 +117,7 @@ function cutBlock(b: SummaryBlock, budget: number): string {
   const notice = b.notice ?? "";
   // A notice alone keeps the block's opening blank line, which ends the table
   // or </details> above it.
-  const alone = (/^\n*/.exec(b.text)?.[0] ?? "") + notice;
+  const alone = (b.text.startsWith("\n") ? "\n" : "") + notice;
   if (b.cut === "atomic") return alone;
   const open = b.open ?? "";
   const close = b.close ?? "";

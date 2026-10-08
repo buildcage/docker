@@ -239,7 +239,7 @@ export function renderReportBlocks(
     // footer, indistinguishable from a report that failed to generate. A run
     // that only looked names up has empty tables but a non-empty timeline, so
     // its discovery lookups still show in Communication details below.
-    blocks.push(frame("_(no communication)_\n\n"));
+    blocks.push(frame(`${gap()}_(no communication)_\n\n`));
   }
 
   const details = renderInspectDetailsBody(report.timeline, report.startedAt);

@@ -185,6 +185,18 @@ describe("renderReportBlocks under a limit", () => {
         }),
       ),
     ).toContain("</details>\n\n### 🚫 Blocked Hosts");
+    expect(fit(report({ parameters: audit, failed: rows("down", 1, "conn-reset") }))).toContain(
+      "</details>\n\n### ⚠️ Failed Connections",
+    );
+    // A TLS rule alone writes an example for a run that reached nothing.
+    expect(
+      fit({
+        ...report({
+          parameters: reportParams({ mode: "audit", allowedTlsRules: ["example.com"] }),
+        }),
+        engine: "inspect",
+      }),
+    ).toContain("</details>\n\n_(no communication)_");
     // The would-refuse list takes the room first, so the blocked table after
     // the example is left with only its notice.
     const timeline: TrafficEvent[] = [
