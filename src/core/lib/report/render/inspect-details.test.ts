@@ -502,6 +502,27 @@ describe("renderInspectDetails credential parameters", () => {
     );
   });
 
+  it("matches a name split by dots or sent as an array", () => {
+    expect(subjectOf("https://h/v1?api.key=a&token[]=b&token[0]=c&Token[a][b]=d")).toBe(
+      "GET https://h/v1?api.key=***&token[]=***&token[0]=***&Token[a][b]=***",
+    );
+  });
+
+  it("matches a name ending in a bracket that closes nothing as it is", () => {
+    expect(subjectOf("https://h/v1?token]=a")).toBe("GET https://h/v1?token]=a");
+  });
+
+  it("reads a long run of unclosed brackets in one pass", () => {
+    const name = "[".repeat(65536);
+    const started = performance.now();
+    expect(subjectOf(`https://h/v1?${name}=a`)).toBe(`GET https://h/v1?${name}=a`);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  it("ignores what an array name's brackets hold", () => {
+    expect(subjectOf("https://h/v1?user[password]=a")).toBe("GET https://h/v1?user[password]=a");
+  });
+
   it("matches the name however its words are joined, keeping the spelling sent", () => {
     expect(subjectOf("https://h/v1?subscription-key=a&api-key=b&client-secret=c")).toBe(
       "GET https://h/v1?subscription-key=***&api-key=***&client-secret=***",
