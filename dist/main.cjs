@@ -12377,8 +12377,9 @@ function resolverHosts(inputs) {
 //#region src/core/lib/acl/haproxy-inspect-stage.ts
 const LOG_FIELD_NAME = /^[a-z][A-Za-z0-9]*$/, LOG_FIELD_VAR = /^txn\.[a-z0-9_]+$/;
 function logFieldTokens({ name, fields }) {
+	if (!LOG_FIELD_NAME.test(name)) throw Error(`invalid log field object: ${name}`);
 	let entries = Object.entries(fields);
-	for (let [field, variable] of entries) if (!LOG_FIELD_NAME.test(name) || !LOG_FIELD_NAME.test(field) || !LOG_FIELD_VAR.test(variable)) throw Error(`invalid log field: ${name}.${field} from ${variable}`);
+	for (let [field, variable] of entries) if (!LOG_FIELD_NAME.test(field) || !LOG_FIELD_VAR.test(variable)) throw Error(`invalid log field: ${name}.${field} from ${variable}`);
 	return entries.map(([field, variable]) => ` ${name}.${field}=%[var(${variable}),regsub([^A-Za-z0-9._-],_,g)]`).join("");
 }
 function clientTlsFields(scheme) {

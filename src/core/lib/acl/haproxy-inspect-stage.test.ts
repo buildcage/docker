@@ -169,6 +169,12 @@ describe("extension", () => {
     }
   });
 
+  it("refuses an object name the log parser could not read back, even with no field", () => {
+    expect(() =>
+      plainStage(rules, "restrict", { ...EXTENSION, logFields: { name: "Example", fields: {} } }),
+    ).toThrow(/invalid log field object/);
+  });
+
   it("logs what restrict would refuse ahead of the host", () => {
     const plain = plainStage(rules, "restrict", EXTENSION);
     expect(

@@ -258,14 +258,18 @@ function hostBeforeRequest(
 /** The `<name>.<field>=<value>` tokens as objects by name, leaving out the
  *  fields logged empty and any object with none left. */
 function extensionFields(tokens: string): Record<string, Record<string, string>> | undefined {
-  let objects: Record<string, Record<string, string>> | undefined;
+  // A Map, so a name such as `constructor` reaches no prototype.
+  const objects = new Map<string, Map<string, string>>();
   for (const token of tokens.split(" ")) {
     const match = /^([^.]+)\.([^=]+)=(.*)$/.exec(token);
     if (!match || match[3] === "-") continue;
-    objects ??= {};
-    (objects[match[1]] ??= {})[match[2]] = match[3];
+    const fields = objects.get(match[1]) ?? new Map<string, string>();
+    objects.set(match[1], fields.set(match[2], match[3]));
   }
-  return objects;
+  if (objects.size === 0) return undefined;
+  return Object.fromEntries(
+    [...objects].map(([name, fields]) => [name, Object.fromEntries(fields)]),
+  );
 }
 
 /** Parse one proxy-log line, or null if it is not one of ours. */

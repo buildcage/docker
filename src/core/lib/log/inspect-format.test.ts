@@ -544,6 +544,14 @@ describe("the generated log-format and this parser describe the same line", () =
       expect("extensions" in e3).toBe(false);
     });
 
+    it("keeps a field under an object named like a prototype member to that object", async () => {
+      const line = render(https).replace(" fcerr=", " constructor.kind=x fcerr=");
+      const [e] = (await scanInspectLog([line])).events;
+      // toStrictEqual would read the `constructor` key as the object's type.
+      expect(JSON.stringify(e.extensions)).toBe('{"constructor":{"kind":"x"}}');
+      expect("kind" in Object).toBe(false);
+    });
+
     it("notes the refusal restrict would have made of a request audit let through", async () => {
       const line = render(https, {
         "%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]": "example-refusal",

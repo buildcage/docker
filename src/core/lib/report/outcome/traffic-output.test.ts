@@ -107,11 +107,17 @@ describe("buildTrafficRecords", () => {
 
   it("raises an action's own objects to the top level, never over a field of the record's own", () => {
     const [r] = buildTrafficRecords<{ example: { kind: string } }>(
-      [{ ...EVENTS[1], extensions: { example: { kind: "signed" }, host: { kind: "x" } } }],
+      [
+        {
+          ...EVENTS[1],
+          extensions: { example: { kind: "signed" }, host: { kind: "x" }, reason: { kind: "x" } },
+        },
+      ],
       t,
     );
     expect(r.example).toStrictEqual({ kind: "signed" });
     expect(r.host).toBe(EVENTS[1].host);
+    expect("reason" in r).toBe(false);
     expect("extensions" in r).toBe(false);
   });
 

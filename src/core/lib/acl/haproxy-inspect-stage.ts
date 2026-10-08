@@ -66,13 +66,10 @@ const LOG_FIELD_VAR = /^txn\.[a-z0-9_]+$/;
 
 /** One `<name>.<field>=<value>` token per field, folded to the SNI's charset. */
 function logFieldTokens({ name, fields }: InspectLogFields): string {
+  if (!LOG_FIELD_NAME.test(name)) throw new Error(`invalid log field object: ${name}`);
   const entries = Object.entries(fields);
   for (const [field, variable] of entries) {
-    if (
-      !LOG_FIELD_NAME.test(name) ||
-      !LOG_FIELD_NAME.test(field) ||
-      !LOG_FIELD_VAR.test(variable)
-    ) {
+    if (!LOG_FIELD_NAME.test(field) || !LOG_FIELD_VAR.test(variable)) {
       throw new Error(`invalid log field: ${name}.${field} from ${variable}`);
     }
   }
