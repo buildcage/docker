@@ -502,6 +502,16 @@ describe("renderInspectDetails credential parameters", () => {
     );
   });
 
+  it("matches a name split by dots or sent as an array", () => {
+    expect(subjectOf("https://h/v1?api.key=a&token[]=b&token[0]=c&Token[a][b]=d")).toBe(
+      "GET https://h/v1?api.key=***&token[]=***&token[0]=***&Token[a][b]=***",
+    );
+  });
+
+  it("ignores what an array name's brackets hold", () => {
+    expect(subjectOf("https://h/v1?user[password]=a")).toBe("GET https://h/v1?user[password]=a");
+  });
+
   it("matches the name however its words are joined, keeping the spelling sent", () => {
     expect(subjectOf("https://h/v1?subscription-key=a&api-key=b&client-secret=c")).toBe(
       "GET https://h/v1?subscription-key=***&api-key=***&client-secret=***",
