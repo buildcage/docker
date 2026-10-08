@@ -193,7 +193,26 @@ const CASES: Record<string, ReportData> = {
     blockedCount: 4,
   },
   "inspect-restrict": inspect,
-  "inspect-audit": audit(inspect),
+  // A request audit let through that restrict would refuse gets its own list.
+  "inspect-audit": {
+    ...audit(inspect),
+    timeline: [
+      ...timeline,
+      {
+        time: 1787471982,
+        action: "audit",
+        protocol: "https",
+        host: "a.example.com",
+        port: 443,
+        method: "POST",
+        url: "https://a.example.com/upload",
+        status: 200,
+        bytes: 512,
+        destination: "93.184.216.34",
+        wouldRefuse: "example-refusal",
+      },
+    ],
+  },
 };
 
 describe("renderReportMarkdown golden files", () => {

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { renderInspectDetails } from "./inspect-details.ts";
+import { renderInspectDetails, renderWouldRefuseBody } from "./inspect-details.ts";
 
 const t = 1787471975;
 const TIMELINE: TrafficEvent[] = [
@@ -44,6 +44,25 @@ const TIMELINE: TrafficEvent[] = [
   },
   { time: t + 4, action: "allow", protocol: "dns", host: "a.example.com" },
 ];
+
+describe("renderWouldRefuseBody", () => {
+  it("lists only the requests restrict would refuse, in a fenced block", () => {
+    const audited: TrafficEvent = {
+      ...TIMELINE[0],
+      action: "audit",
+      wouldRefuse: "example-refusal",
+    };
+    expect(renderWouldRefuseBody([...TIMELINE, audited], t)).toBe(
+      "```\n" +
+        "🚨 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would refuse: example-refusal)\n" +
+        "```\n",
+    );
+  });
+
+  it("is empty when restrict would refuse nothing", () => {
+    expect(renderWouldRefuseBody(TIMELINE, t)).toBe("");
+  });
+});
 
 describe("renderInspectDetails", () => {
   const md = renderInspectDetails(TIMELINE, t);

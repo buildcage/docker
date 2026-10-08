@@ -55,8 +55,8 @@ function describeWouldRefuse(report: ReportData): OutcomeEmission | undefined {
     level: "warning",
     shouldFail: false,
     message:
-      `${count} request(s) restrict mode would refuse. Communication details notes each with ` +
-      '"restrict would refuse", and marks with 🚨 the ones audit let through.',
+      `${count} request(s) restrict mode would refuse. ` +
+      "The 🚨 Restrict Would Refuse section lists each with the reason.",
   };
 }
 
