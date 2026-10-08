@@ -508,6 +508,10 @@ describe("renderInspectDetails credential parameters", () => {
     );
   });
 
+  it("matches a name ending in a bracket that closes nothing as it is", () => {
+    expect(subjectOf("https://h/v1?token]=a")).toBe("GET https://h/v1?token]=a");
+  });
+
   it("reads a long run of unclosed brackets in one pass", () => {
     const name = "[".repeat(65536);
     const started = performance.now();
