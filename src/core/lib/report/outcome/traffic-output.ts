@@ -13,19 +13,45 @@ import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
 import { formatElapsedFixed } from "../elapsed-time.ts";
 
+/** The objects an action's own check adds to a record, by name. */
+export type TrafficExtensions = Record<string, Record<string, string>>;
+
 /**
  * One event, as it appears in the JSON: the same event the report renders,
- * with the time written as text and the elapsed time alongside it. Every other
- * field is documented on TrafficEvent.
+ * with the time written as text and the elapsed time alongside it, and the
+ * objects in its `extensions` raised to the top level, typed by the action as
+ * `X`. Every other field is documented on TrafficEvent.
  */
-export type TrafficRecord = Omit<TrafficEvent, "time"> & {
+export type TrafficRecord<X extends TrafficExtensions = Record<never, never>> = Omit<
+  TrafficEvent,
+  "time" | "extensions"
+> & {
   /** ISO 8601 UTC, from the proxy's own clock. */
   time: string;
   /** Time since the proxy itself started, as formatElapsedFixed writes it.
    *  Absent when the proxy's start time could not be determined; never
    *  fabricated from something else. */
   elapsed?: string;
-};
+} & Partial<X>;
+
+// The record's own fields, set or not. An action's object never takes one of
+// these names.
+const RECORD_FIELDS: ReadonlySet<string> = new Set([
+  "time",
+  "elapsed",
+  "action",
+  "protocol",
+  "host",
+  "port",
+  "queryType",
+  "method",
+  "url",
+  "status",
+  "bytes",
+  "reason",
+  "destination",
+  "wouldRefuse",
+] satisfies (keyof TrafficRecord)[]);
 
 /**
  * Build the records for one run, oldest first.
@@ -36,10 +62,10 @@ export type TrafficRecord = Omit<TrafficEvent, "time"> & {
  * to. A field is absent when it does not apply, never zero, so filter on
  * `action`, not `status`.
  */
-export function buildTrafficRecords(
+export function buildTrafficRecords<X extends TrafficExtensions = Record<never, never>>(
   events: TrafficEvent[],
   startedAt: number | undefined,
-): TrafficRecord[] {
+): TrafficRecord<X>[] {
   return [...events]
     .sort((a, b) => a.time - b.time)
     .map((e) => {
@@ -59,12 +85,19 @@ export function buildTrafficRecords(
       if (e.reason !== undefined) record.reason = e.reason;
       if (e.destination !== undefined) record.destination = e.destination;
       if (e.wouldRefuse !== undefined) record.wouldRefuse = e.wouldRefuse;
-      return record;
+      for (const [name, fields] of Object.entries(e.extensions ?? {})) {
+        if (!RECORD_FIELDS.has(name)) Object.assign(record, { [name]: fields });
+      }
+      // Unchecked: X is what the action says its own log fields hold.
+      return record as TrafficRecord<X>;
     });
 }
 
 /** Write the same records to a file, indented, for this action to upload as
  *  an artifact (fetchable after the run, unlike a job output). */
-export function writeTrafficFile(path: string, records: TrafficRecord[]): void {
+export function writeTrafficFile<X extends TrafficExtensions>(
+  path: string,
+  records: TrafficRecord<X>[],
+): void {
   writeFileSync(path, JSON.stringify(records, null, 2) + "\n");
 }

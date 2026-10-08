@@ -1,5 +1,9 @@
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
-import { inspectStage, type InspectStageExtension } from "./haproxy-inspect-stage.ts";
+import {
+  inspectStage,
+  type InspectLogFields,
+  type InspectStageExtension,
+} from "./haproxy-inspect-stage.ts";
 import { compileRuleSet, INTERNAL_RANGES, type RuleInputs } from "./haproxy-rules.ts";
 import { buildUrlRules } from "./url-rules.ts";
 
@@ -137,6 +141,38 @@ describe("extension", () => {
     const plain = plainStage(rules);
     expect(plain.includes("extension")).toBe(false);
     expect(plain.includes("wr=")).toBe(false);
+  });
+
+  it("logs each field it names after what restrict would refuse", () => {
+    const plain = plainStage(rules, "restrict", {
+      ...EXTENSION,
+      logFields: { name: "example", fields: { kind: "txn.example_kind" } },
+    });
+    expect(
+      plain.includes(
+        "wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)] example.kind=%[var(txn.example_kind),regsub([^A-Za-z0-9._-],_,g)] host=",
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses a field name the log parser could not read back, or a variable it would have to quote", () => {
+    const invalid: InspectLogFields[] = [
+      { name: "Example", fields: { kind: "txn.example_kind" } },
+      { name: "example", fields: { "kind=x": "txn.example_kind" } },
+      { name: "example", fields: { kind: "txn.example kind" } },
+      { name: "example", fields: { kind: "req.hdr(host)" } },
+    ];
+    for (const logFields of invalid) {
+      expect(() => plainStage(rules, "restrict", { ...EXTENSION, logFields })).toThrow(
+        /invalid log field/,
+      );
+    }
+  });
+
+  it("refuses an object name the log parser could not read back, even with no field", () => {
+    expect(() =>
+      plainStage(rules, "restrict", { ...EXTENSION, logFields: { name: "Example", fields: {} } }),
+    ).toThrow(/invalid log field object/);
   });
 
   it("logs what restrict would refuse ahead of the host", () => {

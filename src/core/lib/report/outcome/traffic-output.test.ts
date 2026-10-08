@@ -105,6 +105,22 @@ describe("buildTrafficRecords", () => {
     expect("wouldRefuse" in plain).toBe(false);
   });
 
+  it("raises an action's own objects to the top level, never over a field of the record's own", () => {
+    const [r] = buildTrafficRecords<{ example: { kind: string } }>(
+      [
+        {
+          ...EVENTS[1],
+          extensions: { example: { kind: "signed" }, host: { kind: "x" }, reason: { kind: "x" } },
+        },
+      ],
+      t,
+    );
+    expect(r.example).toStrictEqual({ kind: "signed" });
+    expect(r.host).toBe(EVENTS[1].host);
+    expect("reason" in r).toBe(false);
+    expect("extensions" in r).toBe(false);
+  });
+
   it("keeps millisecond precision, not just whole seconds", () => {
     const [r] = buildTrafficRecords([{ ...EVENTS[1], time: t + 0.123 }], t);
     expect(r.time).toBe("2026-08-23T07:59:35.123Z");
