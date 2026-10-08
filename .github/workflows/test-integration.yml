@@ -72,34 +72,29 @@ jobs:
     permissions:
       contents: read
 
-    # Two targets per job where both fit in the time inspect-restrict takes
-    # alone: the org's concurrent-job limit, not any one job, sets how long a
-    # run waits. The second target reuses the first one's build cache.
+    # The targets in a job run side by side, each under its own builder,
+    # Compose project and test-net subnet (the names a linked worktree gets):
+    # the org's concurrent-job limit, not any one job, sets how long a run
+    # waits, and most of a target's time is spent waiting on the network.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - mode: universal-audit, universal-known-blocked
-            target: test_integration_buildkit_universal_audit
-            target2: test_integration_buildkit_universal_known_blocked
+          - mode: universal
+            target1: test_integration_buildkit_universal_audit
+            target2: test_integration_buildkit_universal_restrict
+            target3: test_integration_buildkit_universal_restrict_no_traffic
+            target4: test_integration_buildkit_universal_known_blocked
             test_compose_file: compose.test-universal.yaml
-          - mode: universal-restrict, universal-restrict-no-traffic
-            target: test_integration_buildkit_universal_restrict
-            target2: test_integration_buildkit_universal_restrict_no_traffic
-            test_compose_file: compose.test-universal.yaml
-          - mode: inspect-restrict
-            target: test_integration_buildkit_inspect_restrict
+          - mode: inspect-restrict, inspect-debian-audit, inspect-debian-restrict
+            target1: test_integration_buildkit_inspect_restrict
+            target2: test_integration_buildkit_inspect_debian_audit
+            target3: test_integration_buildkit_inspect_debian_restrict
             test_compose_file: compose.test-inspect.yaml
-          - mode: inspect-debian-audit, inspect-debian-restrict
-            target: test_integration_buildkit_inspect_debian_audit
-            target2: test_integration_buildkit_inspect_debian_restrict
-            test_compose_file: compose.test-inspect.yaml
-          - mode: inspect-java-audit
-            target: test_integration_buildkit_inspect_java_audit
-            test_compose_file: compose.test-inspect.yaml
-          - mode: inspect-hidden-ca, inspect-chromium-audit
-            target: test_integration_buildkit_inspect_hidden_ca
-            target2: test_integration_buildkit_inspect_chromium_audit
+          - mode: inspect-java-audit, inspect-hidden-ca, inspect-chromium-audit
+            target1: test_integration_buildkit_inspect_java_audit
+            target2: test_integration_buildkit_inspect_hidden_ca
+            target3: test_integration_buildkit_inspect_chromium_audit
             test_compose_file: compose.test-inspect.yaml
 
     name: "integration: test (${{ matrix.mode }})"
@@ -122,37 +117,46 @@ jobs:
       # These jobs test proxy enforcement, not the report action itself: only
       # test-e2e.yml's real `uses: ./report` should produce a Job Summary, so
       # the report the target runs prints to stdout instead.
-      - name: Run ${{ matrix.target }}
-        id: first
-        run: GITHUB_STEP_SUMMARY= make ${{ matrix.target }}
-
-      # The target prints the report itself before asserting; this covers a
-      # failure earlier than that, where nothing has printed the log yet.
-      - name: Show logs
-        if: failure() && steps.first.outcome == 'failure'
-        run: GITHUB_STEP_SUMMARY= make report_buildkit || true
-
-      - name: Cleanup
-        if: always()
-        env:
-          TEST_COMPOSE_FILE: ${{ matrix.test_compose_file }}
-        run: make clean_buildkit 2>/dev/null || true
-
-      # Runs even when the first target failed, so one run reports both.
-      - name: Run ${{ matrix.target2 }}
-        id: second
-        if: ${{ !cancelled() && matrix.target2 }}
-        run: GITHUB_STEP_SUMMARY= make ${{ matrix.target2 }}
-
-      - name: Show logs
-        if: failure() && steps.second.outcome == 'failure'
-        run: GITHUB_STEP_SUMMARY= make report_buildkit || true
-
-      - name: Cleanup
-        if: ${{ always() && matrix.target2 }}
-        env:
-          TEST_COMPOSE_FILE: ${{ matrix.test_compose_file }}
-        run: make clean_buildkit 2>/dev/null || true
+      - parallel:
+          - name: Run ${{ matrix.target1 }}
+            if: matrix.target1
+            env:
+              TARGET: ${{ matrix.target1 }}
+              BUILDCAGE_WORKTREE_SUFFIX: -1
+              TEST_NET_SUBNET: 10.211.0.0/24
+              TEST_COMPOSE_FILE_FOR_CLEANUP: ${{ matrix.test_compose_file }}
+            run: &run-target |
+              rc=0
+              GITHUB_STEP_SUMMARY= make "$TARGET" || rc=$?
+              # The target prints the report itself before asserting; this
+              # covers a failure earlier than that.
+              if [ "$rc" -ne 0 ]; then GITHUB_STEP_SUMMARY= make report_buildkit || true; fi
+              make clean_buildkit TEST_COMPOSE_FILE="$TEST_COMPOSE_FILE_FOR_CLEANUP" 2>/dev/null || true
+              exit "$rc"
+          - name: Run ${{ matrix.target2 }}
+            if: matrix.target2
+            env:
+              TARGET: ${{ matrix.target2 }}
+              BUILDCAGE_WORKTREE_SUFFIX: -2
+              TEST_NET_SUBNET: 10.212.0.0/24
+              TEST_COMPOSE_FILE_FOR_CLEANUP: ${{ matrix.test_compose_file }}
+            run: *run-target
+          - name: Run ${{ matrix.target3 }}
+            if: matrix.target3
+            env:
+              TARGET: ${{ matrix.target3 }}
+              BUILDCAGE_WORKTREE_SUFFIX: -3
+              TEST_NET_SUBNET: 10.213.0.0/24
+              TEST_COMPOSE_FILE_FOR_CLEANUP: ${{ matrix.test_compose_file }}
+            run: *run-target
+          - name: Run ${{ matrix.target4 }}
+            if: matrix.target4
+            env:
+              TARGET: ${{ matrix.target4 }}
+              BUILDCAGE_WORKTREE_SUFFIX: -4
+              TEST_NET_SUBNET: 10.214.0.0/24
+              TEST_COMPOSE_FILE_FOR_CLEANUP: ${{ matrix.test_compose_file }}
+            run: *run-target
 
   test_inspect_roundtrip:
     needs: changes
@@ -282,7 +286,7 @@ jobs:
         run: |
           if ! diff \
             <(make -s --eval 'print_targets: ; @printf "%s\n" $(INTEGRATION_TARGETS)' print_targets | sort) \
-            <(grep -oE '(target2?:|make) test_integration_buildkit_[a-z0-9_]+' .github/workflows/test-integration.yml | awk '{print $2}' | sort -u); then
+            <(grep -oE '(target[0-9]:|make) test_integration_buildkit_[a-z0-9_]+' .github/workflows/test-integration.yml | awk '{print $2}' | sort -u); then
             echo "::error::< lines are Makefile targets no job runs; > lines are jobs with no Makefile target."
             exit 1
           fi
