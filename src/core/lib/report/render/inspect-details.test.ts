@@ -508,6 +508,13 @@ describe("renderInspectDetails credential parameters", () => {
     );
   });
 
+  it("reads a long run of unclosed brackets in one pass", () => {
+    const name = "[".repeat(65536);
+    const started = performance.now();
+    expect(subjectOf(`https://h/v1?${name}=a`)).toBe(`GET https://h/v1?${name}=a`);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("ignores what an array name's brackets hold", () => {
     expect(subjectOf("https://h/v1?user[password]=a")).toBe("GET https://h/v1?user[password]=a");
   });

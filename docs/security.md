@@ -371,8 +371,8 @@ The value of a query parameter named `access_key`, `access_token`, `api_key`, `a
 `jwt`, `key`, `passwd`, `password`, `pat`, `private_token`, `pwd`, `refresh_token`, `secret`,
 `session`, `session_token`, `sig`, `signature`, `subscription-key`, `token`, `x-amz-security-token`,
 `x-amz-signature`, `x-api-key` or `x-goog-signature` is therefore replaced. The name is matched
-ignoring case, `-`, `_`, `.` and a trailing `[...]`, so `api_key`, `api-key`, `api.key`, `apiKey`,
-`APIKEY` and `api_key[]` are one name. What the brackets hold is not looked at, so `user[password]`
+ignoring case, `-`, `_`, `.` and any trailing `[...]`, so `api_key`, `api-key`, `api.key`, `apiKey`,
+`APIKEY` and `api_key[0][]` are one name. What the brackets hold is not looked at, so `user[password]`
 keeps its value. A parameter starts after `&`, `;` or any `?`, so one in a URL carried inside
 another's value is replaced too. The replaced value runs to the next `&`, so a `;` or `?` inside a
 secret does not leave the rest of it showing:

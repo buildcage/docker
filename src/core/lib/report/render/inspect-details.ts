@@ -100,7 +100,7 @@ function renderEvent(event: TrafficEvent, startedAt: number | undefined): string
  * everyone who can read the run, and GitHub masks only values registered as
  * workflow secrets.
  *
- * Matched on the name alone, ignoring case, `-`, `_`, `.` and a trailing
+ * Matched on the name alone, ignoring case, `-`, `_`, `.` and any trailing
  * `[...]`, so a parameter this does not name keeps its value. That covers most
  * of what a refused request was trying to send, but not an exfiltration
  * payload the sender happened to call `code` or `key`; the traffic artifact and
@@ -141,12 +141,21 @@ const CREDENTIAL_PARAMS = new Set([
   "xgoogsignature",
 ]);
 
-/** `api-key`, `api_key`, `api.key`, `apiKey`, `APIKEY` and `apikey[]` all read as one name. */
+/** `api-key`, `api_key`, `api.key`, `apiKey`, `APIKEY` and `api_key[0][]` all read as one name. */
 function credentialName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/(\[[^\]]*\])+$/, "")
-    .replace(/[-_.]/g, "");
+  return withoutIndexes(name).toLowerCase().replace(/[-_.]/g, "");
+}
+
+// A scan back from the end rather than a regex, which backtracks
+// quadratically on a long run of unclosed `[`.
+function withoutIndexes(name: string): string {
+  let end = name.length;
+  while (name[end - 1] === "]") {
+    const open = name.lastIndexOf("[", end - 1);
+    if (open < 0) break;
+    end = open;
+  }
+  return name.slice(0, end);
 }
 
 /**
