@@ -8,9 +8,6 @@ allowed_url_rules: |
   GET https://github.com/coredns/coredns/releases/download/**
   GET https://release-assets.githubusercontent.com/**
 
-  # HAProxy source tarball for the inspect image
-  GET https://www.haproxy.org/download/**
-
   # Node.js runtime for the QuickJS scripts build stage
   GET https://nodejs.org/download/release/**
 
