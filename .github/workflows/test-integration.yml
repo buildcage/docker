@@ -74,7 +74,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - mode: universal
+          - mode: universal, listener scope
             target1: test_integration_buildkit_universal_audit
             target2: test_integration_buildkit_universal_restrict
             target3: test_integration_buildkit_universal_restrict_no_traffic
@@ -198,10 +198,9 @@ jobs:
           fi
 
   # Single, stably-named required status check for branch protection: the
-  # `test` job's own name varies per matrix entry (test (universal-audit),
-  # test (inspect-restrict), etc.), so branch protection can't target it
-  # directly without listing every combination and having to update that list
-  # whenever the matrix changes.
+  # `test` job's own name lists the targets of its matrix entry, so branch
+  # protection can't target it without listing every entry and updating that
+  # list whenever the matrix changes.
   integration-tests-passed:
     name: Integration tests passed
     runs-on: ubuntu-latest
