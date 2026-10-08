@@ -17,6 +17,7 @@
           proxy_mode: restrict
           allowed_url_rules: |
             GET https://a.example.com/pkg.json
+            POST https://a.example.com/upload
 ```
 
 <sub>*Permits exactly what this build did; a versioned or dated URL may drift.*</sub>
@@ -28,6 +29,12 @@
 | Host | Rule | Reason | Count |
 | --- | --- | --- | ---: |
 | bad.example.com:443 | HTTPS | https-not-allowed | 2 |
+
+### 🚨 Restrict Would Refuse
+
+```
+🚨 00:12.000: POST https://a.example.com/upload -> 200 (512B) (restrict would refuse: example-refusal)
+```
 
 ### ⚠️ Failed Connections
 
@@ -46,6 +53,7 @@
 🚫 00:08.000: DNS A unresolvable.example.net -> dns-not-allowed
 ⚠️ 00:09.123: HTTPS untrusted-ca.example.com:443 -> client-aborted
 ⚠️ 00:11.000: GET https://a.example.com/pkg.json -> origin-aborted
+🚨 00:12.000: POST https://a.example.com/upload -> 200 (512B) (restrict would refuse: example-refusal)
 ```
 
 </details>

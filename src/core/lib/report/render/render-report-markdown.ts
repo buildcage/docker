@@ -8,7 +8,11 @@ import {
 import { joinSummaryBlocks, type SummaryBlock } from "./fit-step-summary.ts";
 import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
 import { hostTableTruncationNote, renderHostTable } from "./host-table.ts";
-import { renderInspectDetailsBody } from "./inspect-details.ts";
+import {
+  renderInspectDetailsBody,
+  renderWouldRefuseBody,
+  wouldRefuseTruncationNote,
+} from "./inspect-details.ts";
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
 import { restrictExampleTruncationNote, type ExampleStepOptions } from "./restrict-example.ts";
@@ -35,6 +39,7 @@ const SECTION = "traffic";
 /** The ids renderReportBlocks gives its blocks, for picking their notices. */
 export const TRAFFIC_BLOCK = {
   example: "traffic-example",
+  wouldRefuse: "traffic-would-refuse",
   blocked: "traffic-blocked",
   failed: "traffic-failed",
   passed: "traffic-passed",
@@ -60,6 +65,8 @@ export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): 
   switch (block.id) {
     case TRAFFIC_BLOCK.example:
       return restrictExampleTruncationNote(artifactAvailable);
+    case TRAFFIC_BLOCK.wouldRefuse:
+      return wouldRefuseTruncationNote(artifactAvailable);
     case TRAFFIC_BLOCK.log:
       return communicationTruncationNote(artifactAvailable);
     case TRAFFIC_BLOCK.blocked:
@@ -184,8 +191,22 @@ export function renderReportBlocks(
       ),
     );
   }
+  const wouldRefuse = renderWouldRefuseBody(report.timeline, report.startedAt);
+  if (wouldRefuse) {
+    const before = `${report.passed.length > 0 || report.blocked.length > 0 ? "\n" : ""}### 🚨 Restrict Would Refuse\n\n`;
+    // Cut row by row like a table, whose head here is the heading and opening fence.
+    blocks.push({
+      id: TRAFFIC_BLOCK.wouldRefuse,
+      priority: priorities[TRAFFIC_BLOCK.wouldRefuse],
+      level: 2,
+      section: SECTION,
+      text: before + wouldRefuse,
+      cut: "lines",
+      head: before.split("\n").length,
+    });
+  }
   if (report.failed.length > 0) {
-    const gap = report.passed.length > 0 || report.blocked.length > 0 ? "\n" : "";
+    const gap = report.passed.length > 0 || report.blocked.length > 0 || wouldRefuse ? "\n" : "";
     // The note follows the rows, so a cut table drops it with them.
     blocks.push(
       tableBlock(
