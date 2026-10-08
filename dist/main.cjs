@@ -12890,7 +12890,7 @@ async function runSetupStep(env, overrides = {}) {
 	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 	for (let line of applyConfigFile(env, CONFIG_FILE_INPUTS)?.summary ?? []) log(line);
 	let { proxyEngine, builderName, proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readSetupInputs();
-	log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), checkUrlAndTlsRuleSupport({
+	log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutput("builder_name", builderName), checkUrlAndTlsRuleSupport({
 		proxyEngine,
 		proxyMode,
 		urlRules,
@@ -12946,7 +12946,6 @@ async function runSetupStep(env, overrides = {}) {
 			composeEnv
 		});
 	}
-	setOutput("builder_name", builderName);
 }
 //#endregion
 //#region src/main.ts

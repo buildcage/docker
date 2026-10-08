@@ -166,6 +166,10 @@ export async function runSetupStep(
   // For post; see planPostCleanup. Without the runner's state file there is
   // no post step.
   if (env.GITHUB_STATE) saveState(BUILDER_NAME_STATE, builderName);
+  // The name may come from config_file, so a workflow cannot always know it
+  // for the Buildx endpoint without asking. Set before the builder starts so a
+  // step that runs after a failed setup still gets it.
+  setOutput("builder_name", builderName);
 
   // Before the builder starts, so a rule the engine cannot enforce is reported
   // once, up front, rather than silently not enforced.
@@ -242,8 +246,4 @@ export async function runSetupStep(
       composeEnv,
     });
   }
-
-  // The name may come from config_file, so a workflow cannot always know it
-  // for the Buildx endpoint without asking.
-  setOutput("builder_name", builderName);
 }
