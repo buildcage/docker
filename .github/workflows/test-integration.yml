@@ -26,7 +26,6 @@ jobs:
     if: github.event_name == 'pull_request'
     outputs:
       test: ${{ steps.filter.outputs.test }}
-      test_multiarch: ${{ steps.filter.outputs.test_multiarch }}
     steps:
       - name: Filter changed paths
         id: filter
@@ -56,11 +55,6 @@ jobs:
               - 'compose.test-inspect.yaml'
               - 'test/**'
               - 'report/src/**'
-            test_multiarch:
-              - *docker
-              - *workflow
-              - 'test/Dockerfile.multiarch'
-              - 'test/assert-multiarch.sh'
 
   # Every integration target in the Makefile needs a job here; `targets` checks.
   test:
@@ -68,7 +62,7 @@ jobs:
     # !cancelled() forces this to evaluate when `changes` is skipped (it runs
     # only on pull_request); a skipped need otherwise skips the job unevaluated.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
     permissions:
       contents: read
 
@@ -80,29 +74,42 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - mode: universal
+          - mode: universal, listener scope
             target1: test_integration_buildkit_universal_audit
             target2: test_integration_buildkit_universal_restrict
             target3: test_integration_buildkit_universal_restrict_no_traffic
             target4: test_integration_buildkit_universal_known_blocked
+            # Brings a builder up with no build running and no fixture
+            # network, so its buildcage0 never exists.
+            target5: test_integration_buildkit_listener_scope
             test_compose_file: compose.test-universal.yaml
-          - mode: inspect-restrict, inspect-debian-audit, inspect-debian-restrict
+          # Java and Chromium both keep the CPU busy, so they go in different jobs.
+          - mode: inspect-restrict, inspect-debian-audit, inspect-chromium-audit
             target1: test_integration_buildkit_inspect_restrict
             target2: test_integration_buildkit_inspect_debian_audit
-            target3: test_integration_buildkit_inspect_debian_restrict
+            target3: test_integration_buildkit_inspect_chromium_audit
             test_compose_file: compose.test-inspect.yaml
-          - mode: inspect-java-audit, inspect-hidden-ca, inspect-chromium-audit
+          - mode: inspect-java-audit, inspect-hidden-ca, inspect-debian-restrict
             target1: test_integration_buildkit_inspect_java_audit
             target2: test_integration_buildkit_inspect_hidden_ca
-            target3: test_integration_buildkit_inspect_chromium_audit
+            target3: test_integration_buildkit_inspect_debian_restrict
+            test_compose_file: compose.test-inspect.yaml
+          - mode: inspect round trip, inspect byte-exact, multiarch
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            # The cross-platform half of the multiarch target runs the built
+            # image, which needs the emulator registered on the runner.
+            qemu: true
+            target1: test_integration_buildkit_inspect_roundtrip
+            target2: test_integration_buildkit_inspect_byte_exact
+            target3: test_integration_buildkit_multiarch
             test_compose_file: compose.test-inspect.yaml
 
     name: "integration: test (${{ matrix.mode }})"
 
     env:
-      # The Makefile builds for the development machines' arm64; here the
-      # runner's own architecture is what these tests should exercise.
-      TEST_PLATFORM: linux/amd64
+      # The runner's own architecture is what these tests should exercise.
+      TEST_PLATFORM: ${{ matrix.platform || 'linux/amd64' }}
 
     steps:
       - name: Checkout
@@ -113,6 +120,10 @@ jobs:
       # The targets run report/src/main.ts and src/post.ts straight from
       # source, and both import @actions/core, so node_modules must exist.
       - uses: ./.github/actions/setup-vp
+
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       # These jobs test proxy enforcement, not the report action itself: only
       # test-e2e.yml's real `uses: ./report` should produce a Job Summary, so
@@ -157,119 +168,14 @@ jobs:
               TEST_NET_SUBNET: 10.214.0.0/24
               TEST_COMPOSE_FILE_FOR_CLEANUP: ${{ matrix.test_compose_file }}
             run: *run-target
-
-  test_inspect_roundtrip:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test == 'true') }}
-    runs-on: ubuntu-24.04-arm
-    permissions:
-      contents: read
-    name: "integration: test (inspect round trip)"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-vp
-
-      # Two phases, the second configured by the first, so this is one script
-      # rather than a matrix entry: the rules an audit run generates are fed
-      # straight back as restrict and must both permit what happened and
-      # refuse what did not. Phase 1 is also the suite's only build of
-      # test/Dockerfile.inspect-audit, so it carries the audit-mode
-      # assertions too.
-      - name: Assert the audit run, then enforce the rules it generated
-        run: make test_integration_buildkit_inspect_roundtrip
-
-      # The audit assertions read the proxy log without printing it, so this is
-      # the only place a failure in them shows what the build actually did.
-      - name: Show logs
-        if: failure()
-        run: GITHUB_STEP_SUMMARY= make report_buildkit || true
-
-      - name: Cleanup
-        if: always()
-        env:
-          TEST_COMPOSE_FILE: compose.test-inspect.yaml
-        run: make clean_buildkit 2>/dev/null || true
-
-  test_inspect_byte_exact:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test == 'true') }}
-    runs-on: ubuntu-24.04-arm
-    permissions:
-      contents: read
-    name: "integration: test (inspect byte-exact)"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-vp
-
-      # Brings up inspect, then universal, one after the other (both use the
-      # same builder name), so this is one script rather than a matrix entry.
-      - name: Compare inspect and universal layer-for-layer
-        run: make test_integration_buildkit_inspect_byte_exact
-
-      - name: Cleanup
-        if: always()
-        env:
-          TEST_COMPOSE_FILE: compose.test-inspect.yaml
-        run: |
-          make clean_buildkit 2>/dev/null || true
-          rm -f /tmp/buildcage-byte-exact-inspect.tar /tmp/buildcage-byte-exact-universal.tar
-
-  # Separate job from the others: brings the builder up on its own, with no
-  # build running and no fixture network, so buildcage0 never exists, proving
-  # :10024/:53 stay unreachable from anywhere else rather than merely reachable
-  # from the one interface the jobs above exercise.
-  test_listener_scope:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test == 'true') }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    name: "integration: test (listener scope, both engines)"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Run listener-scope integration tests
-        run: make test_integration_buildkit_listener_scope
-
-  test_multiarch:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test_multiarch == 'true') }}
-    runs-on: ubuntu-24.04-arm
-    permissions:
-      contents: read
-    name: "integration: test (multiarch)"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # The cross-platform half of the target runs the built image, which
-      # needs the emulator registered on the runner.
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-
-      - name: Build for the default and the other platform
-        run: make test_integration_buildkit_multiarch
-
-      - name: Cleanup
-        if: always()
-        run: make clean_buildkit 2>/dev/null || true
+          - name: Run ${{ matrix.target5 }}
+            if: matrix.target5
+            env:
+              TARGET: ${{ matrix.target5 }}
+              BUILDCAGE_WORKTREE_SUFFIX: -5
+              TEST_NET_SUBNET: 10.215.0.0/24
+              TEST_COMPOSE_FILE_FOR_CLEANUP: ${{ matrix.test_compose_file }}
+            run: *run-target
 
   targets:
     runs-on: ubuntu-slim
@@ -292,23 +198,13 @@ jobs:
           fi
 
   # Single, stably-named required status check for branch protection: the
-  # `test` job's own name varies per matrix entry (test (universal-audit),
-  # test (inspect-restrict), etc.), so branch protection can't target it
-  # directly without listing every combination and having to update that list
-  # whenever the matrix changes.
+  # `test` job's own name lists the targets of its matrix entry, so branch
+  # protection can't target it without listing every entry and updating that
+  # list whenever the matrix changes.
   integration-tests-passed:
     name: Integration tests passed
     runs-on: ubuntu-latest
-    needs:
-      [
-        changes,
-        targets,
-        test,
-        test_inspect_roundtrip,
-        test_inspect_byte_exact,
-        test_listener_scope,
-        test_multiarch,
-      ]
+    needs: [changes, targets, test]
     if: always()
     permissions: {}
     steps:
