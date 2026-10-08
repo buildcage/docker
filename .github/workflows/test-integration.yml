@@ -83,15 +83,16 @@ jobs:
             # network, so its buildcage0 never exists.
             target5: test_integration_buildkit_listener_scope
             test_compose_file: compose.test-universal.yaml
-          - mode: inspect-restrict, inspect-debian-audit, inspect-debian-restrict
+          # Java and Chromium both keep the CPU busy, so they go in different jobs.
+          - mode: inspect-restrict, inspect-debian-audit, inspect-chromium-audit
             target1: test_integration_buildkit_inspect_restrict
             target2: test_integration_buildkit_inspect_debian_audit
-            target3: test_integration_buildkit_inspect_debian_restrict
+            target3: test_integration_buildkit_inspect_chromium_audit
             test_compose_file: compose.test-inspect.yaml
-          - mode: inspect-java-audit, inspect-hidden-ca, inspect-chromium-audit
+          - mode: inspect-java-audit, inspect-hidden-ca, inspect-debian-restrict
             target1: test_integration_buildkit_inspect_java_audit
             target2: test_integration_buildkit_inspect_hidden_ca
-            target3: test_integration_buildkit_inspect_chromium_audit
+            target3: test_integration_buildkit_inspect_debian_restrict
             test_compose_file: compose.test-inspect.yaml
           - mode: inspect round trip, inspect byte-exact, multiarch
             runner: ubuntu-24.04-arm
