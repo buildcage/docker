@@ -30,7 +30,7 @@ export interface PostCleanupSources {
  * The input is the fallback for a setup that saved nothing, but not with
  * config_file: the name may be in the file, so the input's could be another
  * job's builder, and a setup that stopped before saving started nothing. Nor
- * when the input is invalid: setup refused it before starting anything.
+ * with an invalid name, which setup refused before starting anything.
  *
  * `projectNameOverride` is gated to this repo's own CI/dev testing by the
  * caller, which is where that gate stays visible.

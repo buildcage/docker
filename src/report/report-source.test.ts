@@ -32,8 +32,6 @@ describe("resolveBuilderName", () => {
     expect(resolveBuilderName(name)).toBe(name);
   });
 
-  // The setup action sets the name as an output, which a workflow may paste
-  // into a run: script.
   it.each(["a", "-ab", ".ab", "a b", "a;b", "$(id)", "a\nb", "ab\n"])("refuses %o", (name) => {
     expect(() => resolveBuilderName(name)).toThrow(
       expect.objectContaining({ name: InvalidInputError.name, code: "INVALID_BUILDER_NAME" }),
