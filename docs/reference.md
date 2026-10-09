@@ -22,13 +22,13 @@ and links here for the details.
 
 `buildcage/docker` starts the builder. Every input is optional.
 
-| Input                | Default     | Description                                                                                                                     |
-| -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `config_file`        | empty       | A YAML file, relative to the workspace, that sets the other inputs. See [Config file](#config-file).                            |
-| `builder_name`       | `buildcage` | Name of the builder container. The Buildx `endpoint` has to match it; see [outputs](#setup-action-outputs).                     |
-| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                 |
-| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                  |
-| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA or its NSS slot left in the image into a warning. See [CA residue](#ca-residue). |
+| Input                | Default     | Description                                                                                                                                                                     |
+| -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config_file`        | empty       | A YAML file, relative to the workspace, that sets the other inputs. See [Config file](#config-file).                                                                            |
+| `builder_name`       | `buildcage` | Name of the builder container: letters, digits, `_`, `.` and `-`, starting with a letter or digit. The Buildx `endpoint` has to match it; see [outputs](#setup-action-outputs). |
+| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                                                                 |
+| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                                                                  |
+| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA or its NSS slot left in the image into a warning. See [CA residue](#ca-residue).                                                 |
 
 `fail_on_ca_residue` takes `true` or `false`. Any other value fails the step before the builder
 starts.

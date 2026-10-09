@@ -15115,7 +15115,11 @@ var ExitCode, init_core = __esmMin((() => {
 //#endregion
 //#region src/core/lib/actions/inputs.ts
 init_core();
-var InvalidInputError = class extends ActionError {};
+var InvalidInputError = class extends ActionError {
+	constructor(message, code) {
+		super(message, code);
+	}
+};
 function readBooleanInput(name, fallback, getInput) {
 	let value = getInput(name);
 	if (value === "") return fallback;
@@ -15278,6 +15282,12 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 }
 //#endregion
 //#region src/report/report-source.ts
+const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
+function resolveBuilderName(value) {
+	if (value === "") return "buildcage";
+	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder_name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
+	return value;
+}
 const LIST_INPUTS = [
 	"allowed_https_rules",
 	"allowed_http_rules",
@@ -15375,7 +15385,7 @@ function findReportSourceContainer(docker, projectName, builderName) {
 //#region report/src/lib/inputs.ts
 init_core();
 function readBuilderName(getInput$2 = getInput) {
-	return getInput$2("builder_name") || "buildcage";
+	return resolveBuilderName(getInput$2("builder_name"));
 }
 function checkFailOnBlocked(getInput$1 = getInput) {
 	readBooleanInput("fail_on_blocked", !0, getInput$1);

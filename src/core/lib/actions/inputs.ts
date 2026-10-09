@@ -2,13 +2,24 @@ import * as core from "@actions/core";
 
 import { ActionError } from "#core/lib/errors.ts";
 
-/** An input whose value is malformed, or names something the step cannot do. */
-export class InvalidInputError extends ActionError<
+type InvalidInputCode =
   | "INVALID_BOOLEAN_INPUT"
   | "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS"
   | "INVALID_PROXY_MODE"
-  | "INVALID_PROXY_ENGINE"
-> {}
+  | "INVALID_PROXY_ENGINE";
+
+/**
+ * An input whose value is malformed, or names something the step cannot do.
+ * `Extra` adds codes for an input only one action has.
+ */
+export class InvalidInputError<Extra extends string = never> extends ActionError<
+  InvalidInputCode | Extra
+> {
+  // NoInfer, or a misspelled code would be inferred as an Extra.
+  constructor(message: string, code: InvalidInputCode | NoInfer<Extra>) {
+    super(message, code);
+  }
+}
 
 /** `core.getInput`, narrowed so a test can pass a plain lookup. */
 export type GetInput = (name: string) => string;

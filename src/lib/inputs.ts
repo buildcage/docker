@@ -12,7 +12,7 @@ import {
   type ProxyMode,
 } from "#core/lib/actions/inputs.ts";
 import { readRuleInputs, type RuleInputs } from "#core/lib/actions/rule-inputs.ts";
-import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
+import { resolveBuilderName } from "#report/report-source.ts";
 
 import { resolveProxyEngine } from "./engine.ts";
 
@@ -20,7 +20,7 @@ import { resolveProxyEngine } from "./engine.ts";
 export type GetInput = (name: string) => string;
 
 export function readBuilderName(getInput: GetInput = core.getInput): string {
-  return getInput("builder_name") || DEFAULT_BUILDER_NAME;
+  return resolveBuilderName(getInput("builder_name"));
 }
 
 export interface SetupInputs extends RuleInputs {

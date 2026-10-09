@@ -14,6 +14,19 @@ function inputs(values: Record<string, string> = {}): (name: string) => string {
   return (name) => values[name] ?? "";
 }
 
+describe("InvalidInputError", () => {
+  it("carries a code its type argument adds", () => {
+    const err = new InvalidInputError<"INVALID_EXTRA">("bad", "INVALID_EXTRA");
+
+    expect(err).toMatchObject({ name: InvalidInputError.name, code: "INVALID_EXTRA" });
+  });
+
+  it("refuses a code nothing declares", () => {
+    // @ts-expect-error a misspelled code is not inferred as an added one
+    expect(new InvalidInputError("bad", "INVALID_BOOLEAN").code).toBe("INVALID_BOOLEAN");
+  });
+});
+
 describe("readBooleanInput", () => {
   it.each(["true", "True", "TRUE"])("reads %o as true", (value) => {
     expect(readBooleanInput("flag", false, inputs({ flag: value }))).toBe(true);

@@ -5071,7 +5071,11 @@ function isLikelySlimRunner(_env = process.env, _exists = node_fs.existsSync) {
 }
 //#endregion
 //#region src/core/lib/actions/inputs.ts
-var InvalidInputError = class extends ActionError {};
+var InvalidInputError = class extends ActionError {
+	constructor(message, code) {
+		super(message, code);
+	}
+};
 function readBooleanInput(name, fallback, getInput) {
 	let value = getInput(name);
 	if (value === "") return fallback;
@@ -11894,6 +11898,14 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine }) 
 	}
 	return requireDigest(digest, actionRef);
 }
+//#endregion
+//#region src/report/report-source.ts
+const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
+function resolveBuilderName(value) {
+	if (value === "") return "buildcage";
+	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder_name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
+	return value;
+}
 const LIST_INPUTS = [
 	"allowed_https_rules",
 	"allowed_http_rules",
@@ -12836,7 +12848,7 @@ function resolveProxyEngine(input) {
 //#endregion
 //#region src/lib/inputs.ts
 function readBuilderName(getInput$3 = getInput) {
-	return getInput$3("builder_name") || "buildcage";
+	return resolveBuilderName(getInput$3("builder_name"));
 }
 function readSetupInputs(getInput$2 = getInput) {
 	let proxyEngine = resolveProxyEngine(getInput$2("proxy_engine")), proxyMode = resolveProxyMode(getInput$2("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$2);

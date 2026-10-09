@@ -4,6 +4,7 @@
  * directly (LABEL/COPY are static text), so keep those values in sync by hand.
  */
 import type { ConfigFileInputs } from "#core/lib/actions/config-file.ts";
+import { InvalidInputError } from "#core/lib/actions/inputs.ts";
 
 export const REPORT_SOURCE_LABEL = "io.github.buildcage.report-source";
 export const REPORT_ACTION_SCRIPT_PATH = "/opt/buildcage/scripts/report-action.js";
@@ -16,6 +17,29 @@ export const REPORT_ACTION_SCRIPT_PATH = "/opt/buildcage/scripts/report-action.j
  * for a container setup never named.
  */
 export const DEFAULT_BUILDER_NAME = "buildcage";
+
+/** Docker's own rule for a container name. */
+const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
+
+/**
+ * `builder_name`, or the default when unset. Checked before setup sets it as
+ * an output: config_file may have supplied it, and a workflow can paste the
+ * output into a `run:` script.
+ *
+ * @throws {InvalidInputError} if the name is not a valid container name
+ */
+export function resolveBuilderName(value: string): string {
+  if (value === "") return DEFAULT_BUILDER_NAME;
+  if (!BUILDER_NAME_PATTERN.test(value)) {
+    throw new InvalidInputError<"INVALID_BUILDER_NAME">(
+      `Invalid builder_name: ${JSON.stringify(value)}. ` +
+        "Must start with a letter or digit and have at least two characters, " +
+        "using only letters, digits, '_', '.' and '-'.",
+      "INVALID_BUILDER_NAME",
+    );
+  }
+  return value;
+}
 
 const LIST_INPUTS = [
   "allowed_https_rules",
