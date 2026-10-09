@@ -75,6 +75,21 @@ describe("planPostCleanup", () => {
     ).toBeUndefined();
   });
 
+  it("takes nothing down when setup refused the input's name", () => {
+    expect(
+      planPostCleanup(COMPOSE_FILE, undefined, {}, { getInput: inputs({ builder_name: "a;b" }) }),
+    ).toBeUndefined();
+  });
+
+  it("lets an unexpected error through", () => {
+    const getInput = (name: string) => {
+      if (name === "builder_name") throw new Error("boom");
+      return "";
+    };
+
+    expect(() => planPostCleanup(COMPOSE_FILE, undefined, {}, { getInput })).toThrow("boom");
+  });
+
   it("falls back to the default builder name when the input is unset", () => {
     const { env } = plan(COMPOSE_FILE, undefined, {}, { getInput: inputs() });
 

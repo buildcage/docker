@@ -3,7 +3,7 @@ import { ActionError } from "#core/lib/errors.ts";
 /**
  * Intentional error in the report action's own logic. Invalid ACL rule syntax
  * throws InvalidRulesError instead (see core/lib/acl/rules.ts); a malformed
- * boolean or retention input throws InvalidInputError (see
+ * builder_name, boolean or retention input throws InvalidInputError (see
  * core/lib/actions/inputs.ts).
  *
  * Codes:

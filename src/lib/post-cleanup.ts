@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 
+import { InvalidInputError } from "#core/lib/actions/inputs.ts";
 import { buildComposeDownArgs } from "#core/lib/docker/args.ts";
 import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
 
@@ -28,7 +29,8 @@ export interface PostCleanupSources {
  * A build cannot write GITHUB_STATE, so the saved name is the one setup used.
  * The input is the fallback for a setup that saved nothing, but not with
  * config_file: the name may be in the file, so the input's could be another
- * job's builder, and a setup that stopped before saving started nothing.
+ * job's builder, and a setup that stopped before saving started nothing. Nor
+ * with an invalid name, which setup refused before starting anything.
  *
  * `projectNameOverride` is gated to this repo's own CI/dev testing by the
  * caller, which is where that gate stays visible.
@@ -40,7 +42,15 @@ export function planPostCleanup(
   { savedBuilderName, getInput = core.getInput }: PostCleanupSources = {},
 ): PostCleanupPlan | undefined {
   if (!savedBuilderName && getInput("config_file")) return undefined;
-  const builderName = savedBuilderName || readBuilderName(getInput);
+  let builderName = savedBuilderName;
+  if (!builderName) {
+    try {
+      builderName = readBuilderName(getInput);
+    } catch (e) {
+      if (e instanceof InvalidInputError) return undefined;
+      throw e;
+    }
+  }
   const projectName = resolveProjectName(builderName, projectNameOverride);
   return {
     args: buildComposeDownArgs({ composeFile, projectName }),

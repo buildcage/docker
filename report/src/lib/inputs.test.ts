@@ -20,6 +20,12 @@ describe("readBuilderName", () => {
     expect(readBuilderName(inputs())).toBe(DEFAULT_BUILDER_NAME);
   });
 
+  it("refuses a name that is not a valid container name", () => {
+    expect(() => readBuilderName(inputs({ builder_name: "a;b" }))).toThrow(
+      'Invalid builder_name: "a;b".',
+    );
+  });
+
   it("treats an empty input as unset rather than as a builder named ''", () => {
     expect(readBuilderName(inputs({ builder_name: "" }))).toBe(DEFAULT_BUILDER_NAME);
   });

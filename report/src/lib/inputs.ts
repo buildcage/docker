@@ -11,13 +11,13 @@
 import * as core from "@actions/core";
 
 import { readBooleanInput } from "#core/lib/actions/inputs.ts";
-import { DEFAULT_BUILDER_NAME } from "#report/report-source.ts";
+import { resolveBuilderName } from "#report/report-source.ts";
 
 /** Narrowed to what this module needs, so a test can pass a plain lookup. */
 export type GetInput = (name: string) => string;
 
 export function readBuilderName(getInput: GetInput = core.getInput): string {
-  return getInput("builder_name") || DEFAULT_BUILDER_NAME;
+  return resolveBuilderName(getInput("builder_name"));
 }
 
 /** The report script in the image reads fail_on_blocked itself; this only

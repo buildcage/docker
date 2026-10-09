@@ -173,6 +173,18 @@ function getState(name) {
 	return process.env[`STATE_${name}`] || "";
 }
 //#endregion
+//#region src/core/lib/errors.ts
+var ActionError = class extends Error {
+	code;
+	constructor(message, code) {
+		super(message), this.name = new.target.name, this.code = code;
+	}
+}, InvalidInputError = class extends ActionError {
+	constructor(message, code) {
+		super(message, code);
+	}
+};
+//#endregion
 //#region src/core/lib/docker/args.ts
 function buildComposeDownArgs({ composeFile, projectName }) {
 	return [
@@ -198,13 +210,27 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[12]?[0-9])", IPV4 = `${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}`;
 RegExp(`^${OCTET}$`), RegExp(`^${IPV4}(?:/${PREFIX})?$`), RegExp(`^${IPV4}/${PREFIX}$`);
 //#endregion
+//#region src/report/report-source.ts
+const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
+function resolveBuilderName(value) {
+	if (value === "") return "buildcage";
+	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder_name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
+	return value;
+}
+//#endregion
 //#region src/lib/inputs.ts
 function readBuilderName(getInput$3 = getInput) {
-	return getInput$3("builder_name") || "buildcage";
+	return resolveBuilderName(getInput$3("builder_name"));
 }
 function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderName, getInput: getInput$1 = getInput } = {}) {
 	if (!savedBuilderName && getInput$1("config_file")) return;
-	let builderName = savedBuilderName || readBuilderName(getInput$1);
+	let builderName = savedBuilderName;
+	if (!builderName) try {
+		builderName = readBuilderName(getInput$1);
+	} catch (e) {
+		if (e instanceof InvalidInputError) return;
+		throw e;
+	}
 	return {
 		args: buildComposeDownArgs({
 			composeFile,
