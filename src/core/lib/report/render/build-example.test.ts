@@ -148,6 +148,24 @@ describe("buildRestrictExample", () => {
       ),
     );
   });
+  it("writes the caller's extra inputs after the rules", () => {
+    const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
+    expect(buildRestrictExample(rows, REPO, REF, { extraInputs: ["fail_on_blocked: false"] })).toBe(
+      restrictExampleBlock(
+        [
+          "- name: Start Buildcage",
+          `  uses: ${REPO}@${REF}`,
+          "  with:",
+          "    proxy_mode: restrict",
+          "    proxy_engine: universal",
+          "    allowed_https_rules: >-",
+          "      registry.npmjs.org:443",
+          "    fail_on_blocked: false",
+        ].join("\n") + "\n",
+      ),
+    );
+  });
+
   it("names the step as the caller asks", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
     expect(buildRestrictExample(rows, REPO, REF, { stepName: "Start isolated-run" })).toMatch(

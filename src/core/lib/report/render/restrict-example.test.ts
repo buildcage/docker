@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   exampleStepHead,
+  extraInputLines,
   restrictExampleBlock,
   restrictExampleTruncationNote,
   usesLine,
@@ -43,6 +44,15 @@ describe("exampleStepHead", () => {
     expect(exampleStepHead(REPO, "v2", { runCommand: "npm ci\nnpm test\n" })).toBe(
       `- name: Start Buildcage\n  uses: ${REPO}@v2\n  with:\n    run: |\n      npm ci\n      npm test\n`,
     );
+  });
+});
+
+describe("extraInputLines", () => {
+  it("writes each line at the input indentation, and nothing when none is given", () => {
+    expect(extraInputLines({ extraInputs: ["a: 1", "b: 2 # note"] })).toBe(
+      "    a: 1\n    b: 2 # note\n",
+    );
+    expect(extraInputLines({})).toBe("");
   });
 });
 

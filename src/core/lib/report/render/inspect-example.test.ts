@@ -399,6 +399,14 @@ describe("buildInspectRestrictExample", () => {
     expect(md.includes("          run: |\n            npm install\n")).toBe(true);
   });
 
+  it("writes the caller's extra inputs after every rule", () => {
+    const md = buildInspectRestrictExample(requests, "owner/repo", "v2", {
+      allowedIpRules: ["10.0.0.5:5432"],
+      extraInputs: ["fail_on_blocked: false"],
+    });
+    expect(md).toContain("10.0.0.5:5432\n          fail_on_blocked: false\n```");
+  });
+
   it("omits the run: block when no runCommand is given", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2");
     expect(md.includes("run: |")).toBe(false);

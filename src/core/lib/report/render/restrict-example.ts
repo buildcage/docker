@@ -27,6 +27,10 @@ export interface ExampleStepOptions {
   /** The `run:` input, for an action whose step runs the command itself: the
    *  snippet must then repeat it to stay copy-pasteable on its own. */
   runCommand?: string;
+  /** Inputs the action adds after the rules, each a whole `name: value` line:
+   *  a setting the rules cannot express, which pasting the snippet must not
+   *  drop. */
+  extraInputs?: string[];
 }
 
 /** The step's `name:`, `uses:` and `with:` lines, then `run:` when given. */
@@ -48,6 +52,11 @@ export function exampleStepHead(
     }
   }
   return yaml;
+}
+
+/** The `extraInputs` lines, at the snippet's input indentation. */
+export function extraInputLines({ extraInputs = [] }: ExampleStepOptions): string {
+  return extraInputs.map((line) => `    ${line}\n`).join("");
 }
 
 export interface RestrictExampleBlockOptions {
