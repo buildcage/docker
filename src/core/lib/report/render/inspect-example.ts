@@ -26,6 +26,7 @@ import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 import { markdownTable } from "./markdown-table.ts";
 import {
   exampleStepHead,
+  extraInputLines,
   restrictExampleBlock,
   type ExampleStepOptions,
 } from "./restrict-example.ts";
@@ -281,6 +282,7 @@ export function buildInspectRestrictExample(
     yaml += "    allowed_ip_rules: |\n";
     for (const rule of allowedIpRules) yaml += `      ${rule}\n`;
   }
+  yaml += extraInputLines(step);
 
   return restrictExampleBlock(yaml, {
     appendix: leftOut.length > 0 ? leftOutSection(leftOut) : undefined,
