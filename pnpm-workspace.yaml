@@ -1,6 +1,8 @@
 engineStrict: true
 trustPolicy: no-downgrade
 minimumReleaseAge: 20160 # 2 weeks
+minimumReleaseAgeExclude:
+  - source-map-js@1.2.2
 
 # Lets tsc/rolldown resolve these, even though they're only vite-plus's
 # transitive dependencies. chai/@vitest/expect/@types/chai are vitest's own
