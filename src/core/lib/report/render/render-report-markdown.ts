@@ -12,19 +12,30 @@ import { renderInspectDetailsBody, type RefusalLabel } from "./inspect-details.t
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
 import { restrictExampleTruncationNote, type ExampleStepOptions } from "./restrict-example.ts";
+import { renderVerdict } from "./verdict.ts";
 
 export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /** Heading text. May carry untrusted input: the heading escapes it. */
   title?: string;
   /** See RefusalLabel; applies to Communication details. */
   refusalLabel?: RefusalLabel;
+  /** See renderVerdict's `extraItems`. */
+  verdictItems?: string[];
   /**
-   * Blocks an action adds after 🚫 Blocked Hosts for a check of its own, such
-   * as the one an InspectStageExtension adds to the proxy. The first opens
-   * with `gap`, the blank line owed to a block before it. Their notices are the
+   * A heading the report's parts go under, one level below the title, for an
+   * action whose summary has other sections after this one.
+   */
+  section?: string;
+  /** False leaves the footer to an action that prints more after the report. */
+  footer?: boolean;
+  /**
+   * Blocks an action adds after the blocked and failed hosts for a check of
+   * its own, such as the one an InspectStageExtension adds to the proxy. The
+   * first opens with `gap`, the blank line owed to a block before it, and
+   * `heading` is the host tables' heading level. Their notices are the
    * caller's to pick, as for every other block.
    */
-  extraBlocks?: (gap: string) => SummaryBlock[];
+  extraBlocks?: (gap: string, heading: string) => SummaryBlock[];
 }
 
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
@@ -45,7 +56,6 @@ const SECTION = "traffic";
 export const TRAFFIC_BLOCK = {
   example: "traffic-example",
   blocked: "traffic-blocked",
-  failed: "traffic-failed",
   passed: "traffic-passed",
   log: "traffic-log",
 } as const;
@@ -72,7 +82,6 @@ export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): 
     case TRAFFIC_BLOCK.log:
       return communicationTruncationNote(artifactAvailable);
     case TRAFFIC_BLOCK.blocked:
-    case TRAFFIC_BLOCK.failed:
     case TRAFFIC_BLOCK.passed:
       return hostTableTruncationNote(artifactAvailable);
     default:
@@ -102,7 +111,8 @@ export function trafficTableBlock(
   };
 }
 
-const frame = (text: string): SummaryBlock => ({
+/** A part of the report kept whole however little room is left. */
+export const frame = (text: string): SummaryBlock => ({
   priority: 0,
   level: 1,
   section: SECTION,
@@ -124,31 +134,33 @@ export function renderReportBlocks(
   {
     title = "Outbound Traffic Report",
     refusalLabel,
+    verdictItems,
+    section,
+    footer = true,
     extraBlocks = () => [],
     ...step
   }: RenderReportMarkdownOptions = {},
 ): SummaryBlock[] {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
+  const h = section ? "####" : "###";
   const heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts";
   const blocks: SummaryBlock[] = [];
 
-  // restrict is what a real run normally uses day to day, so its heading
-  // stays bare; audit is the occasional, deliberately different mode and
-  // says so, the same way the heading below calls out "Audited" vs "Allowed".
-  // escapeCell keeps an untrusted title from injecting Markdown or a newline.
-  let top = `## ${escapeCell(title)}${isAudit ? " (audit mode)" : ""}\n\n`;
+  let top = reportHeading(title, isAudit);
+  top += renderVerdict(report, verdictItems);
 
   // The tables would otherwise read as the whole story.
   if (!report.logLooksPlausible) {
     top +=
-      "> ⚠️ **This report is incomplete**, so the tables below are not a full record of this run.\n" +
+      "> ❗ **This report is incomplete**, so the tables below are not a full record of this run.\n" +
       "> Either the logs don't begin where a real run does, one carries a line that cannot be\n" +
       "> read, or the proxy dropped lines it could not write (or could not say whether it had).\n" +
       "> A missing beginning was either removed or rotated out by traffic heavy enough to fill the\n" +
       "> 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand\n" +
       "> made as long as a request can be.\n\n";
   }
+  if (section) top += `### ${section}\n\n`;
   blocks.push(frame(top));
   // Each block after the first opens with a blank line, which ends the table
   // or the </details> before it.
@@ -160,45 +172,53 @@ export function renderReportBlocks(
       trafficTableBlock(
         TRAFFIC_BLOCK.passed,
         priorities[TRAFFIC_BLOCK.passed],
-        `### ${heading}\n\n`,
+        `${h} ${heading}\n\n`,
         renderHostTable(report.passed),
         "\n",
       ),
     );
     wrote = true;
   }
-  if (report.blocked.length > 0) {
+  if (report.blocked.length > 0 || report.failed.length > 0) {
     // A folded row names its rule; the hosts it stands for are in the
-    // Communication details section.
-    const blocked = foldExpectedBlockedRows(report.blocked);
+    // Communication details section. Unmatched refusals come first, as the
+    // rows to act on, and the ones a rule expected last.
+    const blocked = foldExpectedBlockedRows(report.blocked).map((r) => ({
+      ...r,
+      outcome: "blocked" as const,
+    }));
+    const failed = report.failed.map((r) => ({ ...r, outcome: "failed" as const }));
+    const rows = [
+      ...blocked.filter((r) => !r.expected),
+      ...failed,
+      ...blocked.filter((r) => r.expected),
+    ];
+    const tableTitle =
+      blocked.length === 0
+        ? "⚠️ Failed Hosts"
+        : failed.length === 0
+          ? "🚫 Blocked Hosts"
+          : "🚫 Blocked / ⚠️ Failed Hosts";
+    // The note follows the rows, so a cut table drops it with them.
+    const note =
+      failed.length === 0
+        ? ""
+        : "\n<sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so " +
+          "no rule can change the outcome and none of them fails the step.*</sub>\n";
     blocks.push(
       trafficTableBlock(
         TRAFFIC_BLOCK.blocked,
         priorities[TRAFFIC_BLOCK.blocked],
-        `${gap()}### 🚫 Blocked Hosts\n\n`,
-        renderHostTable(blocked, { showReason: true, showExpected }),
-        "\n",
+        `${gap()}${h} ${tableTitle}\n\n`,
+        renderHostTable(rows, { showReason: true, showExpected }),
+        `\n${note}`,
       ),
     );
     wrote = true;
   }
-  const extra = extraBlocks(gap());
+  const extra = extraBlocks(gap(), h);
   blocks.push(...extra);
   wrote ||= extra.some((b) => b.text !== "");
-  if (report.failed.length > 0) {
-    // The note follows the rows, so a cut table drops it with them.
-    blocks.push(
-      trafficTableBlock(
-        TRAFFIC_BLOCK.failed,
-        priorities[TRAFFIC_BLOCK.failed],
-        `${gap()}### ⚠️ Failed Connections\n\n`,
-        renderHostTable(report.failed, { showReason: true }),
-        "\n\n<sub>*Note: no rule refused these; the connection itself did not complete, so no rule " +
-          "can change the outcome and none of them fails the step.*</sub>\n",
-      ),
-    );
-    wrote = true;
-  }
   if (isAudit) {
     // inspect saw the method and the path of every request, so its example
     // can be that much narrower than one built from hosts alone. A host that
@@ -260,8 +280,20 @@ export function renderReportBlocks(
       "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
   }
 
-  bottom += `\n*Reported by [${actionRepo}](https://github.com/${actionRepo})*\n`;
-  bottom += "\n<hr>\n";
-  blocks.push(frame(bottom));
+  if (footer) bottom += reportFooter(actionRepo);
+  if (bottom) blocks.push(frame(bottom));
   return blocks;
+}
+
+/**
+ * restrict, the everyday mode, keeps the title bare; audit says so. escapeCell
+ * keeps an untrusted title from injecting Markdown or a newline.
+ */
+export function reportHeading(title: string, isAudit: boolean): string {
+  return `## ${escapeCell(title)}${isAudit ? " (audit mode)" : ""}\n\n`;
+}
+
+/** The line every report ends with, for an action that prints it itself. */
+export function reportFooter(actionRepo: string): string {
+  return `\n*Reported by [${actionRepo}](https://github.com/${actionRepo})*\n\n<hr>\n`;
 }

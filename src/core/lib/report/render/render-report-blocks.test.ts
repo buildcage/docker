@@ -20,7 +20,6 @@ const LIMIT = 16 * 1024;
 const PRIORITIES: TrafficPriorities = {
   [TRAFFIC_BLOCK.example]: 2,
   [TRAFFIC_BLOCK.blocked]: 4,
-  [TRAFFIC_BLOCK.failed]: 5,
   [TRAFFIC_BLOCK.passed]: 6,
   [TRAFFIC_BLOCK.log]: 7,
 };
@@ -59,7 +58,7 @@ function fit(r: ReportData): string {
 }
 
 describe("renderReportBlocks under a limit", () => {
-  it("keeps the blocked and failed tables whole and cuts the allowed one", () => {
+  it("keeps the blocked and failed table whole and cuts the allowed one", () => {
     const out = fit(
       report({
         passed: rows("ok", 2000),
@@ -180,8 +179,7 @@ describe("renderReportBlocks under a limit", () => {
     });
     const order = [
       "### 📋 Audited Hosts",
-      "### 🚫 Blocked Hosts",
-      "### ⚠️ Failed Connections",
+      "### 🚫 Blocked / ⚠️ Failed Hosts",
       "🛡️ Switch to restrict mode",
       "💬 Communication details",
     ].map((heading) => out.indexOf(heading));
@@ -211,24 +209,14 @@ describe("renderReportBlocks under a limit", () => {
         failed: rows("down", 1, "conn-reset"),
       }),
     );
-    expect(out).toContain(
-      "| bad0.example.com:443 | HTTPS | not-allowed | 1 |\n\nEXTRA\n\n### ⚠️ Failed",
-    );
-    expect(render(report({ failed: rows("down", 1, "conn-reset") }))).toContain(
-      "## Outbound Traffic Report\n\nEXTRA\n\n### ⚠️ Failed",
-    );
+    expect(out).toContain("the step.*</sub>\n\nEXTRA\n");
+    expect(render(report({}))).toContain("**✅ Nothing was refused**\n\nEXTRA\n\n_(no");
     const empty = joinSummaryBlocks(
-      renderReportBlocks(
-        report({ failed: rows("down", 1, "conn-reset") }),
-        "owner/repo",
-        "v1",
-        PRIORITIES,
-        {
-          extraBlocks: (gap) => [{ ...extra(gap)[0], text: "" }],
-        },
-      ),
+      renderReportBlocks(report({}), "owner/repo", "v1", PRIORITIES, {
+        extraBlocks: (gap) => [{ ...extra(gap)[0], text: "" }],
+      }),
     );
-    expect(empty).toContain("## Outbound Traffic Report\n\n### ⚠️ Failed");
+    expect(empty).toContain("**✅ Nothing was refused**\n\n_(no");
     expect(render(report({ passed: rows("ok", 1) }))).toContain(
       "| ok0.example.com:443 | HTTPS | 1 |\n\nEXTRA\n",
     );

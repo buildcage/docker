@@ -583,8 +583,8 @@ through.
 
 ### The ones Buildcage refused
 
-These are refusals: they are in **🚫 Blocked Hosts**, counted in the blocked-connections annotation,
-and they fail the step under `fail_on_blocked: true` like any other refused connection.
+These are refusals: they are 🚫 rows in **Blocked Hosts**, counted in the blocked-connections
+annotation, and they fail the step under `fail_on_blocked: true` like any other refused connection.
 
 ```
 🚫 00:14.002: GET http://10.0.0.9/pkg.tgz?token=*** -> missing-host-header
@@ -638,8 +638,10 @@ server to speak first (SMTP, FTP) ends as one nobody decided. No rule on the nam
 ## Connections that failed
 
 A request no rule refused can still come to nothing: the origin answers nothing usable, breaks off
-mid-transfer, or its name resolves nowhere. The report tables those apart from what the rules did
-refuse, under **⚠️ Failed Connections**. **Communication details** shows each with ⚠️ too:
+mid-transfer, or its name resolves nowhere. The report lists them as ⚠️ rows in the refusals' table,
+headed **Blocked / Failed Hosts** when it holds both and **Failed Hosts** when it holds only them.
+They come after the unexpected refusals and show `—` for Expected, since `known_blocked_rules` never
+matches a failure. **Communication details** shows each with ⚠️ too:
 
 ```
 ⚠️ 00:12.004: GET https://registry.npmjs.org/big.tgz -> origin-aborted

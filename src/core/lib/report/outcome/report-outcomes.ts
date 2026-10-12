@@ -40,6 +40,12 @@ export function describeReportOutcomes(
   return emissions;
 }
 
+/** Requests that never reached a rule, less the keepalive noise Communication details hides. */
+export function countUndecidedRequests(report: ReportData): number {
+  const isNoise = clientEndedNoise(report.timeline);
+  return report.timeline.filter((event) => event.action === "incomplete" && !isNoise(event)).length;
+}
+
 /**
  * The warning for requests that never reached a rule, or undefined when there
  * were none.
@@ -49,21 +55,15 @@ export function describeReportOutcomes(
  * never opens it would not know a request had gone nowhere.
  *
  * The wording avoids "incomplete", which the report already uses for a log
- * whose beginning is gone (see describeBlockedOutcome) and under the same ⚠️:
- * two ⚠️ warnings about different things would otherwise read as one, and
- * "this report may not be a full record" is a far bigger claim than "one
- * request went nowhere".
+ * whose beginning is gone (see describeBlockedOutcome): two warnings about
+ * different things would otherwise read as one, and "this report may not be a
+ * full record" is a far bigger claim than "one request went nowhere".
  */
 function describeUndecidedRequests(
   report: ReportData,
   engineLabel: "sandbox" | "proxy",
 ): OutcomeEmission | undefined {
-  // The keepalive noise clientEndedNoise hides from Communication details is out
-  // of the count too, so the two stay in step.
-  const isNoise = clientEndedNoise(report.timeline);
-  const count = report.timeline.filter(
-    (event) => event.action === "incomplete" && !isNoise(event),
-  ).length;
+  const count = countUndecidedRequests(report);
   if (count === 0) return undefined;
   return {
     level: "warning",
@@ -82,8 +82,8 @@ function describeUndecidedRequests(
  * The notice for connections that failed after the rules had passed on them, or
  * undefined when there were none.
  *
- * A notice where describeUndecidedRequests warns: these have a table of their
- * own, so it only has to say that the step passed although connections failed.
+ * A notice where describeUndecidedRequests warns: these are in a host table, so
+ * it only has to say that the step passed although connections failed.
  *
  * `audit` enforces nothing, so nothing there was allowed by a rule and the
  * opening says only what happened, the same distinction actionFor makes between
@@ -108,7 +108,7 @@ function describeFailedConnections(
     level: "notice",
     shouldFail: false,
     message:
-      `${opening}, listed under Failed Connections. The origin broke off, answered nothing ` +
+      `${opening}, listed with ⚠️ under Failed Hosts. The origin broke off, answered nothing ` +
       "usable, or its name resolved nowhere upstream: no rule refused them and none can change " +
       "the outcome, so none of them fails the step.",
   };

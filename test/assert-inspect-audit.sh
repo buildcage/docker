@@ -60,7 +60,7 @@ fi
 echo ""
 
 echo "[report] nothing is reported as blocked:"
-if grep -qF "### 🚫 Blocked Hosts" <<< "$REPORT_MARKDOWN"; then
+if grep -qF "### 🚫 Blocked" <<< "$REPORT_MARKDOWN"; then
   fail "audit produced a Blocked Hosts table"
 else
   pass "no Blocked Hosts table"

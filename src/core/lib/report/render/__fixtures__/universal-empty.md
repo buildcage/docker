@@ -1,5 +1,7 @@
 ## Outbound Traffic Report
 
+**✅ Nothing was refused**
+
 _(no communication)_
 
 
