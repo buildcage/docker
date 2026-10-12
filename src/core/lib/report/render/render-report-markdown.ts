@@ -31,8 +31,8 @@ export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /**
    * Blocks an action adds after the blocked and failed hosts for a check of
    * its own, such as the one an InspectStageExtension adds to the proxy. The
-   * first opens with `gap`, the blank line owed to a block before it, and each
-   * heading takes `heading`'s level, the host tables'. Their notices are the
+   * first opens with `gap`, the blank line owed to a block before it, and
+   * `heading` is the host tables' heading level. Their notices are the
    * caller's to pick, as for every other block.
    */
   extraBlocks?: (gap: string, heading: string) => SummaryBlock[];
@@ -286,10 +286,8 @@ export function renderReportBlocks(
 }
 
 /**
- * The report's title line. restrict is what a real run normally uses day to
- * day, so its heading stays bare; audit is the occasional, deliberately
- * different mode and says so. escapeCell keeps an untrusted title from
- * injecting Markdown or a newline.
+ * restrict, the everyday mode, keeps the title bare; audit says so. escapeCell
+ * keeps an untrusted title from injecting Markdown or a newline.
  */
 export function reportHeading(title: string, isAudit: boolean): string {
   return `## ${escapeCell(title)}${isAudit ? " (audit mode)" : ""}\n\n`;

@@ -2,10 +2,9 @@ import { countUndecidedRequests } from "../outcome/report-outcomes.ts";
 import type { ReportData } from "../types.ts";
 
 /**
- * The line under the report's title that says whether anything needs a look,
- * counted the way the annotations count it. `extraItems` follow the refusals,
- * for a check an action adds of its own. A log that is not a full record leads
- * and rules out ✅, as it fails the step on its own under restrict.
+ * Whether anything needs a look, counted as the annotations count it.
+ * `extraItems`, an action's own checks, follow the refusals. An incomplete log
+ * leads and rules out ✅, as it alone fails the step under restrict.
  */
 export function renderVerdict(report: ReportData, extraItems: string[] = []): string {
   let unexpected = 0;

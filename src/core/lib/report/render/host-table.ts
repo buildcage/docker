@@ -16,8 +16,8 @@ export interface HostTableRow extends AggregatedEntry {
   /** Host cell text for a row that stands for something other than one
    *  host:port, such as a folded group naming its rule. */
   display?: string;
-  /** Marks the reason of a row in the table blocked and failed rows share. A
-   *  failed row has no Expected cell, as known_blocked_rules never matches it. */
+  /** The mark on the reason. A failed row shows no Expected, as
+   *  known_blocked_rules never matches one. */
   outcome?: "blocked" | "failed";
 }
 

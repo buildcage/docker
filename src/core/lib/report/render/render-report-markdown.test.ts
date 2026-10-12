@@ -169,7 +169,6 @@ describe("renderReportMarkdown: universal", () => {
       "v1",
     );
     expect(blockedOnly).toMatch(/### 🚫 Blocked Hosts\n/);
-    // No failed row, so no note about them.
     expect(blockedOnly).not.toMatch(/none of them fails the step/);
   });
 

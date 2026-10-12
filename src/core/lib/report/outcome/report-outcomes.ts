@@ -40,11 +40,7 @@ export function describeReportOutcomes(
   return emissions;
 }
 
-/**
- * The requests that never reached a rule. The keepalive noise clientEndedNoise
- * hides from Communication details is out of the count too, so the two stay in
- * step.
- */
+/** Requests that never reached a rule, less the keepalive noise Communication details hides. */
 export function countUndecidedRequests(report: ReportData): number {
   const isNoise = clientEndedNoise(report.timeline);
   return report.timeline.filter((event) => event.action === "incomplete" && !isNoise(event)).length;
@@ -86,9 +82,8 @@ function describeUndecidedRequests(
  * The notice for connections that failed after the rules had passed on them, or
  * undefined when there were none.
  *
- * A notice where describeUndecidedRequests warns: these have ⚠️ rows in the
- * blocked hosts' table, so it only has to say that the step passed although
- * connections failed.
+ * A notice where describeUndecidedRequests warns: these are in a host table, so
+ * it only has to say that the step passed although connections failed.
  *
  * `audit` enforces nothing, so nothing there was allowed by a rule and the
  * opening says only what happened, the same distinction actionFor makes between

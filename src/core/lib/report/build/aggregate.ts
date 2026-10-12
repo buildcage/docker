@@ -213,7 +213,7 @@ export interface ReducedTimeline {
  * engines share. `discovery` and `incomplete` events reach neither table (no
  * rule decided them; the timeline still keeps them). A lookup a connection
  * already covers is dropped, and a failed connection is kept apart from
- * refusals (see TrafficAction), which the renderer marks apart in one table.
+ * refusals (see TrafficAction).
  *
  * Blocked events are kept whole rather than reduced to host rows first:
  * annotateKnownBlocked matches a URL rule against the method and path a host
