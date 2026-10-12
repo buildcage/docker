@@ -3,7 +3,7 @@ import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
 import { scanInspectLog, scanInspectDnsLog } from "#core/lib/log/inspect.ts";
 
 import type { GenReportParameters, InspectReportData } from "../types.ts";
-import { reduceTimeline } from "./aggregate.ts";
+import { assembleReportData } from "./aggregate.ts";
 
 /** Whether the resolver allows a name, by the host regexes its Corefile is
  *  generated from. Case-insensitive, like the Corefile's `(?i)`. */
@@ -33,29 +33,14 @@ export async function buildInspectReportData(
   droppedLogs: number | undefined,
 ): Promise<InspectReportData> {
   const isAudit = parameters.mode === "audit";
-  // Independent inputs (separate `docker exec` log streams, no data
-  // dependency between them), so read concurrently rather than paying their
-  // combined latency serially.
-  const [
-    { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed },
-    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed },
-  ] = await Promise.all([
-    // audit's resolver allows every name.
+  // Independent inputs (separate `docker exec` log streams, no data dependency
+  // between them), so start both scans and let assembleReportData read them
+  // concurrently. audit's resolver allows every name.
+  return assembleReportData(
+    "inspect",
     scanInspectLog(proxyLines, isAudit, isAudit ? undefined : resolverAllows(parameters)),
     scanInspectDnsLog(dnsLines, isAudit),
-  ]);
-
-  const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
-
-  return {
-    engine: "inspect",
     parameters,
-    ...reduceTimeline(timeline, parameters.knownBlockedRules),
-    // Either log losing its beginning loses evidence the other cannot vouch
-    // for, and an unreadable or dropped line is the same gap mid-log.
-    logLooksPlausible:
-      proxyHeadIntact && dnsHeadIntact && unparsed === 0 && dnsUnparsed === 0 && droppedLogs === 0,
-    startedAt,
-    timeline,
-  };
+    droppedLogs,
+  );
 }

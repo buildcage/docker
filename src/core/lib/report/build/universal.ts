@@ -2,7 +2,7 @@ import { scanHaproxyLog } from "#core/lib/log/haproxy.ts";
 import { scanInspectDnsLog } from "#core/lib/log/inspect.ts";
 
 import type { GenReportParameters, UniversalReportData } from "../types.ts";
-import { reduceTimeline } from "./aggregate.ts";
+import { assembleReportData } from "./aggregate.ts";
 
 /**
  * Build the report data from the proxy and resolver logs. Pure: the caller
@@ -21,28 +21,13 @@ export async function buildUniversalReportData(
   droppedLogs: number | undefined,
 ): Promise<UniversalReportData> {
   const isAudit = parameters.mode === "audit";
-  // Independent inputs (separate log streams, no data dependency), so read
-  // concurrently rather than paying their combined latency serially.
-  const [
-    { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed },
-    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed },
-  ] = await Promise.all([
+  // Independent inputs (separate log streams, no data dependency), so start
+  // both scans and let assembleReportData read them concurrently.
+  return assembleReportData(
+    "universal",
     scanHaproxyLog(proxyLines, isAudit),
     scanInspectDnsLog(dnsLines, isAudit),
-  ]);
-
-  const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
-
-  return {
-    engine: "universal",
     parameters,
-    ...reduceTimeline(timeline, parameters.knownBlockedRules),
-    // A decision line this cannot read, or one the proxy dropped, may well have
-    // been a refusal, and either log losing its beginning loses evidence the
-    // other cannot vouch for.
-    logLooksPlausible:
-      proxyHeadIntact && dnsHeadIntact && unparsed === 0 && dnsUnparsed === 0 && droppedLogs === 0,
-    startedAt,
-    timeline,
-  };
+    droppedLogs,
+  );
 }
