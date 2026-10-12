@@ -87,9 +87,9 @@ export function fitStepSummary(
   { usedBytes = 0, limitBytes = STEP_SUMMARY_LIMIT_BYTES }: FitStepSummaryOptions = {},
 ): string {
   const full = blocks.map(whole);
-  const all = full.join("");
+  const sizes = full.map(bytes);
   let budget = limitBytes - SAFETY_MARGIN_BYTES - usedBytes;
-  if (bytes(all) <= budget) return all;
+  if (sizes.reduce((sum, n) => sum + n, 0) <= budget) return full.join("");
 
   const out = blocks.map(() => "");
   const cutAt = new Map<string, number>(); // section -> shallowest level cut
@@ -97,14 +97,14 @@ export function fitStepSummary(
   for (const i of order) {
     const b = blocks[i];
     if ((cutAt.get(b.section) ?? Infinity) < b.level) continue;
-    const size = bytes(full[i]);
-    if (b.cut === "keep" || size <= budget) {
+    if (b.cut === "keep" || sizes[i] <= budget) {
       out[i] = full[i];
+      budget -= sizes[i];
     } else {
       out[i] = cutBlock(b, Math.max(0, budget));
+      budget -= bytes(out[i]);
       cutAt.set(b.section, Math.min(cutAt.get(b.section) ?? Infinity, b.level));
     }
-    budget -= bytes(out[i]);
   }
   return out.join("");
 }
@@ -127,7 +127,13 @@ function cutBlock(b: SummaryBlock, budget: number): string {
   let usedBytes = 0;
   let count = 0;
   let fenceOpen = false;
-  for (const line of b.text.split("\n")) {
+  // Walk one line at a time rather than splitting the whole block: a tens-of-MB
+  // communication log would otherwise array every line to keep only a few. The
+  // block always exceeds the budget, so the final piece overflows and the
+  // budget check ends the loop without an explicit end-of-text test.
+  for (let pos = 0; ;) {
+    const nl = b.text.indexOf("\n", pos);
+    const line = nl === -1 ? b.text.slice(pos) : b.text.slice(pos, nl);
     const withNewline = `${line}\n`;
     const lineBytes = bytes(withNewline);
     if (usedBytes + lineBytes > room) break;
@@ -135,6 +141,7 @@ function cutBlock(b: SummaryBlock, budget: number): string {
     usedBytes += lineBytes;
     count++;
     if (line.trim().startsWith("```")) fenceOpen = !fenceOpen;
+    pos = nl + 1;
   }
   // A heading over no rows would read as an empty list, not a cut one.
   const head = b.head ?? 0;
