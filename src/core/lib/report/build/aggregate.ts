@@ -191,23 +191,13 @@ const RULE_TYPE: Record<TrafficEvent["protocol"], string> = {
 
 /** Reduce an event to the host row a rule is written against. A dns event has
  *  no port, having connected to nothing. */
-function toHostRow(event: TrafficEvent): LogEntry {
+export function toHostRow(event: TrafficEvent): LogEntry {
   return {
     host: event.host,
     port: event.port === undefined ? "-" : String(event.port),
     ruleType: RULE_TYPE[event.protocol],
     reason: event.reason ?? "-",
   };
-}
-
-/** The host rows of the requests audit let through that restrict would
- *  refuse, by the reason restrict would give. */
-export function wouldRefuseRows(timeline: TrafficEvent[]): AggregatedEntry[] {
-  return aggregate(
-    timeline.flatMap((event) =>
-      event.wouldRefuse === undefined ? [] : [{ ...toHostRow(event), reason: event.wouldRefuse }],
-    ),
-  );
 }
 
 export interface ReducedTimeline {

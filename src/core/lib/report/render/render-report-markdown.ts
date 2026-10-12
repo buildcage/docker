@@ -1,4 +1,3 @@
-import { wouldRefuseRows } from "../build/aggregate.ts";
 import type { ReportData } from "../types.ts";
 import { buildRestrictExample } from "./build-example.ts";
 import {
@@ -9,11 +8,7 @@ import {
 import { joinSummaryBlocks, type SummaryBlock } from "./fit-step-summary.ts";
 import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
 import { hostTableTruncationNote, renderHostTable } from "./host-table.ts";
-import {
-  renderInspectDetailsBody,
-  wouldRefuseTruncationNote,
-  type RefusalLabel,
-} from "./inspect-details.ts";
+import { renderInspectDetailsBody, type RefusalLabel } from "./inspect-details.ts";
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
 import { restrictExampleTruncationNote, type ExampleStepOptions } from "./restrict-example.ts";
@@ -23,6 +18,12 @@ export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   title?: string;
   /** See RefusalLabel; applies to Communication details. */
   refusalLabel?: RefusalLabel;
+  /**
+   * Blocks an action adds after 🚫 Blocked Hosts for a check of its own, such
+   * as the one an InspectStageExtension adds to the proxy. The first opens
+   * with `gap`, the blank line owed to a block before it.
+   */
+  extraBlocks?: (gap: string) => SummaryBlock[];
 }
 
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
@@ -42,7 +43,6 @@ const SECTION = "traffic";
 /** The ids renderReportBlocks gives its blocks, for picking their notices. */
 export const TRAFFIC_BLOCK = {
   example: "traffic-example",
-  wouldRefuse: "traffic-would-refuse",
   blocked: "traffic-blocked",
   failed: "traffic-failed",
   passed: "traffic-passed",
@@ -68,8 +68,6 @@ export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): 
   switch (block.id) {
     case TRAFFIC_BLOCK.example:
       return restrictExampleTruncationNote(artifactAvailable);
-    case TRAFFIC_BLOCK.wouldRefuse:
-      return wouldRefuseTruncationNote(artifactAvailable);
     case TRAFFIC_BLOCK.log:
       return communicationTruncationNote(artifactAvailable);
     case TRAFFIC_BLOCK.blocked:
@@ -81,9 +79,11 @@ export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): 
   }
 }
 
-// A table with the text before and after it, cut row by row: its heading,
-// header row and separator stay or the whole table gives way.
-function tableBlock(
+/**
+ * A table of the traffic report with the text before and after it, cut row by
+ * row: its heading, header row and separator stay or the whole table gives way.
+ */
+export function trafficTableBlock(
   id: string,
   priority: number,
   before: string,
@@ -120,7 +120,12 @@ export function renderReportBlocks(
   actionRepo: string,
   actionRef: string,
   priorities: TrafficPriorities,
-  { title = "Outbound Traffic Report", refusalLabel, ...step }: RenderReportMarkdownOptions = {},
+  {
+    title = "Outbound Traffic Report",
+    refusalLabel,
+    extraBlocks = () => [],
+    ...step
+  }: RenderReportMarkdownOptions = {},
 ): SummaryBlock[] {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
@@ -151,7 +156,7 @@ export function renderReportBlocks(
 
   if (report.passed.length > 0) {
     blocks.push(
-      tableBlock(
+      trafficTableBlock(
         TRAFFIC_BLOCK.passed,
         priorities[TRAFFIC_BLOCK.passed],
         `### ${heading}\n\n`,
@@ -166,7 +171,7 @@ export function renderReportBlocks(
     // Communication details section.
     const blocked = foldExpectedBlockedRows(report.blocked);
     blocks.push(
-      tableBlock(
+      trafficTableBlock(
         TRAFFIC_BLOCK.blocked,
         priorities[TRAFFIC_BLOCK.blocked],
         `${gap()}### 🚫 Blocked Hosts\n\n`,
@@ -176,23 +181,13 @@ export function renderReportBlocks(
     );
     wrote = true;
   }
-  const wouldRefuse = wouldRefuseRows(report.timeline);
-  if (wouldRefuse.length > 0) {
-    blocks.push(
-      tableBlock(
-        TRAFFIC_BLOCK.wouldRefuse,
-        priorities[TRAFFIC_BLOCK.wouldRefuse],
-        `${gap()}### 🚨 Restrict Would Refuse\n\n`,
-        renderHostTable(wouldRefuse, { showReason: true }),
-        "\n",
-      ),
-    );
-    wrote = true;
-  }
+  const extra = extraBlocks(gap());
+  blocks.push(...extra);
+  wrote ||= extra.length > 0;
   if (report.failed.length > 0) {
     // The note follows the rows, so a cut table drops it with them.
     blocks.push(
-      tableBlock(
+      trafficTableBlock(
         TRAFFIC_BLOCK.failed,
         priorities[TRAFFIC_BLOCK.failed],
         `${gap()}### ⚠️ Failed Connections\n\n`,

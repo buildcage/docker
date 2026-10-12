@@ -51,14 +51,6 @@ export function renderInspectDetailsBody(
   return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
-/** What a traffic report says where the Job Summary's size limit cut its table of requests restrict would refuse. */
-export function wouldRefuseTruncationNote(artifactAvailable: boolean): string {
-  const rest = artifactAvailable
-    ? "the buildcage-traffic artifact uploaded for this run has every one"
-    : "set upload_traffic_artifact: true to get every one as a downloadable artifact";
-  return `_…truncated: the requests restrict would refuse exceeded GitHub's Job Summary size limit; ${rest}._\n\n`;
-}
-
 // ⚠️ covers both of the outcomes no rule decided that went wrong: a request
 // that never arrived whole, and a connection the origin broke. The reason
 // tells them apart. `discovery` keeps ℹ️: a lookup nothing can answer is

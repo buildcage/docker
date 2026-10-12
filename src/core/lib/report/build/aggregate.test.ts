@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { annotateKnownBlocked, wouldRefuseRows } from "./aggregate.ts";
+import { annotateKnownBlocked, toHostRow } from "./aggregate.ts";
 
 describe("annotateKnownBlocked", () => {
   const block = (overrides: Partial<TrafficEvent> = {}): TrafficEvent => ({
@@ -270,27 +270,13 @@ describe("annotateKnownBlocked", () => {
   });
 });
 
-describe("wouldRefuseRows", () => {
-  const audit = (host: string, wouldRefuse?: string): TrafficEvent => ({
-    time: 1,
-    action: "audit",
-    protocol: "https",
-    host,
-    port: 443,
-    ...(wouldRefuse === undefined ? {} : { wouldRefuse }),
-  });
-
-  it("counts the requests restrict would refuse by host and the reason it would give", () => {
+describe("toHostRow", () => {
+  it("names the rule kind that would permit the event, and no port for a lookup", () => {
     expect(
-      wouldRefuseRows([
-        audit("a.example.com", "r1"),
-        audit("b.example.com"),
-        audit("a.example.com", "r1"),
-        audit("a.example.com", "r2"),
-      ]),
-    ).toStrictEqual([
-      { host: "a.example.com", port: "443", ruleType: "HTTPS", reason: "r1", count: 2 },
-      { host: "a.example.com", port: "443", ruleType: "HTTPS", reason: "r2", count: 1 },
-    ]);
+      toHostRow({ time: 1, action: "block", protocol: "dns", host: "a.example.com", reason: "r" }),
+    ).toStrictEqual({ host: "a.example.com", port: "-", ruleType: "DNS", reason: "r" });
+    expect(
+      toHostRow({ time: 1, action: "audit", protocol: "https", host: "a.example.com", port: 443 }),
+    ).toStrictEqual({ host: "a.example.com", port: "443", ruleType: "HTTPS", reason: "-" });
   });
 });

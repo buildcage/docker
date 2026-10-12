@@ -13,12 +13,6 @@
 | --- | --- | --- | ---: |
 | bad.example.com:443 | HTTPS | https-not-allowed | 2 |
 
-### 🚨 Restrict Would Refuse
-
-| Host | Rule | Reason | Count |
-| --- | --- | --- | ---: |
-| a.example.com:443 | HTTPS | example-refusal | 1 |
-
 ### ⚠️ Failed Connections
 
 | Host | Rule | Reason | Count |

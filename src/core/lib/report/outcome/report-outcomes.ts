@@ -37,26 +37,7 @@ export function describeReportOutcomes(
   if (undecided) emissions.push(undecided);
   const failed = describeFailedConnections(report, engineLabel);
   if (failed) emissions.push(failed);
-  const wouldRefuse = describeWouldRefuse(report);
-  if (wouldRefuse) emissions.push(wouldRefuse);
   return emissions;
-}
-
-/**
- * The warning for requests audit let through that restrict would refuse, or
- * undefined when there were none. Without it a step would pass audit and fail
- * on its switch to restrict with no warning first.
- */
-function describeWouldRefuse(report: ReportData): OutcomeEmission | undefined {
-  const count = report.timeline.filter((event) => event.wouldRefuse !== undefined).length;
-  if (count === 0) return undefined;
-  return {
-    level: "warning",
-    shouldFail: false,
-    message:
-      `${count} request(s) restrict mode would refuse. ` +
-      "The 🚨 Restrict Would Refuse section lists them with the reason.",
-  };
 }
 
 /**
