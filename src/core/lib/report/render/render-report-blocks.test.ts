@@ -214,6 +214,21 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).toContain(
       "| bad0.example.com:443 | HTTPS | not-allowed | 1 |\n\nEXTRA\n\n### ⚠️ Failed",
     );
+    expect(render(report({ failed: rows("down", 1, "conn-reset") }))).toContain(
+      "## Outbound Traffic Report\n\nEXTRA\n\n### ⚠️ Failed",
+    );
+    const empty = joinSummaryBlocks(
+      renderReportBlocks(
+        report({ failed: rows("down", 1, "conn-reset") }),
+        "owner/repo",
+        "v1",
+        PRIORITIES,
+        {
+          extraBlocks: (gap) => [{ ...extra(gap)[0], text: "" }],
+        },
+      ),
+    );
+    expect(empty).toContain("## Outbound Traffic Report\n\n### ⚠️ Failed");
     expect(render(report({ passed: rows("ok", 1) }))).toContain(
       "| ok0.example.com:443 | HTTPS | 1 |\n\nEXTRA\n",
     );
