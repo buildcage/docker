@@ -54,6 +54,14 @@ describe("exampleStepTail", () => {
       "    a: 1\n    run: |\n      npm ci\n      npm test\n",
     );
   });
+
+  it("pins the block indentation with |2 when the command's first line is itself indented", () => {
+    // Plain run: | would read the indented first line as the base and leave the
+    // rest under it, which breaks the YAML.
+    expect(exampleStepTail({ runCommand: "  echo indented\necho base" })).toBe(
+      "    run: |2\n        echo indented\n      echo base\n",
+    );
+  });
 });
 
 describe("restrictExampleBlock", () => {
