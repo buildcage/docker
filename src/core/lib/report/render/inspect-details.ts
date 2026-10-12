@@ -21,9 +21,8 @@ import { wrapCommunicationDetails } from "./communication-section.ts";
 export function renderInspectDetails(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
-  refusalLabel?: RefusalLabel,
 ): string {
-  const body = renderInspectDetailsBody(timeline, startedAt, refusalLabel);
+  const body = renderInspectDetailsBody(timeline, startedAt);
   return body ? wrapCommunicationDetails(body) : "";
 }
 
@@ -76,9 +75,7 @@ function renderEvent(
   const label = (reason: string) => refusalLabel(event, reason) ?? reason;
   const note =
     event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${label(event.wouldRefuse)})`;
-  const result =
-    event.action === "block" && event.reason !== undefined ? label(event.reason) : outcome(event);
-  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${result}${note}`;
+  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}`;
 }
 
 /**
@@ -209,9 +206,10 @@ function subject(event: TrafficEvent): string {
   return `${event.method} ${redactCredentialQuery(event.url)}`;
 }
 
-/** What came of it: a refusal names its reason, anything else its result. */
-function outcome(event: TrafficEvent): string {
-  if (event.action === "block") return event.reason ?? "blocked";
+/** What came of it: a refusal names its reason, as `label` prints it, anything
+ *  else its result. */
+function outcome(event: TrafficEvent, label: (reason: string) => string): string {
+  if (event.action === "block") return event.reason === undefined ? "blocked" : label(event.reason);
   // No status behind one, and the reason tells a close from a timeout and both
   // from bytes that never parsed.
   if (event.action === "incomplete") return event.reason ?? "no request";

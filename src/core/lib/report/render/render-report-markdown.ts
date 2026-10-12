@@ -21,7 +21,8 @@ export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /**
    * Blocks an action adds after 🚫 Blocked Hosts for a check of its own, such
    * as the one an InspectStageExtension adds to the proxy. The first opens
-   * with `gap`, the blank line owed to a block before it.
+   * with `gap`, the blank line owed to a block before it. Their notices are the
+   * caller's to pick, as for every other block.
    */
   extraBlocks?: (gap: string) => SummaryBlock[];
 }
@@ -183,7 +184,7 @@ export function renderReportBlocks(
   }
   const extra = extraBlocks(gap());
   blocks.push(...extra);
-  wrote ||= extra.length > 0;
+  wrote ||= extra.some((b) => b.text !== "");
   if (report.failed.length > 0) {
     // The note follows the rows, so a cut table drops it with them.
     blocks.push(

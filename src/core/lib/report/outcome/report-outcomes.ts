@@ -13,7 +13,7 @@ export interface DescribeReportOutcomesOptions {
 /**
  * Every annotation a finished report calls for, in the order they should be
  * emitted. Both actions build their annotations from here, so neither can grow
- * one the other lacks.
+ * one the other lacks, beyond one about a check of its own.
  *
  * The blocked-connections check always speaks, if only with level "none": it is
  * the one that decides the step's outcome. Anything after it is an aside about

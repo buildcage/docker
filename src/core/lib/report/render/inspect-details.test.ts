@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { renderInspectDetails } from "./inspect-details.ts";
+import { renderInspectDetails, renderInspectDetailsBody } from "./inspect-details.ts";
 
 const t = 1787471975;
 const TIMELINE: TrafficEvent[] = [
@@ -48,7 +48,7 @@ const TIMELINE: TrafficEvent[] = [
 describe("a refusal label", () => {
   const label = (e: TrafficEvent) => (e.host === "evil.example.com" ? "labelled" : undefined);
   const lines = (timeline: TrafficEvent[]) =>
-    (renderInspectDetails(timeline, t, label).split("```")[1] ?? "").trim().split("\n");
+    (renderInspectDetailsBody(timeline, t, label).split("```")[1] ?? "").trim().split("\n");
 
   it("replaces the reason a request was refused for", () => {
     const refused = TIMELINE.find((e) => e.host === "evil.example.com" && e.action === "block");
@@ -76,7 +76,7 @@ describe("a refusal label", () => {
       wouldRefuse: "second",
     };
     const line = (
-      renderInspectDetails([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
+      renderInspectDetailsBody([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
     ).trim();
     expect(line.endsWith(" -> first! (restrict would refuse: second!)")).toBe(true);
   });
