@@ -6,25 +6,6 @@ import {
 } from "#core/lib/log/traffic-event.ts";
 
 import { formatElapsedVariable } from "../elapsed-time.ts";
-import { wrapCommunicationDetails } from "./communication-section.ts";
-
-/**
- * Render the communication detail as a collapsed markdown section, or "" if
- * empty. One timeline, allowed and refused interleaved. A name lookup is kept
- * only while it is its own sole trace, and dropped once a connection to the
- * same name shows up too. A discovery lookup is always its own sole trace,
- * since nothing connects to `_service._proto.<host>`, and so always shows.
- *
- * A URL keeps its query, except for the parameters named in
- * CREDENTIAL_PARAMS, whose values are replaced.
- */
-export function renderInspectDetails(
-  timeline: TrafficEvent[],
-  startedAt: number | undefined,
-): string {
-  const body = renderInspectDetailsBody(timeline, startedAt);
-  return body ? wrapCommunicationDetails(body) : "";
-}
 
 /**
  * What to print in place of `reason`, the one `event` was refused for or, in
@@ -33,7 +14,16 @@ export function renderInspectDetails(
  */
 export type RefusalLabel = (event: TrafficEvent, reason: string) => string | undefined;
 
-/** The section's body alone, a fenced block, or "" if nothing is shown. */
+/**
+ * The communication detail as a fenced block, or "" if nothing is shown. One
+ * timeline, allowed and refused interleaved. A name lookup is kept only while
+ * it is its own sole trace, and dropped once a connection to the same name
+ * shows up too. A discovery lookup is always its own sole trace, since nothing
+ * connects to `_service._proto.<host>`, and so always shows.
+ *
+ * A URL keeps its query, except for the parameters named in CREDENTIAL_PARAMS,
+ * whose values are replaced.
+ */
 export function renderInspectDetailsBody(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
