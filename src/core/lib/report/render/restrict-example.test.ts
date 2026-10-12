@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   exampleStepHead,
-  extraInputLines,
+  exampleStepTail,
   restrictExampleBlock,
   restrictExampleTruncationNote,
   usesLine,
@@ -39,20 +39,20 @@ describe("exampleStepHead", () => {
       `- name: Start isolated-run\n  uses: ${REPO}@v2\n  with:\n`,
     );
   });
-
-  it("repeats a run command under run: |, one line each, with no trailing blank line", () => {
-    expect(exampleStepHead(REPO, "v2", { runCommand: "npm ci\nnpm test\n" })).toBe(
-      `- name: Start Buildcage\n  uses: ${REPO}@v2\n  with:\n    run: |\n      npm ci\n      npm test\n`,
-    );
-  });
 });
 
-describe("extraInputLines", () => {
-  it("writes each line at the input indentation, and nothing when none is given", () => {
-    expect(extraInputLines({ extraInputs: ["a: 1", "b: 2 # note"] })).toBe(
+describe("exampleStepTail", () => {
+  it("writes each extra input at the input indentation, and nothing when none is given", () => {
+    expect(exampleStepTail({ extraInputs: ["a: 1", "b: 2 # note"] })).toBe(
       "    a: 1\n    b: 2 # note\n",
     );
-    expect(extraInputLines({})).toBe("");
+    expect(exampleStepTail({})).toBe("");
+  });
+
+  it("repeats a run command under run: |, after the extra inputs, with no trailing blank line", () => {
+    expect(exampleStepTail({ extraInputs: ["a: 1"], runCommand: "npm ci\nnpm test\n" })).toBe(
+      "    a: 1\n    run: |\n      npm ci\n      npm test\n",
+    );
   });
 });
 

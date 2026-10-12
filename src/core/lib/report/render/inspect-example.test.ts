@@ -392,11 +392,14 @@ describe("buildInspectRestrictExample", () => {
     expect(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/.test(md)).toBe(true);
   });
 
-  it("includes a run: block when a runCommand is given, same as build-example.ts", () => {
+  it("ends with a run: block when a runCommand is given, same as build-example.ts", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       runCommand: "npm install",
+      extraInputs: ["fail_on_blocked: false"],
     });
-    expect(md.includes("          run: |\n            npm install\n")).toBe(true);
+    expect(md).toContain(
+      "          fail_on_blocked: false\n          run: |\n            npm install\n```",
+    );
   });
 
   it("writes the caller's extra inputs after every rule", () => {
