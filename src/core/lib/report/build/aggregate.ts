@@ -11,7 +11,11 @@ import {
   type AggregatedEntry,
   type LogEntry,
 } from "#core/lib/log/aggregate.ts";
+import type { HaproxyLogScan } from "#core/lib/log/haproxy.ts";
+import type { InspectDnsLogScan, InspectLogScan } from "#core/lib/log/inspect.ts";
 import { connectedHosts, isRedundantDns, type TrafficEvent } from "#core/lib/log/traffic-event.ts";
+
+import type { GenReportParameters, ReportData } from "../types.ts";
 
 export interface AnnotatedBlockedRow extends AggregatedEntry {
   expected: boolean;
@@ -240,4 +244,40 @@ export function reduceTimeline(
     failed: aggregate(failedRows),
     blockedCount: blockedEvents.length,
   };
+}
+
+/**
+ * The report data both engines build identically from their already-started
+ * log scans: read them concurrently, merge into one timeline, reduce it, and
+ * judge whether the logs are a complete record. Only the proxy scan differs
+ * between engines (inspect decrypts, universal reads SNI/Host), so each caller
+ * passes its own and shares everything else.
+ */
+export async function assembleReportData<E extends ReportData["engine"]>(
+  engine: E,
+  proxyScan: Promise<InspectLogScan | HaproxyLogScan>,
+  dnsScan: Promise<InspectDnsLogScan>,
+  parameters: GenReportParameters,
+  droppedLogs: number | undefined,
+): Promise<Extract<ReportData, { engine: E }>> {
+  const [
+    { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed },
+    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed },
+  ] = await Promise.all([proxyScan, dnsScan]);
+
+  const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
+
+  // engine is the discriminant and the rest is the shared ReportDataCommon, so
+  // the assertion only restates the variant E already fixes.
+  return {
+    engine,
+    parameters,
+    ...reduceTimeline(timeline, parameters.knownBlockedRules),
+    // Either log losing its beginning loses evidence the other cannot vouch
+    // for, and an unreadable or dropped line is the same gap mid-log.
+    logLooksPlausible:
+      proxyHeadIntact && dnsHeadIntact && unparsed === 0 && dnsUnparsed === 0 && droppedLogs === 0,
+    startedAt,
+    timeline,
+  } as Extract<ReportData, { engine: E }>;
 }
