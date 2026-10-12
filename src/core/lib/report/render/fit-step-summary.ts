@@ -11,8 +11,10 @@
 
 export const STEP_SUMMARY_LIMIT_BYTES = 1024 * 1024;
 // Headroom for byte-counting slop and for the truncation notices themselves,
-// so appending a notice can never be what pushes the file over the edge.
-const SAFETY_MARGIN_BYTES = 8 * 1024;
+// so appending a notice can never be what pushes the file over the edge. A
+// caller fitting its own content alongside this module's output leaves the
+// same headroom.
+export const SAFETY_MARGIN_BYTES = 8 * 1024;
 
 export interface SummaryBlock {
   /** Names the block for its caller, which picks its notice by it. */
@@ -47,7 +49,8 @@ export interface SummaryBlock {
   notice?: string;
 }
 
-const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
+/** A string's length in UTF-8 bytes, the unit the limit is counted in. */
+export const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
 
 const rank = (b: SummaryBlock): number => (b.cut === "keep" ? -Infinity : b.priority);
 
