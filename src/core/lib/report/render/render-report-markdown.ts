@@ -111,8 +111,9 @@ export function trafficTableBlock(
   };
 }
 
-/** A part of the report kept whole however little room is left. */
-export const frame = (text: string): SummaryBlock => ({
+/** A traffic-section block kept whole however little room is left: the
+ *  report's own framing, or a caller's own text set around it. */
+export const trafficFrame = (text: string): SummaryBlock => ({
   priority: 0,
   level: 1,
   section: SECTION,
@@ -161,7 +162,7 @@ export function renderReportBlocks(
       "> made as long as a request can be.\n\n";
   }
   if (section) top += `### ${section}\n\n`;
-  blocks.push(frame(top));
+  blocks.push(trafficFrame(top));
   // Each block after the first opens with a blank line, which ends the table
   // or the </details> before it.
   let wrote = false;
@@ -257,7 +258,7 @@ export function renderReportBlocks(
     // footer, indistinguishable from a report that failed to generate. A run
     // that only looked names up has empty tables but a non-empty timeline, so
     // its discovery lookups still show in Communication details below.
-    blocks.push(frame(`${gap()}_(no communication)_\n\n`));
+    blocks.push(trafficFrame(`${gap()}_(no communication)_\n\n`));
   }
 
   const details = renderInspectDetailsBody(report.timeline, report.startedAt, refusalLabel);
@@ -281,7 +282,7 @@ export function renderReportBlocks(
   }
 
   if (footer) bottom += reportFooter(actionRepo);
-  if (bottom) blocks.push(frame(bottom));
+  if (bottom) blocks.push(trafficFrame(bottom));
   return blocks;
 }
 
