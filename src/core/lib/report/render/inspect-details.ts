@@ -28,11 +28,10 @@ export function renderInspectDetails(
 }
 
 /**
- * What to print for a request's refusal in place of its reason, the one it was
- * refused for or, in audit, the one restrict would refuse it for. Undefined
- * prints the reason.
+ * What to print in place of `reason`, the one `event` was refused for or, in
+ * audit, the one restrict would refuse it for. Undefined prints the reason.
  */
-export type RefusalLabel = (event: TrafficEvent) => string | undefined;
+export type RefusalLabel = (event: TrafficEvent, reason: string) => string | undefined;
 
 /** The section's body alone, a fenced block, or "" if nothing is shown. */
 export function renderInspectDetailsBody(
@@ -82,12 +81,11 @@ function renderEvent(
     event.action === "audit" && event.wouldRefuse !== undefined
       ? "🚨"
       : (MARK[event.action] ?? "✅");
-  const label = refusalLabel(event);
+  const label = (reason: string) => refusalLabel(event, reason) ?? reason;
   const note =
-    event.wouldRefuse === undefined
-      ? ""
-      : ` (restrict would refuse: ${label ?? event.wouldRefuse})`;
-  const result = event.action === "block" && label !== undefined ? label : outcome(event);
+    event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${label(event.wouldRefuse)})`;
+  const result =
+    event.action === "block" && event.reason !== undefined ? label(event.reason) : outcome(event);
   return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${result}${note}`;
 }
 

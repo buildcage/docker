@@ -68,6 +68,19 @@ describe("a refusal label", () => {
     );
   });
 
+  it("labels each reason of a request refused for one that restrict would refuse for another", () => {
+    const both: TrafficEvent = {
+      ...TIMELINE[0],
+      action: "block",
+      reason: "first",
+      wouldRefuse: "second",
+    };
+    const line = (
+      renderInspectDetails([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
+    ).trim();
+    expect(line.endsWith(" -> first! (restrict would refuse: second!)")).toBe(true);
+  });
+
   it("leaves the reason where it gives none", () => {
     const audited: TrafficEvent = {
       ...TIMELINE[0],

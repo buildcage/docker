@@ -44,9 +44,8 @@ export function describeReportOutcomes(
 
 /**
  * The warning for requests audit let through that restrict would refuse, or
- * undefined when there were none. No host table holds them, so without this a
- * step would pass audit and fail on its switch to restrict with no warning
- * first.
+ * undefined when there were none. Without it a step would pass audit and fail
+ * on its switch to restrict with no warning first.
  */
 function describeWouldRefuse(report: ReportData): OutcomeEmission | undefined {
   const count = report.timeline.filter((event) => event.wouldRefuse !== undefined).length;
