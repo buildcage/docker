@@ -232,6 +232,27 @@ describe("fitStepSummary: priorities, levels and sections", () => {
     const out = fitStepSummary([{ ...log(500), notice: undefined }], { limitBytes: SMALL_LIMIT });
     expect(out.endsWith("```\n")).toBe(true);
   });
+
+  it("reports through onCut the blocks it cut, not those it silenced or kept", () => {
+    const cut: (string | undefined)[] = [];
+    fitStepSummary(
+      [
+        { ...table(1000, "a"), id: "a-table" },
+        { ...log(1, "a"), id: "a-log" },
+        { ...frame("*footer*\n"), id: "footer" },
+      ],
+      { limitBytes: SMALL_LIMIT, onCut: (b) => cut.push(b.id) },
+    );
+    expect(cut).toContain("a-table"); // cut to fit
+    expect(cut).not.toContain("a-log"); // silenced below the cut table
+    expect(cut).not.toContain("footer"); // kept whole
+  });
+
+  it("does not call onCut when everything fits", () => {
+    const cut: (string | undefined)[] = [];
+    fitStepSummary([table(3)], { onCut: (b) => cut.push(b.id) });
+    expect(cut).toEqual([]);
+  });
 });
 
 describe("withNotices", () => {
