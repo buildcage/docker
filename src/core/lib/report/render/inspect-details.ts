@@ -21,15 +21,24 @@ import { wrapCommunicationDetails } from "./communication-section.ts";
 export function renderInspectDetails(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
+  refusalLabel?: RefusalLabel,
 ): string {
-  const body = renderInspectDetailsBody(timeline, startedAt);
+  const body = renderInspectDetailsBody(timeline, startedAt, refusalLabel);
   return body ? wrapCommunicationDetails(body) : "";
 }
+
+/**
+ * What to print for a request's refusal in place of its reason, the one it was
+ * refused for or, in audit, the one restrict would refuse it for. Undefined
+ * prints the reason.
+ */
+export type RefusalLabel = (event: TrafficEvent) => string | undefined;
 
 /** The section's body alone, a fenced block, or "" if nothing is shown. */
 export function renderInspectDetailsBody(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
+  refusalLabel: RefusalLabel = () => undefined,
 ): string {
   // The keepalive noise clientEndedNoise marks is dropped here, before
   // connectedHosts, so a hidden close cannot mask a name's other rows.
@@ -37,30 +46,10 @@ export function renderInspectDetailsBody(
   const relevant = timeline.filter((e) => !isNoise(e));
   const connected = connectedHosts(relevant);
   const shown = relevant.filter((e) => !isRedundantDns(e, connected));
-  const body = fenced(shown, startedAt);
-  return body && `${body}\n`;
-}
-
-/**
- * The requests restrict would refuse alone, a fenced block, or "" if there
- * were none. They reach no host table, so a cut communication log would
- * otherwise drop them from the summary.
- */
-export function renderWouldRefuseBody(
-  timeline: TrafficEvent[],
-  startedAt: number | undefined,
-): string {
-  return fenced(
-    timeline.filter((e) => e.wouldRefuse !== undefined),
-    startedAt,
-  );
-}
-
-// A fenced block, so URLs need no markdown escaping and stay copy-pastable.
-function fenced(events: TrafficEvent[], startedAt: number | undefined): string {
-  if (events.length === 0) return "";
-  const body = events.map((event) => renderEvent(event, startedAt)).join("\n") + "\n";
-  return `\`\`\`\n${body}\`\`\`\n`;
+  if (shown.length === 0) return "";
+  // A fenced block, so URLs need no markdown escaping and stay copy-pastable.
+  const lines = shown.map((event) => renderEvent(event, startedAt, refusalLabel));
+  return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
 /** What a traffic report says where the Job Summary's size limit cut its list of requests restrict would refuse. */
@@ -84,14 +73,22 @@ const MARK: Record<string, string> = {
   failed: "⚠️",
 };
 
-function renderEvent(event: TrafficEvent, startedAt: number | undefined): string {
+function renderEvent(
+  event: TrafficEvent,
+  startedAt: number | undefined,
+  refusalLabel: RefusalLabel,
+): string {
   const mark =
     event.action === "audit" && event.wouldRefuse !== undefined
       ? "🚨"
       : (MARK[event.action] ?? "✅");
+  const label = refusalLabel(event);
   const note =
-    event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${event.wouldRefuse})`;
-  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event)}${note}`;
+    event.wouldRefuse === undefined
+      ? ""
+      : ` (restrict would refuse: ${label ?? event.wouldRefuse})`;
+  const result = event.action === "block" && label !== undefined ? label : outcome(event);
+  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${result}${note}`;
 }
 
 /**

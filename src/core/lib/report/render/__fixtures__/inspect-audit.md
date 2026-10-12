@@ -7,6 +7,26 @@
 | a.example.com:443 | HTTPS | 3 |
 | b.example.com:80 | HTTP | 1 |
 
+### 🚫 Blocked Hosts
+
+| Host | Rule | Reason | Count |
+| --- | --- | --- | ---: |
+| bad.example.com:443 | HTTPS | https-not-allowed | 2 |
+
+### 🚨 Restrict Would Refuse
+
+| Host | Rule | Reason | Count |
+| --- | --- | --- | ---: |
+| a.example.com:443 | HTTPS | example-refusal | 1 |
+
+### ⚠️ Failed Connections
+
+| Host | Rule | Reason | Count |
+| --- | --- | --- | ---: |
+| a.example.com:443 | HTTPS | origin-aborted | 1 |
+
+<sub>*Note: no rule refused these; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+
 <details>
 <summary>🛡️ Switch to restrict mode</summary>
 
@@ -23,26 +43,6 @@
 <sub>*Permits exactly what this build did; a versioned or dated URL may drift.*</sub>
 
 </details>
-
-### 🚫 Blocked Hosts
-
-| Host | Rule | Reason | Count |
-| --- | --- | --- | ---: |
-| bad.example.com:443 | HTTPS | https-not-allowed | 2 |
-
-### 🚨 Restrict Would Refuse
-
-```
-🚨 00:12.000: POST https://a.example.com/upload -> 200 (512B) (restrict would refuse: example-refusal)
-```
-
-### ⚠️ Failed Connections
-
-| Host | Rule | Reason | Count |
-| --- | --- | --- | ---: |
-| a.example.com:443 | HTTPS | origin-aborted | 1 |
-
-<sub>*Note: no rule refused these; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
 
 <details>
 <summary>💬 Communication details</summary>

@@ -1,3 +1,4 @@
+import { wouldRefuseRows } from "../build/aggregate.ts";
 import type { ReportData } from "../types.ts";
 import { buildRestrictExample } from "./build-example.ts";
 import {
@@ -10,8 +11,8 @@ import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
 import { hostTableTruncationNote, renderHostTable } from "./host-table.ts";
 import {
   renderInspectDetailsBody,
-  renderWouldRefuseBody,
   wouldRefuseTruncationNote,
+  type RefusalLabel,
 } from "./inspect-details.ts";
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
@@ -20,6 +21,8 @@ import { restrictExampleTruncationNote, type ExampleStepOptions } from "./restri
 export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /** Heading text. May carry untrusted input: the heading escapes it. */
   title?: string;
+  /** See RefusalLabel; applies to Communication details. */
+  refusalLabel?: RefusalLabel;
 }
 
 /** Branches on `report.engine`/`report.parameters.mode` rather than being
@@ -117,7 +120,7 @@ export function renderReportBlocks(
   actionRepo: string,
   actionRef: string,
   priorities: TrafficPriorities,
-  { title = "Outbound Traffic Report", ...step }: RenderReportMarkdownOptions = {},
+  { title = "Outbound Traffic Report", refusalLabel, ...step }: RenderReportMarkdownOptions = {},
 ): SummaryBlock[] {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
@@ -158,6 +161,48 @@ export function renderReportBlocks(
     );
     wrote = true;
   }
+  if (report.blocked.length > 0) {
+    // A folded row names its rule; the hosts it stands for are in the
+    // Communication details section.
+    const blocked = foldExpectedBlockedRows(report.blocked);
+    blocks.push(
+      tableBlock(
+        TRAFFIC_BLOCK.blocked,
+        priorities[TRAFFIC_BLOCK.blocked],
+        `${gap()}### 🚫 Blocked Hosts\n\n`,
+        renderHostTable(blocked, { showReason: true, showExpected }),
+        "\n",
+      ),
+    );
+    wrote = true;
+  }
+  const wouldRefuse = wouldRefuseRows(report.timeline);
+  if (wouldRefuse.length > 0) {
+    blocks.push(
+      tableBlock(
+        TRAFFIC_BLOCK.wouldRefuse,
+        priorities[TRAFFIC_BLOCK.wouldRefuse],
+        `${gap()}### 🚨 Restrict Would Refuse\n\n`,
+        renderHostTable(wouldRefuse, { showReason: true }),
+        "\n",
+      ),
+    );
+    wrote = true;
+  }
+  if (report.failed.length > 0) {
+    // The note follows the rows, so a cut table drops it with them.
+    blocks.push(
+      tableBlock(
+        TRAFFIC_BLOCK.failed,
+        priorities[TRAFFIC_BLOCK.failed],
+        `${gap()}### ⚠️ Failed Connections\n\n`,
+        renderHostTable(report.failed, { showReason: true }),
+        "\n\n<sub>*Note: no rule refused these; the connection itself did not complete, so no rule " +
+          "can change the outcome and none of them fails the step.*</sub>\n",
+      ),
+    );
+    wrote = true;
+  }
   if (isAudit) {
     // inspect saw the method and the path of every request, so its example
     // can be that much narrower than one built from hosts alone. A host that
@@ -184,49 +229,6 @@ export function renderReportBlocks(
     });
     wrote ||= example !== "";
   }
-  if (report.blocked.length > 0) {
-    // A folded row names its rule; the hosts it stands for are in the
-    // Communication details section.
-    const blocked = foldExpectedBlockedRows(report.blocked);
-    blocks.push(
-      tableBlock(
-        TRAFFIC_BLOCK.blocked,
-        priorities[TRAFFIC_BLOCK.blocked],
-        `${gap()}### 🚫 Blocked Hosts\n\n`,
-        renderHostTable(blocked, { showReason: true, showExpected }),
-        "\n",
-      ),
-    );
-    wrote = true;
-  }
-  const wouldRefuse = renderWouldRefuseBody(report.timeline, report.startedAt);
-  if (wouldRefuse) {
-    const before = `${gap()}### 🚨 Restrict Would Refuse\n\n`;
-    // Cut row by row like a table, whose head here is the heading and opening fence.
-    blocks.push({
-      id: TRAFFIC_BLOCK.wouldRefuse,
-      priority: priorities[TRAFFIC_BLOCK.wouldRefuse],
-      level: 2,
-      section: SECTION,
-      text: before + wouldRefuse,
-      cut: "lines",
-      head: before.split("\n").length,
-    });
-    wrote = true;
-  }
-  if (report.failed.length > 0) {
-    // The note follows the rows, so a cut table drops it with them.
-    blocks.push(
-      tableBlock(
-        TRAFFIC_BLOCK.failed,
-        priorities[TRAFFIC_BLOCK.failed],
-        `${gap()}### ⚠️ Failed Connections\n\n`,
-        renderHostTable(report.failed, { showReason: true }),
-        "\n\n<sub>*Note: no rule refused these; the connection itself did not complete, so no rule " +
-          "can change the outcome and none of them fails the step.*</sub>\n",
-      ),
-    );
-  }
 
   let bottom = "";
   if (
@@ -242,7 +244,7 @@ export function renderReportBlocks(
     blocks.push(frame(`${gap()}_(no communication)_\n\n`));
   }
 
-  const details = renderInspectDetailsBody(report.timeline, report.startedAt);
+  const details = renderInspectDetailsBody(report.timeline, report.startedAt, refusalLabel);
   if (details) {
     blocks.push({
       id: TRAFFIC_BLOCK.log,

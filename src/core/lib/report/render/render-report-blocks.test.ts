@@ -152,7 +152,10 @@ describe("renderReportBlocks under a limit", () => {
     });
     expect(out).toContain(communicationTruncationNote(false));
     expect(out).toContain(
-      "### 🚨 Restrict Would Refuse\n\n```\n🚨 16:39.000: GET https://h999.example.com/ -> 200 (restrict would refuse: example-refusal)\n```\n",
+      "### 🚨 Restrict Would Refuse\n\n" +
+        "| Host | Rule | Reason | Count |\n" +
+        "| --- | --- | --- | ---: |\n" +
+        "| h999.example.com:443 | HTTPS | example-refusal | 1 |\n",
     );
   });
 
@@ -169,25 +172,27 @@ describe("renderReportBlocks under a limit", () => {
       ...report({ parameters: reportParams({ mode: "audit" }), timeline }),
       engine: "inspect",
     });
-    expect(out).toContain("h0.example.com:443 -> ");
-    expect(out).toContain("```\n\n" + wouldRefuseTruncationNote(false));
+    expect(out).toContain("| h0.example.com:443 | HTTPS | example-refusal | 1 |");
+    expect(out).not.toContain("h999.example.com");
+    expect(out).toContain(wouldRefuseTruncationNote(false));
   });
 
   it("ends the example with a blank line before whatever follows it", () => {
     const audit = reportParams({ mode: "audit" });
+    expect(fit(report({ parameters: audit, failed: rows("down", 1, "conn-reset") }))).toContain(
+      "</details>\n\n<sub>*Note: HTTP rules",
+    );
     expect(
       fit(
         report({
           parameters: audit,
-          blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
-          blockedCount: 1,
-          failed: rows("down", 1, "conn-reset"),
+          passed: rows("ok", 1),
+          timeline: [
+            { time: 0, action: "allow", protocol: "https", host: "a.example.com", port: 443 },
+          ],
         }),
       ),
-    ).toContain("</details>\n\n### 🚫 Blocked Hosts");
-    expect(fit(report({ parameters: audit, failed: rows("down", 1, "conn-reset") }))).toContain(
-      "</details>\n\n### ⚠️ Failed Connections",
-    );
+    ).toContain("</details>\n\n<details>\n<summary>💬 Communication details");
     // A TLS rule alone writes an example for a run that reached nothing.
     expect(
       fit({
@@ -197,43 +202,42 @@ describe("renderReportBlocks under a limit", () => {
         engine: "inspect",
       }),
     ).toContain("</details>\n\n_(no communication)_");
-    // The would-refuse list takes the room first, so the blocked table after
-    // the example is left with only its notice.
-    const timeline: TrafficEvent[] = [
-      {
-        time: 0,
-        action: "allow",
-        protocol: "https",
-        host: "api.example.com",
-        port: 443,
-        method: "GET",
-        url: "https://api.example.com/",
-        status: 200,
-      },
-      ...Array.from({ length: 1000 }, (_, i) => ({
-        time: 1 + i,
-        action: "audit" as const,
-        protocol: "https" as const,
-        host: `h${i}.example.com`,
-        port: 443,
-        wouldRefuse: "example-refusal",
-      })),
-    ];
+  });
+
+  it("puts the example after the tables, before the communication log", () => {
     const out = fit({
       ...report({
-        parameters: audit,
+        parameters: reportParams({ mode: "audit" }),
+        passed: rows("ok", 1),
         blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
         blockedCount: 1,
-        timeline,
+        failed: rows("down", 1, "conn-reset"),
+        timeline: [
+          {
+            time: 0,
+            action: "audit",
+            protocol: "https",
+            host: "ok0.example.com",
+            port: 443,
+            method: "GET",
+            url: "https://ok0.example.com/",
+            status: 200,
+            wouldRefuse: "example-refusal",
+          },
+        ],
       }),
       engine: "inspect",
     });
-    expect(out).toContain("</details>\n\n" + hostTableTruncationNote(false));
-    const alone = fit({
-      ...report({ parameters: audit, timeline: timeline.slice(0, 2) }),
-      engine: "inspect",
-    });
-    expect(alone).toContain("</details>\n\n### 🚨 Restrict Would Refuse");
+    const order = [
+      "### 📋 Audited Hosts",
+      "### 🚫 Blocked Hosts",
+      "### 🚨 Restrict Would Refuse",
+      "### ⚠️ Failed Connections",
+      "🛡️ Switch to restrict mode",
+      "💬 Communication details",
+    ].map((heading) => out.indexOf(heading));
+    expect(order.every((at) => at !== -1)).toBe(true);
+    expect(order).toStrictEqual(order.toSorted((a, b) => a - b));
   });
 
   it("prints no list of the requests restrict would refuse when there are none", () => {

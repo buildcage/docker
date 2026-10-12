@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { annotateKnownBlocked } from "./aggregate.ts";
+import { annotateKnownBlocked, wouldRefuseRows } from "./aggregate.ts";
 
 describe("annotateKnownBlocked", () => {
   const block = (overrides: Partial<TrafficEvent> = {}): TrafficEvent => ({
@@ -267,5 +267,30 @@ describe("annotateKnownBlocked", () => {
       expect(row.expected).toBe(true);
       expect(row.expectedBy).toBe("POST https://api.example.com/b");
     });
+  });
+});
+
+describe("wouldRefuseRows", () => {
+  const audit = (host: string, wouldRefuse?: string): TrafficEvent => ({
+    time: 1,
+    action: "audit",
+    protocol: "https",
+    host,
+    port: 443,
+    ...(wouldRefuse === undefined ? {} : { wouldRefuse }),
+  });
+
+  it("counts the requests restrict would refuse by host and the reason it would give", () => {
+    expect(
+      wouldRefuseRows([
+        audit("a.example.com", "r1"),
+        audit("b.example.com"),
+        audit("a.example.com", "r1"),
+        audit("a.example.com", "r2"),
+      ]),
+    ).toStrictEqual([
+      { host: "a.example.com", port: "443", ruleType: "HTTPS", reason: "r1", count: 2 },
+      { host: "a.example.com", port: "443", ruleType: "HTTPS", reason: "r2", count: 1 },
+    ]);
   });
 });

@@ -200,6 +200,16 @@ function toHostRow(event: TrafficEvent): LogEntry {
   };
 }
 
+/** The host rows of the requests audit let through that restrict would
+ *  refuse, by the reason restrict would give. */
+export function wouldRefuseRows(timeline: TrafficEvent[]): AggregatedEntry[] {
+  return aggregate(
+    timeline.flatMap((event) =>
+      event.wouldRefuse === undefined ? [] : [{ ...toHostRow(event), reason: event.wouldRefuse }],
+    ),
+  );
+}
+
 export interface ReducedTimeline {
   passed: AggregatedEntry[];
   blocked: AnnotatedBlockedRow[];
