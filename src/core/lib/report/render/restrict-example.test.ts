@@ -55,11 +55,21 @@ describe("exampleStepTail", () => {
     );
   });
 
-  it("pins the block indentation with |2 when the command's first line is itself indented", () => {
-    // Plain run: | would read the indented first line as the base and leave the
-    // rest under it, which breaks the YAML.
+  it("pins the block indentation with |2 when the command's first non-empty line is indented", () => {
+    // Plain run: | would read the indented line as the base and leave the rest
+    // under it, which breaks the YAML. A leading blank line counts: the base is
+    // read from the first non-empty line, not the first line.
     expect(exampleStepTail({ runCommand: "  echo indented\necho base" })).toBe(
       "    run: |2\n        echo indented\n      echo base\n",
+    );
+    expect(exampleStepTail({ runCommand: "\n  echo indented\necho base" })).toBe(
+      "    run: |2\n      \n        echo indented\n      echo base\n",
+    );
+  });
+
+  it("keeps plain run: | for a tab-indented first line, read as content not indentation", () => {
+    expect(exampleStepTail({ runCommand: "\techo tabbed\necho base" })).toBe(
+      "    run: |\n      \techo tabbed\n      echo base\n",
     );
   });
 });

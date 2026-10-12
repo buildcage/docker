@@ -55,11 +55,13 @@ export function exampleStepTail({ extraInputs = [], runCommand }: ExampleStepOpt
     // newline (YAML's default "clip" chomping), which would otherwise
     // split into a spurious blank line at the end.
     const lines = runCommand.replace(/\r?\n$/, "").split(/\r?\n/);
-    // `|` auto-detects the block's indentation from its first line, so a command
-    // whose first line is itself indented would set the base there and leave the
-    // rest under it unparseable. `|2` pins the base two spaces in, where every
-    // content line sits, so the first line's own indentation stays command text.
-    const indicator = lines[0]?.startsWith(" ") ? "|2" : "|";
+    // `|` auto-detects the block's indentation from its first non-empty line, so
+    // a command whose first such line is indented would set the base there and
+    // leave the rest under it unparseable. `|2` pins the base two spaces in,
+    // where every content line sits, so that leading indentation stays command
+    // text. A leading tab needs no indicator: YAML reads it as content, not
+    // indentation.
+    const indicator = lines.find((line) => line !== "")?.startsWith(" ") ? "|2" : "|";
     yaml += `    run: ${indicator}\n`;
     for (const line of lines) {
       yaml += `      ${line}\n`;
