@@ -639,9 +639,9 @@ server to speak first (SMTP, FTP) ends as one nobody decided. No rule on the nam
 
 A request no rule refused can still come to nothing: the origin answers nothing usable, breaks off
 mid-transfer, or its name resolves nowhere. The report lists them as ⚠️ rows in the refusals' table,
-which is then headed **Blocked / Failed Hosts**. They come after the unexpected refusals and show
-`—` for Expected, since `known_blocked_rules` never matches a failure. **Communication details**
-shows each with ⚠️ too:
+headed **Blocked / Failed Hosts** when it holds both and **Failed Hosts** when it holds only them.
+They come after the unexpected refusals and show `—` for Expected, since `known_blocked_rules` never
+matches a failure. **Communication details** shows each with ⚠️ too:
 
 ```
 ⚠️ 00:12.004: GET https://registry.npmjs.org/big.tgz -> origin-aborted

@@ -66,6 +66,14 @@ describe("renderVerdict", () => {
     );
   });
 
+  it("leads with a log that is not a full record, and then never says ✅", () => {
+    const incomplete = { ...base, logLooksPlausible: false };
+    expect(renderVerdict(incomplete)).toBe("**❗ report incomplete**\n\n");
+    expect(renderVerdict({ ...incomplete, blocked: [row(2, true)], blockedCount: 2 })).toBe(
+      "**❗ report incomplete · 2 refused as expected**\n\n",
+    );
+  });
+
   it("counts refusals with no row as unexpected, as the outcome does", () => {
     expect(renderVerdict({ ...base, blockedCount: 2 })).toBe("**🚫 2 refused**\n\n");
   });

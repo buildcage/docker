@@ -4,7 +4,8 @@ import type { ReportData } from "../types.ts";
 /**
  * The line under the report's title that says whether anything needs a look,
  * counted the way the annotations count it. `extraItems` follow the refusals,
- * for a check an action adds of its own.
+ * for a check an action adds of its own. A log that is not a full record leads
+ * and rules out ✅, as it fails the step on its own under restrict.
  */
 export function renderVerdict(report: ReportData, extraItems: string[] = []): string {
   let unexpected = 0;
@@ -20,6 +21,7 @@ export function renderVerdict(report: ReportData, extraItems: string[] = []): st
   const undecided = countUndecidedRequests(report);
 
   const items = [
+    ...(report.logLooksPlausible ? [] : ["❗ report incomplete"]),
     ...(unexpected ? [`🚫 ${unexpected} refused`] : []),
     ...extraItems,
     ...(failed ? [`⚠️ ${failed} failed`] : []),

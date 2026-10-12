@@ -58,7 +58,7 @@ function fit(r: ReportData): string {
 }
 
 describe("renderReportBlocks under a limit", () => {
-  it("keeps the blocked and failed tables whole and cuts the allowed one", () => {
+  it("keeps the blocked and failed table whole and cuts the allowed one", () => {
     const out = fit(
       report({
         passed: rows("ok", 2000),

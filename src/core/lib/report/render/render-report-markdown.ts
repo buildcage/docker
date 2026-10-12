@@ -111,7 +111,8 @@ export function trafficTableBlock(
   };
 }
 
-const frame = (text: string): SummaryBlock => ({
+/** A part of the report kept whole however little room is left. */
+export const frame = (text: string): SummaryBlock => ({
   priority: 0,
   level: 1,
   section: SECTION,
@@ -146,11 +147,7 @@ export function renderReportBlocks(
   const heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts";
   const blocks: SummaryBlock[] = [];
 
-  // restrict is what a real run normally uses day to day, so its heading
-  // stays bare; audit is the occasional, deliberately different mode and
-  // says so, the same way the heading below calls out "Audited" vs "Allowed".
-  // escapeCell keeps an untrusted title from injecting Markdown or a newline.
-  let top = `## ${escapeCell(title)}${isAudit ? " (audit mode)" : ""}\n\n`;
+  let top = reportHeading(title, isAudit);
   top += renderVerdict(report, verdictItems);
 
   // The tables would otherwise read as the whole story.
@@ -286,6 +283,16 @@ export function renderReportBlocks(
   if (footer) bottom += reportFooter(actionRepo);
   if (bottom) blocks.push(frame(bottom));
   return blocks;
+}
+
+/**
+ * The report's title line. restrict is what a real run normally uses day to
+ * day, so its heading stays bare; audit is the occasional, deliberately
+ * different mode and says so. escapeCell keeps an untrusted title from
+ * injecting Markdown or a newline.
+ */
+export function reportHeading(title: string, isAudit: boolean): string {
+  return `## ${escapeCell(title)}${isAudit ? " (audit mode)" : ""}\n\n`;
 }
 
 /** The line every report ends with, for an action that prints it itself. */

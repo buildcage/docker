@@ -59,10 +59,9 @@ export function countUndecidedRequests(report: ReportData): number {
  * never opens it would not know a request had gone nowhere.
  *
  * The wording avoids "incomplete", which the report already uses for a log
- * whose beginning is gone (see describeBlockedOutcome) and under the same ⚠️:
- * two ⚠️ warnings about different things would otherwise read as one, and
- * "this report may not be a full record" is a far bigger claim than "one
- * request went nowhere".
+ * whose beginning is gone (see describeBlockedOutcome): two warnings about
+ * different things would otherwise read as one, and "this report may not be a
+ * full record" is a far bigger claim than "one request went nowhere".
  */
 function describeUndecidedRequests(
   report: ReportData,
@@ -87,8 +86,9 @@ function describeUndecidedRequests(
  * The notice for connections that failed after the rules had passed on them, or
  * undefined when there were none.
  *
- * A notice where describeUndecidedRequests warns: these have a table of their
- * own, so it only has to say that the step passed although connections failed.
+ * A notice where describeUndecidedRequests warns: these have ⚠️ rows in the
+ * blocked hosts' table, so it only has to say that the step passed although
+ * connections failed.
  *
  * `audit` enforces nothing, so nothing there was allowed by a rule and the
  * opening says only what happened, the same distinction actionFor makes between

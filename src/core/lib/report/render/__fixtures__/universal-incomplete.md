@@ -1,6 +1,6 @@
 ## Outbound Traffic Report
 
-**🚫 2 refused · ⚠️ 1 failed**
+**❗ report incomplete · 🚫 2 refused · ⚠️ 1 failed**
 
 > ❗ **This report is incomplete**, so the tables below are not a full record of this run.
 > Either the logs don't begin where a real run does, one carries a line that cannot be
