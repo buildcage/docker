@@ -146,16 +146,49 @@ describe("renderReportMarkdown: universal", () => {
     count: 1,
   };
 
-  it("tables connections the origin broke under their own heading", () => {
+  it("tables connections the origin broke with the refusals, marked apart", () => {
     const md = renderReportMarkdown(
       { ...base, blocked: [blockedRow], blockedCount: 1, failed: [failedRow] },
       "owner/repo",
       "v1",
     );
-    expect(md).toMatch(/### ⚠️ Failed Connections\n/);
-    expect(md).toMatch(/origin-no-response/);
+    expect(md).toMatch(/### 🚫 Blocked \/ ⚠️ Failed Hosts\n/);
+    expect(md).toMatch(
+      /\| bad\.com:80 \| HTTP \| 🚫 not-allowed \| 1 \|\n\| good\.com:443 \| HTTPS \| ⚠️ origin-no-response \| 1 \|/,
+    );
     // The reader is told why the step passed regardless.
     expect(md).toMatch(/none of them fails the step/);
+  });
+
+  it("heads a table of failed connections alone as failed, and blocked alone as blocked", () => {
+    const failedOnly = renderReportMarkdown({ ...base, failed: [failedRow] }, "owner/repo", "v1");
+    expect(failedOnly).toMatch(/### ⚠️ Failed Hosts\n/);
+    const blockedOnly = renderReportMarkdown(
+      { ...base, blocked: [blockedRow], blockedCount: 1 },
+      "owner/repo",
+      "v1",
+    );
+    expect(blockedOnly).toMatch(/### 🚫 Blocked Hosts\n/);
+    // No failed row, so no note about them.
+    expect(blockedOnly).not.toMatch(/none of them fails the step/);
+  });
+
+  it("orders unmatched refusals, then failures, then expected ones, with no Expected cell on a failure", () => {
+    const md = renderReportMarkdown(
+      {
+        ...base,
+        parameters: reportParams({ knownBlockedRules: ["*.sury.org:*"] }),
+        blocked: [...expectedRows, blockedRow],
+        blockedCount: 3,
+        failed: [failedRow],
+      },
+      "owner/repo",
+      "v1",
+    );
+    const at = ["| bad.com:80 |", "| good.com:443 |", "(2 hosts)"].map((s) => md.indexOf(s));
+    expect(at.every((i) => i !== -1)).toBe(true);
+    expect(at).toStrictEqual(at.toSorted((a, b) => a - b));
+    expect(md).toMatch(/⚠️ origin-no-response \| 1 \| — \|/);
   });
 
   it("does not call a run that only failed connections no communication", () => {
@@ -308,9 +341,50 @@ describe("renderReportMarkdown: inspect", () => {
       "v1",
     );
     expect(md).toMatch(
-      /\| \\\*\.sury\.org:\\\* \(2 hosts\) \| HTTPS \| https-not-allowed \| 2 \| ✅ \|/,
+      /\| \\\*\.sury\.org:\\\* \(2 hosts\) \| HTTPS \| 🚫 https-not-allowed \| 2 \| ✅ \|/,
     );
     expect(md).not.toMatch(/a\.sury\.org/);
     expect(md).toMatch(/\| bad\.com:80 \|/);
+  });
+});
+
+describe("renderReportMarkdown: section and footer", () => {
+  const base: UniversalReportData = {
+    engine: "universal",
+    parameters: reportParams(),
+    passed: [allowedRow],
+    blocked: [blockedRow],
+    failed: [],
+    blockedCount: 1,
+    logLooksPlausible: true,
+    timeline: [],
+    startedAt: undefined,
+  };
+
+  it("puts the verdict under the title and its items after the refusals", () => {
+    const md = renderReportMarkdown(base, "owner/repo", "v1", { verdictItems: ["🚨 1 x"] });
+    expect(md).toMatch(/^## Outbound Traffic Report\n\n\*\*🚫 1 refused · 🚨 1 x\*\*\n\n### /);
+  });
+
+  it("nests the tables a level down under a section heading", () => {
+    const md = renderReportMarkdown(base, "owner/repo", "v1", {
+      section: "🌐 Network",
+      extraBlocks: (gap, heading) => [
+        { priority: 1, level: 2, section: "traffic", cut: "keep", text: `${gap}${heading} X\n` },
+      ],
+    });
+    expect(md).toMatch(/\*\*\n\n### 🌐 Network\n\n#### ✅ Allowed Hosts\n/);
+    expect(md).toMatch(/\n#### 🚫 Blocked Hosts\n/);
+    expect(md).toMatch(/\n\n#### X\n/);
+  });
+
+  it("leaves the footer out when asked, keeping the engine's note", () => {
+    const md = renderReportMarkdown(base, "owner/repo", "v1", { footer: false });
+    expect(md).not.toMatch(/Reported by/);
+    expect(md).toMatch(/IP rules on the destination IP address\.\*<\/sub>\n$/);
+    const inspect = renderReportMarkdown({ ...base, engine: "inspect" }, "owner/repo", "v1", {
+      footer: false,
+    });
+    expect(inspect.endsWith("| 1 |\n")).toBe(true);
   });
 });

@@ -16,7 +16,12 @@ export interface HostTableRow extends AggregatedEntry {
   /** Host cell text for a row that stands for something other than one
    *  host:port, such as a folded group naming its rule. */
   display?: string;
+  /** Marks the reason of a row in the table blocked and failed rows share. A
+   *  failed row has no Expected cell, as known_blocked_rules never matches it. */
+  outcome?: "blocked" | "failed";
 }
+
+const OUTCOME_MARK = { blocked: "🚫 ", failed: "⚠️ " } as const;
 
 export interface RenderHostTableOptions {
   showReason?: boolean;
@@ -40,9 +45,9 @@ export function renderHostTable(
     // to show and "name:-" would only invite the reader to look for one.
     host: r.display ?? (r.port === "-" ? r.host : `${r.host}:${r.port}`),
     ruleType: r.ruleType,
-    reason: r.reason,
+    reason: r.outcome ? OUTCOME_MARK[r.outcome] + r.reason : r.reason,
     count: r.count,
-    expected: r.expected ? "✅" : "",
+    expected: r.outcome === "failed" ? "—" : r.expected ? "✅" : "",
   }));
 
   return markdownTable(formats, tableRows);

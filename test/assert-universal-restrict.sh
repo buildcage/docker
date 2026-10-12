@@ -86,25 +86,24 @@ else
 fi
 echo ""
 
-echo "[report] Blocked Hosts, one row per reason the proxy refused for:"
-if grep -qF "### 🚫 Blocked Hosts" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| blocked.example.com:443 | HTTPS | not-allowed |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| 10.200.0.100:80 | IP | ip-not-allowed |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| internal.wildcard.example.com:443 | HTTPS | internal-address |" <<< "$REPORT_MARKDOWN"; then
+echo "[report] Blocked / Failed Hosts, one row per reason the proxy refused for:"
+if grep -qF "### 🚫 Blocked / ⚠️ Failed Hosts" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| blocked.example.com:443 | HTTPS | 🚫 not-allowed |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| 10.200.0.100:80 | IP | 🚫 ip-not-allowed |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| internal.wildcard.example.com:443 | HTTPS | 🚫 internal-address |" <<< "$REPORT_MARKDOWN"; then
   pass "a name no rule covers, an address and an internal one each keep their reason"
 else
-  fail "the Blocked Hosts table is missing expected rows"
+  fail "the Blocked / Failed Hosts table is missing expected rows"
 fi
 echo ""
 
 # The allowlist is checked before anything resolves, so a name that got as far
 # as failing to resolve had passed it: no rule refused it and none can clear it.
-echo "[report] Failed Connections, for a name the resolver could not answer:"
-if grep -qF "### ⚠️ Failed Connections" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| nxdomain.wildcard.example.com:443 | HTTPS | dns-failed |" <<< "$REPORT_MARKDOWN"; then
-  pass "an unresolvable name is reported outside the blocked table"
+echo "[report] a failure, for a name the resolver could not answer:"
+if grep -qF "| nxdomain.wildcard.example.com:443 | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
+  pass "an unresolvable name is reported as a failure, not a refusal"
 else
-  fail "the Failed Connections table is missing expected rows"
+  fail "the Blocked / Failed Hosts table is missing the failed row"
 fi
 echo ""
 

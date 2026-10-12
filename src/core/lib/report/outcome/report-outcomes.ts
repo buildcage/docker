@@ -41,6 +41,16 @@ export function describeReportOutcomes(
 }
 
 /**
+ * The requests that never reached a rule. The keepalive noise clientEndedNoise
+ * hides from Communication details is out of the count too, so the two stay in
+ * step.
+ */
+export function countUndecidedRequests(report: ReportData): number {
+  const isNoise = clientEndedNoise(report.timeline);
+  return report.timeline.filter((event) => event.action === "incomplete" && !isNoise(event)).length;
+}
+
+/**
  * The warning for requests that never reached a rule, or undefined when there
  * were none.
  *
@@ -58,12 +68,7 @@ function describeUndecidedRequests(
   report: ReportData,
   engineLabel: "sandbox" | "proxy",
 ): OutcomeEmission | undefined {
-  // The keepalive noise clientEndedNoise hides from Communication details is out
-  // of the count too, so the two stay in step.
-  const isNoise = clientEndedNoise(report.timeline);
-  const count = report.timeline.filter(
-    (event) => event.action === "incomplete" && !isNoise(event),
-  ).length;
+  const count = countUndecidedRequests(report);
   if (count === 0) return undefined;
   return {
     level: "warning",
@@ -108,7 +113,7 @@ function describeFailedConnections(
     level: "notice",
     shouldFail: false,
     message:
-      `${opening}, listed under Failed Connections. The origin broke off, answered nothing ` +
+      `${opening}, listed with ⚠️ under Failed Hosts. The origin broke off, answered nothing ` +
       "usable, or its name resolved nowhere upstream: no rule refused them and none can change " +
       "the outcome, so none of them fails the step.",
   };
