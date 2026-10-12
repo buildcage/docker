@@ -45,7 +45,28 @@ export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-eve
 // would parse with `sni=<name>` read as the authority instead of counting as
 // unreadable.
 const REQUEST =
-  /^buildcage (\d+) (https?) (\S+) (-?\d+) (\d+) ts=(\S*) reason=(\S+) tlserr=(\S+) dst=(\S+):(\d+) (?:wr=(\S+) )?((?:[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*=\S+ )*)(?:fcerr=(\S+) )?(?:sni=(\S+) )?host=(\S+) (\S+)$/;
+  /^buildcage (?<ms>\d+) (?<scheme>https?) (?<method>\S+) (?<status>-?\d+) (?<bytes>\d+) ts=(?<ts>\S*) reason=(?<reason>\S+) tlserr=(?<tlserr>\S+) dst=(?<dstHost>\S+):(?<dstPort>\d+) (?:wr=(?<wr>\S+) )?(?<ext>(?:[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*=\S+ )*)(?:fcerr=(?<fcerr>\S+) )?(?:sni=(?<sni>\S+) )?host=(?<host>\S+) (?<target>\S+)$/;
+
+/** REQUEST's named groups. wr, fcerr and sni are logged only by a stage an
+ *  action extends; the plain stage omits them, so they can be absent. */
+interface RequestFields {
+  ms: string;
+  scheme: string;
+  method: string;
+  status: string;
+  bytes: string;
+  ts: string;
+  reason: string;
+  tlserr: string;
+  dstHost: string;
+  dstPort: string;
+  wr?: string;
+  ext: string;
+  fcerr?: string;
+  sni?: string;
+  host: string;
+  target: string;
+}
 const PASSTHROUGH =
   /^buildcage (\d+) pass (tls|tcp) (\d+) ts=(\S*) reason=(\S+) dst=(\S+):(\d+) sni=(\S+)$/;
 // CoreDNS escapes a space in a label as `\ `. Names stay escaped, as the
@@ -278,20 +299,18 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
 
   const request = REQUEST.exec(trimmed);
   if (request) {
+    const r = request.groups as unknown as RequestFields;
     // Its termination state reads as this proxy's refusal, which it is not.
-    const fcerr = request[13] ?? "";
+    const fcerr = r.fcerr ?? "";
     const tlsFailed =
-      request[3] === BAD_REQUEST_METHOD &&
-      fcerr.startsWith("SSL_") &&
-      fcerr !== POST_HANDSHAKE_ERROR;
-    const incomplete = tlsFailed ? "client-tls-failed" : incompleteReason(request[6], request[3]);
+      r.method === BAD_REQUEST_METHOD && fcerr.startsWith("SSL_") && fcerr !== POST_HANDSHAKE_ERROR;
+    const incomplete = tlsFailed ? "client-tls-failed" : incompleteReason(r.ts, r.method);
     // Only the https stage connects with `ssl verify required`; the plain one
     // logs the field all the same and has no certificate behind it. See
     // reasonFor for what that changes.
-    const tlsError = request[2] === "https" ? request[8] : undefined;
+    const tlsError = r.scheme === "https" ? r.tlserr : undefined;
     const reason =
-      incomplete ??
-      (isRefusal(request[6]) ? reasonFor(request[7], request[6], tlsError, request[3]) : undefined);
+      incomplete ?? (isRefusal(r.ts) ? reasonFor(r.reason, r.ts, tlsError, r.method) : undefined);
     // The host field holds the `Host` that never came, so the handshake is the
     // only thing left that names the connection.
     const namedByHandshake =
@@ -299,43 +318,43 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
     // A request line that did parse is kept whole even so. The path is where a
     // payload sits, and the report is the only place a reader looks; its URL
     // is built around the same host the row carries.
-    const parsedRequest = request[3] !== BAD_REQUEST_METHOD;
-    const scheme = request[2] as "http" | "https";
+    const parsedRequest = r.method !== BAD_REQUEST_METHOD;
+    const scheme = r.scheme as "http" | "https";
     // Spelled as the rules saw it, like the logged path, so one host sent two
     // ways is one row and a known_blocked rule matches either spelling.
-    const sent = splitHostPort(request[15]);
+    const sent = splitHostPort(r.host);
     const host = ruleHost(sent.host);
     const authority = sent.port === undefined ? host : `${host}:${sent.port}`;
-    const unnamed = namedByHandshake ? hostBeforeRequest(request[14], request[9]) : undefined;
+    const unnamed = namedByHandshake ? hostBeforeRequest(r.sni, r.dstHost) : undefined;
     const event: TrafficEvent = {
       // <ms> is milliseconds; TrafficEvent.time is seconds.
-      time: Number(request[1]) / 1000,
+      time: Number(r.ms) / 1000,
       action: incomplete !== undefined ? "incomplete" : actionFor(reason, isAudit),
       protocol: unnamed?.byAddress ? "tcp" : scheme,
       // The `Host` header names the host; the port comes from dst=, where the
       // request was actually sent.
       host: unnamed?.host ?? host,
-      port: Number(request[10]),
-      destination: `${request[9]}:${request[10]}`,
+      port: Number(r.dstPort),
+      destination: `${r.dstHost}:${r.dstPort}`,
     };
     if (parsedRequest) {
-      event.method = request[3];
+      event.method = r.method;
       const url = urlOf(
         scheme,
-        unnamed ? authorityOf(unnamed.host, request[10], scheme) : authority,
-        request[16],
+        unnamed ? authorityOf(unnamed.host, r.dstPort, scheme) : authority,
+        r.target,
       );
       if (url !== undefined) event.url = url;
     }
     // Set in audit only, and kept even where the request then failed.
-    const wouldRefuse = request[11];
+    const wouldRefuse = r.wr;
     if (wouldRefuse !== undefined && wouldRefuse !== "-") event.wouldRefuse = wouldRefuse;
-    const extensions = extensionFields(request[12]);
+    const extensions = extensionFields(r.ext);
     if (extensions) event.extensions = extensions;
     if (reason !== undefined) event.reason = reason;
     else {
-      event.status = Number(request[4]);
-      event.bytes = Number(request[5]);
+      event.status = Number(r.status);
+      event.bytes = Number(r.bytes);
     }
     return event;
   }
