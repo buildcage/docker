@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { renderInspectDetails, renderWouldRefuseBody } from "./inspect-details.ts";
+import { renderInspectDetails, renderInspectDetailsBody } from "./inspect-details.ts";
 
 const t = 1787471975;
 const TIMELINE: TrafficEvent[] = [
@@ -45,22 +45,49 @@ const TIMELINE: TrafficEvent[] = [
   { time: t + 4, action: "allow", protocol: "dns", host: "a.example.com" },
 ];
 
-describe("renderWouldRefuseBody", () => {
-  it("lists only the requests restrict would refuse, in a fenced block", () => {
+describe("a refusal label", () => {
+  const label = (e: TrafficEvent) => (e.host === "evil.example.com" ? "labelled" : undefined);
+  const lines = (timeline: TrafficEvent[]) =>
+    (renderInspectDetailsBody(timeline, t, label).split("```")[1] ?? "").trim().split("\n");
+
+  it("replaces the reason a request was refused for", () => {
+    const refused = TIMELINE.find((e) => e.host === "evil.example.com" && e.action === "block");
+    expect(refused).toBeDefined();
+    expect(lines([refused!])[0].endsWith(" -> labelled")).toBe(true);
+  });
+
+  it("replaces the reason restrict would refuse a request for", () => {
+    const audited: TrafficEvent = {
+      ...TIMELINE[0],
+      host: "evil.example.com",
+      action: "audit",
+      wouldRefuse: "example-refusal",
+    };
+    expect(lines([audited])[0].endsWith(" -> 200 (708B) (restrict would refuse: labelled)")).toBe(
+      true,
+    );
+  });
+
+  it("labels each reason of a request refused for one that restrict would refuse for another", () => {
+    const both: TrafficEvent = {
+      ...TIMELINE[0],
+      action: "block",
+      reason: "first",
+      wouldRefuse: "second",
+    };
+    const line = (
+      renderInspectDetailsBody([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
+    ).trim();
+    expect(line.endsWith(" -> first! (restrict would refuse: second!)")).toBe(true);
+  });
+
+  it("leaves the reason where it gives none", () => {
     const audited: TrafficEvent = {
       ...TIMELINE[0],
       action: "audit",
       wouldRefuse: "example-refusal",
     };
-    expect(renderWouldRefuseBody([...TIMELINE, audited], t)).toBe(
-      "```\n" +
-        "🚨 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would refuse: example-refusal)\n" +
-        "```\n",
-    );
-  });
-
-  it("is empty when restrict would refuse nothing", () => {
-    expect(renderWouldRefuseBody(TIMELINE, t)).toBe("");
+    expect(lines([audited])[0].endsWith("(restrict would refuse: example-refusal)")).toBe(true);
   });
 });
 

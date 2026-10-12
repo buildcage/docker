@@ -191,7 +191,7 @@ const RULE_TYPE: Record<TrafficEvent["protocol"], string> = {
 
 /** Reduce an event to the host row a rule is written against. A dns event has
  *  no port, having connected to nothing. */
-function toHostRow(event: TrafficEvent): LogEntry {
+export function toHostRow(event: TrafficEvent): LogEntry {
   return {
     host: event.host,
     port: event.port === undefined ? "-" : String(event.port),

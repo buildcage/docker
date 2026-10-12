@@ -13,7 +13,7 @@ export interface DescribeReportOutcomesOptions {
 /**
  * Every annotation a finished report calls for, in the order they should be
  * emitted. Both actions build their annotations from here, so neither can grow
- * one the other lacks.
+ * one the other lacks; an action adds its own only for a check of its own.
  *
  * The blocked-connections check always speaks, if only with level "none": it is
  * the one that decides the step's outcome. Anything after it is an aside about
@@ -37,27 +37,7 @@ export function describeReportOutcomes(
   if (undecided) emissions.push(undecided);
   const failed = describeFailedConnections(report, engineLabel);
   if (failed) emissions.push(failed);
-  const wouldRefuse = describeWouldRefuse(report);
-  if (wouldRefuse) emissions.push(wouldRefuse);
   return emissions;
-}
-
-/**
- * The warning for requests audit let through that restrict would refuse, or
- * undefined when there were none. No host table holds them, so without this a
- * step would pass audit and fail on its switch to restrict with no warning
- * first.
- */
-function describeWouldRefuse(report: ReportData): OutcomeEmission | undefined {
-  const count = report.timeline.filter((event) => event.wouldRefuse !== undefined).length;
-  if (count === 0) return undefined;
-  return {
-    level: "warning",
-    shouldFail: false,
-    message:
-      `${count} request(s) restrict mode would refuse. ` +
-      "The 🚨 Restrict Would Refuse section lists them with the reason.",
-  };
 }
 
 /**

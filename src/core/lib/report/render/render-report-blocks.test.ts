@@ -5,9 +5,8 @@ import { reportParams } from "#core/lib/test/report-data.node.ts";
 
 import type { ReportData, UniversalReportData } from "../types.ts";
 import { communicationTruncationNote } from "./communication-section.ts";
-import { fitStepSummary, withNotices } from "./fit-step-summary.ts";
+import { fitStepSummary, joinSummaryBlocks, withNotices } from "./fit-step-summary.ts";
 import { hostTableTruncationNote } from "./host-table.ts";
-import { wouldRefuseTruncationNote } from "./inspect-details.ts";
 import {
   renderReportBlocks,
   TRAFFIC_BLOCK,
@@ -20,7 +19,6 @@ const LIMIT = 16 * 1024;
 
 const PRIORITIES: TrafficPriorities = {
   [TRAFFIC_BLOCK.example]: 2,
-  [TRAFFIC_BLOCK.wouldRefuse]: 3,
   [TRAFFIC_BLOCK.blocked]: 4,
   [TRAFFIC_BLOCK.failed]: 5,
   [TRAFFIC_BLOCK.passed]: 6,
@@ -129,65 +127,22 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).not.toContain("ok1999.example.com:443");
   });
 
-  it("keeps the requests restrict would refuse when the log around them is cut", () => {
-    const timeline: TrafficEvent[] = Array.from({ length: 1000 }, (_, i) => ({
-      time: 1 + i,
-      action: "audit",
-      protocol: "https",
-      host: `h${i}.example.com`,
-      port: 443,
-      method: "GET",
-      url: `https://h${i}.example.com/`,
-      status: 200,
-      ...(i === 999 ? { wouldRefuse: "example-refusal" } : {}),
-    }));
-    const out = fit({
-      ...report({
-        parameters: reportParams({ mode: "audit" }),
-        passed: rows("h", 1),
-        timeline,
-        startedAt: 1,
-      }),
-      engine: "inspect",
-    });
-    expect(out).toContain(communicationTruncationNote(false));
-    expect(out).toContain(
-      "### 🚨 Restrict Would Refuse\n\n```\n🚨 16:39.000: GET https://h999.example.com/ -> 200 (restrict would refuse: example-refusal)\n```\n",
-    );
-  });
-
-  it("gives a cut list of the requests restrict would refuse its own notice", () => {
-    const timeline: TrafficEvent[] = Array.from({ length: 1000 }, (_, i) => ({
-      time: 1 + i,
-      action: "audit",
-      protocol: "https",
-      host: `h${i}.example.com`,
-      port: 443,
-      wouldRefuse: "example-refusal",
-    }));
-    const out = fit({
-      ...report({ parameters: reportParams({ mode: "audit" }), timeline }),
-      engine: "inspect",
-    });
-    expect(out).toContain("h0.example.com:443 -> ");
-    expect(out).toContain("```\n\n" + wouldRefuseTruncationNote(false));
-  });
-
   it("ends the example with a blank line before whatever follows it", () => {
     const audit = reportParams({ mode: "audit" });
+    expect(fit(report({ parameters: audit, failed: rows("down", 1, "conn-reset") }))).toContain(
+      "</details>\n\n<sub>*Note: HTTP rules",
+    );
     expect(
       fit(
         report({
           parameters: audit,
-          blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
-          blockedCount: 1,
-          failed: rows("down", 1, "conn-reset"),
+          passed: rows("ok", 1),
+          timeline: [
+            { time: 0, action: "allow", protocol: "https", host: "a.example.com", port: 443 },
+          ],
         }),
       ),
-    ).toContain("</details>\n\n### 🚫 Blocked Hosts");
-    expect(fit(report({ parameters: audit, failed: rows("down", 1, "conn-reset") }))).toContain(
-      "</details>\n\n### ⚠️ Failed Connections",
-    );
+    ).toContain("</details>\n\n<details>\n<summary>💬 Communication details");
     // A TLS rule alone writes an example for a run that reached nothing.
     expect(
       fit({
@@ -197,48 +152,86 @@ describe("renderReportBlocks under a limit", () => {
         engine: "inspect",
       }),
     ).toContain("</details>\n\n_(no communication)_");
-    // The would-refuse list takes the room first, so the blocked table after
-    // the example is left with only its notice.
-    const timeline: TrafficEvent[] = [
-      {
-        time: 0,
-        action: "allow",
-        protocol: "https",
-        host: "api.example.com",
-        port: 443,
-        method: "GET",
-        url: "https://api.example.com/",
-        status: 200,
-      },
-      ...Array.from({ length: 1000 }, (_, i) => ({
-        time: 1 + i,
-        action: "audit" as const,
-        protocol: "https" as const,
-        host: `h${i}.example.com`,
-        port: 443,
-        wouldRefuse: "example-refusal",
-      })),
-    ];
+  });
+
+  it("puts the example after the tables, before the communication log", () => {
     const out = fit({
       ...report({
-        parameters: audit,
+        parameters: reportParams({ mode: "audit" }),
+        passed: rows("ok", 1),
         blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
         blockedCount: 1,
-        timeline,
+        failed: rows("down", 1, "conn-reset"),
+        timeline: [
+          {
+            time: 0,
+            action: "audit",
+            protocol: "https",
+            host: "ok0.example.com",
+            port: 443,
+            method: "GET",
+            url: "https://ok0.example.com/",
+            status: 200,
+            wouldRefuse: "example-refusal",
+          },
+        ],
       }),
       engine: "inspect",
     });
-    expect(out).toContain("</details>\n\n" + hostTableTruncationNote(false));
-    const alone = fit({
-      ...report({ parameters: audit, timeline: timeline.slice(0, 2) }),
-      engine: "inspect",
-    });
-    expect(alone).toContain("</details>\n\n### 🚨 Restrict Would Refuse");
+    const order = [
+      "### 📋 Audited Hosts",
+      "### 🚫 Blocked Hosts",
+      "### ⚠️ Failed Connections",
+      "🛡️ Switch to restrict mode",
+      "💬 Communication details",
+    ].map((heading) => out.indexOf(heading));
+    expect(order.every((at) => at !== -1)).toBe(true);
+    expect(order).toStrictEqual(order.toSorted((a, b) => a - b));
   });
 
-  it("prints no list of the requests restrict would refuse when there are none", () => {
-    const out = fit(report({ parameters: reportParams({ mode: "audit" }), passed: rows("ok", 1) }));
-    expect(out).not.toContain("Restrict Would Refuse");
+  it("puts an action's own blocks after the blocked table, a blank line apart", () => {
+    const extra = (gap: string) => [
+      {
+        id: "extra",
+        priority: 1,
+        level: 2,
+        section: "traffic",
+        cut: "keep" as const,
+        text: `${gap}EXTRA\n`,
+      },
+    ];
+    const render = (r: UniversalReportData) =>
+      joinSummaryBlocks(
+        renderReportBlocks(r, "owner/repo", "v1", PRIORITIES, { extraBlocks: extra }),
+      );
+    const out = render(
+      report({
+        blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
+        blockedCount: 1,
+        failed: rows("down", 1, "conn-reset"),
+      }),
+    );
+    expect(out).toContain(
+      "| bad0.example.com:443 | HTTPS | not-allowed | 1 |\n\nEXTRA\n\n### ⚠️ Failed",
+    );
+    expect(render(report({ failed: rows("down", 1, "conn-reset") }))).toContain(
+      "## Outbound Traffic Report\n\nEXTRA\n\n### ⚠️ Failed",
+    );
+    const empty = joinSummaryBlocks(
+      renderReportBlocks(
+        report({ failed: rows("down", 1, "conn-reset") }),
+        "owner/repo",
+        "v1",
+        PRIORITIES,
+        {
+          extraBlocks: (gap) => [{ ...extra(gap)[0], text: "" }],
+        },
+      ),
+    );
+    expect(empty).toContain("## Outbound Traffic Report\n\n### ⚠️ Failed");
+    expect(render(report({ passed: rows("ok", 1) }))).toContain(
+      "| ok0.example.com:443 | HTTPS | 1 |\n\nEXTRA\n",
+    );
   });
 
   it("picks no notice for a block that is not the traffic report's", () => {
@@ -251,19 +244,5 @@ describe("renderReportBlocks under a limit", () => {
       cut: "lines" as const,
     };
     expect(trafficNotice(block, true)).toBeUndefined();
-  });
-
-  it("picks the would-refuse notice for the would-refuse block", () => {
-    const block = renderReportBlocks(
-      report({
-        timeline: [
-          { time: 1, action: "audit", protocol: "https", host: "a.example.com", wouldRefuse: "x" },
-        ],
-      }),
-      "owner/repo",
-      "v1",
-      PRIORITIES,
-    ).find((b) => b.id === TRAFFIC_BLOCK.wouldRefuse);
-    expect(block && trafficNotice(block, true)).toBe(wouldRefuseTruncationNote(true));
   });
 });

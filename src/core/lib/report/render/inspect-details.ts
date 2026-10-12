@@ -26,10 +26,18 @@ export function renderInspectDetails(
   return body ? wrapCommunicationDetails(body) : "";
 }
 
+/**
+ * What to print in place of `reason`, the one `event` was refused for or, in
+ * audit, the one restrict would refuse it for. Undefined prints the reason. It
+ * goes on the event's line inside a fenced block, so it holds no newline.
+ */
+export type RefusalLabel = (event: TrafficEvent, reason: string) => string | undefined;
+
 /** The section's body alone, a fenced block, or "" if nothing is shown. */
 export function renderInspectDetailsBody(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
+  refusalLabel: RefusalLabel = () => undefined,
 ): string {
   // The keepalive noise clientEndedNoise marks is dropped here, before
   // connectedHosts, so a hidden close cannot mask a name's other rows.
@@ -37,38 +45,10 @@ export function renderInspectDetailsBody(
   const relevant = timeline.filter((e) => !isNoise(e));
   const connected = connectedHosts(relevant);
   const shown = relevant.filter((e) => !isRedundantDns(e, connected));
-  const body = fenced(shown, startedAt);
-  return body && `${body}\n`;
-}
-
-/**
- * The requests restrict would refuse alone, a fenced block, or "" if there
- * were none. They reach no host table, so a cut communication log would
- * otherwise drop them from the summary.
- */
-export function renderWouldRefuseBody(
-  timeline: TrafficEvent[],
-  startedAt: number | undefined,
-): string {
-  return fenced(
-    timeline.filter((e) => e.wouldRefuse !== undefined),
-    startedAt,
-  );
-}
-
-// A fenced block, so URLs need no markdown escaping and stay copy-pastable.
-function fenced(events: TrafficEvent[], startedAt: number | undefined): string {
-  if (events.length === 0) return "";
-  const body = events.map((event) => renderEvent(event, startedAt)).join("\n") + "\n";
-  return `\`\`\`\n${body}\`\`\`\n`;
-}
-
-/** What a traffic report says where the Job Summary's size limit cut its list of requests restrict would refuse. */
-export function wouldRefuseTruncationNote(artifactAvailable: boolean): string {
-  const rest = artifactAvailable
-    ? "the buildcage-traffic artifact uploaded for this run has every one"
-    : "set upload_traffic_artifact: true to get every one as a downloadable artifact";
-  return `_…truncated: the requests restrict would refuse exceeded GitHub's Job Summary size limit; ${rest}._\n\n`;
+  if (shown.length === 0) return "";
+  // A fenced block, so URLs need no markdown escaping and stay copy-pastable.
+  const lines = shown.map((event) => renderEvent(event, startedAt, refusalLabel));
+  return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
 // ⚠️ covers both of the outcomes no rule decided that went wrong: a request
@@ -84,14 +64,19 @@ const MARK: Record<string, string> = {
   failed: "⚠️",
 };
 
-function renderEvent(event: TrafficEvent, startedAt: number | undefined): string {
+function renderEvent(
+  event: TrafficEvent,
+  startedAt: number | undefined,
+  refusalLabel: RefusalLabel,
+): string {
   const mark =
     event.action === "audit" && event.wouldRefuse !== undefined
       ? "🚨"
       : (MARK[event.action] ?? "✅");
+  const label = (reason: string) => refusalLabel(event, reason) ?? reason;
   const note =
-    event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${event.wouldRefuse})`;
-  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event)}${note}`;
+    event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${label(event.wouldRefuse)})`;
+  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}`;
 }
 
 /**
@@ -222,9 +207,10 @@ function subject(event: TrafficEvent): string {
   return `${event.method} ${redactCredentialQuery(event.url)}`;
 }
 
-/** What came of it: a refusal names its reason, anything else its result. */
-function outcome(event: TrafficEvent): string {
-  if (event.action === "block") return event.reason ?? "blocked";
+/** What came of it: a refusal names its reason, as `label` prints it, anything
+ *  else its result. */
+function outcome(event: TrafficEvent, label: (reason: string) => string): string {
+  if (event.action === "block") return event.reason === undefined ? "blocked" : label(event.reason);
   // No status behind one, and the reason tells a close from a timeout and both
   // from bytes that never parsed.
   if (event.action === "incomplete") return event.reason ?? "no request";

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { annotateKnownBlocked } from "./aggregate.ts";
+import { annotateKnownBlocked, toHostRow } from "./aggregate.ts";
 
 describe("annotateKnownBlocked", () => {
   const block = (overrides: Partial<TrafficEvent> = {}): TrafficEvent => ({
@@ -267,5 +267,16 @@ describe("annotateKnownBlocked", () => {
       expect(row.expected).toBe(true);
       expect(row.expectedBy).toBe("POST https://api.example.com/b");
     });
+  });
+});
+
+describe("toHostRow", () => {
+  it("names the rule kind that would permit the event, and no port for a lookup", () => {
+    expect(
+      toHostRow({ time: 1, action: "block", protocol: "dns", host: "a.example.com", reason: "r" }),
+    ).toStrictEqual({ host: "a.example.com", port: "-", ruleType: "DNS", reason: "r" });
+    expect(
+      toHostRow({ time: 1, action: "audit", protocol: "https", host: "a.example.com", port: 443 }),
+    ).toStrictEqual({ host: "a.example.com", port: "443", ruleType: "HTTPS", reason: "-" });
   });
 });

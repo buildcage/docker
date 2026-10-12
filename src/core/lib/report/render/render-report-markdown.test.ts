@@ -270,6 +270,20 @@ describe("renderReportMarkdown: inspect", () => {
     expect(md).not.toMatch(/based on the Host header/);
   });
 
+  it("labels a refusal in Communication details as the caller says", () => {
+    const refused: TrafficEvent = {
+      ...timeline[0],
+      action: "block",
+      reason: "not-allowed",
+      status: undefined,
+      bytes: undefined,
+    };
+    const md = renderReportMarkdown({ ...base, timeline: [refused] }, "owner/repo", "v1", {
+      refusalLabel: (_, reason) => `${reason}, labelled`,
+    });
+    expect(md).toContain("GET https://good.com/pkg -> not-allowed, labelled\n");
+  });
+
   it("builds the audit-mode example from the timeline, method and path included", () => {
     const md = renderReportMarkdown(
       { ...base, parameters: reportParams({ mode: "audit" }), timeline },
