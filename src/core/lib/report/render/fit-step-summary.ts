@@ -75,6 +75,8 @@ export interface FitStepSummaryOptions {
    * by the ratio of input to limit, not by the absolute size.
    */
   limitBytes?: number;
+  /** Called with each block the fit truncated or replaced with its notice. */
+  onCut?: (block: SummaryBlock) => void;
 }
 
 /**
@@ -84,7 +86,7 @@ export interface FitStepSummaryOptions {
  */
 export function fitStepSummary(
   blocks: SummaryBlock[],
-  { usedBytes = 0, limitBytes = STEP_SUMMARY_LIMIT_BYTES }: FitStepSummaryOptions = {},
+  { usedBytes = 0, limitBytes = STEP_SUMMARY_LIMIT_BYTES, onCut }: FitStepSummaryOptions = {},
 ): string {
   const full = blocks.map(whole);
   const sizes = full.map(bytes);
@@ -104,6 +106,7 @@ export function fitStepSummary(
       out[i] = cutBlock(b, Math.max(0, budget));
       budget -= bytes(out[i]);
       cutAt.set(b.section, Math.min(cutAt.get(b.section) ?? Infinity, b.level));
+      onCut?.(b);
     }
   }
   return out.join("");
