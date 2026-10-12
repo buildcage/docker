@@ -28,7 +28,8 @@ export function renderInspectDetails(
 
 /**
  * What to print in place of `reason`, the one `event` was refused for or, in
- * audit, the one restrict would refuse it for. Undefined prints the reason.
+ * audit, the one restrict would refuse it for. Undefined prints the reason. It
+ * goes on the event's line inside a fenced block, so it holds no newline.
  */
 export type RefusalLabel = (event: TrafficEvent, reason: string) => string | undefined;
 

@@ -217,8 +217,8 @@ export function renderReportBlocks(
       id: TRAFFIC_BLOCK.example,
       priority: priorities[TRAFFIC_BLOCK.example],
       level: 2,
-      // Its own section: it stands beside the tables and the log, not above
-      // them, so its notice must not silence theirs.
+      // Its own section, so a cut example's notice does not silence the
+      // tables' or the log's.
       section: `${SECTION}-example`,
       cut: "atomic",
       text: example,
