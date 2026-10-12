@@ -52,7 +52,7 @@ export function renderInspectDetailsBody(
   return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
-/** What a traffic report says where the Job Summary's size limit cut its list of requests restrict would refuse. */
+/** What a traffic report says where the Job Summary's size limit cut its table of requests restrict would refuse. */
 export function wouldRefuseTruncationNote(artifactAvailable: boolean): string {
   const rest = artifactAvailable
     ? "the buildcage-traffic artifact uploaded for this run has every one"
