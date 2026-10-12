@@ -2,7 +2,7 @@ import type { AggregatedEntry } from "#core/lib/log/aggregate.ts";
 
 import {
   exampleStepHead,
-  extraInputLines,
+  exampleStepTail,
   restrictExampleBlock,
   type ExampleStepOptions,
 } from "./restrict-example.ts";
@@ -50,7 +50,7 @@ export function buildRestrictExample(
       yaml += `      ${rule}\n`;
     }
   }
-  yaml += extraInputLines(step);
+  yaml += exampleStepTail(step);
 
   return restrictExampleBlock(yaml);
 }

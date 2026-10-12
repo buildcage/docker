@@ -18,7 +18,7 @@ export function usesLine(actionRepo: string, actionRef?: string, actionVersion?:
   return `  uses: ${actionRepo}@${actionRef}${actionVersion ? ` # ${actionVersion}` : ""}\n`;
 }
 
-/** What each action fills into the head of its snippet's step. */
+/** What each action fills into its snippet's step. */
 export interface ExampleStepOptions {
   /** The step's `name:`. Defaults to "Start Buildcage". */
   stepName?: string;
@@ -33,15 +33,23 @@ export interface ExampleStepOptions {
   extraInputs?: string[];
 }
 
-/** The step's `name:`, `uses:` and `with:` lines, then `run:` when given. */
+/** The step's `name:`, `uses:` and `with:` lines. */
 export function exampleStepHead(
   actionRepo: string,
   actionRef: string | undefined,
-  { stepName = "Start Buildcage", actionVersion, runCommand }: ExampleStepOptions = {},
+  { stepName = "Start Buildcage", actionVersion }: ExampleStepOptions = {},
 ): string {
   let yaml = `- name: ${stepName}\n`;
   yaml += usesLine(actionRepo, actionRef, actionVersion);
   yaml += "  with:\n";
+  return yaml;
+}
+
+/** The `extraInputs` lines, then `run:` when given, at the snippet's input
+ *  indentation. The command goes last so the inputs stay readable above a
+ *  long script. */
+export function exampleStepTail({ extraInputs = [], runCommand }: ExampleStepOptions): string {
+  let yaml = extraInputs.map((line) => `    ${line}\n`).join("");
   if (runCommand) {
     yaml += "    run: |\n";
     // GitHub Actions' `run: |` block scalar always keeps one trailing
@@ -52,11 +60,6 @@ export function exampleStepHead(
     }
   }
   return yaml;
-}
-
-/** The `extraInputs` lines, at the snippet's input indentation. */
-export function extraInputLines({ extraInputs = [] }: ExampleStepOptions): string {
-  return extraInputs.map((line) => `    ${line}\n`).join("");
 }
 
 export interface RestrictExampleBlockOptions {
