@@ -5,7 +5,7 @@ import {
   COMMUNICATION_DETAILS_OPEN,
   communicationTruncationNote,
 } from "./communication-section.ts";
-import { joinSummaryBlocks, type SummaryBlock } from "./fit-step-summary.ts";
+import type { SummaryBlock } from "./fit-step-summary.ts";
 import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
 import { hostTableTruncationNote, renderHostTable } from "./host-table.ts";
 import { renderInspectDetailsBody, type RefusalLabel } from "./inspect-details.ts";
@@ -38,18 +38,6 @@ export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   extraBlocks?: (gap: string, heading: string) => SummaryBlock[];
 }
 
-/** Branches on `report.engine`/`report.parameters.mode` rather than being
- *  duplicated per engine. actionRepo/actionRef are real values, not
- *  placeholders: this runs on the runner, with process.env available. */
-export function renderReportMarkdown(
-  report: ReportData,
-  actionRepo: string,
-  actionRef: string,
-  options: RenderReportMarkdownOptions = {},
-): string {
-  return joinSummaryBlocks(renderReportBlocks(report, actionRepo, actionRef, JOINED, options));
-}
-
 const SECTION = "traffic";
 
 /** The ids renderReportBlocks gives its blocks, for picking their notices. */
@@ -64,11 +52,6 @@ export type TrafficBlockId = (typeof TRAFFIC_BLOCK)[keyof typeof TRAFFIC_BLOCK];
 
 /** The priority of each block that can be cut; see SummaryBlock.priority. */
 export type TrafficPriorities = Record<TrafficBlockId, number>;
-
-// Joined whole, the report never compares priorities.
-const JOINED = Object.fromEntries(
-  Object.values(TRAFFIC_BLOCK).map((id) => [id, 0]),
-) as TrafficPriorities;
 
 /**
  * The notice each traffic block gives in place of what a cut dropped, or

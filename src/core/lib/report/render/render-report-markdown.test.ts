@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 import { reportParams, expectedRows } from "#core/lib/test/report-data.node.ts";
 
+import { renderReportMarkdown } from "../../test/render-report-markdown.node.ts";
 import type { UniversalReportData, InspectReportData } from "../types.ts";
-import { renderReportMarkdown } from "./render-report-markdown.ts";
 
 const allowedRow = { host: "good.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 };
 const blockedRow = {

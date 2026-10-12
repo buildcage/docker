@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { renderInspectDetails, renderInspectDetailsBody } from "./inspect-details.ts";
+import { renderInspectDetailsBody } from "./inspect-details.ts";
 
 const t = 1787471975;
 const TIMELINE: TrafficEvent[] = [
@@ -91,8 +91,8 @@ describe("a refusal label", () => {
   });
 });
 
-describe("renderInspectDetails", () => {
-  const md = renderInspectDetails(TIMELINE, t);
+describe("renderInspectDetailsBody", () => {
+  const md = renderInspectDetailsBody(TIMELINE, t);
   const body = md.split("```")[1] ?? "";
   const lines = body.trim().split("\n");
 
@@ -112,7 +112,7 @@ describe("renderInspectDetails", () => {
       action: "audit",
       wouldRefuse: "example-refusal",
     };
-    const line = (renderInspectDetails([audited], t).split("```")[1] ?? "").trim();
+    const line = (renderInspectDetailsBody([audited], t).split("```")[1] ?? "").trim();
     expect(line).toBe(
       "🚨 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would refuse: example-refusal)",
     );
@@ -125,7 +125,7 @@ describe("renderInspectDetails", () => {
       reason: "dns-failed",
       wouldRefuse: "example-refusal",
     };
-    const line = (renderInspectDetails([failed], t).split("```")[1] ?? "").trim();
+    const line = (renderInspectDetailsBody([failed], t).split("```")[1] ?? "").trim();
     expect(line.endsWith("-> dns-failed (restrict would refuse: example-refusal)")).toBe(true);
   });
 
@@ -140,7 +140,7 @@ describe("renderInspectDetails", () => {
   });
 
   it("shows a portless connection as just its host, never host:undefined", () => {
-    const out = renderInspectDetails(
+    const out = renderInspectDetailsBody(
       [{ time: t, action: "allow", protocol: "https", host: "a.example.com" }],
       t,
     );
@@ -151,7 +151,7 @@ describe("renderInspectDetails", () => {
   it("scales the byte count to a readable unit, at each magnitude", () => {
     // A silent unit or rounding error would misreport how much crossed.
     const size = (bytes: number) => {
-      const out = renderInspectDetails(
+      const out = renderInspectDetailsBody(
         [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes }],
         t,
       );
@@ -170,7 +170,7 @@ describe("renderInspectDetails", () => {
   });
 
   it("drops a refused name once a refused request for it also shows up", () => {
-    const md2 = renderInspectDetails(
+    const md2 = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -212,7 +212,7 @@ describe("renderInspectDetails", () => {
   it("names the record type a discovery lookup asked for, and says it got nothing", () => {
     // SRV going unanswered costs apt nothing; TXT going unanswered is why a
     // `mongodb+srv://` connection never got its options.
-    const md2 = renderInspectDetails(
+    const md2 = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -234,7 +234,7 @@ describe("renderInspectDetails", () => {
   it("shows a discovery lookup even though the host it belongs to connected", () => {
     // Nothing connects to `_service._proto.<host>`, so this is not the
     // connection to the plain name said twice.
-    const md2 = renderInspectDetails(
+    const md2 = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -260,13 +260,13 @@ describe("renderInspectDetails", () => {
   });
 
   it("renders nothing at all when there was no traffic", () => {
-    expect(renderInspectDetails([], t)).toBe("");
+    expect(renderInspectDetailsBody([], t)).toBe("");
   });
 
   it("keeps a name that resolved and was never connected to", () => {
     // Its own sole trace: a rule wide enough to cover something the build
     // only looked at is exactly what an audit run is meant to surface.
-    const only = renderInspectDetails(
+    const only = renderInspectDetailsBody(
       [{ time: t, action: "allow", protocol: "dns", host: "a.com" }],
       t,
     );
@@ -274,7 +274,7 @@ describe("renderInspectDetails", () => {
   });
 
   it('falls back to a bare "blocked" when a refusal names no reason', () => {
-    const rendered = renderInspectDetails(
+    const rendered = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -294,7 +294,7 @@ describe("renderInspectDetails", () => {
   it("keeps a client-ended connection to a host nothing else reached", () => {
     // Nothing else reached this host, so the close is kept (see clientEndedNoise).
     for (const reason of ["client-aborted", "client-timeout"]) {
-      const rendered = renderInspectDetails(
+      const rendered = renderInspectDetailsBody(
         [
           {
             time: t,
@@ -313,7 +313,7 @@ describe("renderInspectDetails", () => {
 
   it("keeps a client-ended connection to (unknown), which is never one host", () => {
     // A refusal elsewhere under (unknown) proves nothing about this close.
-    const rendered = renderInspectDetails(
+    const rendered = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -340,7 +340,7 @@ describe("renderInspectDetails", () => {
   it("hides a client-ended connection to a host that also completed one", () => {
     // A keepalive pool cleaning up after its work is noise, not a failure.
     for (const reason of ["client-aborted", "client-timeout"]) {
-      const md = renderInspectDetails(
+      const md = renderInspectDetailsBody(
         [
           {
             time: t,
@@ -372,7 +372,7 @@ describe("renderInspectDetails", () => {
   it("hides a client-ended close to a host whose only request failed at the origin", () => {
     // A failed request still proves the client trusted the CA and a request
     // arrived, so the later keepalive close to that host is noise too.
-    const md = renderInspectDetails(
+    const md = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -402,7 +402,7 @@ describe("renderInspectDetails", () => {
   it("marks a request the proxy could not read as the refusal it was", () => {
     // Refused, so 🚫 rather than ⚠️, and named by its port alone: the plain
     // stage has no SNI, and no request arrived to carry a Host.
-    const rendered = renderInspectDetails(
+    const rendered = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -419,7 +419,7 @@ describe("renderInspectDetails", () => {
   });
 
   it("marks a connection haproxy itself ended before a request arrived", () => {
-    const rendered = renderInspectDetails(
+    const rendered = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -439,7 +439,7 @@ describe("renderInspectDetails", () => {
     // `OPTIONS *` reaches the rules and is refused by them, so the row is a
     // refusal rather than a connection that carried nothing. Without the
     // method it would read as the latter.
-    const rendered = renderInspectDetails(
+    const rendered = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -459,7 +459,7 @@ describe("renderInspectDetails", () => {
   });
 
   it('falls back to a bare "no request" when such a connection names no reason', () => {
-    const rendered = renderInspectDetails(
+    const rendered = renderInspectDetailsBody(
       [{ time: t, action: "incomplete", protocol: "https", host: "a.example.com", port: 443 }],
       t,
     );
@@ -469,7 +469,7 @@ describe("renderInspectDetails", () => {
   // The same ⚠️ as a request that never arrived, but this one has a URL to
   // show: it did arrive, and the rules passed on it.
   it("marks a connection the origin broke, keeping the request it named", () => {
-    const rendered = renderInspectDetails(
+    const rendered = renderInspectDetailsBody(
       [
         {
           time: t,
@@ -490,7 +490,7 @@ describe("renderInspectDetails", () => {
   });
 
   it('falls back to a bare "failed" when such a connection names no reason', () => {
-    const rendered = renderInspectDetails(
+    const rendered = renderInspectDetailsBody(
       [{ time: t, action: "failed", protocol: "https", host: "a.example.com", port: 443 }],
       t,
     );
@@ -498,9 +498,9 @@ describe("renderInspectDetails", () => {
   });
 });
 
-describe("renderInspectDetails credential parameters", () => {
+describe("renderInspectDetailsBody credential parameters", () => {
   const subjectOf = (url: string) => {
-    const md = renderInspectDetails(
+    const md = renderInspectDetailsBody(
       [{ time: t, action: "allow", protocol: "https", host: "h", port: 443, method: "GET", url }],
       t,
     );
@@ -620,9 +620,9 @@ describe("renderInspectDetails credential parameters", () => {
   });
 });
 
-describe("renderInspectDetails elapsed time", () => {
+describe("renderInspectDetailsBody elapsed time", () => {
   it("shows the first event at zero when it lands exactly on the start time", () => {
-    const md = renderInspectDetails(
+    const md = renderInspectDetailsBody(
       [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       t,
     );
@@ -630,7 +630,7 @@ describe("renderInspectDetails elapsed time", () => {
   });
 
   it("widens to HH:MM:SS.mmm once elapsed passes an hour", () => {
-    const md = renderInspectDetails(
+    const md = renderInspectDetailsBody(
       [{ time: t + 3600, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       t,
     );
@@ -638,7 +638,7 @@ describe("renderInspectDetails elapsed time", () => {
   });
 
   it("falls back to absolute UTC when there is no start time to be relative to", () => {
-    const md = renderInspectDetails(
+    const md = renderInspectDetailsBody(
       [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       undefined,
     );

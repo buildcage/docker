@@ -4,10 +4,6 @@ export const COMMUNICATION_DETAILS_OPEN =
   "<details>\n<summary>\u{1F4AC} Communication details</summary>\n\n";
 export const COMMUNICATION_DETAILS_CLOSE = "</details>\n";
 
-export function wrapCommunicationDetails(body: string): string {
-  return `\n${COMMUNICATION_DETAILS_OPEN}${body}${COMMUNICATION_DETAILS_CLOSE}`;
-}
-
 /** What a traffic report says where the Job Summary's size limit cut its communication log. */
 export function communicationTruncationNote(artifactAvailable: boolean): string {
   const rest = artifactAvailable
