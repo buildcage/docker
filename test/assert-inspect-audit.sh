@@ -50,9 +50,9 @@ echo ""
 
 echo "[report] audit heading and the hosts that were reached:"
 if grep -qF "### 📋 Audited Hosts" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| allowed.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| blocked.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| allowed.example.com:9080 | HTTP |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| \`allowed.example.com:443\` | HTTPS |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`blocked.example.com:443\` | HTTPS |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`allowed.example.com:9080\` | HTTP |" <<< "$REPORT_MARKDOWN"; then
   pass "the audited table lists every host, on its own port"
 else
   fail "the Audited Hosts table is missing expected rows"

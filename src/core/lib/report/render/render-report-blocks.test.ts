@@ -218,7 +218,7 @@ describe("renderReportBlocks under a limit", () => {
     );
     expect(empty).toContain("**✅ Nothing was refused**\n\n_(no");
     expect(render(report({ passed: rows("ok", 1) }))).toContain(
-      "| ok0.example.com:443 | HTTPS | 1 |\n\nEXTRA\n",
+      "| `ok0.example.com:443` | HTTPS | 1 |\n\nEXTRA\n",
     );
   });
 

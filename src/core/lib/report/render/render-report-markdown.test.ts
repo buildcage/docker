@@ -154,7 +154,7 @@ describe("renderReportMarkdown: universal", () => {
     );
     expect(md).toMatch(/### 🚫 Blocked \/ ⚠️ Failed Hosts\n/);
     expect(md).toMatch(
-      /\| bad\.com:80 \| HTTP \| 🚫 not-allowed \| 1 \|\n\| good\.com:443 \| HTTPS \| ⚠️ origin-no-response \| 1 \|/,
+      /\| `bad\.com:80` \| HTTP \| 🚫 not-allowed \| 1 \|\n\| `good\.com:443` \| HTTPS \| ⚠️ origin-no-response \| 1 \|/,
     );
     // The reader is told why the step passed regardless.
     expect(md).toMatch(/none of them fails the step/);
@@ -184,7 +184,7 @@ describe("renderReportMarkdown: universal", () => {
       "owner/repo",
       "v1",
     );
-    const at = ["| bad.com:80 |", "| good.com:443 |", "(2 hosts)"].map((s) => md.indexOf(s));
+    const at = ["| `bad.com:80` |", "| `good.com:443` |", "(2 hosts)"].map((s) => md.indexOf(s));
     expect(at.every((i) => i !== -1)).toBe(true);
     expect(at).toStrictEqual(at.toSorted((a, b) => a - b));
     expect(md).toMatch(/⚠️ origin-no-response \| 1 \| — \|/);
@@ -262,7 +262,7 @@ describe("renderReportMarkdown: universal", () => {
       "v1",
     );
     expect(md).toMatch(/\(2 hosts\)/);
-    expect(md).not.toMatch(/\| a\.sury\.org:443 \|/);
+    expect(md).not.toMatch(/\| `a\.sury\.org:443` \|/);
   });
 });
 
@@ -340,10 +340,10 @@ describe("renderReportMarkdown: inspect", () => {
       "v1",
     );
     expect(md).toMatch(
-      /\| \\\*\.sury\.org:\\\* \(2 hosts\) \| HTTPS \| 🚫 https-not-allowed \| 2 \| ✅ \|/,
+      /\| `\*\.sury\.org:\* \(2 hosts\)` \| HTTPS \| 🚫 https-not-allowed \| 2 \| ✅ \|/,
     );
     expect(md).not.toMatch(/a\.sury\.org/);
-    expect(md).toMatch(/\| bad\.com:80 \|/);
+    expect(md).toMatch(/\| `bad\.com:80` \|/);
   });
 });
 

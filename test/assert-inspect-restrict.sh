@@ -367,9 +367,9 @@ echo ""
 
 echo "[report] Allowed Hosts:"
 if grep -qF "### ✅ Allowed Hosts" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| allowed.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| allowed.example.com:80 | HTTP |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| 10.200.0.100:9080 | IP |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| \`allowed.example.com:443\` | HTTPS |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`allowed.example.com:80\` | HTTP |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`10.200.0.100:9080\` | IP |" <<< "$REPORT_MARKDOWN"; then
   pass "the table lists the hosts that were reached"
 else
   fail "the Allowed Hosts table is missing expected rows"
@@ -378,10 +378,10 @@ echo ""
 
 echo "[report] Blocked / Failed Hosts, including a name that never reached the proxy:"
 if grep -qF "### 🚫 Blocked / ⚠️ Failed Hosts" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| blocked.example.com:443 | HTTPS | 🚫 not-allowed |" <<< "$REPORT_MARKDOWN" \
-  && grep -qiF "| secret-in-a-name.attacker.example | DNS | 🚫 dns-not-allowed |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| impostor.example.com:443 | HTTPS | 🚫 origin-untrusted |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| deadend.example.com:443 | HTTPS | 🚫 origin-connect-failed |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| \`blocked.example.com:443\` | HTTPS | 🚫 not-allowed |" <<< "$REPORT_MARKDOWN" \
+  && grep -qiF "| \`secret-in-a-name.attacker.example\` | DNS | 🚫 dns-not-allowed |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`impostor.example.com:443\` | HTTPS | 🚫 origin-untrusted |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`deadend.example.com:443\` | HTTPS | 🚫 origin-connect-failed |" <<< "$REPORT_MARKDOWN"; then
   pass "the table separates a refused request, a refused name and two origins we never authenticated"
 else
   fail "the Blocked / Failed Hosts table is missing expected rows"
@@ -390,15 +390,15 @@ fi
 # towards fail_on_blocked. The plain stage has no SNI to name it by: bytes sent
 # to an address are named by it, as the ip rule that could pass them would be,
 # and a request to a name lands on the proxy's own address, which names nothing.
-if grep -qF '| 10.200.0.100:5432 | IP | 🚫 bad-request |' <<< "$REPORT_MARKDOWN" \
-  && grep -qE '^\| \(unknown\):[0-9]+ \| HTTP \| 🚫 missing-host-header \|' <<< "$REPORT_MARKDOWN"; then
+if grep -qF '| `10.200.0.100:5432` | IP | 🚫 bad-request |' <<< "$REPORT_MARKDOWN" \
+  && grep -qE '^\| `\(unknown\):[0-9]+` \| HTTP \| 🚫 missing-host-header \|' <<< "$REPORT_MARKDOWN"; then
   pass "both refusals that named no host are in the table"
 else
   fail "the Blocked / Failed Hosts table is missing the rows for requests that named no host"
 fi
 # The same unreachable host over plaintext, where no certificate was ever going
 # to be checked, so nothing was hidden by the connection failing.
-if grep -qF "| deadend.example.com:80 | HTTP | ⚠️ origin-unreachable |" <<< "$REPORT_MARKDOWN"; then
+if grep -qF "| \`deadend.example.com:80\` | HTTP | ⚠️ origin-unreachable |" <<< "$REPORT_MARKDOWN"; then
   pass "a plaintext connection that failed is a failure, not a refusal"
 else
   fail "the plaintext connection failure was not reported as a failure"
@@ -408,8 +408,8 @@ echo ""
 # A name the rules allow that resolves nowhere: no rule refused it and none can
 # clear it, so it is marked as a failure and does not fail the step.
 echo "[report] a failure, for a name the upstream resolver could not answer:"
-if grep -qF "| absent.example.com:443 | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| v6only.example.com:443 | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
+if grep -qF "| \`absent.example.com:443\` | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`v6only.example.com:443\` | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
   pass "an unresolvable name is reported as a failure, not a refusal"
 else
   fail "the Blocked / Failed Hosts table is missing the failed rows"
@@ -470,7 +470,7 @@ if grep -qE "⚠️ .*: HTTPS aborted\.example\.com:443 -> client-(aborted|timeo
 else
   fail "the aborted connection is missing from the timeline"
 fi
-if grep -qF "| aborted.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN"; then
+if grep -qF "| \`aborted.example.com:443\` | HTTPS |" <<< "$REPORT_MARKDOWN"; then
   fail "the aborted connection was put in one of the host tables"
 else
   pass "the aborted connection is in neither host table"
@@ -482,7 +482,7 @@ else
 fi
 # No rule takes the row above away, so the refused lookup for the same name has
 # to survive: it is the only row a reader can act on.
-if grep -qF "| aborted.example.com | DNS | 🚫 dns-not-allowed |" <<< "$REPORT_MARKDOWN"; then
+if grep -qF "| \`aborted.example.com\` | DNS | 🚫 dns-not-allowed |" <<< "$REPORT_MARKDOWN"; then
   pass "the refused lookup for the same name is still its own Blocked row"
 else
   fail "the refused lookup for the aborted host was folded away"

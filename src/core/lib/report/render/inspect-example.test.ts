@@ -368,8 +368,8 @@ describe("buildInspectRestrictExample", () => {
     );
     const [snippet, rest] = md.split("```\n\n");
     expect(snippet.includes("*")).toBe(false);
-    expect(rest).toContain("| \\* | https://github.com/\\*\\* | method |");
-    expect(rest).toContain("| PUT | https://\\*.s3.amazonaws.com/\\*\\* | host |");
+    expect(rest).toContain("| `*` | `https://github.com/**` | method |");
+    expect(rest).toContain("| `PUT` | `https://*.s3.amazonaws.com/**` | host |");
     expect(rest.match(/github\.com/g)).toHaveLength(1);
     expect(rest.includes("SECRET")).toBe(false);
   });
@@ -377,7 +377,7 @@ describe("buildInspectRestrictExample", () => {
   it("caps the list, pointing at Communication details for the rest", () => {
     const many = Array.from({ length: 25 }, (_, i) => req("GET", `https://a.example.com/${i}/*`));
     const md = buildInspectRestrictExample(many, "owner/repo", "v2");
-    expect(md.match(/\| GET \| /g)).toHaveLength(20);
+    expect(md.match(/\| `GET` \| /g)).toHaveLength(20);
     expect(md).toContain("…and 5 more, listed in Communication details.");
     expect(md.includes("allowed_url_rules")).toBe(false);
   });

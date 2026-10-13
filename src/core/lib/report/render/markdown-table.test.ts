@@ -74,10 +74,34 @@ describe("markdownTable", () => {
       );
     });
 
-    it("escapes '&' so a character reference cannot render as an invisible character", () => {
-      expect(oneCell("registry.npmjs.org&ZeroWidthSpace;")).toBe(
-        "| registry.npmjs.org\\&ZeroWidthSpace; |",
-      );
+    describe("in a code column", () => {
+      const codeCell = (value: string | undefined) =>
+        markdownTable([{ key: "a", title: "A", code: true }], [{ a: value }]).split("\n")[2];
+
+      it("shows Markdown GitHub would render as itself, a character reference included", () => {
+        expect(codeCell("registry.npmjs.org&ZeroWidthSpace;")).toBe(
+          "| `registry.npmjs.org&ZeroWidthSpace;` |",
+        );
+        expect(codeCell("a~~b~~")).toBe("| `a~~b~~` |");
+      });
+
+      it("escapes a '|', which GFM splits a row on even in a code span", () => {
+        expect(codeCell("a|b")).toBe("| `a\\|b` |");
+      });
+
+      it("fences a backtick with a longer run, padding one at either end", () => {
+        expect(codeCell("a``b")).toBe("| ```a``b``` |");
+        expect(codeCell("`a")).toBe("| `` `a `` |");
+      });
+
+      it("collapses a newline to a space", () => {
+        expect(codeCell("a\r\nb")).toBe("| `a b` |");
+      });
+
+      it("leaves an empty or absent value empty rather than an unclosed span", () => {
+        expect(codeCell("")).toBe("|  |");
+        expect(codeCell(undefined)).toBe("|  |");
+      });
     });
 
     it("escapes asterisks, so a rule pattern is not read as emphasis", () => {

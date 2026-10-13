@@ -33,7 +33,7 @@ export function renderHostTable(
   { showReason = false, showExpected = false }: RenderHostTableOptions = {},
 ): string {
   const formats: ColumnFormat[] = [
-    { key: "host", title: "Host" },
+    { key: "host", title: "Host", code: true },
     { key: "ruleType", title: "Rule" },
   ];
   if (showReason) formats.push({ key: "reason", title: "Reason" });

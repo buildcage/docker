@@ -220,8 +220,8 @@ function leftOutSection(leftOut: LeftOutRequest[]): string {
     "and so permit more than was sent.\n\n";
   md += markdownTable(
     [
-      { key: "method", title: "Method" },
-      { key: "url", title: "URL" },
+      { key: "method", title: "Method", code: true },
+      { key: "url", title: "URL", code: true },
       { key: "part", title: "Read as a pattern" },
     ],
     shown.map((r) => ({ ...r })),

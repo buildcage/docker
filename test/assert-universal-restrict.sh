@@ -78,8 +78,8 @@ echo ""
 
 echo "[report] Allowed Hosts:"
 if grep -qF "### ✅ Allowed Hosts" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| allowed.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| allowed.example.com:80 | HTTP |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| \`allowed.example.com:443\` | HTTPS |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`allowed.example.com:80\` | HTTP |" <<< "$REPORT_MARKDOWN"; then
   pass "the table lists the hosts that were reached, each on its own port"
 else
   fail "the Allowed Hosts table is missing expected rows"
@@ -88,9 +88,9 @@ echo ""
 
 echo "[report] Blocked / Failed Hosts, one row per reason the proxy refused for:"
 if grep -qF "### 🚫 Blocked / ⚠️ Failed Hosts" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| blocked.example.com:443 | HTTPS | 🚫 not-allowed |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| 10.200.0.100:80 | IP | 🚫 ip-not-allowed |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| internal.wildcard.example.com:443 | HTTPS | 🚫 internal-address |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| \`blocked.example.com:443\` | HTTPS | 🚫 not-allowed |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`10.200.0.100:80\` | IP | 🚫 ip-not-allowed |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`internal.wildcard.example.com:443\` | HTTPS | 🚫 internal-address |" <<< "$REPORT_MARKDOWN"; then
   pass "a name no rule covers, an address and an internal one each keep their reason"
 else
   fail "the Blocked / Failed Hosts table is missing expected rows"
@@ -100,7 +100,7 @@ echo ""
 # The allowlist is checked before anything resolves, so a name that got as far
 # as failing to resolve had passed it: no rule refused it and none can clear it.
 echo "[report] a failure, for a name the resolver could not answer:"
-if grep -qF "| nxdomain.wildcard.example.com:443 | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
+if grep -qF "| \`nxdomain.wildcard.example.com:443\` | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
   pass "an unresolvable name is reported as a failure, not a refusal"
 else
   fail "the Blocked / Failed Hosts table is missing the failed row"
