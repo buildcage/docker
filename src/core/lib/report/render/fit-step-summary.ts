@@ -146,6 +146,8 @@ function cutBlock(b: SummaryBlock, budget: number): string {
     kept += withNewline;
     usedBytes += lineBytes;
     count++;
+    // A toggle suffices: the only fences here are the renderers' own bare ```,
+    // and no line inside one starts with a host, URL or path.
     if (line.trim().startsWith("```")) fenceOpen = !fenceOpen;
     pos = nl + 1;
   }
