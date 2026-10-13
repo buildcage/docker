@@ -42,6 +42,7 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'rolldown.scripts.config.js'
               - '.dockerignore'
+              - 'licenses/*.txt'
             workflow: &workflow
               - '.github/workflows/test-integration.yml'
               - '.github/actions/setup-vp/**'
