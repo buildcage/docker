@@ -43,9 +43,9 @@ echo ""
 echo "[report] audit heading and the hosts that were reached:"
 if grep -qF "### 📋 Audited Hosts" <<< "$REPORT_MARKDOWN" \
   && ! grep -qF "### ✅ Allowed Hosts" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| blocked.example.com:443 | HTTPS |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| blocked.example.com:8080 | HTTP |" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| 10.200.0.100:80 | IP |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| \`blocked.example.com:443\` | HTTPS |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`blocked.example.com:8080\` | HTTP |" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "| \`10.200.0.100:80\` | IP |" <<< "$REPORT_MARKDOWN"; then
   pass "every host is audited rather than allowed, on its own port"
 else
   fail "the Audited Hosts table is missing expected rows"
@@ -54,14 +54,14 @@ echo ""
 
 echo "[report] only the guards that fire in both modes reach the Blocked / Failed Hosts table as refusals:"
 if grep -qF "### 🚫 Blocked / ⚠️ Failed Hosts" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "| internal.wildcard.example.com:443 | HTTPS | 🚫 internal-address |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "| \`internal.wildcard.example.com:443\` | HTTPS | 🚫 internal-address |" <<< "$REPORT_MARKDOWN"; then
   pass "the unconditional guard is reported with its reason"
 else
   fail "the Blocked / Failed Hosts table is missing the guard row"
 fi
 # The other unconditional guard, and the one the proxy did not decide: audit
 # reports it the same way restrict does, as a failure rather than a refusal.
-if grep -qF "| nxdomain.wildcard.example.com:443 | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
+if grep -qF "| \`nxdomain.wildcard.example.com:443\` | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
   pass "an unresolvable name is reported as a failure, not a refusal"
 else
   fail "the Blocked / Failed Hosts table is missing the unresolvable name"

@@ -23,7 +23,7 @@
 import { DEFAULT_PORT, splitHostPort } from "#core/lib/log/authority.ts";
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { markdownTable } from "./markdown-table.ts";
+import { codeCell, markdownTable } from "./markdown-table.ts";
 import {
   exampleStepHead,
   exampleStepTail,
@@ -220,8 +220,8 @@ function leftOutSection(leftOut: LeftOutRequest[]): string {
     "and so permit more than was sent.\n\n";
   md += markdownTable(
     [
-      { key: "method", title: "Method" },
-      { key: "url", title: "URL" },
+      { key: "method", title: "Method", cell: codeCell },
+      { key: "url", title: "URL", cell: codeCell },
       { key: "part", title: "Read as a pattern" },
     ],
     shown.map((r) => ({ ...r })),

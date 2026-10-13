@@ -6,15 +6,15 @@
 
 | Host | Rule | Count |
 | --- | --- | ---: |
-| a.example.com:443 | HTTPS | 3 |
-| b.example.com:80 | HTTP | 1 |
+| `a.example.com:443` | HTTPS | 3 |
+| `b.example.com:80` | HTTP | 1 |
 
 ### 🚫 Blocked / ⚠️ Failed Hosts
 
 | Host | Rule | Reason | Count |
 | --- | --- | --- | ---: |
-| bad.example.com:443 | HTTPS | 🚫 https-not-allowed | 2 |
-| a.example.com:443 | HTTPS | ⚠️ origin-aborted | 1 |
+| `bad.example.com:443` | HTTPS | 🚫 https-not-allowed | 2 |
+| `a.example.com:443` | HTTPS | ⚠️ origin-aborted | 1 |
 
 <sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
 

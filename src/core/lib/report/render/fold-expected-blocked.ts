@@ -62,6 +62,6 @@ function toRow(group: ExpectedGroup): HostTableRow {
     count: group.count,
     expected: true,
     expectedBy: group.rule,
-    display: `${group.rule} (${group.hosts.size} host${group.hosts.size === 1 ? "" : "s"})`,
+    note: `(${group.hosts.size} host${group.hosts.size === 1 ? "" : "s"})`,
   };
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { markdownTable } from "./markdown-table.ts";
+import { codeCell, markdownTable } from "./markdown-table.ts";
 
 describe("markdownTable", () => {
   it("renders headers, a left-aligned divider row, and cells pulled by key", () => {
@@ -72,6 +72,38 @@ describe("markdownTable", () => {
       expect(oneCell("x__-__T__buildcage__ALLOWED___HTTPS___f.example.com:443")).toBe(
         "| x__-__T__buildcage__ALLOWED___HTTPS___f.example.com:443 |",
       );
+    });
+
+    describe("in a code column", () => {
+      const codeRow = (value: string | undefined) =>
+        markdownTable([{ key: "a", title: "A", cell: codeCell }], [{ a: value }]).split("\n")[2];
+
+      it("shows Markdown GitHub would render as itself, a character reference included", () => {
+        expect(codeRow("registry.npmjs.org&ZeroWidthSpace;")).toBe(
+          "| `registry.npmjs.org&ZeroWidthSpace;` |",
+        );
+        expect(codeRow("a~~b~~")).toBe("| `a~~b~~` |");
+      });
+
+      it("escapes a '|', which GFM splits a row on even in a code span", () => {
+        expect(codeRow("a|b")).toBe("| `a\\|b` |");
+      });
+
+      it("fences a backtick with a longer run, padding one at either end", () => {
+        expect(codeRow("a``b")).toBe("| ```a``b``` |");
+        expect(codeRow("`a")).toBe("| `` `a `` |");
+      });
+
+      it("collapses a newline to a space, padding a space at either end", () => {
+        expect(codeRow("a\r\nb")).toBe("| `a b` |");
+        expect(codeRow("\na\n")).toBe("| `  a  ` |");
+        expect(codeRow("   ")).toBe("| `   ` |");
+      });
+
+      it("leaves an empty or absent value empty rather than an unclosed span", () => {
+        expect(codeRow("")).toBe("|  |");
+        expect(codeRow(undefined)).toBe("|  |");
+      });
     });
 
     it("escapes asterisks, so a rule pattern is not read as emphasis", () => {

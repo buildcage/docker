@@ -1,6 +1,6 @@
 import type { AggregatedEntry } from "#core/lib/log/aggregate.ts";
 
-import { markdownTable, type ColumnFormat } from "./markdown-table.ts";
+import { codeCell, markdownTable, type ColumnFormat } from "./markdown-table.ts";
 
 /**
  * A row of a host table, at whatever stage it reaches the renderer: an
@@ -13,9 +13,9 @@ export interface HostTableRow extends AggregatedEntry {
   /** The known_blocked_rules rule that marked the row expected, which folded
    *  rows are grouped by (see ../build/aggregate.ts). */
   expectedBy?: string;
-  /** Host cell text for a row that stands for something other than one
-   *  host:port, such as a folded group naming its rule. */
-  display?: string;
+  /** Shown after the host, such as the host count of a folded group, whose
+   *  host is its rule. */
+  note?: string;
   /** The mark on the reason. A failed row shows no Expected, as
    *  known_blocked_rules never matches one. */
   outcome?: "blocked" | "failed";
@@ -33,7 +33,7 @@ export function renderHostTable(
   { showReason = false, showExpected = false }: RenderHostTableOptions = {},
 ): string {
   const formats: ColumnFormat[] = [
-    { key: "host", title: "Host" },
+    { key: "host", title: "Host", cell: String },
     { key: "ruleType", title: "Rule" },
   ];
   if (showReason) formats.push({ key: "reason", title: "Reason" });
@@ -43,7 +43,7 @@ export function renderHostTable(
   const tableRows = rows.map((r) => ({
     // A name refused by the resolver was never connected to, so it has no port
     // to show and "name:-" would only invite the reader to look for one.
-    host: r.display ?? (r.port === "-" ? r.host : `${r.host}:${r.port}`),
+    host: codeCell(r.port === "-" ? r.host : `${r.host}:${r.port}`) + (r.note ? ` ${r.note}` : ""),
     ruleType: r.ruleType,
     reason: r.outcome ? OUTCOME_MARK[r.outcome] + r.reason : r.reason,
     count: r.count,
