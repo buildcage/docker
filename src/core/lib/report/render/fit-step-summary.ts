@@ -146,6 +146,9 @@ function cutBlock(b: SummaryBlock, budget: number): string {
     kept += withNewline;
     usedBytes += lineBytes;
     count++;
+    // A toggle is enough: the only fences in a block cut by lines are the
+    // renderers' own bare ```, and every line inside one starts with a mark, a
+    // time or flags, never with a name or URL that could start with ```.
     if (line.trim().startsWith("```")) fenceOpen = !fenceOpen;
     pos = nl + 1;
   }
