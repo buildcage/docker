@@ -34,13 +34,14 @@ iptables
 
 ------------------------------------------------------------------------------
 
-util-linux (pipesz only, at /usr/bin/pipesz)
+util-linux (util-linux-misc, setarch and the libraries, from the base image)
   Website : https://github.com/util-linux/util-linux
-  License : GNU General Public License (GPL); pipesz.c names no version
+  License : GPL-2.0-or-later by default, with parts under other GPL, LGPL,
+            BSD, MIT and ISC terms (see alpine-packages.txt)
   Source  : https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git or
             via Alpine Linux source packages
-  Note    : Only this binary, copied from Alpine Linux's util-linux-misc
-            package.
+  Note    : The notices of its files under BSD, MIT, ISC and EUPL terms are
+            collected in /opt/buildcage/licenses/alpine/util-linux.txt.
 
 ------------------------------------------------------------------------------
 
@@ -164,9 +165,8 @@ modules linked into them keep the licenses their own source names.
 
 Note on GPL components (HAProxy, iptables, util-linux, rsync):
 
-These components come from the Alpine Linux official package repository;
-pipesz is copied out of the util-linux-misc package. Their source code is
-available through:
+These components come from the Alpine Linux official package repository.
+Their source code is available through:
 
   1. The upstream project repositories listed above
   2. Alpine Linux source packages:

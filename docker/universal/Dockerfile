@@ -25,7 +25,7 @@ ARG CNI_SHA256_ARM64
 ARG COREDNS_VERSION
 ARG COREDNS_SHA256_AMD64
 ARG COREDNS_SHA256_ARM64
-RUN apk add --no-cache curl util-linux-misc && \
+RUN apk add --no-cache curl && \
     mkdir -p /opt/cni/bin && \
     ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') && \
     EXPECTED_SHA256=$([ "$ARCH" = "amd64" ] && echo "$CNI_SHA256_AMD64" || echo "$CNI_SHA256_ARM64") && \
@@ -64,16 +64,19 @@ FROM moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd
 
 LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
-      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-1.0-or-later AND GPL-2.0-only AND GPL-2.0-or-later AND (GPL-2.0-or-later WITH OpenSSL-Exception) AND GPL-3.0-or-later AND LGPL-2.1-only AND LGPL-2.1-or-later AND MPL-2.0 AND curl AND ISC AND BSD-2-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND 0BSD AND Zlib AND X11 AND SSH-OpenSSH" \
+      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-1.0-only AND GPL-1.0-or-later AND GPL-2.0-only AND GPL-2.0-or-later AND (GPL-2.0-or-later WITH OpenSSL-Exception) AND GPL-3.0-or-later AND LGPL-2.1-only AND LGPL-2.1-or-later AND MPL-2.0 AND curl AND ISC AND BSD-1-Clause AND BSD-2-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND 0BSD AND Zlib AND X11 AND SSH-OpenSSH AND blessing" \
       org.opencontainers.image.source="https://github.com/buildcage/docker" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/report/report-source.ts.
 
+# util-linux-misc provides pipesz for s6-rc.d/haproxy/run; the base already
+# carries it.
 RUN apk add --no-cache \
       s6-overlay \
       iptables \
       curl \
-      quickjs-ng
+      quickjs-ng \
+      util-linux-misc
 
 # Its own apk call so the extra repository serves this package alone; naming the
 # branch is what makes apk fail rather than warn and fall back to the base's
@@ -99,9 +102,6 @@ ENV S6_KILL_GRACETIME=500
 
 COPY --from=deps /opt/cni/bin /opt/cni/bin
 COPY --from=deps /usr/local/bin/coredns /usr/local/bin/coredns
-# For s6-rc.d/haproxy/run. The binary alone needs only musl; the package
-# would pull in ~6MB.
-COPY --from=deps /bin/pipesz /usr/bin/pipesz
 
 # CoreDNS answers queries the build controls, so it must not run as root.
 # setcap keeps :53 bindable once it has dropped.

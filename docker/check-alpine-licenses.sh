@@ -28,7 +28,12 @@ while IFS= read -r line; do
     echo "$pkg declares $declared, $list says $listed" >&2
     rc=1
   fi
-  for f in $(echo "$entry" | awk -F ' [|] ' '{ print $3 }'); do
+  files=$(echo "$entry" | awk -F ' [|] ' '{ print $3 }')
+  if [ -z "$files" ]; then
+    echo "$pkg names no license file in $list (- for none)" >&2
+    rc=1
+  fi
+  for f in $files; do
     if [ "$f" != - ] && [ ! -f "$dir/$f" ]; then
       echo "$pkg: $dir/$f is missing" >&2
       rc=1
