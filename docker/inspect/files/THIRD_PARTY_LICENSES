@@ -20,7 +20,8 @@ BuildKit (base image: moby/buildkit)
 
 HAProxy
   Website : https://www.haproxy.org/
-  License : GNU General Public License v2.0 or later (GPL-2.0-or-later)
+  License : GNU General Public License v2.0 or later, with the OpenSSL
+            exception (GPL-2.0-or-later WITH OpenSSL-Exception)
   Source  : https://git.haproxy.org/ or via Alpine Linux source packages
 
 ------------------------------------------------------------------------------
@@ -33,13 +34,14 @@ iptables
 
 ------------------------------------------------------------------------------
 
-util-linux (pipesz only, at /usr/bin/pipesz)
+util-linux (util-linux-misc, setarch and the libraries, from the base image)
   Website : https://github.com/util-linux/util-linux
-  License : GNU General Public License (GPL); pipesz.c names no version
+  License : GPL-2.0-or-later by default, with parts under other GPL, LGPL,
+            BSD, MIT and ISC terms (see alpine-packages.txt)
   Source  : https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git or
             via Alpine Linux source packages
-  Note    : Only this binary, copied from Alpine Linux's util-linux-misc
-            package.
+  Note    : The notices of its files under BSD, MIT, ISC and EUPL terms are
+            collected in /opt/buildcage/licenses/alpine/util-linux.txt.
 
 ------------------------------------------------------------------------------
 
@@ -136,13 +138,15 @@ Go modules linked into /opt/buildcage/bin/buildcage-runc
 ------------------------------------------------------------------------------
 
 Other packages and libraries these pull in, and the rest of the base image's
-packages, keep the licenses their own packages declare; `apk list -I` inside
-the image lists them.
+packages, keep the licenses their own packages declare.
+/opt/buildcage/licenses/alpine-packages.txt lists every Alpine package in the
+image with that license and the license files in /opt/buildcage/licenses/ that
+cover it.
 
 ------------------------------------------------------------------------------
 
-The full texts of the GPL-2.0, GPL-3.0, MPL-2.0 and Apache-2.0 licenses named
-above are in /opt/buildcage/licenses/.
+The full texts of the GPL-1.0, GPL-2.0, GPL-3.0, LGPL-2.1, MPL-2.0 and
+Apache-2.0 licenses are in /opt/buildcage/licenses/.
 
 The license files of curl and QuickJS-ng, copyright notices included, are
 there as curl.txt and QuickJS-ng.txt. The s6-overlay/ directory holds
@@ -161,9 +165,8 @@ modules linked into them keep the licenses their own source names.
 
 Note on GPL components (HAProxy, iptables, util-linux, rsync):
 
-These components come from the Alpine Linux official package repository;
-pipesz is copied out of the util-linux-misc package. Their source code is
-available through:
+These components come from the Alpine Linux official package repository.
+Their source code is available through:
 
   1. The upstream project repositories listed above
   2. Alpine Linux source packages:

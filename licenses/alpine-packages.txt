@@ -1,0 +1,102 @@
+# Each Alpine package in the proxy images, the license its package declares,
+# and the license files under /opt/buildcage/licenses/ that cover it. The image
+# build fails when an installed package is missing here, declares another
+# license, or names a file the image lacks.
+#
+# Where a package offers a choice, the files are those of the license taken.
+# ca-certificates-bundle holds only Mozilla's certificates (MPL-2.0); the MIT
+# part of its package is the update-ca-certificates tool. "-" marks a package
+# with no notice to reproduce: Alpine's signing keys and release files, whose
+# sources carry none, and SQLite, which is in the public domain.
+#
+# package | license | files
+acl-libs | LGPL-2.1-or-later AND GPL-2.0-or-later | LGPL-2.1.txt GPL-2.0.txt
+alpine-baselayout | GPL-2.0-only | GPL-2.0.txt
+alpine-baselayout-data | GPL-2.0-only | GPL-2.0.txt
+alpine-keys | MIT | -
+alpine-release | MIT | -
+apk-tools | GPL-2.0-only | GPL-2.0.txt
+bearssl-libs | MIT | s6-overlay/bearssl.txt
+brotli-libs | MIT | alpine/brotli.txt
+busybox | GPL-2.0-only | GPL-2.0.txt
+busybox-binsh | GPL-2.0-only | GPL-2.0.txt
+c-ares | MIT | alpine/c-ares.txt
+ca-certificates-bundle | MPL-2.0 AND MIT | MPL-2.0.txt
+curl | curl | curl.txt
+execline | ISC | s6-overlay/execline.txt
+execline-libs | ISC | s6-overlay/execline.txt
+fuse-common | GPL-2.0-only AND LGPL-2.1-only | GPL-2.0.txt LGPL-2.1.txt
+fuse3 | GPL-2.0-only AND LGPL-2.1-only | GPL-2.0.txt LGPL-2.1.txt
+fuse3-libs | GPL-2.0-only AND LGPL-2.1-only | GPL-2.0.txt LGPL-2.1.txt
+git | GPL-2.0-only | GPL-2.0.txt
+git-init-template | GPL-2.0-only | GPL-2.0.txt
+haproxy | GPL-2.0-or-later WITH OpenSSL-Exception | GPL-2.0.txt
+iptables | GPL-2.0-or-later | GPL-2.0.txt
+libapk | GPL-2.0-only | GPL-2.0.txt
+libblkid | LGPL-2.1-or-later | LGPL-2.1.txt
+libcrypto3 | Apache-2.0 | Apache-2.0.txt
+libcurl | curl | curl.txt
+libeconf | MIT | alpine/libeconf.txt
+libedit | BSD-3-Clause | alpine/libedit.txt
+libexpat | MIT | alpine/expat.txt
+libfdisk | LGPL-2.1-or-later | LGPL-2.1.txt
+libidn2 | GPL-2.0-or-later OR LGPL-3.0-or-later | GPL-2.0.txt
+libmnl | LGPL-2.1-or-later | LGPL-2.1.txt
+libmount | LGPL-2.1-or-later | LGPL-2.1.txt
+libncursesw | X11 | alpine/ncurses.txt
+libnftnl | GPL-2.0-or-later | GPL-2.0.txt
+libpsl | MIT | alpine/libpsl.txt
+libsmartcols | LGPL-2.1-or-later | LGPL-2.1.txt
+libssl3 | Apache-2.0 | Apache-2.0.txt
+libunistring | GPL-2.0-or-later OR LGPL-3.0-or-later | GPL-2.0.txt
+libuuid | BSD-3-Clause | alpine/util-linux.txt
+libxtables | GPL-2.0-or-later | GPL-2.0.txt
+libxxhash | BSD-2-Clause | alpine/xxhash.txt
+lua5.4-libs | MIT | alpine/lua5.4.txt
+lz4-libs | BSD-2-Clause AND GPL-2.0-or-later | alpine/lz4.txt GPL-2.0.txt
+musl | MIT | alpine/musl.txt
+musl-utils | MIT AND BSD-2-Clause AND GPL-2.0-or-later | alpine/musl.txt alpine/musl-utils.txt GPL-2.0.txt
+ncurses-terminfo-base | X11 | alpine/ncurses.txt
+nghttp2-libs | MIT | alpine/nghttp2.txt
+nspr | MPL-2.0 | MPL-2.0.txt
+nss | MPL-2.0 | MPL-2.0.txt
+nss-tools | MPL-2.0 | MPL-2.0.txt
+openssh | SSH-OpenSSH | alpine/openssh.txt
+openssh-client-common | SSH-OpenSSH | alpine/openssh.txt
+openssh-client-default | SSH-OpenSSH | alpine/openssh.txt
+openssh-keygen | SSH-OpenSSH | alpine/openssh.txt
+openssh-server | SSH-OpenSSH | alpine/openssh.txt
+openssh-server-common | SSH-OpenSSH | alpine/openssh.txt
+openssh-sftp-server | SSH-OpenSSH | alpine/openssh.txt
+openssl | Apache-2.0 | Apache-2.0.txt
+pcre2 | BSD-3-Clause | alpine/pcre2.txt
+pigz | Zlib | alpine/pigz.txt
+popt | MIT | alpine/popt.txt
+quickjs-ng | MIT | QuickJS-ng.txt
+quickjs-ng-libs | MIT | QuickJS-ng.txt
+rsync | GPL-3.0-or-later | GPL-3.0.txt
+s6 | ISC | s6-overlay/s6.txt
+s6-dns | ISC | s6-overlay/s6-dns.txt
+s6-dns-libs | ISC | s6-overlay/s6-dns.txt
+s6-ipcserver | ISC | s6-overlay/s6.txt
+s6-libs | ISC | s6-overlay/s6.txt
+s6-linux-init | ISC | s6-overlay/s6-linux-init.txt
+s6-linux-utils | ISC | s6-overlay/s6-linux-utils.txt
+s6-networking | ISC | s6-overlay/s6-networking.txt
+s6-networking-libs | ISC | s6-overlay/s6-networking.txt
+s6-overlay | ISC | s6-overlay/s6-overlay.txt
+s6-overlay-helpers | ISC | s6-overlay/s6-overlay-helpers.txt
+s6-portable-utils | ISC | s6-overlay/s6-portable-utils.txt
+s6-rc | ISC | s6-overlay/s6-rc.txt
+s6-rc-libs | ISC | s6-overlay/s6-rc.txt
+scanelf | GPL-2.0-only | GPL-2.0.txt
+setarch | GPL-3.0-or-later AND GPL-2.0-or-later AND GPL-2.0-only AND GPL-1.0-only AND LGPL-2.1-or-later AND BSD-1-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND MIT AND Public-Domain | GPL-3.0.txt GPL-2.0.txt GPL-1.0.txt LGPL-2.1.txt alpine/util-linux.txt
+skalibs-libs | ISC | s6-overlay/skalibs.txt
+sqlite-libs | blessing | -
+ssl_client | GPL-2.0-only | GPL-2.0.txt
+util-linux-misc | GPL-3.0-or-later AND GPL-2.0-or-later AND GPL-2.0-only AND GPL-1.0-only AND LGPL-2.1-or-later AND BSD-1-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND MIT AND Public-Domain | GPL-3.0.txt GPL-2.0.txt GPL-1.0.txt LGPL-2.1.txt alpine/util-linux.txt
+utmps-libs | ISC | alpine/utmps.txt
+xz | GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later | GPL-2.0.txt LGPL-2.1.txt alpine/xz.txt
+xz-libs | GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later | GPL-2.0.txt LGPL-2.1.txt alpine/xz.txt
+zlib | Zlib | alpine/zlib.txt
+zstd-libs | BSD-3-Clause OR GPL-2.0-or-later | alpine/zstd.txt
