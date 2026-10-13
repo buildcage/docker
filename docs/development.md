@@ -341,9 +341,10 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 ├── docker/                   # proxy_engine build contexts
 │   ├── compose.action.yaml   # Runtime compose file the action uses (verified, digest-pinned
 │   │                         # image ref), distinct from the top-level compose.yaml below
+│   ├── collect-go-licenses.sh
+│   │                         # Copies the license files of what a Go binary links, at image build
 │   ├── seccomp/              # The builder container's seccomp profile and gen-profile.mjs,
 │   │                         # read by the Docker client on the runner, not copied into an image
-│   ├── collect-go-licenses.sh # Copies the license files of what a Go binary links, at image build
 │   ├── common/               # Image files both engines share: s6 services, init-iptables,
 │   │                         # cni.conflist
 │   ├── universal/            # proxy_engine: universal — BuildKit, HAProxy, CoreDNS, s6-overlay

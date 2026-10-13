@@ -3,8 +3,8 @@ Third-Party Licenses
 
 The Buildcage Docker image (universal proxy engine) includes the following
 third-party software. Each component retains its original license. The
-Buildcage source code itself is licensed under the MIT License (see LICENSE
-file).
+Buildcage source code itself is licensed under the MIT License (see
+/opt/buildcage/LICENSE).
 
 ------------------------------------------------------------------------------
 
@@ -91,9 +91,10 @@ QuickJS-ng
 
 ------------------------------------------------------------------------------
 
-Libraries these packages pull in, and the rest of the base image's packages,
-keep the licenses their own packages declare; `apk list -I` inside the image
-lists them.
+The packages and libraries these pull in, such as the s6, s6-rc and execline
+programs s6-overlay runs, and the rest of the base image's packages, keep the
+licenses their own packages declare; `apk list -I` inside the image lists
+them.
 
 ------------------------------------------------------------------------------
 
@@ -102,10 +103,11 @@ The full texts of the GPL-2.0 and Apache-2.0 licenses named above are in
 
 The license files of curl, s6-overlay and QuickJS-ng, copyright notices
 included, are there as curl.txt, s6-overlay.txt and QuickJS-ng.txt, and
-THIRD_PARTY_LICENSES_NPM holds those of the npm packages, @actions/core among
-them, that report-action.js bundles. CoreDNS and the CNI plugins are their
-projects' release binaries, and the Go modules linked into them keep the
-licenses their own source names.
+THIRD_PARTY_LICENSES_NPM holds the license texts of every npm package the
+actions depend on, those report-action.js bundles, @actions/core among them,
+included. CoreDNS, the CNI plugins and the BuildKit base image's own programs
+are their projects' release binaries, and the Go modules linked into them keep
+the licenses their own source names.
 
 ------------------------------------------------------------------------------
 

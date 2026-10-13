@@ -118,6 +118,7 @@ COPY --from=scripts-build /build/dist/qjs/src/core/scripts/gen-configs-universal
 # it on the runner (see report-action.node.ts).
 COPY --from=scripts-build /build/dist/report-action/docker/universal/scripts/report-action.js /opt/buildcage/scripts/report-action.js
 
+COPY LICENSE /opt/buildcage/LICENSE
 COPY docker/universal/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 COPY licenses/GPL-2.0.txt licenses/Apache-2.0.txt \
      licenses/curl.txt licenses/QuickJS-ng.txt licenses/s6-overlay.txt THIRD_PARTY_LICENSES_NPM /opt/buildcage/licenses/

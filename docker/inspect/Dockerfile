@@ -142,6 +142,7 @@ COPY --from=scripts-build /build/dist/qjs/src/core/scripts/gen-configs-inspect.j
 # it on the runner (see report-action.node.ts).
 COPY --from=scripts-build /build/dist/report-action/docker/inspect/scripts/report-action.js /opt/buildcage/scripts/report-action.js
 
+COPY LICENSE /opt/buildcage/LICENSE
 COPY docker/inspect/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
 COPY licenses/GPL-2.0.txt licenses/GPL-3.0.txt licenses/MPL-2.0.txt licenses/Apache-2.0.txt \
      licenses/curl.txt licenses/QuickJS-ng.txt licenses/s6-overlay.txt THIRD_PARTY_LICENSES_NPM /opt/buildcage/licenses/
