@@ -5655,8 +5655,35 @@ var DecodedURL, init_proxy = __esmMin((() => {
 				return this.abort(err), !1;
 			}
 		}
-		onUpgrade(statusCode, headers, socket) {
-			return assert$26(!this.aborted), assert$26(!this.completed), this[kHandler].onUpgrade(statusCode, headers, socket);
+		onUpgrade(statusCode, headers, socket, statusText = "") {
+			this.onFinally(), assert$26(!this.aborted), assert$26(!this.completed), statusCode !== null && this.#publishUpgradeHeaders(statusCode, headers, statusText);
+			let result = this[kHandler].onUpgrade(statusCode, headers, socket);
+			return this.aborted || (this.completed = !0, statusCode !== null && this.#publishUpgradeTrailers()), result;
+		}
+		onUpgradeResponse(statusCode, headers, parseHeaders, statusText = "") {
+			assert$26(!this.aborted), assert$26(this.completed), channels.headers.hasSubscribers && this.#publishUpgradeHeaders(statusCode, parseHeaders(headers), statusText), this.#publishUpgradeTrailers();
+		}
+		onUpgradeError(error) {
+			assert$26(!this.aborted), assert$26(this.completed), channels.error.hasSubscribers && channels.error.publish({
+				request: this,
+				error
+			});
+		}
+		#publishUpgradeHeaders(statusCode, headers, statusText) {
+			channels.headers.hasSubscribers && channels.headers.publish({
+				request: this,
+				response: {
+					statusCode,
+					headers,
+					statusText
+				}
+			});
+		}
+		#publishUpgradeTrailers() {
+			channels.trailers.hasSubscribers && channels.trailers.publish({
+				request: this,
+				trailers: []
+			});
 		}
 		onComplete(trailers) {
 			this.onFinally(), assert$26(!this.aborted), this.completed = !0, channels.trailers.hasSubscribers && channels.trailers.publish({
@@ -7841,14 +7868,14 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			this.headersSize += len, this.headersSize >= this.headersMaxSize && util.destroy(this.socket, new HeadersOverflowError());
 		}
 		onUpgrade(head) {
-			let { upgrade, client, socket, headers, statusCode } = this;
+			let { upgrade, client, socket, headers, statusCode, statusText } = this;
 			assert$20(upgrade), assert$20(client[kSocket] === socket), assert$20(!socket.destroyed), assert$20(!this.paused), assert$20(!(headers.length & 1));
 			let request = client[kQueue][client[kRunningIdx]];
 			assert$20(request), assert$20(request.upgrade || request.method === "CONNECT"), this.statusCode = null, this.statusText = "", this.shouldKeepAlive = null, this.headers = [], this.headersSize = 0, socket.unshift(head), socket[kParser].destroy(), socket[kParser] = null, socket[kClient] = null, socket[kError] = null, removeAllListeners(socket), client[kSocket] = null, client[kHTTPContext] = null, client[kQueue][client[kRunningIdx]++] = null, client.emit("disconnect", client[kUrl], [client], new InformationalError("upgrade"));
 			try {
-				request.onUpgrade(statusCode, headers, socket);
-			} catch (err) {
-				util.destroy(socket, err);
+				request.onUpgrade(statusCode, headers, socket, statusText);
+			} catch (error) {
+				util.errorRequest(client, request, error), util.destroy(socket, error);
 			}
 			client[kResume]();
 		}
@@ -8015,8 +8042,14 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		}
 		let socket = client[kSocket];
 		clearIdleSocketValidation(socket);
-		let abort = (err) => {
-			request.aborted || request.completed || (util.errorRequest(client, request, err || new RequestAbortedError()), util.destroy(body), util.destroy(socket, new InformationalError("aborted")));
+		let abort = (error) => {
+			if (!request.aborted) {
+				if (request.completed) {
+					(request.upgrade || request.method === "CONNECT") && util.destroy(socket, new InformationalError("aborted"));
+					return;
+				}
+				util.errorRequest(client, request, error || new RequestAbortedError()), util.destroy(body), util.destroy(socket, new InformationalError("aborted"));
+			}
 		};
 		try {
 			request.onConnect(abort);
@@ -8161,7 +8194,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 	};
 	module.exports = connectH1;
 })), require_client_h2 = __commonJSMin(((exports, module) => {
-	let assert$19 = require("node:assert"), { pipeline: pipeline$2 } = require("node:stream"), util = require_util$11(), { RequestContentLengthMismatchError, RequestAbortedError, SocketError, InformationalError } = require_errors$2(), { kUrl, kReset, kClient, kRunning, kPending, kQueue, kPendingIdx, kRunningIdx, kError, kSocket, kStrictContentLength, kOnError, kMaxConcurrentStreams, kHTTP2Session, kResume, kSize, kHTTPContext } = require_symbols$4(), kOpenStreams = Symbol("open streams"), extractBody, h2ExperimentalWarned = !1, http2;
+	let assert$19 = require("node:assert"), { errorMonitor } = require("node:events"), { pipeline: pipeline$2 } = require("node:stream"), util = require_util$11(), { RequestContentLengthMismatchError, RequestAbortedError, SocketError, InformationalError } = require_errors$2(), { kUrl, kReset, kClient, kRunning, kPending, kQueue, kPendingIdx, kRunningIdx, kError, kSocket, kStrictContentLength, kOnError, kMaxConcurrentStreams, kHTTP2Session, kResume, kSize, kHTTPContext } = require_symbols$4(), kOpenStreams = Symbol("open streams"), extractBody, h2ExperimentalWarned = !1, http2;
 	try {
 		http2 = require("node:http2");
 	} catch {
@@ -8173,6 +8206,10 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		for (let [name, value] of Object.entries(headers)) if (Array.isArray(value)) for (let subvalue of value) result.push(Buffer.from(name), Buffer.from(subvalue));
 		else result.push(Buffer.from(name), Buffer.from(value));
 		return result;
+	}
+	function parseH2ResponseHeaders(headers) {
+		let { [HTTP2_HEADER_STATUS]: _statusCode, ...realHeaders } = headers;
+		return parseH2Headers(realHeaders);
 	}
 	async function connectH2(client, socket) {
 		client[kSocket] = socket, h2ExperimentalWarned || (h2ExperimentalWarned = !0, process.emitWarning("H2 support is experimental, expect them to change at any time.", { code: "UNDICI-H2" }));
@@ -8260,8 +8297,14 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		}
 		let stream, { hostname, port } = client[kUrl];
 		headers[HTTP2_HEADER_AUTHORITY] = host || `${hostname}${port ? `:${port}` : ""}`, headers[HTTP2_HEADER_METHOD] = method;
-		let abort = (err) => {
-			request.aborted || request.completed || (err ||= new RequestAbortedError(), util.errorRequest(client, request, err), stream != null && util.destroy(stream, err), util.destroy(body, err), client[kQueue][client[kRunningIdx]++] = null, client[kResume]());
+		let abort = (error) => {
+			if (!request.aborted) {
+				if (request.completed) {
+					method === "CONNECT" && stream != null && util.destroy(stream, error || new RequestAbortedError());
+					return;
+				}
+				error ||= new RequestAbortedError(), util.errorRequest(client, request, error), stream != null && util.destroy(stream, error), util.destroy(body, error), client[kQueue][client[kRunningIdx]++] = null, client[kResume]();
+			}
 		};
 		try {
 			request.onConnect(abort);
@@ -8269,14 +8312,28 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			util.errorRequest(client, request, err);
 		}
 		if (request.aborted) return !1;
-		if (method === "CONNECT") return session.ref(), stream = session.request(headers, {
-			endStream: !1,
-			signal
-		}), stream.id && !stream.pending ? (request.onUpgrade(null, null, stream), ++session[kOpenStreams], client[kQueue][client[kRunningIdx]++] = null) : stream.once("ready", () => {
-			request.onUpgrade(null, null, stream), ++session[kOpenStreams], client[kQueue][client[kRunningIdx]++] = null;
-		}), stream.once("close", () => {
-			--session[kOpenStreams], session[kOpenStreams] === 0 && session.unref();
-		}), !0;
+		if (method === "CONNECT") {
+			session.ref(), stream = session.request(headers, {
+				endStream: !1,
+				signal
+			});
+			let upgradeResponseFinished = !1, onResponse = (headers) => {
+				upgradeResponseFinished = !0, stream.off(errorMonitor, onUpgradeError), request.onUpgradeResponse(Number(headers[HTTP2_HEADER_STATUS]), headers, parseH2ResponseHeaders);
+			}, onUpgradeError = (error) => {
+				upgradeResponseFinished = !0, stream.off("response", onResponse), request.onUpgradeError(error);
+			};
+			return stream.once("response", onResponse), stream.once("error", abort), ++session[kOpenStreams], (() => {
+				try {
+					request.onUpgrade(null, null, stream);
+				} catch (error) {
+					stream.off("response", onResponse), abort(error);
+					return;
+				}
+				request.aborted || (stream.off("error", abort), stream.once(errorMonitor, onUpgradeError), client[kQueue][client[kRunningIdx]++] = null);
+			})(), stream.once("close", () => {
+				!upgradeResponseFinished && request.completed && (stream.off("response", onResponse), stream.off(errorMonitor, onUpgradeError), request.onUpgradeError(new InformationalError(`HTTP/2: "stream error" received - code ${stream.rstCode}`))), --session[kOpenStreams], session[kOpenStreams] === 0 && session.unref();
+			}), !0;
+		}
 		headers[HTTP2_HEADER_PATH] = path, headers[HTTP2_HEADER_SCHEME] = "https";
 		let expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
 		body && typeof body.read == "function" && body.read(0);
@@ -9282,7 +9339,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		}
 		onHeaders(statusCode, rawHeaders, resume, statusMessage) {
 			let headers = parseHeaders(rawHeaders);
-			if (this.retryCount += 1, statusCode >= 300) return this.retryOpts.statusCodes.includes(statusCode) === !1 ? (this.headersSent = !0, this.checkpointResponseEnd(headers, resume), this.handler.onHeaders(statusCode, rawHeaders, resume, statusMessage)) : (this.abort(new RequestRetryError("Request failed", statusCode, {
+			if (this.retryCount += 1, statusCode >= 300) return !this.headersSent && this.retryOpts.statusCodes.includes(statusCode) === !1 ? (this.headersSent = !0, this.checkpointResponseEnd(headers, resume), this.handler.onHeaders(statusCode, rawHeaders, resume, statusMessage)) : (this.abort(new RequestRetryError("Request failed", statusCode, {
 				headers,
 				data: { count: this.retryCount }
 			})), !1);
@@ -23470,7 +23527,7 @@ var init_httpClientAdapter = __esmMin((() => {
 	init_extendedClient(), init_response(), init_requestPolicyFactoryPolicy(), init_disableKeepAlivePolicy(), init_httpClientAdapter(), init_util$2();
 }));
 //#endregion
-//#region node_modules/.pnpm/fast-xml-parser@5.11.1/node_modules/fast-xml-parser/src/util.js
+//#region node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/util.js
 function getAllMatches(string, regex) {
 	let matches = [], match = regex.exec(string);
 	for (; match;) {
@@ -23503,7 +23560,7 @@ var nameStartChar, nameChar, regexName, isName, DANGEROUS_PROPERTY_NAMES, critic
 	];
 }));
 //#endregion
-//#region node_modules/.pnpm/fast-xml-parser@5.11.1/node_modules/fast-xml-parser/src/validator.js
+//#region node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/validator.js
 function validate(xmlData, options) {
 	options = Object.assign({}, defaultOptions$2, options);
 	let tags = [], tagFound = !1, reachedRoot = !1;
@@ -23762,7 +23819,7 @@ var defaultOptions$2, doubleQuote, singleQuote, init_validator = __esmMin((() =>
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@nodable+entities@3.0.0/node_modules/@nodable/entities/src/EntityDecoder.js
+//#region node_modules/.pnpm/@nodable+entities@3.1.0/node_modules/@nodable/entities/src/EntityDecoder.js
 function validateEntityName$1(name) {
 	if (name[0] === "#") throw Error(`[EntityReplacer] Invalid character '#' in entity name: "${name}"`);
 	for (let ch of name) if (SPECIAL_CHARS.has(ch)) throw Error(`[EntityReplacer] Invalid character '${ch}' in entity name: "${name}"`);
@@ -23944,7 +24001,7 @@ var ENTITY_ACTION, SPECIAL_CHARS, LIMIT_TIER_EXTERNAL, LIMIT_TIER_BASE, LIMIT_TI
 	init_EntityDecoder(), init_entities();
 }));
 //#endregion
-//#region node_modules/.pnpm/fast-xml-parser@5.11.1/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
+//#region node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
 function validatePropertyName(propertyName, optionName) {
 	if (typeof propertyName != "string") return;
 	let normalized = propertyName.toLowerCase();
@@ -24099,7 +24156,7 @@ var defaultOnDangerousProperty, defaultOptions$1, buildOptions, init_OptionsBuil
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/fast-xml-parser@5.11.1/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
+//#region node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
 function hasSeq(data, seq, i) {
 	for (let j = 0; j < seq.length; j++) if (seq[j] !== data[i + j + 1]) return !1;
 	return !0;
@@ -24502,7 +24559,7 @@ var hexRegex, binRegex, octRegex, numRegex, consider, eNotationRegx, init_strnum
 	}, eNotationRegx = /^([-+])?(0*)(\d*(\.\d*)?[eE][-\+]?\d+)$/;
 }));
 //#endregion
-//#region node_modules/.pnpm/fast-xml-parser@5.11.1/node_modules/fast-xml-parser/src/ignoreAttributes.js
+//#region node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/ignoreAttributes.js
 function getIgnoreAttributesFn$1(ignoreAttributes) {
 	return typeof ignoreAttributes == "function" ? ignoreAttributes : Array.isArray(ignoreAttributes) ? (attrName) => {
 		for (let pattern of ignoreAttributes) if (typeof pattern == "string" && attrName === pattern || pattern instanceof RegExp && pattern.test(attrName)) return !0;
@@ -25500,7 +25557,7 @@ var init_src$1 = __esmMin((() => {
 	});
 }));
 //#endregion
-//#region node_modules/.pnpm/fast-xml-parser@5.11.1/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
+//#region node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
 function extractRawAttributes(prefixedAttrs, options) {
 	if (!prefixedAttrs) return {};
 	let attrs = options.attributesGroupName ? prefixedAttrs[options.attributesGroupName] : prefixedAttrs;
@@ -25807,7 +25864,7 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/fast-xml-parser@5.11.1/node_modules/fast-xml-parser/src/xmlparser/node2json.js
+//#region node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/xmlparser/node2json.js
 function stripAttributePrefix(attrs, prefix) {
 	if (!attrs || typeof attrs != "object") return {};
 	if (!prefix) return attrs;
@@ -25871,7 +25928,7 @@ var METADATA_SYMBOL, init_node2json = __esmMin((() => {
 			this.externalEntities = {}, this.options = buildOptions(options);
 		}
 		parse(xmlData, validationOption) {
-			if (typeof xmlData != "string" && xmlData.toString) xmlData = xmlData.toString();
+			if (typeof xmlData != "string" && xmlData.toString) xmlData = xmlData instanceof Uint8Array && !(typeof Buffer < "u" && Buffer.isBuffer(xmlData)) ? new TextDecoder("utf-8", { ignoreBOM: !0 }).decode(xmlData) : xmlData.toString();
 			else if (typeof xmlData != "string") throw Error("XML data is accepted in String or Bytes[] form.");
 			if (validationOption) {
 				validationOption === !0 && (validationOption = {});
@@ -28283,7 +28340,7 @@ var storageRequestFailureDetailsParserPolicyName, init_StorageRequestFailureDeta
 })), init_esm$2 = __esmMin((() => {
 	init_indexPlatform();
 })), SDK_VERSION, SERVICE_VERSION, BLOCK_BLOB_MAX_UPLOAD_BLOB_BYTES, BLOCK_BLOB_MAX_STAGE_BLOCK_BYTES, BLOCK_BLOB_MAX_BLOCKS, DEFAULT_BLOCK_BUFFER_SIZE_BYTES, DEFAULT_BLOB_DOWNLOAD_BLOCK_BYTES, REQUEST_TIMEOUT, URLConstants, SIZE_1_MB, EncryptionAlgorithmAES25, DevelopmentConnectionString, StorageBlobLoggingAllowedHeaderNames, StorageBlobLoggingAllowedQueryParameters, PathStylePorts, init_constants = __esmMin((() => {
-	SDK_VERSION = "12.33.0", SERVICE_VERSION = "2026-06-06", BLOCK_BLOB_MAX_UPLOAD_BLOB_BYTES = 268435456, BLOCK_BLOB_MAX_STAGE_BLOCK_BYTES = 4194304e3, BLOCK_BLOB_MAX_BLOCKS = 5e4, DEFAULT_BLOCK_BUFFER_SIZE_BYTES = 8388608, DEFAULT_BLOB_DOWNLOAD_BLOCK_BYTES = 4194304, REQUEST_TIMEOUT = 1e5, URLConstants = { Parameters: {
+	SDK_VERSION = "12.34.0", SERVICE_VERSION = "2026-10-06", BLOCK_BLOB_MAX_UPLOAD_BLOB_BYTES = 268435456, BLOCK_BLOB_MAX_STAGE_BLOCK_BYTES = 4194304e3, BLOCK_BLOB_MAX_BLOCKS = 5e4, DEFAULT_BLOCK_BUFFER_SIZE_BYTES = 8388608, DEFAULT_BLOB_DOWNLOAD_BLOCK_BYTES = 4194304, REQUEST_TIMEOUT = 1e5, URLConstants = { Parameters: {
 		FORCE_BROWSER_NO_CACHE: "_",
 		SIGNATURE: "sig",
 		SNAPSHOT: "snapshot",
@@ -28313,7 +28370,7 @@ var storageRequestFailureDetailsParserPolicyName, init_StorageRequestFailureDeta
 	];
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/Pipeline.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/Pipeline.js
 function isPipelineLike(pipeline) {
 	if (!pipeline || typeof pipeline != "object") return !1;
 	let castPipeline = pipeline;
@@ -28555,8 +28612,12 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 	ContainerGetPropertiesExceptionHeaders: () => ContainerGetPropertiesExceptionHeaders,
 	ContainerGetPropertiesHeaders: () => ContainerGetPropertiesHeaders,
 	ContainerItem: () => ContainerItem,
+	ContainerListBlobFlatSegmentApacheArrowExceptionHeaders: () => ContainerListBlobFlatSegmentApacheArrowExceptionHeaders,
+	ContainerListBlobFlatSegmentApacheArrowHeaders: () => ContainerListBlobFlatSegmentApacheArrowHeaders,
 	ContainerListBlobFlatSegmentExceptionHeaders: () => ContainerListBlobFlatSegmentExceptionHeaders,
 	ContainerListBlobFlatSegmentHeaders: () => ContainerListBlobFlatSegmentHeaders,
+	ContainerListBlobHierarchySegmentApacheArrowExceptionHeaders: () => ContainerListBlobHierarchySegmentApacheArrowExceptionHeaders,
+	ContainerListBlobHierarchySegmentApacheArrowHeaders: () => ContainerListBlobHierarchySegmentApacheArrowHeaders,
 	ContainerListBlobHierarchySegmentExceptionHeaders: () => ContainerListBlobHierarchySegmentExceptionHeaders,
 	ContainerListBlobHierarchySegmentHeaders: () => ContainerListBlobHierarchySegmentHeaders,
 	ContainerProperties: () => ContainerProperties,
@@ -28630,7 +28691,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 	StaticWebsite: () => StaticWebsite,
 	StorageError: () => StorageError,
 	UserDelegationKey: () => UserDelegationKey
-}), BlobServiceProperties, Logging, RetentionPolicy, Metrics, CorsRule, StaticWebsite, StorageError, BlobServiceStatistics, GeoReplication, ListContainersSegmentResponse, ContainerItem, ContainerProperties, KeyInfo, UserDelegationKey, FilterBlobSegment, FilterBlobItem, BlobTags, BlobTag, SignedIdentifier, AccessPolicy, ListBlobsFlatSegmentResponse, BlobFlatListSegment, BlobItemInternal, BlobName, BlobPropertiesInternal, ListBlobsHierarchySegmentResponse, BlobHierarchyListSegment, BlobPrefix, BlockLookupList, BlockList, Block, PageList, PageRange, ClearRange, QueryRequest, QuerySerialization, QueryFormat, DelimitedTextConfiguration, JsonTextConfiguration, ArrowConfiguration, ArrowField, ServiceSetPropertiesHeaders, ServiceSetPropertiesExceptionHeaders, ServiceGetPropertiesHeaders, ServiceGetPropertiesExceptionHeaders, ServiceGetStatisticsHeaders, ServiceGetStatisticsExceptionHeaders, ServiceListContainersSegmentHeaders, ServiceListContainersSegmentExceptionHeaders, ServiceGetUserDelegationKeyHeaders, ServiceGetUserDelegationKeyExceptionHeaders, ServiceGetAccountInfoHeaders, ServiceGetAccountInfoExceptionHeaders, ServiceSubmitBatchHeaders, ServiceSubmitBatchExceptionHeaders, ServiceFilterBlobsHeaders, ServiceFilterBlobsExceptionHeaders, ContainerCreateHeaders, ContainerCreateExceptionHeaders, ContainerGetPropertiesHeaders, ContainerGetPropertiesExceptionHeaders, ContainerDeleteHeaders, ContainerDeleteExceptionHeaders, ContainerSetMetadataHeaders, ContainerSetMetadataExceptionHeaders, ContainerGetAccessPolicyHeaders, ContainerGetAccessPolicyExceptionHeaders, ContainerSetAccessPolicyHeaders, ContainerSetAccessPolicyExceptionHeaders, ContainerRestoreHeaders, ContainerRestoreExceptionHeaders, ContainerRenameHeaders, ContainerRenameExceptionHeaders, ContainerSubmitBatchHeaders, ContainerSubmitBatchExceptionHeaders, ContainerFilterBlobsHeaders, ContainerFilterBlobsExceptionHeaders, ContainerAcquireLeaseHeaders, ContainerAcquireLeaseExceptionHeaders, ContainerReleaseLeaseHeaders, ContainerReleaseLeaseExceptionHeaders, ContainerRenewLeaseHeaders, ContainerRenewLeaseExceptionHeaders, ContainerBreakLeaseHeaders, ContainerBreakLeaseExceptionHeaders, ContainerChangeLeaseHeaders, ContainerChangeLeaseExceptionHeaders, ContainerListBlobFlatSegmentHeaders, ContainerListBlobFlatSegmentExceptionHeaders, ContainerListBlobHierarchySegmentHeaders, ContainerListBlobHierarchySegmentExceptionHeaders, ContainerGetAccountInfoHeaders, ContainerGetAccountInfoExceptionHeaders, BlobDownloadHeaders, BlobDownloadExceptionHeaders, BlobGetPropertiesHeaders, BlobGetPropertiesExceptionHeaders, BlobDeleteHeaders, BlobDeleteExceptionHeaders, BlobUndeleteHeaders, BlobUndeleteExceptionHeaders, BlobSetExpiryHeaders, BlobSetExpiryExceptionHeaders, BlobSetHttpHeadersHeaders, BlobSetHttpHeadersExceptionHeaders, BlobSetImmutabilityPolicyHeaders, BlobSetImmutabilityPolicyExceptionHeaders, BlobDeleteImmutabilityPolicyHeaders, BlobDeleteImmutabilityPolicyExceptionHeaders, BlobSetLegalHoldHeaders, BlobSetLegalHoldExceptionHeaders, BlobSetMetadataHeaders, BlobSetMetadataExceptionHeaders, BlobAcquireLeaseHeaders, BlobAcquireLeaseExceptionHeaders, BlobReleaseLeaseHeaders, BlobReleaseLeaseExceptionHeaders, BlobRenewLeaseHeaders, BlobRenewLeaseExceptionHeaders, BlobChangeLeaseHeaders, BlobChangeLeaseExceptionHeaders, BlobBreakLeaseHeaders, BlobBreakLeaseExceptionHeaders, BlobCreateSnapshotHeaders, BlobCreateSnapshotExceptionHeaders, BlobStartCopyFromURLHeaders, BlobStartCopyFromURLExceptionHeaders, BlobCopyFromURLHeaders, BlobCopyFromURLExceptionHeaders, BlobAbortCopyFromURLHeaders, BlobAbortCopyFromURLExceptionHeaders, BlobSetTierHeaders, BlobSetTierExceptionHeaders, BlobGetAccountInfoHeaders, BlobGetAccountInfoExceptionHeaders, BlobQueryHeaders, BlobQueryExceptionHeaders, BlobGetTagsHeaders, BlobGetTagsExceptionHeaders, BlobSetTagsHeaders, BlobSetTagsExceptionHeaders, PageBlobCreateHeaders, PageBlobCreateExceptionHeaders, PageBlobUploadPagesHeaders, PageBlobUploadPagesExceptionHeaders, PageBlobClearPagesHeaders, PageBlobClearPagesExceptionHeaders, PageBlobUploadPagesFromURLHeaders, PageBlobUploadPagesFromURLExceptionHeaders, PageBlobGetPageRangesHeaders, PageBlobGetPageRangesExceptionHeaders, PageBlobGetPageRangesDiffHeaders, PageBlobGetPageRangesDiffExceptionHeaders, PageBlobResizeHeaders, PageBlobResizeExceptionHeaders, PageBlobUpdateSequenceNumberHeaders, PageBlobUpdateSequenceNumberExceptionHeaders, PageBlobCopyIncrementalHeaders, PageBlobCopyIncrementalExceptionHeaders, AppendBlobCreateHeaders, AppendBlobCreateExceptionHeaders, AppendBlobAppendBlockHeaders, AppendBlobAppendBlockExceptionHeaders, AppendBlobAppendBlockFromUrlHeaders, AppendBlobAppendBlockFromUrlExceptionHeaders, AppendBlobSealHeaders, AppendBlobSealExceptionHeaders, BlockBlobUploadHeaders, BlockBlobUploadExceptionHeaders, BlockBlobPutBlobFromUrlHeaders, BlockBlobPutBlobFromUrlExceptionHeaders, BlockBlobStageBlockHeaders, BlockBlobStageBlockExceptionHeaders, BlockBlobStageBlockFromURLHeaders, BlockBlobStageBlockFromURLExceptionHeaders, BlockBlobCommitBlockListHeaders, BlockBlobCommitBlockListExceptionHeaders, BlockBlobGetBlockListHeaders, BlockBlobGetBlockListExceptionHeaders, init_mappers = __esmMin((() => {
+}), BlobServiceProperties, Logging, RetentionPolicy, Metrics, CorsRule, StaticWebsite, StorageError, BlobServiceStatistics, GeoReplication, ListContainersSegmentResponse, ContainerItem, ContainerProperties, KeyInfo, UserDelegationKey, FilterBlobSegment, FilterBlobItem, BlobTags, BlobTag, SignedIdentifier, AccessPolicy, ListBlobsFlatSegmentResponse, BlobFlatListSegment, BlobItemInternal, BlobName, BlobPropertiesInternal, ListBlobsHierarchySegmentResponse, BlobHierarchyListSegment, BlobPrefix, BlockLookupList, BlockList, Block, PageList, PageRange, ClearRange, QueryRequest, QuerySerialization, QueryFormat, DelimitedTextConfiguration, JsonTextConfiguration, ArrowConfiguration, ArrowField, ServiceSetPropertiesHeaders, ServiceSetPropertiesExceptionHeaders, ServiceGetPropertiesHeaders, ServiceGetPropertiesExceptionHeaders, ServiceGetStatisticsHeaders, ServiceGetStatisticsExceptionHeaders, ServiceListContainersSegmentHeaders, ServiceListContainersSegmentExceptionHeaders, ServiceGetUserDelegationKeyHeaders, ServiceGetUserDelegationKeyExceptionHeaders, ServiceGetAccountInfoHeaders, ServiceGetAccountInfoExceptionHeaders, ServiceSubmitBatchHeaders, ServiceSubmitBatchExceptionHeaders, ServiceFilterBlobsHeaders, ServiceFilterBlobsExceptionHeaders, ContainerCreateHeaders, ContainerCreateExceptionHeaders, ContainerGetPropertiesHeaders, ContainerGetPropertiesExceptionHeaders, ContainerDeleteHeaders, ContainerDeleteExceptionHeaders, ContainerSetMetadataHeaders, ContainerSetMetadataExceptionHeaders, ContainerGetAccessPolicyHeaders, ContainerGetAccessPolicyExceptionHeaders, ContainerSetAccessPolicyHeaders, ContainerSetAccessPolicyExceptionHeaders, ContainerRestoreHeaders, ContainerRestoreExceptionHeaders, ContainerRenameHeaders, ContainerRenameExceptionHeaders, ContainerSubmitBatchHeaders, ContainerSubmitBatchExceptionHeaders, ContainerFilterBlobsHeaders, ContainerFilterBlobsExceptionHeaders, ContainerAcquireLeaseHeaders, ContainerAcquireLeaseExceptionHeaders, ContainerReleaseLeaseHeaders, ContainerReleaseLeaseExceptionHeaders, ContainerRenewLeaseHeaders, ContainerRenewLeaseExceptionHeaders, ContainerBreakLeaseHeaders, ContainerBreakLeaseExceptionHeaders, ContainerChangeLeaseHeaders, ContainerChangeLeaseExceptionHeaders, ContainerListBlobFlatSegmentHeaders, ContainerListBlobFlatSegmentExceptionHeaders, ContainerListBlobFlatSegmentApacheArrowHeaders, ContainerListBlobFlatSegmentApacheArrowExceptionHeaders, ContainerListBlobHierarchySegmentHeaders, ContainerListBlobHierarchySegmentExceptionHeaders, ContainerListBlobHierarchySegmentApacheArrowHeaders, ContainerListBlobHierarchySegmentApacheArrowExceptionHeaders, ContainerGetAccountInfoHeaders, ContainerGetAccountInfoExceptionHeaders, BlobDownloadHeaders, BlobDownloadExceptionHeaders, BlobGetPropertiesHeaders, BlobGetPropertiesExceptionHeaders, BlobDeleteHeaders, BlobDeleteExceptionHeaders, BlobUndeleteHeaders, BlobUndeleteExceptionHeaders, BlobSetExpiryHeaders, BlobSetExpiryExceptionHeaders, BlobSetHttpHeadersHeaders, BlobSetHttpHeadersExceptionHeaders, BlobSetImmutabilityPolicyHeaders, BlobSetImmutabilityPolicyExceptionHeaders, BlobDeleteImmutabilityPolicyHeaders, BlobDeleteImmutabilityPolicyExceptionHeaders, BlobSetLegalHoldHeaders, BlobSetLegalHoldExceptionHeaders, BlobSetMetadataHeaders, BlobSetMetadataExceptionHeaders, BlobAcquireLeaseHeaders, BlobAcquireLeaseExceptionHeaders, BlobReleaseLeaseHeaders, BlobReleaseLeaseExceptionHeaders, BlobRenewLeaseHeaders, BlobRenewLeaseExceptionHeaders, BlobChangeLeaseHeaders, BlobChangeLeaseExceptionHeaders, BlobBreakLeaseHeaders, BlobBreakLeaseExceptionHeaders, BlobCreateSnapshotHeaders, BlobCreateSnapshotExceptionHeaders, BlobStartCopyFromURLHeaders, BlobStartCopyFromURLExceptionHeaders, BlobCopyFromURLHeaders, BlobCopyFromURLExceptionHeaders, BlobAbortCopyFromURLHeaders, BlobAbortCopyFromURLExceptionHeaders, BlobSetTierHeaders, BlobSetTierExceptionHeaders, BlobGetAccountInfoHeaders, BlobGetAccountInfoExceptionHeaders, BlobQueryHeaders, BlobQueryExceptionHeaders, BlobGetTagsHeaders, BlobGetTagsExceptionHeaders, BlobSetTagsHeaders, BlobSetTagsExceptionHeaders, PageBlobCreateHeaders, PageBlobCreateExceptionHeaders, PageBlobUploadPagesHeaders, PageBlobUploadPagesExceptionHeaders, PageBlobClearPagesHeaders, PageBlobClearPagesExceptionHeaders, PageBlobUploadPagesFromURLHeaders, PageBlobUploadPagesFromURLExceptionHeaders, PageBlobGetPageRangesHeaders, PageBlobGetPageRangesExceptionHeaders, PageBlobGetPageRangesDiffHeaders, PageBlobGetPageRangesDiffExceptionHeaders, PageBlobResizeHeaders, PageBlobResizeExceptionHeaders, PageBlobUpdateSequenceNumberHeaders, PageBlobUpdateSequenceNumberExceptionHeaders, PageBlobCopyIncrementalHeaders, PageBlobCopyIncrementalExceptionHeaders, AppendBlobCreateHeaders, AppendBlobCreateExceptionHeaders, AppendBlobAppendBlockHeaders, AppendBlobAppendBlockExceptionHeaders, AppendBlobAppendBlockFromUrlHeaders, AppendBlobAppendBlockFromUrlExceptionHeaders, AppendBlobSealHeaders, AppendBlobSealExceptionHeaders, BlockBlobUploadHeaders, BlockBlobUploadExceptionHeaders, BlockBlobPutBlobFromUrlHeaders, BlockBlobPutBlobFromUrlExceptionHeaders, BlockBlobStageBlockHeaders, BlockBlobStageBlockExceptionHeaders, BlockBlobStageBlockFromURLHeaders, BlockBlobStageBlockFromURLExceptionHeaders, BlockBlobCommitBlockListHeaders, BlockBlobCommitBlockListExceptionHeaders, BlockBlobGetBlockListHeaders, BlockBlobGetBlockListExceptionHeaders, init_mappers = __esmMin((() => {
 	BlobServiceProperties = {
 		serializedName: "BlobServiceProperties",
 		xmlName: "StorageServiceProperties",
@@ -31548,6 +31609,50 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 				type: { name: "String" }
 			} }
 		}
+	}, ContainerListBlobFlatSegmentApacheArrowHeaders = {
+		serializedName: "Container_listBlobFlatSegmentApacheArrowHeaders",
+		type: {
+			name: "Composite",
+			className: "ContainerListBlobFlatSegmentApacheArrowHeaders",
+			modelProperties: {
+				contentType: {
+					serializedName: "content-type",
+					xmlName: "content-type",
+					type: { name: "String" }
+				},
+				clientRequestId: {
+					serializedName: "x-ms-client-request-id",
+					xmlName: "x-ms-client-request-id",
+					type: { name: "String" }
+				},
+				requestId: {
+					serializedName: "x-ms-request-id",
+					xmlName: "x-ms-request-id",
+					type: { name: "String" }
+				},
+				version: {
+					serializedName: "x-ms-version",
+					xmlName: "x-ms-version",
+					type: { name: "String" }
+				},
+				date: {
+					serializedName: "date",
+					xmlName: "date",
+					type: { name: "DateTimeRfc1123" }
+				}
+			}
+		}
+	}, ContainerListBlobFlatSegmentApacheArrowExceptionHeaders = {
+		serializedName: "Container_listBlobFlatSegmentApacheArrowExceptionHeaders",
+		type: {
+			name: "Composite",
+			className: "ContainerListBlobFlatSegmentApacheArrowExceptionHeaders",
+			modelProperties: { errorCode: {
+				serializedName: "x-ms-error-code",
+				xmlName: "x-ms-error-code",
+				type: { name: "String" }
+			} }
+		}
 	}, ContainerListBlobHierarchySegmentHeaders = {
 		serializedName: "Container_listBlobHierarchySegmentHeaders",
 		type: {
@@ -31591,6 +31696,50 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		type: {
 			name: "Composite",
 			className: "ContainerListBlobHierarchySegmentExceptionHeaders",
+			modelProperties: { errorCode: {
+				serializedName: "x-ms-error-code",
+				xmlName: "x-ms-error-code",
+				type: { name: "String" }
+			} }
+		}
+	}, ContainerListBlobHierarchySegmentApacheArrowHeaders = {
+		serializedName: "Container_listBlobHierarchySegmentApacheArrowHeaders",
+		type: {
+			name: "Composite",
+			className: "ContainerListBlobHierarchySegmentApacheArrowHeaders",
+			modelProperties: {
+				contentType: {
+					serializedName: "content-type",
+					xmlName: "content-type",
+					type: { name: "String" }
+				},
+				clientRequestId: {
+					serializedName: "x-ms-client-request-id",
+					xmlName: "x-ms-client-request-id",
+					type: { name: "String" }
+				},
+				requestId: {
+					serializedName: "x-ms-request-id",
+					xmlName: "x-ms-request-id",
+					type: { name: "String" }
+				},
+				version: {
+					serializedName: "x-ms-version",
+					xmlName: "x-ms-version",
+					type: { name: "String" }
+				},
+				date: {
+					serializedName: "date",
+					xmlName: "date",
+					type: { name: "DateTimeRfc1123" }
+				}
+			}
+		}
+	}, ContainerListBlobHierarchySegmentApacheArrowExceptionHeaders = {
+		serializedName: "Container_listBlobHierarchySegmentApacheArrowExceptionHeaders",
+		type: {
+			name: "Composite",
+			className: "ContainerListBlobHierarchySegmentApacheArrowExceptionHeaders",
 			modelProperties: { errorCode: {
 				serializedName: "x-ms-error-code",
 				xmlName: "x-ms-error-code",
@@ -31947,6 +32096,26 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 					serializedName: "x-ms-structured-content-length",
 					xmlName: "x-ms-structured-content-length",
 					type: { name: "Number" }
+				},
+				accessTier: {
+					serializedName: "x-ms-access-tier",
+					xmlName: "x-ms-access-tier",
+					type: { name: "String" }
+				},
+				accessTierInferred: {
+					serializedName: "x-ms-access-tier-inferred",
+					xmlName: "x-ms-access-tier-inferred",
+					type: { name: "Boolean" }
+				},
+				accessTierChangedOn: {
+					serializedName: "x-ms-access-tier-change-time",
+					xmlName: "x-ms-access-tier-change-time",
+					type: { name: "DateTimeRfc1123" }
+				},
+				smartAccessTier: {
+					serializedName: "x-ms-smart-access-tier",
+					xmlName: "x-ms-smart-access-tier",
+					type: { name: "String" }
 				},
 				errorCode: {
 					serializedName: "x-ms-error-code",
@@ -34671,6 +34840,11 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 					xmlName: "content-md5",
 					type: { name: "ByteArray" }
 				},
+				xMsContentCrc64: {
+					serializedName: "x-ms-content-crc64",
+					xmlName: "x-ms-content-crc64",
+					type: { name: "ByteArray" }
+				},
 				clientRequestId: {
 					serializedName: "x-ms-client-request-id",
 					xmlName: "x-ms-client-request-id",
@@ -34753,6 +34927,11 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 				contentMD5: {
 					serializedName: "content-md5",
 					xmlName: "content-md5",
+					type: { name: "ByteArray" }
+				},
+				xMsContentCrc64: {
+					serializedName: "x-ms-content-crc64",
+					xmlName: "x-ms-content-crc64",
 					type: { name: "ByteArray" }
 				},
 				clientRequestId: {
@@ -35129,7 +35308,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			} }
 		}
 	};
-})), contentType, blobServiceProperties, accept, url, restype, comp, timeoutInSeconds, version, requestId, accept1, comp1, comp2, prefix, marker, maxPageSize, include, keyInfo, comp3, restype1, body, comp4, contentLength, multipartContentType, comp5, where, restype2, metadata, access, defaultEncryptionScope, preventEncryptionScopeOverride, leaseId, ifModifiedSince, ifUnmodifiedSince, comp6, comp7, containerAcl, comp8, deletedContainerName, deletedContainerVersion, comp9, sourceContainerName, sourceLeaseId, comp10, action, duration, proposedLeaseId, action1, leaseId1, action2, action3, breakPeriod, action4, proposedLeaseId1, include1, startFrom, delimiter, snapshot, versionId, range, rangeGetContentMD5, rangeGetContentCRC64, structuredBodyType, encryptionKey, encryptionKeySha256, encryptionAlgorithm, ifMatch, ifNoneMatch, ifTags, deleteSnapshots, blobDeleteType, accessTierIfModifiedSince, accessTierIfUnmodifiedSince, comp11, expiryOptions, expiresOn, blobCacheControl, blobContentType, blobContentMD5, blobContentEncoding, blobContentLanguage, blobContentDisposition, comp12, immutabilityPolicyExpiry, immutabilityPolicyMode, comp13, legalHold, encryptionScope, comp14, tier, rehydratePriority, sourceIfModifiedSince, sourceIfUnmodifiedSince, sourceIfMatch, sourceIfNoneMatch, sourceIfTags, copySource, blobTagsString, sealBlob, legalHold1, xMsRequiresSync, sourceContentMD5, copySourceAuthorization, copySourceTags, fileRequestIntent, comp15, copyActionAbortConstant, copyId, comp16, tier1, queryRequest, comp17, comp18, ifModifiedSince1, ifUnmodifiedSince1, ifMatch1, ifNoneMatch1, tags, transactionalContentMD5, transactionalContentCrc64, blobType, blobContentLength, blobSequenceNumber, contentType1, body1, accept2, comp19, pageWrite, ifSequenceNumberLessThanOrEqualTo, ifSequenceNumberLessThan, ifSequenceNumberEqualTo, structuredContentLength, pageWrite1, sourceUrl, sourceRange, sourceContentCrc64, range1, sourceEncryptionKey, sourceEncryptionKeySha256, sourceEncryptionAlgorithm, comp20, prevsnapshot, prevSnapshotUrl, sequenceNumberAction, comp21, blobType1, comp22, maxSize, appendPosition, sourceRange1, comp23, blobType2, copySourceBlobProperties, comp24, blockId, blocks, comp25, listType, init_parameters = __esmMin((() => {
+})), contentType, blobServiceProperties, accept, url, restype, comp, timeoutInSeconds, version, requestId, accept1, comp1, comp2, prefix, marker, maxPageSize, include, keyInfo, comp3, restype1, body, comp4, contentLength, multipartContentType, comp5, where, restype2, metadata, access, defaultEncryptionScope, preventEncryptionScopeOverride, leaseId, ifModifiedSince, ifUnmodifiedSince, comp6, comp7, containerAcl, comp8, deletedContainerName, deletedContainerVersion, comp9, sourceContainerName, sourceLeaseId, comp10, action, duration, proposedLeaseId, action1, leaseId1, action2, action3, breakPeriod, action4, proposedLeaseId1, include1, startFrom, accept2, endBefore, delimiter, snapshot, versionId, range, rangeGetContentMD5, rangeGetContentCRC64, structuredBodyType, encryptionKey, encryptionKeySha256, encryptionAlgorithm, ifMatch, ifNoneMatch, ifTags, deleteSnapshots, blobDeleteType, accessTierIfModifiedSince, accessTierIfUnmodifiedSince, comp11, expiryOptions, expiresOn, blobCacheControl, blobContentType, blobContentMD5, blobContentEncoding, blobContentLanguage, blobContentDisposition, comp12, immutabilityPolicyExpiry, immutabilityPolicyMode, comp13, legalHold, encryptionScope, comp14, tier, rehydratePriority, sourceIfModifiedSince, sourceIfUnmodifiedSince, sourceIfMatch, sourceIfNoneMatch, sourceIfTags, copySource, blobTagsString, sealBlob, legalHold1, xMsRequiresSync, sourceContentMD5, copySourceAuthorization, copySourceTags, fileRequestIntent, comp15, copyActionAbortConstant, copyId, comp16, tier1, queryRequest, comp17, comp18, ifModifiedSince1, ifUnmodifiedSince1, ifMatch1, ifNoneMatch1, tags, transactionalContentMD5, transactionalContentCrc64, blobType, blobContentLength, blobSequenceNumber, contentType1, body1, accept3, comp19, pageWrite, ifSequenceNumberLessThanOrEqualTo, ifSequenceNumberLessThan, ifSequenceNumberEqualTo, structuredContentLength, pageWrite1, sourceUrl, sourceRange, sourceContentCrc64, range1, sourceEncryptionKey, sourceEncryptionKeySha256, sourceEncryptionAlgorithm, comp20, prevsnapshot, prevSnapshotUrl, sequenceNumberAction, comp21, blobType1, comp22, maxSize, appendPosition, sourceRange1, comp23, blobType2, copySourceBlobProperties, comp24, blockId, blocks, comp25, listType, init_parameters = __esmMin((() => {
 	init_mappers(), contentType = {
 		parameterPath: ["options", "contentType"],
 		mapper: {
@@ -35185,7 +35364,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 	}, version = {
 		parameterPath: "version",
 		mapper: {
-			defaultValue: "2026-06-06",
+			defaultValue: "2026-10-06",
 			isConstant: !0,
 			serializedName: "x-ms-version",
 			type: { name: "String" }
@@ -35604,6 +35783,21 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		mapper: {
 			serializedName: "startFrom",
 			xmlName: "startFrom",
+			type: { name: "String" }
+		}
+	}, accept2 = {
+		parameterPath: "accept",
+		mapper: {
+			defaultValue: "application/vnd.apache.arrow.stream,application/xml",
+			isConstant: !0,
+			serializedName: "Accept",
+			type: { name: "String" }
+		}
+	}, endBefore = {
+		parameterPath: ["options", "endBefore"],
+		mapper: {
+			serializedName: "endBefore",
+			xmlName: "endBefore",
 			type: { name: "String" }
 		}
 	}, delimiter = {
@@ -36242,7 +36436,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			xmlName: "body",
 			type: { name: "Stream" }
 		}
-	}, accept2 = {
+	}, accept3 = {
 		parameterPath: "accept",
 		mapper: {
 			defaultValue: "application/xml",
@@ -36796,7 +36990,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		isXML: !0,
 		serializer: xmlSerializer$5
 	};
-})), ContainerImpl, xmlSerializer$4, createOperationSpec$2, getPropertiesOperationSpec$1, deleteOperationSpec$1, setMetadataOperationSpec$1, getAccessPolicyOperationSpec, setAccessPolicyOperationSpec, restoreOperationSpec, renameOperationSpec, submitBatchOperationSpec, filterBlobsOperationSpec, acquireLeaseOperationSpec$1, releaseLeaseOperationSpec$1, renewLeaseOperationSpec$1, breakLeaseOperationSpec$1, changeLeaseOperationSpec$1, listBlobFlatSegmentOperationSpec, listBlobHierarchySegmentOperationSpec, getAccountInfoOperationSpec$1, init_container$1 = __esmMin((() => {
+})), ContainerImpl, xmlSerializer$4, createOperationSpec$2, getPropertiesOperationSpec$1, deleteOperationSpec$1, setMetadataOperationSpec$1, getAccessPolicyOperationSpec, setAccessPolicyOperationSpec, restoreOperationSpec, renameOperationSpec, submitBatchOperationSpec, filterBlobsOperationSpec, acquireLeaseOperationSpec$1, releaseLeaseOperationSpec$1, renewLeaseOperationSpec$1, breakLeaseOperationSpec$1, changeLeaseOperationSpec$1, listBlobFlatSegmentOperationSpec, listBlobFlatSegmentApacheArrowOperationSpec, listBlobHierarchySegmentOperationSpec, listBlobHierarchySegmentApacheArrowOperationSpec, getAccountInfoOperationSpec$1, init_container$1 = __esmMin((() => {
 	init_esm$5(), init_mappers(), init_parameters(), ContainerImpl = class {
 		client;
 		constructor(client) {
@@ -36868,11 +37062,20 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		listBlobFlatSegment(options) {
 			return this.client.sendOperationRequest({ options }, listBlobFlatSegmentOperationSpec);
 		}
+		listBlobFlatSegmentApacheArrow(options) {
+			return this.client.sendOperationRequest({ options }, listBlobFlatSegmentApacheArrowOperationSpec);
+		}
 		listBlobHierarchySegment(delimiter, options) {
 			return this.client.sendOperationRequest({
 				delimiter,
 				options
 			}, listBlobHierarchySegmentOperationSpec);
+		}
+		listBlobHierarchySegmentApacheArrow(delimiter, options) {
+			return this.client.sendOperationRequest({
+				delimiter,
+				options
+			}, listBlobHierarchySegmentApacheArrowOperationSpec);
 		}
 		getAccountInfo(options) {
 			return this.client.sendOperationRequest({ options }, getAccountInfoOperationSpec$1);
@@ -37319,6 +37522,41 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		],
 		isXML: !0,
 		serializer: xmlSerializer$4
+	}, listBlobFlatSegmentApacheArrowOperationSpec = {
+		path: "/{containerName}",
+		httpMethod: "GET",
+		responses: {
+			200: {
+				bodyMapper: {
+					type: { name: "Stream" },
+					serializedName: "parsedResponse"
+				},
+				headersMapper: ContainerListBlobFlatSegmentApacheArrowHeaders
+			},
+			default: {
+				bodyMapper: StorageError,
+				headersMapper: ContainerListBlobFlatSegmentApacheArrowExceptionHeaders
+			}
+		},
+		queryParameters: [
+			timeoutInSeconds,
+			comp2,
+			prefix,
+			marker,
+			maxPageSize,
+			restype2,
+			include1,
+			startFrom,
+			endBefore
+		],
+		urlParameters: [url],
+		headerParameters: [
+			version,
+			requestId,
+			accept2
+		],
+		isXML: !0,
+		serializer: xmlSerializer$4
 	}, listBlobHierarchySegmentOperationSpec = {
 		path: "/{containerName}",
 		httpMethod: "GET",
@@ -37348,6 +37586,42 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			version,
 			requestId,
 			accept1
+		],
+		isXML: !0,
+		serializer: xmlSerializer$4
+	}, listBlobHierarchySegmentApacheArrowOperationSpec = {
+		path: "/{containerName}",
+		httpMethod: "GET",
+		responses: {
+			200: {
+				bodyMapper: {
+					type: { name: "Stream" },
+					serializedName: "parsedResponse"
+				},
+				headersMapper: ContainerListBlobHierarchySegmentApacheArrowHeaders
+			},
+			default: {
+				bodyMapper: StorageError,
+				headersMapper: ContainerListBlobHierarchySegmentApacheArrowExceptionHeaders
+			}
+		},
+		queryParameters: [
+			timeoutInSeconds,
+			comp2,
+			prefix,
+			marker,
+			maxPageSize,
+			restype2,
+			include1,
+			startFrom,
+			endBefore,
+			delimiter
+		],
+		urlParameters: [url],
+		headerParameters: [
+			version,
+			requestId,
+			accept2
 		],
 		isXML: !0,
 		serializer: xmlSerializer$4
@@ -38346,7 +38620,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			transactionalContentMD5,
 			transactionalContentCrc64,
 			contentType1,
-			accept2,
+			accept3,
 			pageWrite,
 			ifSequenceNumberLessThanOrEqualTo,
 			ifSequenceNumberLessThan,
@@ -38697,7 +38971,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			transactionalContentMD5,
 			transactionalContentCrc64,
 			contentType1,
-			accept2,
+			accept3,
 			structuredContentLength,
 			maxSize,
 			appendPosition
@@ -38869,7 +39143,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			transactionalContentMD5,
 			transactionalContentCrc64,
 			contentType1,
-			accept2,
+			accept3,
 			structuredContentLength,
 			blobType2
 		],
@@ -38962,7 +39236,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			transactionalContentMD5,
 			transactionalContentCrc64,
 			contentType1,
-			accept2,
+			accept3,
 			structuredContentLength
 		],
 		isXML: !0,
@@ -39097,13 +39371,13 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		constructor(url, options) {
 			if (url === void 0) throw Error("'url' cannot be null");
 			options ||= {};
-			let defaults = { requestContentType: "application/json; charset=utf-8" }, packageDetails = "azsdk-js-azure-storage-blob/12.33.0", userAgentPrefix = options.userAgentOptions && options.userAgentOptions.userAgentPrefix ? `${options.userAgentOptions.userAgentPrefix} ${packageDetails}` : `${packageDetails}`, optionsWithDefaults = {
+			let defaults = { requestContentType: "application/json; charset=utf-8" }, packageDetails = "azsdk-js-azure-storage-blob/12.34.0", userAgentPrefix = options.userAgentOptions && options.userAgentOptions.userAgentPrefix ? `${options.userAgentOptions.userAgentPrefix} ${packageDetails}` : `${packageDetails}`, optionsWithDefaults = {
 				...defaults,
 				...options,
 				userAgentOptions: { userAgentPrefix },
 				endpoint: options.endpoint ?? options.baseUri ?? "{url}"
 			};
-			super(optionsWithDefaults), this.url = url, this.version = options.version || "2026-06-06", this.service = new ServiceImpl(this), this.container = new ContainerImpl(this), this.blob = new BlobImpl(this), this.pageBlob = new PageBlobImpl(this), this.appendBlob = new AppendBlobImpl(this), this.blockBlob = new BlockBlobImpl(this);
+			super(optionsWithDefaults), this.url = url, this.version = options.version || "2026-10-06", this.service = new ServiceImpl(this), this.container = new ContainerImpl(this), this.blob = new BlobImpl(this), this.pageBlob = new PageBlobImpl(this), this.appendBlob = new AppendBlobImpl(this), this.blockBlob = new BlockBlobImpl(this);
 		}
 		service;
 		container;
@@ -39125,7 +39399,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/utils/utils.common.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/utils/utils.common.js
 function escapeURLPath(url) {
 	let urlParsed = new URL(url), path = urlParsed.pathname;
 	return path ||= "/", path = escape(path), urlParsed.pathname = path, urlParsed.toString();
@@ -39517,7 +39791,7 @@ var accountNameSuffixes, init_utils_common$1 = __esmMin((() => {
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/sas/SasIPRange.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/sas/SasIPRange.js
 function ipRangeToString(ipRange) {
 	return ipRange.end ? `${ipRange.start}-${ipRange.end}` : ipRange.start;
 }
@@ -39664,7 +39938,7 @@ var init_SasIPRange = __esmMin((() => {})), SASProtocol, SASQueryParameters, ini
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/sas/BlobSASSignatureValues.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/sas/BlobSASSignatureValues.js
 function generateBlobSASQueryParameters(blobSASSignatureValues, sharedKeyCredentialOrUserDelegationKey, accountName) {
 	return generateBlobSASQueryParametersInternal(blobSASSignatureValues, sharedKeyCredentialOrUserDelegationKey, accountName).sasQueryParameters;
 }
@@ -40289,6 +40563,18 @@ var init_BlobSASSignatureValues = __esmMin((() => {
 		get legalHold() {
 			return this.originalResponse.legalHold;
 		}
+		get accessTier() {
+			return this.originalResponse.accessTier;
+		}
+		get accessTierInferred() {
+			return this.originalResponse.accessTierInferred;
+		}
+		get accessTierChangedOn() {
+			return this.originalResponse.accessTierChangedOn;
+		}
+		get smartAccessTier() {
+			return this.originalResponse.smartAccessTier;
+		}
 		get structuredBodyType() {
 			return this.originalResponse.structuredBodyType;
 		}
@@ -40501,7 +40787,7 @@ var init_BlobSASSignatureValues = __esmMin((() => {
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/internal-avro/utils/utils.common.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/internal-avro/utils/utils.common.js
 function arraysEqual(a, b) {
 	if (a === b) return !0;
 	if (a == null || b == null || a.length !== b.length) return !1;
@@ -40779,7 +41065,7 @@ var init_utils_common = __esmMin((() => {})), AvroReader, init_AvroReader = __es
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/models.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/models.js
 function toAccessTier(tier) {
 	if (tier !== void 0) return tier;
 }
@@ -40797,7 +41083,7 @@ var BlockBlobTier, PremiumPageBlobTier, StorageBlobAudience, init_models = __esm
 	})(StorageBlobAudience ||= {});
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/PageBlobRangeResponse.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/PageBlobRangeResponse.js
 function rangeResponseFromModel(response) {
 	let pageRange = (response._response.parsedBody.pageRange || []).map((x) => ({
 		offset: x.start,
@@ -40906,7 +41192,7 @@ var init_PageBlobRangeResponse = __esmMin((() => {})), PollerStoppedError, Polle
 	init_esm$11(), init_esm$9(), init_lroEngine(), init_poller(), init_pollOperation();
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/pollers/BlobStartCopyFromUrlPoller.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/pollers/BlobStartCopyFromUrlPoller.js
 function makeBlobBeginCopyFromURLPollOperation(state) {
 	return {
 		state: { ...state },
@@ -40955,7 +41241,7 @@ var BlobBeginCopyFromUrlPoller, cancel, update, toString, init_BlobStartCopyFrom
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/Range.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/Range.js
 function rangeToString(iRange) {
 	if (iRange.offset < 0) throw RangeError("Range.offset cannot be smaller than 0.");
 	if (iRange.count && iRange.count <= 0) throw RangeError("Range.count must be larger than 0. Leave it undefined if you want a range from offset to the end.");
@@ -41011,7 +41297,7 @@ var init_Range = __esmMin((() => {})), BatchStates, Batch, init_Batch = __esmMin
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@azure+storage-blob@12.33.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/utils/utils.js
+//#region node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/utils/utils.js
 async function streamToBuffer(stream, buffer, offset, end, encoding) {
 	let pos = 0, count = end - offset;
 	return new Promise((resolve, reject) => {
@@ -42216,7 +42502,7 @@ var fsStat, fsCreateReadStream, init_utils$2 = __esmMin((() => {
 		}
 	};
 })), init_BlobBatch = __esmMin((() => {})), init_BlobBatchClient = __esmMin((() => {})), init_ContainerClient = __esmMin((() => {})), init_AccountSASPermissions = __esmMin((() => {})), init_AccountSASResourceTypes = __esmMin((() => {})), init_AccountSASServices = __esmMin((() => {})), init_BlobServiceClient = __esmMin((() => {})), init_generatedModels = __esmMin((() => {})), init_esm = __esmMin((() => {
-	init_BlobServiceClient(), init_Clients(), init_ContainerClient(), init_BlobLeaseClient(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_SASQueryParameters(), init_constants(), init_utils_common$1(), init_BlobBatch(), init_BlobBatchClient(), init_BlobSASPermissions(), init_BlobSASSignatureValues(), init_ContainerSASPermissions(), init_models(), init_Pipeline(), init_esm$2(), init_SASQueryParameters(), init_generatedModels(), init_log$1();
+	init_BlobServiceClient(), init_Clients(), init_ContainerClient(), init_BlobLeaseClient(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_SASQueryParameters(), init_constants(), init_utils_common$1(), init_BlobBatch(), init_BlobBatchClient(), init_BlobSASPermissions(), init_BlobSASSignatureValues(), init_ContainerSASPermissions(), init_models(), init_esm$2(), init_Pipeline(), init_SASQueryParameters(), init_generatedModels(), init_log$1();
 }));
 //#endregion
 //#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
