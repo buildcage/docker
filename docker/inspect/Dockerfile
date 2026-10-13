@@ -74,7 +74,7 @@ FROM moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd
 
 LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
       org.opencontainers.image.description="Secure Docker build environment enforcing on method, URL and path" \
-      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-2.0-or-later AND GPL-3.0-or-later AND GPL-1.0-or-later AND curl AND ISC AND MPL-2.0 AND BSD-3-Clause" \
+      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-1.0-or-later AND GPL-2.0-only AND GPL-2.0-or-later AND (GPL-2.0-or-later WITH OpenSSL-Exception) AND GPL-3.0-or-later AND LGPL-2.1-only AND LGPL-2.1-or-later AND MPL-2.0 AND curl AND ISC AND BSD-2-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND 0BSD AND Zlib AND X11 AND SSH-OpenSSH" \
       org.opencontainers.image.source="https://github.com/buildcage/docker" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/report/report-source.ts.
@@ -144,9 +144,11 @@ COPY --from=scripts-build /build/dist/report-action/docker/inspect/scripts/repor
 
 COPY LICENSE /opt/buildcage/LICENSE
 COPY docker/inspect/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
-COPY licenses/GPL-2.0.txt licenses/GPL-3.0.txt licenses/MPL-2.0.txt licenses/Apache-2.0.txt \
+COPY licenses/GPL-1.0.txt licenses/GPL-2.0.txt licenses/GPL-3.0.txt licenses/LGPL-2.1.txt licenses/MPL-2.0.txt licenses/Apache-2.0.txt \
      licenses/curl.txt licenses/QuickJS-ng.txt THIRD_PARTY_LICENSES_NPM /opt/buildcage/licenses/
 COPY licenses/s6-overlay/ /opt/buildcage/licenses/s6-overlay/
+COPY licenses/alpine/ /opt/buildcage/licenses/alpine/
+COPY licenses/alpine-packages.txt /opt/buildcage/licenses/
 COPY --from=runc-wrapper-build /out/licenses/ /opt/buildcage/licenses/
 
 # The services both engines run, then this engine's own files on top.
@@ -162,5 +164,9 @@ COPY docker/inspect/files/s6-scripts/ /etc/s6-overlay/scripts/
 # init-cfg finds nothing to act on. Never set for a real build.
 ARG BUILDCAGE_TEST_HOOKS=""
 RUN if [ -n "$BUILDCAGE_TEST_HOOKS" ]; then touch /opt/buildcage/.test-hooks; fi
+
+# Last, so that it sees every package the image ends up with.
+RUN --mount=type=bind,source=docker/check-alpine-licenses.sh,target=/tmp/check-alpine-licenses.sh \
+    sh /tmp/check-alpine-licenses.sh /opt/buildcage/licenses/alpine-packages.txt /opt/buildcage/licenses
 
 ENTRYPOINT ["/init"]

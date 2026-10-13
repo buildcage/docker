@@ -343,6 +343,9 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │   │                         # image ref), distinct from the top-level compose.yaml below
 │   ├── collect-go-licenses.sh
 │   │                         # Copies the license files of what a Go binary links
+│   ├── check-alpine-licenses.sh
+│   │                         # Fails the image build on an Alpine package that
+│   │                         # licenses/alpine-packages.txt does not cover
 │   ├── seccomp/              # The builder container's seccomp profile and gen-profile.mjs,
 │   │                         # read by the Docker client on the runner, not copied into an image
 │   ├── common/               # Image files both engines share: s6 services, init-iptables,
@@ -358,9 +361,11 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │                             # reference.md/rules.md/inspect-engine.md link stubs
 ├── licenses/                 # gen-license-file.mjs, which regenerates THIRD_PARTY_LICENSES_NPM
 │                             # during `vp run build`, and what .glf.jsonc substitutes in.
-│                             # Its license texts (GPL, MPL, Apache, and those of curl, QuickJS-ng
-│                             # and the s6-overlay family) are copied into the images, with
-│                             # THIRD_PARTY_LICENSES_NPM
+│                             # Its license texts (GPL, LGPL, MPL, Apache, and those of curl,
+│                             # QuickJS-ng, the s6-overlay family and the Alpine packages in
+│                             # alpine/) are copied into the images, with THIRD_PARTY_LICENSES_NPM
+│                             # and alpine-packages.txt, which maps each installed Alpine package
+│                             # to them
 ├── compose.yaml              # Local-dev compose config (dockerfile selected by PROXY_ENGINE)
 └── Makefile                  # Operational commands
 ```
