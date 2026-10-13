@@ -341,6 +341,8 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 ├── docker/                   # proxy_engine build contexts
 │   ├── compose.action.yaml   # Runtime compose file the action uses (verified, digest-pinned
 │   │                         # image ref), distinct from the top-level compose.yaml below
+│   ├── collect-go-licenses.sh
+│   │                         # Copies the license files of what a Go binary links
 │   ├── seccomp/              # The builder container's seccomp profile and gen-profile.mjs,
 │   │                         # read by the Docker client on the runner, not copied into an image
 │   ├── common/               # Image files both engines share: s6 services, init-iptables,
@@ -356,7 +358,9 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │                             # reference.md/rules.md/inspect-engine.md link stubs
 ├── licenses/                 # gen-license-file.mjs, which regenerates THIRD_PARTY_LICENSES_NPM
 │                             # during `vp run build`, and what .glf.jsonc substitutes in.
-│                             # Its GPL, MPL and Apache texts are copied into the images
+│                             # Its license texts (GPL, MPL, Apache, and those of curl, QuickJS-ng
+│                             # and the s6-overlay family) are copied into the images, with
+│                             # THIRD_PARTY_LICENSES_NPM
 ├── compose.yaml              # Local-dev compose config (dockerfile selected by PROXY_ENGINE)
 └── Makefile                  # Operational commands
 ```

@@ -630,6 +630,6 @@ This software is provided "as is", without warranty of any kind, express or impl
 
 The Buildcage source code is licensed under the MIT License. See [LICENSE](./LICENSE) file for details.
 
-The Docker image includes third-party components under their own licenses (GPL, Apache 2.0, ISC, etc.). See [THIRD_PARTY_LICENSES](./THIRD_PARTY_LICENSES) for the full list.
+The Docker image includes third-party components under their own licenses (GPL, Apache 2.0, ISC, etc.). See [THIRD_PARTY_LICENSES](./THIRD_PARTY_LICENSES) for the full list. The image carries that file, this repository's LICENSE and the license texts it points to under `/opt/buildcage/`.
 
 The Actions bundle their npm dependencies (MIT, Apache 2.0, ISC) into the committed `dist/` files. See [THIRD_PARTY_LICENSES_NPM](./THIRD_PARTY_LICENSES_NPM) for their license texts.

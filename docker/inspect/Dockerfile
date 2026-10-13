@@ -49,6 +49,9 @@ WORKDIR /src
 COPY docker/inspect/buildcage-runc/ ./
 RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
     go build -trimpath -ldflags="-s -w" -o /out/buildcage-runc .
+# The license files of what it links, for /opt/buildcage/licenses/.
+COPY docker/collect-go-licenses.sh /usr/local/bin/
+RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" collect-go-licenses.sh /out/licenses/buildcage-runc
 
 # Bundle the Docker-image scripts (rolldown; see rolldown.scripts.config.js):
 # the QuickJS config generator and report-action.node.ts. Architecture-
@@ -139,8 +142,12 @@ COPY --from=scripts-build /build/dist/qjs/src/core/scripts/gen-configs-inspect.j
 # it on the runner (see report-action.node.ts).
 COPY --from=scripts-build /build/dist/report-action/docker/inspect/scripts/report-action.js /opt/buildcage/scripts/report-action.js
 
+COPY LICENSE /opt/buildcage/LICENSE
 COPY docker/inspect/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
-COPY licenses/GPL-2.0.txt licenses/GPL-3.0.txt licenses/MPL-2.0.txt licenses/Apache-2.0.txt /opt/buildcage/licenses/
+COPY licenses/GPL-2.0.txt licenses/GPL-3.0.txt licenses/MPL-2.0.txt licenses/Apache-2.0.txt \
+     licenses/curl.txt licenses/QuickJS-ng.txt THIRD_PARTY_LICENSES_NPM /opt/buildcage/licenses/
+COPY licenses/s6-overlay/ /opt/buildcage/licenses/s6-overlay/
+COPY --from=runc-wrapper-build /out/licenses/ /opt/buildcage/licenses/
 
 # The services both engines run, then this engine's own files on top.
 COPY docker/common/files/s6-rc.d/     /etc/s6-overlay/s6-rc.d/
