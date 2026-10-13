@@ -54,6 +54,11 @@ COPY docker/universal/scripts/ ./docker/universal/scripts/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm run build:scripts
 
+# The final image's qjs alone, for make test_unit_qjs, so the tests skip the
+# builds above. The final image does not build from it.
+FROM moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea AS qjs-test
+RUN apk add --no-cache quickjs-ng
+
 # Final image
 FROM moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
 
