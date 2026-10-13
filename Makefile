@@ -129,7 +129,7 @@ QJS_TEST_DIRS := \
 .PHONY: test_unit_qjs
 test_unit_qjs: ## Run unit tests in Docker
 	@vp run build:qjs-test
-	@docker build -f docker/universal/Dockerfile -t $(QJS_TEST_IMAGE) .
+	@docker build -f docker/universal/Dockerfile --target qjs-test -t $(QJS_TEST_IMAGE) .
 	@docker run --rm --entrypoint qjs $(QJS_MOUNTS) $(QJS_TEST_IMAGE) \
 		--std -m /opt/buildcage/core/scripts/test/run-tests.qjs.js $(QJS_TEST_DIRS)
 
