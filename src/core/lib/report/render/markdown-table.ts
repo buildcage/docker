@@ -27,13 +27,18 @@ const alignMarker = (align?: Align): string => ALIGN_MARKERS[align ?? "left"];
  * character a host may not carry, so escaping it would bury the one row a
  * reviewer reads closely in backslashes.
  *
+ * `&` is escaped because GitHub renders a character reference such as
+ * `&ZeroWidthSpace;`, which HAProxy lets through in a Host header or a path,
+ * as the invisible character it names, so `registry.npmjs.org&ZeroWidthSpace;`
+ * would read as the real host.
+ *
  * A newline would split the row itself, which no backslash can prevent, so it
  * collapses to a space instead.
  */
 export function escapeCell(value: string | number | undefined): string {
   if (value === undefined) return "";
   return String(value)
-    .replace(/[\\`[\]<>|*]/g, "\\$&")
+    .replace(/[\\`[\]<>|*&]/g, "\\$&")
     .replace(/\r?\n/g, " ");
 }
 

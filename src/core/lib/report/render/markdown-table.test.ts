@@ -74,6 +74,12 @@ describe("markdownTable", () => {
       );
     });
 
+    it("escapes '&' so a character reference cannot render as an invisible character", () => {
+      expect(oneCell("registry.npmjs.org&ZeroWidthSpace;")).toBe(
+        "| registry.npmjs.org\\&ZeroWidthSpace; |",
+      );
+    });
+
     it("escapes asterisks, so a rule pattern is not read as emphasis", () => {
       expect(oneCell("**.example.com:*")).toBe("| \\*\\*.example.com:\\* |");
     });
