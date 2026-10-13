@@ -13,8 +13,8 @@ export interface HostTableRow extends AggregatedEntry {
   /** The known_blocked_rules rule that marked the row expected, which folded
    *  rows are grouped by (see ../build/aggregate.ts). */
   expectedBy?: string;
-  /** Shown after the host, for a row that stands for several, such as a
-   *  folded group naming its rule. */
+  /** Shown after the host, such as the host count of a folded group, whose
+   *  host is its rule. */
   note?: string;
   /** The mark on the reason. A failed row shows no Expected, as
    *  known_blocked_rules never matches one. */
