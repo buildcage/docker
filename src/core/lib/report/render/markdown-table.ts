@@ -4,8 +4,9 @@ export interface ColumnFormat {
   key: string;
   title: string;
   align?: Align;
-  /** Show the cell as a code span, for text a request chose. */
-  code?: boolean;
+  /** Renders the cell, escapeCell unless given. codeCell is for text a
+   *  request chose. */
+  cell?: (value: string | number | undefined) => string;
 }
 
 const ALIGN_MARKERS: Record<Align, string> = { left: "---", right: "---:", center: ":---:" };
@@ -15,7 +16,7 @@ const alignMarker = (align?: Align): string => ALIGN_MARKERS[align ?? "left"];
  * Neutralizes the structural Markdown in text so it renders as its literal
  * characters. Shared by the table cells and the report heading (the `label`
  * input); render-report-markdown.ts relies on this exact set. Text a request
- * chose goes in a `code` column instead.
+ * chose goes in a codeCell column instead.
  *
  * An unescaped `|` opens as many extra cells as it likes, pushing values of its
  * own into the row. Brackets and angle brackets do the same to what the cell
@@ -46,11 +47,14 @@ export function escapeCell(value: string | number | undefined): string {
 export function codeSpan(text: string): string {
   const longest = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
   const fence = "`".repeat(longest + 1);
-  const pad = text.startsWith("`") || text.endsWith("`") ? " " : "";
+  // A backtick at either end would join the fence, and CommonMark drops a
+  // space from each end of a span that has one at both.
+  const pad = /^[ `]|[ `]$/.test(text) && text.trim() !== "" ? " " : "";
   return `${fence}${pad}${text}${pad}${fence}`;
 }
 
-/** GFM still splits a table row on a `|` inside a code span, so that alone is escaped. */
+/** GFM still splits a table row on a `|` inside a code span, so that is
+ *  escaped, and a newline collapses to a space as in escapeCell. */
 export function codeCell(value: string | number | undefined): string {
   if (value === undefined || value === "") return "";
   return codeSpan(String(value).replace(/\|/g, "\\|").replace(/\r?\n/g, " "));
@@ -64,7 +68,7 @@ export function markdownTable(
   const aligns = formats.map((f) => alignMarker(f.align));
   const lines = [`| ${headers.join(" | ")} |`, `| ${aligns.join(" | ")} |`];
   for (const row of rows) {
-    const cells = formats.map((f) => (f.code ? codeCell : escapeCell)(row[f.key]));
+    const cells = formats.map((f) => (f.cell ?? escapeCell)(row[f.key]));
     lines.push(`| ${cells.join(" | ")} |`);
   }
   return lines.join("\n");

@@ -340,7 +340,7 @@ describe("renderReportMarkdown: inspect", () => {
       "v1",
     );
     expect(md).toMatch(
-      /\| `\*\.sury\.org:\* \(2 hosts\)` \| HTTPS \| 🚫 https-not-allowed \| 2 \| ✅ \|/,
+      /\| `\*\.sury\.org:\*` \(2 hosts\) \| HTTPS \| 🚫 https-not-allowed \| 2 \| ✅ \|/,
     );
     expect(md).not.toMatch(/a\.sury\.org/);
     expect(md).toMatch(/\| `bad\.com:80` \|/);

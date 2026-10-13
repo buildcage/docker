@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { markdownTable } from "./markdown-table.ts";
+import { codeCell, markdownTable } from "./markdown-table.ts";
 
 describe("markdownTable", () => {
   it("renders headers, a left-aligned divider row, and cells pulled by key", () => {
@@ -75,32 +75,34 @@ describe("markdownTable", () => {
     });
 
     describe("in a code column", () => {
-      const codeCell = (value: string | undefined) =>
-        markdownTable([{ key: "a", title: "A", code: true }], [{ a: value }]).split("\n")[2];
+      const codeRow = (value: string | undefined) =>
+        markdownTable([{ key: "a", title: "A", cell: codeCell }], [{ a: value }]).split("\n")[2];
 
       it("shows Markdown GitHub would render as itself, a character reference included", () => {
-        expect(codeCell("registry.npmjs.org&ZeroWidthSpace;")).toBe(
+        expect(codeRow("registry.npmjs.org&ZeroWidthSpace;")).toBe(
           "| `registry.npmjs.org&ZeroWidthSpace;` |",
         );
-        expect(codeCell("a~~b~~")).toBe("| `a~~b~~` |");
+        expect(codeRow("a~~b~~")).toBe("| `a~~b~~` |");
       });
 
       it("escapes a '|', which GFM splits a row on even in a code span", () => {
-        expect(codeCell("a|b")).toBe("| `a\\|b` |");
+        expect(codeRow("a|b")).toBe("| `a\\|b` |");
       });
 
       it("fences a backtick with a longer run, padding one at either end", () => {
-        expect(codeCell("a``b")).toBe("| ```a``b``` |");
-        expect(codeCell("`a")).toBe("| `` `a `` |");
+        expect(codeRow("a``b")).toBe("| ```a``b``` |");
+        expect(codeRow("`a")).toBe("| `` `a `` |");
       });
 
-      it("collapses a newline to a space", () => {
-        expect(codeCell("a\r\nb")).toBe("| `a b` |");
+      it("collapses a newline to a space, padding a space at either end", () => {
+        expect(codeRow("a\r\nb")).toBe("| `a b` |");
+        expect(codeRow("\na\n")).toBe("| `  a  ` |");
+        expect(codeRow("   ")).toBe("| `   ` |");
       });
 
       it("leaves an empty or absent value empty rather than an unclosed span", () => {
-        expect(codeCell("")).toBe("|  |");
-        expect(codeCell(undefined)).toBe("|  |");
+        expect(codeRow("")).toBe("|  |");
+        expect(codeRow(undefined)).toBe("|  |");
       });
     });
 

@@ -70,8 +70,8 @@ describe("a host carrying markdown syntax", () => {
   });
 });
 
-describe("a row carrying its own Host text", () => {
-  it("shows that text instead of host:port, for a row standing for several", () => {
+describe("a row carrying a note", () => {
+  it("shows the note after the host, for a row standing for several", () => {
     const md = renderHostTable([
       {
         host: "*.sury.org:*",
@@ -79,10 +79,10 @@ describe("a row carrying its own Host text", () => {
         ruleType: "DNS",
         reason: "dns-not-allowed",
         count: 12,
-        display: "*.sury.org:* (12 hosts)",
+        note: "(12 hosts)",
       },
     ]);
-    expect(md.includes("| `*.sury.org:* (12 hosts)` | DNS | 12 |")).toBe(true);
+    expect(md.includes("| `*.sury.org:*` (12 hosts) | DNS | 12 |")).toBe(true);
   });
 });
 
