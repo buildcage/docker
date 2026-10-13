@@ -355,7 +355,8 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 ├── docs/                     # development.md, security.md, plus the
 │                             # reference.md/rules.md/inspect-engine.md link stubs
 ├── licenses/                 # gen-license-file.mjs, which regenerates THIRD_PARTY_LICENSES_NPM
-│                             # during `vp run build`, and what .glf.jsonc substitutes in
+│                             # during `vp run build`, and what .glf.jsonc substitutes in.
+│                             # Its GPL, MPL and Apache texts are copied into the images
 ├── compose.yaml              # Local-dev compose config (dockerfile selected by PROXY_ENGINE)
 └── Makefile                  # Operational commands
 ```
