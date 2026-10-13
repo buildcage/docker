@@ -38,7 +38,8 @@ jobs:
               - 'compose.yaml'
               - 'rolldown.scripts.config.js'
               - '.dockerignore'
-              - 'licenses/*.txt'
+              - 'licenses/**'
+              - 'LICENSE'
             js-built: &js-built
               - 'package.json'
               - 'pnpm-lock.yaml'
