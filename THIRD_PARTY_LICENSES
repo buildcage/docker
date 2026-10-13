@@ -160,6 +160,16 @@ The full texts of the GPL-2.0, GPL-3.0, MPL-2.0 and Apache-2.0 licenses named
 above are in licenses/ in this repository, and each image carries those its
 own components need in /opt/buildcage/licenses/.
 
+The license files of curl, s6-overlay and QuickJS-ng, copyright notices
+included, are in licenses/ and in each image's /opt/buildcage/licenses/ as
+curl.txt, s6-overlay.txt and QuickJS-ng.txt, and the image's copy of
+THIRD_PARTY_LICENSES_NPM holds those of the npm packages, @actions/core among
+them, that report-action.js bundles. Those of the Go standard library and of
+each module buildcage-runc links are under buildcage-runc/ in the inspect
+image, collected from the modules themselves when the image is built. CoreDNS
+and the CNI plugins are their projects' release binaries, and the Go modules
+linked into them keep the licenses their own source names.
+
 ------------------------------------------------------------------------------
 
 Note on GPL components (HAProxy, iptables, util-linux, rsync):
