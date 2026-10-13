@@ -119,6 +119,7 @@ COPY --from=scripts-build /build/dist/qjs/src/core/scripts/gen-configs-universal
 COPY --from=scripts-build /build/dist/report-action/docker/universal/scripts/report-action.js /opt/buildcage/scripts/report-action.js
 
 COPY docker/universal/files/THIRD_PARTY_LICENSES /opt/buildcage/THIRD_PARTY_LICENSES
+COPY licenses/GPL-2.0.txt licenses/Apache-2.0.txt /opt/buildcage/licenses/
 
 # The services both engines run, then this engine's own files on top.
 COPY docker/common/files/s6-rc.d/       /etc/s6-overlay/s6-rc.d/

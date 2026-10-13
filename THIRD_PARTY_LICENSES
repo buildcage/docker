@@ -156,6 +156,12 @@ lists them.
 
 ------------------------------------------------------------------------------
 
+The full texts of the GPL-2.0, GPL-3.0, MPL-2.0 and Apache-2.0 licenses named
+above are in licenses/ in this repository, and each image carries those its
+own components need in /opt/buildcage/licenses/.
+
+------------------------------------------------------------------------------
+
 Note on GPL components (HAProxy, iptables, util-linux, rsync):
 
 These components come from the Alpine Linux official package repository;

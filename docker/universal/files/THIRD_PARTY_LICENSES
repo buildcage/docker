@@ -97,6 +97,11 @@ lists them.
 
 ------------------------------------------------------------------------------
 
+The full texts of the GPL-2.0 and Apache-2.0 licenses named above are in
+/opt/buildcage/licenses/.
+
+------------------------------------------------------------------------------
+
 Note on GPL components (HAProxy, iptables, util-linux):
 
 These components come from the Alpine Linux official package repository;
