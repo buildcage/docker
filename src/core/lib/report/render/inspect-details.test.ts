@@ -56,19 +56,19 @@ describe("a refusal label", () => {
     expect(lines([refused!])[0].endsWith(" -> labelled")).toBe(true);
   });
 
-  it("replaces the reason restrict would refuse a request for", () => {
+  it("replaces the reason restrict would block a request for", () => {
     const audited: TrafficEvent = {
       ...TIMELINE[0],
       host: "evil.example.com",
       action: "audit",
       wouldRefuse: "example-refusal",
     };
-    expect(lines([audited])[0].endsWith(" -> 200 (708B) (restrict would refuse: labelled)")).toBe(
+    expect(lines([audited])[0].endsWith(" -> 200 (708B) (restrict would block: labelled)")).toBe(
       true,
     );
   });
 
-  it("labels each reason of a request refused for one that restrict would refuse for another", () => {
+  it("labels each reason of a request refused for one that restrict would block for another", () => {
     const both: TrafficEvent = {
       ...TIMELINE[0],
       action: "block",
@@ -78,7 +78,7 @@ describe("a refusal label", () => {
     const line = (
       renderInspectDetailsBody([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
     ).trim();
-    expect(line.endsWith(" -> first! (restrict would refuse: second!)")).toBe(true);
+    expect(line.endsWith(" -> first! (restrict would block: second!)")).toBe(true);
   });
 
   it("leaves the reason where it gives none", () => {
@@ -87,7 +87,7 @@ describe("a refusal label", () => {
       action: "audit",
       wouldRefuse: "example-refusal",
     };
-    expect(lines([audited])[0].endsWith("(restrict would refuse: example-refusal)")).toBe(true);
+    expect(lines([audited])[0].endsWith("(restrict would block: example-refusal)")).toBe(true);
   });
 });
 
@@ -114,7 +114,7 @@ describe("renderInspectDetailsBody", () => {
     };
     const line = (renderInspectDetailsBody([audited], t).split("```")[1] ?? "").trim();
     expect(line).toBe(
-      "⚠️ 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would refuse: example-refusal)",
+      "⚠️ 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would block: example-refusal)",
     );
   });
 
@@ -126,7 +126,7 @@ describe("renderInspectDetailsBody", () => {
       wouldRefuse: "example-refusal",
     };
     const line = (renderInspectDetailsBody([failed], t).split("```")[1] ?? "").trim();
-    expect(line.endsWith("-> dns-failed (restrict would refuse: example-refusal)")).toBe(true);
+    expect(line.endsWith("-> dns-failed (restrict would block: example-refusal)")).toBe(true);
   });
 
   it("names the reason after the arrow instead of a status", () => {

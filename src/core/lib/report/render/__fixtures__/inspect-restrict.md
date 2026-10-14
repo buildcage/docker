@@ -1,7 +1,7 @@
 ## Outbound Traffic Report
 
 > [!CAUTION]
-> 2 refused · 1 failed · 1 not acted on
+> 2 blocked · 1 failed · 1 not acted on
 
 ### ✅ Allowed Hosts
 

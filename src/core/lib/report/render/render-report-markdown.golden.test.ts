@@ -191,7 +191,7 @@ const CASES: Record<string, ReportData> = {
     blockedCount: 4,
   },
   "inspect-restrict": inspect,
-  // A request audit let through that restrict would refuse gets its own list.
+  // A request audit let through that restrict would block gets its own list.
   "inspect-audit": {
     ...audit(inspect),
     timeline: [

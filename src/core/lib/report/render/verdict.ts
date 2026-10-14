@@ -23,7 +23,7 @@ export function renderVerdict(report: ReportData, extraItems: string[] = []): st
 
   const caution = [
     ...(report.logLooksPlausible ? [] : ["report incomplete"]),
-    ...(unexpected ? [`${unexpected} refused`] : []),
+    ...(unexpected ? [`${unexpected} blocked`] : []),
   ];
   const warning = [
     ...extraItems,
@@ -31,9 +31,9 @@ export function renderVerdict(report: ReportData, extraItems: string[] = []): st
     ...(undecided ? [`${undecided} not acted on`] : []),
   ];
   // Expected refusals need nothing done, so they lead only when nothing else does.
-  const asExpected = expected ? [`${expected} refused as expected`] : [];
+  const asExpected = expected ? [`${expected} blocked as expected`] : [];
   if (caution.length + warning.length === 0) {
-    return `Result: ✅ ${asExpected[0] ?? "Nothing was refused"}\n\n`;
+    return `Result: ✅ ${asExpected[0] ?? "Nothing was blocked"}\n\n`;
   }
   const items = [...caution, ...warning, ...asExpected].join(" · ");
   return `> [!${caution.length ? "CAUTION" : "WARNING"}]\n> ${items}\n\n`;

@@ -1,7 +1,7 @@
 ## Outbound Traffic Report (audit mode)
 
 > [!CAUTION]
-> 2 refused · 1 failed
+> 2 blocked · 1 failed
 
 ### 📋 Audited Hosts
 

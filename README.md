@@ -278,12 +278,12 @@ with `if: always()` so a failing build still reports:
   uses: buildcage/docker/report@fb8ec1accd272b4a9c38483989af89dbb23161a6 # v4.1.0
 ```
 
-An alert under the report's title counts what needs a look: requests refused, connections that
-failed and requests nothing acted on. It is a CAUTION when a request was refused or the report is
+An alert under the report's title counts what needs a look: requests blocked, connections that
+failed and requests nothing acted on. It is a CAUTION when a request was blocked or the report is
 incomplete and a WARNING otherwise; with nothing to count, a plain line takes its place. Whatever
-was refused is listed under **Blocked Hosts** with the reason, marked 🚫, beside any connection that
+was blocked is listed under **Blocked Hosts** with the reason, marked 🚫, beside any connection that
 failed, marked ⚠️, and, under `inspect`, **Communication details** names the URL of every request,
-allowed or refused, with credential query parameters replaced (see [Credentials in a
+allowed or blocked, with credential query parameters replaced (see [Credentials in a
 URL](docs/security.md#credentials-in-a-url)). In `audit` mode the summary also holds the **Switch to
 restrict mode** allowlist.
 

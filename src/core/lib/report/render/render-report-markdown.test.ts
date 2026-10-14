@@ -362,7 +362,7 @@ describe("renderReportMarkdown: section and footer", () => {
 
   it("puts the verdict under the title and its items after the refusals", () => {
     const md = renderReportMarkdown(base, "owner/repo", "v1", { verdictItems: ["1 x"] });
-    expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 refused · 1 x\n\n### /);
+    expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 blocked · 1 x\n\n### /);
   });
 
   it("puts an action's own blocks after the blocked hosts", () => {

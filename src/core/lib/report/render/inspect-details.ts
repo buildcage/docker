@@ -9,7 +9,7 @@ import { formatElapsedVariable } from "../elapsed-time.ts";
 
 /**
  * What to print in place of `reason`, the one `event` was refused for or, in
- * audit, the one restrict would refuse it for. Undefined prints the reason. It
+ * audit, the one restrict would block it for. Undefined prints the reason. It
  * goes on the event's line inside a fenced block, so it holds no newline.
  */
 export type RefusalLabel = (event: TrafficEvent, reason: string) => string | undefined;
@@ -43,7 +43,7 @@ export function renderInspectDetailsBody(
 
 // ⚠️ covers what went wrong without a rule refusing it: a request that never
 // arrived whole, a connection the origin broke, and a request audit let
-// through that restrict would refuse. The reason or the note tells them
+// through that restrict would block. The reason or the note tells them
 // apart; one that came to nothing anyway keeps its own mark. `discovery`
 // keeps ℹ️: a lookup nothing can answer is harmless.
 const MARK: Record<string, string> = {
@@ -64,7 +64,7 @@ function renderEvent(
       : (MARK[event.action] ?? "✅");
   const label = (reason: string) => refusalLabel(event, reason) ?? reason;
   const note =
-    event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${label(event.wouldRefuse)})`;
+    event.wouldRefuse === undefined ? "" : ` (restrict would block: ${label(event.wouldRefuse)})`;
   return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}`;
 }
 
