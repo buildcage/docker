@@ -1,15 +1,11 @@
 /**
  * The parts every "Switch to restrict mode" snippet shares, whichever engine
  * built it: the `uses:` line and the <details> block the YAML sits in.
- *
- * Shared rather than written out per renderer, so STEP_INDENT's own comment
- * cannot be fixed in one copy and missed in the other.
  */
 
 /**
- * GitHub Actions' own indentation convention (jobs: -> <id>: -> steps: ->
- * "- name:") always puts a step 6 spaces in, so the generated snippet can be
- * pasted directly into an existing steps: list without re-indenting it.
+ * Where the conventional layout (jobs: -> <id>: -> steps: -> "- name:") puts a
+ * step, so the snippet pastes into an existing steps: list as is.
  */
 const STEP_INDENT = "      ";
 
@@ -51,9 +47,8 @@ export function exampleStepHead(
 export function exampleStepTail({ extraInputs = [], runCommand }: ExampleStepOptions): string {
   let yaml = extraInputs.map((line) => `    ${line}\n`).join("");
   if (runCommand) {
-    // GitHub Actions' `run: |` block scalar always keeps one trailing
-    // newline (YAML's default "clip" chomping), which would otherwise
-    // split into a spurious blank line at the end.
+    // `|` keeps one trailing newline already (YAML's "clip" chomping), so a
+    // second would split into a blank last line.
     const lines = runCommand.replace(/\r?\n$/, "").split(/\r?\n/);
     // `|` auto-detects the block's indentation from its first non-empty line, so
     // a command whose first such line is indented would set the base there and

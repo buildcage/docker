@@ -257,7 +257,7 @@ A name refused at resolution, before any connection, has no port. A bare `teleme
 
 One rule per line, and on `inspect` a line can also be a URL rule (a method and a URL, the
 `allowed_url_rules` syntax) to acknowledge a single endpoint on a host whose other traffic is
-allowed — a telemetry POST to an API you otherwise use, say:
+allowed, such as a telemetry POST to an API you otherwise use:
 
 ```yaml
 known_blocked_rules: |

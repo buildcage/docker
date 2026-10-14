@@ -4,9 +4,8 @@ import { describe, it, expect } from "vitest";
 import { fitStepSummary, STEP_SUMMARY_LIMIT_BYTES, type SummaryBlock } from "./fit-step-summary.ts";
 
 /**
- * The pre-refactor `fitStepSummary`, kept verbatim as the oracle for the
- * property below: the rewrite only changes how the fit is computed, so its
- * output must stay byte-identical.
+ * A straightforward `fitStepSummary`, the oracle for the property below: the
+ * optimized one must produce byte-identical output.
  */
 const SAFETY_MARGIN_BYTES = 8 * 1024;
 const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
@@ -100,7 +99,7 @@ const block: fc.Arbitrary<SummaryBlock> = fc.record({
   notice: fc.option(fc.constantFrom("_cut_\n", "…truncated\n"), { nil: undefined }),
 });
 
-describe("fitStepSummary: equivalence with the pre-refactor implementation", () => {
+describe("fitStepSummary: equivalence with the reference implementation", () => {
   it("matches the oracle byte for byte, cutting at line boundaries", () => {
     fc.assert(
       fc.property(

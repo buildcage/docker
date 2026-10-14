@@ -13,10 +13,9 @@ const ALIGN_MARKERS: Record<Align, string> = { left: "---", right: "---:", cente
 const alignMarker = (align?: Align): string => ALIGN_MARKERS[align ?? "left"];
 
 /**
- * Neutralizes the structural Markdown in text so it renders as its literal
- * characters. Shared by the table cells and the report heading (the `label`
- * input); render-report-markdown.ts relies on this exact set. Text a request
- * chose goes in a codeCell column instead.
+ * Neutralizes the structural Markdown in text so it renders literally, for
+ * table cells and the report heading (which may carry an action's `label`
+ * input). Text a request chose goes in a codeCell column instead.
  *
  * An unescaped `|` opens as many extra cells as it likes, pushing values of its
  * own into the row. Brackets and angle brackets do the same to what the cell

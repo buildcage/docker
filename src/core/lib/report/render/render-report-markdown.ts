@@ -89,7 +89,7 @@ export function trafficTableBlock(
 }
 
 /** A traffic-section block kept whole however little room is left: the
- *  report's own framing, or a caller's own text set around it. */
+ *  report's framing, or a caller's text around it. */
 export const trafficFrame = (text: string): SummaryBlock => ({
   priority: 0,
   level: 1,
@@ -155,9 +155,8 @@ export function renderReportBlocks(
     wrote = true;
   }
   if (report.blocked.length > 0 || report.failed.length > 0) {
-    // A folded row names its rule; the hosts it stands for are in the
-    // Communication details section. Unmatched refusals come first, as the
-    // rows to act on, and the ones a rule expected last.
+    // A folded row names its rule; its hosts are in Communication details.
+    // Unexpected refusals come first, as the rows to act on.
     const blocked = foldExpectedBlockedRows(report.blocked).map((r) => ({
       ...r,
       outcome: "blocked" as const,
@@ -195,10 +194,8 @@ export function renderReportBlocks(
   blocks.push(...extra);
   wrote ||= extra.some((b) => b.text !== "");
   if (isAudit) {
-    // inspect saw the method and the path of every request, so its example
-    // can be that much narrower than one built from hosts alone. A host that
-    // failed is kept either way: nothing refused it and the next run asks for
-    // it again, so leaving it out would write rules that break that run.
+    // inspect's example also narrows by method and path. A failed host is kept:
+    // nothing refused it, and leaving it out would break the next run.
     // Whole or not at all: a cut example would read as a complete allowlist.
     const example =
       report.engine === "inspect"
@@ -228,10 +225,8 @@ export function renderReportBlocks(
     report.failed.length === 0 &&
     report.timeline.length === 0
   ) {
-    // Otherwise a no-traffic run leaves nothing between the heading and the
-    // footer, indistinguishable from a report that failed to generate. A run
-    // that only looked names up has empty tables but a non-empty timeline, so
-    // its discovery lookups still show in Communication details below.
+    // Otherwise a no-traffic run reads like a report that failed to generate.
+    // A run that only looked names up has a timeline, so it shows below instead.
     blocks.push(trafficFrame(`${gap()}_(no communication)_\n\n`));
   }
 
@@ -249,8 +244,7 @@ export function renderReportBlocks(
     });
   }
   if (report.engine === "universal") {
-    // Only the universal engine identifies a host this way (see
-    // docs/security.md); inspect terminates TLS instead.
+    // How universal identifies a host (see docs/security.md); inspect terminates TLS instead.
     bottom +=
       "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n";
   }

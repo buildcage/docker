@@ -1,11 +1,9 @@
 /**
  * Full-text golden coverage of renderReportMarkdown.
  *
- * This is the Job Summary a user actually reads, assembled by one function
- * that branches on engine and mode and delegates to six renderers. The tests
- * next door assert that a given phrase appears; these pin the whole document,
- * so moving a section, reordering a table or losing a footnote is visible
- * even where nothing asserts on it.
+ * The unit tests assert that a given phrase appears; these pin the whole
+ * document, so moving a section, reordering a table or losing a footnote is
+ * visible even where nothing asserts on it.
  *
  * vitest-only (see test/golden.node.ts).
  */

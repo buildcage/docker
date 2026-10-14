@@ -16,9 +16,8 @@ const ruleTypeToParam: Record<string, string> = {
 export type AuditedRow = Pick<AggregatedEntry, "host" | "port" | "ruleType">;
 
 /**
- * actionRef is the ref (tag or commit SHA) this action was invoked with.
- * Both actions' action.yml lives at the repo root, not in a subdirectory, so
- * the example's `uses:` never has an action-name path segment.
+ * actionRef is the ref (tag or commit SHA) this action was invoked with. The
+ * action.yml sits at the repo root, so `uses:` has no path segment.
  */
 export function buildRestrictExample(
   auditedRows: AuditedRow[] | null | undefined,
@@ -41,8 +40,7 @@ export function buildRestrictExample(
 
   let yaml = exampleStepHead(actionRepo, actionRef, step);
   yaml += "    proxy_mode: restrict\n";
-  // universal is no longer the default engine, so the snippet must name it to
-  // reproduce this run; pasted without it, restrict would fall back to inspect.
+  // Pasted without it, restrict would run the default engine, inspect.
   yaml += "    proxy_engine: universal\n";
   for (const [param, rules] of groups) {
     yaml += `    ${param}: >-\n`;

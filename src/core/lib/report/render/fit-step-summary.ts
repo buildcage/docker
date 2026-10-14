@@ -1,19 +1,17 @@
 /**
- * Fits a Job Summary into GitHub Actions' per-step limit: confirmed at exactly
- * 1 MiB (`actions/runner`'s `CreateStepSummaryCommand.AttachmentSizeLimit`).
- * Exceeding it does not truncate on GitHub's side: it silently drops the
- * entire step's summary upload, so a summary that grows too large would
- * otherwise vanish rather than degrade.
+ * Fits a Job Summary into GitHub Actions' per-step limit of 1 MiB
+ * (`actions/runner`'s `CreateStepSummaryCommand.AttachmentSizeLimit`). GitHub
+ * does not truncate an oversized summary: it silently drops the step's whole
+ * upload.
  *
  * The summary arrives as blocks in the order they print. When they do not all
  * fit, they get room in priority order instead.
  */
 
 export const STEP_SUMMARY_LIMIT_BYTES = 1024 * 1024;
-// Headroom for byte-counting slop and for the truncation notices themselves,
-// so appending a notice can never be what pushes the file over the edge. A
-// caller fitting its own content alongside this module's output leaves the
-// same headroom.
+// Headroom for byte-counting slop and the truncation notices, so a notice can
+// never push the file over. A caller fitting its own content alongside this
+// output leaves the same headroom.
 export const SAFETY_MARGIN_BYTES = 8 * 1024;
 
 export interface SummaryBlock {
@@ -133,10 +131,9 @@ function cutBlock(b: SummaryBlock, budget: number): string {
   let usedBytes = 0;
   let count = 0;
   let fenceOpen = false;
-  // Walk one line at a time rather than splitting the whole block: a tens-of-MB
-  // communication log would otherwise array every line to keep only a few. The
-  // block always exceeds the budget, so the final piece overflows and the
-  // budget check ends the loop without an explicit end-of-text test.
+  // One line at a time: splitting a tens-of-MB log would array every line to
+  // keep a few. The block always exceeds the budget, so the budget check ends
+  // the loop before the text runs out.
   for (let pos = 0; ;) {
     const nl = b.text.indexOf("\n", pos);
     const line = nl === -1 ? b.text.slice(pos) : b.text.slice(pos, nl);
