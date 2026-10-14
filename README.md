@@ -278,13 +278,14 @@ with `if: always()` so a failing build still reports:
   uses: buildcage/docker/report@fb8ec1accd272b4a9c38483989af89dbb23161a6 # v4.1.0
 ```
 
-An alert under the report's title counts what needs a look: a CAUTION for requests refused or a
-report that is incomplete, a WARNING for connections that failed and requests nothing acted on, and
-a plain line when there is none. Whatever was refused is listed under **Blocked Hosts** with the
-reason, marked 🚫, beside any connection that failed, marked ⚠️, and, under `inspect`,
-**Communication details** names the URL of every request, allowed or refused, with credential query
-parameters replaced (see [Credentials in a URL](docs/security.md#credentials-in-a-url)). In `audit`
-mode the summary also holds the **Switch to restrict mode** allowlist.
+An alert under the report's title counts what needs a look: requests refused, connections that
+failed and requests nothing acted on. It is a CAUTION when a request was refused or the report is
+incomplete and a WARNING otherwise, and a plain line says nothing was refused when there is nothing
+to look at. Whatever was refused is listed under **Blocked Hosts** with the reason, marked 🚫, beside
+any connection that failed, marked ⚠️, and, under `inspect`, **Communication details** names the URL
+of every request, allowed or refused, with credential query parameters replaced (see [Credentials in
+a URL](docs/security.md#credentials-in-a-url)). In `audit` mode the summary also holds the **Switch
+to restrict mode** allowlist.
 
 In `restrict` mode the step fails when a blocked connection is found, and with it the workflow. Pass
 `fail_on_blocked: false` to report without failing, or list what you expect to stay blocked in the

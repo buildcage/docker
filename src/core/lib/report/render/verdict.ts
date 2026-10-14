@@ -3,9 +3,10 @@ import type { ReportData } from "../types.ts";
 
 /**
  * Whether anything needs a look, counted as the annotations count it, as a
- * GitHub alert: CAUTION for what fails the step under restrict, WARNING for
- * the rest. The alert's own icon marks it, so the counts carry no symbol.
- * `extraItems`, an action's own warnings, follow the refusals.
+ * GitHub alert listing every count: CAUTION when a request was refused or the
+ * report is incomplete, WARNING when only the rest is there. The alert's own
+ * icon marks it, so the counts carry no symbol. `extraItems`, an action's own
+ * warnings, follow the refusals.
  */
 export function renderVerdict(report: ReportData, extraItems: string[] = []): string {
   let unexpected = 0;
