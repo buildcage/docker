@@ -2,9 +2,11 @@ import { countUndecidedRequests } from "../outcome/report-outcomes.ts";
 import type { ReportData } from "../types.ts";
 
 /**
- * Whether anything needs a look, counted as the annotations count it.
- * `extraItems`, an action's own checks, follow the refusals. An incomplete log
- * leads and rules out ✅, as it alone fails the step under restrict.
+ * Whether anything needs a look, counted as the annotations count it, as a
+ * GitHub alert listing every count: CAUTION when a request was refused or the
+ * report is incomplete, WARNING otherwise. The alert's own icon marks it, so
+ * the counts carry no symbol. `extraItems`, an action's own warnings, follow
+ * the refusals.
  */
 export function renderVerdict(report: ReportData, extraItems: string[] = []): string {
   let unexpected = 0;
@@ -19,14 +21,20 @@ export function renderVerdict(report: ReportData, extraItems: string[] = []): st
   const failed = report.failed.reduce((total, row) => total + row.count, 0);
   const undecided = countUndecidedRequests(report);
 
-  const items = [
-    ...(report.logLooksPlausible ? [] : ["❗ report incomplete"]),
-    ...(unexpected ? [`🚫 ${unexpected} refused`] : []),
+  const caution = [
+    ...(report.logLooksPlausible ? [] : ["report incomplete"]),
+    ...(unexpected ? [`${unexpected} refused`] : []),
+  ];
+  const warning = [
     ...extraItems,
-    ...(failed ? [`⚠️ ${failed} failed`] : []),
-    ...(undecided ? [`⚠️ ${undecided} not acted on`] : []),
+    ...(failed ? [`${failed} failed`] : []),
+    ...(undecided ? [`${undecided} not acted on`] : []),
   ];
   // Expected refusals need nothing done, so they lead only when nothing else does.
-  if (expected) items.push(`${items.length ? "" : "✅ "}${expected} refused as expected`);
-  return `**${items.length ? items.join(" · ") : "✅ Nothing was refused"}**\n\n`;
+  const asExpected = expected ? [`${expected} refused as expected`] : [];
+  if (caution.length + warning.length === 0) {
+    return `Result: ✅ ${asExpected[0] ?? "Nothing was refused"}\n\n`;
+  }
+  const items = [...caution, ...warning, ...asExpected].join(" · ");
+  return `> [!${caution.length ? "CAUTION" : "WARNING"}]\n> ${items}\n\n`;
 }

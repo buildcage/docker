@@ -1,6 +1,7 @@
 ## Outbound Traffic Report (audit mode)
 
-**🚫 2 refused · ⚠️ 1 failed · ⚠️ 1 not acted on**
+> [!CAUTION]
+> 2 refused · 1 failed · 1 not acted on
 
 ### 📋 Audited Hosts
 
@@ -44,7 +45,7 @@
 🚫 00:08.000: DNS A unresolvable.example.net -> dns-not-allowed
 ⚠️ 00:09.123: HTTPS untrusted-ca.example.com:443 -> client-aborted
 ⚠️ 00:11.000: GET https://a.example.com/pkg.json -> origin-aborted
-🚨 00:12.000: POST https://a.example.com/upload -> 200 (512B) (restrict would refuse: example-refusal)
+⚠️ 00:12.000: POST https://a.example.com/upload -> 200 (512B) (restrict would refuse: example-refusal)
 ```
 
 </details>
