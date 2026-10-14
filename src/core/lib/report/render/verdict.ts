@@ -3,10 +3,10 @@ import type { ReportData } from "../types.ts";
 
 /**
  * Whether anything needs a look, counted as the annotations count it: a GitHub
- * alert listing every count, CAUTION for an unexpected refusal or an
+ * alert listing every count, CAUTION for an unexpected block or an
  * incomplete report and WARNING otherwise. The counts carry no symbol, since
  * the alert has its own icon. `extraItems`, an action's own warnings, follow
- * the refusals.
+ * the blocks.
  */
 export function renderVerdict(report: ReportData, extraItems: string[] = []): string {
   let unexpected = 0;
@@ -15,7 +15,7 @@ export function renderVerdict(report: ReportData, extraItems: string[] = []): st
     if (row.expected) expected += row.count;
     else unexpected += row.count;
   }
-  // Refusals with no row to say whether they were expected count as not, as
+  // Blocks with no row to say whether they were expected count as not, as
   // determineBlockedOutcome fails closed on them.
   if (report.blocked.length === 0) unexpected = report.blockedCount;
   const failed = report.failed.reduce((total, row) => total + row.count, 0);
@@ -30,7 +30,7 @@ export function renderVerdict(report: ReportData, extraItems: string[] = []): st
     ...(failed ? [`${failed} failed`] : []),
     ...(undecided ? [`${undecided} not acted on`] : []),
   ];
-  // Expected refusals need nothing done, so they lead only when nothing else does.
+  // Expected blocks need nothing done, so they lead only when nothing else does.
   const asExpected = expected ? [`${expected} blocked as expected`] : [];
   if (caution.length + warning.length === 0) {
     return `Result: ✅ ${asExpected[0] ?? "Nothing was blocked"}\n\n`;

@@ -171,7 +171,7 @@ describe("renderReportBlocks under a limit", () => {
             method: "GET",
             url: "https://ok0.example.com/",
             status: 200,
-            wouldBlock: "example-refusal",
+            wouldBlock: "example-block",
           },
         ],
       }),

@@ -87,7 +87,7 @@ describe("a row carrying a note", () => {
 });
 
 describe("a row with no port", () => {
-  it("shows the name alone, since a refused name was never connected to", () => {
+  it("shows the name alone, since a blocked name was never connected to", () => {
     const md = renderHostTable([
       { host: "attacker.example", port: "-", ruleType: "DNS", reason: "dns-not-allowed", count: 1 },
     ]);

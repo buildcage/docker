@@ -18,10 +18,10 @@ echo ""
 
 echo "[audit enforces nothing]:"
 if grep -qE "^buildcage [0-9]+ https? [A-Z]+ (403|502) " <<< "$LOGS"; then
-  fail "something was refused in audit mode"
+  fail "something was blocked in audit mode"
   grep -E "(403|502) " <<< "$LOGS" || true
 else
-  pass "no request was refused"
+  pass "no request was blocked"
 fi
 echo ""
 
@@ -29,7 +29,7 @@ echo "[a rule naming an address exempts it from the internal-address guard in au
 if docker compose exec builder grep -qF "set-var(txn.named_address) bool(true)" /etc/haproxy/haproxy.cfg; then
   pass "GET http://10.200.0.100/pub-by-addr/** carried its exemption into haproxy.cfg"
 else
-  fail "no address exemption in haproxy.cfg, so audit refuses what restrict allows"
+  fail "no address exemption in haproxy.cfg, so audit blocks what restrict allows"
 fi
 echo ""
 

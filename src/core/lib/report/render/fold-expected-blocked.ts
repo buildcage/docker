@@ -24,7 +24,7 @@ export function foldExpectedBlockedRows(rows: HostTableRow[]): HostTableRow[] {
       unmatched.push(row);
       continue;
     }
-    // One rule can cover a refused name and a refused connection at once, so
+    // One rule can cover a blocked name and a blocked connection at once, so
     // ruleType and reason stay in the key rather than one row claiming both.
     const key = `${row.expectedBy}\t${row.ruleType}\t${row.reason}`;
     const group = groups.get(key);

@@ -247,7 +247,7 @@ describe("parseAndValidateRules", () => {
 });
 
 describe("known_blocked_rules port completion", () => {
-  it("completes a rule that names no port, so a refused name can be declared", () => {
+  it("completes a rule that names no port, so a blocked name can be declared", () => {
     expect(completeRulePort("_mongodb._tcp.c0.example.net")).toBe("_mongodb._tcp.c0.example.net:*");
     expect(completeRulePort("telemetry.example.com")).toBe("telemetry.example.com:*");
     expect(completeRulePort("*.example.com")).toBe("*.example.com:*");

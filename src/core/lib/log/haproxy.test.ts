@@ -106,7 +106,7 @@ describe("scanHaproxyLog", () => {
   const noRequest = (ts: string, dst = "198.19.255.1:22") =>
     `buildcage 1787471970000 [-] (HTTP) "-" - 0 ts=${ts} dst=${dst}`;
 
-  it("reads bytes the HTTP stage refused as no request as a refusal, in audit too", async () => {
+  it("reads bytes the HTTP stage blocked as no request as a block, in audit too", async () => {
     for (const isAudit of [false, true]) {
       const { events, unparsed } = await scanHaproxyLog([noRequest("PR")], isAudit);
       expect(unparsed).toBe(0);
@@ -191,7 +191,7 @@ describe("scanHaproxyLog", () => {
     expect(unparsed).toBe(0);
   });
 
-  it("counts a decision line it cannot read, since it may have been a refusal", async () => {
+  it("counts a decision line it cannot read, since it may have been a block", async () => {
     const log = [
       line("ALLOWED", "HTTPS", "example.com:443", "-", 10),
       `buildcage 1787471970001 [BLOCKED] (HTTPS) "bad.com:4buildcage 1787471970002 [BLOCKED] (HTTPS) "worse.com:443" not-allowed 0`,

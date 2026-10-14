@@ -71,7 +71,7 @@ describe("buildUniversalReportData", () => {
     ).toStrictEqual(["example.com:443"]);
   });
 
-  it("tables a dns-failed connection apart from refusals", async () => {
+  it("tables a dns-failed connection apart from blocks", async () => {
     const result = await buildUniversalReportData(
       [HAPROXY_START, proxy("BLOCKED", "HTTPS", "absent.com:443", "dns-failed")],
       [DNS_START],
@@ -82,7 +82,7 @@ describe("buildUniversalReportData", () => {
     expect(result.blocked.length).toBe(0);
   });
 
-  it("adds a refused resolver name as a DNS blocked row that fails the step", async () => {
+  it("adds a blocked resolver name as a DNS blocked row that fails the step", async () => {
     const result = await buildUniversalReportData(
       [HAPROXY_START],
       [DNS_START, dnsLine("denied", "exfil.attacker.example")],
@@ -95,7 +95,7 @@ describe("buildUniversalReportData", () => {
     expect(result.blockedCount).toBe(1);
   });
 
-  it("adds a refused service name as a DNS blocked row", async () => {
+  it("adds a blocked service name as a DNS blocked row", async () => {
     const result = await buildUniversalReportData(
       [HAPROXY_START],
       [DNS_START, dnsLine("service-denied", "_mongodb._tcp.c0.example.net", "SRV")],
@@ -172,7 +172,7 @@ describe("buildUniversalReportData", () => {
   });
 
   it("logLooksPlausible is false when a resolver decision line could not be read", async () => {
-    // A refused name reaches no proxy, so an unreadable line is a refusal lost.
+    // A blocked name reaches no proxy, so an unreadable line is a block lost.
     const result = await buildUniversalReportData(
       [HAPROXY_START],
       [DNS_START, dnsLine("denied", "bad com")],

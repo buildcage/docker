@@ -128,7 +128,7 @@ describe("passthrough", () => {
 
   it("leaves a connection an ip rule also covers to that rule, whatever SNI it carries", () => {
     // The ip rule names the address itself, so the SNI neither redirects nor
-    // refuses it; the tls rule's resolution never runs for it.
+    // blocks it; the tls rule's resolution never runs for it.
     const overlap = detect({ ...FULL, ipRules: ["10.0.0.0/8:443"] });
     const accept = overlap.indexOf("tcp-request content accept if { var(txn.pass) -m found }");
     expect(accept).not.toBe(-1);
@@ -250,7 +250,7 @@ describe("ip rules and the proxy's own address", () => {
     expect(result.includes("ip_dst_internal")).toBe(false);
   });
 
-  it("refuses a passthrough to the proxy's own listener, and only there", () => {
+  it("blocks a passthrough to the proxy's own listener, and only there", () => {
     // 0.0.0.0/0 covers the proxy's other addresses, which would loop it into
     // itself; an outside host's 10024 is still the rule's to allow.
     const result = detect({ ipRules: ["0.0.0.0/0:*"] });

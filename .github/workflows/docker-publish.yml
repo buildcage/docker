@@ -243,7 +243,7 @@ jobs:
                 sleep 5; \
               done
           RUN if wget -q -T 15 -O /dev/null https://neverssl.com/; then \
-                echo "FAILED: neverssl.com should have been refused" && exit 1; \
+                echo "FAILED: neverssl.com should have been blocked" && exit 1; \
               fi
           EOF
 
@@ -259,7 +259,7 @@ jobs:
           no-cache: true
 
       # The build only sees that the second request failed, which an outage
-      # would produce too, so the traffic record has to show the proxy refused it.
+      # would produce too, so the traffic record has to show the proxy blocked it.
       - name: Show proxy report
         if: always()
         uses: ./report
@@ -275,7 +275,7 @@ jobs:
           name: buildcage-traffic-${{ env.BUILDER }}
           path: /tmp/buildcage-traffic
 
-      - name: The proxy must have allowed example.com and refused neverssl.com
+      - name: The proxy must have allowed example.com and blocked neverssl.com
         run: |
           node -e '
             const rows = JSON.parse(require("node:fs").readFileSync("/tmp/buildcage-traffic/traffic.json", "utf8"));

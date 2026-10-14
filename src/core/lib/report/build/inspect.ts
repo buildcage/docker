@@ -23,7 +23,7 @@ function resolverAllows(parameters: GenReportParameters): (name: string) => bool
  * fetches both logs, the parameters and the proxy's dropped-line count
  * (undefined where it could not be read).
  *
- * The resolver log matters because a refused name never reached the proxy, so
+ * The resolver log matters because a blocked name never reached the proxy, so
  * a DNS-only exfiltration attempt would otherwise leave no trace.
  */
 export async function buildInspectReportData(

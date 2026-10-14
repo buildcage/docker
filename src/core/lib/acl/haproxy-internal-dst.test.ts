@@ -7,7 +7,7 @@ describe("the internal-destination acl", () => {
   it("tests the same thing for both stages, differing only in the acl name", () => {
     // The passthrough path rejects the connection and the inspected path denies
     // the request with 403, but what counts as internal cannot differ between
-    // them: a destination one refuses and the other allows is a hole.
+    // them: a destination one blocks and the other allows is a hole.
     const [pass] = internalDstAcl("pass_dst_internal", { internalAddrs: ADDRS });
     const [inspected] = internalDstAcl("dst_internal", { internalAddrs: ADDRS });
     expect(pass.replace("pass_dst_internal", "dst_internal")).toBe(inspected);

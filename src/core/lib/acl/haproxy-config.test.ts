@@ -101,7 +101,7 @@ describe("where a request is sent", () => {
   });
 
   it("takes an address in the Host header as it stands, asking no resolver", () => {
-    // No resolver can answer an address, so asking would fail and refuse the
+    // No resolver can answer an address, so asking would fail and block the
     // request, leaving a rule that names an address impossible to satisfy.
     expect(FULL_CONFIG.includes("acl host_is_address var(txn.host) -m reg ^(25[0-5]")).toBe(true);
     expect(
@@ -141,7 +141,7 @@ describe("where a request is sent", () => {
     expect(regex.test("1.2.3")).toBe(false);
   });
 
-  it("refuses a request whose name it could not resolve", () => {
+  it("blocks a request whose name it could not resolve", () => {
     expect(
       FULL_CONFIG.includes("http-request deny deny_status 502 unless { var(txn.dst) -m found }"),
     ).toBe(true);
@@ -164,9 +164,9 @@ describe("resolving, which only a request the rules already admitted reaches", (
   it("sets the resolved destination before the internal-address check, not after", () => {
     // %[dst] in the log-format reads whatever set-dst last wrote. CoreDNS
     // never hands the build a real address (see coredns-config.ts), so a
-    // refusal logged before set-dst ran would show the build's own fake
+    // block logged before set-dst ran would show the build's own fake
     // destination instead of the real one that tripped the guard, silently
-    // losing the address that makes the refusal worth recording.
+    // losing the address that makes the block worth recording.
     for (const frontend of ["https_in", "http_in"]) {
       const segment = frontendSegment(FULL_CONFIG, frontend);
       const setDst = segment.indexOf("http-request set-dst var(txn.dst)");
@@ -244,7 +244,7 @@ describe("resolving, which only a request the rules already admitted reaches", (
 });
 
 describe("the internal-address guard", () => {
-  it("refuses a resolved destination that lands on an internal address", () => {
+  it("blocks a resolved destination that lands on an internal address", () => {
     // The rules check the name; nothing checks where it resolves. A name that
     // resolves to cloud metadata or the proxy itself would otherwise have the
     // proxy connect there from its own network position. Confirmed against a
@@ -461,7 +461,7 @@ describe("what a log line records", () => {
     expect(normalise !== -1 && normalise < capture).toBe(true);
   });
 
-  it("records the path before refusing a traversal, not after", () => {
+  it("records the path before blocking a traversal, not after", () => {
     // Denying first leaves txn.pathq unset, which the log prints as `-`, and
     // the report shows no URL for a request that named no path. Exactly the
     // requests worth seeing would lose theirs.
@@ -482,11 +482,11 @@ describe("the path the rules see", () => {
     expect(decode !== -1 && decode < strip).toBe(true);
   });
 
-  it("refuses a dot-dot beside an encoded slash or backslash", () => {
+  it("blocks a dot-dot beside an encoded slash or backslash", () => {
     // `/` and `\\` are both separators an origin may honour: `%2f` is reserved
     // so it survives decoding, and the URL standard treats `\\` as `/` for
     // http(s). Neither is a segment HAProxy strips, so `..` beside either is
-    // refused. An encoded separator on its own stays legitimate.
+    // blocked. An encoded separator on its own stays legitimate.
     expect(
       FULL_CONFIG.includes(
         "http-request deny deny_status 403 if { path -m reg -i (^|/|%2f|%5c)\\.\\.($|/|;|%2f|%5c|%3b) }",
@@ -494,7 +494,7 @@ describe("the path the rules see", () => {
     ).toBe(true);
   });
 
-  it("refuses a dot-dot ended by a path parameter", () => {
+  it("blocks a dot-dot ended by a path parameter", () => {
     // Tomcat and Jetty drop `;...` from a segment, so `/public/..;/secret` is
     // `/secret` to them. HAProxy strips only a bare `..`, and the rules would
     // match `/public/`.
@@ -509,7 +509,7 @@ describe("the path the rules see", () => {
       expect(re.test(p)).toBe(false);
   });
 
-  it("refuses a raw backslash outright, it being no valid path character", () => {
+  it("blocks a raw backslash outright, it being no valid path character", () => {
     // RFC 3986 does not allow it unencoded; its only use is as a separator on
     // the origins that accept it. `\\\\` in the source is `\\` in the generated config,
     // which HAProxy's parser reads as one literal backslash.
@@ -582,12 +582,12 @@ describe("address wildcards", () => {
 });
 
 // ---------------------------------------------------------------------------
-// audit records without enforcing, so it may not refuse anything
+// audit records without enforcing, so it may not block anything
 // ---------------------------------------------------------------------------
 describe("audit mode", () => {
   const audit = gen({ ...FULL, mode: "audit" });
 
-  it("refuses nothing on either listener", () => {
+  it("blocks nothing on either listener", () => {
     expect(audit.includes("http-request deny unless")).toBe(false);
     expect(audit.includes("# No rules for this scheme")).toBe(false);
   });
@@ -606,7 +606,7 @@ describe("audit mode", () => {
 
   it("still resolves for a scheme with no rules, having denied nothing above", () => {
     // Only restrict's unconditional deny makes the rest of a stage dead; audit
-    // refuses nothing, so a scheme with no rules still needs the resolver.
+    // blocks nothing, so a scheme with no rules still needs the resolver.
     const plain = frontendSegment(gen({ ...FULL, mode: "audit", httpRules: [] }), "http_in");
     expect(plain.includes("do-resolve(txn.dst,buildcage,ipv4) var(txn.host)")).toBe(true);
   });

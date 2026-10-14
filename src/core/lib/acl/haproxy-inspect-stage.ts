@@ -32,7 +32,7 @@ export interface InspectStageContext extends InternalDstOptions {
 
 /**
  * Rules an action adds to both inspected frontends, for a check of its own on
- * top of the URL rules. In `restrict` its request rules refuse by setting
+ * top of the URL rules. In `restrict` its request rules block by setting
  * txn.reason and denying; in `audit` they set txn.would_block to the reason
  * `restrict` would have logged, which the log carries as `wb=`.
  */
@@ -193,7 +193,7 @@ export function inspectStage(
     "    # A request with no Host names nothing: the rules match on it, the",
     "    # origin is resolved from it, and the log's URL is built from it. Named",
     "    # here rather than left to the log's own empty fields, which a Host the",
-    "    # client chose can imitate. Refused in `audit` too, as the same check",
+    "    # client chose can imitate. Blocked in `audit` too, as the same check",
     "    # in the universal engine is: there is nothing to connect to either way.",
     "    # Ahead of the path denies below, so that a request carrying neither a",
     "    # Host nor a legal path is named by the one the report can act on: the",
@@ -208,14 +208,14 @@ export function inspectStage(
     "    # could judge one value and connect to another.",
     `    http-request set-var(txn.host) req.hdr(host),lower,${HOST_ONLY}`,
     "    # A `:` left in the name could let a `~` rule's port pattern match it.",
-    "    # Refused in `audit` too.",
+    "    # Blocked in `audit` too.",
     `    acl host_is_name var(txn.host) -m reg ${HOSTNAME_CHARSET}`,
     "    http-request set-var(txn.reason) str(invalid-host) if !host_is_name",
     "    http-request deny deny_status 400 if !host_is_name",
     "",
     "    # `%2f` and `%5c` survive decoding (both reserved) yet an origin may",
     "    # read `..%2f` / `..%5c` as a segment, and a raw backslash is not a",
-    "    # valid path char at all. None is stripped, so each is refused. A lone",
+    "    # valid path char at all. None is stripped, so each is blocked. A lone",
     "    # encoded separator stays legal (e.g. npm's `/@scope%2fpackage`).",
     "    # `;` (or `%3b`) ends a segment too: Tomcat and Jetty drop what follows",
     "    # as a path parameter, so they read `..;/` as `../`.",
@@ -223,8 +223,8 @@ export function inspectStage(
     "    http-request deny deny_status 403 if { path -m reg -i (^|/|%2f|%5c)\\.\\.($|/|;|%2f|%5c|%3b) }",
     "    http-request deny deny_status 403 if { path -m sub \\\\ }",
     "",
-    // %ts tells a refusal from an origin's own 403 or 503, reason says which
-    // refusal, and tlserr carries haproxy's own error from the handshake with
+    // %ts tells a block from an origin's own 403 or 503, reason says which
+    // block, and tlserr carries haproxy's own error from the handshake with
     // the origin (see log/inspect.ts's reasonFor). All three sit ahead of the
     // target, the one field that could cut the line.
     // host and target are two fields rather than one URL: pathq is empty for
@@ -247,8 +247,8 @@ export function inspectStage(
   // Skipped entirely when the block above denies unconditionally: HAProxy
   // would never reach these rules, and warns that they are NOOP.
   if (!deniesEverything(rules, mode)) {
-    // After the rules, so a request they refuse keeps their reason, and ahead
-    // of the resolve, so one the extension refuses triggers no DNS query.
+    // After the rules, so a request they block keeps their reason, and ahead
+    // of the resolve, so one the extension blocks triggers no DNS query.
     // Response rules run in their own phase; where they sit here is moot.
     if (extension) {
       l.push(...extension.requestRules(mode));
@@ -271,7 +271,7 @@ export function inspectStage(
       "    http-request deny deny_status 502 unless { var(txn.dst) -m found }",
       "",
       "    # Set before the internal-destination check below, not after: %[dst] in",
-      "    # the log-format is this, and a refusal must show the address that",
+      "    # the log-format is this, and a blocked request must show the address that",
       "    # tripped it, not whatever the client's own (fake, unresolved) address",
       "    # was: CoreDNS never hands out a real one; see coredns-config.ts.",
       "    http-request set-dst var(txn.dst)",

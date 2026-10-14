@@ -4,7 +4,7 @@
  * Baked into the image and copied out of it (not out of the running
  * container) by the `report` action, which runs it on the runner as
  * `node report-action.js <container-id>` (see report/src/main.ts). Reads two
- * logs: the proxy's requests and the resolver's refused names, the latter
+ * logs: the proxy's requests and the resolver's blocked names, the latter
  * being the only trace of a DNS-only exfiltration.
  *
  * Everything but those two log paths is src/report/action-main.ts.

@@ -85,7 +85,7 @@ export function resolversSection(): string[] {
 export function originBackends(systemCaFile: string): string[] {
   return [
     "# The only place a request reaches the origin, so where its certificate is",
-    "# checked; a refused request never gets here. The SNI is the port-free",
+    "# checked; a blocked request never gets here. The SNI is the port-free",
     "# txn.host the rules judged, since a certificate is verified against a name,",
     "# not a name and port.",
     "backend origin_tls",

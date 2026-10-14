@@ -45,7 +45,7 @@ export function ruleHost(host: string): string {
 }
 
 /** An SNI as the rules match it: ASCII lowercased, trailing dot kept. Folding
- *  the dot would list a refusal under a host the rules allow. */
+ *  the dot would list a block under a host the rules allow. */
 export function sniHost(sni: string): string {
   return sni.replace(/[A-Z]/g, (c) => c.toLowerCase());
 }

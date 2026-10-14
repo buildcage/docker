@@ -90,8 +90,8 @@ function describeUndecidedRequests(
  * an audited connection and an allowed one.
  *
  * "could not be reached" is deliberately absent: a connection that never
- * completed is a refusal wherever a certificate was going to be checked, and
- * the few that are not refusals have a table entry of their own to explain
+ * completed is a block wherever a certificate was going to be checked, and
+ * the few that are not blocks have a table entry of their own to explain
  * them (see FAILURE_REASONS and docs/reference.md).
  */
 function describeFailedConnections(

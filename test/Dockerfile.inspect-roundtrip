@@ -4,7 +4,7 @@
 # request must still succeed: rules that broke the build they were learned from
 # would make the audit-then-restrict workflow worthless.
 #
-# The second half asks for things that build never did. They must be refused,
+# The second half asks for things that build never did. They must be blocked,
 # or the rules would only look narrow without being so.
 FROM alpine/curl@sha256:1a4d725751c5bd50297ee243db5d4df8ac5aabdf7030dd40dcec3bc3fdaa1cfa
 
@@ -51,7 +51,7 @@ RUN echo "=== [same as audit: query string] ===" && \
     case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
 
 # ---------------------------------------------------------------------------
-# Now refused: none of these happened during the audit run
+# Now blocked: none of these happened during the audit run
 # ---------------------------------------------------------------------------
 
 # A path outside the prefix the generator kept.

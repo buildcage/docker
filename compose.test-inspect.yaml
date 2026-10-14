@@ -55,7 +55,7 @@ services:
         GET ~^https://blocked\.example\.com/defaultport/.*$
 
         # Neither anchor written: the host half is anchored for the author,
-        # so not-ok.wildcard.example.com is refused, while the path half is
+        # so not-ok.wildcard.example.com is blocked, while the path half is
         # left as written and /regexpub/ stays a prefix.
         GET ~https://ok\.wildcard\.example\.com/regexpub/
 

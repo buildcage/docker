@@ -13,7 +13,7 @@ jobs:
 
     steps:
       # Same build as the audit example, with the rules that run produced. npm
-      # publish is a PUT, so it's refused: no rule here covers that method.
+      # publish is a PUT, so it's blocked: no rule here covers that method.
       - name: Start Buildcage builder
         uses: buildcage/docker@fb8ec1accd272b4a9c38483989af89dbb23161a6 # v4.1.0
         with:
@@ -45,7 +45,7 @@ jobs:
               apt-get install -y wget && \
               rm -rf /var/lib/apt/lists/*
           RUN npm init -y && npm install --ignore-scripts @hono/node-server
-          # Refused: the report names the full URL, not just the host.
+          # Blocked: the report names the full URL, not just the host.
           RUN wget -q -O /dev/null --timeout=5 https://example.com/ || true
           EOF
 

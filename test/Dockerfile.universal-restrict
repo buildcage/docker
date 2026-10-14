@@ -84,7 +84,7 @@ RUN echo "=== [Direct IP - blocked] ===" && \
     (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by haproxy (expected)"
 
 # allowed_ip_rules names 10.200.0.100:8443 alone. The SNI is the client's to
-# choose, so it must decide neither way: a name there must not refuse the
+# choose, so it must decide neither way: a name there must not block the
 # allowed address, and the allowed address there must not open another one.
 RUN echo "=== [Direct IP - allowed, SNI names a host] ===" && \
     (node --no-deprecation -e 'require("tls").connect({ host: process.argv[1], port: 8443, servername: process.argv[2], rejectUnauthorized: false }, () => process.exit(0)).on("error", () => process.exit(1)).setTimeout(5000, () => process.exit(1))' 10.200.0.100 allowed.example.com && echo "✓ 10.200.0.100:8443: OK") || (echo "✗ 10.200.0.100:8443: FAILED" && exit 1)
@@ -127,7 +127,7 @@ RUN echo "=== [HTTP - SSRF via allowlisted name] ===" && \
     echo "Testing internal.wildcard.example.com (HTTP, should be blocked)..." && \
     (wget -q -O /dev/null --timeout=5 http://internal.wildcard.example.com/ && echo "✗ internal.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ internal.wildcard.example.com HTTP: BLOCKED (expected)"
 
-# RFC1918 is exempt on purpose, so only the runner's address list refuses it.
+# RFC1918 is exempt on purpose, so only the runner's address list blocks it.
 RUN echo "=== [HTTPS - SSRF back to the runner] ===" && \
     echo "Testing runner.wildcard.example.com (HTTPS, should be blocked)..." && \
     (wget --no-check-certificate -q -O /dev/null --timeout=5 https://runner.wildcard.example.com/ && echo "✗ runner.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ runner.wildcard.example.com: BLOCKED (expected)"
@@ -187,7 +187,7 @@ RUN echo "=== [HTTP keep-alive - blocked then allowed] ===" && \
 # universal never terminates TLS, so npm judges the fixture origin's own
 # self-signed certificate, and rejecting it is the expected outcome: a
 # re-signing engine would have handed npm one its own store could verify.
-# Reaching the certificate at all is the other half, since a refused
+# Reaching the certificate at all is the other half, since a blocked
 # connection never gets that far. It gets a host of its own (the wildcard
 # rule covers it) so that no other case's expected request count depends on
 # how many requests npm decides to make.

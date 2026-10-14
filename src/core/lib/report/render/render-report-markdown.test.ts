@@ -146,7 +146,7 @@ describe("renderReportMarkdown: universal", () => {
     count: 1,
   };
 
-  it("tables connections the origin broke with the refusals, marked apart", () => {
+  it("tables connections the origin broke with the blocks, marked apart", () => {
     const md = renderReportMarkdown(
       { ...base, blocked: [blockedRow], blockedCount: 1, failed: [failedRow] },
       "owner/repo",
@@ -172,7 +172,7 @@ describe("renderReportMarkdown: universal", () => {
     expect(blockedOnly).not.toMatch(/none of them fails the step/);
   });
 
-  it("orders unmatched refusals, then failures, then expected ones, with no Expected cell on a failure", () => {
+  it("orders unmatched blocks, then failures, then expected ones, with no Expected cell on a failure", () => {
     const md = renderReportMarkdown(
       {
         ...base,
@@ -195,7 +195,7 @@ describe("renderReportMarkdown: universal", () => {
     expect(md.includes("_(no communication)_")).toBe(false);
   });
 
-  it("suggests a host whose name failed to resolve in audit, which nothing refused", () => {
+  it("suggests a host whose name failed to resolve in audit, which nothing blocked", () => {
     const dnsFailed = { ...failedRow, host: "flaky.example.com", reason: "dns-failed" };
     const md = renderReportMarkdown(
       { ...base, parameters: reportParams({ mode: "audit" }), failed: [dnsFailed] },
@@ -302,16 +302,16 @@ describe("renderReportMarkdown: inspect", () => {
     expect(md).not.toMatch(/based on the Host header/);
   });
 
-  it("labels a refusal in Communication details as the caller says", () => {
-    const refused: TrafficEvent = {
+  it("labels a block in Communication details as the caller says", () => {
+    const blockedEvent: TrafficEvent = {
       ...timeline[0],
       action: "block",
       reason: "not-allowed",
       status: undefined,
       bytes: undefined,
     };
-    const md = renderReportMarkdown({ ...base, timeline: [refused] }, "owner/repo", "v1", {
-      refusalLabel: (_, reason) => `${reason}, labelled`,
+    const md = renderReportMarkdown({ ...base, timeline: [blockedEvent] }, "owner/repo", "v1", {
+      blockLabel: (_, reason) => `${reason}, labelled`,
     });
     expect(md).toContain("GET https://good.com/pkg -> not-allowed, labelled\n");
   });
@@ -360,7 +360,7 @@ describe("renderReportMarkdown: section and footer", () => {
     startedAt: undefined,
   };
 
-  it("puts the verdict under the title and its items after the refusals", () => {
+  it("puts the verdict under the title and its items after the blocks", () => {
     const md = renderReportMarkdown(base, "owner/repo", "v1", { verdictItems: ["1 x"] });
     expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 blocked · 1 x\n\n### /);
   });

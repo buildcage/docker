@@ -164,7 +164,7 @@ describe("describeReportOutcomes", () => {
     expect(outcomes[1].level).toBe("warning");
   });
 
-  it("never fails the step over one: no rule refused it and none can clear it", () => {
+  it("never fails the step over one: no rule blocked it and none can clear it", () => {
     const outcomes = describeReportOutcomes(inspect([incomplete]), options);
     expect(outcomes.every((outcome) => !outcome.shouldFail)).toBe(true);
   });

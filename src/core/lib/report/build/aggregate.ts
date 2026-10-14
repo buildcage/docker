@@ -39,9 +39,9 @@ interface KnownBlockedMatcher {
 /**
  * What a host rule is tested against, normally `host:port`.
  *
- * A block with no port is a refused name, connected to nothing. It is tested as
+ * A block with no port is a blocked name, connected to nothing. It is tested as
  * port 0, which `host:*` matches (compiling to `host:\d+`) but `host:443` does
- * not, which is right since no port was involved. Without this a refused name
+ * not, which is right since no port was involved. Without this a blocked name
  * could never be marked expected.
  */
 function targetOf(event: TrafficEvent): string {
@@ -74,7 +74,7 @@ interface CompiledUrlRule {
  * Whether a blocked event is one a URL rule acknowledges.
  *
  * Only `inspect` records a method and a URL on a block, so an event without
- * them (a host-level refusal, or any block under `universal`) never matches a
+ * them (a host-level block, or any block under `universal`) never matches a
  * URL rule; those are acknowledged with a host rule instead. Scheme, host, port
  * and path are matched as the proxy would (see haproxy-rule-block.ts and
  * haproxy-rules.ts's per-scheme bucketing): port and scheme against the
@@ -217,7 +217,7 @@ export interface ReducedTimeline {
  * engines share. `discovery` and `incomplete` events reach neither table (no
  * rule decided them; the timeline still keeps them). A lookup a connection
  * already covers is dropped, and a failed connection is kept apart from
- * refusals (see TrafficAction).
+ * blocks (see TrafficAction).
  *
  * Blocked events are kept whole rather than reduced to host rows first:
  * annotateKnownBlocked matches a URL rule against the method and path a host

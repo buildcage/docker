@@ -86,7 +86,7 @@ else
 fi
 echo ""
 
-echo "[report] Blocked / Failed Hosts, one row per reason the proxy refused for:"
+echo "[report] Blocked / Failed Hosts, one row per reason the proxy blocked for:"
 if grep -qF "### 🚫 Blocked / ⚠️ Failed Hosts" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| \`blocked.example.com:443\` | HTTPS | 🚫 not-allowed |" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| \`10.200.0.100:80\` | IP | 🚫 ip-not-allowed |" <<< "$REPORT_MARKDOWN" \
@@ -98,10 +98,10 @@ fi
 echo ""
 
 # The allowlist is checked before anything resolves, so a name that got as far
-# as failing to resolve had passed it: no rule refused it and none can clear it.
+# as failing to resolve had passed it: no rule blocked it and none can clear it.
 echo "[report] a failure, for a name the resolver could not answer:"
 if grep -qF "| \`nxdomain.wildcard.example.com:443\` | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
-  pass "an unresolvable name is reported as a failure, not a refusal"
+  pass "an unresolvable name is reported as a failure, not a block"
 else
   fail "the Blocked / Failed Hosts table is missing the failed row"
 fi

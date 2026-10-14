@@ -7,7 +7,7 @@ import type { TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 
 export interface HaproxyLogScan {
   /** Every decision, oldest first: one connection the proxy allowed, audited,
-   *  refused, or that failed after it was allowed. */
+   *  blocked, or that failed after it was allowed. */
   events: TrafficEvent[];
   /** Seconds since the epoch the proxy started, from the startup marker, so the
    *  report can time each event relative to it. Undefined when the marker
@@ -52,7 +52,7 @@ const PROTOCOL: Record<string, TrafficProtocol> = {
  * A name whose upstream resolution the proxy could not complete. The config
  * rejects a host no rule covers before it ever resolves one, so a line reaching
  * this reason had already passed the allowlist. See TrafficAction for why such
- * a row is kept apart from a refusal.
+ * a row is kept apart from a block.
  */
 const FAILURE_REASONS = new Set(["dns-failed"]);
 
@@ -88,17 +88,17 @@ export async function scanHaproxyLog(
       const { host: address, port } = splitHostPort(target);
       const host = hostOf(address, ruleType);
       const failed = decision === "BLOCKED" && FAILURE_REASONS.has(reason);
-      const refused = decision === "BLOCKED" && !failed;
+      const blocked = decision === "BLOCKED" && !failed;
       const event: TrafficEvent = {
         time: Number(ms) / 1000,
-        action: failed ? "failed" : refused ? "block" : isAudit ? "audit" : "allow",
+        action: failed ? "failed" : blocked ? "block" : isAudit ? "audit" : "allow",
         protocol: PROTOCOL[ruleType] ?? "tcp",
         host,
       };
       if (port !== undefined) event.port = Number(port);
-      // A refusal names its reason and carries no payload; an allowed
+      // A block names its reason and carries no payload; an allowed
       // connection is the other way round.
-      if (refused || failed) event.reason = reason;
+      if (blocked || failed) event.reason = reason;
       else if (bytes !== "-") event.bytes = Number(bytes);
       events.push(event);
       continue;

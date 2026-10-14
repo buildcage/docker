@@ -48,7 +48,7 @@ const failed = [
 
 /** universal's timeline is coarse: a passthrough proxy sees a connection's
  *  host, port and bytes, never its method, URL or status. Its only richer
- *  events come from the resolver: a discovery lookup and a refused name. */
+ *  events come from the resolver: a discovery lookup and a blocked name. */
 const universalTimeline: TrafficEvent[] = [
   {
     time: 1787471975,
@@ -207,7 +207,7 @@ const CASES: Record<string, ReportData> = {
         status: 200,
         bytes: 512,
         destination: "93.184.216.34",
-        wouldBlock: "example-refusal",
+        wouldBlock: "example-block",
       },
     ],
   },

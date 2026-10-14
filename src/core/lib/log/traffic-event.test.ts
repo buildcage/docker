@@ -19,7 +19,7 @@ function redundant(subject: TrafficEvent, timeline: TrafficEvent[]): boolean {
 }
 
 describe("isRedundantDns", () => {
-  it("is redundant once a refused request for the same host also appears", () => {
+  it("is redundant once a blocked request for the same host also appears", () => {
     const dns = event({ protocol: "dns", action: "block", host: "notallowed.example.com" });
     const request = event({ protocol: "https", action: "block", host: "notallowed.example.com" });
     expect(redundant(dns, [dns, request])).toBe(true);
@@ -40,7 +40,7 @@ describe("isRedundantDns", () => {
     expect(redundant(dns, [dns, request])).toBe(false);
   });
 
-  it("keeps a refused lookup that an allowed request contradicts", () => {
+  it("keeps a blocked lookup that an allowed request contradicts", () => {
     const dns = event({ protocol: "dns", action: "block", host: "a.example.com" });
     const request = event({ protocol: "https", action: "allow", host: "a.example.com" });
     expect(redundant(dns, [dns, request])).toBe(false);
@@ -101,11 +101,11 @@ describe("connectedHosts", () => {
   it("indexes only what was connected to, split by outcome", () => {
     const connected = connectedHosts([
       event({ protocol: "https", action: "allow", host: "allowed.example.com" }),
-      event({ protocol: "https", action: "block", host: "refused.example.com" }),
+      event({ protocol: "https", action: "block", host: "blocked.example.com" }),
       event({ protocol: "dns", action: "block", host: "lookup.example.com" }),
     ]);
-    expect([...connected.any].sort().join(",")).toBe("allowed.example.com,refused.example.com");
-    expect([...connected.blocked].join(",")).toBe("refused.example.com");
+    expect([...connected.any].sort().join(",")).toBe("allowed.example.com,blocked.example.com");
+    expect([...connected.blocked].join(",")).toBe("blocked.example.com");
   });
 });
 

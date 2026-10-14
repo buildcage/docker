@@ -14,7 +14,7 @@ function block(inputs: RuleInputs, scheme: "https" | "http" = "https"): string {
 describe("rule block", () => {
   it("matches a host case-insensitively, as a name is", () => {
     // do-resolve already lowercases the name it looks up, so a case-sensitive
-    // acl refuses `Host: Registry.NPMJS.org` despite an explicit allow rule.
+    // acl blocks `Host: Registry.NPMJS.org` despite an explicit allow rule.
     // txn.host arrives lowercased, so the literal pattern must be lowercase
     // and a pattern that stays a regex keeps -i.
     const literal = block({ httpsRules: ["A.com:443"] });
@@ -54,7 +54,7 @@ describe("rule block", () => {
     expect(exact.includes("acl s0_path path -m str /pkg.json")).toBe(true);
     const prefix = block({ urlRules: buildUrlRules("GET https://a.com/pkg/**") });
     expect(prefix.includes("acl s0_path path -m beg /pkg/")).toBe(true);
-    // A single-segment wildcard is not a prefix: /pkg/a/b must stay refused.
+    // A single-segment wildcard is not a prefix: /pkg/a/b must stay blocked.
     const segment = block({ urlRules: buildUrlRules("GET https://a.com/pkg/*") });
     expect(segment.includes("acl s0_path path -m reg ^/pkg/[^/]+$")).toBe(true);
   });
@@ -179,7 +179,7 @@ describe("rule block", () => {
     expect(block(inputs, "http").includes("acl p0_host")).toBe(true);
   });
 
-  it("refuses everything for a scheme with no rules", () => {
+  it("blocks everything for a scheme with no rules", () => {
     // The plaintext listener has no rules here, so it denies outright.
     const plain = block({ httpsRules: ["a.com:443"] }, "http");
     expect(plain.includes("# No rules for this scheme, so nothing is permitted.")).toBe(true);

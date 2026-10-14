@@ -41,7 +41,7 @@ export function renderHostTable(
   if (showExpected) formats.push({ key: "expected", title: "Expected", align: "center" });
 
   const tableRows = rows.map((r) => ({
-    // A name refused by the resolver was never connected to, so it has no port
+    // A name blocked by the resolver was never connected to, so it has no port
     // to show and "name:-" would only invite the reader to look for one.
     host: codeCell(r.port === "-" ? r.host : `${r.host}:${r.port}`) + (r.note ? ` ${r.note}` : ""),
     ruleType: r.ruleType,

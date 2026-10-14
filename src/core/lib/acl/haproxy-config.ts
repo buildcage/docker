@@ -13,7 +13,7 @@
  *     This is the only place a name becomes a real address: the build's own
  *     resolver (CoreDNS) never gives one out; see coredns-config.ts.
  *  3. `..` in the path is resolved before the rules see it (`normalize-uri`).
- *  4. A leaf certificate is generated per SNI, so a refused destination is
+ *  4. A leaf certificate is generated per SNI, so a blocked destination is
  *     never contacted, and the origin certificate is verified on the backend
  *     connection, which is only reached once a request is allowed.
  *
@@ -28,7 +28,7 @@ import { compileRuleSet, INTERNAL_RANGES, type RuleInputs } from "./haproxy-rule
 import { preamble, resolversSection, originBackends } from "./haproxy-sections.ts";
 
 export interface HaproxyConfigOptions extends RuleInputs {
-  /** `audit` records without enforcing, so nothing may be refused. */
+  /** `audit` records without enforcing, so nothing may be blocked. */
   mode?: "restrict" | "audit";
   /** Where redirected traffic arrives. */
   listenPort?: number;

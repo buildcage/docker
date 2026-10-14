@@ -22,7 +22,7 @@ import { convertRule } from "./wildcard-rules.ts";
 export const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`;
 
 /**
- * Ranges a resolved name may not point at, refused to stop an allowlisted name
+ * Ranges a resolved name may not point at, blocked to stop an allowlisted name
  * resolving to somewhere the proxy can reach but the build cannot, a cloud
  * metadata endpoint above all. Only never-public ranges; RFC1918 (and its v6
  * equivalent, fc00::/7 ULA) is allowed, since a name pointing at an internal

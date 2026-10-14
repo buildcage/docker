@@ -52,8 +52,8 @@ function plainStage(
 }
 
 describe("inspect stage", () => {
-  it("refuses a request with no Host before it judges the path", () => {
-    // Both are refusals, so only the reason turns on the order, and one of the
+  it("blocks a request with no Host before it judges the path", () => {
+    // Both are blocks, so only the reason turns on the order, and one of the
     // two names a host the report can act on where the other leaves the `-`
     // the log prints for a Host that never came. No rule is needed to see it:
     // both checks sit above the rule block whatever is written there.
@@ -73,7 +73,7 @@ describe("inspect stage", () => {
     expect(plainStage({}, "audit").includes(set)).toBe(true);
   });
 
-  it("refuses a Host that is not a hostname before any rule or resolution, in audit too", () => {
+  it("blocks a Host that is not a hostname before any rule or resolution, in audit too", () => {
     // `Host: a.com:x.evil.com:80` keeps `a.com:x.evil.com` after host_only,
     // which `~^https?://a\.com:.*/.*$` would match and do-resolve look up.
     for (const mode of ["restrict", "audit"] as const) {
@@ -204,7 +204,7 @@ describe("extension", () => {
   });
 
   // Nothing may follow a deny that always fires; see deniesEverything.
-  it("is left out where the rules refuse everything", () => {
+  it("is left out where the rules block everything", () => {
     const plain = plainStage({}, "restrict", EXTENSION);
     expect(plain.includes("extension request rules")).toBe(false);
   });

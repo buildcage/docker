@@ -45,15 +45,17 @@ const TIMELINE: TrafficEvent[] = [
   { time: t + 4, action: "allow", protocol: "dns", host: "a.example.com" },
 ];
 
-describe("a refusal label", () => {
+describe("a block label", () => {
   const label = (e: TrafficEvent) => (e.host === "evil.example.com" ? "labelled" : undefined);
   const lines = (timeline: TrafficEvent[]) =>
     (renderInspectDetailsBody(timeline, t, label).split("```")[1] ?? "").trim().split("\n");
 
-  it("replaces the reason a request was refused for", () => {
-    const refused = TIMELINE.find((e) => e.host === "evil.example.com" && e.action === "block");
-    expect(refused).toBeDefined();
-    expect(lines([refused!])[0].endsWith(" -> labelled")).toBe(true);
+  it("replaces the reason a request was blocked for", () => {
+    const blockedEvent = TIMELINE.find(
+      (e) => e.host === "evil.example.com" && e.action === "block",
+    );
+    expect(blockedEvent).toBeDefined();
+    expect(lines([blockedEvent!])[0].endsWith(" -> labelled")).toBe(true);
   });
 
   it("replaces the reason restrict would block a request for", () => {
@@ -61,14 +63,14 @@ describe("a refusal label", () => {
       ...TIMELINE[0],
       host: "evil.example.com",
       action: "audit",
-      wouldBlock: "example-refusal",
+      wouldBlock: "example-block",
     };
     expect(lines([audited])[0].endsWith(" -> 200 (708B) (restrict would block: labelled)")).toBe(
       true,
     );
   });
 
-  it("labels each reason of a request refused for one that restrict would block for another", () => {
+  it("labels each reason of a request blocked for one that restrict would block for another", () => {
     const both: TrafficEvent = {
       ...TIMELINE[0],
       action: "block",
@@ -85,9 +87,9 @@ describe("a refusal label", () => {
     const audited: TrafficEvent = {
       ...TIMELINE[0],
       action: "audit",
-      wouldBlock: "example-refusal",
+      wouldBlock: "example-block",
     };
-    expect(lines([audited])[0].endsWith("(restrict would block: example-refusal)")).toBe(true);
+    expect(lines([audited])[0].endsWith("(restrict would block: example-block)")).toBe(true);
   });
 });
 
@@ -102,31 +104,31 @@ describe("renderInspectDetailsBody", () => {
     expect(lines[2].startsWith("🚫")).toBe(true);
   });
 
-  it("shows the URL and method of a refused request", () => {
+  it("shows the URL and method of a blocked request", () => {
     expect(md.includes("POST https://evil.example.com/exfil?token=***")).toBe(true);
   });
 
-  it("says what restrict would have refused of a request audit let through", () => {
+  it("says what restrict would have blocked of a request audit let through", () => {
     const audited: TrafficEvent = {
       ...TIMELINE[0],
       action: "audit",
-      wouldBlock: "example-refusal",
+      wouldBlock: "example-block",
     };
     const line = (renderInspectDetailsBody([audited], t).split("```")[1] ?? "").trim();
     expect(line).toBe(
-      "⚠️ 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would block: example-refusal)",
+      "⚠️ 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would block: example-block)",
     );
   });
 
-  it("says what restrict would have refused after a reason too", () => {
+  it("says what restrict would have blocked after a reason too", () => {
     const failed: TrafficEvent = {
       ...TIMELINE[2],
       action: "failed",
       reason: "dns-failed",
-      wouldBlock: "example-refusal",
+      wouldBlock: "example-block",
     };
     const line = (renderInspectDetailsBody([failed], t).split("```")[1] ?? "").trim();
-    expect(line.endsWith("-> dns-failed (restrict would block: example-refusal)")).toBe(true);
+    expect(line.endsWith("-> dns-failed (restrict would block: example-block)")).toBe(true);
   });
 
   it("names the reason after the arrow instead of a status", () => {
@@ -165,11 +167,11 @@ describe("renderInspectDetailsBody", () => {
     expect(size(3 * 1024 * 1024 + 512 * 1024)).toBe("(3.5MB)");
   });
 
-  it("keeps a refused name, which nothing else records", () => {
+  it("keeps a blocked name, which nothing else records", () => {
     expect(md.includes("DNS secret.attacker.example -> dns-not-allowed")).toBe(true);
   });
 
-  it("drops a refused name once a refused request for it also shows up", () => {
+  it("drops a blocked name once a blocked request for it also shows up", () => {
     const md2 = renderInspectDetailsBody(
       [
         {
@@ -226,7 +228,7 @@ describe("renderInspectDetailsBody", () => {
     );
     expect(md2.includes("DNS SRV _http._tcp.deb.debian.org")).toBe(true);
     expect(md2.includes("no data (SRV is never served)")).toBe(true);
-    // Neither allowed nor refused, so it carries neither mark.
+    // Neither allowed nor blocked, so it carries neither mark.
     expect(md2.includes("🚫")).toBe(false);
     expect(md2.includes("✅")).toBe(false);
   });
@@ -273,7 +275,7 @@ describe("renderInspectDetailsBody", () => {
     expect(only.includes("DNS a.com -> resolved")).toBe(true);
   });
 
-  it('falls back to a bare "blocked" when a refusal names no reason', () => {
+  it('falls back to a bare "blocked" when a block names no reason', () => {
     const rendered = renderInspectDetailsBody(
       [
         {
@@ -312,7 +314,7 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it("keeps a client-ended connection to (unknown), which is never one host", () => {
-    // A refusal elsewhere under (unknown) proves nothing about this close.
+    // A block elsewhere under (unknown) proves nothing about this close.
     const rendered = renderInspectDetailsBody(
       [
         {
@@ -399,8 +401,8 @@ describe("renderInspectDetailsBody", () => {
     expect(md.includes("-> origin-aborted")).toBe(true);
   });
 
-  it("marks a request the proxy could not read as the refusal it was", () => {
-    // Refused, so 🚫 rather than ⚠️, and named by its port alone: the plain
+  it("marks a request the proxy could not read as the block it was", () => {
+    // Blocked, so 🚫 rather than ⚠️, and named by its port alone: the plain
     // stage has no SNI, and no request arrived to carry a Host.
     const rendered = renderInspectDetailsBody(
       [
@@ -436,8 +438,8 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it("keeps the method of a request whose target no URL fits", () => {
-    // `OPTIONS *` reaches the rules and is refused by them, so the row is a
-    // refusal rather than a connection that carried nothing. Without the
+    // `OPTIONS *` reaches the rules and is blocked by them, so the row is a
+    // block rather than a connection that carried nothing. Without the
     // method it would read as the latter.
     const rendered = renderInspectDetailsBody(
       [
@@ -600,7 +602,7 @@ describe("renderInspectDetailsBody credential parameters", () => {
   });
 
   it("leaves a parameter nobody credentialed alone", () => {
-    // A refused request has to keep saying what it tried to send, and an
+    // A blocked request has to keep saying what it tried to send, and an
     // exfiltration payload is named whatever its author chose.
     expect(subjectOf("https://h/?d=BASE64PAYLOAD&page=2")).toBe(
       "GET https://h/?d=BASE64PAYLOAD&page=2",

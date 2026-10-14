@@ -159,12 +159,12 @@ jobs:
           # here, because its runc wrapper points NODE_EXTRA_CA_CERTS at a store
           # carrying the CA.
           RUN npm init -y && npm install --ignore-scripts --no-audit @hono/node-server@2.1.1
-          # Refused by the rules above, so the report shows the full URL, not
-          # just the host. Engines differ in exactly how the refusal shows up
+          # Blocked by the rules above, so the report shows the full URL, not
+          # just the host. Engines differ in exactly how the block shows up
           # (a proxy-level HTTP error under inspect, a rejected connection
           # under universal), so only success here is unexpected.
           RUN if wget -q -O /dev/null --timeout=5 https://example.com/some/path; then \
-                echo "FAILED: example.com should have been refused" && exit 1; \
+                echo "FAILED: example.com should have been blocked" && exit 1; \
               fi
           EOF
 
@@ -177,12 +177,12 @@ jobs:
 
       # allowed_url_rules only permits GET|HEAD, so a POST proves the rule is
       # enforced by method, not just by host.
-      - name: Add a method-refused request to the test Dockerfile
+      - name: Add a method-blocked request to the test Dockerfile
         if: matrix.proxy_engine == 'inspect'
         run: |
           cat <<'EOF' >> /tmp/build-context/Dockerfile
           RUN if wget -q -O /dev/null --post-data='' https://registry.npmjs.org/some-path; then \
-                echo "FAILED: POST to registry.npmjs.org should have been refused" && exit 1; \
+                echo "FAILED: POST to registry.npmjs.org should have been blocked" && exit 1; \
               fi
           EOF
 
@@ -229,7 +229,7 @@ jobs:
             const passthrough = rows.some(
               (r) => r.protocol === "tls" && r.host === "github.com" && r.bytes > 0,
             );
-            const methodRefused = rows.some(
+            const methodBlocked = rows.some(
               (r) => r.action === "block" && r.host === "registry.npmjs.org" && r.method === "POST",
             );
             if (!blocked) {
@@ -240,11 +240,11 @@ jobs:
               console.log("::error::github.com was not recorded as an undecrypted TLS passthrough");
               process.exit(1);
             }
-            if (!methodRefused) {
+            if (!methodBlocked) {
               console.log("::error::the POST to registry.npmjs.org was not recorded as blocked by allowed_url_rules");
               process.exit(1);
             }
-            console.log("example.com blocked, github.com passed through undecrypted, and the out-of-rule POST was refused");
+            console.log("example.com blocked, github.com passed through undecrypted, and the out-of-rule POST was blocked");
           '
 
       # No cleanup step: ephemeral runner, and setup's post-hook already
@@ -325,10 +325,10 @@ jobs:
           # One ordinary allowed request, so the report has both kinds to judge.
           RUN wget -q -O /dev/null --timeout=10 https://registry.npmjs.org/
           # The only blocked connection, and the one known_blocked_rules names.
-          # The build fails if it is not refused, so the report step below
+          # The build fails if it is not blocked, so the report step below
           # cannot pass on a build that never had anything blocked.
           RUN if wget -q -O /dev/null --timeout=5 https://example.com/; then \
-                echo "FAILED: example.com should have been refused" && exit 1; \
+                echo "FAILED: example.com should have been blocked" && exit 1; \
               fi
           EOF
 

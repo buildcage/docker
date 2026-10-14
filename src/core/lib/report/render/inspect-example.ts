@@ -160,7 +160,7 @@ function partitionRequests(requests: TrafficEvent[]): {
 } {
   const writable: ParsedRequest[] = [];
   const leftOut = new Map<string, LeftOutRequest>();
-  // Only what the build or step actually reached: a refused request is not a rule to
+  // Only what the build or step actually reached: a blocked request is not a rule to
   // reproduce, and a passthrough or a name lookup has no URL to write one from.
   // One that failed at the origin is kept: the rules did permit it and the
   // build or step will ask again, so leaving it out would write an allowlist that
