@@ -1,6 +1,7 @@
 ## Outbound Traffic Report
 
-**🚫 2 refused · ⚠️ 1 failed · 2 refused as expected**
+> [!CAUTION]
+> 2 refused · 1 failed · 2 refused as expected
 
 ### ✅ Allowed Hosts
 

@@ -361,20 +361,17 @@ describe("renderReportMarkdown: section and footer", () => {
   };
 
   it("puts the verdict under the title and its items after the refusals", () => {
-    const md = renderReportMarkdown(base, "owner/repo", "v1", { verdictItems: ["🚨 1 x"] });
-    expect(md).toMatch(/^## Outbound Traffic Report\n\n\*\*🚫 1 refused · 🚨 1 x\*\*\n\n### /);
+    const md = renderReportMarkdown(base, "owner/repo", "v1", { verdictItems: ["1 x"] });
+    expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 refused · 1 x\n\n### /);
   });
 
-  it("nests the tables a level down under a section heading", () => {
+  it("puts an action's own blocks after the blocked hosts", () => {
     const md = renderReportMarkdown(base, "owner/repo", "v1", {
-      section: "🌐 Network",
-      extraBlocks: (gap, heading) => [
-        { priority: 1, level: 2, section: "traffic", cut: "keep", text: `${gap}${heading} X\n` },
+      extraBlocks: (gap) => [
+        { priority: 1, level: 2, section: "traffic", cut: "keep", text: `${gap}### X\n` },
       ],
     });
-    expect(md).toMatch(/\*\*\n\n### 🌐 Network\n\n#### ✅ Allowed Hosts\n/);
-    expect(md).toMatch(/\n#### 🚫 Blocked Hosts\n/);
-    expect(md).toMatch(/\n\n#### X\n/);
+    expect(md).toMatch(/\n### 🚫 Blocked Hosts\n[^]*\n\n### X\n/);
   });
 
   it("leaves the footer out when asked, keeping the engine's note", () => {

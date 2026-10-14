@@ -38,10 +38,10 @@ const base: UniversalReportData = {
 
 describe("renderVerdict", () => {
   it("says nothing was refused when nothing needs a look", () => {
-    expect(renderVerdict(base)).toBe("**✅ Nothing was refused**\n\n");
+    expect(renderVerdict(base)).toBe("Result: ✅ Nothing was refused\n\n");
   });
 
-  it("counts requests, in the order refused, extra items, failed, not acted on", () => {
+  it("counts requests, in the order refused, extra items, failed, not acted on, as a caution", () => {
     const verdict = renderVerdict(
       {
         ...base,
@@ -52,34 +52,47 @@ describe("renderVerdict", () => {
         ],
         timeline: [undecided],
       },
-      ["🚨 4 restrict would refuse"],
+      ["4 restrict would refuse"],
     );
     expect(verdict).toBe(
-      "**🚫 3 refused · 🚨 4 restrict would refuse · ⚠️ 3 failed · ⚠️ 1 not acted on · " +
-        "5 refused as expected**\n\n",
+      "> [!CAUTION]\n> 3 refused · 4 restrict would refuse · 3 failed · 1 not acted on · " +
+        "5 refused as expected\n\n",
+    );
+  });
+
+  it("warns when nothing was refused but something else needs a look", () => {
+    const failed = [
+      { host: "down.com", port: "443", ruleType: "HTTPS", reason: "dns-failed", count: 3 },
+    ];
+    expect(renderVerdict({ ...base, failed })).toBe("> [!WARNING]\n> 3 failed\n\n");
+    expect(renderVerdict({ ...base, timeline: [undecided] }, ["2 restrict would refuse"])).toBe(
+      "> [!WARNING]\n> 2 restrict would refuse · 1 not acted on\n\n",
+    );
+    expect(renderVerdict({ ...base, failed, blocked: [row(2, true)], blockedCount: 2 })).toBe(
+      "> [!WARNING]\n> 3 failed · 2 refused as expected\n\n",
     );
   });
 
   it("leads with expected refusals only when nothing else is there", () => {
     expect(renderVerdict({ ...base, blocked: [row(2, true)], blockedCount: 2 })).toBe(
-      "**✅ 2 refused as expected**\n\n",
+      "Result: ✅ 2 refused as expected\n\n",
     );
   });
 
-  it("leads with a log that is not a full record, and then never says ✅", () => {
+  it("leads with a log that is not a full record, as a caution", () => {
     const incomplete = { ...base, logLooksPlausible: false };
-    expect(renderVerdict(incomplete)).toBe("**❗ report incomplete**\n\n");
+    expect(renderVerdict(incomplete)).toBe("> [!CAUTION]\n> report incomplete\n\n");
     expect(renderVerdict({ ...incomplete, blocked: [row(2, true)], blockedCount: 2 })).toBe(
-      "**❗ report incomplete · 2 refused as expected**\n\n",
+      "> [!CAUTION]\n> report incomplete · 2 refused as expected\n\n",
     );
   });
 
   it("counts refusals with no row as unexpected, as the outcome does", () => {
-    expect(renderVerdict({ ...base, blockedCount: 2 })).toBe("**🚫 2 refused**\n\n");
+    expect(renderVerdict({ ...base, blockedCount: 2 })).toBe("> [!CAUTION]\n> 2 refused\n\n");
   });
 
   it("leaves out a close that is keepalive noise, as the warning does", () => {
     const timeline: TrafficEvent[] = [{ ...undecided, action: "allow", status: 200 }, undecided];
-    expect(renderVerdict({ ...base, timeline })).toBe("**✅ Nothing was refused**\n\n");
+    expect(renderVerdict({ ...base, timeline })).toBe("Result: ✅ Nothing was refused\n\n");
   });
 });

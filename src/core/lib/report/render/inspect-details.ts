@@ -41,12 +41,11 @@ export function renderInspectDetailsBody(
   return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
-// ⚠️ covers both of the outcomes no rule decided that went wrong: a request
-// that never arrived whole, and a connection the origin broke. The reason
-// tells them apart. `discovery` keeps ℹ️: a lookup nothing can answer is
-// harmless.
-// 🚨 is a request audit let through that restrict would refuse; one that
-// came to nothing anyway keeps its own mark.
+// ⚠️ covers what went wrong without a rule refusing it: a request that never
+// arrived whole, a connection the origin broke, and a request audit let
+// through that restrict would refuse. The reason or the note tells them
+// apart; one that came to nothing anyway keeps its own mark. `discovery`
+// keeps ℹ️: a lookup nothing can answer is harmless.
 const MARK: Record<string, string> = {
   block: "🚫",
   discovery: "ℹ️",
@@ -61,7 +60,7 @@ function renderEvent(
 ): string {
   const mark =
     event.action === "audit" && event.wouldRefuse !== undefined
-      ? "🚨"
+      ? "⚠️"
       : (MARK[event.action] ?? "✅");
   const label = (reason: string) => refusalLabel(event, reason) ?? reason;
   const note =

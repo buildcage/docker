@@ -21,21 +21,15 @@ export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   refusalLabel?: RefusalLabel;
   /** See renderVerdict's `extraItems`. */
   verdictItems?: string[];
-  /**
-   * A heading the report's parts go under, one level below the title, for an
-   * action whose summary has other sections after this one.
-   */
-  section?: string;
   /** False leaves the footer to an action that prints more after the report. */
   footer?: boolean;
   /**
    * Blocks an action adds after the blocked and failed hosts for a check of
    * its own, such as the one an InspectStageExtension adds to the proxy. The
-   * first opens with `gap`, the blank line owed to a block before it, and
-   * `heading` is the host tables' heading level. Their notices are the
-   * caller's to pick, as for every other block.
+   * first opens with `gap`, the blank line owed to a block before it. Their
+   * notices are the caller's to pick, as for every other block.
    */
-  extraBlocks?: (gap: string, heading: string) => SummaryBlock[];
+  extraBlocks?: (gap: string) => SummaryBlock[];
 }
 
 const SECTION = "traffic";
@@ -119,7 +113,6 @@ export function renderReportBlocks(
     title = "Outbound Traffic Report",
     refusalLabel,
     verdictItems,
-    section,
     footer = true,
     extraBlocks = () => [],
     ...step
@@ -127,7 +120,6 @@ export function renderReportBlocks(
 ): SummaryBlock[] {
   const isAudit = report.parameters.mode === "audit";
   const showExpected = report.parameters.knownBlockedRules.length > 0;
-  const h = section ? "####" : "###";
   const heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts";
   const blocks: SummaryBlock[] = [];
 
@@ -144,7 +136,6 @@ export function renderReportBlocks(
       "> 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand\n" +
       "> made as long as a request can be.\n\n";
   }
-  if (section) top += `### ${section}\n\n`;
   blocks.push(trafficFrame(top));
   // Each block after the first opens with a blank line, which ends the table
   // or the </details> before it.
@@ -156,7 +147,7 @@ export function renderReportBlocks(
       trafficTableBlock(
         TRAFFIC_BLOCK.passed,
         priorities[TRAFFIC_BLOCK.passed],
-        `${h} ${heading}\n\n`,
+        `### ${heading}\n\n`,
         renderHostTable(report.passed),
         "\n",
       ),
@@ -193,14 +184,14 @@ export function renderReportBlocks(
       trafficTableBlock(
         TRAFFIC_BLOCK.blocked,
         priorities[TRAFFIC_BLOCK.blocked],
-        `${gap()}${h} ${tableTitle}\n\n`,
+        `${gap()}### ${tableTitle}\n\n`,
         renderHostTable(rows, { showReason: true, showExpected }),
         `\n${note}`,
       ),
     );
     wrote = true;
   }
-  const extra = extraBlocks(gap(), h);
+  const extra = extraBlocks(gap());
   blocks.push(...extra);
   wrote ||= extra.some((b) => b.text !== "");
   if (isAudit) {
