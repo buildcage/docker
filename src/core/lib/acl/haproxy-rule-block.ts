@@ -3,7 +3,7 @@ import type { CompiledRule } from "./haproxy-rules.ts";
 import { DEFAULT_PORT } from "./url-rules.ts";
 
 /**
- * Whether this scheme's block refuses every request outright.
+ * Whether this scheme's rule block denies every request outright.
  *
  * Its deny carries no condition, so HAProxy treats it as final and skips every
  * http-request rule after it in the same frontend. Nothing may be emitted
@@ -17,7 +17,7 @@ export function deniesEverything(rules: CompiledRule[], mode: string): boolean {
 export function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" | "http"): string[] {
   const lines: string[] = [];
   if (mode === "audit") {
-    lines.push("    # audit records without enforcing, so nothing is refused here.", "");
+    lines.push("    # audit records without enforcing, so nothing is blocked here.", "");
     return lines;
   }
   if (deniesEverything(rules, mode)) {
@@ -100,7 +100,7 @@ export function ruleBlock(rules: CompiledRule[], mode: string, scheme: "https" |
         `!{ var(txn.allowed) -m bool } ${clause}`,
     );
   }
-  // One deny, negated against every rule: a request matching none is refused.
+  // One deny, negated against every rule: a request matching none is blocked.
   lines.push("    http-request deny unless { var(txn.allowed) -m bool }");
   lines.push("");
   return lines;

@@ -141,7 +141,7 @@ a Dockerfile that needs its own policy its own `builder_name` and file.
 | `restrict`   | Allows only what the rules match, blocks and logs everything else | Everyday builds, CI/CD pipelines, security-critical builds |
 
 `audit` allows what the active engine can classify. A connection it cannot classify, such as an HTTP
-request carrying no `Host` header, is still refused, on each engine's own terms.
+request carrying no `Host` header, is still blocked, on each engine's own terms.
 
 Because `audit` enforces nothing, the `allowed_*_rules` have no effect in it; you write them when
 you move to `restrict`. Any other `proxy_mode` value, a differently cased one included, fails the
@@ -259,7 +259,7 @@ connection carries. A leading, trailing or doubled dot is refused.
 
 A `Host` header ending in a dot (`example.com.`) matches as the name without it. An SNI may not end
 in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, `allowed_https_rules`
-under `universal`, and [`sni-not-allowed`](#the-ones-buildcage-refused)), only a rule whose `**` can
+under `universal`, and [`sni-not-allowed`](#the-ones-buildcage-blocked)), only a rule whose `**` can
 take in the dot (`example.**` or `**`, not `example.com.**`), or a `~` rule written to allow the
 dot, matches such a name.
 
@@ -282,15 +282,15 @@ it names one. A `~` rule's port is part of its regex and is not checked.
 
 `known_blocked_rules` is the exception: a host rule there that names no port is read as `:*`. It is
 matched against rows of the report rather than against connections, and a row for a name the
-resolver refused has no port at all, nothing having been connected to. `telemetry.example.com` and
+resolver blocked has no port at all, nothing having been connected to. `telemetry.example.com` and
 `telemetry.example.com:*` are the same rule.
 
 ### Blocked rules: `known_blocked_rules`
 
 `known_blocked_rules` lists traffic that is expected to be blocked, so a build isn't failed over a
-refusal you already know about (see [Report action inputs](#report-action-inputs)). It does not
+block you already know about (see [Report action inputs](#report-action-inputs)). It does not
 allow anything: the traffic stays blocked. That is the point for a telemetry endpoint you want
-refused but not treated as an error, where allowing it would let the request through.
+blocked but not treated as an error, where allowing it would let the request through.
 
 Unlike the allow inputs it is newline-separated, one rule per line, because a line can be either
 form:
@@ -312,7 +312,7 @@ known_blocked_rules: |
 
 A URL rule marks only requests that carry the method and path it names, so it acknowledges one
 endpoint on a host while any other blocked request to the same host still fails the step. A
-host-level refusal (a name the resolver refused, or a connection blocked before any request was
+host-level block (a name the resolver blocked, or a connection blocked before any request was
 read) carries no method or path, so it is matched by a host rule, never a URL rule. Port handling
 follows each form: a host rule with no port reads as `:*`, a URL rule with no port as the scheme's
 default (`443`/`80`), exactly as in the allow inputs.
@@ -521,8 +521,8 @@ resolve.
 ## Requests that never arrived whole
 
 A connection can end before a whole request has arrived. What the report does with one turns on who
-ended it: a client that walks away decided nothing, while bytes Buildcage refused to read as a
-request are a refusal like any other.
+ended it: a client that walks away decided nothing, while bytes Buildcage would not read as a
+request are blocked like any other.
 
 Under `universal`, only a plaintext connection made through a name gets this far, and nothing names
 it before its request does, so its host reads `(unknown)`. Under `inspect`, the host is the name
@@ -542,8 +542,8 @@ with the port where it is not the scheme's default.
 
 A connection the client ended before it sent a whole request reached no rule and no origin, so it is
 in neither host table. **Communication details** shows it with ⚠️ and how it ended. Under `inspect`,
-one sent straight to an address is the exception, refused as
-[`ip-not-allowed`](#the-ones-buildcage-refused) instead, or as `sni-not-allowed` where its SNI names
+one sent straight to an address is the exception, blocked as
+[`ip-not-allowed`](#the-ones-buildcage-blocked) instead, or as `sni-not-allowed` where its SNI names
 a host no rule allows.
 
 ```
@@ -570,7 +570,7 @@ Where the same host also completed one, the close is a keepalive pool cleaning u
 rather than a failure, so it is left out of Communication details as noise. A `client-tls-failed` is
 always shown, since another client reaching the host says nothing of whether this one trusts the CA.
 The raw [traffic artifact](#traffic-artifact) keeps every one either way. None of them fails the
-step, not even with `fail_on_blocked: true`: no rule refused it, so `known_blocked_rules` has
+step, not even with `fail_on_blocked: true`: no rule blocked it, so `known_blocked_rules` has
 nothing to match, and nothing reached an origin. A `::warning::` annotation gives the count of those
 shown.
 
@@ -581,10 +581,10 @@ nothing allows the destination, so it does not fail the step. With no TLS handsh
 `allowed_tls_rules`; connecting to the address under an `allowed_ip_rules` entry is what passes it
 through.
 
-### The ones Buildcage refused
+### The ones Buildcage blocked
 
-These are refusals: they are 🚫 rows in **Blocked Hosts**, counted in the blocked-connections
-annotation, and they fail the step under `fail_on_blocked: true` like any other refused connection.
+Buildcage blocked these: they are 🚫 rows in **Blocked Hosts**, counted in the blocked-connections
+annotation, and they fail the step under `fail_on_blocked: true` like any other blocked connection.
 
 ```
 🚫 00:14.002: GET http://10.0.0.9/pkg.tgz?token=*** -> missing-host-header
@@ -603,13 +603,13 @@ annotation, and they fail the step under `fail_on_blocked: true` like any other 
 `bad-request` is most often a protocol that is not HTTP at all and where the client speaks first,
 such as PostgreSQL or `git://`, on a port no `allowed_ip_rules` or `allowed_tls_rules` entry
 covers: anything that is not a TLS handshake is handed to the plain-HTTP stage, which reads it as a
-request and refuses it. Both are refused in `audit` mode too, as the same check is under
+request and blocks it. Both are blocked in `audit` mode too, as the same check is under
 `universal`, since a request naming no host has nothing to connect to whatever the rules say.
 
 `ip-not-allowed` is a connection to an address such as `203.0.113.9:8443` that ended before its
 request: a client that does not trust the CA, or one waiting for the server to speak first. A client
 sends no SNI to an address, so the certificate the proxy answers with matches no name, and nothing
-that checks it gets further, in `audit` too. `universal` in `restrict` refuses the same connection
+that checks it gets further, in `audit` too. `universal` in `restrict` blocks the same connection
 on arrival. A close on an address and port that also had a request read is a keepalive close and
 stays out of the report.
 Plain HTTP sent to an address with a `Host` naming some other host is the exception: the log records
@@ -623,25 +623,25 @@ against, so the passthrough rule is the only way to clear that one.
 
 `sni-not-allowed` is the same kind of connection carrying an SNI. The name is judged as the
 resolver judges one looked up through DNS, against the host of every rule except `allowed_ip_rules`
-on any port, except that a trailing dot is kept. Through DNS, the same attempt is refused as
+on any port, except that a trailing dot is kept. Through DNS, the same attempt is blocked as
 `dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through DNS: usually a
 client that does not trust the CA, pointed at an address by `/etc/hosts` or `curl --resolve`.
-`audit` refuses no name, so it refuses no SNI. A rule allowing the host clears one, as does a
+`audit` blocks no name, so it blocks no SNI. A rule allowing the host clears one, as does a
 `known_blocked_rules` entry.
 
 Under `universal`, a connection through a name that is not a TLS handshake is also read as HTTP. ssh
-or `git://` to a name is refused as `bad-request`, in `audit` too, and a client waiting for the
+or `git://` to a name is blocked as `bad-request`, in `audit` too, and a client waiting for the
 server to speak first (SMTP, FTP) ends as one nobody decided. No rule on the name clears either:
 `universal` has no `allowed_tls_rules`, so the build has to connect to the address, under an
 `allowed_ip_rules` entry.
 
 ## Connections that failed
 
-A request no rule refused can still come to nothing: the origin answers nothing usable, breaks off
-mid-transfer, or its name resolves nowhere. The report lists them as ⚠️ rows in the refusals' table,
-headed **Blocked / Failed Hosts** when it holds both and **Failed Hosts** when it holds only them.
-They come after the unexpected refusals and show `—` for Expected, since `known_blocked_rules` never
-matches a failure. **Communication details** shows each with ⚠️ too:
+A request no rule blocked can still come to nothing: the origin answers nothing usable, breaks off
+mid-transfer, or its name resolves nowhere. The report lists them as ⚠️ rows in the table of blocked
+hosts, headed **Blocked / Failed Hosts** when it holds both and **Failed Hosts** when it holds only
+them. They come after the unexpected blocks and show `—` for Expected, since `known_blocked_rules`
+never matches a failure. **Communication details** shows each with ⚠️ too:
 
 ```
 ⚠️ 00:12.004: GET https://registry.npmjs.org/big.tgz -> origin-aborted
@@ -652,7 +652,7 @@ matches a failure. **Communication details** shows each with ⚠️ too:
 | -------------------- | --------------------------------------------------------------------- |
 | `origin-no-response` | the connection was made, and no usable response headers came back     |
 | `origin-aborted`     | the response started and the transfer was cut short                   |
-| `dns-failed`         | the name resolved nowhere upstream, no rule having refused it         |
+| `dns-failed`         | the name resolved nowhere upstream, no rule having blocked it         |
 | `origin-unreachable` | a connection carrying no certificate of Buildcage's could not be made |
 
 What the first two have in common is a connection that completed, which is where the origin's
@@ -667,7 +667,7 @@ nothing there was allowed by a rule either: what the table says is that the rule
 stopped these. The rules `audit` suggests for `restrict` include these hosts too, since the next run
 will ask for them again.
 
-**A connection Buildcage never completed is not here.** It is a refusal, it is in Blocked Hosts, and
+**A connection Buildcage never completed is not here.** It is blocked, it is in Blocked Hosts, and
 it does fail the step:
 
 | Reason                  | What happened                                                            |
@@ -678,16 +678,16 @@ it does fail the step:
 `origin-untrusted` is the plain case: a forged certificate, an expired one, or an origin speaking no
 TLS at all. `origin-connect-failed` is the one that looks like an outage and cannot be shown to be
 one. HAProxy retries a failed connection, and the TLS error it reports belongs to the last attempt
-alone, so an impostor whose certificate is refused on one attempt leaves no trace once a later
+alone, so an impostor blocked for its certificate on one attempt leaves no trace once a later
 attempt fails at TCP. The report does not claim to tell that from an origin that is simply down: a
 connection it never completed is one whose origin it never authenticated. See
 [Attempts to get around it](./security.md#attempts-to-get-around-it).
 
-A host that is flaky rather than hostile is cleared the way any expected refusal is, by listing it
+A host that is flaky rather than hostile is cleared the way any expected block is, by listing it
 in `known_blocked_rules`.
 
 None of the four fails the step, not even with `fail_on_blocked: true`, and a `::notice::` gives the
-count. No rule refused them, so no rule can clear them either: `known_blocked_rules` has nothing to
+count. No rule blocked them, so no rule can clear them either: `known_blocked_rules` has nothing to
 match, and an `allowed_*` entry changes nothing. What clears one is the origin coming back, or the
 build reaching for something that is up.
 
@@ -712,20 +712,21 @@ bytes).
 | `protocol`    | yes    | `https`, `http`, `tls`, `tcp`, `dns`                                                     |
 | `host`        | yes    | the name asked for, the address when there was none, or `(unknown)`                      |
 | `port`        |        | absent for `dns`, which connects to nothing                                              |
-| `queryType`   |        | the record asked for; `discovery` rows and refused service names                         |
+| `queryType`   |        | the record asked for; `discovery` rows and blocked service names                         |
 | `method`      |        | `http` and `https`, and `tcp` for a request with no `Host` sent to an address            |
 | `url`         |        | as `method`; verbatim, unlike the summary's                                              |
 | `status`      |        | only when something answered                                                             |
-| `bytes`       |        | absent for a refusal and for `dns`                                                       |
+| `bytes`       |        | absent for a blocked request and for `dns`                                               |
 | `reason`      |        | only when `action` is `block`, `incomplete` or `failed`                                  |
 | `destination` |        | the address it actually resolved to; `inspect` only, and absent for `dns`                |
 
 A `dns` row's `host` is the name as the resolver logged it: lowercased, with escapes such as `\ `
 and `\DDD` kept.
 
-A field is absent because it does not apply, never because it was zero: a refusal has no status
-because nothing answered, and a passthrough none because nothing was decrypted. Filter on `action`.
-The artifact is uploaded even when the build fails, since a failing run is when it is most wanted.
+A field is absent because it does not apply, never because it was zero: a blocked request has no
+status because nothing answered, and a passthrough none because nothing was decrypted. Filter on
+`action`. The artifact is uploaded even when the build fails, since a failing run is when it is most
+wanted.
 
 ```json
 [

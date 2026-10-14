@@ -1,7 +1,7 @@
 ## Outbound Traffic Report (audit mode)
 
 > [!CAUTION]
-> 2 refused · 1 failed · 1 not acted on
+> 2 blocked · 1 failed · 1 not acted on
 
 ### 📋 Audited Hosts
 
@@ -17,7 +17,7 @@
 | `bad.example.com:443` | HTTPS | 🚫 https-not-allowed | 2 |
 | `a.example.com:443` | HTTPS | ⚠️ origin-aborted | 1 |
 
-<sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
 
 <details>
 <summary>🛡️ Switch to restrict mode</summary>
@@ -45,7 +45,7 @@
 🚫 00:08.000: DNS A unresolvable.example.net -> dns-not-allowed
 ⚠️ 00:09.123: HTTPS untrusted-ca.example.com:443 -> client-aborted
 ⚠️ 00:11.000: GET https://a.example.com/pkg.json -> origin-aborted
-⚠️ 00:12.000: POST https://a.example.com/upload -> 200 (512B) (restrict would refuse: example-refusal)
+⚠️ 00:12.000: POST https://a.example.com/upload -> 200 (512B) (restrict would block: example-block)
 ```
 
 </details>

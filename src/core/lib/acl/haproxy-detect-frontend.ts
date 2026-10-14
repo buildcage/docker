@@ -116,7 +116,7 @@ export function detectFrontend(spec: DetectFrontendSpec): string[] {
       }
       // A passthrough is never decrypted and so has no request line; its log
       // line is its only record, carrying the name, destination and byte
-      // count. Flagged before the rules below reject, so a refused passthrough
+      // count. Flagged before the rules below reject, so a blocked passthrough
       // is logged too. IP rule connections were accepted above, so txn.pass
       // here means a tls rule matched, on both its name and its port.
       l.push(

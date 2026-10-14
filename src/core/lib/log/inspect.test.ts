@@ -7,7 +7,7 @@ import type { TrafficEvent } from "./traffic-event.ts";
 // milliseconds since the epoch (HAProxy's date(0,ms)).
 const ALLOWED =
   "buildcage 1787471975123 https GET 200 708 ts=-- reason=- tlserr=- dst=104.16.1.34:443 host=registry.npmjs.org /pkg";
-const REFUSED =
+const BLOCKED =
   "buildcage 1787471976000 https POST 403 0 ts=PR reason=- tlserr=- dst=1.2.3.4:443 host=evil.example.com /exfil?d=SECRET";
 const PLAIN =
   "buildcage 1787471977000 http POST 201 12 ts=-- reason=- tlserr=- dst=10.0.0.5:8080 host=a.example.com:8080 /x";
@@ -80,11 +80,11 @@ describe("scanInspectLog", () => {
   });
 
   it("keeps the query string, where an exfiltration payload would be", async () => {
-    expect((await parse([REFUSED]))[0].url).toBe("https://evil.example.com/exfil?d=SECRET");
+    expect((await parse([BLOCKED]))[0].url).toBe("https://evil.example.com/exfil?d=SECRET");
   });
 
-  it("names the reason instead of a status when it refused", async () => {
-    const [e] = await parse([REFUSED]);
+  it("names the reason instead of a status when it blocked", async () => {
+    const [e] = await parse([BLOCKED]);
     expect(e.action).toBe("block");
     expect(e.reason).toBe("not-allowed");
     // Nothing answered, so reporting either would be inventing a result.
@@ -92,7 +92,7 @@ describe("scanInspectLog", () => {
     expect(e.bytes === undefined).toBe(true);
   });
 
-  it("does not mistake an origin's own 403 or 503 for a refusal", async () => {
+  it("does not mistake an origin's own 403 or 503 for a block", async () => {
     // A registry answers 403 to an unauthenticated fetch and an origin under
     // load answers 503. Counting those would fail a build where nothing was
     // blocked, since fail_on_blocked defaults to true.
@@ -116,7 +116,7 @@ describe("scanInspectLog", () => {
 
   // The cause comes first: `P` is this proxy, so `PH` is not the origin's
   // doing. Phase `C` then splits on tlserr; see reasonFor.
-  it("names a refusal the config left unnamed from the cause, the phase and tlserr", async () => {
+  it("names a block the config left unnamed from the cause, the phase and tlserr", async () => {
     const lines = [
       "buildcage 1 https POST 403 0 ts=PR-- reason=- tlserr=- dst=1.1.1.1:443 host=b.com /",
       "buildcage 2 https GET 503 0 ts=SC-- reason=- tlserr=- dst=1.1.1.1:443 host=c.com /",
@@ -134,7 +134,7 @@ describe("scanInspectLog", () => {
       "not-allowed",
       "origin-aborted",
     ]);
-    // Only what this proxy itself refused stays in the blocked table, and a
+    // Only what this proxy itself blocked stays in the blocked table, and a
     // connection it never completed counts: it never authenticated that origin.
     expect(events.map((e) => e.action)).toStrictEqual([
       "block",
@@ -146,7 +146,7 @@ describe("scanInspectLog", () => {
     ]);
   });
 
-  it("counts an origin that timed out as a refusal, unless it had already answered", async () => {
+  it("counts an origin that timed out as a block, unless it had already answered", async () => {
     // haproxy itself writes the 503 and the 504 in `sC` and `sH`, exactly as it
     // does for `SC` and `SH`; whether the origin refused the connection or
     // simply went quiet is all that separates the two.
@@ -197,7 +197,7 @@ describe("scanInspectLog", () => {
     expect(e.url === undefined).toBe(true);
   });
 
-  it("names a passthrough refusal the same way, though it has no status at all", async () => {
+  it("names a passthrough block the same way, though it has no status at all", async () => {
     const lines = [
       "buildcage 1 pass tcp 0 ts=PR reason=dns-failed dst=10.0.0.5:5432 sni=db.example.com",
       "buildcage 2 pass tcp 0 ts=PR reason=internal-address dst=10.0.0.5:5432 sni=db.example.com",
@@ -248,7 +248,7 @@ describe("scanInspectLog", () => {
   it("counts a line that opens as ours but cannot be read", async () => {
     // What a half-written write leaves: the next line joined onto what got
     // through, still opening with our own prefix.
-    const { events, unparsed } = await scanInspectLog([ALLOWED, ALLOWED.slice(0, 60) + REFUSED]);
+    const { events, unparsed } = await scanInspectLog([ALLOWED, ALLOWED.slice(0, 60) + BLOCKED]);
     expect(events.length).toBe(1);
     expect(unparsed).toBe(1);
   });
@@ -310,7 +310,7 @@ describe("a connection sent straight to an address that ended before its request
   const plainClose =
     "buildcage 2 http <BADREQ> 408 0 ts=cR reason=- tlserr=- dst=10.0.0.5:8080 host=- -";
 
-  it("is refused as an address no ip rule covers, however it ended", async () => {
+  it("is blocked as an address no ip rule covers, however it ended", async () => {
     const events = await parse([
       closed("CR"),
       closed("PR", "SSL_HANDSHAKE"),
@@ -325,7 +325,7 @@ describe("a connection sent straight to an address that ended before its request
     expect(events[0].destination).toBe("203.0.113.9:8443");
   });
 
-  it("is refused in audit mode too, where nothing would have let it through", async () => {
+  it("is blocked in audit mode too, where nothing would have let it through", async () => {
     const [e] = await parse([closed("CR")], true);
     expect(e.action).toBe("block");
   });
@@ -339,7 +339,7 @@ describe("a connection sent straight to an address that ended before its request
     expect(close.reason).toBe("client-timeout");
   });
 
-  it("refuses the close all the same where only another port or a passthrough was served", async () => {
+  it("blocks the close all the same where only another port or a passthrough was served", async () => {
     const otherPort =
       "buildcage 1 http GET 200 5 ts=-- reason=- tlserr=- dst=10.0.0.5:80 host=10.0.0.5 /x";
     const passed = "buildcage 1 pass tcp 900 ts=-- reason=- dst=10.0.0.5:8080 sni=-";
@@ -364,7 +364,7 @@ describe("a connection sent straight to an address with an SNI that ended before
   const allowsName = (name: string) => name === "registry.npmjs.org";
   const judge = async (lines: string[]) => (await scanInspectLog(lines, false, allowsName)).events;
 
-  it("is refused where the resolver would have refused the name, however it ended", async () => {
+  it("is blocked where the resolver would have blocked the name, however it ended", async () => {
     const events = await judge([
       named("exfil.attacker.example"),
       named("exfil.attacker.example", "cR"),
@@ -429,7 +429,7 @@ describe("scanInspectDnsLog", () => {
     expect(events.some((e) => e.host === "registry.npmjs.org")).toBe(true);
   });
 
-  it("separates a name the resolver refused from one it answered", async () => {
+  it("separates a name the resolver blocked from one it answered", async () => {
     const { events } = await scanInspectDnsLog(lines);
     const denied = events.find((e) => e.host === "evil.example.com");
     expect(denied?.action).toBe("block");
@@ -438,7 +438,7 @@ describe("scanInspectDnsLog", () => {
     expect(denied?.port === undefined).toBe(true);
   });
 
-  it("does not let a refused AAAA mask an A that resolved", async () => {
+  it("does not let a blocked AAAA mask an A that resolved", async () => {
     const mixed = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns allowed name=a.example.com.",
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=a.example.com.",
@@ -471,7 +471,7 @@ describe("scanInspectDnsLog", () => {
     expect(events[0].action).toBe("discovery");
     expect(events[0].host).toBe("_http._tcp.deb.debian.org");
     expect(events[0].queryType).toBe("SRV");
-    // No rule refused it, so there is no reason to give for one.
+    // No rule blocked it, so there is no reason to give for one.
     expect(events[0].reason === undefined).toBe(true);
   });
 
@@ -487,7 +487,7 @@ describe("scanInspectDnsLog", () => {
     expect(events.map((e) => e.queryType).join(",")).toBe("SRV,TXT");
   });
 
-  it("reads a refused service name as a refusal that names its own remedy", async () => {
+  it("reads a blocked service name as a block that names its own remedy", async () => {
     // Which names are service names is decided in the Corefile; this only
     // reads the verb it logged them under.
     const { events } = await scanInspectDnsLog([
@@ -499,7 +499,7 @@ describe("scanInspectDnsLog", () => {
     expect(events[0].queryType).toBe("SRV");
   });
 
-  it("reports a refused service name once, whatever it was asked as", async () => {
+  it("reports a blocked service name once, whatever it was asked as", async () => {
     // getaddrinfo(AF_UNSPEC) asks A and AAAA for one name; the report is about
     // the name, so it keeps the type it was first asked as.
     const { events } = await scanInspectDnsLog([
@@ -534,7 +534,7 @@ describe("scanInspectDnsLog", () => {
 describe("a resolver line whose name CoreDNS escaped", () => {
   const at = (rest: string) => `2026-08-23 16:45:00.000000000  [INFO] buildcage dns ${rest}`;
 
-  it("reads a refused name with an escaped space as written", async () => {
+  it("reads a blocked name with an escaped space as written", async () => {
     const { events, unparsed } = await scanInspectDnsLog([
       at(String.raw`denied name=secret\ data.evil.com.`),
     ]);
@@ -627,7 +627,7 @@ describe("a request whose target is not a path", () => {
 
   it("keeps the URL of a request that named a path but no host", async () => {
     // The two are separate cases: a request with no Host still has a path to
-    // show, and the stage names that refusal for itself. Only the target
+    // show, and the stage names that block for itself. Only the target
     // being no path leaves nothing to build a URL around. The URL is built
     // around the host the row carries, with the port only where it is not the
     // scheme's own.

@@ -73,8 +73,8 @@ function describeUndecidedRequests(
       "Communication details. Each ended before a whole request had arrived, so no rule decided " +
       "it and none reached an origin: the client closed or failed the TLS handshake, its own " +
       "timeout expired, or this proxy ran into an error while still reading. None of them " +
-      "fails the step. Bytes this proxy would not read as a request are not among them: that " +
-      "is a refusal, and it is in Blocked Hosts.",
+      "fails the step. Bytes this proxy would not read as a request are not among them: those " +
+      "are blocked, and they are in Blocked Hosts.",
   };
 }
 
@@ -90,8 +90,8 @@ function describeUndecidedRequests(
  * an audited connection and an allowed one.
  *
  * "could not be reached" is deliberately absent: a connection that never
- * completed is a refusal wherever a certificate was going to be checked, and
- * the few that are not refusals have a table entry of their own to explain
+ * completed is a block wherever a certificate was going to be checked, and
+ * the few that are not blocks have a table entry of their own to explain
  * them (see FAILURE_REASONS and docs/reference.md).
  */
 function describeFailedConnections(
@@ -109,7 +109,7 @@ function describeFailedConnections(
     shouldFail: false,
     message:
       `${opening}, listed with ⚠️ under Failed Hosts. The origin broke off, answered nothing ` +
-      "usable, or its name resolved nowhere upstream: no rule refused them and none can change " +
+      "usable, or its name resolved nowhere upstream: no rule blocked them and none can change " +
       "the outcome, so none of them fails the step.",
   };
 }

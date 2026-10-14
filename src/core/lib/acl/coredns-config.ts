@@ -26,7 +26,7 @@ export interface CorednsConfigOptions {
   /** TTL for the synthesised answers. */
   ttlSeconds?: number;
   /**
-   * `audit` refuses nothing, so every name is logged as allowed. Defaults to
+   * `audit` blocks nothing, so every name is logged as allowed. Defaults to
    * `restrict`.
    */
   mode?: "audit" | "restrict";
@@ -63,7 +63,7 @@ function nameMatches(regex: string): string {
  * denied one.
  *
  * `IN ANY` catches every type the two above do not, which would otherwise
- * reach no template and be answered SERVFAIL. NODATA refuses the query
+ * reach no template and be answered SERVFAIL. NODATA blocks the query
  * without telling the resolver the server is broken and worth retrying.
  */
 function proxyAnswerLines(proxyAddress: string, ttlSeconds: number): string[] {
@@ -134,7 +134,7 @@ const SERVICE_PREFIX_REGEX = "_[a-z0-9-]{1,15}[.]_(tcp|udp|sctp)[.]";
  * The types defined at a `_service._proto.` name: SRV (RFC 2782), the TXT
  * DNS-SD pairs with it (RFC 6763), TLSA (RFC 7671) and URI (RFC 7553).
  * Enumerated rather than excluding A and AAAA, so a type this block has never
- * heard of is refused rather than exempted on a guess.
+ * heard of is blocked rather than exempted on a guess.
  */
 const DISCOVERY_TYPES = ["SRV", "TXT", "TLSA", "URI"];
 
@@ -147,7 +147,7 @@ const DISCOVERY_TYPES = ["SRV", "TXT", "TLSA", "URI"];
  * Both conditions keep that verb from becoming a hiding place:
  * `_a._tcp.SECRET.attacker.example` is shaped like a service name too.
  * `parentRegex` holds the block to names under a host the rules already allow;
- * it is undefined in audit alone, which refuses nothing and so has no blocked
+ * it is undefined in audit alone, which blocks nothing and so has no blocked
  * table to leave. The type is checked because an underscore name is a
  * convention for the owner name (RFC 8552), not a promise about the question:
  * an A query really is answered here, with the proxy's address.
@@ -180,7 +180,7 @@ function discoveryZoneLines(
 
 /**
  * The block taking every other service name, under a verb of its own. The
- * refusal is like any other but the remedy is not: the name is an attribute of
+ * block is like any other but the remedy is not: the name is an attribute of
  * the host below it (RFC 8552), so a rule naming it silences the row without
  * making the record resolve, and logging it apart is what lets the report
  * point at the host instead.
@@ -192,7 +192,7 @@ function discoveryZoneLines(
  */
 function serviceZoneLines(proxyAddress: string, ttlSeconds: number): string[] {
   return [
-    "# Every other service name: refused like any other name, but recorded apart",
+    "# Every other service name: blocked like any other name, but recorded apart",
     "# so the report can say the remedy is the host below it rather than the name",
     "# itself, which no rule can make resolve.",
     ". {",

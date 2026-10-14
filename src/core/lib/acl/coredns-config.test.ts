@@ -214,7 +214,7 @@ describe("denied names", () => {
   it("answers every other query type with NODATA rather than leaving it unhandled", () => {
     // A type that reaches no template at all is answered SERVFAIL, which says
     // the server is broken and the query worth retrying: musl waits out its
-    // whole resolver timeout on one. NODATA refuses it without the wait.
+    // whole resolver timeout on one. NODATA blocks it without the wait.
     const denyBlock = config.slice(config.indexOf("# Everything else"));
     const anyBlock = denyBlock.slice(denyBlock.indexOf("template IN ANY"));
     expect(denyBlock.includes("template IN ANY")).toBe(true);
@@ -293,7 +293,7 @@ describe("audit mode", () => {
     expect(config.includes("buildcage dns denied")).toBe(false);
   });
 
-  it("needs no allowlist expression, since nothing is refused", () => {
+  it("needs no allowlist expression, since nothing is blocked", () => {
     expect(config.includes("view allowlist")).toBe(false);
   });
 });
@@ -312,7 +312,7 @@ describe("reverse lookups", () => {
     });
   }
 
-  it("carries an SOA, so the refusal is cacheable rather than re-asked each time", () => {
+  it("carries an SOA, so the block is cacheable rather than re-asked each time", () => {
     expect(reverseBlock(gen({})).includes("IN SOA ns.buildcage.invalid.")).toBe(true);
   });
 
@@ -327,7 +327,7 @@ describe("reverse lookups", () => {
   });
 
   it("answers anything else under those zones like any other name", () => {
-    // Only PTR is refused. A name that merely sits under in-addr.arpa still
+    // Only PTR is blocked. A name that merely sits under in-addr.arpa still
     // resolves to the proxy, so the request that follows is recorded with its
     // full URL the way one for any other name is.
     expect(reverseBlock(gen({})).includes('answer "{{ .Name }} 60 IN A 198.19.255.1"')).toBe(true);
@@ -417,7 +417,7 @@ describe("service-discovery names", () => {
     expect(block.includes("expr type() in ['SRV', 'TXT', 'TLSA', 'URI']")).toBe(true);
   });
 
-  it("takes a service name under any host in audit mode, which refuses nothing", () => {
+  it("takes a service name under any host in audit mode, which blocks nothing", () => {
     // There is no blocked table in audit, so there is none to leave.
     const regex = regexOf(matchesLine(gen({ mode: "audit" }), "view discovery"));
     expect(regex.test("_mongodb._tcp.cluster0.abcde.mongodb.net.")).toBe(true);
@@ -443,12 +443,12 @@ describe("service-discovery names", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Every other service name. Refused like any other name, but recorded apart:
+// Every other service name. Blocked like any other name, but recorded apart:
 // the remedy for one is the host below it, never the name, which no rule can
 // make resolve. Logging it apart is also what keeps the shape of a service
 // name defined in coredns-config.ts alone: the report reads verbs, not names.
 // ---------------------------------------------------------------------------
-describe("refused service names", () => {
+describe("blocked service names", () => {
   it("records them under a verb of their own, carrying the type", () => {
     const block = blockOf(gen({ httpsRules: ["deb.debian.org:443"] }), "view service");
     expect(block.includes('"buildcage dns service-denied name={name} type={type}"')).toBe(true);
@@ -477,7 +477,7 @@ describe("refused service names", () => {
     expect(gen({}).includes("view service")).toBe(true);
   });
 
-  it("is not emitted in audit mode, which refuses nothing", () => {
+  it("is not emitted in audit mode, which blocks nothing", () => {
     expect(gen({ mode: "audit" }).includes("view service")).toBe(false);
   });
 });

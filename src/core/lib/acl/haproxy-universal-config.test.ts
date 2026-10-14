@@ -119,7 +119,7 @@ describe("resolver", () => {
   });
 
   it("retries a failed resolution on the path no inspect-delay caps", () => {
-    // Without the second call one transient miss refuses a name the rules
+    // Without the second call one transient miss blocks a name the rules
     // allow; without its guard a destination already found is re-resolved.
     const resolves = lines(gen()).filter((l) => l.startsWith("http-request do-resolve("));
     expect(resolves.length).toBe(2);
@@ -143,7 +143,7 @@ describe("internal-address guard", () => {
 
 describe("a connection to the proxy's own listener", () => {
   for (const mode of ["restrict", "audit"] as const) {
-    it(`is refused in ${mode} on an internal address, whatever the IP rules say`, () => {
+    it(`is blocked in ${mode} on an internal address, whatever the IP rules say`, () => {
       const all = lines(gen({ mode, ipRules: ["0.0.0.0/0:*"] }));
       const self = "!is_dns_routed is_ip_match ip_dst_internal { dst_port 10024 }";
       const reject = all.indexOf(`tcp-request content reject if ${self}`);
@@ -176,7 +176,7 @@ describe("outbound_proxy", () => {
     expect(all.includes("tcp-request content set-var(txn.sni) req_ssl_sni if is_tls")).toBe(true);
   });
 
-  it("refuses an SNI that is not a hostname before the allowlist or the resolver acts on it", () => {
+  it("blocks an SNI that is not a hostname before the allowlist or the resolver acts on it", () => {
     const reject = all.indexOf("tcp-request content reject if is_tls has_sni !sni_is_name");
     expect(reject !== -1).toBe(true);
     expect(
@@ -218,7 +218,7 @@ describe("an IP rule's connection", () => {
 describe("a plaintext request's Host", () => {
   const deny = "http-request deny deny_status 400";
   for (const mode of ["restrict", "audit"] as const) {
-    it(`is refused in ${mode} when it is not a hostname, before the allowlist or the resolver`, () => {
+    it(`is blocked in ${mode} when it is not a hostname, before the allowlist or the resolver`, () => {
       const all = lines(gen({ mode, httpRules: HTTP }));
       const reject = all.findIndex((l) => l.startsWith(deny) && l.endsWith(" if !host_is_name"));
       expect(reject !== -1).toBe(true);

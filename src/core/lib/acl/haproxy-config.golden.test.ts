@@ -31,7 +31,7 @@ const CASES: Record<string, HaproxyConfigOptions> = {
     proxyAddress: PROXY,
   },
 
-  // Same rules, nothing refused, so the mode branch runs through every stage.
+  // Same rules, nothing blocked, so the mode branch runs through every stage.
   "audit-full": {
     mode: "audit",
     httpsRules: ["a.example.com:443"],

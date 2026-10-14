@@ -171,7 +171,7 @@ describe("renderReportBlocks under a limit", () => {
             method: "GET",
             url: "https://ok0.example.com/",
             status: 200,
-            wouldRefuse: "example-refusal",
+            wouldBlock: "example-block",
           },
         ],
       }),
@@ -210,13 +210,13 @@ describe("renderReportBlocks under a limit", () => {
       }),
     );
     expect(out).toContain("the step.*</sub>\n\nEXTRA\n");
-    expect(render(report({}))).toContain("Result: ✅ Nothing was refused\n\nEXTRA\n\n_(no");
+    expect(render(report({}))).toContain("Result: ✅ Nothing was blocked\n\nEXTRA\n\n_(no");
     const empty = joinSummaryBlocks(
       renderReportBlocks(report({}), "owner/repo", "v1", PRIORITIES, {
         extraBlocks: (gap) => [{ ...extra(gap)[0], text: "" }],
       }),
     );
-    expect(empty).toContain("Result: ✅ Nothing was refused\n\n_(no");
+    expect(empty).toContain("Result: ✅ Nothing was blocked\n\n_(no");
     expect(render(report({ passed: rows("ok", 1) }))).toContain(
       "| `ok0.example.com:443` | HTTPS | 1 |\n\nEXTRA\n",
     );

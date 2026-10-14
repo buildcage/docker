@@ -8,7 +8,7 @@ import {
 import type { SummaryBlock } from "./fit-step-summary.ts";
 import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
 import { hostTableTruncationNote, renderHostTable } from "./host-table.ts";
-import { renderInspectDetailsBody, type RefusalLabel } from "./inspect-details.ts";
+import { renderInspectDetailsBody, type BlockLabel } from "./inspect-details.ts";
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
 import { restrictExampleTruncationNote, type ExampleStepOptions } from "./restrict-example.ts";
@@ -17,8 +17,8 @@ import { renderVerdict } from "./verdict.ts";
 export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /** Heading text. May carry untrusted input: the heading escapes it. */
   title?: string;
-  /** See RefusalLabel; applies to Communication details. */
-  refusalLabel?: RefusalLabel;
+  /** See BlockLabel; applies to Communication details. */
+  blockLabel?: BlockLabel;
   /** See renderVerdict's `extraItems`. */
   verdictItems?: string[];
   /** False leaves the footer to an action that prints more after the report. */
@@ -111,7 +111,7 @@ export function renderReportBlocks(
   priorities: TrafficPriorities,
   {
     title = "Outbound Traffic Report",
-    refusalLabel,
+    blockLabel,
     verdictItems,
     footer = true,
     extraBlocks = () => [],
@@ -156,7 +156,7 @@ export function renderReportBlocks(
   }
   if (report.blocked.length > 0 || report.failed.length > 0) {
     // A folded row names its rule; its hosts are in Communication details.
-    // Unexpected refusals come first, as the rows to act on.
+    // Unexpected blocks come first, as the rows to act on.
     const blocked = foldExpectedBlockedRows(report.blocked).map((r) => ({
       ...r,
       outcome: "blocked" as const,
@@ -177,7 +177,7 @@ export function renderReportBlocks(
     const note =
       failed.length === 0
         ? ""
-        : "\n<sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so " +
+        : "\n<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so " +
           "no rule can change the outcome and none of them fails the step.*</sub>\n";
     blocks.push(
       trafficTableBlock(
@@ -195,7 +195,7 @@ export function renderReportBlocks(
   wrote ||= extra.some((b) => b.text !== "");
   if (isAudit) {
     // inspect's example also narrows by method and path. A failed host is kept:
-    // nothing refused it, and leaving it out would break the next run.
+    // nothing blocked it, and leaving it out would break the next run.
     // Whole or not at all: a cut example would read as a complete allowlist.
     const example =
       report.engine === "inspect"
@@ -230,7 +230,7 @@ export function renderReportBlocks(
     blocks.push(trafficFrame(`${gap()}_(no communication)_\n\n`));
   }
 
-  const details = renderInspectDetailsBody(report.timeline, report.startedAt, refusalLabel);
+  const details = renderInspectDetailsBody(report.timeline, report.startedAt, blockLabel);
   if (details) {
     blocks.push({
       id: TRAFFIC_BLOCK.log,

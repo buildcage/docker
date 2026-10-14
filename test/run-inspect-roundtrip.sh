@@ -96,5 +96,5 @@ start restrict "$BASE_COMPOSE:$OVERRIDE"
 build test/Dockerfile.inspect-roundtrip
 
 echo ""
-echo "✅ The generated rules permit everything the audit run did, and refuse what it never did."
+echo "✅ The generated rules permit everything the audit run did, and block what it never did."
 echo ""

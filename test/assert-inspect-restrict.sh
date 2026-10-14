@@ -21,7 +21,7 @@ assert_logged GET "https://ok.wildcard.example.com/regexpub/deep/pkg.tgz" 200
 assert_logged GET "https://ok.wildcard.example.com/regexexact" 200
 echo ""
 
-echo "[refused] recorded with the method and the full URL, before any origin was contacted:"
+echo "[blocked] recorded with the method and the full URL, before any origin was contacted:"
 assert_logged GET "https://allowed.example.com/private/secret" 403
 assert_logged POST "https://allowed.example.com/public/pkg.tgz" 403
 assert_logged GET "https://absent.example.com/" 502
@@ -38,7 +38,7 @@ echo "[traversal] the path is normalized before the rules see it:"
 # Whether the proxy logs the raw or the normalized path, what must never appear
 # is a 200: that would mean the origin served /private/ for a /public/ rule.
 if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=\S* reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=\S+ host=allowed\.example\.com /(public/\.\./)?private/secret$" <<< "$LOGS"; then
-  pass "GET /public/../private/secret was refused"
+  pass "GET /public/../private/secret was blocked"
 else
   fail "GET /public/../private/secret -- no 403 recorded"
 fi
@@ -50,7 +50,7 @@ echo "[target is not a path] the host is the one the request carried:"
 # resolves and no rule can be written for, in a table the report asks the
 # reader to act on.
 if grep -qE "^buildcage [0-9]+ https OPTIONS 403 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+ dst=\S+ fcerr=\S+ sni=\S+ host=allowed\.example\.com -$" <<< "$LOGS"; then
-  pass "OPTIONS * was refused and recorded against allowed.example.com"
+  pass "OPTIONS * was blocked and recorded against allowed.example.com"
 else
   fail "no such line for the asterisk-form request"
   grep -E "OPTIONS" <<< "$LOGS" || echo "    (no matching log line at all)"
@@ -72,29 +72,29 @@ else
 fi
 echo ""
 
-echo "[no request] what never parsed as one is refused, not passed off as undecided:"
+echo "[no request] what never parsed as one is blocked, not passed off as undecided:"
 # `<BADREQ>` is haproxy's own word for bytes it read no request out of, and no
 # client can send it as a method. The tail is the empty Host and target it
 # never had, one `-` each; dst is not pinned, this one never reaching set-dst.
 if grep -qE "^buildcage [0-9]+ http <BADREQ> 400 [0-9]+ ts=PR reason=\S+ tlserr=\S+ dst=\S+ host=- -$" <<< "$LOGS"; then
-  pass "the bytes that were not a request were refused"
+  pass "the bytes that were not a request were blocked"
 else
-  fail "no refusal recorded for the connection that sent no request"
+  fail "no block recorded for the connection that sent no request"
 fi
 # Named by the config rather than inferred from the empty Host the log prints,
 # which a Host the build chooses could imitate.
 if grep -qE "^buildcage [0-9]+ http GET 400 [0-9]+ ts=PR reason=missing-host-header tlserr=\S+ dst=\S+ host=- /public/pkg\.tgz$" <<< "$LOGS"; then
-  pass "the request that named no host was refused, with the reason named"
+  pass "the request that named no host was blocked, with the reason named"
 else
-  fail "no missing-host-header refusal recorded"
+  fail "no missing-host-header block recorded"
 fi
 echo ""
 
 echo "[exfiltration] the query string is kept, which is where the payload goes:"
 if grep -qF "host=blocked.example.com /exfil?token=SECRET-VALUE" <<< "$LOGS"; then
-  pass "the refused URL was recorded with its query string intact"
+  pass "the blocked URL was recorded with its query string intact"
 else
-  fail "the refused URL's query string was not recorded"
+  fail "the blocked URL's query string was not recorded"
 fi
 echo ""
 
@@ -131,7 +131,7 @@ if grep -qE "^buildcage [0-9]+ https GET 200 [0-9]+ ts=\S+ reason=\S+ tlserr=\S+
 else
   fail "no request recorded as reaching the resolved address"
 fi
-# A refused request never connected, so its dst is still where the client
+# A blocked request never connected, so its dst is still where the client
 # aimed. Only a request that got an answer proves anything was reached.
 if grep -qE "^buildcage [0-9]+ https? [A-Z]+ 2[0-9][0-9] [0-9]+ ts=\\S+ reason=\\S+ tlserr=\\S+ dst=10\\.200\\.0\\.101:" <<< "$LOGS"; then
   fail "a request reached the impostor at 10.200.0.101"
@@ -142,14 +142,14 @@ echo ""
 
 # A numeric tlserr is the assertion: it is what names the certificate as the
 # reason, where a connection that never got that far leaves `-`.
-echo "[origin CA] a certificate the proxy cannot verify is refused by name:"
+echo "[origin CA] a certificate the proxy cannot verify is blocked by name:"
 if grep -qE "^buildcage [0-9]+ https GET 503 [0-9]+ ts=SC\S* reason=\S+ tlserr=[0-9]+ dst=10\.200\.0\.101:443 fcerr=\S+ sni=impostor\.example\.com host=impostor\.example\.com /$" <<< "$LOGS"; then
-  pass "the refusal names the TLS error the handshake failed with"
+  pass "the block names the TLS error the handshake failed with"
 else
   fail "no line recorded a failed origin handshake for impostor.example.com"
 fi
 # The same phase with no TLS error at all. It reads like an outage and is
-# refused anyway: nothing on this connection was ever authenticated.
+# blocked anyway: nothing on this connection was ever authenticated.
 if grep -qE "^buildcage [0-9]+ https GET 503 [0-9]+ ts=[sS]C\S* reason=\S+ tlserr=\S+ dst=10\.200\.0\.102:443 fcerr=\S+ sni=deadend\.example\.com host=deadend\.example\.com /$" <<< "$LOGS"; then
   pass "a connection that never completed was recorded on its own"
 else
@@ -157,18 +157,18 @@ else
 fi
 echo ""
 
-echo "[SSRF] an allowlisted name resolving inward is refused before connecting:"
+echo "[SSRF] an allowlisted name resolving inward is blocked before connecting:"
 if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=PR reason=internal-address tlserr=\S+ dst=169\.254\.169\.254:443 fcerr=\S+ sni=\S+ host=metadata\.example\.com /latest/meta-data$" <<< "$LOGS"; then
-  pass "the name passed the rules but the resolved metadata address was refused"
+  pass "the name passed the rules but the resolved metadata address was blocked"
 else
   fail "the internal-destination guard did not fire"
   grep -E "metadata" <<< "$LOGS" || true
 fi
 echo ""
 
-echo "[SSRF] an allowlisted name resolving back to the runner is refused too:"
+echo "[SSRF] an allowlisted name resolving back to the runner is blocked too:"
 if grep -qE "^buildcage [0-9]+ https GET 403 [0-9]+ ts=PR reason=internal-address tlserr=\S+ dst=10\.200\.0\.199:443 fcerr=\S+ sni=\S+ host=runner\.example\.com /$" <<< "$LOGS"; then
-  pass "the resolved runner address was refused despite being RFC1918"
+  pass "the resolved runner address was blocked despite being RFC1918"
 else
   fail "the runner's own addresses did not reach the internal-destination guard"
   grep -E "runner\.example\.com" <<< "$LOGS" || true
@@ -182,7 +182,7 @@ else
   fail "the address destination was not reached"
 fi
 # Asking would fail, since no resolver can answer an address, and would also
-# put a confusing "name refused" line in the report.
+# put a confusing "name blocked" line in the report.
 if grep -qE "name=10\.200\.0\.100" <<< "$DNS_LOG"; then
   fail "the resolver was asked about an address"
 else
@@ -222,11 +222,11 @@ else
 fi
 echo ""
 
-echo "[Host holding a colon] refused before any rule or resolution:"
+echo "[Host holding a colon] blocked before any rule or resolution:"
 if grep -qE "^buildcage [0-9]+ http GET 400 [0-9]+ ts=PR reason=invalid-host tlserr=\S+ dst=\S+ host=anyport\.example\.com:x\.evil\.example\.net:80 /public/x$" <<< "$LOGS"; then
-  pass "refused as invalid-host"
+  pass "blocked as invalid-host"
 else
-  fail "no invalid-host refusal recorded"
+  fail "no invalid-host block recorded"
   grep -E "anyport" <<< "$LOGS" || true
 fi
 echo ""
@@ -275,11 +275,11 @@ else
 fi
 echo ""
 
-echo "[DNS] a name outside the allowlist is refused and recorded:"
+echo "[DNS] a name outside the allowlist is blocked and recorded:"
 if grep -qiF "buildcage dns denied name=SECRET-IN-A-NAME.attacker.example" <<< "$DNS_LOG"; then
-  pass "the exfiltration name was refused by the resolver"
+  pass "the exfiltration name was blocked by the resolver"
 else
-  fail "the exfiltration name was not recorded as refused"
+  fail "the exfiltration name was not recorded as blocked"
 fi
 if grep -qiF "buildcage dns allowed name=allowed.example.com" <<< "$DNS_LOG"; then
   pass "an allowlisted name was logged as allowed"
@@ -294,7 +294,7 @@ echo "[DNS] a wildcard-host rule's path restriction does not narrow the DNS-laye
 # name as allowed regardless, and answers it with the proxy's own address
 # either way (see coredns-config.ts), never resolving it for real. The path
 # restriction is enforced entirely by HAProxy, after this DNS decision, which
-# is why the request itself still gets refused (checked above via the 403).
+# is why the request itself still gets blocked (checked above via the 403).
 if grep -qiF "buildcage dns allowed name=attacker.wildcard.example.com" <<< "$DNS_LOG"; then
   pass "the wildcard-matching name was logged as allowed, on the host alone"
 else
@@ -318,9 +318,9 @@ fi
 # Only a service name under a host the rules allow is treated that way, or
 # prefixing `_a._tcp.` to an exfiltration name would be a way out.
 if grep -qiF "buildcage dns service-denied name=_mongodb._tcp.secret-in-a-name.attacker.example" <<< "$DNS_LOG"; then
-  pass "a service name under a host no rule allows was still refused and recorded"
+  pass "a service name under a host no rule allows was still blocked and recorded"
 else
-  fail "a service name under a host no rule allows was not recorded as refused"
+  fail "a service name under a host no rule allows was not recorded as blocked"
 fi
 
 echo "[DNS] a reverse lookup is recorded without being judged:"
@@ -341,9 +341,9 @@ fi
 # same zone is judged like any other, or appending `.in-addr.arpa` would be a
 # way out of the report.
 if grep -qiF "buildcage dns denied name=SECRET-IN-A-NAME.in-addr.arpa" <<< "$DNS_LOG"; then
-  pass "an invented name under the reverse zone was still refused and recorded"
+  pass "an invented name under the reverse zone was still blocked and recorded"
 else
-  fail "an invented name under the reverse zone was not recorded as refused"
+  fail "an invented name under the reverse zone was not recorded as blocked"
 fi
 echo ""
 
@@ -382,35 +382,35 @@ if grep -qF "### 🚫 Blocked / ⚠️ Failed Hosts" <<< "$REPORT_MARKDOWN" \
   && grep -qiF "| \`secret-in-a-name.attacker.example\` | DNS | 🚫 dns-not-allowed |" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| \`impostor.example.com:443\` | HTTPS | 🚫 origin-untrusted |" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| \`deadend.example.com:443\` | HTTPS | 🚫 origin-connect-failed |" <<< "$REPORT_MARKDOWN"; then
-  pass "the table separates a refused request, a refused name and two origins we never authenticated"
+  pass "the table separates a blocked request, a blocked name and two origins we never authenticated"
 else
   fail "the Blocked / Failed Hosts table is missing expected rows"
 fi
-# A refusal made before a whole request arrived is still a refusal, and counts
+# A block made before a whole request arrived is still a block, and counts
 # towards fail_on_blocked. The plain stage has no SNI to name it by: bytes sent
 # to an address are named by it, as the ip rule that could pass them would be,
 # and a request to a name lands on the proxy's own address, which names nothing.
 if grep -qF '| `10.200.0.100:5432` | IP | 🚫 bad-request |' <<< "$REPORT_MARKDOWN" \
   && grep -qE '^\| `\(unknown\):[0-9]+` \| HTTP \| 🚫 missing-host-header \|' <<< "$REPORT_MARKDOWN"; then
-  pass "both refusals that named no host are in the table"
+  pass "both blocks that named no host are in the table"
 else
   fail "the Blocked / Failed Hosts table is missing the rows for requests that named no host"
 fi
 # The same unreachable host over plaintext, where no certificate was ever going
 # to be checked, so nothing was hidden by the connection failing.
 if grep -qF "| \`deadend.example.com:80\` | HTTP | ⚠️ origin-unreachable |" <<< "$REPORT_MARKDOWN"; then
-  pass "a plaintext connection that failed is a failure, not a refusal"
+  pass "a plaintext connection that failed is a failure, not a block"
 else
   fail "the plaintext connection failure was not reported as a failure"
 fi
 echo ""
 
-# A name the rules allow that resolves nowhere: no rule refused it and none can
+# A name the rules allow that resolves nowhere: no rule blocked it and none can
 # clear it, so it is marked as a failure and does not fail the step.
 echo "[report] a failure, for a name the upstream resolver could not answer:"
 if grep -qF "| \`absent.example.com:443\` | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN" \
   && grep -qF "| \`v6only.example.com:443\` | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
-  pass "an unresolvable name is reported as a failure, not a refusal"
+  pass "an unresolvable name is reported as a failure, not a block"
 else
   fail "the Blocked / Failed Hosts table is missing the failed rows"
 fi
@@ -420,19 +420,19 @@ echo "[report] one timeline, with everything the build did in order:"
 if grep -qF "Communication details" <<< "$REPORT_MARKDOWN" \
   && grep -qF "✅ " <<< "$REPORT_MARKDOWN" \
   && grep -qF "🚫 " <<< "$REPORT_MARKDOWN"; then
-  pass "allowed and refused are interleaved rather than split"
+  pass "allowed and blocked are interleaved rather than split"
 else
   fail "the Communication details section is missing or still split"
 fi
 
-# A refusal, and a failure the rules never touched, each name why: 403, 502 and
+# A block, and a failure the rules never touched, each name why: 403, 502 and
 # 503 mean different things and the number does not say which.
 if grep -qF "POST https://allowed.example.com/public/pkg.tgz -> not-allowed" <<< "$REPORT_MARKDOWN" \
   && grep -qF "https://absent.example.com/ -> dns-failed" <<< "$REPORT_MARKDOWN" \
   && grep -qF "https://blocked.example.com/exfil?token=*** -> not-allowed" <<< "$REPORT_MARKDOWN"; then
-  pass "a refusal names its reason and keeps its URL"
+  pass "a block names its reason and keeps its URL"
 else
-  fail "a refusal is missing its reason or its URL"
+  fail "a block is missing its reason or its URL"
 fi
 
 # The report is as readable as the run; the traffic artifact, checked below, is
@@ -445,9 +445,9 @@ fi
 
 # The summary is where a reader looks first.
 if grep -qF "end=TAIL-MARKER -> not-allowed" <<< "$REPORT_MARKDOWN"; then
-  pass "the ~1.3KB refused URL reached the summary with its tail"
+  pass "the ~1.3KB blocked URL reached the summary with its tail"
 else
-  fail "the long refused URL is missing or cut in the summary"
+  fail "the long blocked URL is missing or cut in the summary"
 fi
 
 # A passthrough is never decrypted, so this is the only place it can appear.
@@ -458,9 +458,9 @@ else
 fi
 
 if grep -qF "DNS secret-in-a-name.attacker.example -> dns-not-allowed" <<< "$REPORT_MARKDOWN"; then
-  pass "a refused name is in the timeline, having no other trace"
+  pass "a blocked name is in the timeline, having no other trace"
 else
-  fail "the refused name is missing from the timeline"
+  fail "the blocked name is missing from the timeline"
 fi
 
 # No rule decided it and nothing else reached this host, so its close is kept,
@@ -480,12 +480,12 @@ if grep -qE "⚠️ .*: HTTPS abandoned\.example\.com:443 -> client-tls-failed$"
 else
   fail "the failed client handshake is missing from the timeline"
 fi
-# No rule takes the row above away, so the refused lookup for the same name has
+# No rule takes the row above away, so the blocked lookup for the same name has
 # to survive: it is the only row a reader can act on.
 if grep -qF "| \`aborted.example.com\` | DNS | 🚫 dns-not-allowed |" <<< "$REPORT_MARKDOWN"; then
-  pass "the refused lookup for the same name is still its own Blocked row"
+  pass "the blocked lookup for the same name is still its own Blocked row"
 else
-  fail "the refused lookup for the aborted host was folded away"
+  fail "the blocked lookup for the aborted host was folded away"
 fi
 
 if grep -qF "1.255.19.198.in-addr.arpa" <<< "$REPORT_MARKDOWN"; then
@@ -512,12 +512,12 @@ if grep -qF "DNS SRV _http._tcp.allowed.example.com -> no data" <<< "$REPORT_MAR
 else
   fail "the service-discovery lookup is missing from the timeline"
 fi
-# The refusal names its own remedy: the host below the name, which is what a
+# The block names its own remedy: the host below the name, which is what a
 # rule can be written against.
 if grep -qiF "dns-service-not-allowed" <<< "$REPORT_MARKDOWN"; then
-  pass "a refused service name is reported with a reason of its own"
+  pass "a blocked service name is reported with a reason of its own"
 else
-  fail "a refused service name was reported as an ordinary refused name"
+  fail "a blocked service name was reported as an ordinary blocked name"
 fi
 
 # Listing a name that resolved doubles every line, and the request that
@@ -545,7 +545,7 @@ if [ -n "$TRAFFIC" ] \
   && echo "$TRAFFIC" | node -e '
       const rows = JSON.parse(require("fs").readFileSync(0, "utf8"));
       const need = [
-        // Filtering is on action, never on status: a refusal has no status.
+        // Filtering is on action, never on status: a block has no status.
         (r) => r.action === "block" && r.method === "POST" && r.status === undefined,
         (r) => r.action === "block" && (r.url || "").includes("token=SECRET-VALUE"),
         // Long enough to be cut by the default line length.

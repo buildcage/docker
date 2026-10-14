@@ -104,7 +104,7 @@ describe("the universal config's log formats and this parser describe the same l
   });
 
   // ssh or git:// to a name: bytes haproxy would not read as a request.
-  it("reads bytes refused as no request as a refusal, in either mode", async () => {
+  it("reads bytes blocked as no request as a block, in either mode", async () => {
     for (const isAudit of [false, true]) {
       const line = render(HTTP_IN, { ...NO_REQUEST, "%ts": "PR", "%[dst_port]": "22" });
       const { events, unparsed } = await scanHaproxyLog([line], isAudit);

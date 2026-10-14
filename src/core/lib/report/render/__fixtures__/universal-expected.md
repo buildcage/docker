@@ -1,7 +1,7 @@
 ## Outbound Traffic Report
 
 > [!CAUTION]
-> 2 refused · 1 failed · 2 refused as expected
+> 2 blocked · 1 failed · 2 blocked as expected
 
 ### ✅ Allowed Hosts
 
@@ -18,7 +18,7 @@
 | `c.example.com:443` | HTTPS | ⚠️ dns-failed | 1 | — |
 | `*.sury.org:*` (2 hosts) | HTTPS | 🚫 https-not-allowed | 2 | ✅ |
 
-<sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
 
 <details>
 <summary>💬 Communication details</summary>

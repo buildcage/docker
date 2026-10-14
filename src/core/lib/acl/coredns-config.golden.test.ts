@@ -13,7 +13,7 @@ import { buildUrlRules } from "./url-rules.ts";
 const PROXY = "198.19.255.1";
 
 const CASES: Record<string, RuleInputs & Partial<CorednsConfigOptions>> = {
-  // Nothing but the proxy address: the skeleton, refusing every name.
+  // Nothing but the proxy address: the skeleton, blocking every name.
   "restrict-empty": { proxyAddress: PROXY },
 
   "restrict-basic": {
@@ -23,7 +23,7 @@ const CASES: Record<string, RuleInputs & Partial<CorednsConfigOptions>> = {
     proxyAddress: PROXY,
   },
 
-  // audit answers for every name instead of refusing, so the view set differs.
+  // audit answers for every name instead of blocking, so the view set differs.
   "audit-basic": {
     mode: "audit",
     httpsRules: ["a.example.com:443"],

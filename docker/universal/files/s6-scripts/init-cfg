@@ -7,7 +7,7 @@ GATEWAY=198.19.255.1
 
 echo "init-cfg: proxy_mode=${PROXY_MODE:-restrict}"
 
-# Addresses the runner itself holds, refused as a resolved destination by the
+# Addresses the runner itself holds, blocked as a resolved destination by the
 # generated internal-address acl. HOST_ADDRESSES is what the action read off the
 # runner; the routing table adds the compose network's gateway, a runner address
 # the action could not see yet. The container's own addresses keep a name

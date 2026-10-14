@@ -20,7 +20,7 @@ describe("PROXY_ADDRESS", () => {
 
 describe("PROXY_SUBNET", () => {
   it("is the subnet the build network hands out", () => {
-    // The internal-address guard refuses PROXY_SUBNET; a build network outside
+    // The internal-address guard blocks PROXY_SUBNET; a build network outside
     // it would leave the steps on it reachable by name.
     expect(conflist).toContain(`"subnet": "${PROXY_SUBNET}"`);
   });

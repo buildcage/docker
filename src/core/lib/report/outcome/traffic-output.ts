@@ -50,7 +50,7 @@ const RECORD_FIELDS: ReadonlySet<string> = new Set([
   "bytes",
   "reason",
   "destination",
-  "wouldRefuse",
+  "wouldBlock",
 ] satisfies (keyof TrafficRecord)[]);
 
 /**
@@ -84,7 +84,7 @@ export function buildTrafficRecords<X extends TrafficExtensions = Record<never, 
       if (e.bytes !== undefined) record.bytes = e.bytes;
       if (e.reason !== undefined) record.reason = e.reason;
       if (e.destination !== undefined) record.destination = e.destination;
-      if (e.wouldRefuse !== undefined) record.wouldRefuse = e.wouldRefuse;
+      if (e.wouldBlock !== undefined) record.wouldBlock = e.wouldBlock;
       for (const [name, fields] of Object.entries(e.extensions ?? {})) {
         if (!RECORD_FIELDS.has(name)) Object.assign(record, { [name]: fields });
       }

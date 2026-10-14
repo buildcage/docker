@@ -101,13 +101,13 @@ or an SNI naming one host while the connection aims at another all reach the ser
 to: destination spoofing is removed rather than detected. A connection an `allowed_ip_rules` entry
 covers is the one exception: that rule names the address itself, so the connection goes there
 whatever name it carries. A name with anything but letters, digits,
-`.`, `_` and `-` in it never reaches a rule, in `audit` too: `universal` refuses such an SNI
+`.`, `_` and `-` in it never reaches a rule, in `audit` too: `universal` blocks such an SNI
 (`invalid-sni`) or plaintext `Host` (`invalid-host`), and `inspect` never passes one through and
-refuses such a `Host` (`invalid-host`).
+blocks such a `Host` (`invalid-host`).
 A `:` in the name could otherwise let a `~` rule's port pattern match a name the proxy then looks up.
 
 That order is an invariant, not an optimisation. Reversed, resolution would become the exfiltration
-channel the resolver below exists to prevent, so a name a request would be refused for never
+channel the resolver below exists to prevent, so a name a request would be blocked for never
 triggers a real DNS query.
 
 Where the proxy resolves is the container's own `/etc/resolv.conf`. On a runner that is Docker's
@@ -121,7 +121,7 @@ The resolver inside the cage has no upstream at all, and answers every query, on
 not, with the proxy's own address. A lookup by itself therefore cannot carry anything out:
 `SECRET-DATA.attacker.example` would otherwise reach an attacker's own nameserver the moment it was
 forwarded. Answering a name outside the allowlist the same way as one inside is deliberate too, so
-that the request which follows is recorded with its URL before it is refused.
+that the request which follows is recorded with its URL before it is blocked.
 
 No discovery record is returned either. Having no upstream, the resolver has nothing to answer an
 `SRV`, `TXT`, `TLSA` or `URI` query with, which is load-bearing rather than incidental:
@@ -134,7 +134,7 @@ fall back, such as a `mongodb+srv://` connection string, does not work inside th
 
 An allowlisted name that resolves to loopback, link-local (AWS/GCP/Azure IMDS), CGNAT (Alibaba
 IMDS), the IETF protocol block (Oracle IMDS), Azure's WireServer (`168.63.129.16`), the proxy's own
-network (`198.19.255.0/24`, where the build's RUN steps also sit), or **an address the runner itself holds** is refused, reported as `internal-address`, in `audit` too. A name under an
+network (`198.19.255.0/24`, where the build's RUN steps also sit), or **an address the runner itself holds** is blocked, reported as `internal-address`, in `audit` too. A name under an
 attacker's control, or DNS for an allowlisted domain that has been compromised, therefore cannot
 turn the proxy into a route to cloud metadata or back into the runner. The rest of RFC1918 is
 deliberately exempt: a name pointing at an internal mirror is a real, intended setup.
@@ -161,7 +161,7 @@ rule naming the proxy's listener would loop it into itself. A wildcard or regex 
 the address, `**:80` or `~^.*:80$`, is not. Under `universal`, no rule does. Reaching a cloud
 metadata endpoint directly, the way any AWS or GCP SDK does, is not what this is meant to stop, and
 `allowed_ip_rules` is the intended path for it. That path skips this guard except for the listener:
-a connection to port `10024` of an internal address is refused there too, whatever the IP rules say
+a connection to port `10024` of an internal address is blocked there too, whatever the IP rules say
 and in `audit` as well.
 
 ### Only TCP gets out
@@ -170,7 +170,7 @@ Everything that is not TCP is dropped before it reaches the proxy, so ICMP, raw 
 exit path at all; port 53 to the gateway, which is the resolver, is the one exception. IPv6 is
 dropped the same way, AAAA lookups are answered with no records, and the proxy
 reaches allowed names over IPv4 only. The cost of that last part is an allowed name with AAAA
-records and no A record: it never resolves here, is refused on every attempt, in `audit` too, and is
+records and no A record: it never resolves here, fails on every attempt, in `audit` too, and is
 reported as `dns-failed` with no rule able to clear it.
 
 ## Engines
@@ -190,9 +190,9 @@ checks that against the allowlist.
 - **HTTPS**: the SNI from the TLS ClientHello, read without terminating the connection, so the build
   validates the origin's own certificate itself. Checked against `allowed_https_rules`.
 - **HTTP**: the `Host` header, checked against `allowed_http_rules`. A request carrying none is
-  refused with 400, since there is nothing to check it against.
+  blocked with 400, since there is nothing to check it against.
 - **A connection to a bare address**: nothing at all. It skipped DNS, so there is no name to read.
-  It is matched against `allowed_ip_rules` as `ip:port` and, when nothing matches, refused. The
+  It is matched against `allowed_ip_rules` as `ip:port` and, when nothing matches, blocked. The
   address is the one the connection goes to; an SNI it carries is ignored, since the client chose it.
 
 Because nothing in the build has to trust an injected CA or be told about a proxy, this engine
@@ -221,12 +221,12 @@ audit run records everything without being configured for it first.
 
 Three mechanisms make that enforceable:
 
-- **The certificate the build sees is generated from the SNI alone**, so a refused destination is
+- **The certificate the build sees is generated from the SNI alone**, so a blocked destination is
   never contacted. The only path that reaches an origin is the backend, after a request has already
   passed the rules, and the origin's own certificate is checked on that connection.
 - **The path is normalized before the rules see it**: `%2e` is decoded and `..` segments are
   removed. A `..` joined to an encoded separator (`..%2f`, `..%5c`) or to `;`, and any backslash, is
-  refused. Encodings HAProxy does not decode, such as a double-encoded `%252e`, `%00` or an
+  blocked. Encodings HAProxy does not decode, such as a double-encoded `%252e`, `%00` or an
   overlong UTF-8 dot, reach the origin as written and matter only to an origin that decodes them
   again.
 - **`buildcage-runc`**, a wrapper around BuildKit's own `buildkit-runc`, makes each step trust the
@@ -268,7 +268,7 @@ Three mechanisms make that enforceable:
 
 A wide host rule paired with a narrow path or method does not narrow the DNS side. DNS has no notion
 of a path, so a name under an allowed `*.example.com` is logged as allowed the moment it is looked
-up, before any path is known. The request that follows is still refused and still never reaches an
+up, before any path is known. The request that follows is still blocked and still never reaches an
 origin; only the log line reflects the host-only nature of that decision. See
 [Rule syntax](./reference.md#rule-syntax) for how to write a host pattern that doesn't widen this
 more than intended.
@@ -285,20 +285,20 @@ the steps. The post step's `docker compose down` removes the container, and the 
 | What the build does                                                                                | What happens                                                                                                                                                 |
 | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Asks for any name, on or off the allowlist                                                         | Answered locally with the proxy's own address; the query is never forwarded, allowed or not                                                                  |
-| Requests a host no rule covers                                                                     | Refused, origin never contacted; `inspect` records the URL it asked for                                                                                      |
+| Requests a host no rule covers                                                                     | Blocked, origin never contacted; `inspect` records the URL it asked for                                                                                      |
 | Requests a path or method no rule covers                                                           | **403** under `inspect`, recorded with its URL; `universal` reads neither and enforces on the host                                                           |
-| Walks out of an allowed path with `..` or `%2e%2e`                                                 | **403**: the path is normalised before the rules see it, and a `..` joined to an encoded separator or `;` is refused, as is any backslash                    |
+| Walks out of an allowed path with `..` or `%2e%2e`                                                 | **403**: the path is normalised before the rules see it, and a `..` joined to an encoded separator or `;` is blocked, as is any backslash                    |
 | Sends an allowed name while aiming elsewhere, or points `/etc/hosts` at an address of its choosing | Reaches the address the proxy resolved; the build's own choice of address is discarded                                                                       |
 | Puts an address in the `Host` header                                                               | Taken as the destination once a rule allows it; an internal one only if a rule names it as its host                                                          |
-| Allowlists a name that resolves to an internal address                                             | Refused if it lands on loopback, link-local, the proxy itself, an address the runner holds, or another never-public range, in `audit` too                    |
+| Allowlists a name that resolves to an internal address                                             | Blocked if it lands on loopback, link-local, the proxy itself, an address the runner holds, or another never-public range, in `audit` too                    |
 | Reaches an allowed host presenting a wrong certificate                                             | **503** under `inspect`, which checks the origin's certificate when it connects and fails the step; under `universal` the build validates it itself          |
-| Presents a wrong certificate and then stops answering, to look like an outage                      | Still fails the step: a connection `inspect` never completed is one whose origin it never authenticated, so it is refused whether or not the error survived  |
+| Presents a wrong certificate and then stops answering, to look like an outage                      | Still fails the step: a connection `inspect` never completed is one whose origin it never authenticated, so it is blocked whether or not the error survived  |
 | Uses ECH to conceal the real SNI                                                                   | Reaches whatever the outer SNI resolved to, and that outer name still has to be allowed; the type 65 record carrying ECHConfig is never returned either      |
 | Encodes data into DNS queries                                                                      | Answered locally and never forwarded; an outside resolver is unreachable                                                                                     |
 | Uses DNS over TLS or DNS over HTTPS                                                                | Redirected to the proxy like any other TCP and checked on its SNI, so an outside resolver is reachable only if its own host and port are allowlisted         |
 | Tunnels over ICMP, raw UDP or QUIC, or falls back to IPv6                                          | Dropped before the proxy; only TCP is redirected to it, and the proxy reaches allowed names over IPv4                                                        |
-| Connects to a raw address                                                                          | Checked against `allowed_ip_rules`, and refused when nothing matches                                                                                         |
-| Speaks something that is not HTTP to a port no rule covers                                         | Read as a request by the stage it is handed to and refused, on both engines, and the refusal is counted like any other                                       |
+| Connects to a raw address                                                                          | Checked against `allowed_ip_rules`, and blocked when nothing matches                                                                                         |
+| Speaks something that is not HTTP to a port no rule covers                                         | Read as a request by the stage it is handed to and blocked, on both engines, and counted as blocked like any other                                           |
 | Ignores the proxy variables entirely                                                               | No effect: interception is at the network level, not opt-in                                                                                                  |
 | Sends `*` as its method, `Host` or path in audit, to plant a wildcard in the suggested rules       | Left out of the suggested `allowed_url_rules` and listed beside it, so pasting them never permits more than the build sent                                   |
 | Floods the proxy log until earlier entries rotate away                                             | A log that no longer starts where a real run does is not accepted as a complete record: the step fails under `restrict` with `fail_on_blocked` (the default) |
@@ -382,7 +382,7 @@ secret does not leave the rest of it showing:
 🚫 00:05.003: POST https://evil.example.com/?d=BASE64PAYLOAD -> not-allowed
 ```
 
-Everything else is printed as it was sent, parameter names included, so most of what a refused
+Everything else is printed as it was sent, parameter names included, so most of what a blocked
 request tried to send is still there. Two things this does not cover: a credential in the path,
 which `allowed_url_rules` is written against and so cannot be hidden; and one in a parameter the list
 does not name. It also replaces an exfiltration payload the sender happened to name `code` or
@@ -443,8 +443,8 @@ A wildcard host widens the DNS side too. The resolver inside the cage answers lo
 nothing (see [DNS never leaves the job](#dns-never-leaves-the-job)), but a request the rules admit is
 resolved upstream by the proxy against the runner's own DNS before it connects. Under `*.example.com`
 a name like `<data>.example.com` is resolved the moment the request is allowed, so its labels reach
-that domain's authoritative nameserver even if the request is then refused on its path. In `audit`,
-where nothing is refused, every name the build asks for is resolved this way. A literal host, or a
+that domain's authoritative nameserver even if the request is then blocked on its path. In `audit`,
+where nothing is blocked, every name the build asks for is resolved this way. A literal host, or a
 narrow wildcard, limits which names leave the job.
 
 ### Reduce what has to be reachable
@@ -528,7 +528,7 @@ issued during a real workflow run on the real repository.
 Verification establishes where the image came from. Here is what it leaves uncovered.
 
 - **The build before signing is a smoke test, not the test suite.** It proves the released image
-  starts and enforces on a single allowed and a single refused host, per engine and per
+  starts and enforces on a single allowed and a single blocked host, per engine and per
   architecture. The scenario coverage in `test/` runs against an image built from the branch, and
   the parts of it that need the fixture origin cannot run against a released image at all.
 - **A signature says who built the image, not what the code does.** A release published by someone

@@ -54,7 +54,7 @@ describe("annotateKnownBlocked", () => {
     }
   });
 
-  it("matches a refused name with a rule that names no port", () => {
+  it("matches a blocked name with a rule that names no port", () => {
     // The block has no port at all, nothing having been connected to, so the
     // rule that declares it expected names none either.
     const dns = block({ host: "_mongodb._tcp.c0.example.net", port: undefined, protocol: "dns" });
@@ -64,7 +64,7 @@ describe("annotateKnownBlocked", () => {
     ).toBe(true);
   });
 
-  it("matches a refused name in the escaped form the resolver logged", () => {
+  it("matches a blocked name in the escaped form the resolver logged", () => {
     // The Corefile matches the same escaped text.
     const dns = block({
       host: String.raw`secret\ data.evil.com`,
@@ -193,10 +193,10 @@ describe("annotateKnownBlocked", () => {
       ).toBe(true);
     });
 
-    it("never matches a block with no method or path (a host-level refusal)", () => {
-      const refusal = block({ host: "api.example.com" });
+    it("never matches a block with no method or path (a host-level block)", () => {
+      const hostLevel = block({ host: "api.example.com" });
       expect(
-        annotateKnownBlocked([refusal], ["POST https://api.example.com/telemetry"])[0].expected,
+        annotateKnownBlocked([hostLevel], ["POST https://api.example.com/telemetry"])[0].expected,
       ).toBe(false);
     });
 

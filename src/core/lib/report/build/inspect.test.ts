@@ -7,7 +7,7 @@ import { buildInspectReportData } from "./inspect.ts";
 const START = "buildcage haproxy starting 1787471970000";
 const ALLOWED =
   "buildcage 1787471975 https GET 200 708 ts=-- reason=- tlserr=- dst=104.16.1.34:443 host=registry.npmjs.org /pkg";
-const REFUSED =
+const BLOCKED =
   "buildcage 1787471976 https POST 403 0 ts=PR reason=- tlserr=- dst=1.2.3.4:443 host=evil.example.com /exfil?d=SECRET";
 const TLS_PASS =
   "buildcage 1787471977 pass tls 3421 ts=-- reason=- dst=10.0.0.9:5432 sni=db.example.com";
@@ -19,7 +19,7 @@ const ABORTED =
  *  `-` is both the host and the target it never had. */
 const BAD_REQUEST =
   "buildcage 1787471979 http <BADREQ> 400 0 ts=PR reason=- tlserr=- dst=198.19.255.1:8080 host=- -";
-/** A request that parsed and carried no `Host`, which the stage refuses ahead
+/** A request that parsed and carried no `Host`, which the stage blocks ahead
  *  of the rules: there is nothing to match and nothing to resolve. */
 const NO_HOST =
   "buildcage 1787471979 http GET 400 0 ts=PR reason=missing-host-header tlserr=- dst=198.19.255.1:8080 host=- /x";
@@ -33,7 +33,7 @@ describe("buildInspectReportData", () => {
   it("puts everything in one timeline, oldest first", async () => {
     const dns = ["2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=z.example.com."];
     const r = await buildInspectReportData(
-      [START, REFUSED, ALLOWED, TLS_PASS],
+      [START, BLOCKED, ALLOWED, TLS_PASS],
       dns,
       reportParams(),
       0,
@@ -42,7 +42,7 @@ describe("buildInspectReportData", () => {
     expect(r.timeline.every((e, i) => i === 0 || r.timeline[i - 1].time <= e.time)).toBe(true);
   });
 
-  it("tables a failure the origin caused apart from what the rules refused", async () => {
+  it("tables a failure the origin caused apart from what the rules blocked", async () => {
     const r = await buildInspectReportData([START, ORIGIN_FAILED], [], reportParams(), 0);
     expect(r.failed.map((row) => `${row.host} ${row.reason}`)).toStrictEqual([
       "registry.npmjs.org origin-no-response",
@@ -52,12 +52,12 @@ describe("buildInspectReportData", () => {
   });
 
   it("leaves such a failure out of blockedCount", async () => {
-    const r = await buildInspectReportData([START, ORIGIN_FAILED, REFUSED], [], reportParams(), 0);
+    const r = await buildInspectReportData([START, ORIGIN_FAILED, BLOCKED], [], reportParams(), 0);
     expect(r.blockedCount).toBe(1);
   });
 
   it("aggregates each side into host rows a rule could be written from", async () => {
-    const r = await buildInspectReportData([START, ALLOWED, REFUSED], [], reportParams(), 0);
+    const r = await buildInspectReportData([START, ALLOWED, BLOCKED], [], reportParams(), 0);
     expect(r.passed[0].host).toBe("registry.npmjs.org");
     expect(r.passed[0].port).toBe("443");
     expect(r.passed[0].ruleType).toBe("HTTPS");
@@ -66,12 +66,12 @@ describe("buildInspectReportData", () => {
   });
 
   it("drops a blocked DNS row from the tables once the same host's request is also blocked", async () => {
-    // evil.example.com is REFUSED's host: the DNS-only record adds nothing a
+    // evil.example.com is BLOCKED's host: the DNS-only record adds nothing a
     // reader could not already tell from the request row.
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=evil.example.com.",
     ];
-    const r = await buildInspectReportData([START, REFUSED], dns, reportParams(), 0);
+    const r = await buildInspectReportData([START, BLOCKED], dns, reportParams(), 0);
     expect(r.blocked.length).toBe(1);
     expect(r.blocked[0].ruleType).toBe("HTTPS");
     // The raw timeline is untouched: only the host tables collapse it.
@@ -104,12 +104,12 @@ describe("buildInspectReportData", () => {
   });
 
   it("counts every blocked event, not just the distinct hosts", async () => {
-    const r = await buildInspectReportData([START, REFUSED, REFUSED], [], reportParams(), 0);
+    const r = await buildInspectReportData([START, BLOCKED, BLOCKED], [], reportParams(), 0);
     expect(r.blocked.length).toBe(1);
     expect(r.blockedCount).toBe(2);
   });
 
-  it("reports a name the resolver refused, which never reached the proxy", async () => {
+  it("reports a name the resolver blocked, which never reached the proxy", async () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=SECRET.att.example.",
     ];
@@ -148,7 +148,7 @@ describe("buildInspectReportData", () => {
   });
 
   it("keeps a connection dropped before its request out of both tables", async () => {
-    // Nothing left the proxy, so no rule can permit or refuse it: naming the
+    // Nothing left the proxy, so no rule can permit or block it: naming the
     // host would not remove the row, and blocking it would fail the build.
     const r = await buildInspectReportData([START, ABORTED], [], reportParams(), 0);
     expect(r.blocked.length).toBe(0);
@@ -159,9 +159,9 @@ describe("buildInspectReportData", () => {
     expect(r.timeline[0].host).toBe("untrusted-ca.example.com");
   });
 
-  it("tables a request it refused before a whole one had arrived", async () => {
-    // This proxy refused these rather than merely watched them end, so they
-    // count like any other refusal. Neither row names the `-` the log prints
+  it("tables a request it blocked before a whole one had arrived", async () => {
+    // This proxy blocked these rather than merely watched them end, so they
+    // count like any other block. Neither row names the `-` the log prints
     // for a Host that never came: the plain stage has no SNI to name them by,
     // and the address is this proxy's own.
     const r = await buildInspectReportData([START, BAD_REQUEST, NO_HOST], [], reportParams(), 0);
@@ -173,7 +173,7 @@ describe("buildInspectReportData", () => {
     expect(r.passed.length).toBe(0);
   });
 
-  it("tables a refusal sent to an address the build wrote out as an IP row", async () => {
+  it("tables a block sent to an address the build wrote out as an IP row", async () => {
     // allowed_ip_rules is what would have passed it through, so that is the
     // rule kind the row names.
     const toResolver = BAD_REQUEST.replace("dst=198.19.255.1:8080", "dst=8.8.8.8:53");
@@ -234,15 +234,15 @@ describe("buildInspectReportData", () => {
     });
   });
 
-  it("still blocks a refusal whose request did name a host", async () => {
+  it("still blocks a request that did name a host", async () => {
     // Same termination state as the two above, told apart by the reason and
     // by the method haproxy logs where a request never parsed.
-    const r = await buildInspectReportData([START, REFUSED], [], reportParams(), 0);
+    const r = await buildInspectReportData([START, BLOCKED], [], reportParams(), 0);
     expect(r.blockedCount).toBe(1);
     expect(r.blocked[0].host).toBe("evil.example.com");
   });
 
-  it("leaves the DNS refusal for such a host standing, as the one actionable row", async () => {
+  it("leaves the DNS block for such a host standing, as the one actionable row", async () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=untrusted-ca.example.com.",
     ];
@@ -271,7 +271,7 @@ describe("buildInspectReportData", () => {
     expect(r.passed[0].ruleType).toBe("DNS");
   });
 
-  it("says a refused service name takes a different remedy from an ordinary one", async () => {
+  it("says a blocked service name takes a different remedy from an ordinary one", async () => {
     // Naming the service name in a rule silences the row without making the
     // record resolve. The host below it is what a rule is written against, so
     // the row has to say which kind of name it is.
@@ -286,7 +286,7 @@ describe("buildInspectReportData", () => {
     expect(plain?.reason).toBe("dns-not-allowed");
   });
 
-  it("keeps a refused service name silenceable by known_blocked_rules", async () => {
+  it("keeps a blocked service name silenceable by known_blocked_rules", async () => {
     // Neither remedy makes the record resolve; this is the one that leaves the
     // rules alone, so it has to keep working on a name with no port.
     const dns = [
@@ -301,7 +301,7 @@ describe("buildInspectReportData", () => {
     expect(r.blocked[0].expected).toBe(true);
   });
 
-  it("lets a refused name be declared expected", async () => {
+  it("lets a blocked name be declared expected", async () => {
     // The row has no port, so without special handling no writable rule could
     // ever match it and fail_on_blocked would fail the job with no way out.
     const dns = [
@@ -317,11 +317,11 @@ describe("buildInspectReportData", () => {
   });
 
   it("takes one host however its Host header spelled it, as the rules do", async () => {
-    const refused = (host: string) =>
+    const blockedLine = (host: string) =>
       `buildcage 1787471976 https GET 403 0 ts=PR reason=- tlserr=- dst=1.2.3.4:443 host=${host} /`;
     const dns = ["2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=blocked.com."];
     const r = await buildInspectReportData(
-      [START, refused("blocked.com."), refused("BLOCKED.COM"), refused("blocked.com")],
+      [START, blockedLine("blocked.com."), blockedLine("BLOCKED.COM"), blockedLine("blocked.com")],
       dns,
       reportParams({ knownBlockedRules: ["blocked.com"] }),
       0,
@@ -365,7 +365,7 @@ describe("buildInspectReportData", () => {
 
   it("fails closed on a proxy line it cannot read, wherever the log begins", async () => {
     // What survived says nothing about what the rest of the line said.
-    const unreadable = REFUSED.slice(0, 40);
+    const unreadable = BLOCKED.slice(0, 40);
     const r = await buildInspectReportData(
       [START, ALLOWED, unreadable],
       [DNS_START],
@@ -402,7 +402,7 @@ describe("buildInspectReportData", () => {
   });
 
   it("fails closed when the resolver log lost its beginning, even with the proxy log whole", async () => {
-    // A refused name reaches no proxy, so the resolver log is its only trace.
+    // A blocked name reaches no proxy, so the resolver log is its only trace.
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns allowed name=ok.example.com.",
     ];

@@ -8,15 +8,15 @@ import {
 import { formatElapsedVariable } from "../elapsed-time.ts";
 
 /**
- * What to print in place of `reason`, the one `event` was refused for or, in
- * audit, the one restrict would refuse it for. Undefined prints the reason. It
+ * What to print in place of `reason`, the one `event` was blocked for or, in
+ * audit, the one restrict would block it for. Undefined prints the reason. It
  * goes on the event's line inside a fenced block, so it holds no newline.
  */
-export type RefusalLabel = (event: TrafficEvent, reason: string) => string | undefined;
+export type BlockLabel = (event: TrafficEvent, reason: string) => string | undefined;
 
 /**
  * The communication detail as a fenced block, or "" if nothing is shown. One
- * timeline, allowed and refused interleaved. A name lookup is kept only while
+ * timeline, allowed and blocked interleaved. A name lookup is kept only while
  * it is its own sole trace, and dropped once a connection to the same name
  * shows up too. A discovery lookup is always its own sole trace, since nothing
  * connects to `_service._proto.<host>`, and so always shows.
@@ -27,7 +27,7 @@ export type RefusalLabel = (event: TrafficEvent, reason: string) => string | und
 export function renderInspectDetailsBody(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
-  refusalLabel: RefusalLabel = () => undefined,
+  blockLabel: BlockLabel = () => undefined,
 ): string {
   // The keepalive noise clientEndedNoise marks is dropped here, before
   // connectedHosts, so a hidden close cannot mask a name's other rows.
@@ -37,13 +37,13 @@ export function renderInspectDetailsBody(
   const shown = relevant.filter((e) => !isRedundantDns(e, connected));
   if (shown.length === 0) return "";
   // A fenced block, so URLs need no markdown escaping and stay copy-pastable.
-  const lines = shown.map((event) => renderEvent(event, startedAt, refusalLabel));
+  const lines = shown.map((event) => renderEvent(event, startedAt, blockLabel));
   return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
-// ⚠️ covers what went wrong without a rule refusing it: a request that never
+// ⚠️ covers what went wrong without a rule blocking it: a request that never
 // arrived whole, a connection the origin broke, and a request audit let
-// through that restrict would refuse. The reason or the note tells them
+// through that restrict would block. The reason or the note tells them
 // apart; one that came to nothing anyway keeps its own mark. `discovery`
 // keeps ℹ️: a lookup nothing can answer is harmless.
 const MARK: Record<string, string> = {
@@ -56,15 +56,15 @@ const MARK: Record<string, string> = {
 function renderEvent(
   event: TrafficEvent,
   startedAt: number | undefined,
-  refusalLabel: RefusalLabel,
+  blockLabel: BlockLabel,
 ): string {
   const mark =
-    event.action === "audit" && event.wouldRefuse !== undefined
+    event.action === "audit" && event.wouldBlock !== undefined
       ? "⚠️"
       : (MARK[event.action] ?? "✅");
-  const label = (reason: string) => refusalLabel(event, reason) ?? reason;
+  const label = (reason: string) => blockLabel(event, reason) ?? reason;
   const note =
-    event.wouldRefuse === undefined ? "" : ` (restrict would refuse: ${label(event.wouldRefuse)})`;
+    event.wouldBlock === undefined ? "" : ` (restrict would block: ${label(event.wouldBlock)})`;
   return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}`;
 }
 
@@ -76,7 +76,7 @@ function renderEvent(
  *
  * Matched on the name alone, ignoring case, `-`, `_`, `.` and any trailing
  * `[...]`, so a parameter this does not name keeps its value. That covers most
- * of what a refused request was trying to send, but not an exfiltration
+ * of what a blocked request was trying to send, but not an exfiltration
  * payload the sender happened to call `code` or `key`; the traffic artifact and
  * the proxy's own log keep every value verbatim, and are where a suspected
  * payload is read.
@@ -182,7 +182,7 @@ function subject(event: TrafficEvent): string {
   // request has nothing to show, so for both a name and a port is all there is.
   // Not written as a URL: that would drop a non-default port.
   if (event.url === undefined) {
-    // A refused name reached for over no connection has no port; universal's
+    // A blocked name reached for over no connection has no port; universal's
     // coarse events otherwise always carry one.
     const authority = event.port === undefined ? event.host : `${event.host}:${event.port}`;
     const nameAndPort = `${event.protocol.toUpperCase()} ${authority}`;
@@ -195,7 +195,7 @@ function subject(event: TrafficEvent): string {
   return `${event.method} ${redactCredentialQuery(event.url)}`;
 }
 
-/** What came of it: a refusal names its reason, as `label` prints it, anything
+/** What came of it: a block names its reason, as `label` prints it, anything
  *  else its result. */
 function outcome(event: TrafficEvent, label: (reason: string) => string): string {
   if (event.action === "block") return event.reason === undefined ? "blocked" : label(event.reason);

@@ -61,7 +61,7 @@ RUN echo "=== [apt over the injected CA] ===" && \
       *) echo "OK: reached the origin over TLS (exit=$CODE, a content error is expected)" ;; \
     esac
 
-# The one request whose outcome depends on the mode: restrict refuses it at the
+# The one request whose outcome depends on the mode: restrict blocks it at the
 # proxy, audit records it and lets it reach the origin. Both modes run this same
 # Dockerfile, so without it the two runs would assert nothing the other doesn't.
 # apt's own exit code is not the subject here: either way it gets a body it

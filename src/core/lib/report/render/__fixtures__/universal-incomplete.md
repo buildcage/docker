@@ -1,7 +1,7 @@
 ## Outbound Traffic Report
 
 > [!CAUTION]
-> report incomplete · 2 refused · 1 failed
+> report incomplete · 2 blocked · 1 failed
 
 > ❗ **This report is incomplete**, so the tables below are not a full record of this run.
 > Either the logs don't begin where a real run does, one carries a line that cannot be
@@ -24,7 +24,7 @@
 | `bad.example.com:443` | HTTPS | 🚫 https-not-allowed | 2 |
 | `c.example.com:443` | HTTPS | ⚠️ dns-failed | 1 |
 
-<sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
 
 <details>
 <summary>💬 Communication details</summary>

@@ -183,7 +183,7 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    tcp-request content set-var(txn.reason) str(dns-failed) if is_tls has_sni ! { var(txn.dst) -m found }",
     "    tcp-request content reject if is_tls has_sni ! { var(txn.dst) -m found }",
     // Unlike `inspect`, no rule-named address is exempt: a name resolving
-    // to a never-public range is refused whatever the rules say.
+    // to a never-public range is blocked whatever the rules say.
     ...internalDstAcl("dst_internal", guard),
     "    tcp-request content set-var(txn.reason) str(internal-address) if is_tls has_sni dst_internal",
     "    tcp-request content reject if is_tls has_sni dst_internal",
@@ -257,7 +257,7 @@ export function generateUniversalHaproxyConfig(options: UniversalHaproxyConfigOp
     "    http-request set-var-fmt(txn.target) %[var(txn.host_log)]:%[dst_port]",
     "",
     // A `:` left in the name could let a `~` rule's port pattern match it.
-    // Refused in `audit` too.
+    // Blocked in `audit` too.
     `    acl host_is_name var(txn.host_only) -m reg ${HOSTNAME_CHARSET}`,
     "    http-request set-var(txn.reason) str(invalid-host) if !host_is_name",
     '    http-request deny deny_status 400 content-type "text/plain" string "Bad Request: Invalid Host Header" if !host_is_name',

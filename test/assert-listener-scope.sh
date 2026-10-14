@@ -16,7 +16,7 @@ source "$(dirname "$0")/helpers.sh"
 
 cd "$(dirname "$0")/.."
 
-# Both engines run in audit mode so that CoreDNS answers every name (it refuses
+# Both engines run in audit mode so that CoreDNS answers every name (it blocks
 # an unlisted name only in restrict mode, see coredns-config.ts).
 # An answer then proves the port was reachable rather than that a rule matched.
 # The INPUT rules under test are the same in either mode.

@@ -46,10 +46,10 @@ export interface ReportDataCommon {
    *  survived as everything. */
   logLooksPlausible: boolean;
 
-  /** Every connection and refused name, oldest first. Nothing is attributable
+  /** Every connection and blocked name, oldest first. Nothing is attributable
    *  to one RUN step or one command: the proxy log carries no identifier for
    *  either, so one timeline is the only structure available, and the more
-   *  useful one: a refusal reads in the context of what the build or step was
+   *  useful one: a block reads in the context of what the build or step was
    *  doing when it happened. */
   timeline: TrafficEvent[];
 
@@ -64,7 +64,7 @@ export interface UniversalReportData extends ReportDataCommon {
 }
 
 /** The inspect engine decrypts, so its timeline carries the method and full URL
- *  of every request, refused ones included; universal's carries only host,
+ *  of every request, blocked ones included; universal's carries only host,
  *  port and bytes. */
 export interface InspectReportData extends ReportDataCommon {
   engine: "inspect";

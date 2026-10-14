@@ -93,16 +93,16 @@ describe("buildTrafficRecords", () => {
     expect("destination" in blocked).toBe(false);
   });
 
-  it("carries the refusal restrict would have made, and only where there was one", () => {
+  it("carries the block restrict would have made, and only where there was one", () => {
     const [noted, plain] = buildTrafficRecords(
       [
-        { ...EVENTS[1], action: "audit", wouldRefuse: "example-refusal" },
+        { ...EVENTS[1], action: "audit", wouldBlock: "example-block" },
         { ...EVENTS[1], action: "audit" },
       ],
       t,
     );
-    expect(noted.wouldRefuse).toBe("example-refusal");
-    expect("wouldRefuse" in plain).toBe(false);
+    expect(noted.wouldBlock).toBe("example-block");
+    expect("wouldBlock" in plain).toBe(false);
   });
 
   it("raises an action's own objects to the top level, never over a field of the record's own", () => {
@@ -139,7 +139,7 @@ describe("buildTrafficRecords", () => {
   });
 
   it("omits what does not apply rather than reporting it as zero", () => {
-    // A refusal has no status because nothing answered; consumers filter on
+    // A block has no status because nothing answered; consumers filter on
     // action, not on status.
     const blocked = records.find((r) => r.action === "block" && r.protocol === "https")!;
     expect(blocked.status === undefined).toBe(true);

@@ -17,12 +17,12 @@ import { UNKNOWN_HOST } from "./proxy-address.ts";
  * rule nothing to judge, and `failed` is what became of a request the rules had
  * already allowed.
  *
- * A request this proxy refused before one had wholly arrived is a `block` like
- * any other, though: it refused rather than stood by, and a rule does clear it
+ * A request this proxy blocked before one had wholly arrived is a `block` like
+ * any other, though: it blocked rather than stood by, and a rule does clear it
  * (see the bad-request remedy in docs/reference.md). So is one sent straight to
  * an address no ip rule covers that ended before its request, unless its SNI
- * names a host the rules allow; see refuseUnpassedAddresses and
- * refuseUnallowedNames in inspect.ts. `incomplete` is only what the client or
+ * names a host the rules allow; see blockUnpassedAddresses and
+ * blockUnallowedNames in inspect.ts. `incomplete` is only what the client or
  * the proxy's own machinery ended.
  *
  * `failed` alone names a host worth tabulating: the rules passed on it and the
@@ -45,7 +45,7 @@ export interface TrafficEvent {
   /** Absent for dns, which connects to nothing. */
   port?: number;
   /** dns only, and only where the type is the point: a discovery lookup, or a
-   *  refused service name. */
+   *  blocked service name. */
   queryType?: string;
   /** http and https only. */
   method?: string;
@@ -53,16 +53,16 @@ export interface TrafficEvent {
   url?: string;
   /** http and https only, and only when the exchange completed. */
   status?: number;
-  /** Bytes returned to the build. Absent for dns and for a refusal. */
+  /** Bytes returned to the build. Absent for dns and for a block. */
   bytes?: number;
-  /** Why it was refused, or what cut it short before a rule saw it. Set when
+  /** Why it was blocked, or what cut it short before a rule saw it. Set when
    *  action is "block" or "incomplete". */
   reason?: string;
   /** Address it was actually sent to. Absent for dns. */
   destination?: string;
-  /** The reason restrict mode would have refused a request audit let through
+  /** The reason restrict mode would have blocked a request audit let through
    *  for, where an action's own check says so. Set only then. */
-  wouldRefuse?: string;
+  wouldBlock?: string;
   /** What an action's own check logged for a request, as objects by name; see
    *  InspectLogFields. Only the fields that had a value. */
   extensions?: Record<string, Record<string, string>>;
@@ -85,7 +85,7 @@ export const CLIENT_ENDED_REASONS: ReadonlySet<string | undefined> = new Set([
  * (client-aborted, client-timeout) are only noise and are left out of the
  * report: those to a host the client also got a request read on, where the
  * close is a keepalive pool cleaning up after its work. Any non-dns event but
- * these closes proves as much, since an allowed, refused or origin-failed
+ * these closes proves as much, since an allowed, blocked or origin-failed
  * request each took a completed handshake first. A host with none keeps its
  * closes, since then every attempt to it ended before a request, as a client
  * that cannot trust the CA does (a container missing `ca-certificates`). The
@@ -128,8 +128,8 @@ export function connectedHosts(timeline: TrafficEvent[]): ConnectedHosts {
  * keeping for that. Once a connection to the same name also reaches a host
  * table, it says nothing that connection does not and only doubles the row.
  *
- * A refused lookup takes a refused connection to cover it. An allowed request
- * for a name the resolver refused would mean the two disagreed about that host,
+ * A blocked lookup takes a blocked connection to cover it. An allowed request
+ * for a name the resolver blocked would mean the two disagreed about that host,
  * which a reader should see rather than have collapsed away.
  *
  * A discovery lookup is never redundant: it asks about `_service._proto.<host>`,

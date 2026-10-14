@@ -12,7 +12,7 @@ import { assembleReportData } from "./aggregate.ts";
  * universal never terminates TLS, so its proxy events carry no method, URL or
  * status, only the host, port and bytes of each connection. The resolver log is
  * read because a name looked up but never connected to reaches no HAProxy line,
- * so a DNS-only refusal would otherwise leave no trace.
+ * so a DNS-only block would otherwise leave no trace.
  */
 export async function buildUniversalReportData(
   proxyLines: AsyncIterable<string> | Iterable<string>,

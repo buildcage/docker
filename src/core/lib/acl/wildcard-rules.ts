@@ -54,7 +54,7 @@ export function parseAndValidateRules(rulesInput: string | undefined): string[] 
  *
  * Every other rule input is matched against a connection, where the port is
  * part of what is being permitted. This one is matched against a row of the
- * report, and a row for a name the resolver refused has no port at all,
+ * report, and a row for a name the resolver blocked has no port at all,
  * nothing having been connected to. Requiring one there means writing a port
  * that was never involved, and that is true of every DNS row.
  */

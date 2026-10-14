@@ -307,7 +307,7 @@ describe("buildUrlRuleLines", () => {
     expect(buildUrlRuleLines([asterisk]).length).toBe(0);
   });
 
-  it("builds nothing from a refusal, a passthrough or a name lookup", () => {
+  it("builds nothing from a block, a passthrough or a name lookup", () => {
     const events: TrafficEvent[] = [
       { ...req("GET", "https://a.example.com/x"), action: "block", reason: "not-allowed" },
       { time: 1, action: "allow", protocol: "tls", host: "db.example.com", port: 5432, bytes: 1 },

@@ -2,8 +2,8 @@
  * Parsers for the `inspect` engine's two logs, whose formats are emitted by
  * haproxy-config.ts and coredns-config.ts. Seven kinds of line:
  *
- *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wr=<r|-> [<name>.<field>=<v|-> ...]] fcerr=<name|-> sni=<name|-> host=<authority|-> <target|->
- *   buildcage <ms> http <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wr=<r|-> [<name>.<field>=<v|-> ...]] host=<authority|-> <target|->
+ *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wb=<r|-> [<name>.<field>=<v|-> ...]] fcerr=<name|-> sni=<name|-> host=<authority|-> <target|->
+ *   buildcage <ms> http <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wb=<r|-> [<name>.<field>=<v|-> ...]] host=<authority|-> <target|->
  *   buildcage <ms> pass <tls|tcp> <bytes> ts=<st> reason=<r> dst=<addr>:<port> sni=<name|->
  *   <timestamp>  [INFO] buildcage dns <allowed|denied> name=<name>.
  *   <timestamp>  [INFO] buildcage dns discovery name=<name>. type=<qtype>
@@ -15,7 +15,7 @@
  * rule could ever take away. It stays in the resolver log alone.
  *
  * The passthrough line is the only record of undecrypted traffic; the dns line
- * the only record of a refused name, which never reaches the proxy. Only the
+ * the only record of a blocked name, which never reaches the proxy. Only the
  * https line carries an SNI, since only that stage terminates TLS. A client
  * handshake that failed writes that line too, with fcerr naming the failure.
  */
@@ -38,16 +38,16 @@ export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-eve
 // The trailing field stays \S+ rather than .+: two lines joined by a
 // half-written write would otherwise parse as one event instead of counting
 // as unparsed.
-// wr= and the fields named <name>.<field>= are there only where an action
+// wb= and the fields named <name>.<field>= are there only where an action
 // extends the stage; see InspectStageExtension.
 // sni= is optional: the plain stage terminates no TLS and logs no such field.
 // `host=` is a named field for that reason, or a line cut right after the SNI
 // would parse with `sni=<name>` read as the authority instead of counting as
 // unreadable.
 const REQUEST =
-  /^buildcage (?<ms>\d+) (?<scheme>https?) (?<method>\S+) (?<status>-?\d+) (?<bytes>\d+) ts=(?<ts>\S*) reason=(?<reason>\S+) tlserr=(?<tlserr>\S+) dst=(?<dstHost>\S+):(?<dstPort>\d+) (?:wr=(?<wr>\S+) )?(?<ext>(?:[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*=\S+ )*)(?:fcerr=(?<fcerr>\S+) )?(?:sni=(?<sni>\S+) )?host=(?<host>\S+) (?<target>\S+)$/;
+  /^buildcage (?<ms>\d+) (?<scheme>https?) (?<method>\S+) (?<status>-?\d+) (?<bytes>\d+) ts=(?<ts>\S*) reason=(?<reason>\S+) tlserr=(?<tlserr>\S+) dst=(?<dstHost>\S+):(?<dstPort>\d+) (?:wb=(?<wb>\S+) )?(?<ext>(?:[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*=\S+ )*)(?:fcerr=(?<fcerr>\S+) )?(?:sni=(?<sni>\S+) )?host=(?<host>\S+) (?<target>\S+)$/;
 
-/** REQUEST's named groups. wr, fcerr and sni are logged only by a stage an
+/** REQUEST's named groups. wb, fcerr and sni are logged only by a stage an
  *  action extends; the plain stage omits them, so they can be absent. */
 interface RequestFields {
   ms: string;
@@ -60,7 +60,7 @@ interface RequestFields {
   tlserr: string;
   dstHost: string;
   dstPort: string;
-  wr?: string;
+  wb?: string;
   ext: string;
   fcerr?: string;
   sni?: string;
@@ -119,7 +119,7 @@ function timeOf(stamp: string): number {
  * host a rule allowed. A client-side timeout (`c`) is the build dropping its
  * own connection, which the proxy never stood in the way of.
  */
-function isRefusal(terminationState: string): boolean {
+function isBlock(terminationState: string): boolean {
   const cause = terminationState[0];
   if (cause === "P" || cause === "S") return true;
   const phase = terminationState[1];
@@ -127,20 +127,20 @@ function isRefusal(terminationState: string): boolean {
 }
 
 /**
- * Refusal reason, matching the universal engine's kebab-case vocabulary.
+ * Block reason, matching the universal engine's kebab-case vocabulary.
  *
- * The config names the refusals only it can tell apart: 502 is both our DNS
+ * The config names the blocks only it can tell apart: 502 is both our DNS
  * deny and an origin that gave up, and a passthrough reject has no status at
  * all. Everything else the phase already names, so the field stays `-`.
  *
- * Only the server's own causes name the origin. `P` is this proxy refusing,
+ * Only the server's own causes name the origin. `P` is this proxy blocking,
  * whatever phase it happened in: `PH` is a response it judged invalid and `PC`
  * its own connection limit, neither of which the origin chose. In phase `R` it
  * is haproxy's own answer to bytes that parsed as no request at all, which the
- * method tells from a refusal the rules made.
+ * method tells from a block the rules made.
  *
  * Phase `C` is a connection that never completed, and both of its reasons are
- * this proxy's own refusal. `tlserr` says which: the backend connects with
+ * this proxy's own block. `tlserr` says which: the backend connects with
  * `ssl verify required` (see haproxy-sections.ts), and a handshake that failed
  * leaves haproxy's own error there, so `origin-untrusted` names a certificate
  * this proxy would not accept. Any error counts, whether it was forged or the
@@ -148,16 +148,16 @@ function isRefusal(terminationState: string): boolean {
  * authenticate, and reading only the verify error would let the second pass as
  * an outage.
  *
- * `origin-connect-failed` is the rest of that phase, and is a refusal too
+ * `origin-connect-failed` is the rest of that phase, and is a block too
  * because it cannot be shown not to be one. `tlserr` belongs to the last
  * connection attempt alone and a failed handshake is retried, so a certificate
- * refused on one attempt leaves no trace once a later attempt fails at TCP:
+ * that fails on one attempt leaves no trace once a later attempt fails at TCP:
  * measured on haproxy 3.4, an impostor logs `rc=3 ts=SC` with the verify error,
  * and the same impostor going silent partway through those retries logs
  * `ts=SC tlserr=-`, which is what an origin that is merely down logs too. The
  * report cannot tell them apart, so it does not claim to: a connection this
  * proxy never completed is one whose origin it never authenticated. A host that
- * is flaky rather than hostile is cleared the way any expected refusal is, with
+ * is flaky rather than hostile is cleared the way any expected block is, with
  * known_blocked_rules.
  *
  * `tlsError` is undefined where this proxy checked no certificate at all, and
@@ -165,7 +165,7 @@ function isRefusal(terminationState: string): boolean {
  * plaintext to `origin_plain`, which verifies nothing, and the passthrough
  * relays the handshake for the build to judge. Both stay `origin-unreachable`.
  * Only where a certificate was going to be checked is a connection that never
- * completed a refusal.
+ * completed a block.
  */
 function reasonFor(
   logged: string,
@@ -193,7 +193,7 @@ function reasonFor(
 }
 
 /**
- * The refusals this proxy made over a request that named no host. The host
+ * The blocks this proxy made over a request that named no host. The host
  * field is the `Host` the log prints as `-`, so the connection is named by its
  * handshake instead; see hostBeforeRequest.
  */
@@ -227,7 +227,7 @@ const FAILURE_REASONS = new Set([
 ]);
 
 /** Decided from the reason rather than from the termination state, which says
- *  that something was refused but not by whom. */
+ *  that something was blocked but not by whom. */
 function actionFor(reason: string | undefined, isAudit: boolean): TrafficAction {
   if (reason !== undefined) return FAILURE_REASONS.has(reason) ? "failed" : "block";
   // audit enforces nothing, so nothing here was allowed by a rule. Calling it
@@ -242,7 +242,7 @@ function actionFor(reason: string | undefined, isAudit: boolean): TrafficAction 
  * haproxy's `pathq` is empty, printed as `-`, for every request-target that is
  * not origin-form: the asterisk-form `OPTIONS *` of RFC 9112 §3.2.4 and a
  * CONNECT's authority. Both are legal requests that reach the rules and are
- * refused by them, since every path matcher wants a leading slash, so the
+ * blocked by them, since every path matcher wants a leading slash, so the
  * report still has an event to show; it just has no URL to show for it.
  */
 function urlOf(scheme: string, authority: string, target: string): string | undefined {
@@ -300,7 +300,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
   const request = REQUEST.exec(trimmed);
   if (request) {
     const r = request.groups as unknown as RequestFields;
-    // Its termination state reads as this proxy's refusal, which it is not.
+    // Its termination state reads as this proxy's block, which it is not.
     const fcerr = r.fcerr ?? "";
     const tlsFailed =
       r.method === BAD_REQUEST_METHOD && fcerr.startsWith("SSL_") && fcerr !== POST_HANDSHAKE_ERROR;
@@ -310,7 +310,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
     // reasonFor for what that changes.
     const tlsError = r.scheme === "https" ? r.tlserr : undefined;
     const reason =
-      incomplete ?? (isRefusal(r.ts) ? reasonFor(r.reason, r.ts, tlsError, r.method) : undefined);
+      incomplete ?? (isBlock(r.ts) ? reasonFor(r.reason, r.ts, tlsError, r.method) : undefined);
     // The host field holds the `Host` that never came, so the handshake is the
     // only thing left that names the connection.
     const namedByHandshake =
@@ -347,8 +347,8 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
       if (url !== undefined) event.url = url;
     }
     // Set in audit only, and kept even where the request then failed.
-    const wouldRefuse = r.wr;
-    if (wouldRefuse !== undefined && wouldRefuse !== "-") event.wouldRefuse = wouldRefuse;
+    const wouldBlock = r.wb;
+    if (wouldBlock !== undefined && wouldBlock !== "-") event.wouldBlock = wouldBlock;
     const extensions = extensionFields(r.ext);
     if (extensions) event.extensions = extensions;
     if (reason !== undefined) event.reason = reason;
@@ -364,7 +364,7 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
     // This stage relays TLS rather than terminating it, so it has no backend
     // handshake to fail and phase `C` is only a connection that was not made.
     // It reads no request either, hence the method it could never log.
-    const reason = isRefusal(pass[4]) ? reasonFor(pass[5], pass[4], undefined, "-") : undefined;
+    const reason = isBlock(pass[4]) ? reasonFor(pass[5], pass[4], undefined, "-") : undefined;
     // Only a tls rule's passthrough logs an SNI; otherwise the address names it.
     const sni = pass[8];
     const event: TrafficEvent = {
@@ -391,7 +391,7 @@ export interface InspectDnsLogScan {
    *  scanInspectDnsLog. */
   headIntact: boolean;
   /** Lines written for one of our rules yet matching no format above. Each
-   *  may be a refusal the report cannot account for. */
+   *  may be a block the report cannot account for. */
   unparsed: number;
 }
 
@@ -418,7 +418,7 @@ export interface InspectLogScan {
  * consumed once, so it cannot be two separate passes. `for await` also
  * accepts a plain array, so callers with the lines already in memory pass one.
  *
- * Without `allowsName`, no SNI is judged; see refuseUnallowedNames.
+ * Without `allowsName`, no SNI is judged; see blockUnallowedNames.
  */
 export async function scanInspectLog(
   lines: AsyncIterable<string> | Iterable<string>,
@@ -445,13 +445,13 @@ export async function scanInspectLog(
     // the stamp would leave the marker bare, which is not a missing event.
     if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
   }
-  refuseUnpassedAddresses(events);
-  if (allowsName) refuseUnallowedNames(events, allowsName);
+  blockUnpassedAddresses(events);
+  if (allowsName) blockUnallowedNames(events, allowsName);
   return { events, startedAt, headIntact: headIntact ?? false, unparsed };
 }
 
 /**
- * Refuse a connection sent straight to an address that ended before its
+ * Block a connection sent straight to an address that ended before its
  * request, as `universal` does in restrict mode.
  *
  * No allowed_ip_rules entry covers the address, or the connection would have
@@ -462,7 +462,7 @@ export async function scanInspectLog(
  * was read, as a keepalive pool's cleanup. A passthrough proves no such thing,
  * and neither does a request on another port.
  */
-function refuseUnpassedAddresses(events: TrafficEvent[]): void {
+function blockUnpassedAddresses(events: TrafficEvent[]): void {
   // A proxy line always carries a destination.
   const served = new Set<string | undefined>();
   for (const event of events) {
@@ -483,14 +483,14 @@ function refuseUnpassedAddresses(events: TrafficEvent[]): void {
 }
 
 /**
- * Refuse a connection sent straight to an address that ended before its
- * request, where its SNI names a host the resolver would refuse.
+ * Block a connection sent straight to an address that ended before its
+ * request, where its SNI names a host the resolver would block.
  *
- * Through DNS, that attempt is refused on its dns line, which a connection to
+ * Through DNS, that attempt is blocked on its dns line, which a connection to
  * an address never has. A name the rules allow stays undecided, as it does
  * through DNS. One sent to the proxy's own address came through DNS.
  */
-function refuseUnallowedNames(events: TrafficEvent[], allowsName: (name: string) => boolean): void {
+function blockUnallowedNames(events: TrafficEvent[], allowsName: (name: string) => boolean): void {
   for (const event of events) {
     // Only hostBeforeRequest's SNI makes an incomplete https line name a host.
     if (event.action !== "incomplete" || event.protocol !== "https") continue;
@@ -521,18 +521,18 @@ export function hasProxyStarted(lines: Iterable<string>): boolean {
  * A name is asked about repeatedly, and for A and AAAA separately, so only the
  * first mention of each is kept: the report is about which names a build
  * reached for, not how many times a resolver was consulted. An allowed answer
- * is decisive, so an AAAA refusal cannot mask an A that resolved.
+ * is decisive, so an AAAA block cannot mask an A that resolved.
  *
  * A discovery lookup is kept per name and type: the same name asked as SRV and
- * as TXT are two different things. A refused service name is kept per name
- * like any other refusal, carrying the first type it was asked as.
+ * as TXT are two different things. A blocked service name is kept per name
+ * like any other block, carrying the first type it was asked as.
  *
  * The time comes from s6-log rather than from CoreDNS, whose log plugin has no
  * timestamp replacement of its own. CoreDNS lowercases the name it logs, so a
  * name that carried information in its capitalisation is recorded without it.
  *
  * `headIntact` is false when the log doesn't open with the startup marker,
- * meaning its beginning is gone and the earliest refused names with it. Only
+ * meaning its beginning is gone and the earliest blocked names with it. Only
  * the marker counts: CoreDNS's `errors` plugin writes mid-run.
  */
 export async function scanInspectDnsLog(
@@ -564,16 +564,16 @@ export async function scanInspectDnsLog(
       }
       continue;
     }
-    const refused = DNS_SERVICE_DENIED.exec(trimmed);
-    if (!refused) {
+    const blockedService = DNS_SERVICE_DENIED.exec(trimmed);
+    if (!blockedService) {
       if (DNS_LINE.test(trimmed)) unparsed++;
       continue;
     }
-    if (!service.has(refused[2])) {
-      service.set(refused[2], {
-        time: timeOf(refused[1]),
-        host: refused[2],
-        queryType: refused[3],
+    if (!service.has(blockedService[2])) {
+      service.set(blockedService[2], {
+        time: timeOf(blockedService[1]),
+        host: blockedService[2],
+        queryType: blockedService[3],
       });
     }
   }

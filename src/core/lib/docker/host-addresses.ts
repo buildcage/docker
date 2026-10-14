@@ -5,7 +5,7 @@ interface HostAddressOptions {
 }
 
 /**
- * Every IPv4 address the runner itself holds, refused by the engine as a
+ * Every IPv4 address the runner itself holds, blocked by the engine as a
  * resolved destination.
  *
  * The guard allows RFC1918 so that a name pointing at an internal mirror keeps
