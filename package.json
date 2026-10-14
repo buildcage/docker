@@ -35,7 +35,7 @@
     "generate-license-file": "^4.2.5",
     "rolldown": "^1.2.0",
     "typescript": "^7.0.2",
-    "vite-plus": "^0.3.0"
+    "vite-plus": "^1.0.0"
   },
   "devEngines": {
     "packageManager": {
