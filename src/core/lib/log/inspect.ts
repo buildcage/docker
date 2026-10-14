@@ -2,8 +2,8 @@
  * Parsers for the `inspect` engine's two logs, whose formats are emitted by
  * haproxy-config.ts and coredns-config.ts. Seven kinds of line:
  *
- *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wr=<r|-> [<name>.<field>=<v|-> ...]] fcerr=<name|-> sni=<name|-> host=<authority|-> <target|->
- *   buildcage <ms> http <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wr=<r|-> [<name>.<field>=<v|-> ...]] host=<authority|-> <target|->
+ *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wb=<r|-> [<name>.<field>=<v|-> ...]] fcerr=<name|-> sni=<name|-> host=<authority|-> <target|->
+ *   buildcage <ms> http <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wb=<r|-> [<name>.<field>=<v|-> ...]] host=<authority|-> <target|->
  *   buildcage <ms> pass <tls|tcp> <bytes> ts=<st> reason=<r> dst=<addr>:<port> sni=<name|->
  *   <timestamp>  [INFO] buildcage dns <allowed|denied> name=<name>.
  *   <timestamp>  [INFO] buildcage dns discovery name=<name>. type=<qtype>
@@ -38,16 +38,16 @@ export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-eve
 // The trailing field stays \S+ rather than .+: two lines joined by a
 // half-written write would otherwise parse as one event instead of counting
 // as unparsed.
-// wr= and the fields named <name>.<field>= are there only where an action
+// wb= and the fields named <name>.<field>= are there only where an action
 // extends the stage; see InspectStageExtension.
 // sni= is optional: the plain stage terminates no TLS and logs no such field.
 // `host=` is a named field for that reason, or a line cut right after the SNI
 // would parse with `sni=<name>` read as the authority instead of counting as
 // unreadable.
 const REQUEST =
-  /^buildcage (?<ms>\d+) (?<scheme>https?) (?<method>\S+) (?<status>-?\d+) (?<bytes>\d+) ts=(?<ts>\S*) reason=(?<reason>\S+) tlserr=(?<tlserr>\S+) dst=(?<dstHost>\S+):(?<dstPort>\d+) (?:wr=(?<wr>\S+) )?(?<ext>(?:[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*=\S+ )*)(?:fcerr=(?<fcerr>\S+) )?(?:sni=(?<sni>\S+) )?host=(?<host>\S+) (?<target>\S+)$/;
+  /^buildcage (?<ms>\d+) (?<scheme>https?) (?<method>\S+) (?<status>-?\d+) (?<bytes>\d+) ts=(?<ts>\S*) reason=(?<reason>\S+) tlserr=(?<tlserr>\S+) dst=(?<dstHost>\S+):(?<dstPort>\d+) (?:wb=(?<wb>\S+) )?(?<ext>(?:[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*=\S+ )*)(?:fcerr=(?<fcerr>\S+) )?(?:sni=(?<sni>\S+) )?host=(?<host>\S+) (?<target>\S+)$/;
 
-/** REQUEST's named groups. wr, fcerr and sni are logged only by a stage an
+/** REQUEST's named groups. wb, fcerr and sni are logged only by a stage an
  *  action extends; the plain stage omits them, so they can be absent. */
 interface RequestFields {
   ms: string;
@@ -60,7 +60,7 @@ interface RequestFields {
   tlserr: string;
   dstHost: string;
   dstPort: string;
-  wr?: string;
+  wb?: string;
   ext: string;
   fcerr?: string;
   sni?: string;
@@ -347,8 +347,8 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
       if (url !== undefined) event.url = url;
     }
     // Set in audit only, and kept even where the request then failed.
-    const wouldRefuse = r.wr;
-    if (wouldRefuse !== undefined && wouldRefuse !== "-") event.wouldRefuse = wouldRefuse;
+    const wouldBlock = r.wb;
+    if (wouldBlock !== undefined && wouldBlock !== "-") event.wouldBlock = wouldBlock;
     const extensions = extensionFields(r.ext);
     if (extensions) event.extensions = extensions;
     if (reason !== undefined) event.reason = reason;

@@ -61,7 +61,7 @@ describe("a refusal label", () => {
       ...TIMELINE[0],
       host: "evil.example.com",
       action: "audit",
-      wouldRefuse: "example-refusal",
+      wouldBlock: "example-refusal",
     };
     expect(lines([audited])[0].endsWith(" -> 200 (708B) (restrict would block: labelled)")).toBe(
       true,
@@ -73,7 +73,7 @@ describe("a refusal label", () => {
       ...TIMELINE[0],
       action: "block",
       reason: "first",
-      wouldRefuse: "second",
+      wouldBlock: "second",
     };
     const line = (
       renderInspectDetailsBody([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
@@ -85,7 +85,7 @@ describe("a refusal label", () => {
     const audited: TrafficEvent = {
       ...TIMELINE[0],
       action: "audit",
-      wouldRefuse: "example-refusal",
+      wouldBlock: "example-refusal",
     };
     expect(lines([audited])[0].endsWith("(restrict would block: example-refusal)")).toBe(true);
   });
@@ -110,7 +110,7 @@ describe("renderInspectDetailsBody", () => {
     const audited: TrafficEvent = {
       ...TIMELINE[0],
       action: "audit",
-      wouldRefuse: "example-refusal",
+      wouldBlock: "example-refusal",
     };
     const line = (renderInspectDetailsBody([audited], t).split("```")[1] ?? "").trim();
     expect(line).toBe(
@@ -123,7 +123,7 @@ describe("renderInspectDetailsBody", () => {
       ...TIMELINE[2],
       action: "failed",
       reason: "dns-failed",
-      wouldRefuse: "example-refusal",
+      wouldBlock: "example-refusal",
     };
     const line = (renderInspectDetailsBody([failed], t).split("```")[1] ?? "").trim();
     expect(line.endsWith("-> dns-failed (restrict would block: example-refusal)")).toBe(true);

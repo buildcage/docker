@@ -207,7 +207,7 @@ const CASES: Record<string, ReportData> = {
         status: 200,
         bytes: 512,
         destination: "93.184.216.34",
-        wouldRefuse: "example-refusal",
+        wouldBlock: "example-refusal",
       },
     ],
   },

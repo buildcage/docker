@@ -33,8 +33,8 @@ export interface InspectStageContext extends InternalDstOptions {
 /**
  * Rules an action adds to both inspected frontends, for a check of its own on
  * top of the URL rules. In `restrict` its request rules refuse by setting
- * txn.reason and denying; in `audit` they set txn.would_refuse to the reason
- * `restrict` would have logged, which the log carries as `wr=`.
+ * txn.reason and denying; in `audit` they set txn.would_block to the reason
+ * `restrict` would have logged, which the log carries as `wb=`.
  */
 export interface InspectStageExtension {
   /** Run before a request's name resolves: in `restrict` once the URL rules
@@ -160,7 +160,7 @@ export function inspectStage(
   const { mode, extension } = ctx;
   // Folded to one token like the SNI, whatever the extension wrote.
   const extensionField = extension
-    ? " wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]" +
+    ? " wb=%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)]" +
       (extension.logFields ? logFieldTokens(extension.logFields) : "")
     : "";
   const logFormat = `"buildcage %[date(0,ms)] ${scheme} %HM %ST %B ts=%ts reason=%[var(txn.reason)] tlserr=%[ssl_bc_err] dst=%[dst]:%[dst_port]${extensionField}${clientTlsFields(scheme)} host=%[var(txn.host_log)] %[var(txn.pathq)]"`;

@@ -140,17 +140,17 @@ describe("extension", () => {
   it("is left out, log field and all, when there is none", () => {
     const plain = plainStage(rules);
     expect(plain.includes("extension")).toBe(false);
-    expect(plain.includes("wr=")).toBe(false);
+    expect(plain.includes("wb=")).toBe(false);
   });
 
-  it("logs each field it names after what restrict would refuse", () => {
+  it("logs each field it names after what restrict would block", () => {
     const plain = plainStage(rules, "restrict", {
       ...EXTENSION,
       logFields: { name: "example", fields: { kind: "txn.example_kind" } },
     });
     expect(
       plain.includes(
-        "wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)] example.kind=%[var(txn.example_kind),regsub([^A-Za-z0-9._-],_,g)] host=",
+        "wb=%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)] example.kind=%[var(txn.example_kind),regsub([^A-Za-z0-9._-],_,g)] host=",
       ),
     ).toBe(true);
   });
@@ -175,11 +175,11 @@ describe("extension", () => {
     ).toThrow(/invalid log field object/);
   });
 
-  it("logs what restrict would refuse ahead of the host", () => {
+  it("logs what restrict would block ahead of the host", () => {
     const plain = plainStage(rules, "restrict", EXTENSION);
     expect(
       plain.includes(
-        "dst=%[dst]:%[dst_port] wr=%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)] host=",
+        "dst=%[dst]:%[dst_port] wb=%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)] host=",
       ),
     ).toBe(true);
   });

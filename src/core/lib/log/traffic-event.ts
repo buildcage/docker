@@ -62,7 +62,7 @@ export interface TrafficEvent {
   destination?: string;
   /** The reason restrict mode would have refused a request audit let through
    *  for, where an action's own check says so. Set only then. */
-  wouldRefuse?: string;
+  wouldBlock?: string;
   /** What an action's own check logged for a request, as objects by name; see
    *  InspectLogFields. Only the fields that had a value. */
   extensions?: Record<string, Record<string, string>>;

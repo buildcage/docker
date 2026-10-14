@@ -59,12 +59,12 @@ function renderEvent(
   refusalLabel: RefusalLabel,
 ): string {
   const mark =
-    event.action === "audit" && event.wouldRefuse !== undefined
+    event.action === "audit" && event.wouldBlock !== undefined
       ? "⚠️"
       : (MARK[event.action] ?? "✅");
   const label = (reason: string) => refusalLabel(event, reason) ?? reason;
   const note =
-    event.wouldRefuse === undefined ? "" : ` (restrict would block: ${label(event.wouldRefuse)})`;
+    event.wouldBlock === undefined ? "" : ` (restrict would block: ${label(event.wouldBlock)})`;
   return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}`;
 }
 

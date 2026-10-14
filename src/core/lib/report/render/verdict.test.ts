@@ -37,11 +37,11 @@ const base: UniversalReportData = {
 };
 
 describe("renderVerdict", () => {
-  it("says nothing was refused when nothing needs a look", () => {
+  it("says nothing was blocked when nothing needs a look", () => {
     expect(renderVerdict(base)).toBe("Result: ✅ Nothing was blocked\n\n");
   });
 
-  it("counts requests, in the order refused, extra items, failed, not acted on, as a caution", () => {
+  it("counts requests, in the order blocked, extra items, failed, not acted on, as a caution", () => {
     const verdict = renderVerdict(
       {
         ...base,
@@ -60,7 +60,7 @@ describe("renderVerdict", () => {
     );
   });
 
-  it("warns when nothing was refused but something else needs a look", () => {
+  it("warns when nothing was blocked but something else needs a look", () => {
     const failed = [
       { host: "down.com", port: "443", ruleType: "HTTPS", reason: "dns-failed", count: 3 },
     ];
@@ -73,7 +73,7 @@ describe("renderVerdict", () => {
     );
   });
 
-  it("leads with expected refusals only when nothing else is there", () => {
+  it("leads with requests blocked as expected only when nothing else is there", () => {
     expect(renderVerdict({ ...base, blocked: [row(2, true)], blockedCount: 2 })).toBe(
       "Result: ✅ 2 blocked as expected\n\n",
     );
@@ -87,7 +87,7 @@ describe("renderVerdict", () => {
     );
   });
 
-  it("counts refusals with no row as unexpected, as the outcome does", () => {
+  it("counts blocked requests with no row as unexpected, as the outcome does", () => {
     expect(renderVerdict({ ...base, blockedCount: 2 })).toBe("> [!CAUTION]\n> 2 blocked\n\n");
   });
 

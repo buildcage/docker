@@ -35,7 +35,7 @@ const SAMPLES: Record<string, string> = {
   "%[var(txn.sni)]": "db.example.com",
   "%[ssl_fc_sni,regsub([^A-Za-z0-9._-],_,g)]": "registry.npmjs.org",
   "%[fc_err_name]": "-",
-  "%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]": "-",
+  "%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)]": "-",
   "%[var(txn.example_kind),regsub([^A-Za-z0-9._-],_,g)]": "-",
   "%[var(txn.example_owner),regsub([^A-Za-z0-9._-],_,g)]": "-",
 };
@@ -491,7 +491,7 @@ describe("the generated log-format and this parser describe the same line", () =
 
     it("adds its field to both request formats and nothing else", () => {
       expect(EXTENDED_FORMATS.length).toBe(3);
-      expect(EXTENDED_FORMATS.filter((f) => f.includes(" wr=")).length).toBe(2);
+      expect(EXTENDED_FORMATS.filter((f) => f.includes(" wb=")).length).toBe(2);
     });
 
     it("still reads the rest of the line where it was", async () => {
@@ -499,7 +499,7 @@ describe("the generated log-format and this parser describe the same line", () =
         const [e] = (await scanInspectLog([render(format)])).events;
         expect(e.action).toBe("allow");
         expect(e.host).toBe("registry.npmjs.org");
-        expect(e.wouldRefuse).toBe(undefined);
+        expect(e.wouldBlock).toBe(undefined);
       }
     });
 
@@ -512,7 +512,7 @@ describe("the generated log-format and this parser describe the same line", () =
       const [e] = (await scanInspectLog([line])).events;
       expect(e.action).toBe("block");
       expect(e.reason).toBe("example-refusal");
-      expect(e.wouldRefuse).toBe(undefined);
+      expect(e.wouldBlock).toBe(undefined);
     });
 
     it("keeps the refusal restrict would have made where the request came to nothing", async () => {
@@ -522,13 +522,13 @@ describe("the generated log-format and this parser describe the same line", () =
           "%ST": "502",
           "%B": "0",
           "%ts": "PR",
-          "%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]": "example-refusal",
+          "%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)]": "example-refusal",
         },
         { reason: "dns-failed" },
       );
       const [e] = (await scanInspectLog([line], true)).events;
       expect(e.reason).toBe("dns-failed");
-      expect(e.wouldRefuse).toBe("example-refusal");
+      expect(e.wouldBlock).toBe("example-refusal");
     });
 
     it("reads the fields it logs back as one object, leaving out those logged empty", async () => {
@@ -554,12 +554,12 @@ describe("the generated log-format and this parser describe the same line", () =
 
     it("notes the refusal restrict would have made of a request audit let through", async () => {
       const line = render(https, {
-        "%[var(txn.would_refuse),regsub([^A-Za-z0-9._-],_,g)]": "example-refusal",
+        "%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)]": "example-refusal",
       });
       const [e] = (await scanInspectLog([line], true)).events;
       expect(e.action).toBe("audit");
       expect(e.status).toBe(200);
-      expect(e.wouldRefuse).toBe("example-refusal");
+      expect(e.wouldBlock).toBe("example-refusal");
     });
   });
 });

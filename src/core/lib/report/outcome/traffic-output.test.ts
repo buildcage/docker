@@ -96,13 +96,13 @@ describe("buildTrafficRecords", () => {
   it("carries the refusal restrict would have made, and only where there was one", () => {
     const [noted, plain] = buildTrafficRecords(
       [
-        { ...EVENTS[1], action: "audit", wouldRefuse: "example-refusal" },
+        { ...EVENTS[1], action: "audit", wouldBlock: "example-refusal" },
         { ...EVENTS[1], action: "audit" },
       ],
       t,
     );
-    expect(noted.wouldRefuse).toBe("example-refusal");
-    expect("wouldRefuse" in plain).toBe(false);
+    expect(noted.wouldBlock).toBe("example-refusal");
+    expect("wouldBlock" in plain).toBe(false);
   });
 
   it("raises an action's own objects to the top level, never over a field of the record's own", () => {
