@@ -57,7 +57,7 @@ help:
 # Renovate bumps this pin; CI then fails until `make seccomp_profile` has been
 # rerun, so the pin and the vendored profile can't drift apart.
 # renovate: datasource=go depName=github.com/moby/profiles/seccomp
-MOBY_PROFILES_SECCOMP_VERSION ?= v0.2.3
+MOBY_PROFILES_SECCOMP_VERSION ?= v0.2.4
 
 # renovate: datasource=docker depName=eclipse-temurin
 TEST_TEMURIN_PKCS12_IMAGE ?= eclipse-temurin:21@sha256:4d06038800655fe1211760cd561de70ef2ed7a47f5d69255e9834414602b7026
