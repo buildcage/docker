@@ -1,4 +1,4 @@
-github.com/buildcage/go-pkcs12 v0.7.3-buildcage.3 h1:eTI+PUUal7RFeJ0KZTIafQS9KvRMXY2uMdNnlmf1IF4=
-github.com/buildcage/go-pkcs12 v0.7.3-buildcage.3/go.mod h1:Qiz0EyvDRJjjxGyUQa2cCNZn/wMyzrRJ/qcDXOQazLI=
+github.com/buildcage/go-pkcs12 v0.7.4-buildcage.1 h1:WmwSoSIwJ8xGiRoB23HZgpucrfh+tGLCd/RTXFzARaI=
+github.com/buildcage/go-pkcs12 v0.7.4-buildcage.1/go.mod h1:Qiz0EyvDRJjjxGyUQa2cCNZn/wMyzrRJ/qcDXOQazLI=
 golang.org/x/crypto v0.57.0 h1:3ZVCjf8Ggz7zneR/EHRVx68Ctf+2pmIMP2UFhh9cC6M=
 golang.org/x/crypto v0.57.0/go.mod h1:Fdz0i5U6CoizGwLda9DttjSk6qlZo25zYNtR+ycvuZA=
