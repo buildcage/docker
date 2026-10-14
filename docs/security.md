@@ -444,7 +444,7 @@ nothing (see [DNS never leaves the job](#dns-never-leaves-the-job)), but a reque
 resolved upstream by the proxy against the runner's own DNS before it connects. Under `*.example.com`
 a name like `<data>.example.com` is resolved the moment the request is allowed, so its labels reach
 that domain's authoritative nameserver even if the request is then refused on its path. In `audit`,
-where nothing is refused, every name the build asks for is resolved this way. A literal host, or a
+where nothing is blocked, every name the build asks for is resolved this way. A literal host, or a
 narrow wildcard, limits which names leave the job.
 
 ### Reduce what has to be reachable
