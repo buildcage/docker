@@ -17,7 +17,7 @@
 | `bad.example.com:443` | HTTPS | 🚫 https-not-allowed | 2 |
 | `a.example.com:443` | HTTPS | ⚠️ origin-aborted | 1 |
 
-<sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
 
 <details>
 <summary>💬 Communication details</summary>

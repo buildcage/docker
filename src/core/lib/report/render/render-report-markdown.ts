@@ -177,7 +177,7 @@ export function renderReportBlocks(
     const note =
       failed.length === 0
         ? ""
-        : "\n<sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so " +
+        : "\n<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so " +
           "no rule can change the outcome and none of them fails the step.*</sub>\n";
     blocks.push(
       trafficTableBlock(

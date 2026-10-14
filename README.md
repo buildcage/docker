@@ -11,7 +11,7 @@
 
 A `docker build` runs your `RUN` steps, and every dependency they fetch, with unrestricted network
 access. Buildcage puts that behind an allowlist: each `RUN` step can reach only the destinations you
-name, and anything else is refused and reported.
+name, and anything else is blocked and reported.
 
 - Your Dockerfile doesn't change, BuildKit isn't patched, and nothing Buildcage does is left in the
   image layers.
@@ -113,7 +113,7 @@ Paste that allowlist into the setup step and switch the mode:
 ```
 
 Each rule names the methods it permits, so this one lets npm fetch packages without letting it
-publish any: a `POST` to the same host is refused, as is every host not listed.
+publish any: a `POST` to the same host is blocked, as is every host not listed.
 
 <img src="assets/report-inspect-restrict-mode.png" alt="Outbound Traffic Report (restrict mode)" width="568">
 
@@ -134,7 +134,7 @@ Each pair builds the same Dockerfile with and without rules:
 to be set explicitly.
 
 `inspect` terminates TLS and re-signs it with a CA generated for each builder container. Rules
-match on method and URL, so `GET|HEAD https://registry.npmjs.org/**` allows a fetch while refusing a
+match on method and URL, so `GET|HEAD https://registry.npmjs.org/**` allows a fetch while blocking a
 publish on the same host, and the report names every request with its URL. The build has to trust
 that CA: Buildcage adds it to the system store, to the CA-trust variables, to a JVM already in the
 base image, and to Chromium's NSS database, so most toolchains need nothing extra (see [CA trust and
@@ -175,7 +175,7 @@ If you forget a domain the build needs, `restrict` blocks it and the report step
 destination named, which is why it is worth running `audit` first.
 
 `audit` also lets a connection made straight to an address through. Under `universal` that includes
-cloud metadata (`169.254.169.254`) and the runner's own addresses; `inspect` still refuses those
+cloud metadata (`169.254.169.254`) and the runner's own addresses; `inspect` still blocks those
 unless a rule names the address as its host.
 
 ### Rules for the `inspect` engine
@@ -252,7 +252,7 @@ known_blocked_rules: |
   telemetry.example.com
 ```
 
-A name refused at resolution, before any connection, has no port. A bare `telemetry.example.com` (or
+A name blocked at resolution, before any connection, has no port. A bare `telemetry.example.com` (or
 `telemetry.example.com:*`) covers it; `telemetry.example.com:443` does not, since no port was involved.
 
 One rule per line, and on `inspect` a line can also be a URL rule (a method and a URL, the
@@ -382,7 +382,7 @@ data, or source you do not publish. For the full threat model, see
   destination has a stable name.
 - `universal` never sees the method or the path. They travel inside TLS, so neither is enforced and
   neither reaches the report or the traffic artifact. A request fronted behind an allowed SNI is
-  invisible to it as well, while `inspect` matches on the real `Host` and refuses it. See
+  invisible to it as well, while `inspect` matches on the real `Host` and blocks it. See
   [Domain fronting](./docs/security.md#domain-fronting).
 
 ### Protocols
@@ -541,7 +541,7 @@ reported as blocked; see
 ### On the runner itself
 
 An allowlisted name that resolves to cloud metadata, to loopback, or to an address the runner itself
-holds is refused, so a compromised name cannot turn the proxy into a route back into the runner. A
+holds is blocked, so a compromised name cannot turn the proxy into a route back into the runner. A
 mirror or registry running on the runner is therefore not reachable by name: allow it with
 `allowed_ip_rules`, which skips that guard except for the proxy's own port. See
 [A name may not resolve inward](./docs/security.md#a-name-may-not-resolve-inward).
@@ -583,7 +583,7 @@ tell a fetch from a publish on the same host. See [Engines](#engines).
 BuildKit's exec network proxy injects `HTTP_PROXY`/`HTTPS_PROXY` into each `RUN` step and can record
 what it fetched as SLSA provenance, which Buildcage does not do. Two limits kept it from being the
 enforcement mechanism. Its source policy matches a request's host, port and URL path but has no
-notion of an HTTP method, so it cannot allow a fetch from a registry while refusing a publish to the
+notion of an HTTP method, so it cannot allow a fetch from a registry while blocking a publish to the
 same host, which `inspect` does by terminating TLS. And because it is an explicit proxy, what it
 enforces and records reaches only tools that honor the proxy variables; a tool that ignores them is
 not covered. Buildcage enforces at the network level instead, so it also covers those tools and can

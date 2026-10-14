@@ -242,7 +242,7 @@ Where no request parsed, no rule ran and the fields read `[-] (HTTP) "-" -`.
 What the report makes of those is in
 [Requests that never arrived whole](./reference.md#requests-that-never-arrived-whole).
 
-`universal` also reads the resolver's log (`/var/log/coredns`), since a name CoreDNS refused never
+`universal` also reads the resolver's log (`/var/log/coredns`), since a name CoreDNS blocked never
 reaches HAProxy at all: it is the only trace of a name looked up but never connected to.
 
 **`inspect`'s proxy log is richer**, since it terminates TLS and sees each request whole; it reads the
@@ -267,7 +267,7 @@ reader splitting a URL back apart would take the host for `registry.npmjs.org-`.
 prints as `-` too. The log keeps the `Host` as sent; the report lowercases it and drops one trailing
 dot, as the rules do before matching it.
 
-`ts` is HAProxy's termination state and `reason` the refusal reason where the rule that refused
+`ts` is HAProxy's termination state and `reason` the block reason where the rule that blocked
 knew one the line could not otherwise show. `tlserr` carries haproxy's own error from the handshake
 with the origin, which is what tells a connection the proxy would not make from one it could not
 make; the passthrough stage terminates no TLS and logs no such field. `fcerr` is haproxy's error

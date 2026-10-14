@@ -18,7 +18,7 @@
 | `c.example.com:443` | HTTPS | ⚠️ dns-failed | 1 | — |
 | `*.sury.org:*` (2 hosts) | HTTPS | 🚫 https-not-allowed | 2 | ✅ |
 
-<sub>*Note: no rule refused the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
 
 <details>
 <summary>💬 Communication details</summary>
