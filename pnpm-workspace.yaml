@@ -5,12 +5,12 @@ minimumReleaseAgeExclude:
   - source-map-js@1.2.2
 
 # Lets tsc/rolldown resolve these, even though they're only vite-plus's
-# transitive dependencies. chai/@vitest/expect/@types/chai are vitest's own
-# expect() engine, reused directly under QuickJS. Hoisting (rather than
-# pinning our own copies) keeps them locked to whatever version vitest
-# itself uses on Node.
+# transitive dependencies. chai/@types/chai are vitest's own expect()
+# engine, reused directly under QuickJS. Hoisting (rather than pinning our
+# own copies) keeps them locked to whatever version vitest itself uses on
+# Node. vitest bundles @vitest/expect rather than depending on it, so
+# package.json pins that one to vitest's version instead.
 publicHoistPattern:
   - vitest
   - chai
-  - "@vitest/expect"
   - "@types/chai"
