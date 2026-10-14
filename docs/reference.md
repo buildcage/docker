@@ -312,8 +312,8 @@ known_blocked_rules: |
 
 A URL rule marks only requests that carry the method and path it names, so it acknowledges one
 endpoint on a host while any other blocked request to the same host still fails the step. A
-host-level refusal — a name the resolver refused, or a connection blocked before any request was
-read — carries no method or path, so it is matched by a host rule, never a URL rule. Port handling
+host-level refusal (a name the resolver refused, or a connection blocked before any request was
+read) carries no method or path, so it is matched by a host rule, never a URL rule. Port handling
 follows each form: a host rule with no port reads as `:*`, a URL rule with no port as the scheme's
 default (`443`/`80`), exactly as in the allow inputs.
 

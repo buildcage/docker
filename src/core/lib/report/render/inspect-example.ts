@@ -1,7 +1,6 @@
 /**
  * Turns what an `audit` run observed into `allowed_url_rules` for a `restrict`
- * run, the engine's reason for existing: which URLs `npm install` reaches
- * cannot be known in advance.
+ * run, since which URLs `npm install` reaches cannot be known in advance.
  *
  * A generated rule must never permit more than was observed:
  *
@@ -11,13 +10,13 @@
  * - A path keeps its longest unchanging prefix; only what varied becomes
  *   `**`, and a single observed path stays exact.
  *
- * A host reached at many unrelated paths therefore collapses to `/**`, the
- * honest answer, since clustering would invent permissions nobody observed. The
- * rule still constrains the method, which no host-level rule can.
+ * A host reached at many unrelated paths therefore collapses to `/**`:
+ * clustering would invent permissions nobody observed. The rule still
+ * constrains the method, which no host-level rule can.
  *
- * The method, the `Host` header and the path are the build's or step's to choose, so a
- * request whose method, host or path a rule would read as a pattern is left
- * out of the rules and listed beside them instead.
+ * The method, the `Host` header and the path are the build's or step's to
+ * choose, so a request whose method, host or path a rule would read as a
+ * pattern is left out of the rules and listed beside them instead.
  */
 
 import { DEFAULT_PORT, splitHostPort } from "#core/lib/log/authority.ts";
@@ -208,8 +207,8 @@ function ruleLinesFrom(requests: ParsedRequest[]): string[] {
     .map(({ origin, pattern, methods }) => `${sortMethods(methods).join("|")} ${origin}${pattern}`);
 }
 
-/** Enough to show what was left out, and few enough that a build or step sending
- *  thousands can't crowd the rest of the summary out. */
+/** Enough to show what was left out, few enough that thousands of such
+ *  requests can't crowd out the rest of the summary. */
 const LEFT_OUT_LIMIT = 20;
 
 /** The requests left out of the rules, as a table under the snippet. */
@@ -234,11 +233,9 @@ function leftOutSection(leftOut: LeftOutRequest[]): string {
 }
 
 export interface BuildInspectRestrictExampleOptions extends ExampleStepOptions {
-  /** Not derived from `requests`: a passthrough is never decrypted, so there
-   *  is nothing in the traffic to build these from. They are the same values
-   *  the audit run was configured with, echoed back as-is,
-   *  since they apply unchanged under `restrict` (only enforcement
-   *  differs). */
+  /** The audit run's own values, echoed back: a passthrough is never
+   *  decrypted, so the traffic holds nothing to build them from, and they
+   *  apply unchanged under `restrict`. */
   allowedIpRules?: string[];
   allowedTlsRules?: string[];
 }

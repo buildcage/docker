@@ -2,10 +2,10 @@ import { countUndecidedRequests } from "../outcome/report-outcomes.ts";
 import type { ReportData } from "../types.ts";
 
 /**
- * Whether anything needs a look, counted as the annotations count it, as a
- * GitHub alert listing every count: CAUTION when a request was refused or the
- * report is incomplete, WARNING otherwise. The alert's own icon marks it, so
- * the counts carry no symbol. `extraItems`, an action's own warnings, follow
+ * Whether anything needs a look, counted as the annotations count it: a GitHub
+ * alert listing every count, CAUTION for an unexpected refusal or an
+ * incomplete report and WARNING otherwise. The counts carry no symbol, since
+ * the alert has its own icon. `extraItems`, an action's own warnings, follow
  * the refusals.
  */
 export function renderVerdict(report: ReportData, extraItems: string[] = []): string {

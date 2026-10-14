@@ -31,9 +31,9 @@ function req(method: string, url: string): TrafficEvent {
  * Does the generated rule set actually permit this request?
  *
  * Compiles the rules the same way the engine does, so a generated rule that
- * does not cover its own request fails here rather than in a build or step. A rule's
- * authorityRegex always names the port, so the request's is filled in from its
- * scheme before matching.
+ * does not cover its own request fails here rather than in a build or step.
+ * A rule's authorityRegex always names the port, so the request's is filled
+ * in from its scheme before matching.
  */
 function permits(lines: string[], method: string, url: string): boolean {
   const [, scheme, authority, path] = /^(https?):\/\/([^/?#]+)([^?#]*)/.exec(url)!;
@@ -98,8 +98,8 @@ describe("what the rules permit", () => {
 });
 
 // ---------------------------------------------------------------------------
-// The method, the Host header and the path are the build's or step's to choose, so none
-// of them may reach a rule as a pattern.
+// The method, the Host header and the path are the build's or step's to
+// choose, so none of them may reach a rule as a pattern.
 // ---------------------------------------------------------------------------
 describe("what the build or step can write into a rule", () => {
   const legit = req("GET", "https://registry.npmjs.org/express");

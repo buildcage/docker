@@ -186,11 +186,10 @@ function subject(event: TrafficEvent): string {
     // coarse events otherwise always carry one.
     const authority = event.port === undefined ? event.host : `${event.host}:${event.port}`;
     const nameAndPort = `${event.protocol.toUpperCase()} ${authority}`;
-    // Unless a method did arrive: the request was then whole, and it is its
-    // target that no URL fits (`OPTIONS *`; see log/inspect.ts's urlOf).
-    // Dropping the method would read as a connection that carried no request.
-    // The log records only that there was no path, not which other form the
-    // target took, so naming the form here would be a guess.
+    // A method means the request arrived whole and only its target fits no URL
+    // (`OPTIONS *`; see log/inspect.ts's urlOf); without it the line would read
+    // as a connection that carried no request. The log does not record which
+    // form the target took, so it is not named.
     return event.method === undefined ? nameAndPort : `${event.method} ${nameAndPort}`;
   }
   return `${event.method} ${redactCredentialQuery(event.url)}`;
@@ -215,9 +214,7 @@ function outcome(event: TrafficEvent, label: (reason: string) => string): string
 
 /**
  * Elapsed since the proxy started, to the millisecond: several requests
- * routinely land in the same second, and only this engine's log carries the
- * resolution to tell them apart. Falls back to absolute UTC only when there
- * is no start time to be relative to.
+ * routinely land in the same second. Absolute UTC when there is no start time.
  */
 function formatTime(epochSeconds: number, startedAt: number | undefined): string {
   if (startedAt === undefined) {
