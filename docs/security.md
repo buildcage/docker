@@ -170,7 +170,7 @@ Everything that is not TCP is dropped before it reaches the proxy, so ICMP, raw 
 exit path at all; port 53 to the gateway, which is the resolver, is the one exception. IPv6 is
 dropped the same way, AAAA lookups are answered with no records, and the proxy
 reaches allowed names over IPv4 only. The cost of that last part is an allowed name with AAAA
-records and no A record: it never resolves here, is blocked on every attempt, in `audit` too, and is
+records and no A record: it never resolves here, fails on every attempt, in `audit` too, and is
 reported as `dns-failed` with no rule able to clear it.
 
 ## Engines

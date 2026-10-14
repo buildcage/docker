@@ -678,7 +678,7 @@ it does fail the step:
 `origin-untrusted` is the plain case: a forged certificate, an expired one, or an origin speaking no
 TLS at all. `origin-connect-failed` is the one that looks like an outage and cannot be shown to be
 one. HAProxy retries a failed connection, and the TLS error it reports belongs to the last attempt
-alone, so an impostor whose certificate is refused on one attempt leaves no trace once a later
+alone, so an impostor blocked for its certificate on one attempt leaves no trace once a later
 attempt fails at TCP. The report does not claim to tell that from an origin that is simply down: a
 connection it never completed is one whose origin it never authenticated. See
 [Attempts to get around it](./security.md#attempts-to-get-around-it).

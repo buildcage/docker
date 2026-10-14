@@ -151,7 +151,7 @@ function isBlock(terminationState: string): boolean {
  * `origin-connect-failed` is the rest of that phase, and is a block too
  * because it cannot be shown not to be one. `tlserr` belongs to the last
  * connection attempt alone and a failed handshake is retried, so a certificate
- * refused on one attempt leaves no trace once a later attempt fails at TCP:
+ * that fails on one attempt leaves no trace once a later attempt fails at TCP:
  * measured on haproxy 3.4, an impostor logs `rc=3 ts=SC` with the verify error,
  * and the same impostor going silent partway through those retries logs
  * `ts=SC tlserr=-`, which is what an origin that is merely down logs too. The
