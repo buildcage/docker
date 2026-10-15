@@ -37,8 +37,8 @@ const base: UniversalReportData = {
 };
 
 describe("renderVerdict", () => {
-  it("says nothing was blocked when nothing needs a look", () => {
-    expect(renderVerdict(base)).toBe("Result: ✅ Nothing was blocked\n\n");
+  it("says nothing when nothing needs a look", () => {
+    expect(renderVerdict(base)).toBe("");
   });
 
   it("counts requests, in the order blocked, extra items, failed, not acted on, as a caution", () => {
@@ -73,10 +73,8 @@ describe("renderVerdict", () => {
     );
   });
 
-  it("leads with requests blocked as expected only when nothing else is there", () => {
-    expect(renderVerdict({ ...base, blocked: [row(2, true)], blockedCount: 2 })).toBe(
-      "Result: ✅ 2 blocked as expected\n\n",
-    );
+  it("says nothing when every block was expected", () => {
+    expect(renderVerdict({ ...base, blocked: [row(2, true)], blockedCount: 2 })).toBe("");
   });
 
   it("leads with a log that is not a full record, as a caution", () => {
@@ -93,6 +91,6 @@ describe("renderVerdict", () => {
 
   it("leaves out a close that is keepalive noise, as the warning does", () => {
     const timeline: TrafficEvent[] = [{ ...undecided, action: "allow", status: 200 }, undecided];
-    expect(renderVerdict({ ...base, timeline })).toBe("Result: ✅ Nothing was blocked\n\n");
+    expect(renderVerdict({ ...base, timeline })).toBe("");
   });
 });

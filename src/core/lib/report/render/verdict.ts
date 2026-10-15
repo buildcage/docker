@@ -4,9 +4,9 @@ import type { ReportData } from "../types.ts";
 /**
  * Whether anything needs a look, counted as the annotations count it: a GitHub
  * alert listing every count, CAUTION for an unexpected block or an
- * incomplete report and WARNING otherwise. The counts carry no symbol, since
- * the alert has its own icon. `extraItems`, an action's own warnings, follow
- * the blocks.
+ * incomplete report and WARNING otherwise, or nothing when nothing does. The
+ * counts carry no symbol, since the alert has its own icon. `extraItems`, an
+ * action's own warnings, follow the blocks.
  */
 export function renderVerdict(report: ReportData, extraItems: string[] = []): string {
   let unexpected = 0;
@@ -30,11 +30,12 @@ export function renderVerdict(report: ReportData, extraItems: string[] = []): st
     ...(failed ? [`${failed} failed`] : []),
     ...(undecided ? [`${undecided} not acted on`] : []),
   ];
-  // Expected blocks need nothing done, so they lead only when nothing else does.
-  const asExpected = expected ? [`${expected} blocked as expected`] : [];
-  if (caution.length + warning.length === 0) {
-    return `Result: ✅ ${asExpected[0] ?? "Nothing was blocked"}\n\n`;
-  }
-  const items = [...caution, ...warning, ...asExpected].join(" · ");
+  // Expected blocks need nothing done, so they never raise an alert alone.
+  if (caution.length + warning.length === 0) return "";
+  const items = [
+    ...caution,
+    ...warning,
+    ...(expected ? [`${expected} blocked as expected`] : []),
+  ].join(" · ");
   return `> [!${caution.length ? "CAUTION" : "WARNING"}]\n> ${items}\n\n`;
 }

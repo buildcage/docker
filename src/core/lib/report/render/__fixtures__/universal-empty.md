@@ -1,7 +1,5 @@
 ## Outbound Traffic Report
 
-Result: ✅ Nothing was blocked
-
 _(no communication)_
 
 
