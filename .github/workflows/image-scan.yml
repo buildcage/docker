@@ -15,6 +15,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+    env:
+      TRIVY_DISABLE_TELEMETRY: true
+      TRIVY_SKIP_VERSION_CHECK: true
 
     strategy:
       fail-fast: false
