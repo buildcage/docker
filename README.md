@@ -280,12 +280,12 @@ with `if: always()` so a failing build still reports:
 
 An alert under the report's title counts what needs a look: requests blocked, connections that
 failed and requests nothing acted on. It is a CAUTION when a request was blocked unexpectedly or the
-report is incomplete and a WARNING otherwise; with nothing to count, a plain line takes its place.
-Whatever was blocked is listed under **Blocked Hosts** with the reason, marked 🚫, beside any
-connection that failed, marked ⚠️, and, under `inspect`, **Communication details** names the URL of
-every request, allowed or blocked, with credential query parameters replaced (see [Credentials in a
-URL](docs/security.md#credentials-in-a-url)). In `audit` mode the summary also holds the **Switch to
-restrict mode** allowlist.
+report is incomplete and a WARNING otherwise. With nothing to count, or only requests blocked as
+expected, there is no alert. Whatever was blocked is listed under **Blocked Hosts** with the reason,
+marked 🚫, beside any connection that failed, marked ⚠️, and, under `inspect`, **Communication
+details** names the URL of every request, allowed or blocked, with credential query parameters
+replaced (see [Credentials in a URL](docs/security.md#credentials-in-a-url)). In `audit` mode the
+summary also holds the **Switch to restrict mode** allowlist.
 
 In `restrict` mode the step fails when a blocked connection is found, and with it the workflow. Pass
 `fail_on_blocked: false` to report without failing, or list what you expect to stay blocked in the
