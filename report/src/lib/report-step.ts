@@ -101,7 +101,8 @@ export async function runReportStep(
 
   // Before any input is read, and before report-action.js inherits this
   // environment: it reads fail_on_blocked itself.
-  applyConfigFile(env, CONFIG_FILE_INPUTS);
+  const { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
+  if (warning) warn(warning);
   const builderName = readBuilderName();
   checkFailOnBlocked();
   const trafficArtifact = readTrafficArtifactInputs();
