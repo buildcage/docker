@@ -55,18 +55,21 @@ describe("applyConfigFile", () => {
     const env = envFor(writeConfig("proxy_mode: audit\n"));
     expect(applyConfigFile(env, INPUTS)).toEqual({
       path: join(workspace, "buildcage.yml"),
-      summary: ["Inputs read from config_file buildcage.yml:", "  proxy_mode"],
+      summary: [],
     });
     expect(env.INPUT_PROXY_MODE).toBe("audit");
   });
 
-  it("leaves an input the workflow set", () => {
-    const env = envFor(writeConfig("proxy_mode: audit\n"), { INPUT_PROXY_MODE: "restrict" });
+  it("leaves the inputs the workflow set, and names them", () => {
+    const env = envFor(writeConfig("proxy_mode: audit\nproxy_engine: universal\n"), {
+      INPUT_PROXY_MODE: "restrict",
+      INPUT_PROXY_ENGINE: "inspect",
+    });
     expect(applyConfigFile(env, INPUTS)?.summary).toEqual([
-      "Inputs read from config_file buildcage.yml:",
-      "  proxy_mode (ignored: the workflow sets it)",
+      "Ignored from config_file buildcage.yml, set by the workflow: proxy_mode, proxy_engine",
     ]);
     expect(env.INPUT_PROXY_MODE).toBe("restrict");
+    expect(env.INPUT_PROXY_ENGINE).toBe("inspect");
   });
 
   // The runner sets every declared input, an unset one to "".
@@ -81,10 +84,7 @@ describe("applyConfigFile", () => {
       writeConfig("allowed_https_rules: |\n  b.example.com:443\n  c.example.com:443\n"),
       { INPUT_ALLOWED_HTTPS_RULES: "a.example.com:443" },
     );
-    expect(applyConfigFile(env, INPUTS)?.summary).toEqual([
-      "Inputs read from config_file buildcage.yml:",
-      "  allowed_https_rules (added to the workflow's)",
-    ]);
+    expect(applyConfigFile(env, INPUTS)?.summary).toEqual([]);
     expect(env.INPUT_ALLOWED_HTTPS_RULES).toBe(
       "a.example.com:443\nb.example.com:443\nc.example.com:443\n",
     );
@@ -92,10 +92,7 @@ describe("applyConfigFile", () => {
 
   it("takes a list input from the file alone when the workflow has none", () => {
     const env = envFor(writeConfig("known_blocked_rules: t.example.com\n"));
-    expect(applyConfigFile(env, INPUTS)?.summary).toEqual([
-      "Inputs read from config_file buildcage.yml:",
-      "  known_blocked_rules",
-    ]);
+    applyConfigFile(env, INPUTS);
     expect(env.INPUT_KNOWN_BLOCKED_RULES).toBe("t.example.com");
   });
 
@@ -119,9 +116,7 @@ describe("applyConfigFile", () => {
 
   it("accepts an empty file", () => {
     const env = envFor(writeConfig(""));
-    expect(applyConfigFile(env, INPUTS)?.summary).toEqual([
-      "Inputs read from config_file buildcage.yml:",
-    ]);
+    expect(applyConfigFile(env, INPUTS)?.summary).toEqual([]);
   });
 
   it("trims the path", () => {

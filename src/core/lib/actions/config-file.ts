@@ -26,7 +26,7 @@ export interface ConfigFileInputs {
 export interface AppliedConfigFile {
   /** The file's real path. */
   path: string;
-  /** Lines for the job log, one per input the file set. */
+  /** Lines for the job log: the file's inputs the workflow overrode, if any. */
   summary: string[];
 }
 
@@ -159,19 +159,16 @@ export function applyConfigFile(
   }
   const values = parseConfig(text, path, known);
 
-  const summary = [`Inputs read from config_file ${path}:`];
+  const ignored: string[] = [];
   for (const [name, value] of values) {
     const envName = inputEnvName(name);
     const inline = env[envName] ?? "";
-    if (lists.includes(name)) {
-      env[envName] = [inline, value].filter((v) => v.trim()).join("\n");
-      summary.push(`  ${name}${inline.trim() ? " (added to the workflow's)" : ""}`);
-    } else if (inline.trim()) {
-      summary.push(`  ${name} (ignored: the workflow sets it)`);
-    } else {
-      env[envName] = value;
-      summary.push(`  ${name}`);
-    }
+    if (lists.includes(name)) env[envName] = [inline, value].filter((v) => v.trim()).join("\n");
+    else if (inline.trim()) ignored.push(name);
+    else env[envName] = value;
   }
+  const summary = ignored.length
+    ? [`Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`]
+    : [];
   return { path: full, summary };
 }
