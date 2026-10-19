@@ -5046,12 +5046,12 @@ function applyConfigFile(env, { known, lists }) {
 	let values = parseConfig(text, path, known), ignored = [];
 	for (let [name, value] of values) {
 		let envName = inputEnvName(name), inline = env[envName] ?? "";
-		lists.includes(name) ? env[envName] = [inline, value].filter((v) => v.trim()).join("\n") : inline.trim() ? ignored.push(name) : env[envName] = value;
+		lists.includes(name) ? env[envName] = [inline, value].filter((v) => v.trim()).join("\n") : inline.trim() ? value.trim() && value.trim() !== inline.trim() && ignored.push(name) : env[envName] = value;
 	}
-	return {
+	return ignored.length ? {
 		path: full,
-		summary: ignored.length ? [`Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`] : []
-	};
+		warning: `Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`
+	} : { path: full };
 }
 function capturedStderr(e) {
 	let err = e && typeof e == "object" ? e : {};
@@ -12906,8 +12906,8 @@ async function runSetupStep(env, overrides = {}) {
 	let { applyConfigFile, readSetupInputs, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, saveState, setOutput, log, warn } = {
 		...realDeps,
 		...overrides
-	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
-	for (let line of applyConfigFile(env, CONFIG_FILE_INPUTS)?.summary ?? []) log(line);
+	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
+	warning && warn(warning);
 	let { proxyEngine, builderName, proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readSetupInputs();
 	log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutput("builder_name", builderName), checkUrlAndTlsRuleSupport({
 		proxyEngine,

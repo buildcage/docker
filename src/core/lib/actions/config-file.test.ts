@@ -55,7 +55,6 @@ describe("applyConfigFile", () => {
     const env = envFor(writeConfig("proxy_mode: audit\n"));
     expect(applyConfigFile(env, INPUTS)).toEqual({
       path: join(workspace, "buildcage.yml"),
-      summary: [],
     });
     expect(env.INPUT_PROXY_MODE).toBe("audit");
   });
@@ -65,9 +64,19 @@ describe("applyConfigFile", () => {
       INPUT_PROXY_MODE: "restrict",
       INPUT_PROXY_ENGINE: "inspect",
     });
-    expect(applyConfigFile(env, INPUTS)?.summary).toEqual([
+    expect(applyConfigFile(env, INPUTS)?.warning).toBe(
       "Ignored from config_file buildcage.yml, set by the workflow: proxy_mode, proxy_engine",
-    ]);
+    );
+    expect(env.INPUT_PROXY_MODE).toBe("restrict");
+    expect(env.INPUT_PROXY_ENGINE).toBe("inspect");
+  });
+
+  it("names no input whose file value is empty or the workflow's", () => {
+    const env = envFor(writeConfig("proxy_mode: restrict\nproxy_engine:\n"), {
+      INPUT_PROXY_MODE: "restrict",
+      INPUT_PROXY_ENGINE: "inspect",
+    });
+    expect(applyConfigFile(env, INPUTS)?.warning).toBeUndefined();
     expect(env.INPUT_PROXY_MODE).toBe("restrict");
     expect(env.INPUT_PROXY_ENGINE).toBe("inspect");
   });
@@ -84,7 +93,7 @@ describe("applyConfigFile", () => {
       writeConfig("allowed_https_rules: |\n  b.example.com:443\n  c.example.com:443\n"),
       { INPUT_ALLOWED_HTTPS_RULES: "a.example.com:443" },
     );
-    expect(applyConfigFile(env, INPUTS)?.summary).toEqual([]);
+    expect(applyConfigFile(env, INPUTS)?.warning).toBeUndefined();
     expect(env.INPUT_ALLOWED_HTTPS_RULES).toBe(
       "a.example.com:443\nb.example.com:443\nc.example.com:443\n",
     );
@@ -92,7 +101,7 @@ describe("applyConfigFile", () => {
 
   it("takes a list input from the file alone when the workflow has none", () => {
     const env = envFor(writeConfig("known_blocked_rules: t.example.com\n"));
-    applyConfigFile(env, INPUTS);
+    expect(applyConfigFile(env, INPUTS)?.warning).toBeUndefined();
     expect(env.INPUT_KNOWN_BLOCKED_RULES).toBe("t.example.com");
   });
 
@@ -116,7 +125,7 @@ describe("applyConfigFile", () => {
 
   it("accepts an empty file", () => {
     const env = envFor(writeConfig(""));
-    expect(applyConfigFile(env, INPUTS)?.summary).toEqual([]);
+    expect(applyConfigFile(env, INPUTS)?.warning).toBeUndefined();
   });
 
   it("trims the path", () => {

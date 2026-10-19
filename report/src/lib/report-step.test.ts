@@ -72,6 +72,18 @@ describe("runReportStep", () => {
       mocks.readBuilderName.mock.invocationCallOrder[0]!,
     );
     expect(mocks.runReportScript.mock.calls[0][2].env).toBe(env);
+    expect(mocks.warn).not.toHaveBeenCalled();
+  });
+
+  it("warns of the config_file inputs the workflow overrode", async () => {
+    mocks.applyConfigFile.mockReturnValue({
+      path: "/w/c.yml",
+      warning: "Ignored from config_file c.yml, set by the workflow: fail_on_blocked",
+    });
+    await runReportStep({ INPUT_CONFIG_FILE: "c.yml" }, deps);
+    expect(mocks.warn).toHaveBeenCalledWith(
+      "Ignored from config_file c.yml, set by the workflow: fail_on_blocked",
+    );
   });
 
   it("finds the container by the project name derived from the builder name", async () => {

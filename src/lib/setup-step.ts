@@ -147,7 +147,8 @@ export async function runSetupStep(
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 
   // Before any input is read: it rewrites what they all read.
-  for (const line of applyConfigFile(env, CONFIG_FILE_INPUTS)?.summary ?? []) log(line);
+  const { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
+  if (warning) warn(warning);
 
   // Read before the image: each engine has its own image tag.
   const {

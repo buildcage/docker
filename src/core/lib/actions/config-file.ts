@@ -26,8 +26,8 @@ export interface ConfigFileInputs {
 export interface AppliedConfigFile {
   /** The file's real path. */
   path: string;
-  /** Lines for the job log: the file's inputs the workflow overrode, if any. */
-  summary: string[];
+  /** A warning naming the file's inputs the workflow overrode, if any. */
+  warning?: string;
 }
 
 /** The variable `core.getInput(name)` reads. */
@@ -164,11 +164,14 @@ export function applyConfigFile(
     const envName = inputEnvName(name);
     const inline = env[envName] ?? "";
     if (lists.includes(name)) env[envName] = [inline, value].filter((v) => v.trim()).join("\n");
-    else if (inline.trim()) ignored.push(name);
-    else env[envName] = value;
+    // An empty or matching value loses nothing.
+    else if (inline.trim()) {
+      if (value.trim() && value.trim() !== inline.trim()) ignored.push(name);
+    } else env[envName] = value;
   }
-  const summary = ignored.length
-    ? [`Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`]
-    : [];
-  return { path: full, summary };
+  if (!ignored.length) return { path: full };
+  return {
+    path: full,
+    warning: `Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`,
+  };
 }

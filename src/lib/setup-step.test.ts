@@ -104,10 +104,10 @@ describe("runSetupStep", () => {
     expect(orderOf(mocks.setOutput)).toBeLessThan(orderOf(mocks.runDocker));
   });
 
-  it("applies config_file to the step's env before reading any input, and logs it", async () => {
+  it("applies config_file to the step's env before reading any input, and warns of what it ignored", async () => {
     mocks.applyConfigFile.mockReturnValue({
       path: "/home/runner/work/repo/repo/c.yml",
-      summary: ["Ignored from config_file c.yml, set by the workflow: proxy_mode"],
+      warning: "Ignored from config_file c.yml, set by the workflow: proxy_mode",
     });
 
     await runSetupStep(ENV, deps);
@@ -117,7 +117,7 @@ describe("runSetupStep", () => {
       expect.objectContaining({ known: expect.arrayContaining(["builder_name"]) }),
     );
     expect(orderOf(mocks.applyConfigFile)).toBeLessThan(orderOf(mocks.readSetupInputs));
-    expect(mocks.log).toHaveBeenCalledWith(
+    expect(mocks.warn).toHaveBeenCalledWith(
       "Ignored from config_file c.yml, set by the workflow: proxy_mode",
     );
   });
