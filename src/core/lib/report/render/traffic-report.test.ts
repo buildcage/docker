@@ -321,7 +321,7 @@ describe("renderReportMarkdown: inspect", () => {
     expect(md).not.toMatch(/based on the Host header/);
   });
 
-  it("labels a block in Communication details as the caller says", () => {
+  it("ends a line in Communication details with the caller's note", () => {
     const blockedEvent: TrafficEvent = {
       ...timeline[0],
       action: "block",
@@ -333,12 +333,11 @@ describe("renderReportMarkdown: inspect", () => {
       communicationDetailsBlocks(
         { ...base, timeline: [blockedEvent, timeline[0]] },
         { priority: 1, artifactAvailable: false },
-        (_, reason) => `${reason}, labelled`,
         (e) => (e.action === "allow" ? "[noted]" : ""),
       ),
     );
     // An empty note adds nothing, not even the space before it.
-    expect(md).toContain("GET https://good.com/pkg -> not-allowed, labelled\n");
+    expect(md).toContain("GET https://good.com/pkg -> not-allowed\n");
     expect(md).toContain("GET https://good.com/pkg -> 200 (1B) [noted]\n");
   });
 

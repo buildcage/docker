@@ -9,7 +9,6 @@ import {
   COMMUNICATION_DETAILS_OPEN,
   communicationTruncationNote,
   renderCommunicationDetailsBody,
-  type BlockLabel,
   type LineNote,
 } from "./communication-details.ts";
 import type { SummaryBlock } from "./fit-step-summary.ts";
@@ -260,15 +259,9 @@ export function noCommunicationBlocks(report: ReportData): SummaryBlock[] {
 export function communicationDetailsBlocks(
   report: ReportData,
   fit: PartFit,
-  blockLabel?: BlockLabel,
   lineNote?: LineNote,
 ): SummaryBlock[] {
-  const details = renderCommunicationDetailsBody(
-    report.timeline,
-    report.startedAt,
-    blockLabel,
-    lineNote,
-  );
+  const details = renderCommunicationDetailsBody(report.timeline, report.startedAt, lineNote);
   if (!details) return [];
   return [
     {
