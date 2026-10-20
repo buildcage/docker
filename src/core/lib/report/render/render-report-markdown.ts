@@ -88,9 +88,9 @@ export const trafficFrame = (text: string): SummaryBlock => ({
 });
 
 /**
- * The blocks in print order, each part a blank line apart from the last one
- * that printed. The first part follows `heading` directly, which ends with a
- * blank line of its own, and a part that already opens with one gets no other.
+ * The blocks in print order, each part a blank line after the last one that
+ * printed; the first follows `heading`, which ends with one. A part carries no
+ * blank line around itself, so this is the only place one is added.
  *
  * The blank line goes inside the part's first printed block, so the fit counts
  * it, a block cut to its notice keeps it (see fitStepSummary's cutBlock), and
@@ -106,13 +106,11 @@ export function stackTrafficBlocks(heading: SummaryBlock, parts: SummaryBlock[][
       continue;
     }
     const b = part[first];
-    const opens = b.open ?? b.text;
-    const gapped =
-      !wrote || opens.startsWith("\n")
-        ? b
-        : b.open !== undefined
-          ? { ...b, open: `\n${b.open}` }
-          : { ...b, text: `\n${b.text}`, head: b.head === undefined ? undefined : b.head + 1 };
+    const gapped = !wrote
+      ? b
+      : b.open !== undefined
+        ? { ...b, open: `\n${b.open}` }
+        : { ...b, text: `\n${b.text}`, head: b.head === undefined ? undefined : b.head + 1 };
     blocks.push(...part.slice(0, first), gapped, ...part.slice(first + 1));
     wrote = true;
   }
@@ -277,7 +275,7 @@ export function communicationDetailsBlocks(
       level: 3,
       section: SECTION,
       cut: "lines",
-      open: `\n${COMMUNICATION_DETAILS_OPEN}`,
+      open: COMMUNICATION_DETAILS_OPEN,
       text: details,
       close: COMMUNICATION_DETAILS_CLOSE,
     },
@@ -289,7 +287,7 @@ export function engineNoteBlocks(report: ReportData): SummaryBlock[] {
   if (report.engine !== "universal") return [];
   return [
     trafficFrame(
-      "\n<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n",
+      "<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n",
     ),
   ];
 }
@@ -331,5 +329,5 @@ export function reportHeading(title: string, isAudit: boolean): string {
 
 /** The line every report ends with, for an action that prints it itself. */
 export function reportFooter(actionRepo: string): string {
-  return `\n*Reported by [${actionRepo}](https://github.com/${actionRepo})*\n\n<hr>\n`;
+  return `*Reported by [${actionRepo}](https://github.com/${actionRepo})*\n\n<hr>\n`;
 }

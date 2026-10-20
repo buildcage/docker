@@ -82,7 +82,7 @@ export function restrictExampleBlock(
     .map((line) => (line ? STEP_INDENT + line : line))
     .join("\n");
 
-  let md = "\n<details>\n";
+  let md = "<details>\n";
   md += "<summary>🛡️ Switch to restrict mode</summary>\n\n";
   md += "```yaml\n";
   md += indented;
@@ -98,5 +98,5 @@ export function restrictExampleTruncationNote(artifactAvailable: boolean): strin
   const rest = artifactAvailable
     ? "the buildcage-traffic artifact uploaded for this run has every request to write the rules from"
     : "set upload_traffic_artifact: true to get every request to write the rules from as a downloadable artifact";
-  return `_…omitted: the example restrict step is too large for GitHub's Job Summary size limit; ${rest}._\n\n`;
+  return `_…omitted: the example restrict step is too large for GitHub's Job Summary size limit; ${rest}._\n`;
 }

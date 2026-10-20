@@ -394,7 +394,7 @@ describe("renderReportMarkdown: section and footer", () => {
 
   it("notes how universal identifies a host, and inspect nothing", () => {
     expect(joinSummaryBlocks(engineNoteBlocks(base))).toMatch(
-      /^\n<sub>[^]*IP rules on the destination IP address\.\*<\/sub>\n$/,
+      /^<sub>[^]*IP rules on the destination IP address\.\*<\/sub>\n$/,
     );
     expect(engineNoteBlocks({ ...base, engine: "inspect" })).toStrictEqual([]);
   });

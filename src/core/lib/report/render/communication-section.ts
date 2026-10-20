@@ -4,7 +4,11 @@ export const COMMUNICATION_DETAILS_OPEN =
   "<details>\n<summary>\u{1F4AC} Communication details</summary>\n\n";
 export const COMMUNICATION_DETAILS_CLOSE = "</details>\n";
 
-/** What a traffic report says where the Job Summary's size limit cut its communication log. */
+/**
+ * What a traffic report says where the Job Summary's size limit cut its
+ * communication log. The blank line after it ends the paragraph before the
+ * closing tag.
+ */
 export function communicationTruncationNote(artifactAvailable: boolean): string {
   const rest = artifactAvailable
     ? "the buildcage-traffic artifact uploaded for this run has the rest"

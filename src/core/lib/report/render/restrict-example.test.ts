@@ -78,7 +78,7 @@ describe("restrictExampleBlock", () => {
   it("wraps the yaml in the collapsed section, at the step indent Actions expects", () => {
     // A blank line stays blank: trailing spaces on it would show in the fence.
     expect(restrictExampleBlock("- name: Start\n  with:\n\n    x: 1\n")).toBe(
-      "\n<details>\n" +
+      "<details>\n" +
         "<summary>🛡️ Switch to restrict mode</summary>\n\n" +
         "```yaml\n" +
         "      - name: Start\n" +

@@ -215,6 +215,20 @@ describe("renderReportBlocks under a limit", () => {
     expect(order).toStrictEqual(order.toSorted((a, b) => a - b));
   });
 
+  it("leaves one blank line between a cut part's notice and what follows", () => {
+    const out = fit({
+      ...report({
+        parameters: reportParams({ mode: "audit" }),
+        passed: rows("ok", 2000),
+        blocked: rows("bad", 3000, "not-allowed").map((r) => ({ ...r, expected: false })),
+        blockedCount: 3000,
+      }),
+      engine: "inspect",
+    });
+    expect(out).toContain(hostTableTruncationNote(false));
+    expect(out).not.toContain("\n\n\n");
+  });
+
   it("picks no notice for a block that is not the traffic report's", () => {
     const block = {
       id: "filesystem-log",
@@ -250,12 +264,6 @@ describe("stackTrafficBlocks", () => {
 
   it("skips a part that printed nothing", () => {
     expect(join([[block("A\n")], [block("")], [], [block("B\n")]])).toBe("## T\n\nA\n\nB\n");
-  });
-
-  it("adds nothing to a part that opens with a blank line already", () => {
-    expect(
-      join([[block("A\n")], [block("\nB\n")], [block("C\n", { open: "\n<o>", close: "</o>" })]]),
-    ).toBe("## T\n\nA\n\nB\n\n<o>C\n</o>");
   });
 
   it("opens a part's tags with the blank line rather than its text", () => {
@@ -296,7 +304,7 @@ describe("stackTrafficBlocks", () => {
 
   it("keeps the blank line before the notice of a part replaced whole", () => {
     const atomic = { ...block("X".repeat(200) + "\n"), cut: "atomic" as const, notice: "_cut_\n" };
-    const blocks = stackTrafficBlocks(heading, [[block("A\n")], [atomic], [block("\nB\n")]]);
+    const blocks = stackTrafficBlocks(heading, [[block("A\n")], [atomic], [block("B\n")]]);
     const out = fitStepSummary(blocks, { limitBytes: SAFETY_MARGIN_BYTES + 100 });
     expect(out).toBe("## T\n\nA\n\n_cut_\n\nB\n");
   });
