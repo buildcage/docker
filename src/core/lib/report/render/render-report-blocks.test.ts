@@ -76,17 +76,22 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).toContain(hostTableTruncationNote(false));
   });
 
-  it("cuts the known blocked hosts before the allowed ones, keeping the details element closed", () => {
+  it("replaces the known blocked hosts whole before the allowed ones, still printing the log", () => {
     const known = rows("noise", 2000, "not-allowed").map((r) => ({
       ...r,
       expected: true,
       expectedBy: r.host,
     }));
-    const out = fit(report({ passed: rows("ok", 20), blocked: known, blockedCount: 2000 }));
+    const timeline: TrafficEvent[] = [
+      { time: 0, action: "allow", protocol: "https", host: "ok0.example.com", port: 443 },
+    ];
+    const out = fit(
+      report({ passed: rows("ok", 20), blocked: known, blockedCount: 2000, timeline }),
+    );
     expect(out).toContain("ok19.example.com");
-    expect(out).toContain("<summary>🚫 Known Blocked Hosts (2000 hosts)</summary>");
-    expect(out).not.toContain("noise1999.example.com");
-    expect(out).toContain(`${hostTableTruncationNote(false)}\n</details>`);
+    expect(out).not.toContain("Known Blocked Hosts");
+    expect(out).toContain(`|\n\n${hostTableTruncationNote(false)}`);
+    expect(out).toContain("💬 Communication details");
   });
 
   it("gives a cut communication log the log's own notice", () => {

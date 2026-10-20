@@ -24,7 +24,8 @@ export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /** False leaves the footer to an action that prints more after the report. */
   footer?: boolean;
   /**
-   * Blocks an action adds after the blocked and failed hosts for a check of
+   * Blocks an action adds between the blocked and failed hosts and the allowed
+   * ones for a check of
    * its own, such as the one an InspectStageExtension adds to the proxy. The
    * first opens with `gap`, the blank line owed to a block before it. Their
    * notices are the caller's to pick, as for every other block.
@@ -145,9 +146,8 @@ export function renderReportBlocks(
 
   // The rows a known_blocked_rules rule matched need no action, so they
   // follow the allowed hosts, folded and collapsed, rather than lead.
-  const folded = foldExpectedBlockedRows(report.blocked);
-  const known = folded.filter((r) => r.expected);
-  const blocked = folded
+  const expected = report.blocked.filter((r) => r.expected);
+  const blocked = report.blocked
     .filter((r) => !r.expected)
     .map((r) => ({ ...r, outcome: "blocked" as const }));
   if (blocked.length > 0 || report.failed.length > 0) {
@@ -190,18 +190,19 @@ export function renderReportBlocks(
     );
     wrote = true;
   }
-  if (known.length > 0) {
-    const hosts = new Set(report.blocked.filter((r) => r.expected).map((r) => r.host)).size;
-    // The tag opens in the text, so a table cut whole leaves no empty element.
+  if (expected.length > 0) {
+    const hosts = new Set(expected.map((r) => r.host)).size;
+    // Cut whole, so the notice stands outside the collapsed element, and one
+    // level below the tables, so cutting it leaves the log its own notice.
     blocks.push({
-      ...trafficTableBlock(
-        TRAFFIC_BLOCK.known,
-        priorities[TRAFFIC_BLOCK.known],
-        `${gap()}<details>\n<summary>🚫 Known Blocked Hosts (${hosts} host${hosts === 1 ? "" : "s"})</summary>\n\n`,
-        renderHostTable(known, { showReason: true }),
-        "\n",
-      ),
-      close: "\n</details>\n",
+      id: TRAFFIC_BLOCK.known,
+      priority: priorities[TRAFFIC_BLOCK.known],
+      level: 3,
+      section: SECTION,
+      cut: "atomic",
+      text:
+        `${gap()}<details>\n<summary>🚫 Known Blocked Hosts (${hosts} host${hosts === 1 ? "" : "s"})</summary>\n\n` +
+        `${renderHostTable(foldExpectedBlockedRows(expected), { showReason: true })}\n\n</details>\n`,
     });
     wrote = true;
   }

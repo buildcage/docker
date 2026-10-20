@@ -481,10 +481,10 @@ step.
 When every blocked connection matches a `known_blocked_rules` rule, the step no longer fails even
 with `fail_on_blocked: true`, and a `::notice::` is emitted instead of `::error::`; any unmatched
 blocked connection still fails the step. Matching is per request, so a row that counts several
-requests to one host is Expected only when a rule accounts for every one of them: a URL rule that
-names one endpoint leaves the host's other blocked requests to fail the step. The matched rows leave
-Blocked Hosts for **Known Blocked Hosts**, collapsed below the allowed hosts, so the table at the
-top of the report holds only what needs a look.
+requests to one host counts as expected only when a rule accounts for every one of them: a URL rule
+that names one endpoint leaves the host's other blocked requests to fail the step. The matched rows
+leave Blocked Hosts for **Known Blocked Hosts**, collapsed below the allowed hosts, so the table at
+the top of the report holds only what needs a look.
 
 The matched rows are also folded into one row per rule, named after the rule and counting the hosts
 behind it (`*.example.com:* (12 hosts)`). A rule covering noisy traffic then costs the table one

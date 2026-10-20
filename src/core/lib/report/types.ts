@@ -12,7 +12,6 @@ export interface GenReportParameters {
   allowedTlsRules: string[];
   /** One rule per entry, as written. */
   allowedUrlRules: string[];
-  /** Also drives whether the "Expected" column is shown (length > 0). */
   knownBlockedRules: string[];
 }
 
