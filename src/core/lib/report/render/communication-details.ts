@@ -25,15 +25,8 @@ export function communicationTruncationNote(artifactAvailable: boolean): string 
 }
 
 /**
- * What to print in place of `reason`, the one `event` was blocked for or, in
- * audit, the one restrict would block it for. Undefined prints the reason. It
- * goes on the event's line inside a fenced block, so it holds no newline.
- */
-export type BlockLabel = (event: TrafficEvent, reason: string) => string | undefined;
-
-/**
  * What to print at the end of `event`'s line, or undefined or "" for nothing.
- * Like a BlockLabel, it holds no newline.
+ * It goes on the line inside a fenced block, so it holds no newline.
  */
 export type LineNote = (event: TrafficEvent) => string | undefined;
 
@@ -50,7 +43,6 @@ export type LineNote = (event: TrafficEvent) => string | undefined;
 export function renderCommunicationDetailsBody(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
-  blockLabel: BlockLabel = () => undefined,
   lineNote: LineNote = () => undefined,
 ): string {
   // The keepalive noise clientEndedNoise marks is dropped here, before
@@ -61,7 +53,7 @@ export function renderCommunicationDetailsBody(
   const shown = relevant.filter((e) => !isRedundantDns(e, connected));
   if (shown.length === 0) return "";
   // A fenced block, so URLs need no markdown escaping and stay copy-pastable.
-  const lines = shown.map((event) => renderEvent(event, startedAt, blockLabel, lineNote));
+  const lines = shown.map((event) => renderEvent(event, startedAt, lineNote));
   return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
@@ -80,19 +72,16 @@ const MARK: Record<string, string> = {
 function renderEvent(
   event: TrafficEvent,
   startedAt: number | undefined,
-  blockLabel: BlockLabel,
   lineNote: LineNote,
 ): string {
   const mark =
     event.action === "audit" && event.wouldBlock !== undefined
       ? "⚠️"
       : (MARK[event.action] ?? "✅");
-  const label = (reason: string) => blockLabel(event, reason) ?? reason;
-  const note =
-    event.wouldBlock === undefined ? "" : ` (restrict would block: ${label(event.wouldBlock)})`;
+  const note = event.wouldBlock === undefined ? "" : ` (restrict would block: ${event.wouldBlock})`;
   const extra = lineNote(event);
   const tail = extra ? ` ${extra}` : "";
-  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}${tail}`;
+  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event)}${note}${tail}`;
 }
 
 /**
@@ -222,10 +211,9 @@ function subject(event: TrafficEvent): string {
   return `${event.method} ${redactCredentialQuery(event.url)}`;
 }
 
-/** What came of it: a block names its reason, as `label` prints it, anything
- *  else its result. */
-function outcome(event: TrafficEvent, label: (reason: string) => string): string {
-  if (event.action === "block") return event.reason === undefined ? "blocked" : label(event.reason);
+/** What came of it: a block names its reason, anything else its result. */
+function outcome(event: TrafficEvent): string {
+  if (event.action === "block") return event.reason ?? "blocked";
   // No status behind one, and the reason tells a close from a timeout and both
   // from bytes that never parsed.
   if (event.action === "incomplete") return event.reason ?? "no request";

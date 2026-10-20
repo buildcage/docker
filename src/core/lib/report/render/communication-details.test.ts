@@ -45,54 +45,6 @@ const TIMELINE: TrafficEvent[] = [
   { time: t + 4, action: "allow", protocol: "dns", host: "a.example.com" },
 ];
 
-describe("a block label", () => {
-  const label = (e: TrafficEvent) => (e.host === "evil.example.com" ? "labelled" : undefined);
-  const lines = (timeline: TrafficEvent[]) =>
-    (renderCommunicationDetailsBody(timeline, t, label).split("```")[1] ?? "").trim().split("\n");
-
-  it("replaces the reason a request was blocked for", () => {
-    const blockedEvent = TIMELINE.find(
-      (e) => e.host === "evil.example.com" && e.action === "block",
-    );
-    expect(blockedEvent).toBeDefined();
-    expect(lines([blockedEvent!])[0].endsWith(" -> labelled")).toBe(true);
-  });
-
-  it("replaces the reason restrict would block a request for", () => {
-    const audited: TrafficEvent = {
-      ...TIMELINE[0],
-      host: "evil.example.com",
-      action: "audit",
-      wouldBlock: "example-block",
-    };
-    expect(lines([audited])[0].endsWith(" -> 200 (708B) (restrict would block: labelled)")).toBe(
-      true,
-    );
-  });
-
-  it("labels each reason of a request blocked for one that restrict would block for another", () => {
-    const both: TrafficEvent = {
-      ...TIMELINE[0],
-      action: "block",
-      reason: "first",
-      wouldBlock: "second",
-    };
-    const line = (
-      renderCommunicationDetailsBody([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
-    ).trim();
-    expect(line.endsWith(" -> first! (restrict would block: second!)")).toBe(true);
-  });
-
-  it("leaves the reason where it gives none", () => {
-    const audited: TrafficEvent = {
-      ...TIMELINE[0],
-      action: "audit",
-      wouldBlock: "example-block",
-    };
-    expect(lines([audited])[0].endsWith("(restrict would block: example-block)")).toBe(true);
-  });
-});
-
 describe("renderCommunicationDetailsBody", () => {
   const md = renderCommunicationDetailsBody(TIMELINE, t);
   const body = md.split("```")[1] ?? "";
@@ -118,6 +70,17 @@ describe("renderCommunicationDetailsBody", () => {
     expect(line).toBe(
       "⚠️ 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would block: example-block)",
     );
+  });
+
+  it("names the reason a request was blocked for and the one restrict would block it for", () => {
+    const both: TrafficEvent = {
+      ...TIMELINE[0],
+      action: "block",
+      reason: "first",
+      wouldBlock: "second",
+    };
+    const line = (renderCommunicationDetailsBody([both], t).split("```")[1] ?? "").trim();
+    expect(line.endsWith(" -> first (restrict would block: second)")).toBe(true);
   });
 
   it("says what restrict would have blocked after a reason too", () => {
