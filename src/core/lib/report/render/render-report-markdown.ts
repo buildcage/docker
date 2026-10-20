@@ -32,6 +32,22 @@ export const TRAFFIC_BLOCK = {
 
 export type TrafficBlockId = (typeof TRAFFIC_BLOCK)[keyof typeof TRAFFIC_BLOCK];
 
+/**
+ * The traffic section's levels; see SummaryBlock.level. Once a table is cut,
+ * no `nested` block given room after it prints, while the other tables and the
+ * blocks already given room stay.
+ */
+export const TRAFFIC_LEVEL = {
+  /** The report's frame, never cut. */
+  frame: 1,
+  table: 2,
+  /**
+   * Known Blocked Hosts and Communication details, and a table that reads as
+   * part of the one before it. A cut one silences none of the others.
+   */
+  nested: 3,
+} as const;
+
 /** The priority of each block that can be cut; see SummaryBlock.priority. */
 export type TrafficPriorities = Record<TrafficBlockId, number>;
 
@@ -59,7 +75,7 @@ export function trafficTableBlock(
   return {
     id,
     priority,
-    level: 2,
+    level: TRAFFIC_LEVEL.table,
     section: SECTION,
     text: before + table + after,
     cut: "lines",
@@ -72,7 +88,7 @@ export function trafficTableBlock(
  *  report's framing, or a caller's text around it. */
 export const trafficFrame = (text: string): SummaryBlock => ({
   priority: 0,
-  level: 1,
+  level: TRAFFIC_LEVEL.frame,
   section: SECTION,
   text,
   cut: "keep",
@@ -190,13 +206,12 @@ export function knownBlockedBlocks(report: ReportData, fit: PartFit): SummaryBlo
   const expected = report.blocked.filter((r) => r.expected);
   if (expected.length === 0) return [];
   const hosts = new Set(expected.map((r) => r.host)).size;
-  // Cut whole so the notice is not hidden in the collapsed element, and at
-  // the log's level so cutting it does not silence the log.
+  // Cut whole so the notice is not hidden in the collapsed element.
   return [
     {
       id: TRAFFIC_BLOCK.known,
       priority: fit.priority,
-      level: 3,
+      level: TRAFFIC_LEVEL.nested,
       section: SECTION,
       cut: "atomic",
       notice: hostTableTruncationNote(fit.artifactAvailable),
@@ -231,7 +246,7 @@ export function restrictExampleBlocks(
     {
       id: TRAFFIC_BLOCK.example,
       priority: fit.priority,
-      level: 2,
+      level: TRAFFIC_LEVEL.table,
       // Its own section, so a cut example's notice does not silence the
       // tables' or the log's.
       section: `${SECTION}-example`,
@@ -267,7 +282,7 @@ export function communicationDetailsBlocks(
     {
       id: TRAFFIC_BLOCK.log,
       priority: fit.priority,
-      level: 3,
+      level: TRAFFIC_LEVEL.nested,
       section: SECTION,
       cut: "lines",
       open: COMMUNICATION_DETAILS_OPEN,
