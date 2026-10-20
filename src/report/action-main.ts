@@ -38,12 +38,14 @@ const DEFAULT_ACTION_REPOSITORY = "buildcage/docker";
 const DEFAULT_ACTION_REF = "v4";
 
 // The order the report's parts keep their room in when the summary is too
-// large: the example, the blocked and failed table, the allowed one, then the log.
+// large: the example, the blocked and failed table, the allowed one, the known
+// blocked one, then the log.
 const TRAFFIC_PRIORITIES: TrafficPriorities = {
   [TRAFFIC_BLOCK.example]: 1,
   [TRAFFIC_BLOCK.blocked]: 2,
   [TRAFFIC_BLOCK.passed]: 3,
-  [TRAFFIC_BLOCK.log]: 4,
+  [TRAFFIC_BLOCK.known]: 4,
+  [TRAFFIC_BLOCK.log]: 5,
 };
 
 export interface ReportActionSpec {

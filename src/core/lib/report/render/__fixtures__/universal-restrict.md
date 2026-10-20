@@ -3,13 +3,6 @@
 > [!CAUTION]
 > 2 blocked · 1 failed
 
-### ✅ Allowed Hosts
-
-| Host | Rule | Count |
-| --- | --- | ---: |
-| `a.example.com:443` | HTTPS | 3 |
-| `b.example.com:80` | HTTP | 1 |
-
 ### 🚫 Blocked / ⚠️ Failed Hosts
 
 | Host | Rule | Reason | Count |
@@ -18,6 +11,13 @@
 | `c.example.com:443` | HTTPS | ⚠️ dns-failed | 1 |
 
 <sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+
+### ✅ Allowed Hosts
+
+| Host | Rule | Count |
+| --- | --- | ---: |
+| `a.example.com:443` | HTTPS | 3 |
+| `b.example.com:80` | HTTP | 1 |
 
 <details>
 <summary>💬 Communication details</summary>

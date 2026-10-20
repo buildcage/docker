@@ -21,7 +21,8 @@ const PRIORITIES: TrafficPriorities = {
   [TRAFFIC_BLOCK.example]: 2,
   [TRAFFIC_BLOCK.blocked]: 4,
   [TRAFFIC_BLOCK.passed]: 6,
-  [TRAFFIC_BLOCK.log]: 7,
+  [TRAFFIC_BLOCK.known]: 7,
+  [TRAFFIC_BLOCK.log]: 8,
 };
 
 const rows = (prefix: string, n: number, reason = "-") =>
@@ -73,6 +74,19 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).toContain("ok0.example.com");
     expect(out).not.toContain("ok1999.example.com");
     expect(out).toContain(hostTableTruncationNote(false));
+  });
+
+  it("cuts the known blocked hosts before the allowed ones, keeping the details element closed", () => {
+    const known = rows("noise", 2000, "not-allowed").map((r) => ({
+      ...r,
+      expected: true,
+      expectedBy: r.host,
+    }));
+    const out = fit(report({ passed: rows("ok", 20), blocked: known, blockedCount: 2000 }));
+    expect(out).toContain("ok19.example.com");
+    expect(out).toContain("<summary>🚫 Known Blocked Hosts (2000)</summary>");
+    expect(out).not.toContain("noise1999.example.com");
+    expect(out).toContain(`${hostTableTruncationNote(false)}\n</details>`);
   });
 
   it("gives a cut communication log the log's own notice", () => {
@@ -178,8 +192,8 @@ describe("renderReportBlocks under a limit", () => {
       engine: "inspect",
     });
     const order = [
-      "### 📋 Audited Hosts",
       "### 🚫 Blocked / ⚠️ Failed Hosts",
+      "### 📋 Audited Hosts",
       "🛡️ Switch to restrict mode",
       "💬 Communication details",
     ].map((heading) => out.indexOf(heading));
@@ -187,7 +201,7 @@ describe("renderReportBlocks under a limit", () => {
     expect(order).toStrictEqual(order.toSorted((a, b) => a - b));
   });
 
-  it("puts an action's own blocks after the blocked table, a blank line apart", () => {
+  it("puts an action's own blocks between the blocked table and the allowed one, a blank line apart", () => {
     const extra = (gap: string) => [
       {
         id: "extra",
@@ -218,7 +232,7 @@ describe("renderReportBlocks under a limit", () => {
     );
     expect(empty).toContain("## Outbound Traffic Report\n\n_(no");
     expect(render(report({ passed: rows("ok", 1) }))).toContain(
-      "| `ok0.example.com:443` | HTTPS | 1 |\n\nEXTRA\n",
+      "## Outbound Traffic Report\n\nEXTRA\n\n### ✅ Allowed Hosts",
     );
   });
 
