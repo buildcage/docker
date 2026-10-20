@@ -21,7 +21,7 @@ export interface RenderReportMarkdownOptions extends ExampleStepOptions {
 
 const SECTION = "traffic";
 
-/** The ids renderReportBlocks gives its blocks, for picking their notices. */
+/** The ids of the parts' blocks, for their priorities and for telling which a fit cut. */
 export const TRAFFIC_BLOCK = {
   example: "traffic-example",
   blocked: "traffic-blocked",
@@ -35,33 +35,23 @@ export type TrafficBlockId = (typeof TRAFFIC_BLOCK)[keyof typeof TRAFFIC_BLOCK];
 /** The priority of each block that can be cut; see SummaryBlock.priority. */
 export type TrafficPriorities = Record<TrafficBlockId, number>;
 
-/**
- * The notice each traffic block gives in place of what a cut dropped, or
- * undefined for a block that is not one of renderReportBlocks', so a block
- * handed to the wrong picker prints no misleading notice.
- */
-export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): string | undefined {
-  switch (block.id) {
-    case TRAFFIC_BLOCK.example:
-      return restrictExampleTruncationNote(artifactAvailable);
-    case TRAFFIC_BLOCK.log:
-      return communicationTruncationNote(artifactAvailable);
-    case TRAFFIC_BLOCK.blocked:
-    case TRAFFIC_BLOCK.passed:
-    case TRAFFIC_BLOCK.known:
-      return hostTableTruncationNote(artifactAvailable);
-    default:
-      return undefined;
-  }
+/** How a part fits into a summary too large to print whole. */
+export interface PartFit {
+  /** See SummaryBlock.priority. */
+  priority: number;
+  /** Whether the notice in place of what was cut can point to the traffic artifact. */
+  artifactAvailable: boolean;
 }
 
 /**
  * A table of the traffic report with the text before and after it, cut row by
- * row: its heading, header row and separator stay or the whole table gives way.
+ * row: its heading, header row and separator stay or the whole table gives way
+ * to `notice`.
  */
 export function trafficTableBlock(
   id: string,
   priority: number,
+  notice: string,
   before: string,
   table: string,
   after: string,
@@ -74,6 +64,7 @@ export function trafficTableBlock(
     text: before + table + after,
     cut: "lines",
     head: before.split("\n").length + 1,
+    notice,
   };
 }
 
@@ -145,7 +136,7 @@ export function trafficHeadingBlock(
 }
 
 /** The blocked hosts no known_blocked_rules rule matched, and the failed ones. */
-export function blockedHostsBlocks(report: ReportData, priority: number): SummaryBlock[] {
+export function blockedHostsBlocks(report: ReportData, fit: PartFit): SummaryBlock[] {
   const blocked = report.blocked
     .filter((r) => !r.expected)
     .map((r) => ({ ...r, outcome: "blocked" as const }));
@@ -166,7 +157,8 @@ export function blockedHostsBlocks(report: ReportData, priority: number): Summar
   return [
     trafficTableBlock(
       TRAFFIC_BLOCK.blocked,
-      priority,
+      fit.priority,
+      hostTableTruncationNote(fit.artifactAvailable),
       `### ${tableTitle}\n\n`,
       renderHostTable([...blocked, ...failed], { showReason: true }),
       `\n${note}`,
@@ -175,13 +167,14 @@ export function blockedHostsBlocks(report: ReportData, priority: number): Summar
 }
 
 /** The hosts let through: allowed, or in audit, audited. */
-export function passedHostsBlocks(report: ReportData, priority: number): SummaryBlock[] {
+export function passedHostsBlocks(report: ReportData, fit: PartFit): SummaryBlock[] {
   if (report.passed.length === 0) return [];
   const heading = report.parameters.mode === "audit" ? "📋 Audited Hosts" : "✅ Allowed Hosts";
   return [
     trafficTableBlock(
       TRAFFIC_BLOCK.passed,
-      priority,
+      fit.priority,
+      hostTableTruncationNote(fit.artifactAvailable),
       `### ${heading}\n\n`,
       renderHostTable(report.passed),
       "\n",
@@ -193,7 +186,7 @@ export function passedHostsBlocks(report: ReportData, priority: number): Summary
  * The blocked hosts a known_blocked_rules rule matched, collapsed: they need
  * no action.
  */
-export function knownBlockedBlocks(report: ReportData, priority: number): SummaryBlock[] {
+export function knownBlockedBlocks(report: ReportData, fit: PartFit): SummaryBlock[] {
   const expected = report.blocked.filter((r) => r.expected);
   if (expected.length === 0) return [];
   const hosts = new Set(expected.map((r) => r.host)).size;
@@ -202,10 +195,11 @@ export function knownBlockedBlocks(report: ReportData, priority: number): Summar
   return [
     {
       id: TRAFFIC_BLOCK.known,
-      priority,
+      priority: fit.priority,
       level: 3,
       section: SECTION,
       cut: "atomic",
+      notice: hostTableTruncationNote(fit.artifactAvailable),
       text:
         `<details>\n<summary>🚫 Known Blocked Hosts (${hosts} host${hosts === 1 ? "" : "s"})</summary>\n\n` +
         `${renderHostTable(foldExpectedBlockedRows(expected), { showReason: true })}\n\n</details>\n`,
@@ -218,7 +212,7 @@ export function restrictExampleBlocks(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
-  priority: number,
+  fit: PartFit,
   step: ExampleStepOptions = {},
 ): SummaryBlock[] {
   if (report.parameters.mode !== "audit") return [];
@@ -236,13 +230,14 @@ export function restrictExampleBlocks(
   return [
     {
       id: TRAFFIC_BLOCK.example,
-      priority,
+      priority: fit.priority,
       level: 2,
       // Its own section, so a cut example's notice does not silence the
       // tables' or the log's.
       section: `${SECTION}-example`,
       cut: "atomic",
       text: example,
+      notice: restrictExampleTruncationNote(fit.artifactAvailable),
     },
   ];
 }
@@ -262,7 +257,7 @@ export function noCommunicationBlocks(report: ReportData): SummaryBlock[] {
 /** Communication details, the timeline line by line; see renderInspectDetailsBody. */
 export function communicationDetailsBlocks(
   report: ReportData,
-  priority: number,
+  fit: PartFit,
   blockLabel?: BlockLabel,
   lineNote?: LineNote,
 ): SummaryBlock[] {
@@ -271,13 +266,14 @@ export function communicationDetailsBlocks(
   return [
     {
       id: TRAFFIC_BLOCK.log,
-      priority,
+      priority: fit.priority,
       level: 3,
       section: SECTION,
       cut: "lines",
       open: COMMUNICATION_DETAILS_OPEN,
       text: details,
       close: COMMUNICATION_DETAILS_CLOSE,
+      notice: communicationTruncationNote(fit.artifactAvailable),
     },
   ];
 }
@@ -296,24 +292,25 @@ export function engineNoteBlocks(report: ReportData): SummaryBlock[] {
  * The report as blocks for fitStepSummary, in print order: what needs acting
  * on first, then what got through, then the record. The frame (title, notes,
  * footer) is kept whole; every other block takes its priority from
- * `priorities`, and its notice is the caller's to pick with withNotices, both
- * by TRAFFIC_BLOCK id. An action that adds parts of its own stacks them with
- * the same functions in its own order instead.
+ * `priorities` by TRAFFIC_BLOCK id. An action that adds parts of its own
+ * stacks them with the same functions in its own order instead.
  */
 export function renderReportBlocks(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
   priorities: TrafficPriorities,
+  artifactAvailable: boolean,
   { title = "Outbound Traffic Report", ...step }: RenderReportMarkdownOptions = {},
 ): SummaryBlock[] {
+  const fit = (id: TrafficBlockId): PartFit => ({ priority: priorities[id], artifactAvailable });
   return stackTrafficBlocks(trafficHeadingBlock(report, title), [
-    blockedHostsBlocks(report, priorities[TRAFFIC_BLOCK.blocked]),
-    passedHostsBlocks(report, priorities[TRAFFIC_BLOCK.passed]),
-    knownBlockedBlocks(report, priorities[TRAFFIC_BLOCK.known]),
-    restrictExampleBlocks(report, actionRepo, actionRef, priorities[TRAFFIC_BLOCK.example], step),
+    blockedHostsBlocks(report, fit(TRAFFIC_BLOCK.blocked)),
+    passedHostsBlocks(report, fit(TRAFFIC_BLOCK.passed)),
+    knownBlockedBlocks(report, fit(TRAFFIC_BLOCK.known)),
+    restrictExampleBlocks(report, actionRepo, actionRef, fit(TRAFFIC_BLOCK.example), step),
     noCommunicationBlocks(report),
-    communicationDetailsBlocks(report, priorities[TRAFFIC_BLOCK.log]),
+    communicationDetailsBlocks(report, fit(TRAFFIC_BLOCK.log)),
     engineNoteBlocks(report),
     [trafficFrame(reportFooter(actionRepo))],
   ]);

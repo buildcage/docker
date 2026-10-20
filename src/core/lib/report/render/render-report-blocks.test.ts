@@ -9,7 +9,6 @@ import {
   fitStepSummary,
   joinSummaryBlocks,
   SAFETY_MARGIN_BYTES,
-  withNotices,
   type SummaryBlock,
 } from "./fit-step-summary.ts";
 import { hostTableTruncationNote } from "./host-table.ts";
@@ -18,7 +17,6 @@ import {
   stackTrafficBlocks,
   TRAFFIC_BLOCK,
   trafficFrame,
-  trafficNotice,
   trafficTableBlock,
   type TrafficPriorities,
 } from "./render-report-markdown.ts";
@@ -59,12 +57,9 @@ function report(overrides: Partial<UniversalReportData>): UniversalReportData {
 }
 
 function fit(r: ReportData): string {
-  return fitStepSummary(
-    withNotices(renderReportBlocks(r, "owner/repo", "v1", PRIORITIES), (b) =>
-      trafficNotice(b, false),
-    ),
-    { limitBytes: LIMIT },
-  );
+  return fitStepSummary(renderReportBlocks(r, "owner/repo", "v1", PRIORITIES, false), {
+    limitBytes: LIMIT,
+  });
 }
 
 describe("renderReportBlocks under a limit", () => {
@@ -228,18 +223,6 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).toContain(hostTableTruncationNote(false));
     expect(out).not.toContain("\n\n\n");
   });
-
-  it("picks no notice for a block that is not the traffic report's", () => {
-    const block = {
-      id: "filesystem-log",
-      priority: 1,
-      level: 1,
-      section: "fs",
-      text: "",
-      cut: "lines" as const,
-    };
-    expect(trafficNotice(block, true)).toBeUndefined();
-  });
 });
 
 describe("stackTrafficBlocks", () => {
@@ -283,10 +266,14 @@ describe("stackTrafficBlocks", () => {
   // and header row with no separator or rows under them.
   it("never cuts a stacked table to its heading without a row", () => {
     const rows = Array.from({ length: 50 }, (_, i) => `| r${i} |`).join("\n");
-    const table = {
-      ...trafficTableBlock("t", 5, "### Table\n\n", `| h |\n| --- |\n${rows}\n`, "\n"),
-      notice: "_cut_\n",
-    };
+    const table = trafficTableBlock(
+      "t",
+      5,
+      "_cut_\n",
+      "### Table\n\n",
+      `| h |\n| --- |\n${rows}\n`,
+      "\n",
+    );
     const blocks = stackTrafficBlocks(heading, [[block("A\n")], [table]]);
     expect(blocks[2]).toMatchObject({ head: (table.head ?? 0) + 1 });
     const frame = Buffer.byteLength("## T\n\nA\n");

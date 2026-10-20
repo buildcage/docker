@@ -20,11 +20,10 @@ import { createDocker } from "#core/lib/docker/client.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
-import { fitStepSummary, withNotices } from "#core/lib/report/render/fit-step-summary.ts";
+import { fitStepSummary } from "#core/lib/report/render/fit-step-summary.ts";
 import {
   renderReportBlocks,
   TRAFFIC_BLOCK,
-  trafficNotice,
   type TrafficPriorities,
 } from "#core/lib/report/render/render-report-markdown.ts";
 import type { GenReportParameters, ReportData } from "#core/lib/report/types.ts";
@@ -111,11 +110,18 @@ export async function runReportAction(
     console.log(line);
   }
 
+  // The report action uploads this file as an artifact if asked; the upload
+  // client is large and needs the runner's credentials, so it stays out of the
+  // image and the file is written here instead. Its name is known before the
+  // summary is rendered, so a truncated section can say whether the full list
+  // is available as an artifact.
+  const trafficFile = env.BUILDCAGE_TRAFFIC_FILE;
   const blocks = renderReportBlocks(
     report,
     env.GITHUB_ACTION_REPOSITORY || DEFAULT_ACTION_REPOSITORY,
     env.GITHUB_ACTION_REF || DEFAULT_ACTION_REF,
     TRAFFIC_PRIORITIES,
+    trafficFile !== undefined,
     { actionVersion: readActionVersion(docker, containerId, spec.proxyEngine) },
   );
 
@@ -124,12 +130,6 @@ export async function runReportAction(
     summaryFile: env.GITHUB_STEP_SUMMARY,
   });
 
-  // The report action uploads this file as an artifact if asked; the upload
-  // client is large and needs the runner's credentials, so it stays out of the
-  // image and the file is written here instead. Its name is known before the
-  // summary is written, so a truncated Communication details section can say
-  // whether the full list is available as an artifact.
-  const trafficFile = env.BUILDCAGE_TRAFFIC_FILE;
   // Both writes are tried; a failure in either is thrown once both have run.
   const failures: unknown[] = [];
   if (trafficFile) {
@@ -140,10 +140,7 @@ export async function runReportAction(
     }
   }
   try {
-    await writeStepSummary(
-      fitStepSummary(withNotices(blocks, (b) => trafficNotice(b, trafficFile !== undefined))),
-      env.GITHUB_STEP_SUMMARY,
-    );
+    await writeStepSummary(fitStepSummary(blocks), env.GITHUB_STEP_SUMMARY);
   } catch (e) {
     failures.push(e);
   }

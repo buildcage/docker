@@ -24,5 +24,7 @@ export function renderReportMarkdown(
   actionRef: string,
   options: RenderReportMarkdownOptions = {},
 ): string {
-  return joinSummaryBlocks(renderReportBlocks(report, actionRepo, actionRef, JOINED, options));
+  return joinSummaryBlocks(
+    renderReportBlocks(report, actionRepo, actionRef, JOINED, false, options),
+  );
 }

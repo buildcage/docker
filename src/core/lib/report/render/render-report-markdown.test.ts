@@ -332,7 +332,7 @@ describe("renderReportMarkdown: inspect", () => {
     const md = joinSummaryBlocks(
       communicationDetailsBlocks(
         { ...base, timeline: [blockedEvent, timeline[0]] },
-        1,
+        { priority: 1, artifactAvailable: false },
         (_, reason) => `${reason}, labelled`,
         (e) => (e.action === "allow" ? "[noted]" : undefined),
       ),
@@ -386,7 +386,7 @@ describe("renderReportMarkdown: section and footer", () => {
   it("puts the verdict under the title and its items after the blocks", () => {
     const md = joinSummaryBlocks(
       stackTrafficBlocks(trafficHeadingBlock(base, "Outbound Traffic Report", ["1 x"]), [
-        blockedHostsBlocks(base, 1),
+        blockedHostsBlocks(base, { priority: 1, artifactAvailable: false }),
       ]),
     );
     expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 blocked · 1 x\n\n### /);
