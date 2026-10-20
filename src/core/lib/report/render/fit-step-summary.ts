@@ -15,7 +15,7 @@ export const STEP_SUMMARY_LIMIT_BYTES = 1024 * 1024;
 export const SAFETY_MARGIN_BYTES = 8 * 1024;
 
 export interface SummaryBlock {
-  /** Names the block for its caller, which picks its notice by it. */
+  /** Names the block for its caller, which tells by it which blocks a fit cut. */
   id?: string;
   /**
    * Lower is given room first when the summary has to be cut. A `keep` block
@@ -52,7 +52,8 @@ export const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
 
 const rank = (b: SummaryBlock): number => (b.cut === "keep" ? -Infinity : b.priority);
 
-const whole = (b: SummaryBlock): string => (b.open ?? "") + b.text + (b.close ?? "");
+/** The block as it prints when it is not cut. */
+export const wholeBlock = (b: SummaryBlock): string => (b.open ?? "") + b.text + (b.close ?? "");
 
 /** The blocks with the notice `noticeFor` picks on every one a cut can reach. */
 export function withNotices(
@@ -64,7 +65,7 @@ export function withNotices(
 
 /** The blocks printed whole, as they read with no limit to fit. */
 export function joinSummaryBlocks(blocks: SummaryBlock[]): string {
-  return blocks.map(whole).join("");
+  return blocks.map(wholeBlock).join("");
 }
 
 export interface FitStepSummaryOptions {
@@ -89,7 +90,7 @@ export function fitStepSummary(
   blocks: SummaryBlock[],
   { usedBytes = 0, limitBytes = STEP_SUMMARY_LIMIT_BYTES, onCut }: FitStepSummaryOptions = {},
 ): string {
-  const full = blocks.map(whole);
+  const full = blocks.map(wholeBlock);
   const sizes = full.map(bytes);
   let budget = limitBytes - SAFETY_MARGIN_BYTES - usedBytes;
   if (sizes.reduce((sum, n) => sum + n, 0) <= budget) return full.join("");
@@ -120,8 +121,9 @@ export function fitStepSummary(
 function cutBlock(b: SummaryBlock, budget: number): string {
   const notice = b.notice ?? "";
   // A notice alone keeps the block's opening blank line, which ends the table
-  // or </details> above it.
-  const alone = (b.text.startsWith("\n") ? "\n" : "") + notice;
+  // or </details> above it, whether it opens `open` or `text`. Not read off
+  // the joined block, which would copy a log of tens of MB for one character.
+  const alone = ((b.open || b.text).startsWith("\n") ? "\n" : "") + notice;
   if (b.cut === "atomic") return alone;
   const open = b.open ?? "";
   const close = b.close ?? "";

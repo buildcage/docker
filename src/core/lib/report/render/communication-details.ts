@@ -7,12 +7,35 @@ import {
 
 import { formatElapsedVariable } from "../elapsed-time.ts";
 
+/** The `💬 Communication details` section's own markup. */
+export const COMMUNICATION_DETAILS_OPEN =
+  "<details>\n<summary>\u{1F4AC} Communication details</summary>\n\n";
+export const COMMUNICATION_DETAILS_CLOSE = "</details>\n";
+
+/**
+ * What a traffic report says where the Job Summary's size limit cut its
+ * communication log. The blank line after it ends the paragraph before the
+ * closing tag.
+ */
+export function communicationTruncationNote(artifactAvailable: boolean): string {
+  const rest = artifactAvailable
+    ? "the buildcage-traffic artifact uploaded for this run has the rest"
+    : "set upload_traffic_artifact: true to get the rest as a downloadable artifact";
+  return `_…truncated: the full communication log exceeded GitHub's Job Summary size limit; ${rest}._\n\n`;
+}
+
 /**
  * What to print in place of `reason`, the one `event` was blocked for or, in
  * audit, the one restrict would block it for. Undefined prints the reason. It
  * goes on the event's line inside a fenced block, so it holds no newline.
  */
 export type BlockLabel = (event: TrafficEvent, reason: string) => string | undefined;
+
+/**
+ * What to print at the end of `event`'s line, or undefined or "" for nothing.
+ * Like a BlockLabel, it holds no newline.
+ */
+export type LineNote = (event: TrafficEvent) => string | undefined;
 
 /**
  * The communication detail as a fenced block, or "" if nothing is shown. One
@@ -24,10 +47,11 @@ export type BlockLabel = (event: TrafficEvent, reason: string) => string | undef
  * A URL keeps its query, except for the parameters named in CREDENTIAL_PARAMS,
  * whose values are replaced.
  */
-export function renderInspectDetailsBody(
+export function renderCommunicationDetailsBody(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
   blockLabel: BlockLabel = () => undefined,
+  lineNote: LineNote = () => undefined,
 ): string {
   // The keepalive noise clientEndedNoise marks is dropped here, before
   // connectedHosts, so a hidden close cannot mask a name's other rows.
@@ -37,7 +61,7 @@ export function renderInspectDetailsBody(
   const shown = relevant.filter((e) => !isRedundantDns(e, connected));
   if (shown.length === 0) return "";
   // A fenced block, so URLs need no markdown escaping and stay copy-pastable.
-  const lines = shown.map((event) => renderEvent(event, startedAt, blockLabel));
+  const lines = shown.map((event) => renderEvent(event, startedAt, blockLabel, lineNote));
   return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
@@ -57,6 +81,7 @@ function renderEvent(
   event: TrafficEvent,
   startedAt: number | undefined,
   blockLabel: BlockLabel,
+  lineNote: LineNote,
 ): string {
   const mark =
     event.action === "audit" && event.wouldBlock !== undefined
@@ -65,7 +90,9 @@ function renderEvent(
   const label = (reason: string) => blockLabel(event, reason) ?? reason;
   const note =
     event.wouldBlock === undefined ? "" : ` (restrict would block: ${label(event.wouldBlock)})`;
-  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}`;
+  const extra = lineNote(event);
+  const tail = extra ? ` ${extra}` : "";
+  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}${tail}`;
 }
 
 /**

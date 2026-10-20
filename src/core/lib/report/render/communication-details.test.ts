@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import { renderInspectDetailsBody } from "./inspect-details.ts";
+import { renderCommunicationDetailsBody } from "./communication-details.ts";
 
 const t = 1787471975;
 const TIMELINE: TrafficEvent[] = [
@@ -48,7 +48,7 @@ const TIMELINE: TrafficEvent[] = [
 describe("a block label", () => {
   const label = (e: TrafficEvent) => (e.host === "evil.example.com" ? "labelled" : undefined);
   const lines = (timeline: TrafficEvent[]) =>
-    (renderInspectDetailsBody(timeline, t, label).split("```")[1] ?? "").trim().split("\n");
+    (renderCommunicationDetailsBody(timeline, t, label).split("```")[1] ?? "").trim().split("\n");
 
   it("replaces the reason a request was blocked for", () => {
     const blockedEvent = TIMELINE.find(
@@ -78,7 +78,7 @@ describe("a block label", () => {
       wouldBlock: "second",
     };
     const line = (
-      renderInspectDetailsBody([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
+      renderCommunicationDetailsBody([both], t, (_, reason) => `${reason}!`).split("```")[1] ?? ""
     ).trim();
     expect(line.endsWith(" -> first! (restrict would block: second!)")).toBe(true);
   });
@@ -93,8 +93,8 @@ describe("a block label", () => {
   });
 });
 
-describe("renderInspectDetailsBody", () => {
-  const md = renderInspectDetailsBody(TIMELINE, t);
+describe("renderCommunicationDetailsBody", () => {
+  const md = renderCommunicationDetailsBody(TIMELINE, t);
   const body = md.split("```")[1] ?? "";
   const lines = body.trim().split("\n");
 
@@ -114,7 +114,7 @@ describe("renderInspectDetailsBody", () => {
       action: "audit",
       wouldBlock: "example-block",
     };
-    const line = (renderInspectDetailsBody([audited], t).split("```")[1] ?? "").trim();
+    const line = (renderCommunicationDetailsBody([audited], t).split("```")[1] ?? "").trim();
     expect(line).toBe(
       "⚠️ 00:00.000: GET https://a.example.com/pkg -> 200 (708B) (restrict would block: example-block)",
     );
@@ -127,7 +127,7 @@ describe("renderInspectDetailsBody", () => {
       reason: "dns-failed",
       wouldBlock: "example-block",
     };
-    const line = (renderInspectDetailsBody([failed], t).split("```")[1] ?? "").trim();
+    const line = (renderCommunicationDetailsBody([failed], t).split("```")[1] ?? "").trim();
     expect(line.endsWith("-> dns-failed (restrict would block: example-block)")).toBe(true);
   });
 
@@ -142,7 +142,7 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it("shows a portless connection as just its host, never host:undefined", () => {
-    const out = renderInspectDetailsBody(
+    const out = renderCommunicationDetailsBody(
       [{ time: t, action: "allow", protocol: "https", host: "a.example.com" }],
       t,
     );
@@ -153,7 +153,7 @@ describe("renderInspectDetailsBody", () => {
   it("scales the byte count to a readable unit, at each magnitude", () => {
     // A silent unit or rounding error would misreport how much crossed.
     const size = (bytes: number) => {
-      const out = renderInspectDetailsBody(
+      const out = renderCommunicationDetailsBody(
         [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes }],
         t,
       );
@@ -172,7 +172,7 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it("drops a blocked name once a blocked request for it also shows up", () => {
-    const md2 = renderInspectDetailsBody(
+    const md2 = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -214,7 +214,7 @@ describe("renderInspectDetailsBody", () => {
   it("names the record type a discovery lookup asked for, and says it got nothing", () => {
     // SRV going unanswered costs apt nothing; TXT going unanswered is why a
     // `mongodb+srv://` connection never got its options.
-    const md2 = renderInspectDetailsBody(
+    const md2 = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -236,7 +236,7 @@ describe("renderInspectDetailsBody", () => {
   it("shows a discovery lookup even though the host it belongs to connected", () => {
     // Nothing connects to `_service._proto.<host>`, so this is not the
     // connection to the plain name said twice.
-    const md2 = renderInspectDetailsBody(
+    const md2 = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -262,13 +262,13 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it("renders nothing at all when there was no traffic", () => {
-    expect(renderInspectDetailsBody([], t)).toBe("");
+    expect(renderCommunicationDetailsBody([], t)).toBe("");
   });
 
   it("keeps a name that resolved and was never connected to", () => {
     // Its own sole trace: a rule wide enough to cover something the build
     // only looked at is exactly what an audit run is meant to surface.
-    const only = renderInspectDetailsBody(
+    const only = renderCommunicationDetailsBody(
       [{ time: t, action: "allow", protocol: "dns", host: "a.com" }],
       t,
     );
@@ -276,7 +276,7 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it('falls back to a bare "blocked" when a block names no reason', () => {
-    const rendered = renderInspectDetailsBody(
+    const rendered = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -296,7 +296,7 @@ describe("renderInspectDetailsBody", () => {
   it("keeps a client-ended connection to a host nothing else reached", () => {
     // Nothing else reached this host, so the close is kept (see clientEndedNoise).
     for (const reason of ["client-aborted", "client-timeout"]) {
-      const rendered = renderInspectDetailsBody(
+      const rendered = renderCommunicationDetailsBody(
         [
           {
             time: t,
@@ -315,7 +315,7 @@ describe("renderInspectDetailsBody", () => {
 
   it("keeps a client-ended connection to (unknown), which is never one host", () => {
     // A block elsewhere under (unknown) proves nothing about this close.
-    const rendered = renderInspectDetailsBody(
+    const rendered = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -342,7 +342,7 @@ describe("renderInspectDetailsBody", () => {
   it("hides a client-ended connection to a host that also completed one", () => {
     // A keepalive pool cleaning up after its work is noise, not a failure.
     for (const reason of ["client-aborted", "client-timeout"]) {
-      const md = renderInspectDetailsBody(
+      const md = renderCommunicationDetailsBody(
         [
           {
             time: t,
@@ -374,7 +374,7 @@ describe("renderInspectDetailsBody", () => {
   it("hides a client-ended close to a host whose only request failed at the origin", () => {
     // A failed request still proves the client trusted the CA and a request
     // arrived, so the later keepalive close to that host is noise too.
-    const md = renderInspectDetailsBody(
+    const md = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -404,7 +404,7 @@ describe("renderInspectDetailsBody", () => {
   it("marks a request the proxy could not read as the block it was", () => {
     // Blocked, so 🚫 rather than ⚠️, and named by its port alone: the plain
     // stage has no SNI, and no request arrived to carry a Host.
-    const rendered = renderInspectDetailsBody(
+    const rendered = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -421,7 +421,7 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it("marks a connection haproxy itself ended before a request arrived", () => {
-    const rendered = renderInspectDetailsBody(
+    const rendered = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -441,7 +441,7 @@ describe("renderInspectDetailsBody", () => {
     // `OPTIONS *` reaches the rules and is blocked by them, so the row is a
     // block rather than a connection that carried nothing. Without the
     // method it would read as the latter.
-    const rendered = renderInspectDetailsBody(
+    const rendered = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -461,7 +461,7 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it('falls back to a bare "no request" when such a connection names no reason', () => {
-    const rendered = renderInspectDetailsBody(
+    const rendered = renderCommunicationDetailsBody(
       [{ time: t, action: "incomplete", protocol: "https", host: "a.example.com", port: 443 }],
       t,
     );
@@ -471,7 +471,7 @@ describe("renderInspectDetailsBody", () => {
   // The same ⚠️ as a request that never arrived, but this one has a URL to
   // show: it did arrive, and the rules passed on it.
   it("marks a connection the origin broke, keeping the request it named", () => {
-    const rendered = renderInspectDetailsBody(
+    const rendered = renderCommunicationDetailsBody(
       [
         {
           time: t,
@@ -492,7 +492,7 @@ describe("renderInspectDetailsBody", () => {
   });
 
   it('falls back to a bare "failed" when such a connection names no reason', () => {
-    const rendered = renderInspectDetailsBody(
+    const rendered = renderCommunicationDetailsBody(
       [{ time: t, action: "failed", protocol: "https", host: "a.example.com", port: 443 }],
       t,
     );
@@ -500,9 +500,9 @@ describe("renderInspectDetailsBody", () => {
   });
 });
 
-describe("renderInspectDetailsBody credential parameters", () => {
+describe("renderCommunicationDetailsBody credential parameters", () => {
   const subjectOf = (url: string) => {
-    const md = renderInspectDetailsBody(
+    const md = renderCommunicationDetailsBody(
       [{ time: t, action: "allow", protocol: "https", host: "h", port: 443, method: "GET", url }],
       t,
     );
@@ -622,9 +622,9 @@ describe("renderInspectDetailsBody credential parameters", () => {
   });
 });
 
-describe("renderInspectDetailsBody elapsed time", () => {
+describe("renderCommunicationDetailsBody elapsed time", () => {
   it("shows the first event at zero when it lands exactly on the start time", () => {
-    const md = renderInspectDetailsBody(
+    const md = renderCommunicationDetailsBody(
       [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       t,
     );
@@ -632,7 +632,7 @@ describe("renderInspectDetailsBody elapsed time", () => {
   });
 
   it("widens to HH:MM:SS.mmm once elapsed passes an hour", () => {
-    const md = renderInspectDetailsBody(
+    const md = renderCommunicationDetailsBody(
       [{ time: t + 3600, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       t,
     );
@@ -640,7 +640,7 @@ describe("renderInspectDetailsBody elapsed time", () => {
   });
 
   it("falls back to absolute UTC when there is no start time to be relative to", () => {
-    const md = renderInspectDetailsBody(
+    const md = renderCommunicationDetailsBody(
       [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       undefined,
     );

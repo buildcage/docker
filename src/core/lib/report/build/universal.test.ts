@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { reportParams } from "#core/lib/test/report-data.node.ts";
 
-import { buildRestrictExample } from "../render/build-example.ts";
+import { buildUniversalRestrictExample } from "../render/universal-example.ts";
 import { buildUniversalReportData } from "./universal.ts";
 
 const HAPROXY_START = "buildcage haproxy starting 1787471970000";
@@ -67,7 +67,7 @@ describe("buildUniversalReportData", () => {
     );
     expect(result.passed.map((r) => [r.host, r.count])).toStrictEqual([["example.com", 2]]);
     expect(
-      buildRestrictExample(result.passed, "owner/repo").match(/example\.com:443/g),
+      buildUniversalRestrictExample(result.passed, "owner/repo").match(/example\.com:443/g),
     ).toStrictEqual(["example.com:443"]);
   });
 

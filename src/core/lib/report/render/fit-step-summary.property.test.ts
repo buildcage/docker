@@ -41,7 +41,7 @@ function referenceFit(
 
 function referenceCut(b: SummaryBlock, budget: number): string {
   const notice = b.notice ?? "";
-  const alone = (b.text.startsWith("\n") ? "\n" : "") + notice;
+  const alone = ((b.open || b.text).startsWith("\n") ? "\n" : "") + notice;
   if (b.cut === "atomic") return alone;
   const open = b.open ?? "";
   const close = b.close ?? "";

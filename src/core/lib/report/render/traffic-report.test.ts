@@ -5,6 +5,14 @@ import { reportParams, expectedRows } from "#core/lib/test/report-data.node.ts";
 
 import { renderReportMarkdown } from "../../test/render-report-markdown.node.ts";
 import type { UniversalReportData, InspectReportData } from "../types.ts";
+import { joinSummaryBlocks } from "./fit-step-summary.ts";
+import {
+  blockedHostsBlocks,
+  communicationDetailsBlocks,
+  engineNoteBlocks,
+  trafficHeadingBlock,
+} from "./traffic-parts.ts";
+import { stackTrafficBlocks } from "./traffic-report.ts";
 
 const allowedRow = { host: "good.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 };
 const blockedRow = {
@@ -321,10 +329,17 @@ describe("renderReportMarkdown: inspect", () => {
       status: undefined,
       bytes: undefined,
     };
-    const md = renderReportMarkdown({ ...base, timeline: [blockedEvent] }, "owner/repo", "v1", {
-      blockLabel: (_, reason) => `${reason}, labelled`,
-    });
+    const md = joinSummaryBlocks(
+      communicationDetailsBlocks(
+        { ...base, timeline: [blockedEvent, timeline[0]] },
+        { priority: 1, artifactAvailable: false },
+        (_, reason) => `${reason}, labelled`,
+        (e) => (e.action === "allow" ? "[noted]" : ""),
+      ),
+    );
+    // An empty note adds nothing, not even the space before it.
     expect(md).toContain("GET https://good.com/pkg -> not-allowed, labelled\n");
+    expect(md).toContain("GET https://good.com/pkg -> 200 (1B) [noted]\n");
   });
 
   it("builds the audit-mode example from the timeline, method and path included", () => {
@@ -370,26 +385,24 @@ describe("renderReportMarkdown: section and footer", () => {
   };
 
   it("puts the verdict under the title and its items after the blocks", () => {
-    const md = renderReportMarkdown(base, "owner/repo", "v1", { verdictItems: ["1 x"] });
+    const md = joinSummaryBlocks(
+      stackTrafficBlocks(trafficHeadingBlock(base, "Outbound Traffic Report", ["1 x"]), [
+        blockedHostsBlocks(base, { priority: 1, artifactAvailable: false }),
+      ]),
+    );
     expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 blocked · 1 x\n\n### /);
   });
 
-  it("puts an action's own blocks after the blocked hosts", () => {
-    const md = renderReportMarkdown(base, "owner/repo", "v1", {
-      extraBlocks: (gap) => [
-        { priority: 1, level: 2, section: "traffic", cut: "keep", text: `${gap}### X\n` },
-      ],
-    });
-    expect(md).toMatch(/\n### 🚫 Blocked Hosts\n[^]*\n\n### X\n/);
+  it("notes how universal identifies a host, and inspect nothing", () => {
+    expect(joinSummaryBlocks(engineNoteBlocks(base))).toMatch(
+      /^<sub>[^]*IP rules on the destination IP address\.\*<\/sub>\n$/,
+    );
+    expect(engineNoteBlocks({ ...base, engine: "inspect" })).toStrictEqual([]);
   });
 
-  it("leaves the footer out when asked, keeping the engine's note", () => {
-    const md = renderReportMarkdown(base, "owner/repo", "v1", { footer: false });
-    expect(md).not.toMatch(/Reported by/);
-    expect(md).toMatch(/IP rules on the destination IP address\.\*<\/sub>\n$/);
-    const inspect = renderReportMarkdown({ ...base, engine: "inspect" }, "owner/repo", "v1", {
-      footer: false,
-    });
-    expect(inspect.endsWith("| 1 |\n")).toBe(true);
+  it("ends with the footer", () => {
+    expect(renderReportMarkdown(base, "owner/repo", "v1")).toMatch(
+      /\.\*<\/sub>\n\n\*Reported by \[owner\/repo\]\(https:\/\/github\.com\/owner\/repo\)\*\n\n<hr>\n$/,
+    );
   });
 });

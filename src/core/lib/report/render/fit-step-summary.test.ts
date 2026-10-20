@@ -4,7 +4,7 @@ import {
   COMMUNICATION_DETAILS_CLOSE,
   COMMUNICATION_DETAILS_OPEN,
   communicationTruncationNote,
-} from "./communication-section.ts";
+} from "./communication-details.ts";
 import {
   fitStepSummary,
   joinSummaryBlocks,

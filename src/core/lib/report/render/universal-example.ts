@@ -19,7 +19,7 @@ export type AuditedRow = Pick<AggregatedEntry, "host" | "port" | "ruleType">;
  * actionRef is the ref (tag or commit SHA) this action was invoked with. The
  * action.yml sits at the repo root, so `uses:` has no path segment.
  */
-export function buildRestrictExample(
+export function buildUniversalRestrictExample(
   auditedRows: AuditedRow[] | null | undefined,
   actionRepo: string,
   actionRef?: string,
