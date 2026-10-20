@@ -24,7 +24,8 @@ export interface RenderReportMarkdownOptions extends ExampleStepOptions {
   /** False leaves the footer to an action that prints more after the report. */
   footer?: boolean;
   /**
-   * Blocks an action adds after the blocked and failed hosts for a check of
+   * Blocks an action adds between the blocked and failed hosts and the allowed
+   * ones for a check of
    * its own, such as the one an InspectStageExtension adds to the proxy. The
    * first opens with `gap`, the blank line owed to a block before it. Their
    * notices are the caller's to pick, as for every other block.
@@ -39,6 +40,7 @@ export const TRAFFIC_BLOCK = {
   example: "traffic-example",
   blocked: "traffic-blocked",
   passed: "traffic-passed",
+  known: "traffic-known",
   log: "traffic-log",
 } as const;
 
@@ -60,6 +62,7 @@ export function trafficNotice(block: SummaryBlock, artifactAvailable: boolean): 
       return communicationTruncationNote(artifactAvailable);
     case TRAFFIC_BLOCK.blocked:
     case TRAFFIC_BLOCK.passed:
+    case TRAFFIC_BLOCK.known:
       return hostTableTruncationNote(artifactAvailable);
     default:
       return undefined;
@@ -119,7 +122,6 @@ export function renderReportBlocks(
   }: RenderReportMarkdownOptions = {},
 ): SummaryBlock[] {
   const isAudit = report.parameters.mode === "audit";
-  const showExpected = report.parameters.knownBlockedRules.length > 0;
   const heading = isAudit ? "📋 Audited Hosts" : "✅ Allowed Hosts";
   const blocks: SummaryBlock[] = [];
 
@@ -142,31 +144,14 @@ export function renderReportBlocks(
   let wrote = false;
   const gap = () => (wrote ? "\n" : "");
 
-  if (report.passed.length > 0) {
-    blocks.push(
-      trafficTableBlock(
-        TRAFFIC_BLOCK.passed,
-        priorities[TRAFFIC_BLOCK.passed],
-        `### ${heading}\n\n`,
-        renderHostTable(report.passed),
-        "\n",
-      ),
-    );
-    wrote = true;
-  }
-  if (report.blocked.length > 0 || report.failed.length > 0) {
-    // A folded row names its rule; its hosts are in Communication details.
-    // Unexpected blocks come first, as the rows to act on.
-    const blocked = foldExpectedBlockedRows(report.blocked).map((r) => ({
-      ...r,
-      outcome: "blocked" as const,
-    }));
+  // The rows a known_blocked_rules rule matched need no action, so they go
+  // last, collapsed.
+  const expected = report.blocked.filter((r) => r.expected);
+  const blocked = report.blocked
+    .filter((r) => !r.expected)
+    .map((r) => ({ ...r, outcome: "blocked" as const }));
+  if (blocked.length > 0 || report.failed.length > 0) {
     const failed = report.failed.map((r) => ({ ...r, outcome: "failed" as const }));
-    const rows = [
-      ...blocked.filter((r) => !r.expected),
-      ...failed,
-      ...blocked.filter((r) => r.expected),
-    ];
     const tableTitle =
       blocked.length === 0
         ? "⚠️ Failed Hosts"
@@ -183,8 +168,8 @@ export function renderReportBlocks(
       trafficTableBlock(
         TRAFFIC_BLOCK.blocked,
         priorities[TRAFFIC_BLOCK.blocked],
-        `${gap()}### ${tableTitle}\n\n`,
-        renderHostTable(rows, { showReason: true, showExpected }),
+        `### ${tableTitle}\n\n`,
+        renderHostTable([...blocked, ...failed], { showReason: true }),
         `\n${note}`,
       ),
     );
@@ -193,6 +178,34 @@ export function renderReportBlocks(
   const extra = extraBlocks(gap());
   blocks.push(...extra);
   wrote ||= extra.some((b) => b.text !== "");
+  if (report.passed.length > 0) {
+    blocks.push(
+      trafficTableBlock(
+        TRAFFIC_BLOCK.passed,
+        priorities[TRAFFIC_BLOCK.passed],
+        `${gap()}### ${heading}\n\n`,
+        renderHostTable(report.passed),
+        "\n",
+      ),
+    );
+    wrote = true;
+  }
+  if (expected.length > 0) {
+    const hosts = new Set(expected.map((r) => r.host)).size;
+    // Cut whole so the notice is not hidden in the collapsed element, and at
+    // the log's level so cutting it does not silence the log.
+    blocks.push({
+      id: TRAFFIC_BLOCK.known,
+      priority: priorities[TRAFFIC_BLOCK.known],
+      level: 3,
+      section: SECTION,
+      cut: "atomic",
+      text:
+        `${gap()}<details>\n<summary>🚫 Known Blocked Hosts (${hosts} host${hosts === 1 ? "" : "s"})</summary>\n\n` +
+        `${renderHostTable(foldExpectedBlockedRows(expected), { showReason: true })}\n\n</details>\n`,
+    });
+    wrote = true;
+  }
   if (isAudit) {
     // inspect's example also narrows by method and path. A failed host is kept:
     // nothing blocked it, and leaving it out would break the next run.

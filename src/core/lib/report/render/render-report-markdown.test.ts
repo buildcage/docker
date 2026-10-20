@@ -172,11 +172,12 @@ describe("renderReportMarkdown: universal", () => {
     expect(blockedOnly).not.toMatch(/none of them fails the step/);
   });
 
-  it("orders unmatched blocks, then failures, then expected ones, with no Expected cell on a failure", () => {
+  it("puts blocks and failures above the allowed hosts and the known blocked ones below", () => {
     const md = renderReportMarkdown(
       {
         ...base,
         parameters: reportParams({ knownBlockedRules: ["*.sury.org:*"] }),
+        passed: [{ ...allowedRow, host: "ok.com" }],
         blocked: [...expectedRows, blockedRow],
         blockedCount: 3,
         failed: [failedRow],
@@ -184,10 +185,15 @@ describe("renderReportMarkdown: universal", () => {
       "owner/repo",
       "v1",
     );
-    const at = ["| `bad.com:80` |", "| `good.com:443` |", "(2 hosts)"].map((s) => md.indexOf(s));
+    const at = [
+      "| `bad.com:80` |",
+      "| `good.com:443` |",
+      "### ✅ Allowed Hosts",
+      "Known Blocked Hosts",
+      "(2 hosts)",
+    ].map((s) => md.indexOf(s));
     expect(at.every((i) => i !== -1)).toBe(true);
     expect(at).toStrictEqual(at.toSorted((a, b) => a - b));
-    expect(md).toMatch(/⚠️ origin-no-response \| 1 \| — \|/);
   });
 
   it("does not call a run that only failed connections no communication", () => {
@@ -224,17 +230,22 @@ describe("renderReportMarkdown: universal", () => {
     expect(md).toMatch(/run: \|\n\s+npm install/);
   });
 
-  it("adds an Expected column marking known_blocked_rules matches when set", () => {
+  it("collapses the known_blocked_rules matches into their own details element", () => {
     const md = renderReportMarkdown(
       {
         ...base,
         parameters: reportParams({ knownBlockedRules: ["bad.com:80"] }),
-        blocked: [blockedRow],
+        blocked: [{ ...blockedRow, expected: true, expectedBy: "bad.com:80" }],
       },
       "owner/repo",
       "v1",
     );
-    expect(md).toMatch(/\| Host \| Rule \| Reason \| Count \| Expected \|/);
+    expect(md).toContain(
+      "<details>\n<summary>🚫 Known Blocked Hosts (1 host)</summary>\n\n" +
+        "| Host | Rule | Reason | Count |\n| --- | --- | --- | ---: |\n" +
+        "| `bad.com:80` (1 host) | HTTP | not-allowed | 1 |\n\n</details>\n",
+    );
+    expect(md).not.toMatch(/### 🚫 Blocked Hosts/);
   });
 
   it("separates the two tables when a run has both allowed and blocked hosts", () => {
@@ -243,12 +254,12 @@ describe("renderReportMarkdown: universal", () => {
       "owner/repo",
       "v1",
     );
-    expect(md).toMatch(/good\.com[\s\S]*\n\n### 🚫 Blocked Hosts/);
+    expect(md).toMatch(/bad\.com[\s\S]*\n\n### ✅ Allowed Hosts/);
   });
 
-  it("omits the Expected column when known_blocked_rules is not set", () => {
+  it("omits the known blocked hosts when no row matched known_blocked_rules", () => {
     const md = renderReportMarkdown({ ...base, blocked: [blockedRow] }, "owner/repo", "v1");
-    expect(md).not.toMatch(/Expected/);
+    expect(md).not.toMatch(/Known Blocked/);
   });
 
   it("folds the rows one known_blocked_rule matched into a single row naming the rule", () => {
@@ -339,9 +350,7 @@ describe("renderReportMarkdown: inspect", () => {
       "owner/repo",
       "v1",
     );
-    expect(md).toMatch(
-      /\| `\*\.sury\.org:\*` \(2 hosts\) \| HTTPS \| 🚫 https-not-allowed \| 2 \| ✅ \|/,
-    );
+    expect(md).toMatch(/\| `\*\.sury\.org:\*` \(2 hosts\) \| HTTPS \| https-not-allowed \| 2 \|/);
     expect(md).not.toMatch(/a\.sury\.org/);
     expect(md).toMatch(/\| `bad\.com:80` \|/);
   });

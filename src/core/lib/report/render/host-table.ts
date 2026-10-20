@@ -16,8 +16,7 @@ export interface HostTableRow extends AggregatedEntry {
   /** Shown after the host, such as the host count of a folded group, whose
    *  host is its rule. */
   note?: string;
-  /** The mark on the reason. A failed row shows no Expected, as
-   *  known_blocked_rules never matches one. */
+  /** The mark on the reason. */
   outcome?: "blocked" | "failed";
 }
 
@@ -25,12 +24,11 @@ const OUTCOME_MARK = { blocked: "🚫 ", failed: "⚠️ " } as const;
 
 export interface RenderHostTableOptions {
   showReason?: boolean;
-  showExpected?: boolean;
 }
 
 export function renderHostTable(
   rows: HostTableRow[],
-  { showReason = false, showExpected = false }: RenderHostTableOptions = {},
+  { showReason = false }: RenderHostTableOptions = {},
 ): string {
   const formats: ColumnFormat[] = [
     { key: "host", title: "Host", cell: String },
@@ -38,7 +36,6 @@ export function renderHostTable(
   ];
   if (showReason) formats.push({ key: "reason", title: "Reason" });
   formats.push({ key: "count", title: "Count", align: "right" });
-  if (showExpected) formats.push({ key: "expected", title: "Expected", align: "center" });
 
   const tableRows = rows.map((r) => ({
     // A name blocked by the resolver was never connected to, so it has no port
@@ -47,7 +44,6 @@ export function renderHostTable(
     ruleType: r.ruleType,
     reason: r.outcome ? OUTCOME_MARK[r.outcome] + r.reason : r.reason,
     count: r.count,
-    expected: r.outcome === "failed" ? "—" : r.expected ? "✅" : "",
   }));
 
   return markdownTable(formats, tableRows);

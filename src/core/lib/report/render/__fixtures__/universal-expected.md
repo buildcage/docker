@@ -3,6 +3,15 @@
 > [!CAUTION]
 > 2 blocked · 1 failed · 2 blocked as expected
 
+### 🚫 Blocked / ⚠️ Failed Hosts
+
+| Host | Rule | Reason | Count |
+| --- | --- | --- | ---: |
+| `bad.example.com:443` | HTTPS | 🚫 https-not-allowed | 2 |
+| `c.example.com:443` | HTTPS | ⚠️ dns-failed | 1 |
+
+<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+
 ### ✅ Allowed Hosts
 
 | Host | Rule | Count |
@@ -10,15 +19,14 @@
 | `a.example.com:443` | HTTPS | 3 |
 | `b.example.com:80` | HTTP | 1 |
 
-### 🚫 Blocked / ⚠️ Failed Hosts
+<details>
+<summary>🚫 Known Blocked Hosts (2 hosts)</summary>
 
-| Host | Rule | Reason | Count | Expected |
-| --- | --- | --- | ---: | :---: |
-| `bad.example.com:443` | HTTPS | 🚫 https-not-allowed | 2 |  |
-| `c.example.com:443` | HTTPS | ⚠️ dns-failed | 1 | — |
-| `*.sury.org:*` (2 hosts) | HTTPS | 🚫 https-not-allowed | 2 | ✅ |
+| Host | Rule | Reason | Count |
+| --- | --- | --- | ---: |
+| `*.sury.org:*` (2 hosts) | HTTPS | https-not-allowed | 2 |
 
-<sub>*Note: no rule blocked the ⚠️ rows; the connection itself did not complete, so no rule can change the outcome and none of them fails the step.*</sub>
+</details>
 
 <details>
 <summary>💬 Communication details</summary>

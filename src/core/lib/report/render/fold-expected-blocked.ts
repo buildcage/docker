@@ -11,9 +11,8 @@ interface ExpectedGroup {
 
 /**
  * Collapse the blocked rows a known_blocked_rules rule matched into one row per
- * rule, below the rows nothing matched. A rule covering noisy traffic then
- * costs the table one line however many hosts it names, and the rows a reader
- * has to act on come first.
+ * rule, after any row no rule claimed. A rule covering noisy traffic then
+ * costs the table one line however many hosts it names.
  */
 export function foldExpectedBlockedRows(rows: HostTableRow[]): HostTableRow[] {
   const unmatched: HostTableRow[] = [];
