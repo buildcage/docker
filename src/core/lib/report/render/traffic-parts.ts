@@ -176,7 +176,8 @@ export function knownBlockedBlocks(report: ReportData, fit: PartFit): SummaryBlo
   const expected = report.blocked.filter((r) => r.expected);
   if (expected.length === 0) return [];
   const hosts = new Set(expected.map((r) => r.host)).size;
-  // Cut whole so the notice is not hidden in the collapsed element.
+  // Cut whole so the notice is not hidden in the collapsed element, and
+  // nested so cutting it does not silence the log.
   return [
     {
       id: TRAFFIC_BLOCK.known,

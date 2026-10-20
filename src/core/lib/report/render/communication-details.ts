@@ -32,8 +32,8 @@ export function communicationTruncationNote(artifactAvailable: boolean): string 
 export type BlockLabel = (event: TrafficEvent, reason: string) => string | undefined;
 
 /**
- * What to print at the end of `event`'s line, or undefined for nothing. Like a
- * BlockLabel, it holds no newline.
+ * What to print at the end of `event`'s line, or undefined or "" for nothing.
+ * Like a BlockLabel, it holds no newline.
  */
 export type LineNote = (event: TrafficEvent) => string | undefined;
 
@@ -91,7 +91,7 @@ function renderEvent(
   const note =
     event.wouldBlock === undefined ? "" : ` (restrict would block: ${label(event.wouldBlock)})`;
   const extra = lineNote(event);
-  const tail = extra === undefined ? "" : ` ${extra}`;
+  const tail = extra ? ` ${extra}` : "";
   return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}${tail}`;
 }
 

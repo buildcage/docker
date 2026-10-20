@@ -107,11 +107,8 @@ export async function runReportAction(
     console.log(line);
   }
 
-  // The report action uploads this file as an artifact if asked; the upload
-  // client is large and needs the runner's credentials, so it stays out of the
-  // image and the file is written here instead. Its name is known before the
-  // summary is rendered, so a truncated section can say whether the full list
-  // is available as an artifact.
+  // Known before the summary is rendered, so a truncated section can say
+  // whether the full list is available as an artifact.
   const trafficFile = env.BUILDCAGE_TRAFFIC_FILE;
   const blocks = renderReportBlocks(
     report,
@@ -127,7 +124,10 @@ export async function runReportAction(
     summaryFile: env.GITHUB_STEP_SUMMARY,
   });
 
-  // Both writes are tried; a failure in either is thrown once both have run.
+  // The report action uploads this file as an artifact if asked; the upload
+  // client is large and needs the runner's credentials, so it stays out of the
+  // image and the file is written here instead. Both writes are tried; a
+  // failure in either is thrown once both have run.
   const failures: unknown[] = [];
   if (trafficFile) {
     try {

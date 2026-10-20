@@ -15,7 +15,7 @@ export const STEP_SUMMARY_LIMIT_BYTES = 1024 * 1024;
 export const SAFETY_MARGIN_BYTES = 8 * 1024;
 
 export interface SummaryBlock {
-  /** Names the block for its caller, which picks its notice by it. */
+  /** Names the block for its caller, which tells by it which blocks a fit cut. */
   id?: string;
   /**
    * Lower is given room first when the summary has to be cut. A `keep` block
@@ -121,8 +121,8 @@ export function fitStepSummary(
 function cutBlock(b: SummaryBlock, budget: number): string {
   const notice = b.notice ?? "";
   // A notice alone keeps the block's opening blank line, which ends the table
-  // or </details> above it.
-  const alone = (b.text.startsWith("\n") ? "\n" : "") + notice;
+  // or </details> above it, whether it opens `open` or `text`.
+  const alone = (wholeBlock(b).startsWith("\n") ? "\n" : "") + notice;
   if (b.cut === "atomic") return alone;
   const open = b.open ?? "";
   const close = b.close ?? "";

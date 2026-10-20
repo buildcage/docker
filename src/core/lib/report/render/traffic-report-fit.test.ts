@@ -294,4 +294,15 @@ describe("stackTrafficBlocks", () => {
     const out = fitStepSummary(blocks, { limitBytes: SAFETY_MARGIN_BYTES + 100 });
     expect(out).toBe("## T\n\nA\n\n_cut_\n\nB\n");
   });
+
+  it("keeps the blank line before the notice of a collapsed part replaced whole", () => {
+    const collapsed = {
+      ...block("X".repeat(200) + "\n", { open: "<o>\n", close: "</o>\n" }),
+      cut: "atomic" as const,
+      notice: "_cut_\n",
+    };
+    const blocks = stackTrafficBlocks(heading, [[block("A\n")], [collapsed], [block("B\n")]]);
+    const out = fitStepSummary(blocks, { limitBytes: SAFETY_MARGIN_BYTES + 100 });
+    expect(out).toBe("## T\n\nA\n\n_cut_\n\nB\n");
+  });
 });

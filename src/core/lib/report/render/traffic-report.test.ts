@@ -334,9 +334,10 @@ describe("renderReportMarkdown: inspect", () => {
         { ...base, timeline: [blockedEvent, timeline[0]] },
         { priority: 1, artifactAvailable: false },
         (_, reason) => `${reason}, labelled`,
-        (e) => (e.action === "allow" ? "[noted]" : undefined),
+        (e) => (e.action === "allow" ? "[noted]" : ""),
       ),
     );
+    // An empty note adds nothing, not even the space before it.
     expect(md).toContain("GET https://good.com/pkg -> not-allowed, labelled\n");
     expect(md).toContain("GET https://good.com/pkg -> 200 (1B) [noted]\n");
   });
