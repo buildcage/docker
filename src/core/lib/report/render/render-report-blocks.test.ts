@@ -76,7 +76,7 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).toContain(hostTableTruncationNote(false));
   });
 
-  it("replaces the known blocked hosts whole before the allowed ones, still printing the log", () => {
+  it("replaces a known blocked table that does not fit with its notice and still prints the log", () => {
     const known = rows("noise", 2000, "not-allowed").map((r) => ({
       ...r,
       expected: true,

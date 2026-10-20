@@ -144,8 +144,8 @@ export function renderReportBlocks(
   let wrote = false;
   const gap = () => (wrote ? "\n" : "");
 
-  // The rows a known_blocked_rules rule matched need no action, so they
-  // follow the allowed hosts, folded and collapsed, rather than lead.
+  // The rows a known_blocked_rules rule matched need no action, so they go
+  // last, collapsed.
   const expected = report.blocked.filter((r) => r.expected);
   const blocked = report.blocked
     .filter((r) => !r.expected)
@@ -192,8 +192,8 @@ export function renderReportBlocks(
   }
   if (expected.length > 0) {
     const hosts = new Set(expected.map((r) => r.host)).size;
-    // Cut whole, so the notice stands outside the collapsed element, and one
-    // level below the tables, so cutting it leaves the log its own notice.
+    // Cut whole so the notice is not hidden in the collapsed element, and at
+    // the log's level so cutting it does not silence the log.
     blocks.push({
       id: TRAFFIC_BLOCK.known,
       priority: priorities[TRAFFIC_BLOCK.known],
