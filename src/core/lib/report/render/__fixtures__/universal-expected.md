@@ -20,7 +20,7 @@
 | `b.example.com:80` | HTTP | 1 |
 
 <details>
-<summary>🚫 Known Blocked Hosts (2)</summary>
+<summary>🚫 Known Blocked Hosts (2 hosts)</summary>
 
 | Host | Rule | Reason | Count |
 | --- | --- | --- | ---: |

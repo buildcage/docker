@@ -84,7 +84,7 @@ describe("renderReportBlocks under a limit", () => {
     }));
     const out = fit(report({ passed: rows("ok", 20), blocked: known, blockedCount: 2000 }));
     expect(out).toContain("ok19.example.com");
-    expect(out).toContain("<summary>🚫 Known Blocked Hosts (2000)</summary>");
+    expect(out).toContain("<summary>🚫 Known Blocked Hosts (2000 hosts)</summary>");
     expect(out).not.toContain("noise1999.example.com");
     expect(out).toContain(`${hostTableTruncationNote(false)}\n</details>`);
   });

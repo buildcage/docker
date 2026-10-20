@@ -241,7 +241,7 @@ describe("renderReportMarkdown: universal", () => {
       "v1",
     );
     expect(md).toContain(
-      "<details>\n<summary>🚫 Known Blocked Hosts (1)</summary>\n\n" +
+      "<details>\n<summary>🚫 Known Blocked Hosts (1 host)</summary>\n\n" +
         "| Host | Rule | Reason | Count |\n| --- | --- | --- | ---: |\n" +
         "| `bad.com:80` (1 host) | HTTP | not-allowed | 1 |\n\n</details>\n",
     );

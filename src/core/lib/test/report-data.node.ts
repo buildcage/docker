@@ -20,8 +20,7 @@ export function reportParams(overrides: Partial<GenReportParameters> = {}): GenR
   };
 }
 
-/** Two hosts one known_blocked_rule covers, so the Expected column and the
- *  folded row both render. */
+/** Two hosts one known_blocked_rule covers, so they render as one folded row. */
 export const expectedRows: AnnotatedBlockedRow[] = [
   {
     host: "a.sury.org",

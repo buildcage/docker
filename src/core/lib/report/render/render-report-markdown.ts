@@ -197,7 +197,7 @@ export function renderReportBlocks(
       ...trafficTableBlock(
         TRAFFIC_BLOCK.known,
         priorities[TRAFFIC_BLOCK.known],
-        `${gap()}<details>\n<summary>🚫 Known Blocked Hosts (${hosts})</summary>\n\n`,
+        `${gap()}<details>\n<summary>🚫 Known Blocked Hosts (${hosts} host${hosts === 1 ? "" : "s"})</summary>\n\n`,
         renderHostTable(known, { showReason: true }),
         "\n",
       ),
