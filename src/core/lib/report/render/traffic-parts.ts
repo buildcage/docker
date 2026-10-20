@@ -61,6 +61,14 @@ export interface PartFit {
   artifactAvailable: boolean;
 }
 
+/** Each part's PartFit, its priority taken from `priorities` by its id. */
+export function partFits(
+  priorities: TrafficPriorities,
+  artifactAvailable: boolean,
+): (id: TrafficBlockId) => PartFit {
+  return (id) => ({ priority: priorities[id], artifactAvailable });
+}
+
 /**
  * A table of the traffic report with the text before and after it, cut row by
  * row: its heading, header row and separator stay or the whole table gives way
@@ -218,6 +226,9 @@ export function restrictExampleBlocks(
           actionRef,
           step,
         );
+  // Otherwise a fit with no room left would cut the empty block and print the
+  // notice for an example that does not exist.
+  if (example === "") return [];
   return [
     {
       id: TRAFFIC_BLOCK.example,

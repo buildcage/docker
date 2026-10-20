@@ -15,8 +15,7 @@ import {
   TRAFFIC_BLOCK,
   trafficFrame,
   trafficHeadingBlock,
-  type PartFit,
-  type TrafficBlockId,
+  partFits,
   type TrafficPriorities,
 } from "./traffic-parts.ts";
 
@@ -70,7 +69,7 @@ export function renderReportBlocks(
   artifactAvailable: boolean,
   { title = "Outbound Traffic Report", ...step }: RenderReportBlocksOptions = {},
 ): SummaryBlock[] {
-  const fit = (id: TrafficBlockId): PartFit => ({ priority: priorities[id], artifactAvailable });
+  const fit = partFits(priorities, artifactAvailable);
   return stackTrafficBlocks(trafficHeadingBlock(report, title), [
     blockedHostsBlocks(report, fit(TRAFFIC_BLOCK.blocked)),
     passedHostsBlocks(report, fit(TRAFFIC_BLOCK.passed)),

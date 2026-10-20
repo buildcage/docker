@@ -121,8 +121,9 @@ export function fitStepSummary(
 function cutBlock(b: SummaryBlock, budget: number): string {
   const notice = b.notice ?? "";
   // A notice alone keeps the block's opening blank line, which ends the table
-  // or </details> above it, whether it opens `open` or `text`.
-  const alone = (wholeBlock(b).startsWith("\n") ? "\n" : "") + notice;
+  // or </details> above it, whether it opens `open` or `text`. Not read off
+  // the joined block, which would copy a log of tens of MB for one character.
+  const alone = ((b.open || b.text).startsWith("\n") ? "\n" : "") + notice;
   if (b.cut === "atomic") return alone;
   const open = b.open ?? "";
   const close = b.close ?? "";

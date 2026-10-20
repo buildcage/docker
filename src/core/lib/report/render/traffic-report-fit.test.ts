@@ -110,6 +110,17 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).not.toContain(hostTableTruncationNote(false));
   });
 
+  it("prints no notice for an example with nothing in it, however little room is left", () => {
+    // A TLS rule alone is what gives inspect an example; without one there is none.
+    const r = {
+      ...report({ parameters: reportParams({ mode: "audit" }) }),
+      engine: "inspect" as const,
+    };
+    const blocks = renderReportBlocks(r, "owner/repo", "v1", PRIORITIES, false);
+    expect(blocks.some((b) => b.id === TRAFFIC_BLOCK.example)).toBe(false);
+    expect(fitStepSummary(blocks, { limitBytes: 1 })).not.toContain("omitted");
+  });
+
   it("keeps the example whole ahead of the tables in audit mode", () => {
     const out = fit(
       report({ parameters: reportParams({ mode: "audit" }), passed: rows("ok", 120) }),
