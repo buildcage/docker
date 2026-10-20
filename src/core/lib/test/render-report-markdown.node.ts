@@ -1,10 +1,9 @@
 import { joinSummaryBlocks } from "../report/render/fit-step-summary.ts";
+import { TRAFFIC_BLOCK, type TrafficPriorities } from "../report/render/traffic-parts.ts";
 import {
   renderReportBlocks,
-  TRAFFIC_BLOCK,
-  type RenderReportMarkdownOptions,
-  type TrafficPriorities,
-} from "../report/render/render-report-markdown.ts";
+  type RenderReportBlocksOptions,
+} from "../report/render/traffic-report.ts";
 import type { ReportData } from "../report/types.ts";
 
 // Joined whole, the report never compares priorities.
@@ -22,7 +21,7 @@ export function renderReportMarkdown(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
-  options: RenderReportMarkdownOptions = {},
+  options: RenderReportBlocksOptions = {},
 ): string {
   return joinSummaryBlocks(
     renderReportBlocks(report, actionRepo, actionRef, JOINED, false, options),

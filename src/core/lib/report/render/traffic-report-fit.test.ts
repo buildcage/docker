@@ -4,7 +4,7 @@ import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 import { reportParams } from "#core/lib/test/report-data.node.ts";
 
 import type { ReportData, UniversalReportData } from "../types.ts";
-import { communicationTruncationNote } from "./communication-section.ts";
+import { communicationTruncationNote } from "./communication-details.ts";
 import {
   fitStepSummary,
   joinSummaryBlocks,
@@ -12,15 +12,14 @@ import {
   type SummaryBlock,
 } from "./fit-step-summary.ts";
 import { hostTableTruncationNote } from "./host-table.ts";
+import { restrictExampleTruncationNote } from "./restrict-example.ts";
 import {
-  renderReportBlocks,
-  stackTrafficBlocks,
   TRAFFIC_BLOCK,
   trafficFrame,
   trafficTableBlock,
   type TrafficPriorities,
-} from "./render-report-markdown.ts";
-import { restrictExampleTruncationNote } from "./restrict-example.ts";
+} from "./traffic-parts.ts";
+import { renderReportBlocks, stackTrafficBlocks } from "./traffic-report.ts";
 
 const LIMIT = 16 * 1024;
 

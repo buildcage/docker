@@ -21,11 +21,8 @@ import { errorMessage } from "#core/lib/errors.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
 import { fitStepSummary } from "#core/lib/report/render/fit-step-summary.ts";
-import {
-  renderReportBlocks,
-  TRAFFIC_BLOCK,
-  type TrafficPriorities,
-} from "#core/lib/report/render/render-report-markdown.ts";
+import { TRAFFIC_BLOCK, type TrafficPriorities } from "#core/lib/report/render/traffic-parts.ts";
+import { renderReportBlocks } from "#core/lib/report/render/traffic-report.ts";
 import type { GenReportParameters, ReportData } from "#core/lib/report/types.ts";
 
 import { emitReportOutcomes } from "./emit.ts";

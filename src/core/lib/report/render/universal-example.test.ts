@@ -1,19 +1,19 @@
 import { describe, it, expect } from "vitest";
 
-import { buildRestrictExample } from "./build-example.ts";
 import { restrictExampleBlock } from "./restrict-example.ts";
+import { buildUniversalRestrictExample } from "./universal-example.ts";
 
 const REPO = "owner/repo";
 const REF = "v1";
 
-describe("buildRestrictExample", () => {
+describe("buildUniversalRestrictExample", () => {
   it("empty array → empty string", () => {
-    expect(buildRestrictExample([], REPO)).toBe("");
+    expect(buildUniversalRestrictExample([], REPO)).toBe("");
   });
 
   it("null/undefined → empty string", () => {
-    expect(buildRestrictExample(null, REPO)).toBe("");
-    expect(buildRestrictExample(undefined, REPO)).toBe("");
+    expect(buildUniversalRestrictExample(null, REPO)).toBe("");
+    expect(buildUniversalRestrictExample(undefined, REPO)).toBe("");
   });
 
   it("keeps several rules under one param, in the order they appeared", () => {
@@ -21,7 +21,7 @@ describe("buildRestrictExample", () => {
       { host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 5 },
       { host: "github.com", port: "443", ruleType: "HTTPS", count: 2 },
     ];
-    expect(buildRestrictExample(rows, REPO, REF)).toBe(
+    expect(buildUniversalRestrictExample(rows, REPO, REF)).toBe(
       restrictExampleBlock(
         [
           "- name: Start Buildcage",
@@ -43,7 +43,7 @@ describe("buildRestrictExample", () => {
       { host: "b.example.com", port: "443", ruleType: "HTTPS" },
       { host: "a.example.com", port: "443", ruleType: "HTTPS" },
     ];
-    const md = buildRestrictExample(rows, REPO, REF);
+    const md = buildUniversalRestrictExample(rows, REPO, REF);
     expect(md.match(/a\.example\.com:443/g)).toHaveLength(1);
     expect(md).toMatch(/a\.example\.com:443\n\s+b\.example\.com:443\n/);
   });
@@ -54,7 +54,7 @@ describe("buildRestrictExample", () => {
       { host: "example.com", port: "80", ruleType: "HTTP", count: 1 },
       { host: "10.0.0.1", port: "8080", ruleType: "IP", count: 1 },
     ];
-    expect(buildRestrictExample(rows, REPO, REF)).toBe(
+    expect(buildUniversalRestrictExample(rows, REPO, REF)).toBe(
       restrictExampleBlock(
         [
           "- name: Start Buildcage",
@@ -75,7 +75,7 @@ describe("buildRestrictExample", () => {
 
   it("includes the run command when provided", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 5 }];
-    expect(buildRestrictExample(rows, REPO, REF, { runCommand: "npm install" })).toBe(
+    expect(buildUniversalRestrictExample(rows, REPO, REF, { runCommand: "npm install" })).toBe(
       restrictExampleBlock(
         [
           "- name: Start Buildcage",
@@ -94,7 +94,7 @@ describe("buildRestrictExample", () => {
 
   it("preserves multi-line run commands, indented under run: |", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    expect(buildRestrictExample(rows, REPO, REF, { runCommand: "npm ci\nnpm test" })).toBe(
+    expect(buildUniversalRestrictExample(rows, REPO, REF, { runCommand: "npm ci\nnpm test" })).toBe(
       restrictExampleBlock(
         [
           "- name: Start Buildcage",
@@ -114,7 +114,9 @@ describe("buildRestrictExample", () => {
 
   it("strips the trailing newline GitHub Actions adds to `run: |` block scalars", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    expect(buildRestrictExample(rows, REPO, REF, { runCommand: "npm ci\nnpm test\n" })).toBe(
+    expect(
+      buildUniversalRestrictExample(rows, REPO, REF, { runCommand: "npm ci\nnpm test\n" }),
+    ).toBe(
       restrictExampleBlock(
         [
           "- name: Start Buildcage",
@@ -134,7 +136,7 @@ describe("buildRestrictExample", () => {
 
   it("without a runCommand, omits the run: block", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    expect(buildRestrictExample(rows, REPO, REF)).toBe(
+    expect(buildUniversalRestrictExample(rows, REPO, REF)).toBe(
       restrictExampleBlock(
         [
           "- name: Start Buildcage",
@@ -150,7 +152,9 @@ describe("buildRestrictExample", () => {
   });
   it("writes the caller's extra inputs after the rules", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    expect(buildRestrictExample(rows, REPO, REF, { extraInputs: ["fail_on_blocked: false"] })).toBe(
+    expect(
+      buildUniversalRestrictExample(rows, REPO, REF, { extraInputs: ["fail_on_blocked: false"] }),
+    ).toBe(
       restrictExampleBlock(
         [
           "- name: Start Buildcage",
@@ -168,13 +172,13 @@ describe("buildRestrictExample", () => {
 
   it("names the step as the caller asks", () => {
     const rows = [{ host: "registry.npmjs.org", port: "443", ruleType: "HTTPS", count: 1 }];
-    expect(buildRestrictExample(rows, REPO, REF, { stepName: "Start isolated-run" })).toMatch(
-      /^ {6}- name: Start isolated-run$/m,
-    );
+    expect(
+      buildUniversalRestrictExample(rows, REPO, REF, { stepName: "Start isolated-run" }),
+    ).toMatch(/^ {6}- name: Start isolated-run$/m);
   });
 });
 
-describe("buildRestrictExample: rows that map to no action input", () => {
+describe("buildUniversalRestrictExample: rows that map to no action input", () => {
   const audited = (ruleType: string) => ({
     host: "a.example.com",
     port: "443",
@@ -183,11 +187,11 @@ describe("buildRestrictExample: rows that map to no action input", () => {
   });
 
   it("skips a rule type the setup action has no input for", () => {
-    const yaml = buildRestrictExample([audited("DNS"), audited("HTTPS")], REPO, "v3");
+    const yaml = buildUniversalRestrictExample([audited("DNS"), audited("HTTPS")], REPO, "v3");
     expect(yaml.match(/a\.example\.com/g)?.length).toBe(1);
   });
 
   it("renders nothing when no row maps to an input", () => {
-    expect(buildRestrictExample([audited("DNS")], REPO, "v3")).toBe("");
+    expect(buildUniversalRestrictExample([audited("DNS")], REPO, "v3")).toBe("");
   });
 });

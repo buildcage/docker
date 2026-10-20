@@ -1,23 +1,25 @@
+/**
+ * The traffic report's parts, one per table or section, each as the blocks
+ * traffic-report.ts stacks in print order.
+ */
+
 import type { ReportData } from "../types.ts";
-import { buildRestrictExample } from "./build-example.ts";
 import {
   COMMUNICATION_DETAILS_CLOSE,
   COMMUNICATION_DETAILS_OPEN,
   communicationTruncationNote,
-} from "./communication-section.ts";
+  renderCommunicationDetailsBody,
+  type BlockLabel,
+  type LineNote,
+} from "./communication-details.ts";
 import type { SummaryBlock } from "./fit-step-summary.ts";
 import { foldExpectedBlockedRows } from "./fold-expected-blocked.ts";
 import { hostTableTruncationNote, renderHostTable } from "./host-table.ts";
-import { renderInspectDetailsBody, type BlockLabel, type LineNote } from "./inspect-details.ts";
 import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
 import { restrictExampleTruncationNote, type ExampleStepOptions } from "./restrict-example.ts";
+import { buildUniversalRestrictExample } from "./universal-example.ts";
 import { renderVerdict } from "./verdict.ts";
-
-export interface RenderReportMarkdownOptions extends ExampleStepOptions {
-  /** Heading text. May carry untrusted input: the heading escapes it. */
-  title?: string;
-}
 
 const SECTION = "traffic";
 
@@ -93,38 +95,6 @@ export const trafficFrame = (text: string): SummaryBlock => ({
   text,
   cut: "keep",
 });
-
-/**
- * The blocks in print order, each part a blank line after the last one that
- * printed; the first follows `heading`, which ends with one. A part carries no
- * blank line around itself, so this is the only place one is added.
- *
- * The blank line goes inside the part's first printed block, so the fit counts
- * it, a block cut to its notice keeps it (see fitStepSummary's cutBlock), and
- * a table's `head` still covers its heading.
- */
-export function stackTrafficBlocks(heading: SummaryBlock, parts: SummaryBlock[][]): SummaryBlock[] {
-  const blocks = [heading];
-  let wrote = false;
-  for (const part of parts) {
-    const first = part.findIndex((b) => whole(b) !== "");
-    if (first === -1) {
-      blocks.push(...part);
-      continue;
-    }
-    const b = part[first];
-    const gapped = !wrote
-      ? b
-      : b.open !== undefined
-        ? { ...b, open: `\n${b.open}` }
-        : { ...b, text: `\n${b.text}`, head: b.head === undefined ? undefined : b.head + 1 };
-    blocks.push(...part.slice(0, first), gapped, ...part.slice(first + 1));
-    wrote = true;
-  }
-  return blocks;
-}
-
-const whole = (b: SummaryBlock): string => (b.open ?? "") + b.text + (b.close ?? "");
 
 /**
  * The report's title, the verdict, and a warning when the logs do not read as
@@ -241,7 +211,12 @@ export function restrictExampleBlocks(
           allowedIpRules: report.parameters.allowedIpRules,
           allowedTlsRules: report.parameters.allowedTlsRules,
         })
-      : buildRestrictExample([...report.passed, ...report.failed], actionRepo, actionRef, step);
+      : buildUniversalRestrictExample(
+          [...report.passed, ...report.failed],
+          actionRepo,
+          actionRef,
+          step,
+        );
   return [
     {
       id: TRAFFIC_BLOCK.example,
@@ -269,14 +244,19 @@ export function noCommunicationBlocks(report: ReportData): SummaryBlock[] {
   return none ? [trafficFrame("_(no communication)_\n\n")] : [];
 }
 
-/** Communication details, the timeline line by line; see renderInspectDetailsBody. */
+/** Communication details, the timeline line by line; see renderCommunicationDetailsBody. */
 export function communicationDetailsBlocks(
   report: ReportData,
   fit: PartFit,
   blockLabel?: BlockLabel,
   lineNote?: LineNote,
 ): SummaryBlock[] {
-  const details = renderInspectDetailsBody(report.timeline, report.startedAt, blockLabel, lineNote);
+  const details = renderCommunicationDetailsBody(
+    report.timeline,
+    report.startedAt,
+    blockLabel,
+    lineNote,
+  );
   if (!details) return [];
   return [
     {
@@ -301,34 +281,6 @@ export function engineNoteBlocks(report: ReportData): SummaryBlock[] {
       "<sub>*Note: HTTP rules are based on the Host header, HTTPS rules on SNI, and IP rules on the destination IP address.*</sub>\n",
     ),
   ];
-}
-
-/**
- * The report as blocks for fitStepSummary, in print order: what needs acting
- * on first, then what got through, then the record. The frame (title, notes,
- * footer) is kept whole; every other block takes its priority from
- * `priorities` by TRAFFIC_BLOCK id. An action that adds parts of its own
- * stacks them with the same functions in its own order instead.
- */
-export function renderReportBlocks(
-  report: ReportData,
-  actionRepo: string,
-  actionRef: string,
-  priorities: TrafficPriorities,
-  artifactAvailable: boolean,
-  { title = "Outbound Traffic Report", ...step }: RenderReportMarkdownOptions = {},
-): SummaryBlock[] {
-  const fit = (id: TrafficBlockId): PartFit => ({ priority: priorities[id], artifactAvailable });
-  return stackTrafficBlocks(trafficHeadingBlock(report, title), [
-    blockedHostsBlocks(report, fit(TRAFFIC_BLOCK.blocked)),
-    passedHostsBlocks(report, fit(TRAFFIC_BLOCK.passed)),
-    knownBlockedBlocks(report, fit(TRAFFIC_BLOCK.known)),
-    restrictExampleBlocks(report, actionRepo, actionRef, fit(TRAFFIC_BLOCK.example), step),
-    noCommunicationBlocks(report),
-    communicationDetailsBlocks(report, fit(TRAFFIC_BLOCK.log)),
-    engineNoteBlocks(report),
-    [trafficFrame(reportFooter(actionRepo))],
-  ]);
 }
 
 /**

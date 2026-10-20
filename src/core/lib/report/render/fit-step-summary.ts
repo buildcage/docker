@@ -52,7 +52,8 @@ export const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
 
 const rank = (b: SummaryBlock): number => (b.cut === "keep" ? -Infinity : b.priority);
 
-const whole = (b: SummaryBlock): string => (b.open ?? "") + b.text + (b.close ?? "");
+/** The block as it prints when it is not cut. */
+export const wholeBlock = (b: SummaryBlock): string => (b.open ?? "") + b.text + (b.close ?? "");
 
 /** The blocks with the notice `noticeFor` picks on every one a cut can reach. */
 export function withNotices(
@@ -64,7 +65,7 @@ export function withNotices(
 
 /** The blocks printed whole, as they read with no limit to fit. */
 export function joinSummaryBlocks(blocks: SummaryBlock[]): string {
-  return blocks.map(whole).join("");
+  return blocks.map(wholeBlock).join("");
 }
 
 export interface FitStepSummaryOptions {
@@ -89,7 +90,7 @@ export function fitStepSummary(
   blocks: SummaryBlock[],
   { usedBytes = 0, limitBytes = STEP_SUMMARY_LIMIT_BYTES, onCut }: FitStepSummaryOptions = {},
 ): string {
-  const full = blocks.map(whole);
+  const full = blocks.map(wholeBlock);
   const sizes = full.map(bytes);
   let budget = limitBytes - SAFETY_MARGIN_BYTES - usedBytes;
   if (sizes.reduce((sum, n) => sum + n, 0) <= budget) return full.join("");

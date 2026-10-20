@@ -10,9 +10,9 @@ import {
   blockedHostsBlocks,
   communicationDetailsBlocks,
   engineNoteBlocks,
-  stackTrafficBlocks,
   trafficHeadingBlock,
-} from "./render-report-markdown.ts";
+} from "./traffic-parts.ts";
+import { stackTrafficBlocks } from "./traffic-report.ts";
 
 const allowedRow = { host: "good.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 };
 const blockedRow = {
