@@ -15,6 +15,12 @@ import { formatElapsedVariable } from "../elapsed-time.ts";
 export type BlockLabel = (event: TrafficEvent, reason: string) => string | undefined;
 
 /**
+ * What to print at the end of `event`'s line, or undefined for nothing. Like a
+ * BlockLabel, it holds no newline.
+ */
+export type LineNote = (event: TrafficEvent) => string | undefined;
+
+/**
  * The communication detail as a fenced block, or "" if nothing is shown. One
  * timeline, allowed and blocked interleaved. A name lookup is kept only while
  * it is its own sole trace, and dropped once a connection to the same name
@@ -28,6 +34,7 @@ export function renderInspectDetailsBody(
   timeline: TrafficEvent[],
   startedAt: number | undefined,
   blockLabel: BlockLabel = () => undefined,
+  lineNote: LineNote = () => undefined,
 ): string {
   // The keepalive noise clientEndedNoise marks is dropped here, before
   // connectedHosts, so a hidden close cannot mask a name's other rows.
@@ -37,7 +44,7 @@ export function renderInspectDetailsBody(
   const shown = relevant.filter((e) => !isRedundantDns(e, connected));
   if (shown.length === 0) return "";
   // A fenced block, so URLs need no markdown escaping and stay copy-pastable.
-  const lines = shown.map((event) => renderEvent(event, startedAt, blockLabel));
+  const lines = shown.map((event) => renderEvent(event, startedAt, blockLabel, lineNote));
   return `\`\`\`\n${lines.join("\n")}\n\`\`\`\n\n`;
 }
 
@@ -57,6 +64,7 @@ function renderEvent(
   event: TrafficEvent,
   startedAt: number | undefined,
   blockLabel: BlockLabel,
+  lineNote: LineNote,
 ): string {
   const mark =
     event.action === "audit" && event.wouldBlock !== undefined
@@ -65,7 +73,9 @@ function renderEvent(
   const label = (reason: string) => blockLabel(event, reason) ?? reason;
   const note =
     event.wouldBlock === undefined ? "" : ` (restrict would block: ${label(event.wouldBlock)})`;
-  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}`;
+  const extra = lineNote(event);
+  const tail = extra === undefined ? "" : ` ${extra}`;
+  return `${mark} ${formatTime(event.time, startedAt)}: ${subject(event)} -> ${outcome(event, label)}${note}${tail}`;
 }
 
 /**

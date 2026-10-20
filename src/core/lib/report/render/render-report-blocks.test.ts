@@ -5,12 +5,21 @@ import { reportParams } from "#core/lib/test/report-data.node.ts";
 
 import type { ReportData, UniversalReportData } from "../types.ts";
 import { communicationTruncationNote } from "./communication-section.ts";
-import { fitStepSummary, joinSummaryBlocks, withNotices } from "./fit-step-summary.ts";
+import {
+  fitStepSummary,
+  joinSummaryBlocks,
+  SAFETY_MARGIN_BYTES,
+  withNotices,
+  type SummaryBlock,
+} from "./fit-step-summary.ts";
 import { hostTableTruncationNote } from "./host-table.ts";
 import {
   renderReportBlocks,
+  stackTrafficBlocks,
   TRAFFIC_BLOCK,
+  trafficFrame,
   trafficNotice,
+  trafficTableBlock,
   type TrafficPriorities,
 } from "./render-report-markdown.ts";
 import { restrictExampleTruncationNote } from "./restrict-example.ts";
@@ -206,41 +215,6 @@ describe("renderReportBlocks under a limit", () => {
     expect(order).toStrictEqual(order.toSorted((a, b) => a - b));
   });
 
-  it("puts an action's own blocks between the blocked table and the allowed one, a blank line apart", () => {
-    const extra = (gap: string) => [
-      {
-        id: "extra",
-        priority: 1,
-        level: 2,
-        section: "traffic",
-        cut: "keep" as const,
-        text: `${gap}EXTRA\n`,
-      },
-    ];
-    const render = (r: UniversalReportData) =>
-      joinSummaryBlocks(
-        renderReportBlocks(r, "owner/repo", "v1", PRIORITIES, { extraBlocks: extra }),
-      );
-    const out = render(
-      report({
-        blocked: rows("bad", 1, "not-allowed").map((r) => ({ ...r, expected: false })),
-        blockedCount: 1,
-        failed: rows("down", 1, "conn-reset"),
-      }),
-    );
-    expect(out).toContain("the step.*</sub>\n\nEXTRA\n");
-    expect(render(report({}))).toContain("## Outbound Traffic Report\n\nEXTRA\n\n_(no");
-    const empty = joinSummaryBlocks(
-      renderReportBlocks(report({}), "owner/repo", "v1", PRIORITIES, {
-        extraBlocks: (gap) => [{ ...extra(gap)[0], text: "" }],
-      }),
-    );
-    expect(empty).toContain("## Outbound Traffic Report\n\n_(no");
-    expect(render(report({ passed: rows("ok", 1) }))).toContain(
-      "## Outbound Traffic Report\n\nEXTRA\n\n### ✅ Allowed Hosts",
-    );
-  });
-
   it("picks no notice for a block that is not the traffic report's", () => {
     const block = {
       id: "filesystem-log",
@@ -251,5 +225,79 @@ describe("renderReportBlocks under a limit", () => {
       cut: "lines" as const,
     };
     expect(trafficNotice(block, true)).toBeUndefined();
+  });
+});
+
+describe("stackTrafficBlocks", () => {
+  const heading = trafficFrame("## T\n\n");
+  const block = (text: string, extra: Partial<SummaryBlock> = {}): SummaryBlock => ({
+    priority: 1,
+    level: 2,
+    section: "traffic",
+    cut: "keep",
+    text,
+    ...extra,
+  });
+  const join = (parts: SummaryBlock[][]) => joinSummaryBlocks(stackTrafficBlocks(heading, parts));
+
+  it("sets each part a blank line after the last one that printed", () => {
+    expect(join([[block("A\n")], [block("B\n")], [block("C\n")]])).toBe("## T\n\nA\n\nB\n\nC\n");
+  });
+
+  it("starts the first part right after the heading", () => {
+    expect(join([[], [block("")], [block("A\n")]])).toBe("## T\n\nA\n");
+  });
+
+  it("skips a part that printed nothing", () => {
+    expect(join([[block("A\n")], [block("")], [], [block("B\n")]])).toBe("## T\n\nA\n\nB\n");
+  });
+
+  it("adds nothing to a part that opens with a blank line already", () => {
+    expect(
+      join([[block("A\n")], [block("\nB\n")], [block("C\n", { open: "\n<o>", close: "</o>" })]]),
+    ).toBe("## T\n\nA\n\nB\n\n<o>C\n</o>");
+  });
+
+  it("opens a part's tags with the blank line rather than its text", () => {
+    expect(join([[block("A\n")], [block("B\n", { open: "<o>", close: "</o>" })]])).toBe(
+      "## T\n\nA\n\n<o>B\n</o>",
+    );
+  });
+
+  it("gives the blank line to the part's first block that prints", () => {
+    expect(join([[block("A\n")], [block(""), block("B\n"), block("C\n")]])).toBe(
+      "## T\n\nA\n\nB\nC\n",
+    );
+  });
+
+  // The blank line is a line of the table's block, so the rows the cut must
+  // keep with the heading count it too; otherwise a cut could keep the heading
+  // and header row with no separator or rows under them.
+  it("never cuts a stacked table to its heading without a row", () => {
+    const rows = Array.from({ length: 50 }, (_, i) => `| r${i} |`).join("\n");
+    const table = {
+      ...trafficTableBlock("t", 5, "### Table\n\n", `| h |\n| --- |\n${rows}\n`, "\n"),
+      notice: "_cut_\n",
+    };
+    const blocks = stackTrafficBlocks(heading, [[block("A\n")], [table]]);
+    expect(blocks[2]).toMatchObject({ head: (table.head ?? 0) + 1 });
+    const frame = Buffer.byteLength("## T\n\nA\n");
+    for (let room = 0; room < 400; room++) {
+      const out = fitStepSummary(blocks, { limitBytes: SAFETY_MARGIN_BYTES + frame + room });
+      const rest = out.slice(frame);
+      expect(rest.startsWith("\n")).toBe(true);
+      if (rest.includes("### Table")) {
+        expect(rest).toMatch(/^\n### Table\n\n\| h \|\n\| --- \|\n\| r0 \|\n/);
+      } else {
+        expect(rest).toBe("\n_cut_\n");
+      }
+    }
+  });
+
+  it("keeps the blank line before the notice of a part replaced whole", () => {
+    const atomic = { ...block("X".repeat(200) + "\n"), cut: "atomic" as const, notice: "_cut_\n" };
+    const blocks = stackTrafficBlocks(heading, [[block("A\n")], [atomic], [block("\nB\n")]]);
+    const out = fitStepSummary(blocks, { limitBytes: SAFETY_MARGIN_BYTES + 100 });
+    expect(out).toBe("## T\n\nA\n\n_cut_\n\nB\n");
   });
 });
