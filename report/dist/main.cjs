@@ -4468,23 +4468,29 @@ function resolveConfigPath(path, env) {
 	return real;
 }
 function parseConfig(text, path, known) {
-	let invalid = (reason) => new ConfigFileError(`Invalid config_file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), doc;
-	try {
-		doc = (0, import_dist$2.parse)(text);
-	} catch (e) {
-		throw invalid(errorMessage(e));
-	}
-	if (doc == null) return new Map();
-	if (typeof doc != "object" || Array.isArray(doc)) throw invalid("the top level must be a mapping of input names to values.");
-	let values = new Map();
-	for (let [key, value] of Object.entries(doc)) {
+	let invalid = (reason) => new ConfigFileError(`Invalid config_file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$2.LineCounter(), doc = (0, import_dist$2.parseDocument)(text, { lineCounter });
+	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
+	let js = doc.toJS();
+	if (js == null) return new Map();
+	if (typeof js != "object" || Array.isArray(js)) throw invalid("the top level must be a mapping of input names to values.");
+	let lineOf = (key) => {
+		let node = doc.contents.get(key, !0), at = lineCounter.linePos(node.range[0]).line;
+		return (0, import_dist$2.isScalar)(node) && node.type === import_dist$2.Scalar.BLOCK_LITERAL ? at + 1 : at;
+	}, values = new Map();
+	for (let [key, value] of Object.entries(js)) {
 		if (!known.includes(key)) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
-		if (value == null) values.set(key, "");
+		if (value == null) values.set(key, {
+			text: "",
+			line: 0
+		});
 		else if ([
 			"string",
 			"number",
 			"boolean"
-		].includes(typeof value)) values.set(key, String(value));
+		].includes(typeof value)) values.set(key, {
+			text: String(value),
+			line: lineOf(key)
+		});
 		else throw invalid(`${key} must be a string, as it would be in the workflow.`);
 	}
 	return values;
@@ -4499,15 +4505,29 @@ function applyConfigFile(env, { known, lists }) {
 	} catch (e) {
 		throw new ConfigFileError(`config_file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`, "CONFIG_FILE_PATH");
 	}
-	let values = parseConfig(text, path, known), ignored = [];
-	for (let [name, value] of values) {
+	let values = parseConfig(text, path, known), ignored = [], origins = new Map();
+	for (let [name, { text: value, line }] of values) {
 		let envName = inputEnvName(name), inline = env[envName] ?? "";
-		lists.includes(name) ? env[envName] = [inline, value].filter((v) => v.trim()).join("\n") : inline.trim() ? value.trim() && value.trim() !== inline.trim() && ignored.push(name) : env[envName] = value;
+		if (lists.includes(name)) {
+			env[envName] = [inline, value].filter((v) => v.trim()).join("\n");
+			let offset = inline.trim() ? inline.split("\n").length : 0;
+			value.trim() && origins.set(name, {
+				offset,
+				line
+			});
+		} else inline.trim() ? value.trim() && value.trim() !== inline.trim() && ignored.push(name) : (env[envName] = value, value.trim() && origins.set(name, {
+			offset: 0,
+			line
+		}));
 	}
 	return ignored.length ? {
 		path: full,
-		warning: `Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`
-	} : { path: full };
+		warning: `Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`,
+		origins
+	} : {
+		path: full,
+		origins
+	};
 }
 //#endregion
 //#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/utils.js

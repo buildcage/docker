@@ -55,8 +55,48 @@ describe("applyConfigFile", () => {
     const env = envFor(writeConfig("proxy_mode: audit\n"));
     expect(applyConfigFile(env, INPUTS)).toEqual({
       path: join(workspace, "buildcage.yml"),
+      origins: new Map([["proxy_mode", { offset: 0, line: 1 }]]),
     });
     expect(env.INPUT_PROXY_MODE).toBe("audit");
+  });
+
+  describe("origins", () => {
+    it("places a list input's file lines after the workflow's", () => {
+      const env = envFor(
+        writeConfig("proxy_mode: audit\nallowed_https_rules: |\n  b.example.com:443\n"),
+        { INPUT_ALLOWED_HTTPS_RULES: "a.example.com:443\n# a comment\n" },
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins.get("allowed_https_rules")).toEqual({
+        offset: 3,
+        line: 3,
+      });
+      expect(env.INPUT_ALLOWED_HTTPS_RULES!.split("\n")[3]).toBe("b.example.com:443");
+    });
+
+    it("starts a list input at the file's lines when the workflow has none", () => {
+      const env = envFor(writeConfig("\nknown_blocked_rules: t.example.com\n"), {
+        INPUT_KNOWN_BLOCKED_RULES: " ",
+      });
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([["known_blocked_rules", { offset: 0, line: 2 }]]),
+      );
+    });
+
+    it("puts a value YAML may fold on the line it starts on", () => {
+      const env = envFor(writeConfig("known_blocked_rules: >\n  t.example.com\n"));
+      expect(applyConfigFile(env, INPUTS)?.origins.get("known_blocked_rules")).toEqual({
+        offset: 0,
+        line: 1,
+      });
+    });
+
+    it("leaves out an input the file's value did not reach, or reached empty", () => {
+      const env = envFor(
+        writeConfig("proxy_mode: audit\nproxy_engine:\nallowed_https_rules: ''\n"),
+        { INPUT_PROXY_MODE: "restrict" },
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(new Map());
+    });
   });
 
   it("leaves the inputs the workflow set, and names them", () => {

@@ -7,7 +7,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
-import { parse } from "yaml";
+import { isScalar, LineCounter, parseDocument, Scalar, type Node, type YAMLMap } from "yaml";
 
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
 
@@ -23,11 +23,24 @@ export interface ConfigFileInputs {
   lists: readonly string[];
 }
 
+/** Where the file's part of an input's value is. */
+export interface ConfigValueOrigin {
+  /** The line of the input's value it starts on, from 0: after the
+   *  workflow's lines in a list input that has both. */
+  offset: number;
+  /** The file's line holding that first line, from 1. Only a `|` block keeps
+   *  the lines after it on the file's next lines; YAML may fold or join any
+   *  other value's. */
+  line: number;
+}
+
 export interface AppliedConfigFile {
   /** The file's real path. */
   path: string;
   /** A warning naming the file's inputs the workflow overrode, if any. */
   warning?: string;
+  /** Each input whose value now holds the file's, by name. */
+  origins: Map<string, ConfigValueOrigin>;
 }
 
 /** The variable `core.getInput(name)` reads. */
@@ -95,34 +108,42 @@ function resolveConfigPath(path: string, env: NodeJS.ProcessEnv): string {
   return real;
 }
 
-/** Each key's value as the text an input would hold. */
-function parseConfig(text: string, path: string, known: readonly string[]): Map<string, string> {
+/** Each key's value as the text an input would hold, and the line its first line is on. */
+function parseConfig(
+  text: string,
+  path: string,
+  known: readonly string[],
+): Map<string, { text: string; line: number }> {
   const invalid = (reason: string) =>
     new ConfigFileError(
       `Invalid config_file ${JSON.stringify(path)}: ${reason}`,
       "CONFIG_FILE_INVALID",
     );
 
-  let doc: unknown;
-  try {
-    doc = parse(text);
-  } catch (e) {
-    throw invalid(errorMessage(e));
-  }
-  if (doc == null) return new Map();
-  if (typeof doc !== "object" || Array.isArray(doc)) {
+  const lineCounter = new LineCounter();
+  const doc = parseDocument(text, { lineCounter });
+  if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
+  const js: unknown = doc.toJS();
+  if (js == null) return new Map();
+  if (typeof js !== "object" || Array.isArray(js)) {
     throw invalid("the top level must be a mapping of input names to values.");
   }
 
-  const values = new Map<string, string>();
-  for (const [key, value] of Object.entries(doc)) {
+  // The line a value starts on; a `|` block's first line is the one after it.
+  const lineOf = (key: string): number => {
+    const node = (doc.contents as YAMLMap).get(key, true) as Node;
+    const at = lineCounter.linePos(node.range![0]).line;
+    return isScalar(node) && node.type === Scalar.BLOCK_LITERAL ? at + 1 : at;
+  };
+  const values = new Map<string, { text: string; line: number }>();
+  for (const [key, value] of Object.entries(js)) {
     if (!known.includes(key)) {
       throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
     }
     if (value == null) {
-      values.set(key, "");
+      values.set(key, { text: "", line: 0 });
     } else if (["string", "number", "boolean"].includes(typeof value)) {
-      values.set(key, String(value));
+      values.set(key, { text: String(value), line: lineOf(key) });
     } else {
       throw invalid(`${key} must be a string, as it would be in the workflow.`);
     }
@@ -160,18 +181,27 @@ export function applyConfigFile(
   const values = parseConfig(text, path, known);
 
   const ignored: string[] = [];
-  for (const [name, value] of values) {
+  const origins = new Map<string, ConfigValueOrigin>();
+  for (const [name, { text: value, line }] of values) {
     const envName = inputEnvName(name);
     const inline = env[envName] ?? "";
-    if (lists.includes(name)) env[envName] = [inline, value].filter((v) => v.trim()).join("\n");
+    if (lists.includes(name)) {
+      env[envName] = [inline, value].filter((v) => v.trim()).join("\n");
+      const offset = inline.trim() ? inline.split("\n").length : 0;
+      if (value.trim()) origins.set(name, { offset, line });
+    }
     // An empty or matching value loses nothing.
     else if (inline.trim()) {
       if (value.trim() && value.trim() !== inline.trim()) ignored.push(name);
-    } else env[envName] = value;
+    } else {
+      env[envName] = value;
+      if (value.trim()) origins.set(name, { offset: 0, line });
+    }
   }
-  if (!ignored.length) return { path: full };
+  if (!ignored.length) return { path: full, origins };
   return {
     path: full,
     warning: `Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`,
+    origins,
   };
 }
