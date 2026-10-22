@@ -27,9 +27,6 @@ export interface ExampleStepOptions {
    *  a setting the rules cannot express, which pasting the snippet must not
    *  drop. */
   extraInputs?: string[];
-  /** Markdown the action adds after the notice that the example was too
-   *  large to print, such as a way to make it shorter. */
-  omittedNote?: string;
 }
 
 /** The step's `name:`, `uses:` and `with:` lines. */

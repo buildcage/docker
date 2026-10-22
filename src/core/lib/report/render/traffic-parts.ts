@@ -200,13 +200,18 @@ export function knownBlockedBlocks(report: ReportData, fit: PartFit): SummaryBlo
   ];
 }
 
-/** In audit, the restrict step to switch to; nothing in restrict. */
+/**
+ * In audit, the restrict step to switch to; nothing in restrict. `omittedNote`
+ * is a short sentence of the action's own, a paragraph after the notice that
+ * the example was too large to print: the fit does not count its bytes.
+ */
 export function restrictExampleBlocks(
   report: ReportData,
   actionRepo: string,
   actionRef: string,
   fit: PartFit,
   step: ExampleStepOptions = {},
+  omittedNote?: string,
 ): SummaryBlock[] {
   if (report.parameters.mode !== "audit") return [];
   // inspect's example also narrows by method and path. A failed host is kept:
@@ -238,7 +243,9 @@ export function restrictExampleBlocks(
       section: `${SECTION}-example`,
       cut: "atomic",
       text: example,
-      notice: restrictExampleTruncationNote(fit.artifactAvailable) + (step.omittedNote ?? ""),
+      notice:
+        restrictExampleTruncationNote(fit.artifactAvailable) +
+        (omittedNote ? `\n${omittedNote}\n` : ""),
     },
   ];
 }

@@ -166,10 +166,10 @@ describe("renderReportBlocks under a limit", () => {
       "v1",
       PRIORITIES,
       false,
-      { omittedNote: "_Shorter with x._\n" },
+      { omittedNote: "_Shorter with x._" },
     );
     expect(fitStepSummary(blocks, { limitBytes: LIMIT })).toContain(
-      `${restrictExampleTruncationNote(false)}_Shorter with x._\n`,
+      `${restrictExampleTruncationNote(false)}\n_Shorter with x._\n`,
     );
   });
 

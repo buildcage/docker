@@ -22,6 +22,8 @@ import {
 export interface RenderReportBlocksOptions extends ExampleStepOptions {
   /** Heading text. May carry untrusted input: the heading escapes it. */
   title?: string;
+  /** See restrictExampleBlocks. */
+  omittedNote?: string;
 }
 
 /**
@@ -67,14 +69,21 @@ export function renderReportBlocks(
   actionRef: string,
   priorities: TrafficPriorities,
   artifactAvailable: boolean,
-  { title = "Outbound Traffic Report", ...step }: RenderReportBlocksOptions = {},
+  { title = "Outbound Traffic Report", omittedNote, ...step }: RenderReportBlocksOptions = {},
 ): SummaryBlock[] {
   const fit = partFits(priorities, artifactAvailable);
   return stackTrafficBlocks(trafficHeadingBlock(report, title), [
     blockedHostsBlocks(report, fit(TRAFFIC_BLOCK.blocked)),
     passedHostsBlocks(report, fit(TRAFFIC_BLOCK.passed)),
     knownBlockedBlocks(report, fit(TRAFFIC_BLOCK.known)),
-    restrictExampleBlocks(report, actionRepo, actionRef, fit(TRAFFIC_BLOCK.example), step),
+    restrictExampleBlocks(
+      report,
+      actionRepo,
+      actionRef,
+      fit(TRAFFIC_BLOCK.example),
+      step,
+      omittedNote,
+    ),
     noCommunicationBlocks(report),
     communicationDetailsBlocks(report, fit(TRAFFIC_BLOCK.log)),
     engineNoteBlocks(report),
