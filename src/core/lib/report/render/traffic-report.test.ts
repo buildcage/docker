@@ -393,6 +393,18 @@ describe("renderReportMarkdown: section and footer", () => {
     expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 blocked · 1 x\n\n### /);
   });
 
+  it("raises an action's caution in the verdict under the title", () => {
+    const md = joinSummaryBlocks(
+      stackTrafficBlocks(
+        trafficHeadingBlock({ ...base, blocked: [], blockedCount: 0 }, "Outbound Traffic Report", {
+          caution: ["1 x"],
+        }),
+        [],
+      ),
+    );
+    expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 x\n\n/);
+  });
+
   it("notes how universal identifies a host, and inspect nothing", () => {
     expect(joinSummaryBlocks(engineNoteBlocks(base))).toMatch(
       /^<sub>[^]*IP rules on the destination IP address\.\*<\/sub>\n$/,

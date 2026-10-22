@@ -69,6 +69,23 @@ describe("renderVerdict", () => {
     );
   });
 
+  it("puts an action's items between the report's cautions and its other counts", () => {
+    const report = {
+      ...base,
+      blocked: [row(2, false), row(5, true)],
+      blockedCount: 7,
+      failed: [
+        { host: "down.com", port: "443", ruleType: "HTTPS", reason: "dns-failed", count: 3 },
+      ],
+      logLooksPlausible: false,
+      timeline: [undecided],
+    };
+    expect(renderVerdict(report, { caution: ["1 x"], warning: ["2 y"] })).toBe(
+      "> [!CAUTION]\n> report incomplete · 2 blocked · 1 x · 2 y · 3 failed · 1 not acted on · " +
+        "5 blocked as expected\n\n",
+    );
+  });
+
   it("warns when nothing was blocked but something else needs a look", () => {
     const failed = [
       { host: "down.com", port: "443", ruleType: "HTTPS", reason: "dns-failed", count: 3 },
