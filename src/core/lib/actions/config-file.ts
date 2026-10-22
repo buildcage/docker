@@ -7,7 +7,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
-import { isScalar, LineCounter, parseDocument, Scalar, type Node, type YAMLMap } from "yaml";
+import { isAlias, isScalar, LineCounter, parseDocument, Scalar, type YAMLMap } from "yaml";
 
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
 
@@ -25,13 +25,14 @@ export interface ConfigFileInputs {
 
 /** Where the file's part of an input's value is. */
 export interface ConfigValueOrigin {
-  /** The line of the input's value it starts on, from 0: after the
-   *  workflow's lines in a list input that has both. */
+  /** The line of the input's value, as `env` holds it before any trim, it
+   *  starts on, from 0: after the workflow's lines in a list input that has
+   *  both. */
   offset: number;
-  /** The file's line holding that first line, from 1. Only a `|` block keeps
-   *  the lines after it on the file's next lines; YAML may fold or join any
-   *  other value's. */
-  line: number;
+  /** The file's line holding that first line, from 1, each later line of the
+   *  value being on the file's next line. Absent when they are not, as YAML
+   *  may fold or join a value's lines outside a `|` block. */
+  line?: number;
 }
 
 export interface AppliedConfigFile {
@@ -108,12 +109,12 @@ function resolveConfigPath(path: string, env: NodeJS.ProcessEnv): string {
   return real;
 }
 
-/** Each key's value as the text an input would hold, and the line its first line is on. */
+/** Each key's value as the text an input would hold, and the line it is on, as ConfigValueOrigin has it. */
 function parseConfig(
   text: string,
   path: string,
   known: readonly string[],
-): Map<string, { text: string; line: number }> {
+): Map<string, { text: string; line?: number }> {
   const invalid = (reason: string) =>
     new ConfigFileError(
       `Invalid config_file ${JSON.stringify(path)}: ${reason}`,
@@ -123,27 +124,39 @@ function parseConfig(
   const lineCounter = new LineCounter();
   const doc = parseDocument(text, { lineCounter });
   if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
-  const js: unknown = doc.toJS();
+  // As yaml's parse() reports them.
+  for (const warning of doc.warnings) process.emitWarning(warning);
+  let js: unknown;
+  try {
+    js = doc.toJS();
+  } catch (e) {
+    throw invalid(errorMessage(e));
+  }
   if (js == null) return new Map();
   if (typeof js !== "object" || Array.isArray(js)) {
     throw invalid("the top level must be a mapping of input names to values.");
   }
 
-  // The line a value starts on; a `|` block's first line is the one after it.
-  const lineOf = (key: string): number => {
-    const node = (doc.contents as YAMLMap).get(key, true) as Node;
-    const at = lineCounter.linePos(node.range![0]).line;
-    return isScalar(node) && node.type === Scalar.BLOCK_LITERAL ? at + 1 : at;
+  // A value from a merge key (<<) has no node of its own in the map.
+  const lineOf = (key: string, value: string): number | undefined => {
+    const found: unknown = (doc.contents as YAMLMap).get(key, true);
+    const node = isAlias(found) ? found.resolve(doc) : found;
+    if (!isScalar(node)) return undefined;
+    const literal = node.type === Scalar.BLOCK_LITERAL;
+    const block = literal || node.type === Scalar.BLOCK_FOLDED;
+    // A block's first line is the one after its header.
+    const at = lineCounter.linePos(node.range![0]).line + (block ? 1 : 0);
+    return literal || !value.trimEnd().includes("\n") ? at : undefined;
   };
-  const values = new Map<string, { text: string; line: number }>();
+  const values = new Map<string, { text: string; line?: number }>();
   for (const [key, value] of Object.entries(js)) {
     if (!known.includes(key)) {
       throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
     }
     if (value == null) {
-      values.set(key, { text: "", line: 0 });
+      values.set(key, { text: "" });
     } else if (["string", "number", "boolean"].includes(typeof value)) {
-      values.set(key, { text: String(value), line: lineOf(key) });
+      values.set(key, { text: String(value), line: lineOf(key, String(value)) });
     } else {
       throw invalid(`${key} must be a string, as it would be in the workflow.`);
     }

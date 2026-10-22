@@ -5014,26 +5014,31 @@ function resolveConfigPath(path, env) {
 function parseConfig(text, path, known) {
 	let invalid = (reason) => new ConfigFileError(`Invalid config_file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$3.LineCounter(), doc = (0, import_dist$3.parseDocument)(text, { lineCounter });
 	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
-	let js = doc.toJS();
+	for (let warning of doc.warnings) process.emitWarning(warning);
+	let js;
+	try {
+		js = doc.toJS();
+	} catch (e) {
+		throw invalid(errorMessage(e));
+	}
 	if (js == null) return new Map();
 	if (typeof js != "object" || Array.isArray(js)) throw invalid("the top level must be a mapping of input names to values.");
-	let lineOf = (key) => {
-		let node = doc.contents.get(key, !0), at = lineCounter.linePos(node.range[0]).line;
-		return (0, import_dist$3.isScalar)(node) && node.type === import_dist$3.Scalar.BLOCK_LITERAL ? at + 1 : at;
+	let lineOf = (key, value) => {
+		let found = doc.contents.get(key, !0), node = (0, import_dist$3.isAlias)(found) ? found.resolve(doc) : found;
+		if (!(0, import_dist$3.isScalar)(node)) return;
+		let literal = node.type === import_dist$3.Scalar.BLOCK_LITERAL, block = literal || node.type === import_dist$3.Scalar.BLOCK_FOLDED, at = lineCounter.linePos(node.range[0]).line + +!!block;
+		return literal || !value.trimEnd().includes("\n") ? at : void 0;
 	}, values = new Map();
 	for (let [key, value] of Object.entries(js)) {
 		if (!known.includes(key)) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
-		if (value == null) values.set(key, {
-			text: "",
-			line: 0
-		});
+		if (value == null) values.set(key, { text: "" });
 		else if ([
 			"string",
 			"number",
 			"boolean"
 		].includes(typeof value)) values.set(key, {
 			text: String(value),
-			line: lineOf(key)
+			line: lineOf(key, String(value))
 		});
 		else throw invalid(`${key} must be a string, as it would be in the workflow.`);
 	}
