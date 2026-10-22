@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { applyConfigFile, ConfigFileError } from "./config-file.ts";
 
@@ -55,8 +55,140 @@ describe("applyConfigFile", () => {
     const env = envFor(writeConfig("proxy_mode: audit\n"));
     expect(applyConfigFile(env, INPUTS)).toEqual({
       path: join(workspace, "buildcage.yml"),
+      origins: new Map([["proxy_mode", { offset: 0, line: 1 }]]),
     });
     expect(env.INPUT_PROXY_MODE).toBe("audit");
+  });
+
+  describe("origins", () => {
+    it("places a list input's file lines after the workflow's", () => {
+      const env = envFor(
+        writeConfig("proxy_mode: audit\nallowed_https_rules: |\n  b.example.com:443\n"),
+        { INPUT_ALLOWED_HTTPS_RULES: "a.example.com:443\n# a comment\n" },
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins.get("allowed_https_rules")).toEqual({
+        offset: 3,
+        line: 3,
+      });
+      expect(env.INPUT_ALLOWED_HTTPS_RULES!.split("\n")[3]).toBe("b.example.com:443");
+    });
+
+    it("starts a list input at the file's lines when the workflow has none", () => {
+      const env = envFor(writeConfig("\nknown_blocked_rules: t.example.com\n"), {
+        INPUT_KNOWN_BLOCKED_RULES: " ",
+      });
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([["known_blocked_rules", { offset: 0, line: 2 }]]),
+      );
+    });
+
+    it("puts a block's value on the lines after its header", () => {
+      const env = envFor(writeConfig("known_blocked_rules: |\n  t.example.com\n"));
+      expect(applyConfigFile(env, INPUTS)?.origins.get("known_blocked_rules")).toEqual({
+        offset: 0,
+        line: 2,
+      });
+    });
+
+    it("gives no line for a value whose lines YAML may have joined", () => {
+      const env = envFor(
+        writeConfig(
+          'allowed_https_rules: "a.example.com:443\\nb.example.com:443"\n' +
+            "known_blocked_rules: >\n  t.example.com\n  u.example.com\n",
+        ),
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([
+          ["allowed_https_rules", { offset: 0 }],
+          ["known_blocked_rules", { offset: 0 }],
+        ]),
+      );
+      expect(env.INPUT_ALLOWED_HTTPS_RULES).toBe("a.example.com:443\nb.example.com:443");
+    });
+
+    it("puts an alias's value where its anchor's is", () => {
+      const env = envFor(
+        writeConfig(
+          "allowed_https_rules: &r |\n  a.example.com:443\n  b.example.com:443\n" +
+            "known_blocked_rules: *r\n",
+        ),
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins.get("known_blocked_rules")).toEqual({
+        offset: 0,
+        line: 2,
+      });
+    });
+
+    it("puts a merged value where its map has it, the map's own and the first merged winning", () => {
+      const env = envFor(
+        writeConfig(
+          "%YAML 1.1\n---\n<<:\n  - &m {proxy_mode: audit}\n" +
+            "  - {proxy_mode: restrict, proxy_engine: inspect}\n  - *m\n" +
+            "<<: {known_blocked_rules: t.example.com}\nknown_blocked_rules: u.example.com\n",
+        ),
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([
+          ["proxy_mode", { offset: 0, line: 4 }],
+          ["proxy_engine", { offset: 0, line: 5 }],
+          ["known_blocked_rules", { offset: 0, line: 8 }],
+        ]),
+      );
+      expect(env).toMatchObject({
+        INPUT_PROXY_MODE: "audit",
+        INPUT_PROXY_ENGINE: "inspect",
+        INPUT_KNOWN_BLOCKED_RULES: "u.example.com",
+      });
+    });
+
+    it("finds a value merged as yaml merges it, under a tagged key or from an aliased list", () => {
+      const env = envFor(
+        writeConfig(
+          "%YAML 1.1\n---\n!!str <<: {proxy_mode: audit}\n" +
+            "<<: {known_blocked_rules: &s [{proxy_engine: inspect}]}\n" +
+            "known_blocked_rules: t.example.com\n<<: *s\n",
+        ),
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([
+          ["proxy_mode", { offset: 0, line: 3 }],
+          ["known_blocked_rules", { offset: 0, line: 5 }],
+          ["proxy_engine", { offset: 0, line: 4 }],
+        ]),
+      );
+    });
+
+    it("finds a value whose key is an alias", () => {
+      const env = envFor(writeConfig("proxy_mode: &k proxy_engine\n*k : inspect\n"));
+      expect(applyConfigFile(env, INPUTS)?.origins.get("proxy_engine")).toEqual({
+        offset: 0,
+        line: 2,
+      });
+      expect(env.INPUT_PROXY_ENGINE).toBe("inspect");
+    });
+
+    it("gives no line for a quoted value whose text is not all on its line", () => {
+      const env = envFor(
+        writeConfig(
+          'allowed_https_rules: "a.example.com:443\\n"\nknown_blocked_rules: "\\\n  t.example.com"\n',
+        ),
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([
+          ["allowed_https_rules", { offset: 0 }],
+          ["known_blocked_rules", { offset: 0 }],
+        ]),
+      );
+      expect(env.INPUT_KNOWN_BLOCKED_RULES).toBe("t.example.com");
+    });
+
+    it("leaves out an input the file's value did not reach, or reached empty", () => {
+      const env = envFor(
+        writeConfig("proxy_mode: audit\nproxy_engine:\nallowed_https_rules: ''\n"),
+        { INPUT_PROXY_MODE: "restrict" },
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(new Map());
+    });
   });
 
   it("leaves the inputs the workflow set, and names them", () => {
@@ -297,10 +429,25 @@ describe("applyConfigFile", () => {
         'Invalid config_file "buildcage.yml": the top level must be a mapping of input names to values.',
       ],
       [
+        "with a key that is not a name",
+        "proxy_mode: audit\n? [a]\n: x\n",
+        /^Invalid config_file "buildcage.yml": unknown key "\[ a \]"/,
+      ],
+      [
         "with an unknown key",
         "proxy_mod: audit\n",
         'Invalid config_file "buildcage.yml": unknown key "proxy_mod". Allowed keys: ' +
           "proxy_mode, proxy_engine, allowed_https_rules, known_blocked_rules.",
+      ],
+      [
+        "with a << key YAML 1.2 does not merge",
+        "proxy_mode: audit\n<<: {proxy_engine: inspect}\n",
+        /^Invalid config_file "buildcage.yml": unknown key "<<"/,
+      ],
+      [
+        "with a quoted << key",
+        '%YAML 1.1\n---\nproxy_mode: audit\n"<<": x\n',
+        /^Invalid config_file "buildcage.yml": unknown key "<<"/,
       ],
       [
         "with a list value",
@@ -315,6 +462,31 @@ describe("applyConfigFile", () => {
     ])("%s", (_, text, message) => {
       expectError(envFor(writeConfig(text)), "CONFIG_FILE_INVALID", message);
     });
+  });
+
+  it("refuses a file whose aliases expand too far", () => {
+    const list = (item: string) => `[${Array(10).fill(item).join(", ")}]`;
+    expectError(
+      envFor(writeConfig(`a: &a ${list("x")}\nb: &b ${list("*a")}\nc: ${list("*b")}\n`)),
+      "CONFIG_FILE_INVALID",
+      /^Invalid config_file "buildcage.yml": Excessive alias count/,
+    );
+  });
+
+  it("passes on YAML's warnings, before any error", () => {
+    const emitWarning = vi.spyOn(process, "emitWarning").mockImplementation(() => {});
+    const env = envFor(writeConfig("proxy_mode: !unknown audit\n"));
+    applyConfigFile(env, INPUTS);
+    expect(env.INPUT_PROXY_MODE).toBe("audit");
+    expectError(
+      envFor(writeConfig("proxy_engine: !unknown x\nproxy_mode: [\n")),
+      "CONFIG_FILE_INVALID",
+      /^Invalid config_file "buildcage.yml": /,
+    );
+    expect(emitWarning).toHaveBeenCalledTimes(2);
+    expect(emitWarning).toHaveBeenLastCalledWith(
+      expect.objectContaining({ message: expect.stringMatching(/^Unresolved tag: !unknown/) }),
+    );
   });
 
   it("changes nothing when the file is refused", () => {
