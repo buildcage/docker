@@ -79,6 +79,10 @@ LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/report/report-source.ts.
 
+# apk add leaves an installed package alone, so without this the CA bundle
+# stays as old as the base image and keeps trusting roots since withdrawn.
+RUN apk add --no-cache --upgrade ca-certificates-bundle
+
 # nss-tools provides certutil for init-cfg's NSS database.
 # util-linux-misc provides pipesz for s6-rc.d/haproxy/run; the base already
 # carries it.
