@@ -14,6 +14,8 @@ import {
 import { hostTableTruncationNote } from "./host-table.ts";
 import { restrictExampleTruncationNote } from "./restrict-example.ts";
 import {
+  partFits,
+  restrictExampleBlocks,
   TRAFFIC_BLOCK,
   trafficFrame,
   trafficTableBlock,
@@ -171,6 +173,19 @@ describe("renderReportBlocks under a limit", () => {
     expect(fitStepSummary(blocks, { limitBytes: LIMIT })).toContain(
       `${restrictExampleTruncationNote(false)}\n_Shorter with x._\n`,
     );
+  });
+
+  it("keeps the action's own note out of the example it follows", () => {
+    const [block] = restrictExampleBlocks(
+      report({ parameters: reportParams({ mode: "audit" }), passed: rows("ok", 1) }),
+      "owner/repo",
+      "v1",
+      partFits(PRIORITIES, true)(TRAFFIC_BLOCK.example),
+      { stepName: "Fetch deps", omittedNote: "_Shorter with x._" },
+    );
+    expect(block.notice).toBe(`${restrictExampleTruncationNote(true)}\n_Shorter with x._\n`);
+    expect(block.text).toContain("Fetch deps");
+    expect(block.text).not.toContain("Shorter");
   });
 
   it("ends the example with a blank line before whatever follows it", () => {

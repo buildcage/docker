@@ -2,7 +2,6 @@
 
 import type { ReportData } from "../types.ts";
 import { wholeBlock, type SummaryBlock } from "./fit-step-summary.ts";
-import type { ExampleStepOptions } from "./restrict-example.ts";
 import {
   blockedHostsBlocks,
   communicationDetailsBlocks,
@@ -12,6 +11,7 @@ import {
   passedHostsBlocks,
   reportFooter,
   restrictExampleBlocks,
+  type RestrictExampleBlocksOptions,
   TRAFFIC_BLOCK,
   trafficFrame,
   trafficHeadingBlock,
@@ -19,11 +19,9 @@ import {
   type TrafficPriorities,
 } from "./traffic-parts.ts";
 
-export interface RenderReportBlocksOptions extends ExampleStepOptions {
+export interface RenderReportBlocksOptions extends RestrictExampleBlocksOptions {
   /** Heading text. May carry untrusted input: the heading escapes it. */
   title?: string;
-  /** See restrictExampleBlocks. */
-  omittedNote?: string;
 }
 
 /**
@@ -69,21 +67,14 @@ export function renderReportBlocks(
   actionRef: string,
   priorities: TrafficPriorities,
   artifactAvailable: boolean,
-  { title = "Outbound Traffic Report", omittedNote, ...step }: RenderReportBlocksOptions = {},
+  { title = "Outbound Traffic Report", ...step }: RenderReportBlocksOptions = {},
 ): SummaryBlock[] {
   const fit = partFits(priorities, artifactAvailable);
   return stackTrafficBlocks(trafficHeadingBlock(report, title), [
     blockedHostsBlocks(report, fit(TRAFFIC_BLOCK.blocked)),
     passedHostsBlocks(report, fit(TRAFFIC_BLOCK.passed)),
     knownBlockedBlocks(report, fit(TRAFFIC_BLOCK.known)),
-    restrictExampleBlocks(
-      report,
-      actionRepo,
-      actionRef,
-      fit(TRAFFIC_BLOCK.example),
-      step,
-      omittedNote,
-    ),
+    restrictExampleBlocks(report, actionRepo, actionRef, fit(TRAFFIC_BLOCK.example), step),
     noCommunicationBlocks(report),
     communicationDetailsBlocks(report, fit(TRAFFIC_BLOCK.log)),
     engineNoteBlocks(report),
