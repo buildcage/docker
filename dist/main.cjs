@@ -5011,10 +5011,20 @@ function resolveConfigPath(path, env) {
 	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError("leads outside the workspace.");
 	return real;
 }
+const isMergeKey = (key) => (0, import_dist$3.isScalar)(key) && (key.value === "<<" || typeof key.value == "symbol" && key.value.description === "<<");
+function valueNodes(map, doc) {
+	let nodes = new Map(), merged = [];
+	for (let { key, value } of map.items) isMergeKey(key) ? merged.push(...(0, import_dist$3.isSeq)(value) ? value.items : [value]) : nodes.set((0, import_dist$3.isScalar)(key) ? key.value : key, value);
+	for (let source of merged) {
+		let from = valueNodes((0, import_dist$3.isAlias)(source) ? source.resolve(doc) : source, doc);
+		for (let [key, value] of from) nodes.has(key) || nodes.set(key, value);
+	}
+	return nodes;
+}
 function parseConfig(text, path, known) {
 	let invalid = (reason) => new ConfigFileError(`Invalid config_file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$3.LineCounter(), doc = (0, import_dist$3.parseDocument)(text, { lineCounter });
-	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
 	for (let warning of doc.warnings) process.emitWarning(warning);
+	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
 	let js;
 	try {
 		js = doc.toJS();
@@ -5023,11 +5033,10 @@ function parseConfig(text, path, known) {
 	}
 	if (js == null) return new Map();
 	if (typeof js != "object" || Array.isArray(js)) throw invalid("the top level must be a mapping of input names to values.");
-	let lineOf = (key, value) => {
-		let found = doc.contents.get(key, !0), node = (0, import_dist$3.isAlias)(found) ? found.resolve(doc) : found;
-		if (!(0, import_dist$3.isScalar)(node)) return;
-		let literal = node.type === import_dist$3.Scalar.BLOCK_LITERAL, block = literal || node.type === import_dist$3.Scalar.BLOCK_FOLDED, at = lineCounter.linePos(node.range[0]).line + +!!block;
-		return literal || !value.trimEnd().includes("\n") ? at : void 0;
+	let nodes, lineOf = (key, value) => {
+		nodes ??= valueNodes(doc.contents, doc);
+		let found = nodes.get(key), node = (0, import_dist$3.isAlias)(found) ? found.resolve(doc) : found, [start, end] = node.range, at = lineCounter.linePos(start).line;
+		return node.type === import_dist$3.Scalar.BLOCK_LITERAL ? at + 1 : node.type === import_dist$3.Scalar.BLOCK_FOLDED ? value.trimEnd().includes("\n") ? void 0 : at + 1 : value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
 	}, values = new Map();
 	for (let [key, value] of Object.entries(js)) {
 		if (!known.includes(key)) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
@@ -5036,11 +5045,13 @@ function parseConfig(text, path, known) {
 			"string",
 			"number",
 			"boolean"
-		].includes(typeof value)) values.set(key, {
-			text: String(value),
-			line: lineOf(key, String(value))
-		});
-		else throw invalid(`${key} must be a string, as it would be in the workflow.`);
+		].includes(typeof value)) {
+			let text = String(value);
+			values.set(key, {
+				text,
+				line: lineOf(key, text)
+			});
+		} else throw invalid(`${key} must be a string, as it would be in the workflow.`);
 	}
 	return values;
 }

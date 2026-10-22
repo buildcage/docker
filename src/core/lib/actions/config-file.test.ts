@@ -119,12 +119,41 @@ describe("applyConfigFile", () => {
       });
     });
 
-    it("gives no line for a value from a merge key", () => {
-      const env = envFor(writeConfig("%YAML 1.1\n---\n<<: {proxy_mode: audit}\n"));
-      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
-        new Map([["proxy_mode", { offset: 0 }]]),
+    it("puts a merged value where its map has it, the map's own and the first merged winning", () => {
+      const env = envFor(
+        writeConfig(
+          "%YAML 1.1\n---\n<<:\n  - &m {proxy_mode: audit}\n" +
+            "  - {proxy_mode: restrict, proxy_engine: inspect}\n  - *m\n" +
+            "<<: {known_blocked_rules: t.example.com}\nknown_blocked_rules: u.example.com\n",
+        ),
       );
-      expect(env.INPUT_PROXY_MODE).toBe("audit");
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([
+          ["proxy_mode", { offset: 0, line: 4 }],
+          ["proxy_engine", { offset: 0, line: 5 }],
+          ["known_blocked_rules", { offset: 0, line: 8 }],
+        ]),
+      );
+      expect(env).toMatchObject({
+        INPUT_PROXY_MODE: "audit",
+        INPUT_PROXY_ENGINE: "inspect",
+        INPUT_KNOWN_BLOCKED_RULES: "u.example.com",
+      });
+    });
+
+    it("gives no line for a quoted value whose text is not all on its line", () => {
+      const env = envFor(
+        writeConfig(
+          'allowed_https_rules: "a.example.com:443\\n"\nknown_blocked_rules: "\\\n  t.example.com"\n',
+        ),
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([
+          ["allowed_https_rules", { offset: 0 }],
+          ["known_blocked_rules", { offset: 0 }],
+        ]),
+      );
+      expect(env.INPUT_KNOWN_BLOCKED_RULES).toBe("t.example.com");
     });
 
     it("leaves out an input the file's value did not reach, or reached empty", () => {
@@ -374,6 +403,11 @@ describe("applyConfigFile", () => {
         'Invalid config_file "buildcage.yml": the top level must be a mapping of input names to values.',
       ],
       [
+        "with a key that is not a name",
+        "proxy_mode: audit\n? [a]\n: x\n",
+        /^Invalid config_file "buildcage.yml": unknown key "\[ a \]"/,
+      ],
+      [
         "with an unknown key",
         "proxy_mod: audit\n",
         'Invalid config_file "buildcage.yml": unknown key "proxy_mod". Allowed keys: ' +
@@ -403,15 +437,20 @@ describe("applyConfigFile", () => {
     );
   });
 
-  it("passes on YAML's warnings", () => {
+  it("passes on YAML's warnings, before any error", () => {
     const emitWarning = vi.spyOn(process, "emitWarning").mockImplementation(() => {});
     const env = envFor(writeConfig("proxy_mode: !unknown audit\n"));
     applyConfigFile(env, INPUTS);
-    expect(emitWarning).toHaveBeenCalledWith(
+    expect(env.INPUT_PROXY_MODE).toBe("audit");
+    expectError(
+      envFor(writeConfig("proxy_engine: !unknown x\nproxy_mode: [\n")),
+      "CONFIG_FILE_INVALID",
+      /^Invalid config_file "buildcage.yml": /,
+    );
+    expect(emitWarning).toHaveBeenCalledTimes(2);
+    expect(emitWarning).toHaveBeenLastCalledWith(
       expect.objectContaining({ message: expect.stringMatching(/^Unresolved tag: !unknown/) }),
     );
-    expect(env.INPUT_PROXY_MODE).toBe("audit");
-    emitWarning.mockRestore();
   });
 
   it("changes nothing when the file is refused", () => {

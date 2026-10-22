@@ -7,7 +7,16 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
-import { isAlias, isScalar, LineCounter, parseDocument, Scalar, type YAMLMap } from "yaml";
+import {
+  isAlias,
+  isScalar,
+  isSeq,
+  LineCounter,
+  parseDocument,
+  Scalar,
+  type Document,
+  type YAMLMap,
+} from "yaml";
 
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
 
@@ -25,9 +34,9 @@ export interface ConfigFileInputs {
 
 /** Where the file's part of an input's value is. */
 export interface ConfigValueOrigin {
-  /** The line of the input's value, as `env` holds it before any trim, it
-   *  starts on, from 0: after the workflow's lines in a list input that has
-   *  both. */
+  /** The index, from 0, of the line it starts on in the input's `INPUT_*`
+   *  variable, untrimmed: after the workflow's lines in a list input that
+   *  has both. */
   offset: number;
   /** The file's line holding that first line, from 1, each later line of the
    *  value being on the file's next line. Absent when they are not, as YAML
@@ -40,7 +49,7 @@ export interface AppliedConfigFile {
   path: string;
   /** A warning naming the file's inputs the workflow overrode, if any. */
   warning?: string;
-  /** Each input whose value now holds the file's, by name. */
+  /** Each input the file's value was written into, by name. */
   origins: Map<string, ConfigValueOrigin>;
 }
 
@@ -109,12 +118,41 @@ function resolveConfigPath(path: string, env: NodeJS.ProcessEnv): string {
   return real;
 }
 
-/** Each key's value as the text an input would hold, and the line it is on, as ConfigValueOrigin has it. */
+/** A key's value as the text an input would hold, and its line as ConfigValueOrigin has it. */
+interface ParsedValue {
+  text: string;
+  line?: number;
+}
+
+const isMergeKey = (key: unknown): boolean =>
+  isScalar(key) &&
+  (key.value === "<<" || (typeof key.value === "symbol" && key.value.description === "<<"));
+
+/**
+ * Each key's value node in `map`, a merge key's maps giving the keys the map
+ * does not set, the first of them first, as toJS() merges them.
+ */
+function valueNodes(map: YAMLMap, doc: Document): Map<unknown, unknown> {
+  const nodes = new Map<unknown, unknown>();
+  const merged: unknown[] = [];
+  for (const { key, value } of map.items) {
+    if (isMergeKey(key)) merged.push(...(isSeq(value) ? value.items : [value]));
+    else nodes.set(isScalar(key) ? key.value : key, value);
+  }
+  // toJS() refuses a merge of anything but maps.
+  for (const source of merged) {
+    const from = valueNodes((isAlias(source) ? source.resolve(doc) : source) as YAMLMap, doc);
+    for (const [key, value] of from) if (!nodes.has(key)) nodes.set(key, value);
+  }
+  return nodes;
+}
+
+/** Each key's value, as ParsedValue has it. */
 function parseConfig(
   text: string,
   path: string,
   known: readonly string[],
-): Map<string, { text: string; line?: number }> {
+): Map<string, ParsedValue> {
   const invalid = (reason: string) =>
     new ConfigFileError(
       `Invalid config_file ${JSON.stringify(path)}: ${reason}`,
@@ -123,9 +161,9 @@ function parseConfig(
 
   const lineCounter = new LineCounter();
   const doc = parseDocument(text, { lineCounter });
-  if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
   // As yaml's parse() reports them.
   for (const warning of doc.warnings) process.emitWarning(warning);
+  if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
   let js: unknown;
   try {
     js = doc.toJS();
@@ -137,18 +175,24 @@ function parseConfig(
     throw invalid("the top level must be a mapping of input names to values.");
   }
 
-  // A value from a merge key (<<) has no node of its own in the map.
+  // Read once a known key is found, as a mapping holds it then.
+  let nodes: Map<unknown, unknown> | undefined;
   const lineOf = (key: string, value: string): number | undefined => {
-    const found: unknown = (doc.contents as YAMLMap).get(key, true);
-    const node = isAlias(found) ? found.resolve(doc) : found;
-    if (!isScalar(node)) return undefined;
-    const literal = node.type === Scalar.BLOCK_LITERAL;
-    const block = literal || node.type === Scalar.BLOCK_FOLDED;
-    // A block's first line is the one after its header.
-    const at = lineCounter.linePos(node.range![0]).line + (block ? 1 : 0);
-    return literal || !value.trimEnd().includes("\n") ? at : undefined;
+    nodes ??= valueNodes(doc.contents as YAMLMap, doc);
+    // toJS() gave the key a string, number or boolean, so its node is a scalar.
+    const found = nodes.get(key);
+    const node = (isAlias(found) ? found.resolve(doc) : found) as Scalar;
+    const [start, end] = node.range!;
+    const at = lineCounter.linePos(start).line;
+    // A block's first line is the one after its header. Only a literal one
+    // keeps each line of its text on a line of its own.
+    if (node.type === Scalar.BLOCK_LITERAL) return at + 1;
+    if (node.type === Scalar.BLOCK_FOLDED)
+      return value.trimEnd().includes("\n") ? undefined : at + 1;
+    // Any other value's text is on its line only when it is all on that one.
+    return value.includes("\n") || lineCounter.linePos(end).line !== at ? undefined : at;
   };
-  const values = new Map<string, { text: string; line?: number }>();
+  const values = new Map<string, ParsedValue>();
   for (const [key, value] of Object.entries(js)) {
     if (!known.includes(key)) {
       throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
@@ -156,7 +200,8 @@ function parseConfig(
     if (value == null) {
       values.set(key, { text: "" });
     } else if (["string", "number", "boolean"].includes(typeof value)) {
-      values.set(key, { text: String(value), line: lineOf(key, String(value)) });
+      const text = String(value);
+      values.set(key, { text, line: lineOf(key, text) });
     } else {
       throw invalid(`${key} must be a string, as it would be in the workflow.`);
     }
