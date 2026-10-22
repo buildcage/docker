@@ -141,6 +141,23 @@ describe("applyConfigFile", () => {
       });
     });
 
+    it("finds a value merged as yaml merges it, under a tagged key or from an aliased list", () => {
+      const env = envFor(
+        writeConfig(
+          "%YAML 1.1\n---\n!!str <<: {proxy_mode: audit}\n" +
+            "<<: {known_blocked_rules: &s [{proxy_engine: inspect}]}\n" +
+            "known_blocked_rules: t.example.com\n<<: *s\n",
+        ),
+      );
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([
+          ["proxy_mode", { offset: 0, line: 3 }],
+          ["known_blocked_rules", { offset: 0, line: 5 }],
+          ["proxy_engine", { offset: 0, line: 4 }],
+        ]),
+      );
+    });
+
     it("finds a value whose key is an alias", () => {
       const env = envFor(writeConfig("proxy_mode: &k proxy_engine\n*k : inspect\n"));
       expect(applyConfigFile(env, INPUTS)?.origins.get("proxy_engine")).toEqual({

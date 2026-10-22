@@ -108,6 +108,7 @@ describe("runSetupStep", () => {
     mocks.applyConfigFile.mockReturnValue({
       path: "/home/runner/work/repo/repo/c.yml",
       warning: "Ignored from config_file c.yml, set by the workflow: proxy_mode",
+      origins: new Map(),
     });
 
     await runSetupStep(ENV, deps);

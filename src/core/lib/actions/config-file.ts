@@ -124,30 +124,49 @@ interface ParsedValue {
   line?: number;
 }
 
-// A key yaml read as a merge, which a quoted or YAML 1.2 `<<` is not.
-const isMergeKey = (key: unknown): boolean =>
-  isScalar(key) && typeof key.value === "symbol" && key.value.description === "<<";
+const resolved = (node: unknown, doc: Document): unknown =>
+  isAlias(node) ? node.resolve(doc) : node;
+
+const MERGE_TAG = "tag:yaml.org,2002:merge";
+
+/** Whether toJS() merges `key`'s value into its map, as yaml decides it. */
+function isMergeKey(key: unknown, doc: Document): boolean {
+  if (!isScalar(key) || (key.type && key.type !== Scalar.PLAIN)) return false;
+  const { value } = key;
+  const merge = value === "<<" || (typeof value === "symbol" && value.description === "<<");
+  return merge && doc.schema.tags.some((tag) => tag.tag === MERGE_TAG && tag.default);
+}
 
 /**
- * Each key's value node in `map`, by the key's text, a merge key's maps giving
- * the keys the map does not set, the first of them first, as toJS() merges
- * them.
+ * Each key's value node in the document's top map, by the key's text, a merge
+ * key's maps giving the keys the map does not set, the first of them first,
+ * as toJS() merges them.
  */
-function valueNodes(map: YAMLMap, doc: Document): Map<string, unknown> {
-  const nodes = new Map<string, unknown>();
-  const merged: unknown[] = [];
-  const resolved = (node: unknown) => (isAlias(node) ? node.resolve(doc) : node);
-  for (const { key, value } of map.items) {
-    const name = resolved(key);
-    if (isMergeKey(name)) merged.push(...(isSeq(value) ? value.items : [value]));
-    // Only a scalar key can be a known input's.
-    else if (isScalar(name)) nodes.set(String(name.value), value);
-  }
-  // toJS() refuses a merge of anything but maps.
-  for (const source of merged.map(resolved) as YAMLMap[]) {
-    for (const [key, value] of valueNodes(source, doc)) if (!nodes.has(key)) nodes.set(key, value);
-  }
-  return nodes;
+function valueNodes(doc: Document): Map<string, unknown> {
+  // A map merged many times is read once.
+  const read = new Map<YAMLMap, Map<string, unknown>>();
+  const nodesOf = (map: YAMLMap): Map<string, unknown> => {
+    const done = read.get(map);
+    if (done) return done;
+    const nodes = new Map<string, unknown>();
+    const merged: unknown[] = [];
+    for (const { key, value } of map.items) {
+      if (isMergeKey(key, doc)) {
+        const source = resolved(value, doc);
+        merged.push(...(isSeq(source) ? source.items : [source]));
+      } else {
+        const name = resolved(key, doc);
+        // Only a scalar key can be a known input's.
+        if (isScalar(name)) nodes.set(String(name.value), value);
+      }
+    }
+    // toJS() refuses a merge of anything but maps.
+    for (const source of merged.map((node) => resolved(node, doc)) as YAMLMap[])
+      for (const [key, value] of nodesOf(source)) if (!nodes.has(key)) nodes.set(key, value);
+    read.set(map, nodes);
+    return nodes;
+  };
+  return nodesOf(doc.contents as YAMLMap);
 }
 
 /** Each key's value, as ParsedValue has it. */
@@ -178,13 +197,10 @@ function parseConfig(
     throw invalid("the top level must be a mapping of input names to values.");
   }
 
-  // Read once a known key is found, as a mapping holds it then.
-  let nodes: Map<string, unknown> | undefined;
+  const nodes = valueNodes(doc);
   const lineOf = (key: string, value: string): number | undefined => {
-    nodes ??= valueNodes(doc.contents as YAMLMap, doc);
     // toJS() gave the key a string, number or boolean, so its node is a scalar.
-    const found = nodes.get(key);
-    const node = (isAlias(found) ? found.resolve(doc) : found) as Scalar;
+    const node = resolved(nodes.get(key), doc) as Scalar;
     const [start, end] = node.range!;
     const at = lineCounter.linePos(start).line;
     // A block's first line is the one after its header. Only a literal one

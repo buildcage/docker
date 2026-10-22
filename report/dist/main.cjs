@@ -4467,15 +4467,28 @@ function resolveConfigPath(path, env) {
 	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError("leads outside the workspace.");
 	return real;
 }
-const isMergeKey = (key) => (0, import_dist$2.isScalar)(key) && typeof key.value == "symbol" && key.value.description === "<<";
-function valueNodes(map, doc) {
-	let nodes = new Map(), merged = [], resolved = (node) => (0, import_dist$2.isAlias)(node) ? node.resolve(doc) : node;
-	for (let { key, value } of map.items) {
-		let name = resolved(key);
-		isMergeKey(name) ? merged.push(...(0, import_dist$2.isSeq)(value) ? value.items : [value]) : (0, import_dist$2.isScalar)(name) && nodes.set(String(name.value), value);
-	}
-	for (let source of merged.map(resolved)) for (let [key, value] of valueNodes(source, doc)) nodes.has(key) || nodes.set(key, value);
-	return nodes;
+const resolved = (node, doc) => (0, import_dist$2.isAlias)(node) ? node.resolve(doc) : node;
+function isMergeKey(key, doc) {
+	if (!(0, import_dist$2.isScalar)(key) || key.type && key.type !== import_dist$2.Scalar.PLAIN) return !1;
+	let { value } = key;
+	return (value === "<<" || typeof value == "symbol" && value.description === "<<") && doc.schema.tags.some((tag) => tag.tag === "tag:yaml.org,2002:merge" && tag.default);
+}
+function valueNodes(doc) {
+	let read = new Map(), nodesOf = (map) => {
+		let done = read.get(map);
+		if (done) return done;
+		let nodes = new Map(), merged = [];
+		for (let { key, value } of map.items) if (isMergeKey(key, doc)) {
+			let source = resolved(value, doc);
+			merged.push(...(0, import_dist$2.isSeq)(source) ? source.items : [source]);
+		} else {
+			let name = resolved(key, doc);
+			(0, import_dist$2.isScalar)(name) && nodes.set(String(name.value), value);
+		}
+		for (let source of merged.map((node) => resolved(node, doc))) for (let [key, value] of nodesOf(source)) nodes.has(key) || nodes.set(key, value);
+		return read.set(map, nodes), nodes;
+	};
+	return nodesOf(doc.contents);
 }
 function parseConfig(text, path, known) {
 	let invalid = (reason) => new ConfigFileError(`Invalid config_file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$2.LineCounter(), doc = (0, import_dist$2.parseDocument)(text, { lineCounter });
@@ -4489,9 +4502,8 @@ function parseConfig(text, path, known) {
 	}
 	if (js == null) return new Map();
 	if (typeof js != "object" || Array.isArray(js)) throw invalid("the top level must be a mapping of input names to values.");
-	let nodes, lineOf = (key, value) => {
-		nodes ??= valueNodes(doc.contents, doc);
-		let found = nodes.get(key), node = (0, import_dist$2.isAlias)(found) ? found.resolve(doc) : found, [start, end] = node.range, at = lineCounter.linePos(start).line;
+	let nodes = valueNodes(doc), lineOf = (key, value) => {
+		let node = resolved(nodes.get(key), doc), [start, end] = node.range, at = lineCounter.linePos(start).line;
 		if (node.type === import_dist$2.Scalar.BLOCK_LITERAL) return at + 1;
 		if (node.type !== import_dist$2.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
 	}, values = new Map();
