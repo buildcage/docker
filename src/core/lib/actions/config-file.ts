@@ -124,25 +124,28 @@ interface ParsedValue {
   line?: number;
 }
 
+// A key yaml read as a merge, which a quoted or YAML 1.2 `<<` is not.
 const isMergeKey = (key: unknown): boolean =>
-  isScalar(key) &&
-  (key.value === "<<" || (typeof key.value === "symbol" && key.value.description === "<<"));
+  isScalar(key) && typeof key.value === "symbol" && key.value.description === "<<";
 
 /**
- * Each key's value node in `map`, a merge key's maps giving the keys the map
- * does not set, the first of them first, as toJS() merges them.
+ * Each key's value node in `map`, by the key's text, a merge key's maps giving
+ * the keys the map does not set, the first of them first, as toJS() merges
+ * them.
  */
-function valueNodes(map: YAMLMap, doc: Document): Map<unknown, unknown> {
-  const nodes = new Map<unknown, unknown>();
+function valueNodes(map: YAMLMap, doc: Document): Map<string, unknown> {
+  const nodes = new Map<string, unknown>();
   const merged: unknown[] = [];
+  const resolved = (node: unknown) => (isAlias(node) ? node.resolve(doc) : node);
   for (const { key, value } of map.items) {
-    if (isMergeKey(key)) merged.push(...(isSeq(value) ? value.items : [value]));
-    else nodes.set(isScalar(key) ? key.value : key, value);
+    const name = resolved(key);
+    if (isMergeKey(name)) merged.push(...(isSeq(value) ? value.items : [value]));
+    // Only a scalar key can be a known input's.
+    else if (isScalar(name)) nodes.set(String(name.value), value);
   }
   // toJS() refuses a merge of anything but maps.
-  for (const source of merged) {
-    const from = valueNodes((isAlias(source) ? source.resolve(doc) : source) as YAMLMap, doc);
-    for (const [key, value] of from) if (!nodes.has(key)) nodes.set(key, value);
+  for (const source of merged.map(resolved) as YAMLMap[]) {
+    for (const [key, value] of valueNodes(source, doc)) if (!nodes.has(key)) nodes.set(key, value);
   }
   return nodes;
 }
@@ -176,7 +179,7 @@ function parseConfig(
   }
 
   // Read once a known key is found, as a mapping holds it then.
-  let nodes: Map<unknown, unknown> | undefined;
+  let nodes: Map<string, unknown> | undefined;
   const lineOf = (key: string, value: string): number | undefined => {
     nodes ??= valueNodes(doc.contents as YAMLMap, doc);
     // toJS() gave the key a string, number or boolean, so its node is a scalar.
@@ -187,8 +190,7 @@ function parseConfig(
     // A block's first line is the one after its header. Only a literal one
     // keeps each line of its text on a line of its own.
     if (node.type === Scalar.BLOCK_LITERAL) return at + 1;
-    if (node.type === Scalar.BLOCK_FOLDED)
-      return value.trimEnd().includes("\n") ? undefined : at + 1;
+    if (node.type === Scalar.BLOCK_FOLDED) return undefined;
     // Any other value's text is on its line only when it is all on that one.
     return value.includes("\n") || lineCounter.linePos(end).line !== at ? undefined : at;
   };
@@ -244,9 +246,11 @@ export function applyConfigFile(
     const envName = inputEnvName(name);
     const inline = env[envName] ?? "";
     if (lists.includes(name)) {
-      env[envName] = [inline, value].filter((v) => v.trim()).join("\n");
-      const offset = inline.trim() ? inline.split("\n").length : 0;
-      if (value.trim()) origins.set(name, { offset, line });
+      const joined = [inline, value].filter((v) => v.trim()).join("\n");
+      env[envName] = joined;
+      // The file's value ends the joined text when it is there at all.
+      const before = joined.slice(0, joined.length - value.length);
+      if (value.trim()) origins.set(name, { offset: before.split("\n").length - 1, line });
     }
     // An empty or matching value loses nothing.
     else if (inline.trim()) {

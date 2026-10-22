@@ -5011,14 +5011,14 @@ function resolveConfigPath(path, env) {
 	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError("leads outside the workspace.");
 	return real;
 }
-const isMergeKey = (key) => (0, import_dist$3.isScalar)(key) && (key.value === "<<" || typeof key.value == "symbol" && key.value.description === "<<");
+const isMergeKey = (key) => (0, import_dist$3.isScalar)(key) && typeof key.value == "symbol" && key.value.description === "<<";
 function valueNodes(map, doc) {
-	let nodes = new Map(), merged = [];
-	for (let { key, value } of map.items) isMergeKey(key) ? merged.push(...(0, import_dist$3.isSeq)(value) ? value.items : [value]) : nodes.set((0, import_dist$3.isScalar)(key) ? key.value : key, value);
-	for (let source of merged) {
-		let from = valueNodes((0, import_dist$3.isAlias)(source) ? source.resolve(doc) : source, doc);
-		for (let [key, value] of from) nodes.has(key) || nodes.set(key, value);
+	let nodes = new Map(), merged = [], resolved = (node) => (0, import_dist$3.isAlias)(node) ? node.resolve(doc) : node;
+	for (let { key, value } of map.items) {
+		let name = resolved(key);
+		isMergeKey(name) ? merged.push(...(0, import_dist$3.isSeq)(value) ? value.items : [value]) : (0, import_dist$3.isScalar)(name) && nodes.set(String(name.value), value);
 	}
+	for (let source of merged.map(resolved)) for (let [key, value] of valueNodes(source, doc)) nodes.has(key) || nodes.set(key, value);
 	return nodes;
 }
 function parseConfig(text, path, known) {
@@ -5036,7 +5036,8 @@ function parseConfig(text, path, known) {
 	let nodes, lineOf = (key, value) => {
 		nodes ??= valueNodes(doc.contents, doc);
 		let found = nodes.get(key), node = (0, import_dist$3.isAlias)(found) ? found.resolve(doc) : found, [start, end] = node.range, at = lineCounter.linePos(start).line;
-		return node.type === import_dist$3.Scalar.BLOCK_LITERAL ? at + 1 : node.type === import_dist$3.Scalar.BLOCK_FOLDED ? value.trimEnd().includes("\n") ? void 0 : at + 1 : value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
+		if (node.type === import_dist$3.Scalar.BLOCK_LITERAL) return at + 1;
+		if (node.type !== import_dist$3.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
 	}, values = new Map();
 	for (let [key, value] of Object.entries(js)) {
 		if (!known.includes(key)) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
@@ -5069,10 +5070,11 @@ function applyConfigFile(env, { known, lists }) {
 	for (let [name, { text: value, line }] of values) {
 		let envName = inputEnvName(name), inline = env[envName] ?? "";
 		if (lists.includes(name)) {
-			env[envName] = [inline, value].filter((v) => v.trim()).join("\n");
-			let offset = inline.trim() ? inline.split("\n").length : 0;
+			let joined = [inline, value].filter((v) => v.trim()).join("\n");
+			env[envName] = joined;
+			let before = joined.slice(0, joined.length - value.length);
 			value.trim() && origins.set(name, {
-				offset,
+				offset: before.split("\n").length - 1,
 				line
 			});
 		} else inline.trim() ? value.trim() && value.trim() !== inline.trim() && ignored.push(name) : (env[envName] = value, value.trim() && origins.set(name, {

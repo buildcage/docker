@@ -83,18 +83,18 @@ describe("applyConfigFile", () => {
     });
 
     it("puts a block's value on the lines after its header", () => {
-      const env = envFor(writeConfig("known_blocked_rules: >\n  t.example.com\n"));
+      const env = envFor(writeConfig("known_blocked_rules: |\n  t.example.com\n"));
       expect(applyConfigFile(env, INPUTS)?.origins.get("known_blocked_rules")).toEqual({
         offset: 0,
         line: 2,
       });
     });
 
-    it("gives no line for a value whose lines YAML joined", () => {
+    it("gives no line for a value whose lines YAML may have joined", () => {
       const env = envFor(
         writeConfig(
           'allowed_https_rules: "a.example.com:443\\nb.example.com:443"\n' +
-            "known_blocked_rules: >\n  t.example.com\n\n  u.example.com\n",
+            "known_blocked_rules: >\n  t.example.com\n  u.example.com\n",
         ),
       );
       expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
@@ -139,6 +139,15 @@ describe("applyConfigFile", () => {
         INPUT_PROXY_ENGINE: "inspect",
         INPUT_KNOWN_BLOCKED_RULES: "u.example.com",
       });
+    });
+
+    it("finds a value whose key is an alias", () => {
+      const env = envFor(writeConfig("proxy_mode: &k proxy_engine\n*k : inspect\n"));
+      expect(applyConfigFile(env, INPUTS)?.origins.get("proxy_engine")).toEqual({
+        offset: 0,
+        line: 2,
+      });
+      expect(env.INPUT_PROXY_ENGINE).toBe("inspect");
     });
 
     it("gives no line for a quoted value whose text is not all on its line", () => {
@@ -412,6 +421,16 @@ describe("applyConfigFile", () => {
         "proxy_mod: audit\n",
         'Invalid config_file "buildcage.yml": unknown key "proxy_mod". Allowed keys: ' +
           "proxy_mode, proxy_engine, allowed_https_rules, known_blocked_rules.",
+      ],
+      [
+        "with a << key YAML 1.2 does not merge",
+        "proxy_mode: audit\n<<: {proxy_engine: inspect}\n",
+        /^Invalid config_file "buildcage.yml": unknown key "<<"/,
+      ],
+      [
+        "with a quoted << key",
+        '%YAML 1.1\n---\nproxy_mode: audit\n"<<": x\n',
+        /^Invalid config_file "buildcage.yml": unknown key "<<"/,
       ],
       [
         "with a list value",
