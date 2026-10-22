@@ -385,9 +385,10 @@ describe("renderReportMarkdown: section and footer", () => {
 
   it("puts the verdict under the title and its items after the blocks", () => {
     const md = joinSummaryBlocks(
-      stackTrafficBlocks(trafficHeadingBlock(base, "Outbound Traffic Report", ["1 x"]), [
-        blockedHostsBlocks(base, { priority: 1, artifactAvailable: false }),
-      ]),
+      stackTrafficBlocks(
+        trafficHeadingBlock(base, "Outbound Traffic Report", { warning: ["1 x"] }),
+        [blockedHostsBlocks(base, { priority: 1, artifactAvailable: false })],
+      ),
     );
     expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 blocked · 1 x\n\n### /);
   });

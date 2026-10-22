@@ -18,7 +18,7 @@ import { buildInspectRestrictExample } from "./inspect-example.ts";
 import { escapeCell } from "./markdown-table.ts";
 import { restrictExampleTruncationNote, type ExampleStepOptions } from "./restrict-example.ts";
 import { buildUniversalRestrictExample } from "./universal-example.ts";
-import { renderVerdict } from "./verdict.ts";
+import { renderVerdict, type VerdictItems } from "./verdict.ts";
 
 const SECTION = "traffic";
 
@@ -105,12 +105,12 @@ export const trafficFrame = (text: string): SummaryBlock => ({
 
 /**
  * The report's title, the verdict, and a warning when the logs do not read as
- * a whole run. `verdictItems`: see renderVerdict's `extraItems`.
+ * a whole run. `verdictItems`: see renderVerdict.
  */
 export function trafficHeadingBlock(
   report: ReportData,
   title: string,
-  verdictItems?: string[],
+  verdictItems?: VerdictItems,
 ): SummaryBlock {
   let top = reportHeading(title, report.parameters.mode === "audit");
   top += renderVerdict(report, verdictItems);

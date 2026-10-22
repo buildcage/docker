@@ -52,11 +52,20 @@ describe("renderVerdict", () => {
         ],
         timeline: [undecided],
       },
-      ["4 restrict would block"],
+      { warning: ["4 restrict would block"] },
     );
     expect(verdict).toBe(
       "> [!CAUTION]\n> 3 blocked · 4 restrict would block · 3 failed · 1 not acted on · " +
         "5 blocked as expected\n\n",
+    );
+  });
+
+  it("raises an action's caution as the blocks do, before its warnings", () => {
+    expect(renderVerdict(base, { caution: ["1 x"], warning: ["2 y"] })).toBe(
+      "> [!CAUTION]\n> 1 x · 2 y\n\n",
+    );
+    expect(renderVerdict({ ...base, blockedCount: 2 }, { caution: ["1 x"] })).toBe(
+      "> [!CAUTION]\n> 2 blocked · 1 x\n\n",
     );
   });
 
@@ -65,9 +74,9 @@ describe("renderVerdict", () => {
       { host: "down.com", port: "443", ruleType: "HTTPS", reason: "dns-failed", count: 3 },
     ];
     expect(renderVerdict({ ...base, failed })).toBe("> [!WARNING]\n> 3 failed\n\n");
-    expect(renderVerdict({ ...base, timeline: [undecided] }, ["2 restrict would block"])).toBe(
-      "> [!WARNING]\n> 2 restrict would block · 1 not acted on\n\n",
-    );
+    expect(
+      renderVerdict({ ...base, timeline: [undecided] }, { warning: ["2 restrict would block"] }),
+    ).toBe("> [!WARNING]\n> 2 restrict would block · 1 not acted on\n\n");
     expect(renderVerdict({ ...base, failed, blocked: [row(2, true)], blockedCount: 2 })).toBe(
       "> [!WARNING]\n> 3 failed · 2 blocked as expected\n\n",
     );
