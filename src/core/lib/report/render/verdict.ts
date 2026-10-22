@@ -2,13 +2,23 @@ import { countUndecidedRequests } from "../outcome/report-outcomes.ts";
 import type { ReportData } from "../types.ts";
 
 /**
- * Whether anything needs a look, counted as the annotations count it: a GitHub
- * alert listing every count, CAUTION for an unexpected block or an
- * incomplete report and WARNING otherwise, or nothing when nothing does. The
- * counts carry no symbol, since the alert has its own icon. `extraItems`, an
- * action's own warnings, follow the blocks.
+ * An action's own items for the verdict: a caution for what fails the step,
+ * so the alert matches its annotation, and a warning for what only needs a
+ * look.
  */
-export function renderVerdict(report: ReportData, extraItems: string[] = []): string {
+export interface VerdictItems {
+  caution?: string[];
+  warning?: string[];
+}
+
+/**
+ * Whether anything needs a look, counted as the annotations count it: a GitHub
+ * alert listing every count, CAUTION for an unexpected block, an incomplete
+ * report or an action's caution and WARNING otherwise, or nothing when nothing
+ * does. The counts carry no symbol, since the alert has its own icon. An
+ * action's items follow the blocks, its cautions first.
+ */
+export function renderVerdict(report: ReportData, extra: VerdictItems = {}): string {
   let unexpected = 0;
   let expected = 0;
   for (const row of report.blocked) {
@@ -24,9 +34,10 @@ export function renderVerdict(report: ReportData, extraItems: string[] = []): st
   const caution = [
     ...(report.logLooksPlausible ? [] : ["report incomplete"]),
     ...(unexpected ? [`${unexpected} blocked`] : []),
+    ...(extra.caution ?? []),
   ];
   const warning = [
-    ...extraItems,
+    ...(extra.warning ?? []),
     ...(failed ? [`${failed} failed`] : []),
     ...(undecided ? [`${undecided} not acted on`] : []),
   ];
