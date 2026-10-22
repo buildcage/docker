@@ -1,7 +1,11 @@
 import { countUndecidedRequests } from "../outcome/report-outcomes.ts";
 import type { ReportData } from "../types.ts";
 
-/** An action's own items for the verdict, as cautions or as warnings. */
+/**
+ * An action's own items for the verdict: a caution for what fails the step,
+ * so the alert matches its annotation, and a warning for what only needs a
+ * look.
+ */
 export interface VerdictItems {
   caution?: string[];
   warning?: string[];

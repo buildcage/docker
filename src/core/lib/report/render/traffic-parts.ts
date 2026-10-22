@@ -105,7 +105,7 @@ export const trafficFrame = (text: string): SummaryBlock => ({
 
 /**
  * The report's title, the verdict, and a warning when the logs do not read as
- * a whole run. `verdictItems`: see renderVerdict.
+ * a whole run, with the action's own VerdictItems.
  */
 export function trafficHeadingBlock(
   report: ReportData,
