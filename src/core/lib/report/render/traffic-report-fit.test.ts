@@ -159,6 +159,20 @@ describe("renderReportBlocks under a limit", () => {
     expect(out).not.toContain("ok1999.example.com:443");
   });
 
+  it("adds the action's own note to an omitted example's notice", () => {
+    const blocks = renderReportBlocks(
+      report({ parameters: reportParams({ mode: "audit" }), passed: rows("ok", 2000) }),
+      "owner/repo",
+      "v1",
+      PRIORITIES,
+      false,
+      { omittedNote: "_Shorter with x._\n" },
+    );
+    expect(fitStepSummary(blocks, { limitBytes: LIMIT })).toContain(
+      `${restrictExampleTruncationNote(false)}_Shorter with x._\n`,
+    );
+  });
+
   it("ends the example with a blank line before whatever follows it", () => {
     const audit = reportParams({ mode: "audit" });
     expect(fit(report({ parameters: audit, failed: rows("down", 1, "conn-reset") }))).toContain(

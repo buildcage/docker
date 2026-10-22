@@ -238,7 +238,7 @@ export function restrictExampleBlocks(
       section: `${SECTION}-example`,
       cut: "atomic",
       text: example,
-      notice: restrictExampleTruncationNote(fit.artifactAvailable),
+      notice: restrictExampleTruncationNote(fit.artifactAvailable) + (step.omittedNote ?? ""),
     },
   ];
 }
