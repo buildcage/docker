@@ -3,9 +3,8 @@ run-name: CA Bundle Watch
 
 # Each engine image trusts the CA bundle it was released with (the inspect proxy
 # verifies origins against it), so a root CA that Alpine removes stays trusted
-# until a new release.
-# This fails while the latest release's bundle differs from the newest one in
-# the image's own Alpine branch, listing the certificates removed and added.
+# until a new release. This fails while the latest release's bundle differs
+# from the newest one in the image's own Alpine branch.
 on:
   schedule:
     # Daily at 00:00 UTC
@@ -87,7 +86,7 @@ jobs:
               echo ""
             fi
             if [ -n "$ADDED" ]; then
-              echo "**Added:**"
+              echo "**Added**:"
               echo ""
               echo '```'
               echo "$ADDED"
