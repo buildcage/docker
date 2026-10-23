@@ -1,0 +1,86 @@
+name: CA Bundle Watch
+run-name: CA Bundle Watch
+
+# The inspect proxy verifies origins against the CA bundle in the released
+# image, so a root CA that Alpine removes stays trusted until a new release.
+# This fails while the latest release's bundle differs from the one a rebuild
+# would take, listing the certificates removed and added.
+on:
+  schedule:
+    # Daily at 00:00 UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [universal, inspect]
+
+    steps:
+      - name: Compare the latest release's CA bundle with Alpine's
+        env:
+          ENGINE: ${{ matrix.engine }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=$(gh release view --repo "$REPO" --json tagName -q .tagName)
+          IMAGE="ghcr.io/${REPO}:${TAG#v}-${ENGINE}"
+          OUT=$(mktemp -d)
+
+          # The same upgrade the Dockerfile runs, against the image's own repositories.
+          docker run --rm --pull always --user 0 --entrypoint sh -v "$OUT:/out" "$IMAGE" -c '
+            set -eu
+            apk info -v 2>/dev/null | grep "^ca-certificates-bundle-" > /out/old-version
+            cp /etc/ssl/certs/ca-certificates.crt /out/old.crt
+            apk add --no-cache --upgrade -q ca-certificates-bundle > /dev/null
+            apk info -v 2>/dev/null | grep "^ca-certificates-bundle-" > /out/new-version
+            cp /etc/ssl/certs/ca-certificates.crt /out/new.crt
+          '
+
+          subjects() {
+            openssl crl2pkcs7 -nocrl -certfile "$1" | openssl pkcs7 -print_certs -noout |
+              sed -n 's/^subject=//p' | sort
+          }
+          subjects "$OUT/old.crt" > "$OUT/old.txt"
+          subjects "$OUT/new.crt" > "$OUT/new.txt"
+          REMOVED=$(comm -23 "$OUT/old.txt" "$OUT/new.txt")
+          ADDED=$(comm -13 "$OUT/old.txt" "$OUT/new.txt")
+          OLD=$(cat "$OUT/old-version")
+          NEW=$(cat "$OUT/new-version")
+
+          {
+            echo "### \`$IMAGE\`"
+            echo ""
+            echo "- Released: \`$OLD\`"
+            echo "- Available: \`$NEW\`"
+            echo ""
+            if [ -n "$REMOVED" ]; then
+              echo "**Removed** (still trusted by the released image):"
+              echo ""
+              echo '```'
+              echo "$REMOVED"
+              echo '```'
+              echo ""
+            fi
+            if [ -n "$ADDED" ]; then
+              echo "**Added:**"
+              echo ""
+              echo '```'
+              echo "$ADDED"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$REMOVED$ADDED" ]; then
+            echo "::error::$IMAGE carries $OLD; a release now would take $NEW ($(echo -n "$REMOVED" | grep -c '^' || true) removed, $(echo -n "$ADDED" | grep -c '^' || true) added)"
+            exit 1
+          fi
