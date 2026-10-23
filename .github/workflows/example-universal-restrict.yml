@@ -16,7 +16,7 @@ jobs:
       # universal enforces on host and port only, which is as far as it can see
       # without decrypting, and all a JVM build like this one can accept.
       - name: Start Buildcage builder
-        uses: buildcage/docker@f343d2d0b20be981978f59b70d69ddaa5bd6b89f # v4.2.1
+        uses: buildcage/docker@0e382c9c236fb24e60ccce9dba512a67b270b8bf # v4.3.0
         with:
           proxy_mode: restrict
           proxy_engine: universal
@@ -52,6 +52,6 @@ jobs:
       # leave it at its default so a real workflow fails on a disallowed destination.
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@f343d2d0b20be981978f59b70d69ddaa5bd6b89f # v4.2.1
+        uses: buildcage/docker/report@0e382c9c236fb24e60ccce9dba512a67b270b8bf # v4.3.0
         with:
           fail_on_blocked: false
