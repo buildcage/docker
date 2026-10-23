@@ -34,7 +34,7 @@ and links here for the details.
 starts.
 
 ```yaml
-- uses: buildcage/docker@f343d2d0b20be981978f59b70d69ddaa5bd6b89f # v4.2.1
+- uses: buildcage/docker@0e382c9c236fb24e60ccce9dba512a67b270b8bf # v4.3.0
   with:
     builder_name: buildcage
     proxy_mode: restrict
