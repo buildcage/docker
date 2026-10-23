@@ -60,6 +60,8 @@ corresponding [GitHub Release](https://github.com/buildcage/docker/releases).
 - [Trivy](https://github.com/aquasecurity/trivy) rebuilds each engine's image from source and scans
   it for known vulnerabilities on a monthly schedule (and on manual dispatch), and Dependabot alerts
   are enabled on the repository; both report into this repository's Security tab.
+- A daily check fails while the CA bundle in the latest release's images differs from the newest
+  one in their Alpine branch, as it does once Alpine removes a root CA.
 
 ## Reporting a Vulnerability
 

@@ -1,0 +1,100 @@
+name: CA Bundle Watch
+run-name: CA Bundle Watch
+
+# Each engine image trusts the CA bundle it was released with (the inspect proxy
+# verifies origins against it), so a root CA that Alpine removes stays trusted
+# until a new release. This fails while the latest release's bundle differs
+# from the newest one in the image's own Alpine branch.
+on:
+  schedule:
+    # Daily at 00:00 UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [universal, inspect]
+
+    steps:
+      - name: Compare the latest release's CA bundle with Alpine's
+        env:
+          ENGINE: ${{ matrix.engine }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=$(gh release view --repo "$REPO" --json tagName -q .tagName)
+          IMAGE="ghcr.io/${REPO}:${TAG#v}-${ENGINE}"
+          OUT=$(mktemp -d)
+
+          # The same upgrade the Dockerfile runs, against the image's own repositories.
+          docker run --rm --pull always --user 0 --entrypoint sh -v "$OUT:/out" "$IMAGE" -c '
+            set -eu
+            apk info -v 2>/dev/null | grep "^ca-certificates-bundle-" > /out/old-version
+            cp /etc/ssl/certs/ca-certificates.crt /out/old.crt
+            apk add --no-cache --upgrade ca-certificates-bundle > /dev/null
+            apk info -v 2>/dev/null | grep "^ca-certificates-bundle-" > /out/new-version
+            cp /etc/ssl/certs/ca-certificates.crt /out/new.crt
+          '
+
+          # One "subject<TAB>fingerprint" line per certificate, so a certificate
+          # replaced under the same subject shows as removed and added.
+          certs() {
+            local dir f
+            dir=$(mktemp -d "$OUT/split.XXXXXX")
+            awk -v d="$dir" '/-----BEGIN CERTIFICATE-----/ { f = sprintf("%s/%05d.pem", d, ++n) }
+              f { print > f }
+              /-----END CERTIFICATE-----/ { close(f); f = "" }' "$1"
+            for f in "$dir"/*.pem; do
+              [ -e "$f" ] || { echo "::error::No certificates in $1" >&2; exit 1; }
+              openssl x509 -in "$f" -noout -subject -fingerprint -sha256 |
+                sed 's/^subject=//; s/^.*Fingerprint=//' | paste - -
+            done | sort
+          }
+          certs "$OUT/old.crt" > "$OUT/old.txt"
+          certs "$OUT/new.crt" > "$OUT/new.txt"
+          comm -23 "$OUT/old.txt" "$OUT/new.txt" > "$OUT/removed.txt"
+          comm -13 "$OUT/old.txt" "$OUT/new.txt" > "$OUT/added.txt"
+          show() { awk -F '\t' '{ print $1; print "  SHA-256 " $2 }' "$1"; }
+          REMOVED=$(show "$OUT/removed.txt")
+          ADDED=$(show "$OUT/added.txt")
+          OLD=$(cat "$OUT/old-version")
+          NEW=$(cat "$OUT/new-version")
+
+          {
+            echo "### \`$IMAGE\`"
+            echo ""
+            echo "- Released: \`$OLD\`"
+            echo "- Available: \`$NEW\`"
+            echo ""
+            if [ -n "$REMOVED" ]; then
+              echo "**Removed** (still trusted by the released image):"
+              echo ""
+              echo '```'
+              echo "$REMOVED"
+              echo '```'
+              echo ""
+            fi
+            if [ -n "$ADDED" ]; then
+              echo "**Added**:"
+              echo ""
+              echo '```'
+              echo "$ADDED"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$REMOVED$ADDED" ]; then
+            echo "::error::$IMAGE carries $OLD; its Alpine branch now has $NEW ($(($(wc -l < "$OUT/removed.txt"))) removed, $(($(wc -l < "$OUT/added.txt"))) added)"
+            exit 1
+          fi
