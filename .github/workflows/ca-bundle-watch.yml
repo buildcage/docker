@@ -1,8 +1,9 @@
 name: CA Bundle Watch
 run-name: CA Bundle Watch
 
-# The inspect proxy verifies origins against the CA bundle in the released
-# image, so a root CA that Alpine removes stays trusted until a new release.
+# Each engine image trusts the CA bundle it was released with (the inspect proxy
+# verifies origins against it), so a root CA that Alpine removes stays trusted
+# until a new release.
 # This fails while the latest release's bundle differs from the newest one in
 # the image's own Alpine branch, listing the certificates removed and added.
 on:
@@ -51,20 +52,23 @@ jobs:
           # replaced under the same subject shows as removed and added.
           certs() {
             local dir f
-            dir=$(mktemp -d)
+            dir=$(mktemp -d "$OUT/split.XXXXXX")
             awk -v d="$dir" '/-----BEGIN CERTIFICATE-----/ { f = sprintf("%s/%05d.pem", d, ++n) }
               f { print > f }
               /-----END CERTIFICATE-----/ { close(f); f = "" }' "$1"
             for f in "$dir"/*.pem; do
-              printf '%s\t%s\n' \
-                "$(openssl x509 -in "$f" -noout -subject | sed 's/^subject=//')" \
-                "$(openssl x509 -in "$f" -noout -fingerprint -sha256 | sed 's/^.*=//')"
+              [ -e "$f" ] || { echo "::error::No certificates in $1" >&2; exit 1; }
+              openssl x509 -in "$f" -noout -subject -fingerprint -sha256 |
+                sed 's/^subject=//; s/^.*Fingerprint=//' | paste - -
             done | sort
           }
           certs "$OUT/old.crt" > "$OUT/old.txt"
           certs "$OUT/new.crt" > "$OUT/new.txt"
-          REMOVED=$(comm -23 "$OUT/old.txt" "$OUT/new.txt" | cut -f1)
-          ADDED=$(comm -13 "$OUT/old.txt" "$OUT/new.txt" | cut -f1)
+          comm -23 "$OUT/old.txt" "$OUT/new.txt" > "$OUT/removed.txt"
+          comm -13 "$OUT/old.txt" "$OUT/new.txt" > "$OUT/added.txt"
+          show() { awk -F '\t' '{ print $1; print "  SHA-256 " $2 }' "$1"; }
+          REMOVED=$(show "$OUT/removed.txt")
+          ADDED=$(show "$OUT/added.txt")
           OLD=$(cat "$OUT/old-version")
           NEW=$(cat "$OUT/new-version")
 
@@ -92,6 +96,6 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -n "$REMOVED$ADDED" ]; then
-            echo "::error::$IMAGE carries $OLD; its Alpine branch now has $NEW ($(echo -n "$REMOVED" | grep -c '^' || true) removed, $(echo -n "$ADDED" | grep -c '^' || true) added)"
+            echo "::error::$IMAGE carries $OLD; its Alpine branch now has $NEW ($(($(wc -l < "$OUT/removed.txt"))) removed, $(($(wc -l < "$OUT/added.txt"))) added)"
             exit 1
           fi
