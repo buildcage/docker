@@ -3,8 +3,8 @@ run-name: CA Bundle Watch
 
 # The inspect proxy verifies origins against the CA bundle in the released
 # image, so a root CA that Alpine removes stays trusted until a new release.
-# This fails while the latest release's bundle differs from the one a rebuild
-# would take, listing the certificates removed and added.
+# This fails while the latest release's bundle differs from the newest one in
+# the image's own Alpine branch, listing the certificates removed and added.
 on:
   schedule:
     # Daily at 00:00 UTC
@@ -16,6 +16,7 @@ permissions: {}
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
 
@@ -41,19 +42,29 @@ jobs:
             set -eu
             apk info -v 2>/dev/null | grep "^ca-certificates-bundle-" > /out/old-version
             cp /etc/ssl/certs/ca-certificates.crt /out/old.crt
-            apk add --no-cache --upgrade -q ca-certificates-bundle > /dev/null
+            apk add --no-cache --upgrade ca-certificates-bundle > /dev/null
             apk info -v 2>/dev/null | grep "^ca-certificates-bundle-" > /out/new-version
             cp /etc/ssl/certs/ca-certificates.crt /out/new.crt
           '
 
-          subjects() {
-            openssl crl2pkcs7 -nocrl -certfile "$1" | openssl pkcs7 -print_certs -noout |
-              sed -n 's/^subject=//p' | sort
+          # One "subject<TAB>fingerprint" line per certificate, so a certificate
+          # replaced under the same subject shows as removed and added.
+          certs() {
+            local dir f
+            dir=$(mktemp -d)
+            awk -v d="$dir" '/-----BEGIN CERTIFICATE-----/ { f = sprintf("%s/%05d.pem", d, ++n) }
+              f { print > f }
+              /-----END CERTIFICATE-----/ { close(f); f = "" }' "$1"
+            for f in "$dir"/*.pem; do
+              printf '%s\t%s\n' \
+                "$(openssl x509 -in "$f" -noout -subject | sed 's/^subject=//')" \
+                "$(openssl x509 -in "$f" -noout -fingerprint -sha256 | sed 's/^.*=//')"
+            done | sort
           }
-          subjects "$OUT/old.crt" > "$OUT/old.txt"
-          subjects "$OUT/new.crt" > "$OUT/new.txt"
-          REMOVED=$(comm -23 "$OUT/old.txt" "$OUT/new.txt")
-          ADDED=$(comm -13 "$OUT/old.txt" "$OUT/new.txt")
+          certs "$OUT/old.crt" > "$OUT/old.txt"
+          certs "$OUT/new.crt" > "$OUT/new.txt"
+          REMOVED=$(comm -23 "$OUT/old.txt" "$OUT/new.txt" | cut -f1)
+          ADDED=$(comm -13 "$OUT/old.txt" "$OUT/new.txt" | cut -f1)
           OLD=$(cat "$OUT/old-version")
           NEW=$(cat "$OUT/new-version")
 
@@ -81,6 +92,6 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -n "$REMOVED$ADDED" ]; then
-            echo "::error::$IMAGE carries $OLD; a release now would take $NEW ($(echo -n "$REMOVED" | grep -c '^' || true) removed, $(echo -n "$ADDED" | grep -c '^' || true) added)"
+            echo "::error::$IMAGE carries $OLD; its Alpine branch now has $NEW ($(echo -n "$REMOVED" | grep -c '^' || true) removed, $(echo -n "$ADDED" | grep -c '^' || true) added)"
             exit 1
           fi
