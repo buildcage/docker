@@ -298,17 +298,7 @@ const REGEX_META = /[.+^$()[\]{}|\\]/g, DOMAIN = {
 };
 function atomToRegex(atom, vocab) {
 	let out = "";
-	for (let i = 0; i < atom.length; i++) {
-		if (atom[i] === "*") {
-			atom[i + 1] === "*" ? (out += vocab.across, i++) : out += vocab.within;
-			continue;
-		}
-		if (atom[i] === "?") {
-			out += vocab.single;
-			continue;
-		}
-		out += atom[i].replace(REGEX_META, "\\$&");
-	}
+	for (let i = 0; i < atom.length; i++) atom[i] === "*" ? atom[i + 1] === "*" ? (out += vocab.across, i++) : out += vocab.within : atom[i] === "?" ? out += vocab.single : out += atom[i].replace(REGEX_META, "\\$&");
 	return out;
 }
 const HOST_LABEL = /^[A-Za-z0-9_*?-]+$/;
@@ -4375,22 +4365,22 @@ var require_identity = __commonJSMin(((exports) => {
 					offset: this.offset,
 					source: this.source
 				});
-				return;
+			} else {
+				if (!top) return yield* this.stream();
+				switch (top.type) {
+					case "document": return yield* this.document(top);
+					case "alias":
+					case "scalar":
+					case "single-quoted-scalar":
+					case "double-quoted-scalar": return yield* this.scalar(top);
+					case "block-scalar": return yield* this.blockScalar(top);
+					case "block-map": return yield* this.blockMap(top);
+					case "block-seq": return yield* this.blockSequence(top);
+					case "flow-collection": return yield* this.flowCollection(top);
+					case "doc-end": return yield* this.documentEnd(top);
+				}
+				yield* this.pop();
 			}
-			if (!top) return yield* this.stream();
-			switch (top.type) {
-				case "document": return yield* this.document(top);
-				case "alias":
-				case "scalar":
-				case "single-quoted-scalar":
-				case "double-quoted-scalar": return yield* this.scalar(top);
-				case "block-scalar": return yield* this.blockScalar(top);
-				case "block-map": return yield* this.blockMap(top);
-				case "block-seq": return yield* this.blockSequence(top);
-				case "flow-collection": return yield* this.flowCollection(top);
-				case "doc-end": return yield* this.documentEnd(top);
-			}
-			yield* this.pop();
 		}
 		peek(n) {
 			return this.stack[this.stack.length - n];
@@ -5161,20 +5151,14 @@ function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules 
 	let unsupported = [];
 	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allowed_tls_rules"), unsupported.length === 0) return;
 	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy_engine: ${proxyEngine}, which only sees the host and port, never a method or a path.`;
-	if (proxyMode === "audit") {
-		warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
-		return;
-	}
-	throw new InvalidInputError(`${reason} In restrict mode that means ${list} would not actually be enforced, so the step would look protected but isn't. Switch to proxy_engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
+	if (proxyMode === "audit") warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
+	else throw new InvalidInputError(`${reason} In restrict mode that means ${list} would not actually be enforced, so the step would look protected but isn't. Switch to proxy_engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
 }
 function checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedUrlRules }, warn) {
 	if (proxyEngine === "inspect" || knownBlockedUrlRules.length === 0) return;
 	let reason = `known_blocked_rules contains URL rules (a method and a URL) that need proxy_engine: inspect, which alone sees a method or a path; proxy_engine: ${proxyEngine} sees only the host and port, so these rules match no blocked connection and acknowledge nothing.`;
-	if (proxyMode === "audit") {
-		warn(`${reason} They are ignored for this run. Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`);
-		return;
-	}
-	throw new InvalidInputError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`, "INVALID_PROXY_ENGINE");
+	if (proxyMode === "audit") warn(`${reason} They are ignored for this run. Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`);
+	else throw new InvalidInputError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`, "INVALID_PROXY_ENGINE");
 }
 //#endregion
 //#region src/core/lib/actions/log.ts
@@ -7113,43 +7097,29 @@ var require_envelope = __commonJSMin(((exports) => {
 		let ranges = [], negs = [], i = pos + 1, sawStart = !1, uflag = !1, escaping = !1, negate = !1, endPos = pos, rangeStart = "";
 		WHILE: for (; i < glob.length;) {
 			let c = glob.charAt(i);
-			if ((c === "!" || c === "^") && i === pos + 1) {
-				negate = !0, i++;
-				continue;
-			}
-			if (c === "]" && sawStart && !escaping) {
-				endPos = i + 1;
-				break;
-			}
-			if (sawStart = !0, c === "\\" && !escaping) {
-				escaping = !0, i++;
-				continue;
-			}
-			if (c === "[" && !escaping) {
-				for (let [cls, [unip, u, neg]] of Object.entries(posixClasses)) if (glob.startsWith(cls, i)) {
-					if (rangeStart) return [
-						"$.",
-						!1,
-						glob.length - pos,
-						!0
-					];
-					i += cls.length, neg ? negs.push(unip) : ranges.push(unip), uflag ||= u;
-					continue WHILE;
+			if ((c === "!" || c === "^") && i === pos + 1) negate = !0, i++;
+			else {
+				if (c === "]" && sawStart && !escaping) {
+					endPos = i + 1;
+					break;
+				}
+				if (sawStart = !0, c === "\\" && !escaping) escaping = !0, i++;
+				else {
+					if (c === "[" && !escaping) {
+						for (let [cls, [unip, u, neg]] of Object.entries(posixClasses)) if (glob.startsWith(cls, i)) {
+							if (rangeStart) return [
+								"$.",
+								!1,
+								glob.length - pos,
+								!0
+							];
+							i += cls.length, neg ? negs.push(unip) : ranges.push(unip), uflag ||= u;
+							continue WHILE;
+						}
+					}
+					escaping = !1, rangeStart ? (c > rangeStart ? ranges.push(braceEscape(rangeStart) + "-" + braceEscape(c)) : c === rangeStart && ranges.push(braceEscape(c)), rangeStart = "", i++) : glob.startsWith("-]", i + 1) ? (ranges.push(braceEscape(c + "-")), i += 2) : glob.startsWith("-", i + 1) ? (rangeStart = c, i += 2) : (ranges.push(braceEscape(c)), i++);
 				}
 			}
-			if (escaping = !1, rangeStart) {
-				c > rangeStart ? ranges.push(braceEscape(rangeStart) + "-" + braceEscape(c)) : c === rangeStart && ranges.push(braceEscape(c)), rangeStart = "", i++;
-				continue;
-			}
-			if (glob.startsWith("-]", i + 1)) {
-				ranges.push(braceEscape(c + "-")), i += 2;
-				continue;
-			}
-			if (glob.startsWith("-", i + 1)) {
-				rangeStart = c, i += 2;
-				continue;
-			}
-			ranges.push(braceEscape(c)), i++;
 		}
 		if (endPos < i) return [
 			"",
@@ -7334,56 +7304,33 @@ var require_envelope = __commonJSMin(((exports) => {
 				let i = pos, acc = "";
 				for (; i < str.length;) {
 					let c = str.charAt(i++);
-					if (escaping || c === "\\") {
-						escaping = !escaping, acc += c;
-						continue;
-					}
-					if (inBrace) {
-						i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
-						continue;
-					}
-					if (c === "[") {
-						inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
-						continue;
-					}
-					if (!opt.noext && isExtglobType(c) && str.charAt(i) === "(" && extDepth <= maxDepth) {
+					if (escaping || c === "\\") escaping = !escaping, acc += c;
+					else if (inBrace) i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
+					else if (c === "[") inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
+					else if (!opt.noext && isExtglobType(c) && str.charAt(i) === "(" && extDepth <= maxDepth) {
 						ast.push(acc), acc = "";
 						let ext = new _a(c, ast);
 						i = _a.#parseAST(str, ext, i, opt, extDepth + 1), ast.push(ext);
-						continue;
-					}
-					acc += c;
+					} else acc += c;
 				}
 				return ast.push(acc), i;
 			}
 			let i = pos + 1, part = new _a(null, ast), parts = [], acc = "";
 			for (; i < str.length;) {
 				let c = str.charAt(i++);
-				if (escaping || c === "\\") {
-					escaping = !escaping, acc += c;
-					continue;
-				}
-				if (inBrace) {
-					i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
-					continue;
-				}
-				if (c === "[") {
-					inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
-					continue;
-				}
-				if (!opt.noext && isExtglobType(c) && str.charAt(i) === "(" && (extDepth <= maxDepth || ast && ast.#canAdoptType(c))) {
+				if (escaping || c === "\\") escaping = !escaping, acc += c;
+				else if (inBrace) i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
+				else if (c === "[") inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
+				else if (!opt.noext && isExtglobType(c) && str.charAt(i) === "(" && (extDepth <= maxDepth || ast && ast.#canAdoptType(c))) {
 					let depthAdd = ast && ast.#canAdoptType(c) ? 0 : 1;
 					part.push(acc), acc = "";
 					let ext = new _a(c, part);
 					part.push(ext), i = _a.#parseAST(str, ext, i, opt, extDepth + depthAdd);
-					continue;
+				} else if (c === "|") part.push(acc), acc = "", parts.push(part), part = new _a(null, ast);
+				else {
+					if (c === ")") return acc === "" && ast.#parts.length === 0 && (ast.#emptyExt = !0), part.push(acc), acc = "", ast.push(...parts, part), i;
+					acc += c;
 				}
-				if (c === "|") {
-					part.push(acc), acc = "", parts.push(part), part = new _a(null, ast);
-					continue;
-				}
-				if (c === ")") return acc === "" && ast.#parts.length === 0 && (ast.#emptyExt = !0), part.push(acc), acc = "", ast.push(...parts, part), i;
-				acc += c;
 			}
 			return ast.type = null, ast.#hasMagic = void 0, ast.#parts = [str.substring(pos - 1)], i;
 		}
@@ -7508,31 +7455,21 @@ var require_envelope = __commonJSMin(((exports) => {
 			let escaping = !1, re = "", uflag = !1, inStar = !1;
 			for (let i = 0; i < glob.length; i++) {
 				let c = glob.charAt(i);
-				if (escaping) {
-					escaping = !1, re += (reSpecials.has(c) ? "\\" : "") + c;
-					continue;
-				}
-				if (c === "*") {
+				if (escaping) escaping = !1, re += (reSpecials.has(c) ? "\\" : "") + c;
+				else if (c === "*") {
 					if (inStar) continue;
 					inStar = !0, re += noEmpty && /^[*]+$/.test(glob) ? starNoEmpty : "[^/]*?", hasMagic = !0;
-					continue;
-				}
-				if (inStar = !1, c === "\\") {
-					i === glob.length - 1 ? re += "\\\\" : escaping = !0;
-					continue;
-				}
-				if (c === "[") {
-					let [src, needUflag, consumed, magic] = (0, brace_expressions_js_1.parseClass)(glob, i);
-					if (consumed) {
-						re += src, uflag ||= needUflag, i += consumed - 1, hasMagic ||= magic;
-						continue;
+				} else if (inStar = !1, c === "\\") i === glob.length - 1 ? re += "\\\\" : escaping = !0;
+				else {
+					if (c === "[") {
+						let [src, needUflag, consumed, magic] = (0, brace_expressions_js_1.parseClass)(glob, i);
+						if (consumed) {
+							re += src, uflag ||= needUflag, i += consumed - 1, hasMagic ||= magic;
+							continue;
+						}
 					}
+					c === "?" ? (re += "[^/]", hasMagic = !0) : re += regExpEscape(c);
 				}
-				if (c === "?") {
-					re += "[^/]", hasMagic = !0;
-					continue;
-				}
-				re += regExpEscape(c);
 			}
 			return [
 				re,
@@ -11007,11 +10944,7 @@ var require_envelope = __commonJSMin(((exports) => {
 		findIssuer(certificate) {
 			let issuers = [], keyIdentifier;
 			return certificate.subject.equals(certificate.issuer) && certificate.verify() ? [certificate] : (certificate.extAuthorityKeyID && (keyIdentifier = certificate.extAuthorityKeyID.keyIdentifier), this.localCerts.forEach((possibleIssuer) => {
-				if (keyIdentifier && possibleIssuer.extSubjectKeyID) {
-					possibleIssuer.extSubjectKeyID.keyIdentifier.equals(keyIdentifier) && issuers.push(possibleIssuer);
-					return;
-				}
-				possibleIssuer.subject.equals(certificate.issuer) && issuers.push(possibleIssuer);
+				keyIdentifier && possibleIssuer.extSubjectKeyID ? possibleIssuer.extSubjectKeyID.keyIdentifier.equals(keyIdentifier) && issuers.push(possibleIssuer) : possibleIssuer.subject.equals(certificate.issuer) && issuers.push(possibleIssuer);
 			}), issuers = issuers.filter((issuer) => {
 				try {
 					return certificate.verify(issuer);
@@ -12350,28 +12283,22 @@ function compileSchemeRules(hostRules, urlRules, scheme) {
 		methods: null,
 		raw: pattern
 	});
-	for (let rule of urlRules ?? []) if (rule.schemes.includes(scheme)) {
-		if (rule.isRegex) {
-			out.push({
-				id: "",
-				hostMatch: "hostBareFull",
-				hostRegex: rule.hostRegex,
-				port: null,
-				pathRegex: rule.pathRegex,
-				methods: rule.methods,
-				raw: rule.raw
-			});
-			continue;
-		}
-		out.push({
-			id: "",
-			hostMatch: "wildcard",
-			...urlRuleToMatcher(rule),
-			pathRegex: rule.pathRegex,
-			methods: rule.methods,
-			raw: rule.raw
-		});
-	}
+	for (let rule of urlRules ?? []) rule.schemes.includes(scheme) && (rule.isRegex ? out.push({
+		id: "",
+		hostMatch: "hostBareFull",
+		hostRegex: rule.hostRegex,
+		port: null,
+		pathRegex: rule.pathRegex,
+		methods: rule.methods,
+		raw: rule.raw
+	}) : out.push({
+		id: "",
+		hostMatch: "wildcard",
+		...urlRuleToMatcher(rule),
+		pathRegex: rule.pathRegex,
+		methods: rule.methods,
+		raw: rule.raw
+	}));
 	return out.forEach((rule, i) => {
 		rule.id = `${scheme === "https" ? "s" : "p"}${i}`;
 	}), out;
@@ -12393,21 +12320,17 @@ function compileIpRules(rules) {
 		if (colonIndex === -1) throw Error(`Invalid rule "${rule}": missing port`);
 		let address = rule.slice(0, colonIndex), port = rule.slice(colonIndex + 1);
 		if (!isIpRuleAddress(address)) throw Error(`Invalid address in rule "${rule}": not an address, CIDR block or address wildcard, which is all that can be tunnelled without inspection`);
-		if (checkPort(port, rule), !IPV4_OR_CIDR.test(address)) {
-			out.push({
-				id: `ip${index}`,
-				address: convertRule(rule),
-				hostMatch: "hostPort",
-				port: null,
-				raw: rule
-			});
-			return;
-		}
-		out.push({
+		checkPort(port, rule), IPV4_OR_CIDR.test(address) ? out.push({
 			id: `ip${index}`,
 			address,
 			hostMatch: "wildcard",
 			port: port === "*" ? null : port,
+			raw: rule
+		}) : out.push({
+			id: `ip${index}`,
+			address: convertRule(rule),
+			hostMatch: "hostPort",
+			port: null,
 			raw: rule
 		});
 	}), out;

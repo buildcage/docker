@@ -3831,22 +3831,22 @@ var require_identity$1 = __commonJSMin(((exports) => {
 					offset: this.offset,
 					source: this.source
 				});
-				return;
+			} else {
+				if (!top) return yield* this.stream();
+				switch (top.type) {
+					case "document": return yield* this.document(top);
+					case "alias":
+					case "scalar":
+					case "single-quoted-scalar":
+					case "double-quoted-scalar": return yield* this.scalar(top);
+					case "block-scalar": return yield* this.blockScalar(top);
+					case "block-map": return yield* this.blockMap(top);
+					case "block-seq": return yield* this.blockSequence(top);
+					case "flow-collection": return yield* this.flowCollection(top);
+					case "doc-end": return yield* this.documentEnd(top);
+				}
+				yield* this.pop();
 			}
-			if (!top) return yield* this.stream();
-			switch (top.type) {
-				case "document": return yield* this.document(top);
-				case "alias":
-				case "scalar":
-				case "single-quoted-scalar":
-				case "double-quoted-scalar": return yield* this.scalar(top);
-				case "block-scalar": return yield* this.blockScalar(top);
-				case "block-map": return yield* this.blockMap(top);
-				case "block-seq": return yield* this.blockSequence(top);
-				case "flow-collection": return yield* this.flowCollection(top);
-				case "doc-end": return yield* this.documentEnd(top);
-			}
-			yield* this.pop();
 		}
 		peek(n) {
 			return this.stack[this.stack.length - n];
@@ -4685,11 +4685,7 @@ var DecodedURL, init_proxy = __esmMin((() => {
 	}
 	util$14.inherits(TunnelingAgent, events$1.EventEmitter), TunnelingAgent.prototype.addRequest = function(req, host, port, localAddress) {
 		var self = this, options = mergeOptions({ request: req }, self.options, toOptions(host, port, localAddress));
-		if (self.sockets.length >= this.maxSockets) {
-			self.requests.push(options);
-			return;
-		}
-		self.createSocket(options, function(socket) {
+		self.sockets.length >= this.maxSockets ? self.requests.push(options) : self.createSocket(options, function(socket) {
 			socket.on("free", onFree), socket.on("close", onCloseOrRemove), socket.on("agentRemove", onCloseOrRemove), req.onSocket(socket);
 			function onFree() {
 				self.emit("free", socket, options);
@@ -4723,15 +4719,11 @@ var DecodedURL, init_proxy = __esmMin((() => {
 				debug("tunneling socket could not be established, statusCode=%d", res.statusCode), socket.destroy();
 				var error = Error("tunneling socket could not be established, statusCode=" + res.statusCode);
 				error.code = "ECONNRESET", options.request.emit("error", error), self.removeSocket(placeholder);
-				return;
-			}
-			if (head.length > 0) {
+			} else if (head.length > 0) {
 				debug("got illegal response body from proxy"), socket.destroy();
 				var error = Error("got illegal response body from proxy");
 				error.code = "ECONNRESET", options.request.emit("error", error), self.removeSocket(placeholder);
-				return;
-			}
-			return debug("tunneling connection has established"), self.sockets[self.sockets.indexOf(placeholder)] = socket, cb(socket);
+			} else return debug("tunneling connection has established"), self.sockets[self.sockets.indexOf(placeholder)] = socket, cb(socket);
 		}
 		function onError(cause) {
 			connectReq.removeAllListeners(), debug("tunneling socket could not be established, cause=%s\n", cause.message, cause.stack);
@@ -7984,9 +7976,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			if (err.code === "ECONNRESET" && parser.statusCode && !parser.shouldKeepAlive) {
 				let parserErr = parser.finish();
 				parserErr && (this[kError] = parserErr, this[kClient][kOnError](parserErr));
-				return;
-			}
-			this[kError] = err, this[kClient][kOnError](err);
+			} else this[kError] = err, this[kClient][kOnError](err);
 		}), addListener(socket, "readable", function() {
 			let parser = this[kParser];
 			parser && parser.readMore();
@@ -7995,9 +7985,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			if (parser.statusCode && !parser.shouldKeepAlive) {
 				let parserErr = parser.finish();
 				parserErr && util.destroy(this, parserErr);
-				return;
-			}
-			util.destroy(this, new SocketError("other side closed", util.getSocketInfo(this)));
+			} else util.destroy(this, new SocketError("other side closed", util.getSocketInfo(this)));
 		}), addListener(socket, "close", function() {
 			let client = this[kClient], parser = this[kParser];
 			clearIdleSocketValidation(this), parser && (!this[kError] && parser.statusCode && !parser.shouldKeepAlive && (this[kError] = parser.finish() || this[kError]), this[kParser].destroy(), this[kParser] = null);
@@ -8093,13 +8081,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		let socket = client[kSocket];
 		clearIdleSocketValidation(socket);
 		let abort = (error) => {
-			if (!request.aborted) {
-				if (request.completed) {
-					(request.upgrade || request.method === "CONNECT") && util.destroy(socket, new InformationalError("aborted"));
-					return;
-				}
-				util.errorRequest(client, request, error || new RequestAbortedError()), util.destroy(body), util.destroy(socket, new InformationalError("aborted"));
-			}
+			request.aborted || (request.completed ? (request.upgrade || request.method === "CONNECT") && util.destroy(socket, new InformationalError("aborted")) : (util.errorRequest(client, request, error || new RequestAbortedError()), util.destroy(body), util.destroy(socket, new InformationalError("aborted"))));
 		};
 		try {
 			request.onConnect(abort);
@@ -8348,13 +8330,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		let stream, { hostname, port } = client[kUrl];
 		headers[HTTP2_HEADER_AUTHORITY] = host || `${hostname}${port ? `:${port}` : ""}`, headers[HTTP2_HEADER_METHOD] = method;
 		let abort = (error) => {
-			if (!request.aborted) {
-				if (request.completed) {
-					method === "CONNECT" && stream != null && util.destroy(stream, error || new RequestAbortedError());
-					return;
-				}
-				error ||= new RequestAbortedError(), util.errorRequest(client, request, error), stream != null && util.destroy(stream, error), util.destroy(body, error), client[kQueue][client[kRunningIdx]++] = null, client[kResume]();
-			}
+			request.aborted || (request.completed ? method === "CONNECT" && stream != null && util.destroy(stream, error || new RequestAbortedError()) : (error ||= new RequestAbortedError(), util.errorRequest(client, request, error), stream != null && util.destroy(stream, error), util.destroy(body, error), client[kQueue][client[kRunningIdx]++] = null, client[kResume]()));
 		};
 		try {
 			request.onConnect(abort);
@@ -8410,9 +8386,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			if (request.onResponseStarted(), request.aborted) {
 				let err = new RequestAbortedError();
 				util.errorRequest(client, request, err), util.destroy(stream, err);
-				return;
-			}
-			request.onHeaders(Number(statusCode), parseH2Headers(realHeaders), stream.resume.bind(stream), "") === !1 && stream.pause(), stream.on("data", (chunk) => {
+			} else request.onHeaders(Number(statusCode), parseH2Headers(realHeaders), stream.resume.bind(stream), "") === !1 && stream.pause(), stream.on("data", (chunk) => {
 				request.onData(chunk) === !1 && stream.pause();
 			});
 		}), stream.once("end", () => {
@@ -9106,11 +9080,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		[kDispatch](opts, handler) {
 			let onHeaders = handler.onHeaders;
 			handler.onHeaders = function(statusCode, data, resume) {
-				if (statusCode === 407) {
-					typeof handler.onError == "function" && handler.onError(new InvalidArgumentError("Proxy Authentication Required (407)"));
-					return;
-				}
-				onHeaders && onHeaders.call(this, statusCode, data, resume);
+				statusCode === 407 ? typeof handler.onError == "function" && handler.onError(new InvalidArgumentError("Proxy Authentication Required (407)")) : onHeaders && onHeaders.call(this, statusCode, data, resume);
 			};
 			let { origin, path = "/", headers = {} } = opts;
 			if (opts.path = origin + path, !("host" in headers) && !("Host" in headers)) {
@@ -9366,19 +9336,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		}
 		static [kRetryHandlerDefaultRetry](err, { state, opts }, cb) {
 			let { statusCode, code, headers } = err, { method, retryOptions } = opts, { maxRetries, minTimeout, maxTimeout, timeoutFactor, statusCodes, errorCodes, methods } = retryOptions, { counter } = state;
-			if (code && code !== "UND_ERR_REQ_RETRY" && !errorCodes.includes(code)) {
-				cb(err);
-				return;
-			}
-			if (Array.isArray(methods) && !methods.includes(method)) {
-				cb(err);
-				return;
-			}
-			if (statusCode != null && Array.isArray(statusCodes) && !statusCodes.includes(statusCode)) {
-				cb(err);
-				return;
-			}
-			if (counter > maxRetries) {
+			if (code && code !== "UND_ERR_REQ_RETRY" && !errorCodes.includes(code) || Array.isArray(methods) && !methods.includes(method) || statusCode != null && Array.isArray(statusCodes) && !statusCodes.includes(statusCode) || counter > maxRetries) {
 				cb(err);
 				return;
 			}
@@ -9702,11 +9660,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			}));
 		}
 		onConnect(abort, context) {
-			if (this.reason) {
-				abort(this.reason);
-				return;
-			}
-			assert$13(this.callback), this.abort = abort, this.context = context;
+			this.reason ? abort(this.reason) : (assert$13(this.callback), this.abort = abort, this.context = context);
 		}
 		onHeaders(statusCode, rawHeaders, resume, statusMessage) {
 			let { callback, opaque, abort, context, responseHeaders, highWaterMark } = this, headers = responseHeaders === "raw" ? util.parseRawHeaders(rawHeaders) : util.parseHeaders(rawHeaders);
@@ -9774,15 +9728,9 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		self.abort ? self.abort(self[kSignal]?.reason) : self.reason = self[kSignal]?.reason ?? new RequestAbortedError(), removeSignal(self);
 	}
 	function addSignal(self, signal) {
-		if (self.reason = null, self[kSignal] = null, self[kListener] = null, signal) {
-			if (signal.aborted) {
-				abort(self);
-				return;
-			}
-			self[kSignal] = signal, self[kListener] = () => {
-				abort(self);
-			}, addAbortListener(self[kSignal], self[kListener]);
-		}
+		self.reason = null, self[kSignal] = null, self[kListener] = null, signal && (signal.aborted ? abort(self) : (self[kSignal] = signal, self[kListener] = () => {
+			abort(self);
+		}, addAbortListener(self[kSignal], self[kListener])));
 	}
 	function removeSignal(self) {
 		self[kSignal] && ("removeEventListener" in self[kSignal] ? self[kSignal].removeEventListener("abort", self[kListener]) : self[kSignal].removeListener("abort", self[kListener]), self[kSignal] = null, self[kListener] = null);
@@ -9812,11 +9760,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			}), addSignal(this, signal);
 		}
 		onConnect(abort, context) {
-			if (this.reason) {
-				abort(this.reason);
-				return;
-			}
-			assert$12(this.callback), this.abort = abort, this.context = context;
+			this.reason ? abort(this.reason) : (assert$12(this.callback), this.abort = abort, this.context = context);
 		}
 		onHeaders(statusCode, rawHeaders, resume, statusMessage) {
 			let { factory, opaque, context, callback, responseHeaders } = this, headers = responseHeaders === "raw" ? util.parseRawHeaders(rawHeaders) : util.parseHeaders(rawHeaders);
@@ -9938,11 +9882,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		}
 		onConnect(abort, context) {
 			let { ret, res } = this;
-			if (this.reason) {
-				abort(this.reason);
-				return;
-			}
-			assert$11(!res, "pipeline cannot be retried"), assert$11(!ret.destroyed), this.abort = abort, this.context = context;
+			this.reason ? abort(this.reason) : (assert$11(!res, "pipeline cannot be retried"), assert$11(!ret.destroyed), this.abort = abort, this.context = context);
 		}
 		onHeaders(statusCode, rawHeaders, resume) {
 			let { opaque, handler, context } = this;
@@ -10022,11 +9962,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			super("UNDICI_UPGRADE"), this.responseHeaders = responseHeaders || null, this.opaque = opaque || null, this.callback = callback, this.abort = null, this.context = null, addSignal(this, signal);
 		}
 		onConnect(abort, context) {
-			if (this.reason) {
-				abort(this.reason);
-				return;
-			}
-			assert$10(this.callback), this.abort = abort, this.context = null;
+			this.reason ? abort(this.reason) : (assert$10(this.callback), this.abort = abort, this.context = null);
 		}
 		onHeaders() {
 			throw new SocketError("bad upgrade", null);
@@ -10079,11 +10015,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			super("UNDICI_CONNECT"), this.opaque = opaque || null, this.responseHeaders = responseHeaders || null, this.callback = callback, this.abort = null, addSignal(this, signal);
 		}
 		onConnect(abort, context) {
-			if (this.reason) {
-				abort(this.reason);
-				return;
-			}
-			assert$9(this.callback), this.abort = abort, this.context = context;
+			this.reason ? abort(this.reason) : (assert$9(this.callback), this.abort = abort, this.context = context);
 		}
 		onHeaders() {
 			throw new SocketError("bad connect", null);
@@ -10170,9 +10102,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 	function getHeaderByName(headers, key) {
 		if (Array.isArray(headers)) {
 			for (let i = 0; i < headers.length; i += 2) if (headers[i].toLocaleLowerCase() === key.toLocaleLowerCase()) return headers[i + 1];
-			return;
-		}
-		return typeof headers.get == "function" ? headers.get(key) : lowerCaseEntries(headers)[key.toLocaleLowerCase()];
+		} else return typeof headers.get == "function" ? headers.get(key) : lowerCaseEntries(headers)[key.toLocaleLowerCase()];
 	}
 	function buildHeadersFromArray(headers) {
 		let clone = headers.slice(), entries = [];
@@ -10679,13 +10609,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 			return this.#size += chunk.length, this.#size >= this.#maxSize && (this.#dumped = !0, this.#aborted ? this.#handler.onError(this.#reason) : this.#handler.onComplete([])), !0;
 		}
 		onComplete(trailers) {
-			if (!this.#dumped) {
-				if (this.#aborted) {
-					this.#handler.onError(this.reason);
-					return;
-				}
-				this.#handler.onComplete(trailers);
-			}
+			this.#dumped || (this.#aborted ? this.#handler.onError(this.reason) : this.#handler.onComplete(trailers));
 		}
 	};
 	function createDumpInterceptor({ maxSize: defaultMaxSize } = { maxSize: 1048576 }) {
@@ -11787,17 +11711,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 			request,
 			processResponseEndOfBody: handleFetchDone,
 			processResponse: (response) => {
-				if (!locallyAborted) {
-					if (response.aborted) {
-						abortFetch(p, request, responseObject, controller.serializedAbortReason);
-						return;
-					}
-					if (response.type === "error") {
-						p.reject(TypeError("fetch failed", { cause: response.error }));
-						return;
-					}
-					responseObject = new WeakRef(fromInnerResponse(response, "immutable")), p.resolve(responseObject.deref()), p = null;
-				}
+				locallyAborted || (response.aborted ? abortFetch(p, request, responseObject, controller.serializedAbortReason) : response.type === "error" ? p.reject(TypeError("fetch failed", { cause: response.error })) : (responseObject = new WeakRef(fromInnerResponse(response, "immutable")), p.resolve(responseObject.deref()), p = null));
 			},
 			dispatcher: requestObject[kDispatcher]
 		}), p.promise;
@@ -11852,11 +11766,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 				return;
 			}
 			await fullyReadBody(response.body, (bytes) => {
-				if (!bytesMatch(bytes, request.integrity)) {
-					processBodyError("integrity mismatch");
-					return;
-				}
-				response.body = safelyExtractBody(bytes)[0], fetchFinale(fetchParams, response);
+				bytesMatch(bytes, request.integrity) ? (response.body = safelyExtractBody(bytes)[0], fetchFinale(fetchParams, response)) : processBodyError("integrity mismatch");
 			}, processBodyError);
 		} else fetchFinale(fetchParams, response);
 	}
@@ -12589,11 +12499,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 			webidl.brandCheck(this, FileReader), webidl.argumentLengthCheck(arguments, 1, "FileReader.readAsDataURL"), blob = webidl.converters.Blob(blob, { strict: !1 }), readOperation(this, blob, "DataURL");
 		}
 		abort() {
-			if (this[kState] === "empty" || this[kState] === "done") {
-				this[kResult] = null;
-				return;
-			}
-			this[kState] === "loading" && (this[kState] = "done", this[kResult] = null), this[kAborted] = !0, fireAProgressEvent("abort", this), this[kState] !== "loading" && fireAProgressEvent("loadend", this);
+			this[kState] === "empty" || this[kState] === "done" ? this[kResult] = null : (this[kState] === "loading" && (this[kState] = "done", this[kResult] = null), this[kAborted] = !0, fireAProgressEvent("abort", this), this[kState] !== "loading" && fireAProgressEvent("loadend", this));
 		}
 		get readyState() {
 			switch (webidl.brandCheck(this, FileReader), this[kState]) {
@@ -12764,11 +12670,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 						}
 					},
 					processResponseEndOfBody(response) {
-						if (response.aborted) {
-							responsePromise.reject(new DOMException("aborted", "AbortError"));
-							return;
-						}
-						responsePromise.resolve(response);
+						response.aborted ? responsePromise.reject(new DOMException("aborted", "AbortError")) : responsePromise.resolve(response);
 					}
 				})), responsePromises.push(responsePromise.promise);
 			}
@@ -13112,9 +13014,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 			if (code === 46) {
 				if (labelLength === 0 || domain.charCodeAt(i - 1) === 45) throw Error("Invalid cookie domain");
 				labelLength = 0;
-				continue;
-			}
-			if (labelLength === 0 && !isLetterOrDigit(code) || !isLetterOrDigit(code) && code !== 45 || ++labelLength > 63) throw Error("Invalid cookie domain");
+			} else if (labelLength === 0 && !isLetterOrDigit(code) || !isLetterOrDigit(code) && code !== 45 || ++labelLength > 63) throw Error("Invalid cookie domain");
 		}
 		if (labelLength === 0 || domain.charCodeAt(domain.length - 1) === 45) throw Error("Invalid cookie domain");
 	}
@@ -13848,11 +13748,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 					return;
 				}
 				this.#inflate[kBuffer] = [], this.#inflate[kLength] = 0, this.#inflate.on("data", (data) => {
-					if (this.#inflate[kLength] += data.length, this.#maxPayloadSize > 0 && this.#inflate[kLength] > this.#maxPayloadSize) {
-						callback(new MessageSizeExceededError()), this.#inflate.removeAllListeners(), this.#inflate.destroy(), this.#inflate = null;
-						return;
-					}
-					this.#inflate[kBuffer].push(data);
+					this.#inflate[kLength] += data.length, this.#maxPayloadSize > 0 && this.#inflate[kLength] > this.#maxPayloadSize ? (callback(new MessageSizeExceededError()), this.#inflate.removeAllListeners(), this.#inflate.destroy(), this.#inflate = null) : this.#inflate[kBuffer].push(data);
 				}), this.#inflate.on("error", (err) => {
 					this.#inflate = null, callback(err);
 				});
@@ -13948,19 +13844,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 						if (error) {
 							let code = error instanceof MessageSizeExceededError ? 1009 : 1007;
 							failWebsocketConnectionWithCode(this.ws, code, error.message);
-							return;
-						}
-						if (this.writeFragments(data)) {
-							if (this.#maxPayloadSize > 0 && this.#fragmentsBytes > this.#maxPayloadSize) {
-								failWebsocketConnectionWithCode(this.ws, 1009, new MessageSizeExceededError().message);
-								return;
-							}
-							if (!this.#info.fin) {
-								this.#state = parserStates.INFO, this.#loop = !0, this.run(callback);
-								return;
-							}
-							websocketMessageReceived(this.ws, this.#info.binaryType, this.consumeFragments()), this.#loop = !0, this.#state = parserStates.INFO, this.run(callback);
-						}
+						} else this.writeFragments(data) && (this.#maxPayloadSize > 0 && this.#fragmentsBytes > this.#maxPayloadSize ? failWebsocketConnectionWithCode(this.ws, 1009, new MessageSizeExceededError().message) : this.#info.fin ? (websocketMessageReceived(this.ws, this.#info.binaryType, this.consumeFragments()), this.#loop = !0, this.#state = parserStates.INFO, this.run(callback)) : (this.#state = parserStates.INFO, this.#loop = !0, this.run(callback)));
 					}), this.#loop = !1;
 					break;
 				} else {
@@ -14351,38 +14235,28 @@ ${pendingInterceptorsFormatter.format(pending)}
 			options.readableObjectMode = !0, super(options), this.state = options.eventSourceSettings || {}, options.push && (this.push = options.push);
 		}
 		_transform(chunk, _encoding, callback) {
-			if (chunk.length === 0) {
-				callback();
-				return;
-			}
-			if (this.chunks.push(chunk), this.checkBOM && this.handleBOM()) {
-				callback();
-				return;
-			}
-			for (; this.hasCurrentByte();) {
-				let byte = this.currentByte();
-				if (this.eventEndCheck) {
-					if (this.crlfCheck) {
-						if (byte === 10) {
-							this.crlfCheck = !1, this.consumeCurrentByte();
+			if (chunk.length === 0) callback();
+			else if (this.chunks.push(chunk), this.checkBOM && this.handleBOM()) callback();
+			else {
+				for (; this.hasCurrentByte();) {
+					let byte = this.currentByte();
+					if (this.eventEndCheck) {
+						if (this.crlfCheck) {
+							if (byte === 10) {
+								this.crlfCheck = !1, this.consumeCurrentByte();
+								continue;
+							}
+							this.crlfCheck = !1;
+						}
+						if (byte === 10 || byte === 13) {
+							byte === 13 && (this.crlfCheck = !0), this.consumeCurrentByte(), this.hasPendingEvent() && this.processEvent(this.event), this.clearEvent();
 							continue;
 						}
-						this.crlfCheck = !1;
-					}
-					if (byte === 10 || byte === 13) {
-						byte === 13 && (this.crlfCheck = !0), this.consumeCurrentByte(), this.hasPendingEvent() && this.processEvent(this.event), this.clearEvent();
-						continue;
-					}
-					this.eventEndCheck = !1;
-					continue;
+						this.eventEndCheck = !1;
+					} else byte === 10 || byte === 13 ? (byte === 13 && (this.crlfCheck = !0), this.parseLine(this.readLine(), this.event), this.consumeCurrentByte(), this.eventEndCheck = !0) : this.advanceCursor();
 				}
-				if (byte === 10 || byte === 13) {
-					byte === 13 && (this.crlfCheck = !0), this.parseLine(this.readLine(), this.event), this.consumeCurrentByte(), this.eventEndCheck = !0;
-					continue;
-				}
-				this.advanceCursor();
+				callback();
 			}
-			callback();
 		}
 		parseLine(line, event) {
 			if (line.length === 0) return;
@@ -14392,17 +14266,9 @@ ${pendingInterceptorsFormatter.format(pending)}
 			if (colonPosition !== -1 && (fieldLength = colonPosition, valueStart = colonPosition + 1, line[valueStart] === 32 && ++valueStart), isFieldName(line, fieldLength, DATA)) {
 				let value = line.toString("utf8", valueStart);
 				event.data === void 0 ? event.data = value : event.data += `\n${value}`;
-				return;
-			}
-			if (isFieldName(line, fieldLength, RETRY)) {
-				isASCIINumberBytes(line, valueStart) && (event.retry = line.toString("utf8", valueStart));
-				return;
-			}
-			if (isFieldName(line, fieldLength, ID)) {
-				isValidLastEventIdBytes(line, valueStart) && (event.id = line.toString("utf8", valueStart));
-				return;
-			}
-			if (isFieldName(line, fieldLength, EVENT)) {
+			} else if (isFieldName(line, fieldLength, RETRY)) isASCIINumberBytes(line, valueStart) && (event.retry = line.toString("utf8", valueStart));
+			else if (isFieldName(line, fieldLength, ID)) isValidLastEventIdBytes(line, valueStart) && (event.id = line.toString("utf8", valueStart));
+			else if (isFieldName(line, fieldLength, EVENT)) {
 				let value = line.toString("utf8", valueStart);
 				value.length > 0 && (event.event = value);
 			}
@@ -16579,11 +16445,8 @@ var init_config = __esmMin((() => {
 		}
 		enum(type, value, fieldName, optional, emitDefaultValues, enumAsInteger) {
 			if (type[0] == "google.protobuf.NullValue") return !emitDefaultValues && !optional ? void 0 : null;
-			if (value === void 0) {
-				assert_1.assert(optional);
-				return;
-			}
-			if (value !== 0 || emitDefaultValues || optional) return assert_1.assert(typeof value == "number"), assert_1.assert(Number.isInteger(value)), enumAsInteger || !type[1].hasOwnProperty(value) ? value : type[2] ? type[2] + type[1][value] : type[1][value];
+			if (value === void 0) assert_1.assert(optional);
+			else if (value !== 0 || emitDefaultValues || optional) return assert_1.assert(typeof value == "number"), assert_1.assert(Number.isInteger(value)), enumAsInteger || !type[1].hasOwnProperty(value) ? value : type[2] ? type[2] + type[1][value] : type[1][value];
 		}
 		message(type, value, fieldName, options) {
 			return value === void 0 ? options.emitDefaultValues ? null : void 0 : type.internalJsonWrite(value, options);
@@ -17404,8 +17267,8 @@ var init_config = __esmMin((() => {
 			return assert_1.assertFloat32;
 		}
 	});
-})), import_commonjs$13, import_commonjs$14, import_commonjs$15, import_commonjs$16, import_commonjs$17, import_commonjs$18, import_commonjs$19, Timestamp$Type, Timestamp, init_timestamp = __esmMin((() => {
-	import_commonjs$13 = require_commonjs$6(), import_commonjs$14 = require_commonjs$6(), import_commonjs$15 = require_commonjs$6(), import_commonjs$16 = require_commonjs$6(), import_commonjs$17 = require_commonjs$6(), import_commonjs$18 = require_commonjs$6(), import_commonjs$19 = require_commonjs$6(), Timestamp$Type = class extends import_commonjs$19.MessageType {
+})), import_commonjs$3, Timestamp$Type, Timestamp, init_timestamp = __esmMin((() => {
+	import_commonjs$3 = require_commonjs$6(), Timestamp$Type = class extends import_commonjs$3.MessageType {
 		constructor() {
 			super("google.protobuf.Timestamp", [{
 				no: 1,
@@ -17421,17 +17284,17 @@ var init_config = __esmMin((() => {
 		}
 		now() {
 			let msg = this.create(), ms = Date.now();
-			return msg.seconds = import_commonjs$18.PbLong.from(Math.floor(ms / 1e3)).toString(), msg.nanos = ms % 1e3 * 1e6, msg;
+			return msg.seconds = import_commonjs$3.PbLong.from(Math.floor(ms / 1e3)).toString(), msg.nanos = ms % 1e3 * 1e6, msg;
 		}
 		toDate(message) {
-			return new Date(import_commonjs$18.PbLong.from(message.seconds).toNumber() * 1e3 + Math.ceil(message.nanos / 1e6));
+			return new Date(import_commonjs$3.PbLong.from(message.seconds).toNumber() * 1e3 + Math.ceil(message.nanos / 1e6));
 		}
 		fromDate(date) {
 			let msg = this.create(), ms = date.getTime();
-			return msg.seconds = import_commonjs$18.PbLong.from(Math.floor(ms / 1e3)).toString(), msg.nanos = ms % 1e3 * 1e6, msg;
+			return msg.seconds = import_commonjs$3.PbLong.from(Math.floor(ms / 1e3)).toString(), msg.nanos = ms % 1e3 * 1e6, msg;
 		}
 		internalJsonWrite(message, options) {
-			let ms = import_commonjs$18.PbLong.from(message.seconds).toNumber() * 1e3;
+			let ms = import_commonjs$3.PbLong.from(message.seconds).toNumber() * 1e3;
 			if (ms < Date.parse("0001-01-01T00:00:00Z") || ms > Date.parse("9999-12-31T23:59:59Z")) throw Error("Unable to encode Timestamp to JSON. Must be from 0001-01-01T00:00:00Z to 9999-12-31T23:59:59Z inclusive.");
 			if (message.nanos < 0) throw Error("Unable to encode invalid Timestamp to JSON. Nanos must not be negative.");
 			let z = "Z";
@@ -17442,23 +17305,23 @@ var init_config = __esmMin((() => {
 			return new Date(ms).toISOString().replace(".000Z", z);
 		}
 		internalJsonRead(json, options, target) {
-			if (typeof json != "string") throw Error("Unable to parse Timestamp from JSON " + (0, import_commonjs$17.typeofJsonValue)(json) + ".");
+			if (typeof json != "string") throw Error("Unable to parse Timestamp from JSON " + (0, import_commonjs$3.typeofJsonValue)(json) + ".");
 			let matches = json.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:Z|\.([0-9]{3,9})Z|([+-][0-9][0-9]:[0-9][0-9]))$/);
 			if (!matches) throw Error("Unable to parse Timestamp from JSON. Invalid format.");
 			let ms = Date.parse(matches[1] + "-" + matches[2] + "-" + matches[3] + "T" + matches[4] + ":" + matches[5] + ":" + matches[6] + (matches[8] ? matches[8] : "Z"));
 			if (Number.isNaN(ms)) throw Error("Unable to parse Timestamp from JSON. Invalid value.");
 			if (ms < Date.parse("0001-01-01T00:00:00Z") || ms > Date.parse("9999-12-31T23:59:59Z")) throw new globalThis.Error("Unable to parse Timestamp from JSON. Must be from 0001-01-01T00:00:00Z to 9999-12-31T23:59:59Z inclusive.");
-			return target ||= this.create(), target.seconds = import_commonjs$18.PbLong.from(ms / 1e3).toString(), target.nanos = 0, matches[7] && (target.nanos = parseInt("1" + matches[7] + "0".repeat(9 - matches[7].length)) - 1e9), target;
+			return target ||= this.create(), target.seconds = import_commonjs$3.PbLong.from(ms / 1e3).toString(), target.nanos = 0, matches[7] && (target.nanos = parseInt("1" + matches[7] + "0".repeat(9 - matches[7].length)) - 1e9), target;
 		}
 		create(value) {
 			let message = {
 				seconds: "0",
 				nanos: 0
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$16.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$3.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$15.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17475,19 +17338,19 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$14.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$3.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.seconds !== "0" && writer.tag(1, import_commonjs$13.WireType.Varint).int64(message.seconds), message.nanos !== 0 && writer.tag(2, import_commonjs$13.WireType.Varint).int32(message.nanos);
+			message.seconds !== "0" && writer.tag(1, import_commonjs$3.WireType.Varint).int64(message.seconds), message.nanos !== 0 && writer.tag(2, import_commonjs$3.WireType.Varint).int32(message.nanos);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$14.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$3.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
 	}, Timestamp = new Timestamp$Type();
-})), import_commonjs$6, import_commonjs$7, import_commonjs$8, import_commonjs$9, import_commonjs$10, import_commonjs$11, import_commonjs$12, DoubleValue$Type, FloatValue$Type, Int64Value$Type, Int64Value, UInt64Value$Type, Int32Value$Type, UInt32Value$Type, BoolValue$Type, StringValue$Type, StringValue, BytesValue$Type, init_wrappers = __esmMin((() => {
-	import_commonjs$6 = require_commonjs$6(), import_commonjs$7 = require_commonjs$6(), import_commonjs$8 = require_commonjs$6(), import_commonjs$9 = require_commonjs$6(), import_commonjs$10 = require_commonjs$6(), import_commonjs$11 = require_commonjs$6(), import_commonjs$12 = require_commonjs$6(), DoubleValue$Type = class extends import_commonjs$12.MessageType {
+})), import_commonjs$2, DoubleValue$Type, FloatValue$Type, Int64Value$Type, Int64Value, UInt64Value$Type, Int32Value$Type, UInt32Value$Type, BoolValue$Type, StringValue$Type, StringValue, BytesValue$Type, init_wrappers = __esmMin((() => {
+	import_commonjs$2 = require_commonjs$6(), DoubleValue$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.DoubleValue", [{
 				no: 1,
@@ -17504,10 +17367,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { value: 0 };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17521,17 +17384,17 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value !== 0 && writer.tag(1, import_commonjs$8.WireType.Bit64).double(message.value);
+			message.value !== 0 && writer.tag(1, import_commonjs$2.WireType.Bit64).double(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, new DoubleValue$Type(), FloatValue$Type = class extends import_commonjs$12.MessageType {
+	}, new DoubleValue$Type(), FloatValue$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.FloatValue", [{
 				no: 1,
@@ -17548,10 +17411,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { value: 0 };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17565,17 +17428,17 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value !== 0 && writer.tag(1, import_commonjs$8.WireType.Bit32).float(message.value);
+			message.value !== 0 && writer.tag(1, import_commonjs$2.WireType.Bit32).float(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, new FloatValue$Type(), Int64Value$Type = class extends import_commonjs$12.MessageType {
+	}, new FloatValue$Type(), Int64Value$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.Int64Value", [{
 				no: 1,
@@ -17585,17 +17448,17 @@ var init_config = __esmMin((() => {
 			}]);
 		}
 		internalJsonWrite(message, options) {
-			return this.refJsonWriter.scalar(import_commonjs$6.ScalarType.INT64, message.value, "value", !1, !0);
+			return this.refJsonWriter.scalar(import_commonjs$2.ScalarType.INT64, message.value, "value", !1, !0);
 		}
 		internalJsonRead(json, options, target) {
-			return target ||= this.create(), target.value = this.refJsonReader.scalar(json, import_commonjs$6.ScalarType.INT64, import_commonjs$7.LongType.STRING, "value"), target;
+			return target ||= this.create(), target.value = this.refJsonReader.scalar(json, import_commonjs$2.ScalarType.INT64, import_commonjs$2.LongType.STRING, "value"), target;
 		}
 		create(value) {
 			let message = { value: "0" };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17609,17 +17472,17 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value !== "0" && writer.tag(1, import_commonjs$8.WireType.Varint).int64(message.value);
+			message.value !== "0" && writer.tag(1, import_commonjs$2.WireType.Varint).int64(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, Int64Value = new Int64Value$Type(), UInt64Value$Type = class extends import_commonjs$12.MessageType {
+	}, Int64Value = new Int64Value$Type(), UInt64Value$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.UInt64Value", [{
 				no: 1,
@@ -17629,17 +17492,17 @@ var init_config = __esmMin((() => {
 			}]);
 		}
 		internalJsonWrite(message, options) {
-			return this.refJsonWriter.scalar(import_commonjs$6.ScalarType.UINT64, message.value, "value", !1, !0);
+			return this.refJsonWriter.scalar(import_commonjs$2.ScalarType.UINT64, message.value, "value", !1, !0);
 		}
 		internalJsonRead(json, options, target) {
-			return target ||= this.create(), target.value = this.refJsonReader.scalar(json, import_commonjs$6.ScalarType.UINT64, import_commonjs$7.LongType.STRING, "value"), target;
+			return target ||= this.create(), target.value = this.refJsonReader.scalar(json, import_commonjs$2.ScalarType.UINT64, import_commonjs$2.LongType.STRING, "value"), target;
 		}
 		create(value) {
 			let message = { value: "0" };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17653,17 +17516,17 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value !== "0" && writer.tag(1, import_commonjs$8.WireType.Varint).uint64(message.value);
+			message.value !== "0" && writer.tag(1, import_commonjs$2.WireType.Varint).uint64(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, new UInt64Value$Type(), Int32Value$Type = class extends import_commonjs$12.MessageType {
+	}, new UInt64Value$Type(), Int32Value$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.Int32Value", [{
 				no: 1,
@@ -17680,10 +17543,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { value: 0 };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17697,17 +17560,17 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value !== 0 && writer.tag(1, import_commonjs$8.WireType.Varint).int32(message.value);
+			message.value !== 0 && writer.tag(1, import_commonjs$2.WireType.Varint).int32(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, new Int32Value$Type(), UInt32Value$Type = class extends import_commonjs$12.MessageType {
+	}, new Int32Value$Type(), UInt32Value$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.UInt32Value", [{
 				no: 1,
@@ -17724,10 +17587,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { value: 0 };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17741,17 +17604,17 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value !== 0 && writer.tag(1, import_commonjs$8.WireType.Varint).uint32(message.value);
+			message.value !== 0 && writer.tag(1, import_commonjs$2.WireType.Varint).uint32(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, new UInt32Value$Type(), BoolValue$Type = class extends import_commonjs$12.MessageType {
+	}, new UInt32Value$Type(), BoolValue$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.BoolValue", [{
 				no: 1,
@@ -17768,10 +17631,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { value: !1 };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17785,17 +17648,17 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value !== !1 && writer.tag(1, import_commonjs$8.WireType.Varint).bool(message.value);
+			message.value !== !1 && writer.tag(1, import_commonjs$2.WireType.Varint).bool(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, new BoolValue$Type(), StringValue$Type = class extends import_commonjs$12.MessageType {
+	}, new BoolValue$Type(), StringValue$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.StringValue", [{
 				no: 1,
@@ -17812,10 +17675,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { value: "" };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17829,17 +17692,17 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value !== "" && writer.tag(1, import_commonjs$8.WireType.LengthDelimited).string(message.value);
+			message.value !== "" && writer.tag(1, import_commonjs$2.WireType.LengthDelimited).string(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, StringValue = new StringValue$Type(), BytesValue$Type = class extends import_commonjs$12.MessageType {
+	}, StringValue = new StringValue$Type(), BytesValue$Type = class extends import_commonjs$2.MessageType {
 		constructor() {
 			super("google.protobuf.BytesValue", [{
 				no: 1,
@@ -17856,10 +17719,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { value: new Uint8Array() };
-			return globalThis.Object.defineProperty(message, import_commonjs$11.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$2.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$10.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$2.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -17873,15 +17736,15 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$9.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
 		}
 		internalBinaryWrite(message, writer, options) {
-			message.value.length && writer.tag(1, import_commonjs$8.WireType.LengthDelimited).bytes(message.value);
+			message.value.length && writer.tag(1, import_commonjs$2.WireType.LengthDelimited).bytes(message.value);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$9.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
 	}, new BytesValue$Type();
 })), require_reflection_info = __commonJSMin(((exports) => {
@@ -18345,28 +18208,19 @@ var init_config = __esmMin((() => {
 					stream.notifyError(error);
 					return;
 				}
-				if (this.data.response instanceof rpc_error_1.RpcError) {
-					stream.notifyError(this.data.response);
-					return;
-				}
-				for (let msg of messages) {
-					stream.notifyMessage(msg);
-					try {
-						yield delay(this.betweenResponseDelay, abort)(void 0);
-					} catch (error) {
-						stream.notifyError(error);
-						return;
+				if (this.data.response instanceof rpc_error_1.RpcError) stream.notifyError(this.data.response);
+				else {
+					for (let msg of messages) {
+						stream.notifyMessage(msg);
+						try {
+							yield delay(this.betweenResponseDelay, abort)(void 0);
+						} catch (error) {
+							stream.notifyError(error);
+							return;
+						}
 					}
+					this.data.status instanceof rpc_error_1.RpcError ? stream.notifyError(this.data.status) : this.data.trailers instanceof rpc_error_1.RpcError ? stream.notifyError(this.data.trailers) : stream.notifyComplete();
 				}
-				if (this.data.status instanceof rpc_error_1.RpcError) {
-					stream.notifyError(this.data.status);
-					return;
-				}
-				if (this.data.trailers instanceof rpc_error_1.RpcError) {
-					stream.notifyError(this.data.trailers);
-					return;
-				}
-				stream.notifyComplete();
 			});
 		}
 		promiseStatus() {
@@ -18651,8 +18505,8 @@ var init_config = __esmMin((() => {
 			return server_call_context_1.ServerCallContextController;
 		}
 	});
-})), import_commonjs, import_commonjs$1, import_commonjs$2, import_commonjs$3, import_commonjs$4, import_commonjs$5, CreateArtifactRequest$Type, CreateArtifactRequest, CreateArtifactResponse$Type, CreateArtifactResponse, FinalizeArtifactRequest$Type, FinalizeArtifactRequest, FinalizeArtifactResponse$Type, FinalizeArtifactResponse, ListArtifactsRequest$Type, ListArtifactsRequest, ListArtifactsResponse$Type, ListArtifactsResponse, ListArtifactsResponse_MonolithArtifact$Type, ListArtifactsResponse_MonolithArtifact, GetSignedArtifactURLRequest$Type, GetSignedArtifactURLRequest, GetSignedArtifactURLResponse$Type, GetSignedArtifactURLResponse, DeleteArtifactRequest$Type, DeleteArtifactRequest, DeleteArtifactResponse$Type, DeleteArtifactResponse, init_artifact$1 = __esmMin((() => {
-	import_commonjs = require_commonjs$5(), import_commonjs$1 = require_commonjs$6(), import_commonjs$2 = require_commonjs$6(), import_commonjs$3 = require_commonjs$6(), import_commonjs$4 = require_commonjs$6(), import_commonjs$5 = require_commonjs$6(), init_wrappers(), init_timestamp(), CreateArtifactRequest$Type = class extends import_commonjs$5.MessageType {
+})), import_commonjs, import_commonjs$1, CreateArtifactRequest$Type, CreateArtifactRequest, CreateArtifactResponse$Type, CreateArtifactResponse, FinalizeArtifactRequest$Type, FinalizeArtifactRequest, FinalizeArtifactResponse$Type, FinalizeArtifactResponse, ListArtifactsRequest$Type, ListArtifactsRequest, ListArtifactsResponse$Type, ListArtifactsResponse, ListArtifactsResponse_MonolithArtifact$Type, ListArtifactsResponse_MonolithArtifact, GetSignedArtifactURLRequest$Type, GetSignedArtifactURLRequest, GetSignedArtifactURLResponse$Type, GetSignedArtifactURLResponse, DeleteArtifactRequest$Type, DeleteArtifactRequest, DeleteArtifactResponse$Type, DeleteArtifactResponse, init_artifact$1 = __esmMin((() => {
+	import_commonjs = require_commonjs$5(), import_commonjs$1 = require_commonjs$6(), init_wrappers(), init_timestamp(), CreateArtifactRequest$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.CreateArtifactRequest", [
 				{
@@ -18700,10 +18554,10 @@ var init_config = __esmMin((() => {
 				name: "",
 				version: 0
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -18732,7 +18586,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -18740,9 +18594,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.workflowRunBackendId !== "" && writer.tag(1, import_commonjs$1.WireType.LengthDelimited).string(message.workflowRunBackendId), message.workflowJobRunBackendId !== "" && writer.tag(2, import_commonjs$1.WireType.LengthDelimited).string(message.workflowJobRunBackendId), message.name !== "" && writer.tag(3, import_commonjs$1.WireType.LengthDelimited).string(message.name), message.expiresAt && Timestamp.internalBinaryWrite(message.expiresAt, writer.tag(4, import_commonjs$1.WireType.LengthDelimited).fork(), options).join(), message.version !== 0 && writer.tag(5, import_commonjs$1.WireType.Varint).int32(message.version), message.mimeType && StringValue.internalBinaryWrite(message.mimeType, writer.tag(6, import_commonjs$1.WireType.LengthDelimited).fork(), options).join();
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, CreateArtifactRequest = new CreateArtifactRequest$Type(), CreateArtifactResponse$Type = class extends import_commonjs$5.MessageType {
+	}, CreateArtifactRequest = new CreateArtifactRequest$Type(), CreateArtifactResponse$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.CreateArtifactResponse", [{
 				no: 1,
@@ -18761,10 +18615,10 @@ var init_config = __esmMin((() => {
 				ok: !1,
 				signedUploadUrl: ""
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -18781,7 +18635,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -18789,9 +18643,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.ok !== !1 && writer.tag(1, import_commonjs$1.WireType.Varint).bool(message.ok), message.signedUploadUrl !== "" && writer.tag(2, import_commonjs$1.WireType.LengthDelimited).string(message.signedUploadUrl);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, CreateArtifactResponse = new CreateArtifactResponse$Type(), FinalizeArtifactRequest$Type = class extends import_commonjs$5.MessageType {
+	}, CreateArtifactResponse = new CreateArtifactResponse$Type(), FinalizeArtifactRequest$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.FinalizeArtifactRequest", [
 				{
@@ -18833,10 +18687,10 @@ var init_config = __esmMin((() => {
 				name: "",
 				size: "0"
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -18862,7 +18716,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -18870,9 +18724,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.workflowRunBackendId !== "" && writer.tag(1, import_commonjs$1.WireType.LengthDelimited).string(message.workflowRunBackendId), message.workflowJobRunBackendId !== "" && writer.tag(2, import_commonjs$1.WireType.LengthDelimited).string(message.workflowJobRunBackendId), message.name !== "" && writer.tag(3, import_commonjs$1.WireType.LengthDelimited).string(message.name), message.size !== "0" && writer.tag(4, import_commonjs$1.WireType.Varint).int64(message.size), message.hash && StringValue.internalBinaryWrite(message.hash, writer.tag(5, import_commonjs$1.WireType.LengthDelimited).fork(), options).join();
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, FinalizeArtifactRequest = new FinalizeArtifactRequest$Type(), FinalizeArtifactResponse$Type = class extends import_commonjs$5.MessageType {
+	}, FinalizeArtifactRequest = new FinalizeArtifactRequest$Type(), FinalizeArtifactResponse$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.FinalizeArtifactResponse", [{
 				no: 1,
@@ -18891,10 +18745,10 @@ var init_config = __esmMin((() => {
 				ok: !1,
 				artifactId: "0"
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -18911,7 +18765,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -18919,9 +18773,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.ok !== !1 && writer.tag(1, import_commonjs$1.WireType.Varint).bool(message.ok), message.artifactId !== "0" && writer.tag(2, import_commonjs$1.WireType.Varint).int64(message.artifactId);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, FinalizeArtifactResponse = new FinalizeArtifactResponse$Type(), ListArtifactsRequest$Type = class extends import_commonjs$5.MessageType {
+	}, FinalizeArtifactResponse = new FinalizeArtifactResponse$Type(), ListArtifactsRequest$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.ListArtifactsRequest", [
 				{
@@ -18955,10 +18809,10 @@ var init_config = __esmMin((() => {
 				workflowRunBackendId: "",
 				workflowJobRunBackendId: ""
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -18981,7 +18835,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -18989,9 +18843,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.workflowRunBackendId !== "" && writer.tag(1, import_commonjs$1.WireType.LengthDelimited).string(message.workflowRunBackendId), message.workflowJobRunBackendId !== "" && writer.tag(2, import_commonjs$1.WireType.LengthDelimited).string(message.workflowJobRunBackendId), message.nameFilter && StringValue.internalBinaryWrite(message.nameFilter, writer.tag(3, import_commonjs$1.WireType.LengthDelimited).fork(), options).join(), message.idFilter && Int64Value.internalBinaryWrite(message.idFilter, writer.tag(4, import_commonjs$1.WireType.LengthDelimited).fork(), options).join();
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, ListArtifactsRequest = new ListArtifactsRequest$Type(), ListArtifactsResponse$Type = class extends import_commonjs$5.MessageType {
+	}, ListArtifactsRequest = new ListArtifactsRequest$Type(), ListArtifactsResponse$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.ListArtifactsResponse", [{
 				no: 1,
@@ -19003,10 +18857,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { artifacts: [] };
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -19020,7 +18874,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -19028,9 +18882,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			for (let i = 0; i < message.artifacts.length; i++) ListArtifactsResponse_MonolithArtifact.internalBinaryWrite(message.artifacts[i], writer.tag(1, import_commonjs$1.WireType.LengthDelimited).fork(), options).join();
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, ListArtifactsResponse = new ListArtifactsResponse$Type(), ListArtifactsResponse_MonolithArtifact$Type = class extends import_commonjs$5.MessageType {
+	}, ListArtifactsResponse = new ListArtifactsResponse$Type(), ListArtifactsResponse_MonolithArtifact$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.ListArtifactsResponse.MonolithArtifact", [
 				{
@@ -19085,10 +18939,10 @@ var init_config = __esmMin((() => {
 				name: "",
 				size: "0"
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -19120,7 +18974,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -19128,9 +18982,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.workflowRunBackendId !== "" && writer.tag(1, import_commonjs$1.WireType.LengthDelimited).string(message.workflowRunBackendId), message.workflowJobRunBackendId !== "" && writer.tag(2, import_commonjs$1.WireType.LengthDelimited).string(message.workflowJobRunBackendId), message.databaseId !== "0" && writer.tag(3, import_commonjs$1.WireType.Varint).int64(message.databaseId), message.name !== "" && writer.tag(4, import_commonjs$1.WireType.LengthDelimited).string(message.name), message.size !== "0" && writer.tag(5, import_commonjs$1.WireType.Varint).int64(message.size), message.createdAt && Timestamp.internalBinaryWrite(message.createdAt, writer.tag(6, import_commonjs$1.WireType.LengthDelimited).fork(), options).join(), message.digest && StringValue.internalBinaryWrite(message.digest, writer.tag(7, import_commonjs$1.WireType.LengthDelimited).fork(), options).join();
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, ListArtifactsResponse_MonolithArtifact = new ListArtifactsResponse_MonolithArtifact$Type(), GetSignedArtifactURLRequest$Type = class extends import_commonjs$5.MessageType {
+	}, ListArtifactsResponse_MonolithArtifact = new ListArtifactsResponse_MonolithArtifact$Type(), GetSignedArtifactURLRequest$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.GetSignedArtifactURLRequest", [
 				{
@@ -19159,10 +19013,10 @@ var init_config = __esmMin((() => {
 				workflowJobRunBackendId: "",
 				name: ""
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -19182,7 +19036,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -19190,9 +19044,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.workflowRunBackendId !== "" && writer.tag(1, import_commonjs$1.WireType.LengthDelimited).string(message.workflowRunBackendId), message.workflowJobRunBackendId !== "" && writer.tag(2, import_commonjs$1.WireType.LengthDelimited).string(message.workflowJobRunBackendId), message.name !== "" && writer.tag(3, import_commonjs$1.WireType.LengthDelimited).string(message.name);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, GetSignedArtifactURLRequest = new GetSignedArtifactURLRequest$Type(), GetSignedArtifactURLResponse$Type = class extends import_commonjs$5.MessageType {
+	}, GetSignedArtifactURLRequest = new GetSignedArtifactURLRequest$Type(), GetSignedArtifactURLResponse$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.GetSignedArtifactURLResponse", [{
 				no: 1,
@@ -19203,10 +19057,10 @@ var init_config = __esmMin((() => {
 		}
 		create(value) {
 			let message = { signedUrl: "" };
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -19220,7 +19074,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -19228,9 +19082,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.signedUrl !== "" && writer.tag(1, import_commonjs$1.WireType.LengthDelimited).string(message.signedUrl);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, GetSignedArtifactURLResponse = new GetSignedArtifactURLResponse$Type(), DeleteArtifactRequest$Type = class extends import_commonjs$5.MessageType {
+	}, GetSignedArtifactURLResponse = new GetSignedArtifactURLResponse$Type(), DeleteArtifactRequest$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.DeleteArtifactRequest", [
 				{
@@ -19259,10 +19113,10 @@ var init_config = __esmMin((() => {
 				workflowJobRunBackendId: "",
 				name: ""
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -19282,7 +19136,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -19290,9 +19144,9 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.workflowRunBackendId !== "" && writer.tag(1, import_commonjs$1.WireType.LengthDelimited).string(message.workflowRunBackendId), message.workflowJobRunBackendId !== "" && writer.tag(2, import_commonjs$1.WireType.LengthDelimited).string(message.workflowJobRunBackendId), message.name !== "" && writer.tag(3, import_commonjs$1.WireType.LengthDelimited).string(message.name);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
-	}, DeleteArtifactRequest = new DeleteArtifactRequest$Type(), DeleteArtifactResponse$Type = class extends import_commonjs$5.MessageType {
+	}, DeleteArtifactRequest = new DeleteArtifactRequest$Type(), DeleteArtifactResponse$Type = class extends import_commonjs$1.MessageType {
 		constructor() {
 			super("github.actions.results.api.v1.DeleteArtifactResponse", [{
 				no: 1,
@@ -19311,10 +19165,10 @@ var init_config = __esmMin((() => {
 				ok: !1,
 				artifactId: "0"
 			};
-			return globalThis.Object.defineProperty(message, import_commonjs$4.MESSAGE_TYPE, {
+			return globalThis.Object.defineProperty(message, import_commonjs$1.MESSAGE_TYPE, {
 				enumerable: !1,
 				value: this
-			}), value !== void 0 && (0, import_commonjs$3.reflectionMergePartial)(this, message, value), message;
+			}), value !== void 0 && (0, import_commonjs$1.reflectionMergePartial)(this, message, value), message;
 		}
 		internalBinaryRead(reader, length, options, target) {
 			let message = target ?? this.create(), end = reader.pos + length;
@@ -19331,7 +19185,7 @@ var init_config = __esmMin((() => {
 						let u = options.readUnknownField;
 						if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
 						let d = reader.skip(wireType);
-						u !== !1 && (u === !0 ? import_commonjs$2.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+						u !== !1 && (u === !0 ? import_commonjs$1.UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
 				}
 			}
 			return message;
@@ -19339,7 +19193,7 @@ var init_config = __esmMin((() => {
 		internalBinaryWrite(message, writer, options) {
 			message.ok !== !1 && writer.tag(1, import_commonjs$1.WireType.Varint).bool(message.ok), message.artifactId !== "0" && writer.tag(2, import_commonjs$1.WireType.Varint).int64(message.artifactId);
 			let u = options.writeUnknownFields;
-			return u !== !1 && (u == 1 ? import_commonjs$2.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
+			return u !== !1 && (u == 1 ? import_commonjs$1.UnknownFieldHandler.onWrite : u)(this.typeName, message, writer), writer;
 		}
 	}, DeleteArtifactResponse = new DeleteArtifactResponse$Type(), new import_commonjs.ServiceType("github.actions.results.api.v1.ArtifactService", [
 		{
@@ -19658,11 +19512,7 @@ function maskSigUrl(url) {
 	}
 }
 function maskSecretUrls(body) {
-	if (typeof body != "object" || !body) {
-		debug("body is not an object or is null");
-		return;
-	}
-	"signed_upload_url" in body && typeof body.signed_upload_url == "string" && maskSigUrl(body.signed_upload_url), "signed_url" in body && typeof body.signed_url == "string" && maskSigUrl(body.signed_url);
+	typeof body != "object" || !body ? debug("body is not an object or is null") : ("signed_upload_url" in body && typeof body.signed_upload_url == "string" && maskSigUrl(body.signed_upload_url), "signed_url" in body && typeof body.signed_url == "string" && maskSigUrl(body.signed_url));
 }
 var InvalidJwtError, init_util$3 = __esmMin((() => {
 	init_core(), init_config(), init_esm$13(), InvalidJwtError = Error("Failed to get backend IDs: The provided JWT token is invalid and/or missing claims");
@@ -20446,10 +20296,10 @@ var DEFAULT_TLS_SETTINGS, ReportTransform, NodeHttpClient, init_nodeHttpClient =
 			{
 				if (disableKeepAlive && !request.tlsSettings) return node_https.default.globalAgent;
 				let tlsSettings = request.tlsSettings ?? DEFAULT_TLS_SETTINGS, agent = this.cachedHttpsAgents.get(tlsSettings);
-				return agent && agent.options.keepAlive === !disableKeepAlive ? agent : (logger$4.info("No cached TLS Agent exist, creating a new Agent"), agent = new node_https.default.Agent({
+				return agent && agent.options.keepAlive === !disableKeepAlive || (logger$4.info("No cached TLS Agent exist, creating a new Agent"), agent = new node_https.default.Agent({
 					keepAlive: !disableKeepAlive,
 					...tlsSettings
-				}), this.cachedHttpsAgents.set(tlsSettings, agent), agent);
+				}), this.cachedHttpsAgents.set(tlsSettings, agent)), agent;
 			}
 		}
 	};
@@ -23993,11 +23843,8 @@ var ENTITY_ACTION, SPECIAL_CHARS, LIMIT_TIER_EXTERNAL, LIMIT_TIER_BASE, LIMIT_TI
 					let resolved = this._resolveName(token);
 					replacement = resolved?.value, tier = resolved?.tier;
 				}
-				if (replacement === void 0) {
-					i++;
-					continue;
-				}
-				if (i > last && chunks.push(str.slice(last, i)), chunks.push(replacement), last = j + 1, i = last, checkLimits && this._tierCounts(tier)) {
+				if (replacement === void 0) i++;
+				else if (i > last && chunks.push(str.slice(last, i)), chunks.push(replacement), last = j + 1, i = last, checkLimits && this._tierCounts(tier)) {
 					if (limitExpansions && (this._totalExpansions++, this._totalExpansions > this._maxTotalExpansions)) throw Error(`[EntityReplacer] Entity expansion count limit exceeded: ${this._totalExpansions} > ${this._maxTotalExpansions}`);
 					if (limitLength) {
 						let delta = replacement.length - (token.length + 2);
@@ -24228,39 +24075,31 @@ var DocTypeReader, skipWhitespace, init_DocTypeReader = __esmMin((() => {
 			if (xmlData[i + 3] === "O" && xmlData[i + 4] === "C" && xmlData[i + 5] === "T" && xmlData[i + 6] === "Y" && xmlData[i + 7] === "P" && xmlData[i + 8] === "E") {
 				i += 9;
 				let angleBracketsCount = 1, hasBody = !1, comment = !1, quoteChar = null, exp = "";
-				for (; i < xmlData.length; i++) {
-					if (quoteChar !== null) {
-						xmlData[i] === quoteChar && (quoteChar = null), exp += xmlData[i];
-						continue;
-					}
-					if (!hasBody && !comment && (xmlData[i] === "\"" || xmlData[i] === "'")) {
-						quoteChar = xmlData[i], exp += xmlData[i];
-						continue;
-					}
-					if (xmlData[i] === "<" && !comment) {
-						if (hasBody && hasSeq(xmlData, "!ENTITY", i)) {
-							i += 7;
-							let entityName, val;
-							if ([entityName, val, i] = this.readEntityExp(xmlData, i + 1, this.suppressValidationErr), val.indexOf("&") === -1) {
-								if (this.options.enabled !== !1 && this.options.maxEntityCount != null && entityCount >= this.options.maxEntityCount) throw Error(`Entity count (${entityCount + 1}) exceeds maximum allowed (${this.options.maxEntityCount})`);
-								entities[entityName] = val, entityCount++;
-							}
-						} else if (hasBody && hasSeq(xmlData, "!ELEMENT", i)) {
-							i += 8;
-							let { index } = this.readElementExp(xmlData, i + 1);
-							i = index;
-						} else if (hasBody && hasSeq(xmlData, "!ATTLIST", i)) i += 8;
-						else if (hasBody && hasSeq(xmlData, "!NOTATION", i)) {
-							i += 9;
-							let { index } = this.readNotationExp(xmlData, i + 1, this.suppressValidationErr);
-							i = index;
-						} else if (hasSeq(xmlData, "!--", i)) comment = !0;
-						else throw Error("Invalid DOCTYPE");
-						angleBracketsCount++, exp = "";
-					} else if (xmlData[i] === ">") {
-						if (comment ? xmlData[i - 1] === "-" && xmlData[i - 2] === "-" && (comment = !1, angleBracketsCount--) : angleBracketsCount--, angleBracketsCount === 0) break;
-					} else xmlData[i] === "[" ? hasBody = !0 : exp += xmlData[i];
-				}
+				for (; i < xmlData.length; i++) if (quoteChar !== null) xmlData[i] === quoteChar && (quoteChar = null), exp += xmlData[i];
+				else if (!hasBody && !comment && (xmlData[i] === "\"" || xmlData[i] === "'")) quoteChar = xmlData[i], exp += xmlData[i];
+				else if (xmlData[i] === "<" && !comment) {
+					if (hasBody && hasSeq(xmlData, "!ENTITY", i)) {
+						i += 7;
+						let entityName, val;
+						if ([entityName, val, i] = this.readEntityExp(xmlData, i + 1, this.suppressValidationErr), val.indexOf("&") === -1) {
+							if (this.options.enabled !== !1 && this.options.maxEntityCount != null && entityCount >= this.options.maxEntityCount) throw Error(`Entity count (${entityCount + 1}) exceeds maximum allowed (${this.options.maxEntityCount})`);
+							entities[entityName] = val, entityCount++;
+						}
+					} else if (hasBody && hasSeq(xmlData, "!ELEMENT", i)) {
+						i += 8;
+						let { index } = this.readElementExp(xmlData, i + 1);
+						i = index;
+					} else if (hasBody && hasSeq(xmlData, "!ATTLIST", i)) i += 8;
+					else if (hasBody && hasSeq(xmlData, "!NOTATION", i)) {
+						i += 9;
+						let { index } = this.readNotationExp(xmlData, i + 1, this.suppressValidationErr);
+						i = index;
+					} else if (hasSeq(xmlData, "!--", i)) comment = !0;
+					else throw Error("Invalid DOCTYPE");
+					angleBracketsCount++, exp = "";
+				} else if (xmlData[i] === ">") {
+					if (comment ? xmlData[i - 1] === "-" && xmlData[i - 2] === "-" && (comment = !1, angleBracketsCount--) : angleBracketsCount--, angleBracketsCount === 0) break;
+				} else xmlData[i] === "[" ? hasBody = !0 : exp += xmlData[i];
 				if (quoteChar !== null || angleBracketsCount !== 0) throw Error("Unclosed DOCTYPE");
 			} else throw Error("Invalid Tag instead of DOCTYPE");
 			return {
@@ -24470,9 +24309,7 @@ function anynum(str) {
 					firstHit = i;
 					break;
 				}
-				continue;
-			}
-			if (cc >= 55296 && cc <= 56319) {
+			} else if (cc >= 55296 && cc <= 56319) {
 				if (i + 1 < len) {
 					let low = str.charCodeAt(i + 1);
 					if (low >= 56320 && low <= 57343) {
@@ -24483,9 +24320,7 @@ function anynum(str) {
 						}
 					}
 				}
-				continue;
-			}
-			if (TABLE[cc - 1632] !== 255 || MINUS_SET.has(cc)) {
+			} else if (TABLE[cc - 1632] !== 255 || MINUS_SET.has(cc)) {
 				firstHit = i;
 				break;
 			}
@@ -25559,9 +25394,7 @@ function assertContext(context) {
 			if (Array.isArray(context[0])) {
 				for (let list of context) if (!Array.isArray(list) || list.length === 0) throw TypeError("is-unsafe: each context in the array must be a non-empty pattern array (PatternList)");
 			}
-			return;
-		}
-		throw TypeError(`is-unsafe: second argument must be a PatternList (e.g. HTML), an array of PatternLists (e.g. [HTML, XML]), or a RegExp. Got: ${typeof context}`);
+		} else throw TypeError(`is-unsafe: second argument must be a PatternList (e.g. HTML), an array of PatternLists (e.g. [HTML, XML]), or a RegExp. Got: ${typeof context}`);
 	}
 }
 function normalise(context) {
@@ -26581,11 +26414,8 @@ var init_xml = __esmMin((() => {
 				}), this.emitter.on("error", (err) => {
 					this.isError = !0, this.readable.pause(), reject(err);
 				}), this.emitter.on("checkEnd", () => {
-					if (this.outgoing.length > 0) {
-						this.triggerOutgoingHandlers();
-						return;
-					}
-					if (this.isStreamEnd && this.executingOutgoingHandlers === 0) {
+					if (this.outgoing.length > 0) this.triggerOutgoingHandlers();
+					else if (this.isStreamEnd && this.executingOutgoingHandlers === 0) {
 						if (this.unresolvedLength > 0 && this.unresolvedLength < this.bufferSize) {
 							let buffer = this.shiftBufferFromUnresolvedDataArray();
 							this.outgoingHandler(() => buffer.getReadableStream(), buffer.size, this.offset).then(resolve).catch(reject);
@@ -26721,20 +26551,18 @@ var init_xml = __esmMin((() => {
 			if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) return UTF8Decoder.decode(heapOrArray.subarray(idx, endPtr));
 			for (var str = ""; idx < endPtr;) {
 				var u0 = heapOrArray[idx++];
-				if (!(u0 & 128)) {
-					str += String.fromCharCode(u0);
-					continue;
-				}
-				var u1 = heapOrArray[idx++] & 63;
-				if ((u0 & 224) == 192) {
-					str += String.fromCharCode((u0 & 31) << 6 | u1);
-					continue;
-				}
-				var u2 = heapOrArray[idx++] & 63;
-				if ((u0 & 240) == 224 ? u0 = (u0 & 15) << 12 | u1 << 6 | u2 : ((u0 & 248) != 240 && warnOnce("Invalid UTF-8 leading byte " + ptrToString(u0) + " encountered when deserializing a UTF-8 string in wasm memory to a JS string!"), u0 = (u0 & 7) << 18 | u1 << 12 | u2 << 6 | heapOrArray[idx++] & 63), u0 < 65536) str += String.fromCharCode(u0);
+				if (!(u0 & 128)) str += String.fromCharCode(u0);
 				else {
-					var ch = u0 - 65536;
-					str += String.fromCharCode(55296 | ch >> 10, 56320 | ch & 1023);
+					var u1 = heapOrArray[idx++] & 63;
+					if ((u0 & 224) == 192) str += String.fromCharCode((u0 & 31) << 6 | u1);
+					else {
+						var u2 = heapOrArray[idx++] & 63;
+						if ((u0 & 240) == 224 ? u0 = (u0 & 15) << 12 | u1 << 6 | u2 : ((u0 & 248) != 240 && warnOnce("Invalid UTF-8 leading byte " + ptrToString(u0) + " encountered when deserializing a UTF-8 string in wasm memory to a JS string!"), u0 = (u0 & 7) << 18 | u1 << 12 | u2 << 6 | heapOrArray[idx++] & 63), u0 < 65536) str += String.fromCharCode(u0);
+						else {
+							var ch = u0 - 65536;
+							str += String.fromCharCode(55296 | ch >> 10, 56320 | ch & 1023);
+						}
+					}
 				}
 			}
 			return str;
@@ -26792,13 +26620,12 @@ var init_xml = __esmMin((() => {
 		var runDependencies = 0, runDependencyWatcher = null, dependenciesFulfilled = null, runDependencyTracking = {};
 		function addRunDependency(id) {
 			runDependencies++, Module.monitorRunDependencies && Module.monitorRunDependencies(runDependencies), id ? (assert(!runDependencyTracking[id]), runDependencyTracking[id] = 1, runDependencyWatcher === null && typeof setInterval < "u" && (runDependencyWatcher = setInterval(function() {
-				if (ABORT) {
-					clearInterval(runDependencyWatcher), runDependencyWatcher = null;
-					return;
+				if (ABORT) clearInterval(runDependencyWatcher), runDependencyWatcher = null;
+				else {
+					var shown = !1;
+					for (var dep in runDependencyTracking) shown || (shown = !0, err("still waiting on run dependencies:")), err("dependency: " + dep);
+					shown && err("(end of list)");
 				}
-				var shown = !1;
-				for (var dep in runDependencyTracking) shown || (shown = !0, err("still waiting on run dependencies:")), err("dependency: " + dep);
-				shown && err("(end of list)");
 			}, 1e4))) : err("warning: run dependency added without ID");
 		}
 		function removeRunDependency(id) {
@@ -27271,11 +27098,7 @@ async function structuredMessageEncoding(source, contentLength) {
 }
 async function pump(reader, controller, encodingStream) {
 	let { done, value } = await reader.read();
-	if (done) {
-		controller.close();
-		return;
-	}
-	encodingStream.sourceDataHandler(Buffer.from(value));
+	done ? controller.close() : encodingStream.sourceDataHandler(Buffer.from(value));
 }
 async function BrowserStream(source, contentLength) {
 	let reader = (source instanceof Blob ? source.stream() : source).getReader(), encodingStream, stream = new ReadableStream({
@@ -27321,11 +27144,7 @@ var StructuredMessageEncodingStream, init_StructuredMessageEncodingStream = __es
 			this.destroy(abortError);
 		};
 		sourceErrorOrEndHandler = (err) => {
-			if (err && err.name === "AbortError") {
-				this.destroy(err);
-				return;
-			}
-			this.removeSourceEventHandlers();
+			err && err.name === "AbortError" ? this.destroy(err) : this.removeSourceEventHandlers();
 		};
 		_read() {
 			this.source.resume();
@@ -27451,11 +27270,7 @@ var StructuredMessageDecodingStream, init_StructuredMessageDecodingStream = __es
 			this.destroy(abortError);
 		};
 		sourceErrorOrEndHandler = (err) => {
-			if (err) {
-				this.destroy(err);
-				return;
-			}
-			this.removeSourceEventHandlers();
+			err ? this.destroy(err) : this.removeSourceEventHandlers();
 		};
 		_destroy(error, callback) {
 			this.removeSourceEventHandlers(), this.source.destroy(), callback(error === null ? void 0 : error);
@@ -39680,7 +39495,7 @@ async function setUploadChecksumParameters(body, contentLength, parameters, uplo
 	};
 }
 var accountNameSuffixes, init_utils_common$1 = __esmMin((() => {
-	init_esm$9(), init_constants(), init_esm$2(), accountNameSuffixes = [
+	init_esm$9(), init_esm$2(), init_constants(), accountNameSuffixes = [
 		"-secondary-ipv6",
 		"-secondary-dualstack",
 		"-ipv6",
@@ -40454,26 +40269,18 @@ var init_BlobSASSignatureValues = __esmMin((() => {
 			this.source.removeListener("data", this.sourceDataHandler), this.source.removeListener("end", this.sourceErrorOrEndHandler), this.source.removeListener("error", this.sourceErrorOrEndHandler), this.source.removeListener("aborted", this.sourceAbortedHandler);
 		}
 		sourceDataHandler = (data) => {
-			if (this.options.doInjectErrorOnce) {
-				this.options.doInjectErrorOnce = void 0, this.source.pause(), this.sourceErrorOrEndHandler(), this.source.destroy();
-				return;
-			}
-			this.offset += data.length, this.onProgress && this.onProgress({ loadedBytes: this.offset - this.start }), this.push(data) || this.source.pause();
+			this.options.doInjectErrorOnce ? (this.options.doInjectErrorOnce = void 0, this.source.pause(), this.sourceErrorOrEndHandler(), this.source.destroy()) : (this.offset += data.length, this.onProgress && this.onProgress({ loadedBytes: this.offset - this.start }), this.push(data) || this.source.pause());
 		};
 		sourceAbortedHandler = () => {
 			let abortError = new AbortError("The operation was aborted.");
 			this.destroy(abortError);
 		};
 		sourceErrorOrEndHandler = (err) => {
-			if (err && err.name === "AbortError") {
-				this.destroy(err);
-				return;
-			}
-			this.removeSourceEventHandlers(), this.offset - 1 === this.end ? this.push(null) : this.offset <= this.end ? this.retries < this.maxRetryRequests ? (this.retries += 1, this.getter(this.offset).then((newSource) => {
+			err && err.name === "AbortError" ? this.destroy(err) : (this.removeSourceEventHandlers(), this.offset - 1 === this.end ? this.push(null) : this.offset <= this.end ? this.retries < this.maxRetryRequests ? (this.retries += 1, this.getter(this.offset).then((newSource) => {
 				this.source = newSource, this.setSourceEventHandlers();
 			}).catch((error) => {
 				this.destroy(error);
-			})) : this.destroy(Error(`Data corruption failure: received less data than required and reached maxRetires limitation. Received data offset: ${this.offset - 1}, data needed offset: ${this.end}, retries: ${this.retries}, max retries: ${this.maxRetryRequests}`)) : this.destroy(Error(`Data corruption failure: Received more data than original request, data needed offset is ${this.end}, received offset: ${this.offset - 1}`));
+			})) : this.destroy(Error(`Data corruption failure: received less data than required and reached maxRetires limitation. Received data offset: ${this.offset - 1}, data needed offset: ${this.end}, retries: ${this.retries}, max retries: ${this.maxRetryRequests}`)) : this.destroy(Error(`Data corruption failure: Received more data than original request, data needed offset is ${this.end}, received offset: ${this.offset - 1}`)));
 		};
 		_destroy(error, callback) {
 			this.removeSourceEventHandlers(), this.source.destroy(), callback(error === null ? void 0 : error);
@@ -41333,11 +41140,8 @@ var init_Range = __esmMin((() => {})), BatchStates, Batch, init_Batch = __esmMin
 		}
 		parallelExecute() {
 			if (this.state !== BatchStates.Error) {
-				if (this.completed >= this.operations.length) {
-					this.emitter.emit("finish");
-					return;
-				}
-				for (; this.actives < this.concurrency;) {
+				if (this.completed >= this.operations.length) this.emitter.emit("finish");
+				else for (; this.actives < this.concurrency;) {
 					let operation = this.nextOperation();
 					if (operation) operation();
 					else return;
@@ -42552,7 +42356,7 @@ var fsStat, fsCreateReadStream, init_utils$2 = __esmMin((() => {
 		}
 	};
 })), init_BlobBatch = __esmMin((() => {})), init_BlobBatchClient = __esmMin((() => {})), init_ContainerClient = __esmMin((() => {})), init_AccountSASPermissions = __esmMin((() => {})), init_AccountSASResourceTypes = __esmMin((() => {})), init_AccountSASServices = __esmMin((() => {})), init_BlobServiceClient = __esmMin((() => {})), init_generatedModels = __esmMin((() => {})), init_esm = __esmMin((() => {
-	init_BlobServiceClient(), init_Clients(), init_ContainerClient(), init_BlobLeaseClient(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_SASQueryParameters(), init_constants(), init_utils_common$1(), init_BlobBatch(), init_BlobBatchClient(), init_BlobSASPermissions(), init_BlobSASSignatureValues(), init_ContainerSASPermissions(), init_models(), init_esm$2(), init_Pipeline(), init_SASQueryParameters(), init_generatedModels(), init_log$1();
+	init_esm$7(), init_BlobServiceClient(), init_Clients(), init_ContainerClient(), init_BlobLeaseClient(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_SASQueryParameters(), init_constants(), init_utils_common$1(), init_BlobBatch(), init_BlobBatchClient(), init_BlobSASPermissions(), init_BlobSASSignatureValues(), init_ContainerSASPermissions(), init_models(), init_esm$2(), init_Pipeline(), init_SASQueryParameters(), init_generatedModels(), init_log$1();
 }));
 //#endregion
 //#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
@@ -42733,39 +42537,39 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			if (/\$$/.test(pre)) {
 				if (acc = combine(acc, pre + "{" + m.body + "}", [""], max, maxLength, dropEmpties && !m.post.length), firstGroup = !1, !m.post.length) break;
 				str = m.post;
-				continue;
-			}
-			var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body), isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body), isSequence = isNumericSequence || isAlphaSequence, isOptions = m.body.indexOf(",") >= 0;
-			if (!isSequence && !isOptions) {
-				if (rewrites < maxRewrites && m.post.match(/,(?!,).*\}/)) {
-					rewrites++, str = m.pre + "{" + m.body + escClose + m.post, isTop = !0;
-					continue;
+			} else {
+				var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body), isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body), isSequence = isNumericSequence || isAlphaSequence, isOptions = m.body.indexOf(",") >= 0;
+				if (!isSequence && !isOptions) {
+					if (rewrites < maxRewrites && m.post.match(/,(?!,).*\}/)) {
+						rewrites++, str = m.pre + "{" + m.body + escClose + m.post, isTop = !0;
+						continue;
+					}
+					return combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties);
 				}
-				return combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties);
-			}
-			firstGroup &&= (dropEmpties = isTop && !isSequence, !1);
-			var values;
-			if (isSequence) values = expandSequence(m.body, isAlphaSequence, max, maxLength);
-			else {
-				var n = parseCommaParts(m.body);
-				if (n.length === 1 && n[0] !== void 0 && (n = expand(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, !1).map(embrace), n.length === 1)) {
-					if (acc = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
-					str = m.post;
-					continue;
-				}
-				for (var dropsEmpties = dropEmpties && !m.post.length && !pre, d = 0; dropsEmpties && d < acc.length; d++) acc[d] && (dropsEmpties = !1);
-				values = [];
-				var valuesLength = 0;
-				outer: for (var j = 0; j < n.length; j++) for (var expanded = expand(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, !1), k = 0; k < expanded.length; k++) {
-					var v = expanded[k];
-					if (!dropsEmpties || v) {
-						if (values.length >= max || valuesLength + v.length > maxLength) break outer;
-						values.push(v), valuesLength += v.length;
+				firstGroup &&= (dropEmpties = isTop && !isSequence, !1);
+				var values;
+				if (isSequence) values = expandSequence(m.body, isAlphaSequence, max, maxLength);
+				else {
+					var n = parseCommaParts(m.body);
+					if (n.length === 1 && n[0] !== void 0 && (n = expand(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, !1).map(embrace), n.length === 1)) {
+						if (acc = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
+						str = m.post;
+						continue;
+					}
+					for (var dropsEmpties = dropEmpties && !m.post.length && !pre, d = 0; dropsEmpties && d < acc.length; d++) acc[d] && (dropsEmpties = !1);
+					values = [];
+					var valuesLength = 0;
+					outer: for (var j = 0; j < n.length; j++) for (var expanded = expand(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, !1), k = 0; k < expanded.length; k++) {
+						var v = expanded[k];
+						if (!dropsEmpties || v) {
+							if (values.length >= max || valuesLength + v.length > maxLength) break outer;
+							values.push(v), valuesLength += v.length;
+						}
 					}
 				}
+				if (acc = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
+				str = m.post;
 			}
-			if (acc = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
-			str = m.post;
 		}
 		return acc;
 	}
@@ -42951,92 +42755,88 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 					this.debug("clearStateChar %j %j", stateChar, re), stateChar = !1;
 				}
 			};
-			for (let i = 0, c; i < pattern.length && (c = pattern.charAt(i)); i++) {
-				if (this.debug("%s	%s %s %j", pattern, i, re, c), escaping) {
-					if (c === "/") return !1;
-					reSpecials[c] && (re += "\\"), re += c, escaping = !1;
+			for (let i = 0, c; i < pattern.length && (c = pattern.charAt(i)); i++) if (this.debug("%s	%s %s %j", pattern, i, re, c), escaping) {
+				if (c === "/") return !1;
+				reSpecials[c] && (re += "\\"), re += c, escaping = !1;
+			} else switch (c) {
+				case "/": return !1;
+				case "\\":
+					if (inClass && pattern.charAt(i + 1) === "-") {
+						re += c;
+						continue;
+					}
+					clearStateChar(), escaping = !0;
+					continue;
+				case "?":
+				case "*":
+				case "+":
+				case "@":
+				case "!":
+					if (this.debug("%s	%s %s %j <-- stateChar", pattern, i, re, c), inClass) {
+						this.debug("  in class"), c === "!" && i === classStart + 1 && (c = "^"), re += c;
+						continue;
+					}
+					if (c === "*" && stateChar === "*") continue;
+					this.debug("call clearStateChar %j", stateChar), clearStateChar(), stateChar = c, options.noext && clearStateChar();
+					continue;
+				case "(": {
+					if (inClass) {
+						re += "(";
+						continue;
+					}
+					if (!stateChar) {
+						re += "\\(";
+						continue;
+					}
+					let plEntry = {
+						type: stateChar,
+						start: i - 1,
+						reStart: re.length,
+						open: plTypes[stateChar].open,
+						close: plTypes[stateChar].close
+					};
+					this.debug(this.pattern, "	", plEntry), patternListStack.push(plEntry), re += plEntry.open, plEntry.start === 0 && plEntry.type !== "!" && (dotTravAllowed = !0, re += subPatternStart(pattern.slice(i + 1))), this.debug("plType %j %j", stateChar, re), stateChar = !1;
 					continue;
 				}
-				switch (c) {
-					case "/": return !1;
-					case "\\":
-						if (inClass && pattern.charAt(i + 1) === "-") {
-							re += c;
-							continue;
-						}
-						clearStateChar(), escaping = !0;
-						continue;
-					case "?":
-					case "*":
-					case "+":
-					case "@":
-					case "!":
-						if (this.debug("%s	%s %s %j <-- stateChar", pattern, i, re, c), inClass) {
-							this.debug("  in class"), c === "!" && i === classStart + 1 && (c = "^"), re += c;
-							continue;
-						}
-						if (c === "*" && stateChar === "*") continue;
-						this.debug("call clearStateChar %j", stateChar), clearStateChar(), stateChar = c, options.noext && clearStateChar();
-						continue;
-					case "(": {
-						if (inClass) {
-							re += "(";
-							continue;
-						}
-						if (!stateChar) {
-							re += "\\(";
-							continue;
-						}
-						let plEntry = {
-							type: stateChar,
-							start: i - 1,
-							reStart: re.length,
-							open: plTypes[stateChar].open,
-							close: plTypes[stateChar].close
-						};
-						this.debug(this.pattern, "	", plEntry), patternListStack.push(plEntry), re += plEntry.open, plEntry.start === 0 && plEntry.type !== "!" && (dotTravAllowed = !0, re += subPatternStart(pattern.slice(i + 1))), this.debug("plType %j %j", stateChar, re), stateChar = !1;
+				case ")": {
+					let plEntry = patternListStack[patternListStack.length - 1];
+					if (inClass || !plEntry) {
+						re += "\\)";
 						continue;
 					}
-					case ")": {
-						let plEntry = patternListStack[patternListStack.length - 1];
-						if (inClass || !plEntry) {
-							re += "\\)";
-							continue;
-						}
-						patternListStack.pop(), clearStateChar(), hasMagic = !0, pl = plEntry, re += pl.close, pl.type === "!" && negativeLists.push(Object.assign(pl, { reEnd: re.length }));
-						continue;
-					}
-					case "|": {
-						let plEntry = patternListStack[patternListStack.length - 1];
-						if (inClass || !plEntry) {
-							re += "\\|";
-							continue;
-						}
-						clearStateChar(), re += "|", plEntry.start === 0 && plEntry.type !== "!" && (dotTravAllowed = !0, re += subPatternStart(pattern.slice(i + 1)));
-						continue;
-					}
-					case "[":
-						if (clearStateChar(), inClass) {
-							re += "\\" + c;
-							continue;
-						}
-						inClass = !0, classStart = i, reClassStart = re.length, re += c;
-						continue;
-					case "]":
-						if (i === classStart + 1 || !inClass) {
-							re += "\\" + c;
-							continue;
-						}
-						cs = pattern.substring(classStart + 1, i);
-						try {
-							RegExp("[" + braExpEscape(charUnescape(cs)) + "]"), re += c;
-						} catch {
-							re = re.substring(0, reClassStart) + "(?:$.)";
-						}
-						hasMagic = !0, inClass = !1;
-						continue;
-					default: clearStateChar(), reSpecials[c] && !(c === "^" && inClass) && (re += "\\"), re += c;
+					patternListStack.pop(), clearStateChar(), hasMagic = !0, pl = plEntry, re += pl.close, pl.type === "!" && negativeLists.push(Object.assign(pl, { reEnd: re.length }));
+					continue;
 				}
+				case "|": {
+					let plEntry = patternListStack[patternListStack.length - 1];
+					if (inClass || !plEntry) {
+						re += "\\|";
+						continue;
+					}
+					clearStateChar(), re += "|", plEntry.start === 0 && plEntry.type !== "!" && (dotTravAllowed = !0, re += subPatternStart(pattern.slice(i + 1)));
+					continue;
+				}
+				case "[":
+					if (clearStateChar(), inClass) {
+						re += "\\" + c;
+						continue;
+					}
+					inClass = !0, classStart = i, reClassStart = re.length, re += c;
+					continue;
+				case "]":
+					if (i === classStart + 1 || !inClass) {
+						re += "\\" + c;
+						continue;
+					}
+					cs = pattern.substring(classStart + 1, i);
+					try {
+						RegExp("[" + braExpEscape(charUnescape(cs)) + "]"), re += c;
+					} catch {
+						re = re.substring(0, reClassStart) + "(?:$.)";
+					}
+					hasMagic = !0, inClass = !1;
+					continue;
+				default: clearStateChar(), reSpecials[c] && !(c === "^" && inClass) && (re += "\\"), re += c;
 			}
 			for (inClass && (cs = pattern.slice(classStart + 1), sp = this.parse(cs, SUBPARSE), re = re.substring(0, reClassStart) + "\\[" + sp[0], hasMagic ||= sp[1]), pl = patternListStack.pop(); pl; pl = patternListStack.pop()) {
 				let tail;
@@ -43398,24 +43198,17 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			let done = !1, canceled = !1, awaiting = !1, running = 0, idx = 0;
 			function replenish() {
 				running >= limit || awaiting || done || (awaiting = !0, generator.next().then(({ value, done: iterDone }) => {
-					if (!(canceled || done)) {
-						if (awaiting = !1, iterDone) {
-							done = !0, running <= 0 && callback(null);
-							return;
-						}
-						running++, iteratee(value, idx, iterateeCallback), idx++, replenish();
-					}
+					canceled || done || (awaiting = !1, iterDone ? (done = !0, running <= 0 && callback(null)) : (running++, iteratee(value, idx, iterateeCallback), idx++, replenish()));
 				}).catch(handleError));
 			}
 			function iterateeCallback(err, result) {
 				if (--running, !canceled) {
 					if (err) return handleError(err);
-					if (err === !1) {
-						done = !0, canceled = !0;
-						return;
+					if (err === !1) done = !0, canceled = !0;
+					else {
+						if (result === breakLoop || done && running <= 0) return done = !0, callback(null);
+						replenish();
 					}
-					if (result === breakLoop || done && running <= 0) return done = !0, callback(null);
-					replenish();
 				}
 			}
 			function handleError(err) {
@@ -43501,21 +43294,16 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			var results = {}, runningTasks = 0, canceled = !1, hasError = !1, listeners = Object.create(null), readyTasks = [], readyToCheck = [], uncheckedDependencies = {};
 			Object.keys(tasks).forEach((key) => {
 				var task = tasks[key];
-				if (!Array.isArray(task)) {
-					enqueueTask(key, [task]), readyToCheck.push(key);
-					return;
+				if (!Array.isArray(task)) enqueueTask(key, [task]), readyToCheck.push(key);
+				else {
+					var dependencies = task.slice(0, task.length - 1), remainingDependencies = dependencies.length;
+					remainingDependencies === 0 ? (enqueueTask(key, task), readyToCheck.push(key)) : (uncheckedDependencies[key] = remainingDependencies, dependencies.forEach((dependencyName) => {
+						if (!tasks[dependencyName]) throw Error("async.auto task `" + key + "` has a non-existent dependency `" + dependencyName + "` in " + dependencies.join(", "));
+						addListener(dependencyName, () => {
+							remainingDependencies--, remainingDependencies === 0 && enqueueTask(key, task);
+						});
+					}));
 				}
-				var dependencies = task.slice(0, task.length - 1), remainingDependencies = dependencies.length;
-				if (remainingDependencies === 0) {
-					enqueueTask(key, task), readyToCheck.push(key);
-					return;
-				}
-				uncheckedDependencies[key] = remainingDependencies, dependencies.forEach((dependencyName) => {
-					if (!tasks[dependencyName]) throw Error("async.auto task `" + key + "` has a non-existent dependency `" + dependencyName + "` in " + dependencies.join(", "));
-					addListener(dependencyName, () => {
-						remainingDependencies--, remainingDependencies === 0 && enqueueTask(key, task);
-					});
-				});
 			}), checkForDeadlocks(), processQueue();
 			function enqueueTask(key, task) {
 				readyTasks.push(() => runTask(key, task));
@@ -43536,11 +43324,8 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			function runTask(key, task) {
 				if (!hasError) {
 					var taskCallback = onlyOnce((err, ...result) => {
-						if (runningTasks--, err === !1) {
-							canceled = !0;
-							return;
-						}
-						if (result.length < 2 && ([result] = result), err) {
+						if (runningTasks--, err === !1) canceled = !0;
+						else if (result.length < 2 && ([result] = result), err) {
 							var safeResults = {};
 							if (Object.keys(results).forEach((rkey) => {
 								safeResults[rkey] = results[rkey];
@@ -44491,15 +44276,11 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			function rename(from, to, cb) {
 				var start = Date.now(), backoff = 0;
 				fs$rename(from, to, function CB(er) {
-					if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
-						setTimeout(function() {
-							fs.stat(to, function(stater, st) {
-								stater && stater.code === "ENOENT" ? fs$rename(from, to, CB) : cb(er);
-							});
-						}, backoff), backoff < 100 && (backoff += 10);
-						return;
-					}
-					cb && cb(er);
+					er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4 ? (setTimeout(function() {
+						fs.stat(to, function(stater, st) {
+							stater && stater.code === "ENOENT" ? fs$rename(from, to, CB) : cb(er);
+						});
+					}, backoff), backoff < 100 && (backoff += 10)) : cb && cb(er);
 				});
 			}
 			return Object.setPrototypeOf && Object.setPrototypeOf(rename, fs$rename), rename;
@@ -44532,11 +44313,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		function patchLchmod(fs) {
 			fs.lchmod = function(path, mode, callback) {
 				fs.open(path, constants.O_WRONLY | constants.O_SYMLINK, mode, function(err, fd) {
-					if (err) {
-						callback && callback(err);
-						return;
-					}
-					fs.fchmod(fd, mode, function(err) {
+					err ? callback && callback(err) : fs.fchmod(fd, mode, function(err) {
 						fs.close(fd, function(err2) {
 							callback && callback(err || err2);
 						});
@@ -44558,11 +44335,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		function patchLutimes(fs) {
 			constants.hasOwnProperty("O_SYMLINK") && fs.futimes ? (fs.lutimes = function(path, at, mt, cb) {
 				fs.open(path, constants.O_SYMLINK, function(er, fd) {
-					if (er) {
-						cb && cb(er);
-						return;
-					}
-					fs.futimes(fd, at, mt, function(er) {
+					er ? cb && cb(er) : fs.futimes(fd, at, mt, function(er) {
 						fs.close(fd, function(er2) {
 							cb && cb(er || er2);
 						});
@@ -44658,18 +44431,10 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 				if (this.start > this.end) throw Error("start must be <= end");
 				this.pos = this.start;
 			}
-			if (this.fd !== null) {
-				process.nextTick(function() {
-					self._read();
-				});
-				return;
-			}
-			fs.open(this.path, this.flags, this.mode, function(err, fd) {
-				if (err) {
-					self.emit("error", err), self.readable = !1;
-					return;
-				}
-				self.fd = fd, self.emit("open", fd), self._read();
+			this.fd === null ? fs.open(this.path, this.flags, this.mode, function(err, fd) {
+				err ? (self.emit("error", err), self.readable = !1) : (self.fd = fd, self.emit("open", fd), self._read());
+			}) : process.nextTick(function() {
+				self._read();
 			});
 		}
 		function WriteStream(path, options) {
@@ -45729,7 +45494,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	Readable.prototype.unpipe = function(dest) {
 		var state = this._readableState, unpipeInfo = { hasUnpiped: !1 };
 		if (state.pipesCount === 0) return this;
-		if (state.pipesCount === 1) return dest && dest !== state.pipes ? this : (dest ||= state.pipes, state.pipes = null, state.pipesCount = 0, state.flowing = !1, dest && dest.emit("unpipe", this, unpipeInfo), this);
+		if (state.pipesCount === 1) return dest && dest !== state.pipes || (dest ||= state.pipes, state.pipes = null, state.pipesCount = 0, state.flowing = !1, dest && dest.emit("unpipe", this, unpipeInfo)), this;
 		if (!dest) {
 			var dests = state.pipes, len = state.pipesCount;
 			state.pipes = null, state.pipesCount = 0, state.flowing = !1;
@@ -45737,7 +45502,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			return this;
 		}
 		var index = indexOf(state.pipes, dest);
-		return index === -1 ? this : (state.pipes.splice(index, 1), --state.pipesCount, state.pipesCount === 1 && (state.pipes = state.pipes[0]), dest.emit("unpipe", this, unpipeInfo), this);
+		return index === -1 || (state.pipes.splice(index, 1), --state.pipesCount, state.pipesCount === 1 && (state.pipes = state.pipes[0]), dest.emit("unpipe", this, unpipeInfo)), this;
 	}, Readable.prototype.on = function(ev, fn) {
 		var res = Stream.prototype.on.call(this, ev, fn);
 		if (ev === "data") this._readableState.flowing !== !1 && this.resume();
@@ -46560,11 +46325,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		return console.assert(retv != null, "'this' is expected an Event object, but got", event), retv;
 	}
 	function setCancelFlag(data) {
-		if (data.passiveListener != null) {
-			typeof console < "u" && typeof console.error == "function" && console.error("Unable to preventDefault inside passive event listener invocation.", data.passiveListener);
-			return;
-		}
-		data.event.cancelable && (data.canceled = !0, typeof data.event.preventDefault == "function" && data.event.preventDefault());
+		data.passiveListener == null ? data.event.cancelable && (data.canceled = !0, typeof data.event.preventDefault == "function" && data.event.preventDefault()) : typeof console < "u" && typeof console.error == "function" && console.error("Unable to preventDefault inside passive event listener invocation.", data.passiveListener);
 	}
 	function Event(eventTarget, event) {
 		privateData.set(this, {
@@ -46781,17 +46542,16 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		return CustomEventTarget;
 	}
 	function EventTarget() {
-		if (this instanceof EventTarget) {
-			listenersMap.set(this, new Map());
-			return;
+		if (this instanceof EventTarget) listenersMap.set(this, new Map());
+		else {
+			if (arguments.length === 1 && Array.isArray(arguments[0])) return defineCustomEventTarget(arguments[0]);
+			if (arguments.length > 0) {
+				let types = Array(arguments.length);
+				for (let i = 0; i < arguments.length; ++i) types[i] = arguments[i];
+				return defineCustomEventTarget(types);
+			}
+			throw TypeError("Cannot call a class as a function");
 		}
-		if (arguments.length === 1 && Array.isArray(arguments[0])) return defineCustomEventTarget(arguments[0]);
-		if (arguments.length > 0) {
-			let types = Array(arguments.length);
-			for (let i = 0; i < arguments.length; ++i) types[i] = arguments[i];
-			return defineCustomEventTarget(types);
-		}
-		throw TypeError("Cannot call a class as a function");
 	}
 	EventTarget.prototype = {
 		addEventListener(eventName, listener, options) {
@@ -48045,7 +47805,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			return this;
 		}
 		let index = ArrayPrototypeIndexOf(state.pipes, dest);
-		return index === -1 ? this : (state.pipes.splice(index, 1), state.pipes.length === 0 && this.pause(), dest.emit("unpipe", this, unpipeInfo), this);
+		return index === -1 || (state.pipes.splice(index, 1), state.pipes.length === 0 && this.pause(), dest.emit("unpipe", this, unpipeInfo)), this;
 	}, Readable.prototype.on = function(ev, fn) {
 		let res = Stream.prototype.on.call(this, ev, fn), state = this._readableState;
 		return ev === "data" ? (state.readableListening = this.listenerCount("readable") > 0, state.flowing !== !1 && this.resume()) : ev === "readable" && !state.endEmitted && !state.readableListening && (state.readableListening = state.needReadable = !0, state.flowing = !1, state.emittedReadable = !1, debug("on readable", state.length, state.reading), state.length ? emitReadable(this) : state.reading || process.nextTick(nReadingNextTick, this)), res;
@@ -48382,16 +48142,12 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	}
 	function onwrite(stream, er) {
 		let state = stream._writableState, sync = state.sync, cb = state.writecb;
-		if (typeof cb != "function") {
-			errorOrDestroy(stream, new ERR_MULTIPLE_CALLBACK());
-			return;
-		}
-		state.writing = !1, state.writecb = null, state.length -= state.writelen, state.writelen = 0, er ? (er.stack, state.errored ||= er, stream._readableState && !stream._readableState.errored && (stream._readableState.errored = er), sync ? process.nextTick(onwriteError, stream, state, er, cb) : onwriteError(stream, state, er, cb)) : (state.buffered.length > state.bufferedIndex && clearBuffer(stream, state), sync ? state.afterWriteTickInfo !== null && state.afterWriteTickInfo.cb === cb ? state.afterWriteTickInfo.count++ : (state.afterWriteTickInfo = {
+		typeof cb == "function" ? (state.writing = !1, state.writecb = null, state.length -= state.writelen, state.writelen = 0, er ? (er.stack, state.errored ||= er, stream._readableState && !stream._readableState.errored && (stream._readableState.errored = er), sync ? process.nextTick(onwriteError, stream, state, er, cb) : onwriteError(stream, state, er, cb)) : (state.buffered.length > state.bufferedIndex && clearBuffer(stream, state), sync ? state.afterWriteTickInfo !== null && state.afterWriteTickInfo.cb === cb ? state.afterWriteTickInfo.count++ : (state.afterWriteTickInfo = {
 			count: 1,
 			cb,
 			stream,
 			state
-		}, process.nextTick(afterWriteTick, state.afterWriteTickInfo)) : afterWrite(stream, state, 1, cb));
+		}, process.nextTick(afterWriteTick, state.afterWriteTickInfo)) : afterWrite(stream, state, 1, cb))) : errorOrDestroy(stream, new ERR_MULTIPLE_CALLBACK());
 	}
 	function afterWriteTick({ stream, state, count, cb }) {
 		return state.afterWriteTickInfo = null, afterWrite(stream, state, count, cb);
@@ -48452,11 +48208,8 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	function callFinal(stream, state) {
 		let called = !1;
 		function onFinish(err) {
-			if (called) {
-				errorOrDestroy(stream, err ?? ERR_MULTIPLE_CALLBACK());
-				return;
-			}
-			if (called = !0, state.pendingcb--, err) {
+			if (called) errorOrDestroy(stream, err ?? ERR_MULTIPLE_CALLBACK());
+			else if (called = !0, state.pendingcb--, err) {
 				let onfinishCallbacks = state[kOnFinished].splice(0);
 				for (let i = 0; i < onfinishCallbacks.length; i++) onfinishCallbacks[i](err);
 				errorOrDestroy(stream, err, state.sync);
@@ -48860,11 +48613,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	}
 	function final(cb) {
 		typeof this._flush == "function" && !this.destroyed ? this._flush((er, data) => {
-			if (er) {
-				cb ? cb(er) : this.destroy(er);
-				return;
-			}
-			data != null && this.push(data), this.push(null), cb && cb();
+			er ? cb ? cb(er) : this.destroy(er) : (data != null && this.push(data), this.push(null), cb && cb());
 		}) : (this.push(null), cb && cb());
 	}
 	function prefinish() {
@@ -48875,11 +48624,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	}, Transform.prototype._write = function(chunk, encoding, callback) {
 		let rState = this._readableState, wState = this._writableState, length = rState.length;
 		this._transform(chunk, encoding, (err, val) => {
-			if (err) {
-				callback(err);
-				return;
-			}
-			val != null && this.push(val), wState.ended || length === rState.length || rState.length < rState.highWaterMark ? callback() : this[kCallback] = callback;
+			err ? callback(err) : (val != null && this.push(val), wState.ended || length === rState.length || rState.length < rState.highWaterMark ? callback() : this[kCallback] = callback);
 		});
 	}, Transform.prototype._read = function() {
 		if (this[kCallback]) {
@@ -49869,43 +49614,29 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		let ranges = [], negs = [], i = pos + 1, sawStart = !1, uflag = !1, escaping = !1, negate = !1, endPos = pos, rangeStart = "";
 		WHILE: for (; i < glob.length;) {
 			let c = glob.charAt(i);
-			if ((c === "!" || c === "^") && i === pos + 1) {
-				negate = !0, i++;
-				continue;
-			}
-			if (c === "]" && sawStart && !escaping) {
-				endPos = i + 1;
-				break;
-			}
-			if (sawStart = !0, c === "\\" && !escaping) {
-				escaping = !0, i++;
-				continue;
-			}
-			if (c === "[" && !escaping) {
-				for (let [cls, [unip, u, neg]] of Object.entries(posixClasses)) if (glob.startsWith(cls, i)) {
-					if (rangeStart) return [
-						"$.",
-						!1,
-						glob.length - pos,
-						!0
-					];
-					i += cls.length, neg ? negs.push(unip) : ranges.push(unip), uflag ||= u;
-					continue WHILE;
+			if ((c === "!" || c === "^") && i === pos + 1) negate = !0, i++;
+			else {
+				if (c === "]" && sawStart && !escaping) {
+					endPos = i + 1;
+					break;
+				}
+				if (sawStart = !0, c === "\\" && !escaping) escaping = !0, i++;
+				else {
+					if (c === "[" && !escaping) {
+						for (let [cls, [unip, u, neg]] of Object.entries(posixClasses)) if (glob.startsWith(cls, i)) {
+							if (rangeStart) return [
+								"$.",
+								!1,
+								glob.length - pos,
+								!0
+							];
+							i += cls.length, neg ? negs.push(unip) : ranges.push(unip), uflag ||= u;
+							continue WHILE;
+						}
+					}
+					escaping = !1, rangeStart ? (c > rangeStart ? ranges.push(braceEscape(rangeStart) + "-" + braceEscape(c)) : c === rangeStart && ranges.push(braceEscape(c)), rangeStart = "", i++) : glob.startsWith("-]", i + 1) ? (ranges.push(braceEscape(c + "-")), i += 2) : glob.startsWith("-", i + 1) ? (rangeStart = c, i += 2) : (ranges.push(braceEscape(c)), i++);
 				}
 			}
-			if (escaping = !1, rangeStart) {
-				c > rangeStart ? ranges.push(braceEscape(rangeStart) + "-" + braceEscape(c)) : c === rangeStart && ranges.push(braceEscape(c)), rangeStart = "", i++;
-				continue;
-			}
-			if (glob.startsWith("-]", i + 1)) {
-				ranges.push(braceEscape(c + "-")), i += 2;
-				continue;
-			}
-			if (glob.startsWith("-", i + 1)) {
-				rangeStart = c, i += 2;
-				continue;
-			}
-			ranges.push(braceEscape(c)), i++;
 		}
 		if (endPos < i) return [
 			"",
@@ -50074,56 +49805,33 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 				let i = pos, acc = "";
 				for (; i < str.length;) {
 					let c = str.charAt(i++);
-					if (escaping || c === "\\") {
-						escaping = !escaping, acc += c;
-						continue;
-					}
-					if (inBrace) {
-						i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
-						continue;
-					}
-					if (c === "[") {
-						inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
-						continue;
-					}
-					if (!opt.noext && isExtglobType(c) && str.charAt(i) === "(" && extDepth <= maxDepth) {
+					if (escaping || c === "\\") escaping = !escaping, acc += c;
+					else if (inBrace) i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
+					else if (c === "[") inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
+					else if (!opt.noext && isExtglobType(c) && str.charAt(i) === "(" && extDepth <= maxDepth) {
 						ast.push(acc), acc = "";
 						let ext = new _a(c, ast);
 						i = _a.#parseAST(str, ext, i, opt, extDepth + 1), ast.push(ext);
-						continue;
-					}
-					acc += c;
+					} else acc += c;
 				}
 				return ast.push(acc), i;
 			}
 			let i = pos + 1, part = new _a(null, ast), parts = [], acc = "";
 			for (; i < str.length;) {
 				let c = str.charAt(i++);
-				if (escaping || c === "\\") {
-					escaping = !escaping, acc += c;
-					continue;
-				}
-				if (inBrace) {
-					i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
-					continue;
-				}
-				if (c === "[") {
-					inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
-					continue;
-				}
-				if (isExtglobType(c) && str.charAt(i) === "(" && (extDepth <= maxDepth || ast && ast.#canAdoptType(c))) {
+				if (escaping || c === "\\") escaping = !escaping, acc += c;
+				else if (inBrace) i === braceStart + 1 ? (c === "^" || c === "!") && (braceNeg = !0) : c === "]" && !(i === braceStart + 2 && braceNeg) && (inBrace = !1), acc += c;
+				else if (c === "[") inBrace = !0, braceStart = i, braceNeg = !1, acc += c;
+				else if (isExtglobType(c) && str.charAt(i) === "(" && (extDepth <= maxDepth || ast && ast.#canAdoptType(c))) {
 					let depthAdd = ast && ast.#canAdoptType(c) ? 0 : 1;
 					part.push(acc), acc = "";
 					let ext = new _a(c, part);
 					part.push(ext), i = _a.#parseAST(str, ext, i, opt, extDepth + depthAdd);
-					continue;
+				} else if (c === "|") part.push(acc), acc = "", parts.push(part), part = new _a(null, ast);
+				else {
+					if (c === ")") return acc === "" && ast.#parts.length === 0 && (ast.#emptyExt = !0), part.push(acc), acc = "", ast.push(...parts, part), i;
+					acc += c;
 				}
-				if (c === "|") {
-					part.push(acc), acc = "", parts.push(part), part = new _a(null, ast);
-					continue;
-				}
-				if (c === ")") return acc === "" && ast.#parts.length === 0 && (ast.#emptyExt = !0), part.push(acc), acc = "", ast.push(...parts, part), i;
-				acc += c;
 			}
 			return ast.type = null, ast.#hasMagic = void 0, ast.#parts = [str.substring(pos - 1)], i;
 		}
@@ -50248,31 +49956,21 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			let escaping = !1, re = "", uflag = !1, inStar = !1;
 			for (let i = 0; i < glob.length; i++) {
 				let c = glob.charAt(i);
-				if (escaping) {
-					escaping = !1, re += (reSpecials.has(c) ? "\\" : "") + c, inStar = !1;
-					continue;
-				}
-				if (c === "\\") {
-					i === glob.length - 1 ? re += "\\\\" : escaping = !0;
-					continue;
-				}
-				if (c === "[") {
-					let [src, needUflag, consumed, magic] = (0, brace_expressions_js_1.parseClass)(glob, i);
-					if (consumed) {
-						re += src, uflag ||= needUflag, i += consumed - 1, hasMagic ||= magic, inStar = !1;
-						continue;
+				if (escaping) escaping = !1, re += (reSpecials.has(c) ? "\\" : "") + c, inStar = !1;
+				else if (c === "\\") i === glob.length - 1 ? re += "\\\\" : escaping = !0;
+				else {
+					if (c === "[") {
+						let [src, needUflag, consumed, magic] = (0, brace_expressions_js_1.parseClass)(glob, i);
+						if (consumed) {
+							re += src, uflag ||= needUflag, i += consumed - 1, hasMagic ||= magic, inStar = !1;
+							continue;
+						}
 					}
+					if (c === "*") {
+						if (inStar) continue;
+						inStar = !0, re += noEmpty && /^[*]+$/.test(glob) ? starNoEmpty : "[^/]*?", hasMagic = !0;
+					} else inStar = !1, c === "?" ? (re += "[^/]", hasMagic = !0) : re += regExpEscape(c);
 				}
-				if (c === "*") {
-					if (inStar) continue;
-					inStar = !0, re += noEmpty && /^[*]+$/.test(glob) ? starNoEmpty : "[^/]*?", hasMagic = !0;
-					continue;
-				}
-				if (inStar = !1, c === "?") {
-					re += "[^/]", hasMagic = !0;
-					continue;
-				}
-				re += regExpEscape(c);
 			}
 			return [
 				re,
@@ -52652,9 +52350,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 				if (typeof p == "string") {
 					let ifDir = p === ".." || p === "" || p === ".";
 					this.matches.add(t.resolve(p), absolute, ifDir);
-					continue;
-				}
-				if (p === minimatch_1.GLOBSTAR) {
+				} else if (p === minimatch_1.GLOBSTAR) {
 					(!t.isSymbolicLink() || this.follow || pattern.checkFollowGlobstar()) && this.subwalks.add(t, pattern);
 					let rp = rest?.pattern(), rrest = rest?.rest();
 					if (!rest || (rp === "" || rp === ".") && !rrest) this.matches.add(t, absolute, rp === "" || rp === ".");
@@ -53281,20 +52977,8 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 	}, Archiver.prototype._maybeFinalize = function() {
 		return this._state.finalizing || this._state.finalized || this._state.aborted ? !1 : this._state.finalize && this._pending === 0 && this._queue.idle() && this._statQueue.idle() ? (this._finalize(), !0) : !1;
 	}, Archiver.prototype._moduleAppend = function(source, data, callback) {
-		if (this._state.aborted) {
-			callback();
-			return;
-		}
-		this._module.append(source, data, function(err) {
-			if (this._task = null, this._state.aborted) {
-				this._shutdown();
-				return;
-			}
-			if (err) {
-				this.emit("error", err), setImmediate(callback);
-				return;
-			}
-			this.emit("entry", data), this._entriesProcessedCount++, data.stats && data.stats.size && (this._fsEntriesProcessedBytes += data.stats.size), this.emit("progress", {
+		this._state.aborted ? callback() : this._module.append(source, data, function(err) {
+			this._task = null, this._state.aborted ? this._shutdown() : err ? (this.emit("error", err), setImmediate(callback)) : (this.emit("entry", data), this._entriesProcessedCount++, data.stats && data.stats.size && (this._fsEntriesProcessedBytes += data.stats.size), this.emit("progress", {
 				entries: {
 					total: this._entriesCount,
 					processed: this._entriesProcessedCount
@@ -53303,7 +52987,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 					totalBytes: this._fsEntriesTotalBytes,
 					processedBytes: this._fsEntriesProcessedBytes
 				}
-			}), setImmediate(callback);
+			}), setImmediate(callback));
 		}.bind(this));
 	}, Archiver.prototype._moduleFinalize = function() {
 		typeof this._module.finalize == "function" ? this._module.finalize() : typeof this._module.end == "function" ? this._module.end() : this.emit("error", new ArchiverError("NOENDMETHOD"));
@@ -53333,26 +53017,10 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 		var fullCallback = () => {
 			task.data.callback && task.data.callback(), callback();
 		};
-		if (this._state.finalizing || this._state.finalized || this._state.aborted) {
-			fullCallback();
-			return;
-		}
-		this._task = task, this._moduleAppend(task.source, task.data, fullCallback);
+		this._state.finalizing || this._state.finalized || this._state.aborted ? fullCallback() : (this._task = task, this._moduleAppend(task.source, task.data, fullCallback));
 	}, Archiver.prototype._onStatQueueTask = function(task, callback) {
-		if (this._state.finalizing || this._state.finalized || this._state.aborted) {
-			callback();
-			return;
-		}
-		fs$4.lstat(task.filepath, function(err, stats) {
-			if (this._state.aborted) {
-				setImmediate(callback);
-				return;
-			}
-			if (err) {
-				this._entriesCount--, this.emit("warning", err), setImmediate(callback);
-				return;
-			}
-			task = this._updateQueueTaskWithStats(task, stats), task && (stats.size && (this._fsEntriesTotalBytes += stats.size), this._queue.push(task)), setImmediate(callback);
+		this._state.finalizing || this._state.finalized || this._state.aborted ? callback() : fs$4.lstat(task.filepath, function(err, stats) {
+			this._state.aborted ? setImmediate(callback) : err ? (this._entriesCount--, this.emit("warning", err), setImmediate(callback)) : (task = this._updateQueueTaskWithStats(task, stats), task && (stats.size && (this._fsEntriesTotalBytes += stats.size), this._queue.push(task)), setImmediate(callback));
 		}.bind(this));
 	}, Archiver.prototype._shutdown = function() {
 		this._moduleUnpipe(), this.end();
@@ -53408,11 +53076,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 				this.emit("error", e);
 				return;
 			}
-			if (ignoreMatch) {
-				globber.resume();
-				return;
-			}
-			this._append(match.absolute, entryData);
+			ignoreMatch ? globber.resume() : this._append(match.absolute, entryData);
 		}
 		var globber = glob(dirpath, globOptions);
 		return globber.on("error", onGlobError.bind(this)), globber.on("match", onGlobMatch.bind(this)), globber.on("end", onGlobEnd.bind(this)), this;
@@ -53507,7 +53171,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 		return buf.readUInt16LE(offset);
 	}, util.getLongBytes = function(v) {
 		var buf = Buffer.alloc(4);
-		return buf.writeUInt32LE((v & 4294967295) >>> 0, 0), buf;
+		return buf.writeUInt32LE((v | 0) >>> 0, 0), buf;
 	}, util.getLongBytesValue = function(buf, offset) {
 		return buf.readUInt32LE(offset);
 	}, util.toDosTime = function(d) {
@@ -53725,31 +53389,20 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 	}, ArchiveOutputStream.prototype._finish = function(ae) {}, ArchiveOutputStream.prototype._normalizeEntry = function(ae) {}, ArchiveOutputStream.prototype._transform = function(chunk, encoding, callback) {
 		callback(null, chunk);
 	}, ArchiveOutputStream.prototype.entry = function(ae, source, callback) {
-		if (source ||= null, typeof callback != "function" && (callback = this._emitErrorCallback.bind(this)), !(ae instanceof ArchiveEntry)) {
-			callback(Error("not a valid instance of ArchiveEntry"));
-			return;
-		}
-		if (this._archive.finish || this._archive.finished) {
-			callback(Error("unacceptable entry after finish"));
-			return;
-		}
-		if (this._archive.processing) {
-			callback(Error("already processing an entry"));
-			return;
-		}
-		if (this._archive.processing = !0, this._normalizeEntry(ae), this._entry = ae, source = util.normalizeInputSource(source), Buffer.isBuffer(source)) this._appendBuffer(ae, source, callback);
-		else if (isStream(source)) this._appendStream(ae, source, callback);
+		if (source ||= null, typeof callback != "function" && (callback = this._emitErrorCallback.bind(this)), !(ae instanceof ArchiveEntry)) callback(Error("not a valid instance of ArchiveEntry"));
+		else if (this._archive.finish || this._archive.finished) callback(Error("unacceptable entry after finish"));
+		else if (this._archive.processing) callback(Error("already processing an entry"));
 		else {
-			this._archive.processing = !1, callback(Error("input source must be valid Stream or Buffer instance"));
-			return;
+			if (this._archive.processing = !0, this._normalizeEntry(ae), this._entry = ae, source = util.normalizeInputSource(source), Buffer.isBuffer(source)) this._appendBuffer(ae, source, callback);
+			else if (isStream(source)) this._appendStream(ae, source, callback);
+			else {
+				this._archive.processing = !1, callback(Error("input source must be valid Stream or Buffer instance"));
+				return;
+			}
+			return this;
 		}
-		return this;
 	}, ArchiveOutputStream.prototype.finish = function() {
-		if (this._archive.processing) {
-			this._archive.finish = !0;
-			return;
-		}
-		this._finish();
+		this._archive.processing ? this._archive.finish = !0 : this._finish();
 	}, ArchiveOutputStream.prototype.getBytesWritten = function() {
 		return this.offset;
 	}, ArchiveOutputStream.prototype.write = function(chunk, cb) {
@@ -53863,15 +53516,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 	}, ZipArchiveOutputStream.prototype._appendBuffer = function(ae, source, callback) {
 		source.length === 0 && ae.setMethod(constants.METHOD_STORED);
 		var method = ae.getMethod();
-		if (method === constants.METHOD_STORED && (ae.setSize(source.length), ae.setCompressedSize(source.length), ae.setCrc(crc32.buf(source) >>> 0)), this._writeLocalFileHeader(ae), method === constants.METHOD_STORED) {
-			this.write(source), this._afterAppend(ae), callback(null, ae);
-			return;
-		}
-		if (method === constants.METHOD_DEFLATED) {
-			this._smartStream(ae, callback).end(source);
-			return;
-		}
-		callback(Error("compression method " + method + " not implemented"));
+		method === constants.METHOD_STORED && (ae.setSize(source.length), ae.setCompressedSize(source.length), ae.setCrc(crc32.buf(source) >>> 0)), this._writeLocalFileHeader(ae), method === constants.METHOD_STORED ? (this.write(source), this._afterAppend(ae), callback(null, ae)) : method === constants.METHOD_DEFLATED ? this._smartStream(ae, callback).end(source) : callback(Error("compression method " + method + " not implemented"));
 	}, ZipArchiveOutputStream.prototype._appendStream = function(ae, source, callback) {
 		ae.getGeneralPurposeBit().useDataDescriptor(!0), ae.setVersionNeededToExtract(constants.MIN_VERSION_DATA_DESCRIPTOR), this._writeLocalFileHeader(ae);
 		var smart = this._smartStream(ae, callback);
@@ -53960,20 +53605,13 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 		var isDir = data.type === "directory", isSymlink = data.type === "symlink";
 		return data.name && (data.name = util.sanitizePath(data.name), !isSymlink && data.name.slice(-1) === "/" ? (isDir = !0, data.type = "directory") : isDir && (data.name += "/")), (isDir || isSymlink) && (data.store = !0), data.date = util.dateify(data.date), data;
 	}, ZipStream.prototype.entry = function(source, data, callback) {
-		if (typeof callback != "function" && (callback = this._emitErrorCallback.bind(this)), data = this._normalizeFileData(data), data.type !== "file" && data.type !== "directory" && data.type !== "symlink") {
-			callback(Error(data.type + " entries not currently supported"));
-			return;
+		if (typeof callback != "function" && (callback = this._emitErrorCallback.bind(this)), data = this._normalizeFileData(data), data.type !== "file" && data.type !== "directory" && data.type !== "symlink") callback(Error(data.type + " entries not currently supported"));
+		else if (typeof data.name != "string" || data.name.length === 0) callback(Error("entry name must be a non-empty string value"));
+		else if (data.type === "symlink" && typeof data.linkname != "string") callback(Error("entry linkname must be a non-empty string value when type equals symlink"));
+		else {
+			var entry = new ZipArchiveEntry(data.name);
+			return entry.setTime(data.date, this.options.forceLocalTime), data.namePrependSlash && entry.setName(data.name, !0), data.store && entry.setMethod(0), data.comment.length > 0 && entry.setComment(data.comment), data.type === "symlink" && typeof data.mode != "number" && (data.mode = 40960), typeof data.mode == "number" && (data.type === "symlink" && (data.mode |= 40960), entry.setUnixMode(data.mode)), data.type === "symlink" && typeof data.linkname == "string" && (source = Buffer.from(data.linkname)), ZipArchiveOutputStream.prototype.entry.call(this, entry, source, callback);
 		}
-		if (typeof data.name != "string" || data.name.length === 0) {
-			callback(Error("entry name must be a non-empty string value"));
-			return;
-		}
-		if (data.type === "symlink" && typeof data.linkname != "string") {
-			callback(Error("entry linkname must be a non-empty string value when type equals symlink"));
-			return;
-		}
-		var entry = new ZipArchiveEntry(data.name);
-		return entry.setTime(data.date, this.options.forceLocalTime), data.namePrependSlash && entry.setName(data.name, !0), data.store && entry.setMethod(0), data.comment.length > 0 && entry.setComment(data.comment), data.type === "symlink" && typeof data.mode != "number" && (data.mode = 40960), typeof data.mode == "number" && (data.type === "symlink" && (data.mode |= 40960), entry.setUnixMode(data.mode)), data.type === "symlink" && typeof data.linkname == "string" && (source = Buffer.from(data.linkname)), ZipArchiveOutputStream.prototype.entry.call(this, entry, source, callback);
 	}, ZipStream.prototype.finalize = function() {
 		this.finish();
 	};
@@ -54260,15 +53898,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 			end > start && (result += b4a.toString(data, "utf8", start, end));
 			for (let i = end; i < data.byteLength; i++) {
 				let byte = data[i];
-				if (this.bytesNeeded === 0) {
-					byte <= 127 ? (this.bytesSeen = 0, result += String.fromCharCode(byte)) : byte >= 194 && byte <= 223 ? (this.bytesNeeded = 2, this.bytesSeen = 1, this.codePoint = byte & 31) : byte >= 224 && byte <= 239 ? (byte === 224 ? this.lowerBoundary = 160 : byte === 237 && (this.upperBoundary = 159), this.bytesNeeded = 3, this.bytesSeen = 1, this.codePoint = byte & 15) : byte >= 240 && byte <= 244 ? (byte === 240 ? this.lowerBoundary = 144 : byte === 244 && (this.upperBoundary = 143), this.bytesNeeded = 4, this.bytesSeen = 1, this.codePoint = byte & 7) : (this.bytesSeen = 1, result += "�");
-					continue;
-				}
-				if (byte < this.lowerBoundary || byte > this.upperBoundary) {
-					result += "�", i--, this._reset();
-					continue;
-				}
-				this.lowerBoundary = 128, this.upperBoundary = 191, this.codePoint = this.codePoint << 6 | byte & 63, this.bytesSeen++, this.bytesSeen === this.bytesNeeded && (result += String.fromCodePoint(this.codePoint), this._reset());
+				this.bytesNeeded === 0 ? byte <= 127 ? (this.bytesSeen = 0, result += String.fromCharCode(byte)) : byte >= 194 && byte <= 223 ? (this.bytesNeeded = 2, this.bytesSeen = 1, this.codePoint = byte & 31) : byte >= 224 && byte <= 239 ? (byte === 224 ? this.lowerBoundary = 160 : byte === 237 && (this.upperBoundary = 159), this.bytesNeeded = 3, this.bytesSeen = 1, this.codePoint = byte & 15) : byte >= 240 && byte <= 244 ? (byte === 240 ? this.lowerBoundary = 144 : byte === 244 && (this.upperBoundary = 143), this.bytesNeeded = 4, this.bytesSeen = 1, this.codePoint = byte & 7) : (this.bytesSeen = 1, result += "�") : byte < this.lowerBoundary || byte > this.upperBoundary ? (result += "�", i--, this._reset()) : (this.lowerBoundary = 128, this.upperBoundary = 191, this.codePoint = this.codePoint << 6 | byte & 63, this.bytesSeen++, this.bytesSeen === this.bytesNeeded && (result += String.fromCodePoint(this.codePoint), this._reset()));
 			}
 			return result;
 		}
@@ -54434,15 +54064,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 		}
 		updateNonPrimary() {
 			let stream = this.stream;
-			if ((stream._duplexState & 144965647) == WRITE_FINISHING) {
-				stream._duplexState |= 262144, stream._final(afterFinal.bind(this));
-				return;
-			}
-			if ((stream._duplexState & 14) == 4) {
-				stream._duplexState & ACTIVE_OR_TICKING || (stream._duplexState |= ACTIVE, stream._destroy(afterDestroy.bind(this)));
-				return;
-			}
-			(stream._duplexState & IS_OPENING) == 1 && (stream._duplexState = (stream._duplexState | ACTIVE) & NOT_OPENING, stream._open(afterOpen.bind(this)));
+			(stream._duplexState & 144965647) == WRITE_FINISHING ? (stream._duplexState |= 262144, stream._final(afterFinal.bind(this))) : (stream._duplexState & 14) == 4 ? stream._duplexState & ACTIVE_OR_TICKING || (stream._duplexState |= ACTIVE, stream._destroy(afterDestroy.bind(this))) : (stream._duplexState & IS_OPENING) == 1 && (stream._duplexState = (stream._duplexState | ACTIVE) & NOT_OPENING, stream._open(afterOpen.bind(this)));
 		}
 		continueUpdate() {
 			return this.stream._duplexState & WRITE_NEXT_TICK ? (this.stream._duplexState &= WRITE_NOT_NEXT_TICK, !0) : !1;
@@ -54515,11 +54137,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 		}
 		updateNonPrimary() {
 			let stream = this.stream;
-			if ((stream._duplexState & 1167) == READ_ENDING && (stream._duplexState = (stream._duplexState | READ_DONE) & 536869887, stream.emit("end"), (stream._duplexState & AUTO_DESTROY) == DONE && (stream._duplexState |= 4), this.pipeTo !== null && this.pipeTo.end()), (stream._duplexState & 14) == 4) {
-				stream._duplexState & ACTIVE_OR_TICKING || (stream._duplexState |= ACTIVE, stream._destroy(afterDestroy.bind(this)));
-				return;
-			}
-			(stream._duplexState & IS_OPENING) == 1 && (stream._duplexState = (stream._duplexState | ACTIVE) & NOT_OPENING, stream._open(afterOpen.bind(this)));
+			(stream._duplexState & 1167) == READ_ENDING && (stream._duplexState = (stream._duplexState | READ_DONE) & 536869887, stream.emit("end"), (stream._duplexState & AUTO_DESTROY) == DONE && (stream._duplexState |= 4), this.pipeTo !== null && this.pipeTo.end()), (stream._duplexState & 14) == 4 ? stream._duplexState & ACTIVE_OR_TICKING || (stream._duplexState |= ACTIVE, stream._destroy(afterDestroy.bind(this))) : (stream._duplexState & IS_OPENING) == 1 && (stream._duplexState = (stream._duplexState | ACTIVE) & NOT_OPENING, stream._open(afterOpen.bind(this)));
 		}
 		continueUpdate() {
 			return this.stream._duplexState & READ_NEXT_TICK ? (this.stream._duplexState &= READ_NOT_NEXT_TICK, !0) : !1;
@@ -54545,15 +54163,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 			this.pipeToFinished = !0;
 		}
 		done(stream, err) {
-			if (err && (this.error = err), stream === this.to && (this.to = null, this.from !== null)) {
-				(!(this.from._duplexState & READ_DONE) || !this.pipeToFinished) && this.from.destroy(this.error || StreamError.PREMATURE_CLOSE("Writable stream closed"));
-				return;
-			}
-			if (stream === this.from && (this.from = null, this.to !== null)) {
-				stream._duplexState & READ_DONE || this.to.destroy(this.error || StreamError.PREMATURE_CLOSE("Readable stream closed"));
-				return;
-			}
-			this.afterPipe !== null && this.afterPipe(this.error), this.to = this.from = this.afterPipe = null;
+			err && (this.error = err), stream === this.to && (this.to = null, this.from !== null) ? (!(this.from._duplexState & READ_DONE) || !this.pipeToFinished) && this.from.destroy(this.error || StreamError.PREMATURE_CLOSE("Writable stream closed")) : stream === this.from && (this.from = null, this.to !== null) ? stream._duplexState & READ_DONE || this.to.destroy(this.error || StreamError.PREMATURE_CLOSE("Readable stream closed")) : (this.afterPipe !== null && this.afterPipe(this.error), this.to = this.from = this.afterPipe = null);
 		}
 	};
 	function afterDrain() {
@@ -55148,11 +54758,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 			super(opts), opts ||= {}, this._buffer = new BufferList(), this._offset = 0, this._header = null, this._stream = null, this._missing = 0, this._longHeader = !1, this._callback = noop, this._locked = !1, this._finished = !1, this._pax = null, this._paxGlobal = null, this._gnuLongPath = null, this._gnuLongLinkPath = null, this._filenameEncoding = opts.filenameEncoding || "utf-8", this._allowUnknownFormat = !!opts.allowUnknownFormat, this._unlockBound = this._unlock.bind(this);
 		}
 		_unlock(err) {
-			if (this._locked = !1, err) {
-				this.destroy(err), this._continueWrite(err);
-				return;
-			}
-			this._update();
+			this._locked = !1, err ? (this.destroy(err), this._continueWrite(err)) : this._update();
 		}
 		_consumeHeader() {
 			if (this._locked) return !1;
@@ -55209,21 +54815,19 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 			return new Source(this, this._header, this._offset);
 		}
 		_update() {
-			for (; this._buffer.buffered > 0 && !this.destroying;) {
-				if (this._missing > 0) {
-					if (this._stream !== null) {
-						if (this._consumeStream() === !1) return;
-						continue;
-					}
-					if (this._longHeader === !0) {
-						if (this._missing > this._buffer.buffered) break;
-						if (this._consumeLongHeader() === !1) return !1;
-						continue;
-					}
-					let ignore = this._buffer.shiftFirst(this._missing);
-					ignore !== null && (this._missing -= ignore.byteLength);
+			for (; this._buffer.buffered > 0 && !this.destroying;) if (this._missing > 0) {
+				if (this._stream !== null) {
+					if (this._consumeStream() === !1) return;
 					continue;
 				}
+				if (this._longHeader === !0) {
+					if (this._missing > this._buffer.buffered) break;
+					if (this._consumeLongHeader() === !1) return !1;
+					continue;
+				}
+				let ignore = this._buffer.shiftFirst(this._missing);
+				ignore !== null && (this._missing -= ignore.byteLength);
+			} else {
 				if (this._buffer.buffered < 512) break;
 				if (this._stream !== null || this._consumeHeader() === !1) return;
 			}
@@ -55270,17 +54874,13 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 			}
 			function onnext(resolve, reject) {
 				if (error) return reject(error);
-				if (entryStream) {
-					resolve({
-						value: entryStream,
-						done: !1
-					}), entryStream = null;
-					return;
-				}
-				promiseResolve = resolve, promiseReject = reject, consumeCallback(null), extract._finished && promiseResolve && (promiseResolve({
+				entryStream ? (resolve({
+					value: entryStream,
+					done: !1
+				}), entryStream = null) : (promiseResolve = resolve, promiseReject = reject, consumeCallback(null), extract._finished && promiseResolve && (promiseResolve({
 					value: void 0,
 					done: !0
-				}), promiseResolve = promiseReject = null);
+				}), promiseResolve = promiseReject = null));
 			}
 			function onentry(header, stream, callback) {
 				entryCallback = callback, stream.on("error", noop), promiseResolve ? (promiseResolve({
@@ -55390,11 +54990,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 			return b4a.isBuffer(buffer) ? (header.size = buffer.byteLength, sink.write(buffer), sink.end(), sink) : (sink._isVoid, sink);
 		}
 		finalize() {
-			if (this._stream || this._pending.length > 0) {
-				this._finalizing = !0;
-				return;
-			}
-			this._finalized || (this._finalized = !0, this.push(END_OF_TAR), this.push(null));
+			this._stream || this._pending.length > 0 ? this._finalizing = !0 : this._finalized || (this._finalized = !0, this.push(END_OF_TAR), this.push(null));
 		}
 		_done(stream) {
 			stream === this._stream && (this._stream = null, this._finalizing && this.finalize(), this._pending.length && this._pending.shift()._continueOpen());
@@ -55482,11 +55078,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 		var self = this;
 		data.mtime = data.date;
 		function append(err, sourceBuffer) {
-			if (err) {
-				callback(err);
-				return;
-			}
-			self.engine.entry(data, sourceBuffer, function(err) {
+			err ? callback(err) : self.engine.entry(data, sourceBuffer, function(err) {
 				callback(err, data);
 			});
 		}
@@ -55810,11 +55402,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 		var self = this;
 		data.crc32 = 0;
 		function onend(err, sourceBuffer) {
-			if (err) {
-				callback(err);
-				return;
-			}
-			data.size = sourceBuffer.length || 0, data.crc32 = crc32.unsigned(sourceBuffer), self.files.push(data), callback(null, data);
+			err ? callback(err) : (data.size = sourceBuffer.length || 0, data.crc32 = crc32.unsigned(sourceBuffer), self.files.push(data), callback(null, data));
 		}
 		data.sourceType === "buffer" ? onend(null, source) : data.sourceType === "stream" && util.collectStream(source, onend);
 	}, Json.prototype.finalize = function() {
@@ -56861,11 +56449,7 @@ function parseParameters(header, type, index, len, stopFlags) {
 							if (stop !== 0) break parameter;
 							continue parameter;
 						}
-						if (code === BSLASH && index + 1 < len) {
-							escaped = !0, index += 2;
-							continue;
-						}
-						index++;
+						code === BSLASH && index + 1 < len ? (escaped = !0, index += 2) : index++;
 					}
 					continue parameter;
 				}
@@ -57265,11 +56849,7 @@ var noop, consoleWarn, consoleError, userAgentTrail, Octokit, init_dist_src$2 = 
 			return class extends this {
 				constructor(...args) {
 					let options = args[0] || {};
-					if (typeof defaults == "function") {
-						super(defaults(options));
-						return;
-					}
-					super(Object.assign({}, defaults, options, options.userAgent && defaults.userAgent ? { userAgent: `${options.userAgent} ${defaults.userAgent}` } : null));
+					super(typeof defaults == "function" ? defaults(options) : Object.assign({}, defaults, options, options.userAgent && defaults.userAgent ? { userAgent: `${options.userAgent} ${defaults.userAgent}` } : null));
 				}
 			};
 		}
@@ -59162,11 +58742,8 @@ var init_github = __esmMin((() => {
 		}
 		var offset = null;
 		function dispatch() {
-			if (!pending) {
-				caughtEnd && (done = !0);
-				return;
-			}
-			if (typeof pending == "function") pending();
+			if (!pending) caughtEnd && (done = !0);
+			else if (typeof pending == "function") pending();
 			else {
 				var bytes = offset + pending.bytes;
 				if (buffers.length >= bytes) {
@@ -59332,22 +58909,17 @@ var init_github = __esmMin((() => {
 					var packet = this.data.slice(0, matchIndex);
 					this.push(packet), this.bytesSoFar += matchIndex, this.data = this.data.slice(matchIndex);
 				}
-				return;
-			}
-			if (matchIndex === -1) {
+			} else if (matchIndex === -1) {
 				var packetLen = this.data.length - this.requiredLength + 1, packet = this.data.slice(0, packetLen);
 				this.push(packet), this.bytesSoFar += packetLen, this.data = this.data.slice(packetLen);
-				return;
+			} else {
+				if (matchIndex > 0) {
+					var packet = this.data.slice(0, matchIndex);
+					this.data = this.data.slice(matchIndex), this.push(packet), this.bytesSoFar += matchIndex;
+				}
+				if (!this.matchFn || this.matchFn(this.data, this.bytesSoFar)) this.data = new Buffer("");
+				else return !0;
 			}
-			if (matchIndex > 0) {
-				var packet = this.data.slice(0, matchIndex);
-				this.data = this.data.slice(matchIndex), this.push(packet), this.bytesSoFar += matchIndex;
-			}
-			if (!this.matchFn || this.matchFn(this.data, this.bytesSoFar)) {
-				this.data = new Buffer("");
-				return;
-			}
-			return !0;
 		}
 	}, MatcherStream.prototype._transform = function(chunk, encoding, cb) {
 		this.data = Buffer.concat([this.data, chunk]);
@@ -59548,15 +59120,15 @@ var init_github = __esmMin((() => {
 			entry.skip = !0, setImmediate(() => {
 				self.emit("error", Error(message));
 			}), this.outStreamInfo.stream.pipe(new Entry().autodrain());
-			return;
+		} else {
+			if (vars.compressionMethod > 0) {
+				var inflater = zlib.createInflateRaw();
+				inflater.on("error", function(err) {
+					self.state = states.ERROR, self.emit("error", err);
+				}), this.outStreamInfo.stream.pipe(inflater).pipe(entry);
+			} else this.outStreamInfo.stream.pipe(entry);
+			this._drainAllEntries && entry.autodrain();
 		}
-		if (vars.compressionMethod > 0) {
-			var inflater = zlib.createInflateRaw();
-			inflater.on("error", function(err) {
-				self.state = states.ERROR, self.emit("error", err);
-			}), this.outStreamInfo.stream.pipe(inflater).pipe(entry);
-		} else this.outStreamInfo.stream.pipe(entry);
-		this._drainAllEntries && entry.autodrain();
 	}, UnzipStream.prototype._readFile = function(data) {
 		return binary.parse(data).word16lu("versionsNeededToExtract").word16lu("flags").word16lu("compressionMethod").word16lu("lastModifiedTime").word16lu("lastModifiedDate").word32lu("crc32").word32lu("compressedSize").word32lu("uncompressedSize").word16lu("fileNameLength").word16lu("extraFieldLength").vars;
 	}, UnzipStream.prototype._readExtraFields = function(data) {
@@ -59679,35 +59251,28 @@ var init_github = __esmMin((() => {
 					cb();
 				});
 			}
-			return;
-		}
-		cb();
+		} else cb();
 	}, UnzipStream.prototype.drainAll = function() {
 		this._drainAllEntries = !0;
 	}, UnzipStream.prototype._transform = function(chunk, encoding, cb) {
 		var self = this;
 		self.data = self.data.length > 0 ? Buffer.concat([self.data, chunk]) : chunk;
 		var startDataLength = self.data.length, done = function() {
-			if (self.data.length > 0 && self.data.length < startDataLength) {
-				startDataLength = self.data.length, self._parseOrOutput(encoding, done);
-				return;
-			}
-			cb();
+			self.data.length > 0 && self.data.length < startDataLength ? (startDataLength = self.data.length, self._parseOrOutput(encoding, done)) : cb();
 		};
 		self._parseOrOutput(encoding, done);
 	}, UnzipStream.prototype._flush = function(cb) {
 		var self = this;
-		if (self.data.length > 0) {
-			self._parseOrOutput("buffer", function() {
-				if (self.data.length > 0) return setImmediate(function() {
-					self._flush(cb);
-				});
-				cb();
+		if (self.data.length > 0) self._parseOrOutput("buffer", function() {
+			if (self.data.length > 0) return setImmediate(function() {
+				self._flush(cb);
 			});
-			return;
+			cb();
+		});
+		else {
+			if (self.state === states.FILE_DATA) return cb(Error("Stream finished in an invalid state, uncompression failed"));
+			setImmediate(cb);
 		}
-		if (self.state === states.FILE_DATA) return cb(Error("Stream finished in an invalid state, uncompression failed"));
-		setImmediate(cb);
 	}, module.exports = UnzipStream;
 })), require_parser_stream = __commonJSMin(((exports, module) => {
 	var Transform$1 = require("stream").Transform, util$1 = require("util"), UnzipStream = require_unzip_stream();
@@ -59822,11 +59387,7 @@ var init_github = __esmMin((() => {
 		if (this.createdDirectories[directory] || directory === ".") return writeFileFn();
 		mkdirp(directory, function(err) {
 			if (err) return self.emit("error", err);
-			if (self.createdDirectories[directory] = !0, entry.isDirectory) {
-				self.unfinishedEntries--, self._notifyAwaiter();
-				return;
-			}
-			writeFileFn();
+			self.createdDirectories[directory] = !0, entry.isDirectory ? (self.unfinishedEntries--, self._notifyAwaiter()) : writeFileFn();
 		});
 	}, Extract.prototype._notifyAwaiter = function() {
 		this.afterFlushWait && this.unfinishedEntries === 0 && (this.emit("await-finished"), this.afterFlushWait = !1);

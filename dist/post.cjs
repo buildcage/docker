@@ -247,14 +247,10 @@ function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderNa
 const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href));
 function main() {
 	let plan = planPostCleanup((0, node_path.join)(__dirname$1, "../docker/compose.action.yaml"), void 0, process.env, { savedBuilderName: getState("builder_name") });
-	if (!plan) {
-		info("No builder to remove: the setup step stopped before it named one.");
-		return;
-	}
-	(0, node_child_process.execFileSync)("docker", plan.args, {
+	plan ? (0, node_child_process.execFileSync)("docker", plan.args, {
 		stdio: "inherit",
 		env: plan.env
-	});
+	}) : info("No builder to remove: the setup step stopped before it named one.");
 }
 process.argv[1] && (0, node_fs.realpathSync)(process.argv[1]) === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main();
 //#endregion
