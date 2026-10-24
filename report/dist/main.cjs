@@ -15386,7 +15386,7 @@ function runReportScript(scriptPath, containerId, { trafficFile, env = process.e
 	return 0;
 }
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/config.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/config.js
 function getUploadChunkSize() {
 	return 8388608;
 }
@@ -19272,7 +19272,7 @@ var init_config = __esmMin((() => {
 	init_timestamp(), init_wrappers(), init_artifact$1(), init_artifact_twirp_client$1();
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/retention.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/retention.js
 function getExpiration(retentionDays) {
 	if (!retentionDays) return;
 	let maxRetentionDays = getRetentionDays();
@@ -19290,7 +19290,7 @@ var init_retention = __esmMin((() => {
 	init_generated(), init_core();
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/path-and-artifact-name-validation.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/path-and-artifact-name-validation.js
 function validateArtifactName(name) {
 	if (!name) throw Error("Provided artifact name input during validation is empty");
 	for (let [invalidCharacterKey, errorMessageForCharacter] of invalidArtifactNameCharacters) if (name.includes(invalidCharacterKey)) throw Error(`The artifact name is not valid: ${name}. Contains the following character: ${errorMessageForCharacter}
@@ -19328,7 +19328,7 @@ var invalidArtifactFilePathCharacters, invalidArtifactNameCharacters, init_path_
 })), require_package = __commonJSMin(((exports, module) => {
 	module.exports = {
 		name: "@actions/artifact",
-		version: "6.2.1",
+		version: "6.3.1",
 		preview: !0,
 		description: "Actions artifact lib",
 		keywords: [
@@ -19366,26 +19366,27 @@ var invalidArtifactFilePathCharacters, invalidArtifactNameCharacters, init_path_
 		},
 		bugs: { url: "https://github.com/actions/toolkit/issues" },
 		dependencies: {
-			"@actions/core": "^3.0.0",
-			"@actions/github": "^9.0.0",
-			"@actions/http-client": "^4.0.0",
-			"@azure/storage-blob": "^12.30.0",
+			"@actions/core": "^3.0.1",
+			"@actions/github": "^9.1.1",
+			"@actions/http-client": "^4.0.1",
+			"@azure/storage-blob": "^12.31.0",
 			"@octokit/core": "^7.0.6",
 			"@octokit/plugin-request-log": "^6.0.0",
-			"@octokit/plugin-retry": "^8.0.0",
-			"@octokit/request": "^10.0.7",
+			"@octokit/plugin-retry": "^8.1.0",
+			"@octokit/request": "^10.0.8",
 			"@octokit/request-error": "^7.1.0",
-			"@protobuf-ts/plugin": "^2.2.3-alpha.1",
-			"@protobuf-ts/runtime": "^2.9.4",
+			"@protobuf-ts/runtime": "^2.11.1",
+			"@protobuf-ts/runtime-rpc": "^2.11.1",
 			archiver: "^7.0.1",
 			"jwt-decode": "^4.0.0",
 			"unzip-stream": "^0.3.1"
 		},
 		devDependencies: {
+			"@protobuf-ts/plugin": "^2.11.1",
 			"@types/archiver": "^7.0.0",
 			"@types/unzip-stream": "^0.3.4",
-			typedoc: "^0.28.16",
-			"typedoc-plugin-markdown": "^4.9.0",
+			typedoc: "^0.28.19",
+			"typedoc-plugin-markdown": "^4.11.0",
 			typescript: "^5.9.3"
 		},
 		overrides: {
@@ -19397,7 +19398,7 @@ var invalidArtifactFilePathCharacters, invalidArtifactNameCharacters, init_path_
 	module.exports = { version: require_package().version };
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/user-agent.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/user-agent.js
 function getUserAgentString$1() {
 	return `@actions/artifact-${import_package_version.version}`;
 }
@@ -19485,7 +19486,7 @@ var InvalidTokenError, init_esm$13 = __esmMin((() => {
 	InvalidTokenError = class extends Error {}, InvalidTokenError.prototype.name = "InvalidTokenError";
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/util.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/util.js
 function getBackendIdsFromToken() {
 	let decoded = jwtDecode(getRuntimeToken());
 	if (!decoded.scp) throw InvalidJwtError;
@@ -19518,7 +19519,7 @@ var InvalidJwtError, init_util$3 = __esmMin((() => {
 	init_core(), init_config(), init_esm$13(), InvalidJwtError = Error("Failed to get backend IDs: The provided JWT token is invalid and/or missing claims");
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/artifact-twirp-client.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/artifact-twirp-client.js
 function internalArtifactTwirpClient(options) {
 	let client = new ArtifactHttpClient(getUserAgentString$1(), options?.maxAttempts, options?.retryIntervalMs, options?.retryMultiplier);
 	return new ArtifactServiceClientJSON(client);
@@ -19552,7 +19553,7 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 		});
 	}, ArtifactHttpClient = class {
 		constructor(userAgent, maxAttempts, baseRetryIntervalMilliseconds, retryMultiplier) {
-			this.maxAttempts = 5, this.baseRetryIntervalMilliseconds = 3e3, this.retryMultiplier = 1.5;
+			this.maxAttempts = 5, this.baseRetryIntervalMilliseconds = 8e3, this.retryMultiplier = 1.5, this.retryTimeoutMilliseconds = 12e4;
 			let token = getRuntimeToken();
 			this.baseUrl = getResultsServiceUrl(), maxAttempts && (this.maxAttempts = maxAttempts), baseRetryIntervalMilliseconds && (this.baseRetryIntervalMilliseconds = baseRetryIntervalMilliseconds), retryMultiplier && (this.retryMultiplier = retryMultiplier), this.httpClient = new HttpClient(userAgent, [new BearerCredentialHandler(token)]);
 		}
@@ -19573,12 +19574,12 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 		}
 		retryableRequest(operation) {
 			return __awaiter$10(this, void 0, void 0, function* () {
-				let attempt = 0, errorMessage = "", rawBody = "";
+				let attempt = 0, errorMessage = "", rawBody = "", totalRetryWaitMilliseconds = 0;
 				for (; attempt < this.maxAttempts;) {
-					let isRetryable = !1;
+					let isRetryable = !1, retryAfterSeconds;
 					try {
 						let response = yield operation(), statusCode = response.message.statusCode;
-						rawBody = yield response.readBody(), debug(`[Response] - ${response.message.statusCode}`), debug(`Headers: ${JSON.stringify(response.message.headers, null, 2)}`);
+						statusCode === HttpCodes.TooManyRequests && (retryAfterSeconds = this.getRetryAfterSeconds(response)), rawBody = yield response.readBody(), debug(`[Response] - ${response.message.statusCode}`), debug(`Headers: ${JSON.stringify(response.message.headers, null, 2)}`);
 						let body = JSON.parse(rawBody);
 						if (maskSecretUrls(body), debug(`Body: ${JSON.stringify(body, null, 2)}`), this.isSuccessStatusCode(statusCode)) return {
 							response,
@@ -19595,8 +19596,9 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 					}
 					if (!isRetryable) throw Error(`Received non-retryable error: ${errorMessage}`);
 					if (attempt + 1 === this.maxAttempts) throw Error(`Failed to make request after ${this.maxAttempts} attempts: ${errorMessage}`);
-					let retryTimeMilliseconds = this.getExponentialRetryTimeMilliseconds(attempt);
-					info(`Attempt ${attempt + 1} of ${this.maxAttempts} failed with error: ${errorMessage}. Retrying request in ${retryTimeMilliseconds} ms...`), yield this.sleep(retryTimeMilliseconds), attempt++;
+					let retryTimeMilliseconds = retryAfterSeconds === void 0 ? this.getExponentialRetryTimeMilliseconds(attempt) : retryAfterSeconds * 1e3;
+					if (totalRetryWaitMilliseconds + retryTimeMilliseconds > this.retryTimeoutMilliseconds) throw Error(`Retry wait of ${retryTimeMilliseconds} ms would exceed the maximum total retry wait of ${this.retryTimeoutMilliseconds} ms: ${errorMessage}`);
+					info(`Attempt ${attempt + 1} of ${this.maxAttempts} failed with error: ${errorMessage}. Retrying request in ${retryTimeMilliseconds} ms...`), yield this.sleep(retryTimeMilliseconds), totalRetryWaitMilliseconds += retryTimeMilliseconds, attempt++;
 				}
 				throw Error("Request failed");
 			});
@@ -19613,6 +19615,12 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 				HttpCodes.TooManyRequests
 			].includes(statusCode) : !1;
 		}
+		getRetryAfterSeconds(response) {
+			let header = response.message.headers["retry-after"], value = (Array.isArray(header) ? header[0] : header)?.trim();
+			if (value === void 0 || !/^\d+$/.test(value)) return;
+			let parsed = parseInt(value, 10);
+			return !isNaN(parsed) && parsed > 0 ? parsed : void 0;
+		}
 		sleep(milliseconds) {
 			return __awaiter$10(this, void 0, void 0, function* () {
 				return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -19627,7 +19635,7 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
 function validateRootDirectory(rootDirectory) {
 	if (!fs.existsSync(rootDirectory)) throw Error(`The provided rootDirectory ${rootDirectory} does not exist`);
 	if (!fs.statSync(rootDirectory).isDirectory()) throw Error(`The provided rootDirectory ${rootDirectory} is not a valid directory`);
@@ -42359,7 +42367,7 @@ var fsStat, fsCreateReadStream, init_utils$2 = __esmMin((() => {
 	init_esm$7(), init_BlobServiceClient(), init_Clients(), init_ContainerClient(), init_BlobLeaseClient(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_SASQueryParameters(), init_constants(), init_utils_common$1(), init_BlobBatch(), init_BlobBatchClient(), init_BlobSASPermissions(), init_BlobSASSignatureValues(), init_ContainerSASPermissions(), init_models(), init_esm$2(), init_Pipeline(), init_SASQueryParameters(), init_generatedModels(), init_log$1();
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
 function uploadToBlobStorage(authenticatedUploadURL, uploadStream, contentType) {
 	return __awaiter$9(this, void 0, void 0, function* () {
 		let uploadByteCount = 0, lastProgressTime = Date.now(), abortController = new AbortController(), chunkTimer = (interval) => __awaiter$9(this, void 0, void 0, function* () {
@@ -55428,7 +55436,7 @@ while (this[FLUSHCHUNK](this[BUFFERSHIFT]()) && this[BUFFER].length);
 	}, vending.registerFormat("zip", require_zip()), vending.registerFormat("tar", require_tar()), vending.registerFormat("json", require_json()), module.exports = vending;
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/stream.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/stream.js
 function createRawFileUploadStream(filePath) {
 	return __awaiter$8(this, void 0, void 0, function* () {
 		debug(`Creating raw file upload stream for: ${filePath}`);
@@ -55477,7 +55485,7 @@ var __awaiter$8, WaterMarkedUploadStream, init_stream = __esmMin((() => {
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/zip.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/zip.js
 function createZipUploadStream(uploadSpecification_1) {
 	return __awaiter$7(this, arguments, void 0, function* (uploadSpecification, compressionLevel = 6) {
 		debug(`Creating Artifact archive with compressionLevel: ${compressionLevel}`);
@@ -55532,7 +55540,7 @@ var import_archiver, __awaiter$7, zipErrorCallback, zipWarningCallback, zipFinis
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/types.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/types.js
 function getMimeType(filePath) {
 	let ext = path.extname(filePath).toLowerCase();
 	return mimeTypes[ext] || "application/octet-stream";
@@ -55590,7 +55598,7 @@ var mimeTypes, init_types = __esmMin((() => {
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-artifact.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-artifact.js
 function uploadArtifact(name, files, rootDirectory, options) {
 	return __awaiter$6(this, void 0, void 0, function* () {
 		let artifactFileName = `${name}.zip`;
@@ -59396,7 +59404,7 @@ var init_github = __esmMin((() => {
 	exports.Parse = require_parser_stream(), exports.Extract = require_extract();
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/download/download-artifact.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/download/download-artifact.js
 function exists(path$6) {
 	return __awaiter$4(this, void 0, void 0, function* () {
 		try {
@@ -59540,7 +59548,7 @@ var import_unzip, __awaiter$4, scrubQueryParameters, init_download_artifact = __
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/retry-options.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/retry-options.js
 function getRetryOptions(defaultOptions, retries = defaultMaxRetryNumber, exemptStatusCodes = defaultExemptStatusCodes) {
 	if (retries <= 0) return [{ enabled: !1 }, defaultOptions.request];
 	let retryOptions = { enabled: !0 };
@@ -60331,7 +60339,7 @@ var import_light, VERSION, init_dist_bundle = __esmMin((() => {
 	import_light = __toESM(require_light(), 1), init_dist_src$3(), VERSION = "0.0.0-development", retry.VERSION = VERSION;
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/get-artifact.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/get-artifact.js
 function getArtifactPublic(artifactName, workflowRunId, repositoryOwner, repositoryName, token) {
 	return __awaiter$3(this, void 0, void 0, function* () {
 		let [retryOpts, requestOpts] = getRetryOptions(defaults), getArtifactResp = yield getOctokit(token, {
@@ -60410,7 +60418,7 @@ var __awaiter$3, init_get_artifact = __esmMin((() => {
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/delete/delete-artifact.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/delete/delete-artifact.js
 function deleteArtifactPublic(artifactName, workflowRunId, repositoryOwner, repositoryName, token) {
 	return __awaiter$2(this, void 0, void 0, function* () {
 		let [retryOpts, requestOpts] = getRetryOptions(defaults), github = getOctokit(token, {
@@ -60476,7 +60484,7 @@ var __awaiter$2, init_delete_artifact = __esmMin((() => {
 	};
 }));
 //#endregion
-//#region node_modules/.pnpm/@actions+artifact@6.2.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/list-artifacts.js
+//#region node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/list-artifacts.js
 function listArtifactsPublic(workflowRunId_1, repositoryOwner_1, repositoryName_1, token_1) {
 	return __awaiter$1(this, arguments, void 0, function* (workflowRunId, repositoryOwner, repositoryName, token, latest = !1) {
 		info(`Fetching artifact list for workflow run ${workflowRunId} in repository ${repositoryOwner}/${repositoryName}`);
