@@ -425,7 +425,7 @@ If you encounter issues, try reproducing the problem locally to get detailed log
    there needs `universal`. See [Limitations](../README.md#limitations).
 
 4. **The setup step fails with "never became ready"**: the builder came up but `buildctl debug
-workers` never succeeded inside it. The step prints the container log; locally:
+   workers` never succeeded inside it. The step prints the container log; locally:
 
    ```bash
    docker inspect --format '{{json .State.Health}}' buildcage
