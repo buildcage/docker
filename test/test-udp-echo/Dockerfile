@@ -1,4 +1,4 @@
-# A UDP echo server, so "the build could not reach it" can be told apart from
+# A UDP echo server, so "the cage could not reach it" can be told apart from
 # "there was nothing there to reach". The same probe is run from inside the
 # cage, where it must fail, and from a container beside this one, where it must
 # succeed.

@@ -26,7 +26,7 @@ services:
 
   # Test HTTP server (with a self-signed certificate)
   test-server:
-    build: ../test/test-server
+    build: ../test/test-server-universal
     cap_add:
       - NET_ADMIN
     environment:
@@ -36,7 +36,7 @@ services:
 
   # The same server on an address no rule allows
   test-server-unlisted:
-    build: ../test/test-server
+    build: ../test/test-server-universal
     cap_add:
       - NET_ADMIN
     environment:
@@ -46,7 +46,7 @@ services:
 
   # DNS used by builder (resolves all domains to test-server)
   test-dns:
-    build: ../test/test-dns
+    build: ../test/test-dns-universal
     cap_add:
       - NET_ADMIN
     environment:
