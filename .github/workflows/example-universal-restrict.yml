@@ -12,9 +12,9 @@ jobs:
       contents: read
 
     steps:
-      # Same build as the audit example, with the rules that run produced.
-      # universal enforces on host and port only, which is as far as it can see
-      # without decrypting, and all a JVM build like this one can accept.
+      # The audit example's build, with the rules that run produced and one
+      # request they block. universal enforces on host and port only, which is
+      # as far as it can see without decrypting.
       - name: Start Buildcage builder
         uses: buildcage/docker@0e382c9c236fb24e60ccce9dba512a67b270b8bf # v4.3.0
         with:

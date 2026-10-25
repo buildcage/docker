@@ -12,8 +12,9 @@ jobs:
       contents: read
 
     steps:
-      # Same build as the audit example, with the rules that run produced. npm
-      # publish is a PUT, so it's blocked: no rule here covers that method.
+      # The audit example's build, with the rules that run produced and one
+      # request they block. The rules name methods too, so an npm publish (a
+      # PUT) would be blocked as well.
       - name: Start Buildcage builder
         uses: buildcage/docker@0e382c9c236fb24e60ccce9dba512a67b270b8bf # v4.3.0
         with:
@@ -24,7 +25,7 @@ jobs:
             GET http://deb.debian.org/debian/**
             GET http://deb.debian.org/debian-security/**
 
-            # npm install, plus its post-install audit-endpoint POST
+            # npm install, plus the audit POST it sends after installing
             GET|HEAD https://registry.npmjs.org/**
             POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk
 

@@ -57,7 +57,7 @@ jobs:
             IS_PRERELEASE=$(echo "$RELEASE" | jq -r '.isPrerelease')
           fi
           if [ "$IS_PRERELEASE" = "true" ]; then
-            echo "::notice::$TAG is a prerelease — skipping major/minor/latest tag updates"
+            echo "::notice::$TAG is a prerelease, so major/minor/latest tags are not updated"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
