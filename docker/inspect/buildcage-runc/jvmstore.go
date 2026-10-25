@@ -30,10 +30,11 @@ import (
 // shaped like a PKCS#12, so injection has nothing it knows how to write.
 var errNotAKeystore = errors.New("not a JKS or PKCS#12 keystore")
 
-// errKeystoreHalfWritten means writing the CA into a keystore failed partway,
-// so the file holds neither its old bytes nor the injected ones and the step
-// must not run with it.
-var errKeystoreHalfWritten = errors.New("the keystore was left half-written")
+// errKeystoreHalfWritten means writing the CA into the mirror's copy of a
+// keystore failed partway, so the copy holds neither its old bytes nor the
+// injected ones and the step must not run with it. The image's own keystore is
+// never written here.
+var errKeystoreHalfWritten = errors.New("adding the CA to the wrapper's copy of this keystore failed partway; the image's own keystore is unchanged")
 
 // The alias of the injected entry in either keystore shape, and its creation
 // time in a JKS. The time is fixed so the entry is byte-for-byte the same every
@@ -179,6 +180,10 @@ func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 		if err := f.Truncate(int64(len(injected))); err != nil {
 			return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
 		}
+	}
+	// Some filesystems (NFS among them) report a failed write only at close.
+	if err := f.Close(); err != nil {
+		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
 	}
 	return content, nil
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -270,60 +271,60 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		dir := filepath.Dir(keystore)
 		keystoresByDir[dir] = append(keystoresByDir[dir], filepath.Base(keystore))
 	}
-	// What finishes the injection, from the binds and directories so far.
-	current := func() *injection {
-		return &injection{
-			rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
-			upper: upper,
-		}
-	}
-	// A keystore left half-written stops the injection there, before the spec
-	// is saved, so a step that will not run leaves it as it was.
-	abandonFor := func(b *dirBind) (*injection, error) {
-		if err := current().abandon(); err != nil {
-			logf("undoing the CA injection: %v", err)
-		}
-		return nil, b.halfWritten
-	}
-	for hostDir, names := range keystoresByDir {
+	// In a fixed order, so the same image fails on the same keystore every run.
+	var halfWritten *dirBind
+keystores:
+	for _, hostDir := range slices.Sorted(maps.Keys(keystoresByDir)) {
+		names := keystoresByDir[hostDir]
 		containerDir := containerPathOf(s.rootfs, hostDir)
 		if covering := bindCovering(binds, containerDir); covering != nil {
 			for _, name := range names {
 				rel := filepath.Join(strings.TrimPrefix(containerDir, covering.containerDir), name)
-				if covering.coverKeystore(rel, ca); covering.halfWritten != nil {
-					return abandonFor(covering)
+				covering.coverKeystore(rel, ca)
+				if covering.halfWritten != nil {
+					halfWritten = covering
+					break keystores
 				}
 			}
 		} else if b := prepareBind(s, bundle, hostDir, names, ca, customDirLimit, true); b != nil {
 			binds = append(binds, b)
 			if b.halfWritten != nil {
-				return abandonFor(b)
+				halfWritten = b
+				break keystores
 			}
 		}
 	}
 
+	in := &injection{
+		rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
+		upper: upper,
+	}
+	// Before the spec is saved, so a step that will not run leaves it as it was.
+	if halfWritten != nil {
+		if err := in.abandon(); err != nil {
+			logf("undoing the CA injection: %v", err)
+		}
+		return nil, halfWritten.halfWritten
+	}
+
 	// Chromium reads neither the store nor any variable (see nssdb.go).
-	var nssAppended []byte
 	nssMirror, nssCreated := placeNSSDB(s, bundle, ca)
 	if nssMirror != nil {
-		binds = append(binds, nssMirror)
-		nssAppended = nssMirror.nssAppended
+		in.binds = append(in.binds, nssMirror)
+		in.nssAppended = nssMirror.nssAppended
 	}
-	created.add(nssCreated.dirs)
+	in.created.add(nssCreated.dirs)
 
 	s.setEnv(plan.env)
 	if err := s.save(); err != nil {
 		logf("cannot update the process spec: %v", err)
 	}
-
-	in := current()
-	in.nssAppended = nssAppended
 	return in, nil
 }
 
-// abandon undoes an injection whose step will not run. The mirrors are dropped
-// unwritten, since a half-written keystore in one must not reach the layer and
-// the step has changed nothing else, and finish takes out the rest.
+// abandon undoes an injection whose step will not run. The mirrors hold only
+// the injection's own writes, a half-written keystore among them, so they are
+// dropped unwritten, and finish takes out the rest.
 func (in *injection) abandon() error {
 	for _, b := range in.binds {
 		b.cleanup()

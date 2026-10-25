@@ -286,6 +286,14 @@ func TestInsertIntoKeystoreReportsAShortWrite(t *testing.T) {
 	}
 }
 
+func TestInsertIntoKeystoreReportsACloseFailure(t *testing.T) {
+	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{failClose: true})
+	if _, err := insertIntoKeystore(path, testCA); !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the close failure as a half-written keystore", err)
+	}
+}
+
 // A JKS rewrite only grows, so there is no tail to cut and no truncate to fail.
 func TestInsertIntoKeystoreSkipsTheTruncateForAGrowingRewrite(t *testing.T) {
 	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
@@ -778,12 +786,19 @@ func TestInjectAbandonsAHalfWrittenKeystoreInsideTheStoreDir(t *testing.T) {
 	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/lib/security"))
 	mustSymlink(t, "/etc/ssl/certs/java/cacerts",
 		filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	before, err := os.ReadFile(filepath.Join(bundle, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
 
-	_, err := inject(bundle, testCA)
+	_, err = inject(bundle, testCA)
 	if !errors.Is(err, errKeystoreHalfWritten) ||
 		!strings.Contains(err.Error(), "/etc/ssl/certs/java/cacerts") {
 		t.Fatalf("got %v, want the half-written keystore named by its container path", err)
+	}
+	if after, _ := os.ReadFile(filepath.Join(bundle, "config.json")); !bytes.Equal(after, before) {
+		t.Error("the spec was saved for a step that will not run")
 	}
 	real, err := os.ReadFile(filepath.Join(rootfs, "etc/ssl/certs/java/cacerts"))
 	if err != nil {

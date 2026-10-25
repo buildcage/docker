@@ -72,6 +72,7 @@ type brokenFile struct {
 	failWrite    int  // likewise for WriteString
 	failStat     bool // fail Stat outright
 	failTruncate bool // likewise for Truncate
+	failClose    bool // close for real, but report a failure
 	notRegular   bool // succeed, but report something other than a regular file
 	reads        int
 	writes       int
@@ -113,6 +114,14 @@ func (b *brokenFile) Truncate(size int64) error {
 		return errBrokenFile
 	}
 	return b.bundleFile.Truncate(size)
+}
+
+func (b *brokenFile) Close() error {
+	err := b.bundleFile.Close()
+	if b.failClose {
+		return errBrokenFile
+	}
+	return err
 }
 
 func (b *brokenFile) Stat() (fs.FileInfo, error) {

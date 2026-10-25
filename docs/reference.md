@@ -847,7 +847,8 @@ A JVM reads none of these variables, only its own keystore. The CA is added, for
 ships (JKS or PKCS#12), and taken back out before the layer is committed. A keystore sealed with a
 password other than the JDK default is not rewritten, so that JDK does not trust the CA. Any other
 JDK, one further along `PATH` or one the step itself downloads, keeps its keystore as it is. If
-writing the CA into a keystore fails partway, the step does not run.
+writing the CA into the wrapper's copy of a keystore fails partway, the step does not run; the
+image's keystore is left as it was.
 
 ### Chromium
 
@@ -922,9 +923,9 @@ Two things fail the build by default, pointing at `fail_on_ca_residue`:
   [CA trust variables](#ca-trust-variables))
 
 With `fail_on_ca_residue: false` both only warn, and the copy or the slot stays in the image. Whatever
-the setting, a step whose layer the wrapper cannot read back does not run, nor does one whose JVM
-keystore the wrapper left half-written while adding the CA, and an error reading the layer back or
-restoring it fails the build.
+the setting, a step whose layer the wrapper cannot read back does not run, nor does one where adding
+the CA to the wrapper's copy of a JVM keystore failed partway, and an error reading the layer back
+or restoring it fails the build.
 
 A copy the wrapper cannot read is never found, so it stays in the image whatever the setting: one in
 a compressed archive, hex-dumped, re-wrapped outside a PEM block in shorter lines, in a keystore
