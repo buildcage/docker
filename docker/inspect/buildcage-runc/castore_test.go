@@ -118,21 +118,6 @@ func TestResolveInRootReportsANonMissingError(t *testing.T) {
 	}
 }
 
-// The lines a certificate is armoured between, spelled out here because the
-// code itself only knows the shape of them and not the label.
-const (
-	beginTestBlock = "-----BEGIN CERTIFICATE-----"
-	endTestBlock   = "-----END CERTIFICATE-----"
-)
-
-// testCA is PEM-shaped rather than a real certificate: removal matches on what
-// the base64 between the two lines decodes to, not on its meaning.
-var testCA = []byte(beginTestBlock + "\nQlVJTERDQUdFLUNB\n" + endTestBlock + "\n")
-
-// otherCA stands for a certificate the bundle already carried, which removal
-// has to walk past.
-var otherCA = []byte(beginTestBlock + "\nU09NRU9ORS1FTFNF\n" + endTestBlock + "\n")
-
 // caOfSize is a PEM block of exactly n bytes, so a test can place a
 // certificate at a chosen offset relative to a read window. The body has to
 // decode, so the bytes that do not make up a whole base64 quantum are line

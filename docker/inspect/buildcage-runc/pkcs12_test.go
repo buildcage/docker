@@ -20,34 +20,6 @@ import (
 	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
 
-// A PKCS#12 trust store holds parsed X.509 certificates, unlike the JKS tests
-// whose "DER" is a stand-in string the parser never decodes. These build real
-// certificates so go-pkcs12 accepts them the way a JDK's cacerts does.
-func testCert(t *testing.T, cn string) *x509.Certificate {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("generating a key: %v", err)
-	}
-	tmpl := &x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: cn},
-		NotBefore:             time.Unix(1700000000, 0),
-		NotAfter:              time.Unix(1900000000, 0),
-		IsCA:                  true,
-		BasicConstraintsValid: true,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
-	if err != nil {
-		t.Fatalf("creating a certificate: %v", err)
-	}
-	cert, err := x509.ParseCertificate(der)
-	if err != nil {
-		t.Fatalf("parsing the certificate: %v", err)
-	}
-	return cert
-}
-
 // passwordlessStore is a cacerts written the way the JDK ships one: no MAC, the
 // certificate bags unencrypted, so it opens under the empty password.
 func passwordlessStore(t *testing.T, certs ...*x509.Certificate) []byte {
@@ -524,32 +496,6 @@ func TestEncodePKCS12NamesAnEntryWithoutAnAlias(t *testing.T) {
 	if got := aliasesOf(t, out); !slices.Equal(got, []string{"CN=first", "kept"}) {
 		t.Errorf("aliases = %q, want [CN=first kept]", got)
 	}
-}
-
-// nonce stands in for the random serialNumber in the proxy CA's subject.
-func testIssuer(t *testing.T, nonce string) (*x509.Certificate, *ecdsa.PrivateKey) {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("generating a key: %v", err)
-	}
-	tmpl := &x509.Certificate{
-		SerialNumber:          big.NewInt(7),
-		Subject:               pkix.Name{CommonName: "buildcage proxy CA", SerialNumber: nonce},
-		NotBefore:             time.Unix(1700000000, 0),
-		NotAfter:              time.Unix(1900000000, 0),
-		IsCA:                  true,
-		BasicConstraintsValid: true,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
-	if err != nil {
-		t.Fatalf("creating the CA: %v", err)
-	}
-	cert, err := x509.ParseCertificate(der)
-	if err != nil {
-		t.Fatalf("parsing the CA: %v", err)
-	}
-	return cert, key
 }
 
 func testLeaf(t *testing.T, ca *x509.Certificate, caKey *ecdsa.PrivateKey, host string) (*x509.Certificate, *ecdsa.PrivateKey) {

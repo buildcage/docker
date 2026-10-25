@@ -62,12 +62,6 @@ func keystore(version uint32, entries ...[]byte) []byte {
 	return append(out, keystoreDigest(out)...)
 }
 
-// testDER is what testCA's base64 decodes to: what a container holds of a
-// certificate, and what every shape of copy has in common.
-var testDER = []byte("BUILDCAGE-CA")
-
-var otherDER = []byte("SOMEONE-ELSE")
-
 func mustWriteKeystore(t *testing.T, content []byte) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "cacerts")

@@ -8,20 +8,6 @@ import (
 	"testing"
 )
 
-// useTempLog points logf and the dump at a file the test owns, since a test
-// process usually can't write the real host path.
-func useTempLog(t *testing.T) {
-	t.Helper()
-	oldFile, oldTag := logFile, logTag
-	logFile = filepath.Join(t.TempDir(), "runc.log")
-	logTag = "[this-step]"
-	ownLog.Reset()
-	t.Cleanup(func() {
-		logFile, logTag = oldFile, oldTag
-		ownLog.Reset()
-	})
-}
-
 // A failure must report the failing step's lines and no one else's, however
 // the concurrent steps ended up interleaved on disk.
 func TestDumpOwnLogCoversOnlyThisInvocation(t *testing.T) {

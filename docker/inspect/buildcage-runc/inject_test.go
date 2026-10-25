@@ -1,57 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 )
-
-// newBundleNoStore lays out a bundle with no CA store at all under
-// rootfs/etc/ssl/certs, the node:*-slim shape: no OS trust store, only
-// Node's own bundled roots, which findSystemStore cannot find.
-func newBundleNoStore(t *testing.T, env []string) (bundle, rootfs string) {
-	t.Helper()
-	bundle = t.TempDir()
-	rootfs = filepath.Join(bundle, "rootfs")
-	// /etc exists, as it does in any real base image (passwd, hostname, ...);
-	// only etc/ssl/certs and its siblings are absent, which is what actually
-	// makes findSystemStore fail.
-	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
-
-	config := map[string]any{
-		"root":    map[string]any{"path": "rootfs"},
-		"process": map[string]any{"env": toAny(env)},
-	}
-	raw, err := json.Marshal(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustWriteFile(t, filepath.Join(bundle, "config.json"), string(raw))
-	// inject refuses a step whose layer it cannot read back.
-	useMountInfo(t, overlayLine(rootfs, rootfs))
-	return bundle, rootfs
-}
-
-// newBundle is the same bundle with one system CA candidate in the rootfs,
-// which is what the store-present half of the decision table needs.
-func newBundle(t *testing.T, env []string) (bundle, rootfs string) {
-	t.Helper()
-	bundle, rootfs = newBundleNoStore(t, env)
-	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ssl", "certs"))
-	mustWriteFile(t, filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt"), "ORIGINAL-ROOTS\n")
-	return bundle, rootfs
-}
-
-func toAny(env []string) []any {
-	out := make([]any, len(env))
-	for i, e := range env {
-		out[i] = e
-	}
-	return out
-}
 
 func loadEnv(t *testing.T, bundle string) map[string]string {
 	t.Helper()
@@ -60,33 +15,6 @@ func loadEnv(t *testing.T, bundle string) map[string]string {
 		t.Fatal(err)
 	}
 	return s.env
-}
-
-func loadMounts(t *testing.T, bundle string) []map[string]any {
-	t.Helper()
-	s, err := loadSpec(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, _ := s.raw["mounts"].([]any)
-	mounts := make([]map[string]any, 0, len(raw))
-	for _, m := range raw {
-		if entry, ok := m.(map[string]any); ok {
-			mounts = append(mounts, entry)
-		}
-	}
-	return mounts
-}
-
-func findMount(t *testing.T, mounts []map[string]any, dest string) map[string]any {
-	t.Helper()
-	for _, m := range mounts {
-		if m["destination"] == dest {
-			return m
-		}
-	}
-	t.Fatalf("no mount for %s", dest)
-	return nil
 }
 
 // ownCASource fails the test unless a file is bound read-only at ownCAPath, and

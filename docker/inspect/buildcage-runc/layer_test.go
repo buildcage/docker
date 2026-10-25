@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,28 +18,6 @@ func mustHardLink(t *testing.T, from, to string) {
 	if err := os.Link(from, to); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// mountLine is the shape /proc/self/mountinfo writes, taken from a real build:
-//
-//	339 508 0:114 / /var/lib/buildkit/.../rootfs rw,relatime - overlay overlay
-//	rw,lowerdir=...,upperdir=.../snapshots/4/fs,workdir=...,uuid=on,nouserxattr
-func mountLine(mountPoint, fstype, superOptions string) string {
-	return fmt.Sprintf("339 508 0:114 / %s rw,relatime shared:1 - %s overlay %s",
-		mountPoint, fstype, superOptions)
-}
-
-func overlayLine(mountPoint, upper string) string {
-	return mountLine(mountPoint, "overlay", "rw,lowerdir=/l,upperdir="+upper+",workdir=/w,nouserxattr")
-}
-
-// useMountInfo hands upperDirOf these lines instead of the test process's own
-// mount table, which holds no overlay over a temporary directory.
-func useMountInfo(t *testing.T, lines ...string) {
-	t.Helper()
-	old := readMountInfo
-	readMountInfo = func() ([]byte, error) { return []byte(strings.Join(lines, "\n") + "\n"), nil }
-	t.Cleanup(func() { readMountInfo = old })
 }
 
 func TestUpperDirOfReadsTheStepsOwnLayer(t *testing.T) {
