@@ -73,8 +73,8 @@ jobs:
     # only on pull_request); a skipped need otherwise skips the job unevaluated.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test_action == 'true') }}
     runs-on: ubuntu-latest
-    # Well above a normal run; without a limit a hung builder holds a runner
-    # for six hours.
+    # Well above a normal run; without a limit a hang holds a runner for six
+    # hours.
     timeout-minutes: 15
     permissions:
       contents: read
