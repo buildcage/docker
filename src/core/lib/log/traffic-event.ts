@@ -1,6 +1,6 @@
 /**
  * The report's domain model: one thing a build did, produced by the log
- * parsers (inspect.ts, haproxy.ts) and consumed by the report layer.
+ * parsers (inspect.ts, haproxy.ts, dns.ts) and consumed by the report layer.
  */
 
 import { ruleHost } from "./authority.ts";
@@ -66,6 +66,36 @@ export interface TrafficEvent {
   /** What an action's own check logged for a request, as objects by name; see
    *  InspectLogFields. Only the fields that had a value. */
   extensions?: Record<string, Record<string, string>>;
+}
+
+/**
+ * The failures that are not the inspect proxy's own: an origin that answered
+ * nothing usable or broke off mid-transfer, one no passthrough could reach,
+ * and a name the upstream resolver could not answer for a host the rules had
+ * already allowed. See TrafficAction for what the report does with them.
+ *
+ * What the first two share is a connection that completed, which is where the
+ * origin's certificate was checked: whatever went wrong afterwards, it went
+ * wrong with an origin this proxy had authenticated. An inspected connection
+ * that never completed is absent on purpose, `origin-connect-failed` as much as
+ * `origin-untrusted`: the check guards nothing if failing it does not fail a
+ * build, and the log cannot say which of the two it was. See reasonFor in
+ * inspect.ts.
+ */
+const FAILURE_REASONS = new Set([
+  "origin-unreachable",
+  "origin-no-response",
+  "origin-aborted",
+  "dns-failed",
+]);
+
+/** Decided from the reason rather than from the termination state, which says
+ *  that something was blocked but not by whom. */
+export function actionFor(reason: string | undefined, isAudit: boolean): TrafficAction {
+  if (reason !== undefined) return FAILURE_REASONS.has(reason) ? "failed" : "block";
+  // audit enforces nothing, so nothing here was allowed by a rule. Calling it
+  // "allow" would claim a decision that was never made.
+  return isAudit ? "audit" : "allow";
 }
 
 /** The hosts a run connected to, for isRedundantDns. */

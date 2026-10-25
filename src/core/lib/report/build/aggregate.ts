@@ -11,8 +11,9 @@ import {
   type AggregatedEntry,
   type LogEntry,
 } from "#core/lib/log/aggregate.ts";
+import type { DnsLogScan } from "#core/lib/log/dns.ts";
 import type { HaproxyLogScan } from "#core/lib/log/haproxy.ts";
-import type { InspectDnsLogScan, InspectLogScan } from "#core/lib/log/inspect.ts";
+import type { InspectLogScan } from "#core/lib/log/inspect.ts";
 import { connectedHosts, isRedundantDns, type TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
 import type { GenReportParameters, ReportData } from "../types.ts";
@@ -255,7 +256,7 @@ export function reduceTimeline(
 export async function assembleReportData<E extends ReportData["engine"]>(
   engine: E,
   proxyScan: Promise<InspectLogScan | HaproxyLogScan>,
-  dnsScan: Promise<InspectDnsLogScan>,
+  dnsScan: Promise<DnsLogScan>,
   parameters: GenReportParameters,
   droppedLogs: number | undefined,
 ): Promise<Extract<ReportData, { engine: E }>> {

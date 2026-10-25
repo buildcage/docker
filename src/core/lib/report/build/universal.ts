@@ -1,5 +1,5 @@
+import { scanDnsLog } from "#core/lib/log/dns.ts";
 import { scanHaproxyLog } from "#core/lib/log/haproxy.ts";
-import { scanInspectDnsLog } from "#core/lib/log/inspect.ts";
 
 import type { GenReportParameters, UniversalReportData } from "../types.ts";
 import { assembleReportData } from "./aggregate.ts";
@@ -26,7 +26,7 @@ export async function buildUniversalReportData(
   return assembleReportData(
     "universal",
     scanHaproxyLog(proxyLines, isAudit),
-    scanInspectDnsLog(dnsLines, isAudit),
+    scanDnsLog(dnsLines, isAudit),
     parameters,
     droppedLogs,
   );

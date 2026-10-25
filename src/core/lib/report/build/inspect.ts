@@ -1,6 +1,7 @@
 import { compileRuleSet } from "#core/lib/acl/haproxy-rules.ts";
 import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
-import { scanInspectLog, scanInspectDnsLog } from "#core/lib/log/inspect.ts";
+import { scanDnsLog } from "#core/lib/log/dns.ts";
+import { scanInspectLog } from "#core/lib/log/inspect.ts";
 
 import type { GenReportParameters, InspectReportData } from "../types.ts";
 import { assembleReportData } from "./aggregate.ts";
@@ -39,7 +40,7 @@ export async function buildInspectReportData(
   return assembleReportData(
     "inspect",
     scanInspectLog(proxyLines, isAudit, isAudit ? undefined : resolverAllows(parameters)),
-    scanInspectDnsLog(dnsLines, isAudit),
+    scanDnsLog(dnsLines, isAudit),
     parameters,
     droppedLogs,
   );
