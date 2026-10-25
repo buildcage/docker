@@ -156,7 +156,9 @@ describe("fetchBundle: fallback tag refusals", () => {
   });
 
   it("throws TRANSIENT on 401/403, an auth problem rather than a missing bundle", async () => {
-    await expectVerifyError(bundle(tagIs(failsWith(403))), "TRANSIENT");
+    for (const status of [401, 403]) {
+      await expectVerifyError(bundle(tagIs(failsWith(status))), "TRANSIENT");
+    }
   });
 
   it("throws NOT_FOUND for any other non-ok status", async () => {

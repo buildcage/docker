@@ -46,7 +46,9 @@ describe("checkUrlAndTlsRuleSupport", () => {
         },
         warn,
       ),
-    ).toThrow(InvalidInputError);
+    ).toThrow(
+      expect.objectContaining({ name: InvalidInputError.name, code: "INVALID_PROXY_ENGINE" }),
+    );
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -137,7 +139,9 @@ describe("checkKnownBlockedUrlRuleSupport", () => {
         },
         warn,
       ),
-    ).toThrow(InvalidInputError);
+    ).toThrow(
+      expect.objectContaining({ name: InvalidInputError.name, code: "INVALID_PROXY_ENGINE" }),
+    );
     expect(warn).not.toHaveBeenCalled();
   });
 
