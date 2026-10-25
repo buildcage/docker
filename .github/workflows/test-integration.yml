@@ -94,7 +94,7 @@ jobs:
             target2: test_integration_buildkit_inspect_hidden_ca
             target3: test_integration_buildkit_inspect_debian_restrict
             test_compose_file: docker/compose.action.test-inspect.yaml
-          - mode: inspect round trip, inspect byte-exact, multiarch
+          - mode: inspect round trip, inspect byte-exact, multiarch, HAProxy configs
             runner: ubuntu-24.04-arm
             platform: linux/arm64
             # The cross-platform half of the multiarch target runs the built
@@ -103,6 +103,8 @@ jobs:
             target1: test_integration_buildkit_inspect_roundtrip
             target2: test_integration_buildkit_inspect_byte_exact
             target3: test_integration_buildkit_multiarch
+            # Builds each engine's image and starts none.
+            target4: test_integration_buildkit_haproxy_configs
             test_compose_file: docker/compose.action.test-inspect.yaml
 
     name: "integration: test (${{ matrix.mode }})"

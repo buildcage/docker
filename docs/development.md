@@ -165,12 +165,18 @@ make test_integration_buildkit_universal_known_blocked
 make test_integration_buildkit_multiarch
 # Brings the builder up alone and probes :10024/:53 from the compose network and the host
 make test_integration_buildkit_listener_scope
+# Loads every HAProxy config the generators write, in each engine's image
+make test_integration_buildkit_haproxy_configs
 ```
 
 A target that needs the fixtures sets `BUILDCAGE_TEST_COMPOSE_OVERLAY` to
 `docker/compose.action.test-<engine>.yaml`, which the setup step layers on the shipped compose
 file: the builder runs as it ships, plus the fixture network. The rules those tests run under are
 in `test/fixture-rules-<engine>.sh`, given to the setup step as inputs.
+
+The HAProxy check runs `haproxy -c` over the golden configs in `src/core/lib/acl/__fixtures__/`,
+and over one the image's own generator writes from a large rule set. CoreDNS has no way to check a
+Corefile without serving it, so the Corefile is not checked.
 
 `make help` lists the rest, such as `inspect_byte_exact` and `universal_restrict_no_traffic`, and
 `make test_integration_buildkit` runs all of them in turn. CI runs them in a few jobs, several

@@ -377,6 +377,14 @@ test_integration_buildkit_listener_scope: ## Check :10024/:53 are unreachable ou
 	@echo "Running listener-scope tests..."
 	@./test/assert-listener-scope.sh
 
+# Needs the engine images, not a running builder: the script builds each under
+# a name of its own and removes it, pass or fail.
+.PHONY: test_integration_buildkit_haproxy_configs
+test_integration_buildkit_haproxy_configs: ## Check every HAProxy config the generators write loads in each engine's image
+	@echo "Running HAProxy config load tests..."
+	@./test/assert-haproxy-configs.sh universal src/core/lib/acl/__fixtures__/haproxy-universal
+	@./test/assert-haproxy-configs.sh inspect src/core/lib/acl/__fixtures__/haproxy
+
 .PHONY: test_integration_buildkit_multiarch
 test_integration_buildkit_multiarch: ## Check the builder's default and cross-platform builds
 	@echo "Running multi-architecture build tests..."
