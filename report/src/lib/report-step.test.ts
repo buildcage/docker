@@ -1,3 +1,7 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { InvalidInputError } from "#core/lib/actions/inputs.ts";
@@ -150,6 +154,51 @@ describe("the COMPOSE_PROJECT_NAME override, which is this repo's own test hook"
       "buildcage-e2e",
       "buildcage",
     );
+  });
+});
+
+describe("the Job Summary copy, which is this repo's own test hook", () => {
+  let dir: string;
+  let env: NodeJS.ProcessEnv;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "report-step-test-"));
+    env = {
+      GITHUB_STEP_SUMMARY: join(dir, "step-summary.md"),
+      BUILDCAGE_TEST_SUMMARY_FILE: join(dir, "copy.md"),
+    };
+    mocks.runReportScript.mockImplementation(() => {
+      writeFileSync(join(dir, "step-summary.md"), "### Report\n");
+      return 1;
+    });
+  });
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("is not written without the build-test-hooks flag, however the environment is set", async () => {
+    await runReportStep(env, deps);
+    expect(existsSync(join(dir, "copy.md"))).toBe(false);
+  });
+
+  it("holds what the script wrote to the step summary once the flag is set, whatever its exit status", async () => {
+    process.env.BUILDCAGE_BUILD_TEST_HOOKS = "1";
+    await runReportStep(env, deps);
+    expect(readFileSync(join(dir, "copy.md"), "utf8")).toBe("### Report\n");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("is not written when the runner gave the step no summary file", async () => {
+    process.env.BUILDCAGE_BUILD_TEST_HOOKS = "1";
+    await runReportStep({ BUILDCAGE_TEST_SUMMARY_FILE: env.BUILDCAGE_TEST_SUMMARY_FILE }, deps);
+    expect(existsSync(join(dir, "copy.md"))).toBe(false);
+  });
+
+  it("is not written, and the script's exit status stands, when the script wrote no step summary", async () => {
+    process.env.BUILDCAGE_BUILD_TEST_HOOKS = "1";
+    mocks.runReportScript.mockReturnValue(2);
+    await runReportStep(env, deps);
+    expect(existsSync(join(dir, "copy.md"))).toBe(false);
+    expect(process.exitCode).toBe(2);
   });
 });
 

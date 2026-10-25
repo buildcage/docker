@@ -106,8 +106,10 @@ setup targets, and without them the report does not find the builder.
 
 Sigstore verification needs a real, published GHCR image, so the setup action cannot normally run
 against local changes. A test-hook build lets it: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build`
-produces a `dist/main.cjs` that honors `BUILDCAGE_LOCAL_IMAGE_REF`. CI's `test_action` job in
-`.github/workflows/test-e2e.yml` runs the real `setup` and `report` actions this way.
+produces a `dist/main.cjs` that honors `BUILDCAGE_LOCAL_IMAGE_REF`, and a `report/dist/main.cjs`
+that copies its Job Summary to `BUILDCAGE_TEST_SUMMARY_FILE` when that is set, since a later step
+cannot read the summary back. CI's `test_action` job in `.github/workflows/test-e2e.yml` runs the
+real `setup` and `report` actions this way.
 
 1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine).
 2. `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build`
