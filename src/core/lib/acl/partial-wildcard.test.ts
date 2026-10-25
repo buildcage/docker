@@ -16,7 +16,7 @@ function matches(pattern: string, name: string): boolean {
 
 // ---------------------------------------------------------------------------
 // The point of this compiler: a wildcard may sit among literal text in a
-// label. The shared compiler rejects that, forcing an author to widen the
+// label. wildcard-rules.ts rejects that, forcing an author to widen the
 // pattern to a whole label, which widens the resolver's scope with it.
 // ---------------------------------------------------------------------------
 describe("wildcard inside a label", () => {
@@ -39,13 +39,13 @@ describe("wildcard inside a label", () => {
     expect(matches("a*z.example.com", "abcy.example.com")).toBe(false);
   });
 
-  it("requires at least one character, matching the shared `*`", () => {
+  it("requires at least one character, matching wildcard-rules.ts's `*`", () => {
     expect(matches("abc*.example.com", "abc.example.com")).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Every wildcard the shared compiler accepts keeps the same meaning here.
+// Every wildcard that wildcard-rules.ts accepts keeps the same meaning here.
 // ---------------------------------------------------------------------------
 describe("unchanged vocabulary", () => {
   it("* alone is one label", () => {
@@ -220,7 +220,7 @@ describe("checkRawRegexHalf", () => {
     }
   });
 
-  it("keeps the escapes both engines read alike, and any escaped punctuation", () => {
+  it("keeps the escapes PCRE2 and JavaScript read alike, and any escaped punctuation", () => {
     for (const text of [
       "\\d+\\.com:443",
       "a\\s?\\b\\-b\\.com:443",
@@ -346,7 +346,7 @@ describe("checkRawRegexHalf", () => {
     expect(() => check("/(?<=a)(b)\\1", false)).not.toThrow();
   });
 
-  it("reads a digit escape in a class as the octal both engines take it for", () => {
+  it("reads a digit escape in a class as the octal PCRE2 and JavaScript take it for", () => {
     expect(() => check("/[\\1]", false)).not.toThrow();
   });
 

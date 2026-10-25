@@ -434,7 +434,7 @@ func TestInjectFallsBackWhenTheAncestorCannotBeBound(t *testing.T) {
 	}
 }
 
-// Without an outer directory that cannot be bound, the groups under it still
+// Under an outer directory that cannot be bound, the groups below it still
 // fold together: here /etc conflicts with a BuildKit mount, and /etc/ssl takes
 // the store in rather than losing to it.
 func TestInjectFoldsWhatIsLeftUnderAnAncestorItCannotBind(t *testing.T) {
@@ -486,8 +486,8 @@ func TestInjectResolvesARelativeVariableFromTheWorkingDirectory(t *testing.T) {
 
 // A variable pointing at a bundle under a directory that is not there is the
 // step's own: nothing can be appended to a file whose directory does not
-// exist, so it is left alone rather than mirrored. (resolveInRoot resolves such
-// a path now, for the anchors' sake, so this is guarded separately.)
+// exist, so it is left alone rather than mirrored. (resolveInRoot accepts such
+// a path, for the anchors' sake, so this is guarded separately.)
 func TestInjectLeavesAVariableUnderAMissingDirectoryAlone(t *testing.T) {
 	useFakeRsync(t)
 	bundle, _ := newBundle(t, []string{"DENO_CERT=/not-there/roots.pem"})
@@ -817,7 +817,8 @@ func TestInjectSkipsADirectoryPrepareRefuses(t *testing.T) {
 	findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")
 }
 
-// Not at a store the CA never went into.
+// A store too large to mirror never gets the CA, so the variables point at the
+// proxy-CA-only file rather than at it.
 func TestInjectFallsBackWhenTheStoreCannotBeMirrored(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})

@@ -59,8 +59,8 @@ if grep -qF "### 🚫 Blocked / ⚠️ Failed Hosts" <<< "$REPORT_MARKDOWN" \
 else
   fail "the Blocked / Failed Hosts table is missing the guard row"
 fi
-# The other unconditional guard, and the one the proxy did not decide: audit
-# reports it the same way restrict does, as a failure rather than a block.
+# A name that failed to resolve was decided by no rule: audit reports it the
+# same way restrict does, as a failure rather than a block.
 if grep -qF "| \`nxdomain.wildcard.example.com:443\` | HTTPS | ⚠️ dns-failed |" <<< "$REPORT_MARKDOWN"; then
   pass "an unresolvable name is reported as a failure, not a block"
 else

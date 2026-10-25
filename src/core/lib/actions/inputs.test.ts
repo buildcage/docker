@@ -145,7 +145,8 @@ describe("resolveProxyMode", () => {
     expect(resolveProxyMode("restrict")).toBe("restrict");
   });
 
-  // Anything else would enforce a run meant only to record.
+  // Falling back to the restrict default, a mistyped `Audit` would enforce a
+  // run meant only to record.
   it("rejects anything else, a differently cased mode included", () => {
     for (const mode of ["Audit", "RESTRICT", "enforce"]) {
       expect(() => resolveProxyMode(mode)).toThrow(

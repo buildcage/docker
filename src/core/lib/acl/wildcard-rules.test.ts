@@ -281,9 +281,8 @@ describe("known_blocked_rules port completion", () => {
     ]);
   });
 
-  it("reads two host rules crammed onto one line as a malformed URL rule (v4)", () => {
-    // Newline-separated now, so a space is a URL rule's method separator; the
-    // old whitespace-separated form no longer parses.
+  it("reads two host rules crammed onto one line as a malformed URL rule", () => {
+    // One rule per line, so a space is a URL rule's method separator.
     expect(() => parseAndValidateKnownBlockedRules("a.example.com b.example.com:443")).toThrow(
       /Invalid method/,
     );
@@ -318,7 +317,8 @@ describe("known_blocked_rules port completion", () => {
   });
 
   it("rejects a # glued to a rule rather than completing it into a dead rule", () => {
-    // Without a port, `noisy#c` used to gain `:*` and pass as `noisy#c:*`.
+    // Port completion would otherwise turn `noisy#c` into `noisy#c:*`, a rule
+    // no host matches.
     expect(() => parseAndValidateKnownBlockedRules("noisy.example.com#c")).toThrow(/Invalid rule/);
   });
 

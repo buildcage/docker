@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import { resolveProxyEngine } from "./inputs.ts";
 
 describe("resolveProxyEngine: properties", () => {
-  it("always returns one of the two canonical engine names, or throws", () => {
+  it("always returns a canonical engine name, or throws", () => {
     fc.assert(
       fc.property(fc.string({ minLength: 0, maxLength: 20 }), (input) => {
         let result;

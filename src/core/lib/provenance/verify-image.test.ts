@@ -1,10 +1,9 @@
 /**
  * Covers the orchestration-level pure functions only (toProvenanceError,
  * requireDigest); imageTagFromRef and buildVerifyOptions have their own test
- * files (image-tag.test.ts, verify-policy.test.ts). The I/O functions
- * (verifyImageDigest, verifyImageDigestOrThrow, and the registry and sigstore
- * calls they make) need a live network or TUF call and are covered by the
- * end-to-end tests instead.
+ * files (image-tag.test.ts, verify-policy.test.ts). verifyImageDigest and
+ * verifyImageDigestOrThrow chain live registry and TUF calls and are left to
+ * the end-to-end tests; each call they make has its own test file.
  */
 import { describe, it, expect } from "vitest";
 

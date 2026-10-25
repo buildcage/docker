@@ -15,8 +15,7 @@ import * as chai from "chai";
 
 const isNode = typeof (globalThis as { process?: unknown }).process !== "undefined";
 
-/** Deliberately narrow subset of vitest's real `expect()` chain: only the
- *  matchers this codebase's tests actually use. */
+/** Deliberately narrow subset of vitest's real `expect()` chain. */
 interface ExpectMatchers {
   toBe(expected: unknown): void;
   toStrictEqual(expected: unknown): void;

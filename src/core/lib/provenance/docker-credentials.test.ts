@@ -22,7 +22,7 @@ describe("readGhcrBasicAuth", () => {
     expect(readGhcrBasicAuth({}, mockReadFileSync(config))).toBe(null);
   });
 
-  it("returns null when auth field is empty string (credsStore environment)", () => {
+  it("returns null when the ghcr.io entry has no auth (credsStore environment)", () => {
     const config = JSON.stringify({ auths: { "ghcr.io": {} } });
     expect(readGhcrBasicAuth({}, mockReadFileSync(config))).toBe(null);
   });

@@ -45,8 +45,8 @@ const CASES: Record<string, UniversalCase> = {
     ],
   },
 
-  // The same rules in audit, where they allow nothing more than audit already
-  // does.
+  // Some of the same rules in audit, where they allow nothing more than audit
+  // already does.
   "audit-full": {
     mode: "audit",
     httpsRules: ["github.com:443", "*.example.com:443"],

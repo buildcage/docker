@@ -17,7 +17,7 @@ function plan(...args: Parameters<typeof planPostCleanup>): PostCleanupPlan {
 }
 
 describe("planPostCleanup", () => {
-  it("takes down the project main.ts derived from the same builder_name", () => {
+  it("takes down the project for the builder_name input", () => {
     const { args, env } = plan(
       COMPOSE_FILE,
       undefined,
@@ -96,7 +96,7 @@ describe("planPostCleanup", () => {
     expect(env.BUILDER_NAME).toBe("buildcage");
   });
 
-  it("derives the same project name main.ts and report do for one builder", () => {
+  it("derives the same project name every time for one builder", () => {
     const getInput = inputs({ builder_name: "second" });
     const first = plan(COMPOSE_FILE, undefined, {}, { getInput });
     const second = plan(COMPOSE_FILE, undefined, {}, { getInput });

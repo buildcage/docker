@@ -3,15 +3,15 @@ import { describe, it, expect } from "vitest";
 
 import { fitStepSummary, STEP_SUMMARY_LIMIT_BYTES, type SummaryBlock } from "./fit-step-summary.ts";
 
-/**
- * A straightforward `fitStepSummary`, the oracle for the property below: the
- * optimized one must produce byte-identical output.
- */
 const SAFETY_MARGIN_BYTES = 8 * 1024;
 const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
 const rank = (b: SummaryBlock): number => (b.cut === "keep" ? -Infinity : b.priority);
 const whole = (b: SummaryBlock): string => (b.open ?? "") + b.text + (b.close ?? "");
 
+/**
+ * A straightforward `fitStepSummary`, the oracle for the property below: the
+ * optimized one must produce byte-identical output.
+ */
 function referenceFit(
   blocks: SummaryBlock[],
   { usedBytes = 0, limitBytes = STEP_SUMMARY_LIMIT_BYTES } = {},

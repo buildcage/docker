@@ -1,4 +1,4 @@
-# Each CASE leaves a copy of the proxy CA that the layer sweep finds but cannot
+# Two CASEs leave a copy of the proxy CA that the layer sweep finds but cannot
 # remove, so the build must fail:
 #
 #   leaf      a server certificate the proxy forged, saved trust-on-first-use

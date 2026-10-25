@@ -81,7 +81,7 @@ describe("host and url rule compilation", () => {
 
   it("keeps a ~regex url rule's own port pattern in the host half untouched", () => {
     // The whole host half, port pattern included, is matched as one
-    // expression; see haproxy-config.ts.
+    // expression; see HostMatch in haproxy-rules.ts.
     const set = compileRuleSet({ urlRules: buildUrlRules("GET ~^https://a\\.com:(443|8443)/x$") });
     expect(set.https[0].hostMatch).toBe("hostBareFull");
     expect(set.https[0].hostRegex).toBe("^a\\.com:(443|8443)$");

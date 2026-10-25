@@ -75,7 +75,6 @@ func TestLogfKeepsTheLineWhenTheSharedFileCannotBeOpened(t *testing.T) {
 
 	logf("CA write-back failed for %s: %v", "/etc/ssl/certs", "rsync exit status 23")
 
-	// ENOTDIR, not ENOENT: a file sits where the directory would be.
 	if _, err := os.Stat(logFile); err == nil {
 		t.Fatal("the shared log was reachable after all, so this proves nothing")
 	}

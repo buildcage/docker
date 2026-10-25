@@ -161,8 +161,8 @@ describe("foldExpectedBlockedRows: two groups one rule produced", () => {
 });
 
 describe("foldExpectedBlockedRows: a tie broken the other way", () => {
-  // The tie-break has to hold whichever order the rows arrived in, so this is
-  // the mirror of the case above.
+  // The tie-break has to hold whichever order the rows arrived in, so this
+  // mirrors "breaks a tie on count by rule text".
   it("keeps rules in order when they already are", () => {
     const row = (expectedBy: string): HostTableRow => ({
       host: "a.example.com",

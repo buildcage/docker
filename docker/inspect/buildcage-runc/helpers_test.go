@@ -252,7 +252,7 @@ func mustAppendFile(t *testing.T, path, content string) {
 }
 
 // mustSparseFile makes a file that reports size bytes without writing them;
-// sizeAndCount reads the reported size, which is what the limits bound.
+// checkMirrorable reads the reported size, which is what the limits bound.
 func mustSparseFile(t *testing.T, path string, size int64) {
 	t.Helper()
 	f, err := os.Create(path)
@@ -300,7 +300,7 @@ func useFakeRsync(t *testing.T) {
 
 // fakeRsyncCopy stands in for `rsync -a[HAX] [--checksum] [--delete] ... src/ dst/`:
 // it only looks at the last two arguments and replaces dst wholesale with
-// src's tree, which is close enough to mirror/writeBack's actual usage for
+// src's tree, which is close enough to mirrorDir/writeBack's actual usage for
 // unit tests to observe the resulting on-disk state.
 func fakeRsyncCopy(args []string) ([]byte, error) {
 	if len(args) < 2 {

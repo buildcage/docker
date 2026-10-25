@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 
 import { PROXY_ADDRESS, PROXY_SUBNET } from "#core/lib/log/proxy-address.ts";
 
-// Both engines' build network; it cannot import these constants.
+// The build network; it cannot import these constants.
 const conflist = readFileSync(
   new URL("../../docker/common/files/cni.conflist", import.meta.url),
   "utf8",

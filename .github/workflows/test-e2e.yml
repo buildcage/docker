@@ -138,7 +138,7 @@ jobs:
           # inspect uses allowed_url_rules instead, so a host-level rule here
           # wouldn't prove method/path enforcement actually happened.
           allowed_https_rules: ${{ matrix.proxy_engine != 'inspect' && 'registry.npmjs.org:443' || '' }}
-          # inspect only; empty is a no-op for the other engines.
+          # inspect only; empty is a no-op otherwise.
           allowed_tls_rules: ${{ matrix.proxy_engine == 'inspect' && 'github.com:443' || '' }}
           allowed_url_rules: ${{ steps.url_rules.outputs.value }}
 
@@ -156,8 +156,8 @@ jobs:
           FROM node:24-alpine
           WORKDIR /app
           # universal does not MITM TLS; inspect terminates it but needs nothing
-          # here, because its runc wrapper points NODE_EXTRA_CA_CERTS at a store
-          # carrying the CA.
+          # here, because its runc wrapper points NODE_EXTRA_CA_CERTS at the
+          # proxy CA.
           RUN npm init -y && npm install --ignore-scripts --no-audit @hono/node-server@2.1.1
           # Blocked by the rules above, so the report shows the full URL, not
           # just the host. Engines differ in exactly how the block shows up

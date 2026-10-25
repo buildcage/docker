@@ -412,7 +412,8 @@ func TestPrepareRefusesACustomDirOverTheLimits(t *testing.T) {
 	}
 }
 
-// findSystemStore bounds it under limits of its own.
+// The store directory is bounded by findSystemStore's own limits, not the
+// custom ones.
 func TestPrepareDoesNotHoldTheStoreDirToTheCustomLimits(t *testing.T) {
 	useFakeRsync(t)
 	rootfs := t.TempDir()

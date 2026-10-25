@@ -46,8 +46,7 @@ assert_report_complete() {
   fi
 }
 
-# One of the builder's s6 service logs: haproxy (universal/inspect) or coredns
-# (inspect's resolver).
+# One of the builder's s6 service logs: haproxy or coredns.
 builder_log() {
   docker compose exec builder cat "/var/log/$1/current" 2>/dev/null
 }

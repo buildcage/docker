@@ -25,8 +25,8 @@ describe("rule block", () => {
   });
 
   it("reads no Host header of its own, however many rules are matched", () => {
-    // Every rule matches txn.host. A fetch and its regsub per rule would be paid per rule per request, and
-    // rule sets have no size limit.
+    // Every rule matches txn.host. A fetch and its regsub per rule would be paid
+    // per rule per request, and rule sets have no size limit.
     const config = block({
       urlRules: buildUrlRules(
         Array.from({ length: 8 }, (_, i) => `GET https://h${i}.com/x`).join("\n"),
@@ -188,8 +188,7 @@ describe("rule block", () => {
   it("escapes a special character in a path so it can't break the ACL line", () => {
     // A raw `"` (like a space or backslash) would otherwise let haproxy
     // misparse the line; escapeForHaproxy backslash-escapes it. A `#` is the
-    // other such character, but a rule can no longer carry one
-    // (rejectGluedHash), so it never reaches here.
+    // other such character, but rejectGluedHash keeps one out of every rule.
     const config = block({ urlRules: buildUrlRules('GET ~^https://a\\.com/pkg"x$') });
     expect(config.includes('path -m reg ^/pkg\\"x$')).toBe(true);
     expect(config.includes('path -m reg ^/pkg"x$')).toBe(false);
