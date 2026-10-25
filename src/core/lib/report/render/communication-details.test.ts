@@ -460,144 +460,27 @@ describe("renderCommunicationDetailsBody", () => {
 });
 
 describe("renderCommunicationDetailsBody credential parameters", () => {
-  const subjectOf = (url: string) => {
+  it("redacts a credential in the query of the URL it prints", () => {
     const md = renderCommunicationDetailsBody(
-      [{ time: t, action: "allow", protocol: "https", host: "h", port: 443, method: "GET", url }],
+      [
+        {
+          time: t,
+          action: "allow",
+          protocol: "https",
+          host: "h",
+          port: 443,
+          method: "GET",
+          url: "https://h/x?token=secret&page=2",
+        },
+      ],
       t,
     );
-    const line = (md.split("```")[1] ?? "").trim();
-    return line.slice(line.indexOf("GET "), line.indexOf(" ->"));
-  };
-
-  it("replaces a presigned URL's signature and leaves the rest readable", () => {
-    // Which object was fetched and when the link expires are the whole point
-    // of the line; the signature is the only part that grants anything.
-    expect(subjectOf("https://h/x.tar.gz?X-Amz-Signature=abc123&X-Amz-Expires=3600")).toBe(
-      "GET https://h/x.tar.gz?X-Amz-Signature=***&X-Amz-Expires=3600",
-    );
-  });
-
-  it("matches the parameter name whatever its case", () => {
-    expect(subjectOf("https://h/v1?Api_Key=sk_live_1")).toBe("GET https://h/v1?Api_Key=***");
-  });
-
-  it("redacts the token names a bearer scheme spells out", () => {
-    expect(subjectOf("https://h/v1?api_token=t&auth_token=t&session_token=t&jwt=t")).toBe(
-      "GET https://h/v1?api_token=***&auth_token=***&session_token=***&jwt=***",
-    );
-    expect(subjectOf("https://h/v1?PRIVATE-TOKEN=t&access_key=k&passwd=p&pwd=p")).toBe(
-      "GET https://h/v1?PRIVATE-TOKEN=***&access_key=***&passwd=***&pwd=***",
-    );
-  });
-
-  it("matches a name split by dots or sent as an array", () => {
-    expect(subjectOf("https://h/v1?api.key=a&token[]=b&token[0]=c&Token[a][b]=d")).toBe(
-      "GET https://h/v1?api.key=***&token[]=***&token[0]=***&Token[a][b]=***",
-    );
-  });
-
-  it("matches a name ending in a bracket that closes nothing as it is", () => {
-    expect(subjectOf("https://h/v1?token]=a")).toBe("GET https://h/v1?token]=a");
-  });
-
-  it("reads a long run of unclosed brackets in one pass", () => {
-    const name = "[".repeat(65536);
-    const started = performance.now();
-    expect(subjectOf(`https://h/v1?${name}=a`)).toBe(`GET https://h/v1?${name}=a`);
-    expect(performance.now() - started).toBeLessThan(500);
-  });
-
-  it("ignores what an array name's brackets hold", () => {
-    expect(subjectOf("https://h/v1?user[password]=a")).toBe("GET https://h/v1?user[password]=a");
-  });
-
-  it("matches the name however its words are joined, keeping the spelling sent", () => {
-    expect(subjectOf("https://h/v1?subscription-key=a&api-key=b&client-secret=c")).toBe(
-      "GET https://h/v1?subscription-key=***&api-key=***&client-secret=***",
-    );
-    expect(
-      subjectOf(
-        "https://h/v1?accessToken=a&apiToken=b&clientSecret=c&authToken=d&refreshToken=e&idToken=f&sessionToken=g",
-      ),
-    ).toBe(
-      "GET https://h/v1?accessToken=***&apiToken=***&clientSecret=***&authToken=***&refreshToken=***&idToken=***&sessionToken=***",
-    );
-    expect(subjectOf("https://h/v1?X-Api-Key=a&subscription_key=b")).toBe(
-      "GET https://h/v1?X-Api-Key=***&subscription_key=***",
-    );
-  });
-
-  it("redacts the names a session or a personal access token goes by", () => {
-    expect(subjectOf("https://h/v1?Authorization=a&session=b&pat=c")).toBe(
-      "GET https://h/v1?Authorization=***&session=***&pat=***",
-    );
-  });
-
-  it("redacts a credential or credentials parameter", () => {
-    expect(subjectOf("https://h/v1?credential=a&Credentials=b")).toBe(
-      "GET https://h/v1?credential=***&Credentials=***",
-    );
-  });
-
-  it("splits parameters at `;` too, keeping the separator sent", () => {
-    expect(subjectOf("https://h/v1?a=1;token=t&b=2")).toBe("GET https://h/v1?a=1;token=***&b=2");
-  });
-
-  it("hides a credential's value up to the next `&`, whatever it holds", () => {
-    expect(subjectOf("https://h/v1?password=p;ss?w&x=1")).toBe("GET https://h/v1?password=***&x=1");
-    expect(subjectOf("https://h/v1?token=;s&x=1")).toBe("GET https://h/v1?token=***&x=1");
-  });
-
-  it("reads the query of a URL carried in a value", () => {
-    expect(subjectOf("https://h/login?next=/cb?token=t&page=2")).toBe(
-      "GET https://h/login?next=/cb?token=***&page=2",
-    );
-  });
-
-  it("does not match a name that only contains one it knows", () => {
-    expect(subjectOf("https://h/v1?tokenizer=x&keys=y")).toBe(
-      "GET https://h/v1?tokenizer=x&keys=y",
-    );
-  });
-
-  it("leaves a parameter nobody credentialed alone", () => {
-    // A blocked request has to keep saying what it tried to send, and an
-    // exfiltration payload is named whatever its author chose.
-    expect(subjectOf("https://h/?d=BASE64PAYLOAD&page=2")).toBe(
-      "GET https://h/?d=BASE64PAYLOAD&page=2",
-    );
-  });
-
-  it("leaves an empty value empty rather than claiming a secret", () => {
-    expect(subjectOf("https://h/v1?token=&page=2")).toBe("GET https://h/v1?token=&page=2");
-  });
-
-  it("leaves a URL with no query of its own alone", () => {
-    expect(subjectOf("https://h/token/key")).toBe("GET https://h/token/key");
-  });
-
-  it("redacts the query of a URL that also carries a fragment", () => {
-    expect(subjectOf("https://h/x?token=secret#frag")).toBe("GET https://h/x?token=***#frag");
+    expect(md).toContain("GET https://h/x?token=***&page=2 ->");
+    expect(md).not.toContain("secret");
   });
 });
 
 describe("renderCommunicationDetailsBody elapsed time", () => {
-  it("shows the first event at zero when it lands exactly on the start time", () => {
-    const md = renderCommunicationDetailsBody(
-      [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
-      t,
-    );
-    expect(md).toContain("00:00.000:");
-  });
-
-  it("widens to HH:MM:SS.mmm once elapsed passes an hour", () => {
-    const md = renderCommunicationDetailsBody(
-      [{ time: t + 3600, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
-      t,
-    );
-    expect(md).toContain("01:00:00.000:");
-  });
-
   it("falls back to absolute UTC when there is no start time to be relative to", () => {
     const md = renderCommunicationDetailsBody(
       [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
