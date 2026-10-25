@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -273,6 +275,16 @@ func TestInsertIntoKeystoreReportsATruncateFailure(t *testing.T) {
 	}
 	if original != nil {
 		t.Error("returned the original bytes for a keystore it left half-written")
+	}
+}
+
+func TestWithoutPathDropsTheScratchPath(t *testing.T) {
+	err := withoutPath(&fs.PathError{Op: "write", Path: "/scratch/cacerts", Err: syscall.ENOSPC})
+	if !errors.Is(err, syscall.ENOSPC) || strings.Contains(err.Error(), "/scratch") {
+		t.Errorf("got %v, want ENOSPC without the scratch path", err)
+	}
+	if got := withoutPath(errBrokenFile); got != errBrokenFile {
+		t.Errorf("got %v, want an error without a path passed through", got)
 	}
 }
 
@@ -684,6 +696,35 @@ func TestPKCS12WithInsertsEveryCert(t *testing.T) {
 	}
 	if len(certs) != 3 {
 		t.Fatalf("got %d certificates, want the original plus two", len(certs))
+	}
+}
+
+// The keystore inside the store mirror being left half-written abandons the
+// store's bind too: nothing reaches the real store or keystore.
+func TestInjectAbandonsAHalfWrittenKeystoreInsideTheStoreDir(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	pristine := keystore(2, trustedEntry(2, "digicert", otherDER))
+	writeRootfsKeystore(t, rootfs, "/etc/ssl/certs/java/cacerts", pristine)
+	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/lib/security"))
+	mustSymlink(t, "/etc/ssl/certs/java/cacerts",
+		filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
+
+	_, err := inject(bundle, testCA)
+	if !errors.Is(err, errKeystoreHalfWritten) ||
+		!strings.Contains(err.Error(), "/etc/ssl/certs/java/cacerts") {
+		t.Fatalf("got %v, want the half-written keystore named by its container path", err)
+	}
+	real, err := os.ReadFile(filepath.Join(rootfs, "etc/ssl/certs/java/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(real, pristine) {
+		t.Error("the real keystore was changed")
+	}
+	if left, err := os.ReadDir(scratchRoot); err != nil || len(left) != 0 {
+		t.Errorf("scratch directories left behind: %v %v", left, err)
 	}
 }
 

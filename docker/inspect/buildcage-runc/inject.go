@@ -270,15 +270,29 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		dir := filepath.Dir(keystore)
 		keystoresByDir[dir] = append(keystoresByDir[dir], filepath.Base(keystore))
 	}
+	// A keystore left half-written stops the injection there, before the spec
+	// is saved, so a step that will not run leaves it as it was.
+	abandonFor := func(b *dirBind) (*injection, error) {
+		in := &injection{
+			rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
+			upper: upper,
+		}
+		return nil, errors.Join(b.halfWritten, in.abandon())
+	}
 	for hostDir, names := range keystoresByDir {
 		containerDir := containerPathOf(s.rootfs, hostDir)
 		if covering := bindCovering(binds, containerDir); covering != nil {
 			for _, name := range names {
 				rel := filepath.Join(strings.TrimPrefix(containerDir, covering.containerDir), name)
-				covering.coverKeystore(rel, ca)
+				if covering.coverKeystore(rel, ca); covering.halfWritten != nil {
+					return abandonFor(covering)
+				}
 			}
 		} else if b := prepareBind(s, bundle, hostDir, names, ca, customDirLimit, true); b != nil {
 			binds = append(binds, b)
+			if b.halfWritten != nil {
+				return abandonFor(b)
+			}
 		}
 	}
 
@@ -291,22 +305,15 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	}
 	created.add(nssCreated.dirs)
 
-	in := &injection{
-		rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
-		upper: upper, nssAppended: nssAppended,
-	}
-	// Before the spec is saved, so a step that will not run leaves it as it was.
-	for _, b := range binds {
-		if b.halfWritten != nil {
-			return nil, errors.Join(b.halfWritten, in.abandon())
-		}
-	}
-
 	s.setEnv(plan.env)
 	if err := s.save(); err != nil {
 		logf("cannot update the process spec: %v", err)
 	}
-	return in, nil
+
+	return &injection{
+		rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
+		upper: upper, nssAppended: nssAppended,
+	}, nil
 }
 
 // abandon undoes an injection whose step will not run. The mirrors are dropped

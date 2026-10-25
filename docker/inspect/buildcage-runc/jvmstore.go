@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -166,13 +167,22 @@ func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 
-	// Unnamed: the caller knows the keystore by its path in the container.
 	if _, err := f.WriteAt(injected, 0); err != nil {
-		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, err)
+		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
 	}
 	// A failed truncate may leave the old tail after a shorter rewrite.
 	if err := f.Truncate(int64(len(injected))); err != nil {
-		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, err)
+		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
 	}
 	return content, nil
+}
+
+// withoutPath drops the scratch path an *fs.PathError carries, since the
+// caller names the keystore by its path in the container.
+func withoutPath(err error) error {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return pathErr.Err
+	}
+	return err
 }
