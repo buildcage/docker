@@ -22,6 +22,9 @@ interface ExpectMatchers {
   toBeTruthy(): void;
   toThrow(pattern?: RegExp | string): void;
   toMatch(pattern: RegExp | string): void;
+  toContain(item: unknown): void;
+  toBeGreaterThan(n: number): void;
+  toBeLessThan(n: number): void;
   toSatisfy(predicate: (value: unknown) => boolean): void;
   not: ExpectMatchers;
   rejects: AsyncExpectMatchers;
@@ -34,6 +37,9 @@ interface AsyncExpectMatchers {
   toBeTruthy(): Promise<void>;
   toThrow(pattern?: RegExp | string): Promise<void>;
   toMatch(pattern: RegExp | string): Promise<void>;
+  toContain(item: unknown): Promise<void>;
+  toBeGreaterThan(n: number): Promise<void>;
+  toBeLessThan(n: number): Promise<void>;
   toSatisfy(predicate: (value: unknown) => boolean): Promise<void>;
 }
 type Expect = (actual: unknown) => ExpectMatchers;

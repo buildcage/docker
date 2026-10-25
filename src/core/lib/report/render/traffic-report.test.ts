@@ -206,7 +206,7 @@ describe("renderReportMarkdown: universal", () => {
 
   it("does not call a run that only failed connections no communication", () => {
     const md = renderReportMarkdown({ ...base, failed: [failedRow] }, "owner/repo", "v1");
-    expect(md.includes("_(no communication)_")).toBe(false);
+    expect(md).not.toContain("_(no communication)_");
   });
 
   it("suggests a host whose name failed to resolve in audit, which nothing blocked", () => {

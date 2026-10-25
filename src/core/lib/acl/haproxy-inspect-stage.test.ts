@@ -67,10 +67,10 @@ describe("inspect stage", () => {
     // and some tools write it that way to skip resolv.conf's search list.
     const set = "http-request set-var(txn.host) req.hdr(host),lower,host_only,regsub(\\.$,)";
     const plain = plainStage({ httpRules: ["a.com:80"] });
-    expect(plain.includes(set)).toBe(true);
+    expect(plain).toContain(set);
     expect(plain.indexOf(set) < plain.indexOf("set-var(txn.allowed)")).toBe(true);
     // audit has no rule block, but still resolves from it.
-    expect(plainStage({}, "audit").includes(set)).toBe(true);
+    expect(plainStage({}, "audit")).toContain(set);
   });
 
   it("blocks a Host that is not a hostname before any rule or resolution, in audit too", () => {
@@ -79,8 +79,8 @@ describe("inspect stage", () => {
     for (const mode of ["restrict", "audit"] as const) {
       const plain = plainStage({ httpRules: ["~^a\\.com:.*$"] }, mode);
       const deny = plain.indexOf("http-request deny deny_status 400 if !host_is_name");
-      expect(plain.includes("acl host_is_name var(txn.host) -m reg ^[A-Za-z0-9._-]+$")).toBe(true);
-      expect(plain.includes("set-var(txn.reason) str(invalid-host) if !host_is_name")).toBe(true);
+      expect(plain).toContain("acl host_is_name var(txn.host) -m reg ^[A-Za-z0-9._-]+$");
+      expect(plain).toContain("set-var(txn.reason) str(invalid-host) if !host_is_name");
       expect(deny > plain.indexOf("set-var(txn.host)")).toBe(true);
       expect(deny < plain.indexOf("do-resolve")).toBe(true);
       if (mode === "restrict") expect(deny < plain.indexOf("set-var(txn.allowed)")).toBe(true);
@@ -91,9 +91,9 @@ describe("inspect stage", () => {
     // HAProxy skips every http-request rule after an unconditional deny and
     // warns that they are NOOP. The resolver block is what would follow here.
     const plain = plainStage({ httpsRules: ["a.example.com:443"] });
-    expect(plain.includes("# No rules for this scheme, so nothing is permitted.")).toBe(true);
-    expect(plain.includes("do-resolve")).toBe(false);
-    expect(plain.includes("acl dst_internal")).toBe(false);
+    expect(plain).toContain("# No rules for this scheme, so nothing is permitted.");
+    expect(plain).not.toContain("do-resolve");
+    expect(plain).not.toContain("acl dst_internal");
   });
 
   it("exempts only where a rule that writes the address as its host matches", () => {
@@ -116,21 +116,19 @@ describe("inspect stage", () => {
 
   it("never exempts the proxy's own network or listener, which would loop back", () => {
     const plain = plainStage({ httpRules: ["127.0.0.1:10024"] });
-    expect(plain.includes("acl dst_proxy_self var(txn.dst) -m ip 198.19.255.0/24")).toBe(true);
-    expect(plain.includes("acl dst_proxy_self dst_port 10024")).toBe(true);
-    expect(
-      plain.includes(
-        "deny deny_status 403 if dst_internal !named_address or dst_internal dst_proxy_self\n",
-      ),
-    ).toBe(true);
+    expect(plain).toContain("acl dst_proxy_self var(txn.dst) -m ip 198.19.255.0/24");
+    expect(plain).toContain("acl dst_proxy_self dst_port 10024");
+    expect(plain).toContain(
+      "deny deny_status 403 if dst_internal !named_address or dst_internal dst_proxy_self\n",
+    );
   });
 
   it("keeps the exemption in audit, where no rule is enforced", () => {
     // audit emits no rule block, so the exemption cannot lean on it.
     const plain = plainStage({ httpRules: ["169.254.169.254:80"] }, "audit");
-    expect(plain.includes("txn.allowed")).toBe(false);
-    expect(plain.includes("-m str 169.254.169.254 } { dst_port 80 }")).toBe(true);
-    expect(plain.includes("deny deny_status 403 if dst_internal !named_address")).toBe(true);
+    expect(plain).not.toContain("txn.allowed");
+    expect(plain).toContain("-m str 169.254.169.254 } { dst_port 80 }");
+    expect(plain).toContain("deny deny_status 403 if dst_internal !named_address");
   });
 });
 
@@ -139,8 +137,8 @@ describe("extension", () => {
 
   it("is left out, log field and all, when there is none", () => {
     const plain = plainStage(rules);
-    expect(plain.includes("extension")).toBe(false);
-    expect(plain.includes("wb=")).toBe(false);
+    expect(plain).not.toContain("extension");
+    expect(plain).not.toContain("wb=");
   });
 
   it("logs each field it names after what restrict would block", () => {
@@ -148,11 +146,9 @@ describe("extension", () => {
       ...EXTENSION,
       logFields: { name: "example", fields: { kind: "txn.example_kind" } },
     });
-    expect(
-      plain.includes(
-        "wb=%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)] example.kind=%[var(txn.example_kind),regsub([^A-Za-z0-9._-],_,g)] host=",
-      ),
-    ).toBe(true);
+    expect(plain).toContain(
+      "wb=%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)] example.kind=%[var(txn.example_kind),regsub([^A-Za-z0-9._-],_,g)] host=",
+    );
   });
 
   it("refuses a field name the log parser could not read back, or a variable it would have to quote", () => {
@@ -177,11 +173,9 @@ describe("extension", () => {
 
   it("logs what restrict would block ahead of the host", () => {
     const plain = plainStage(rules, "restrict", EXTENSION);
-    expect(
-      plain.includes(
-        "dst=%[dst]:%[dst_port] wb=%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)] host=",
-      ),
-    ).toBe(true);
+    expect(plain).toContain(
+      "dst=%[dst]:%[dst_port] wb=%[var(txn.would_block),regsub([^A-Za-z0-9._-],_,g)] host=",
+    );
   });
 
   it("runs after the rules and before the name is resolved, told the mode", () => {
@@ -195,18 +189,16 @@ describe("extension", () => {
   });
 
   it("adds response rules to the TLS stage alone", () => {
-    expect(
-      tlsStage({ httpsRules: ["~^b\\.example\\.com:443$"] }, "audit", EXTENSION).includes(
-        "extension response rules",
-      ),
-    ).toBe(true);
-    expect(plainStage(rules, "audit", EXTENSION).includes("extension response rules")).toBe(false);
+    expect(tlsStage({ httpsRules: ["~^b\\.example\\.com:443$"] }, "audit", EXTENSION)).toContain(
+      "extension response rules",
+    );
+    expect(plainStage(rules, "audit", EXTENSION)).not.toContain("extension response rules");
   });
 
   // Nothing may follow a deny that always fires; see deniesEverything.
   it("is left out where the rules block everything", () => {
     const plain = plainStage({}, "restrict", EXTENSION);
-    expect(plain.includes("extension request rules")).toBe(false);
+    expect(plain).not.toContain("extension request rules");
   });
 });
 

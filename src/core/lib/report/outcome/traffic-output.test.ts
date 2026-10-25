@@ -187,7 +187,7 @@ describe("writeTrafficFile", () => {
     const file = join(mkdtempSync(join(tmpdir(), "buildcage-art-")), "traffic.json");
     writeTrafficFile(file, buildTrafficRecords(EVENTS, t));
     const text = readFileSync(file, "utf8");
-    expect(text.includes('\n  {\n    "time"')).toBe(true);
+    expect(text).toContain('\n  {\n    "time"');
     expect(JSON.parse(text).length).toBe(6);
   });
 });

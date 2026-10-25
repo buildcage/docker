@@ -18,7 +18,7 @@ describe("section boundaries", () => {
 
 describe("defaults", () => {
   it("keeps an idle tunnel open past the client and server timeouts", () => {
-    expect(preamble({ global: [], defaults: [] }).includes("    timeout tunnel 1h")).toBe(true);
+    expect(preamble({ global: [], defaults: [] })).toContain("    timeout tunnel 1h");
   });
 });
 

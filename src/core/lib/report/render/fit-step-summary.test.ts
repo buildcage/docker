@@ -98,11 +98,11 @@ describe("fitStepSummary", () => {
 
     // Without this the check below would also hold for input that was never
     // cut, which has its fences balanced already.
-    expect(truncated.includes("truncated")).toBe(true);
+    expect(truncated).toContain("truncated");
     // An odd number of fence markers would mean the cut left one open.
     const fenceCount = (truncated.match(/^```$/gm) ?? []).length;
     expect(fenceCount % 2).toBe(0);
-    expect(truncated.includes("</details>")).toBe(true);
+    expect(truncated).toContain("</details>");
     expect(truncated.endsWith(FOOTER)).toBe(true);
   });
 
@@ -110,20 +110,20 @@ describe("fitStepSummary", () => {
     const truncated = fitStepSummary(withCommunicationDetails(logLines(200), true), {
       limitBytes: SMALL_LIMIT,
     });
-    expect(truncated.includes("buildcage-traffic artifact")).toBe(true);
+    expect(truncated).toContain("buildcage-traffic artifact");
   });
 
   it("suggests turning the artifact on when none was uploaded", () => {
     const truncated = fitStepSummary(withCommunicationDetails(logLines(200)), {
       limitBytes: SMALL_LIMIT,
     });
-    expect(truncated.includes("upload_traffic_artifact: true")).toBe(true);
+    expect(truncated).toContain("upload_traffic_artifact: true");
   });
 
   it("still fits and still notes the cut even when the fixed parts alone leave no budget", () => {
     const blocks = [frame("x".repeat(SMALL_LIMIT)), ...withCommunicationDetails(["one line"])];
     const truncated = fitStepSummary(blocks, { limitBytes: SMALL_LIMIT });
-    expect(truncated.includes("truncated")).toBe(true);
+    expect(truncated).toContain("truncated");
     expect(truncated.endsWith(FOOTER)).toBe(true);
   });
 

@@ -196,7 +196,7 @@ describe("describeBlockedOutcome", () => {
         "2 blocked connection(s) and lookup(s) detected by buildcage proxy",
       ),
     ).toBe(true);
-    expect(result.message.includes("the logs are incomplete")).toBe(true);
+    expect(result.message).toContain("the logs are incomplete");
   });
 
   it("names no count for an incomplete log that recorded none", () => {

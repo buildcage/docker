@@ -62,7 +62,7 @@ describe("a row carrying a note", () => {
         note: "(12 hosts)",
       },
     ]);
-    expect(md.includes("| `*.sury.org:*` (12 hosts) | DNS | 12 |")).toBe(true);
+    expect(md).toContain("| `*.sury.org:*` (12 hosts) | DNS | 12 |");
   });
 });
 
@@ -71,7 +71,7 @@ describe("a row with no port", () => {
     const md = renderHostTable([
       { host: "attacker.example", port: "-", ruleType: "DNS", reason: "dns-not-allowed", count: 1 },
     ]);
-    expect(md.includes("`attacker.example` |")).toBe(true);
-    expect(md.includes("attacker.example:-")).toBe(false);
+    expect(md).toContain("`attacker.example` |");
+    expect(md).not.toContain("attacker.example:-");
   });
 });

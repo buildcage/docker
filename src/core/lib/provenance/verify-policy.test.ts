@@ -118,7 +118,7 @@ describe("buildVerifyOptions: SHA pin", () => {
   it("lowercases the SHA in the OID value", () => {
     const opts = buildVerifyOptions({ actionRef: pinSha.toUpperCase(), actionRepo: REPO })!;
     const oidValue = opts.certificateOIDs![OID_SOURCE_REPO_DIGEST];
-    expect(oidValue.includes(pinSha.toLowerCase()), "SHA must be lowercased").toBeTruthy();
+    expect(oidValue, "SHA must be lowercased").toContain(pinSha.toLowerCase());
   });
 
   it("certificateIdentityURI accepts any version tag SAN (SHA checked via OID)", () => {

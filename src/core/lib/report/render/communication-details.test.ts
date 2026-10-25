@@ -57,7 +57,7 @@ describe("renderCommunicationDetailsBody", () => {
   });
 
   it("shows the URL and method of a blocked request", () => {
-    expect(md.includes("POST https://evil.example.com/exfil?token=***")).toBe(true);
+    expect(md).toContain("POST https://evil.example.com/exfil?token=***");
   });
 
   it("says what restrict would have blocked of a request audit let through", () => {
@@ -96,12 +96,12 @@ describe("renderCommunicationDetailsBody", () => {
 
   it("names the reason after the arrow instead of a status", () => {
     // 403, 502 and 503 mean different things; the number does not say which.
-    expect(md.includes("-> not-allowed")).toBe(true);
-    expect(md.includes("-> 403")).toBe(false);
+    expect(md).toContain("-> not-allowed");
+    expect(md).not.toContain("-> 403");
   });
 
   it("shows a passthrough as a host and port, though it has no url to show", () => {
-    expect(md.includes("TLS db.example.com:5432 -> (3.3KB)")).toBe(true);
+    expect(md).toContain("TLS db.example.com:5432 -> (3.3KB)");
   });
 
   it("shows a portless connection as just its host, never host:undefined", () => {
@@ -131,7 +131,7 @@ describe("renderCommunicationDetailsBody", () => {
   });
 
   it("keeps a blocked name, which nothing else records", () => {
-    expect(md.includes("DNS secret.attacker.example -> dns-not-allowed")).toBe(true);
+    expect(md).toContain("DNS secret.attacker.example -> dns-not-allowed");
   });
 
   it("drops a blocked name once a blocked request for it also shows up", () => {
@@ -158,20 +158,20 @@ describe("renderCommunicationDetailsBody", () => {
     );
     const body2 = (md2.split("```")[1] ?? "").trim().split("\n");
     expect(body2.length).toBe(1);
-    expect(body2[0].includes("DNS notallowed.example.com")).toBe(false);
-    expect(body2[0].includes("GET https://notallowed.example.com/")).toBe(true);
+    expect(body2[0]).not.toContain("DNS notallowed.example.com");
+    expect(body2[0]).toContain("GET https://notallowed.example.com/");
   });
 
   it("leaves out a name that merely resolved", () => {
     // The request that followed already says it did, and listing both doubles
     // every line.
     expect(lines.length).toBe(4);
-    expect(md.includes("DNS a.example.com")).toBe(false);
+    expect(md).not.toContain("DNS a.example.com");
   });
 
   it("puts everything in a fenced block, so URLs stay copy-pastable", () => {
-    expect(md.includes("```")).toBe(true);
-    expect(md.includes("\\_")).toBe(false);
+    expect(md).toContain("```");
+    expect(md).not.toContain("\\_");
   });
 
   it("names the record type a discovery lookup asked for, and says it got nothing", () => {
@@ -189,11 +189,11 @@ describe("renderCommunicationDetailsBody", () => {
       ],
       t,
     );
-    expect(md2.includes("DNS SRV _http._tcp.deb.debian.org")).toBe(true);
-    expect(md2.includes("no data (SRV is never served)")).toBe(true);
+    expect(md2).toContain("DNS SRV _http._tcp.deb.debian.org");
+    expect(md2).toContain("no data (SRV is never served)");
     // Neither allowed nor blocked, so it carries neither mark.
-    expect(md2.includes("🚫")).toBe(false);
-    expect(md2.includes("✅")).toBe(false);
+    expect(md2).not.toContain("🚫");
+    expect(md2).not.toContain("✅");
   });
 
   it("shows a discovery lookup even though the host it belongs to connected", () => {
@@ -235,7 +235,7 @@ describe("renderCommunicationDetailsBody", () => {
       [{ time: t, action: "allow", protocol: "dns", host: "a.com" }],
       t,
     );
-    expect(only.includes("DNS a.com -> resolved")).toBe(true);
+    expect(only).toContain("DNS a.com -> resolved");
   });
 
   it('falls back to a bare "blocked" when a block names no reason', () => {
@@ -272,7 +272,7 @@ describe("renderCommunicationDetailsBody", () => {
         ],
         t,
       );
-      expect(rendered.includes(`HTTPS untrusted.example.com:8443 -> ${reason}`)).toBe(true);
+      expect(rendered).toContain(`HTTPS untrusted.example.com:8443 -> ${reason}`);
     }
   });
 
@@ -299,7 +299,7 @@ describe("renderCommunicationDetailsBody", () => {
       ],
       t,
     );
-    expect(rendered.includes("HTTP (unknown):25 -> client-aborted")).toBe(true);
+    expect(rendered).toContain("HTTP (unknown):25 -> client-aborted");
   });
 
   it("hides a client-ended connection to a host that also completed one", () => {
@@ -329,8 +329,8 @@ describe("renderCommunicationDetailsBody", () => {
         ],
         t,
       );
-      expect(md.includes(reason)).toBe(false);
-      expect(md.includes("GET https://registry.example.com/pkg")).toBe(true);
+      expect(md).not.toContain(reason);
+      expect(md).toContain("GET https://registry.example.com/pkg");
     }
   });
 
@@ -360,8 +360,8 @@ describe("renderCommunicationDetailsBody", () => {
       ],
       t,
     );
-    expect(md.includes("client-aborted")).toBe(false);
-    expect(md.includes("-> origin-aborted")).toBe(true);
+    expect(md).not.toContain("client-aborted");
+    expect(md).toContain("-> origin-aborted");
   });
 
   it("marks a request the proxy could not read as the block it was", () => {
@@ -380,7 +380,7 @@ describe("renderCommunicationDetailsBody", () => {
       ],
       t,
     );
-    expect(rendered.includes("🚫 00:00.000: HTTP (unknown):8080 -> bad-request")).toBe(true);
+    expect(rendered).toContain("🚫 00:00.000: HTTP (unknown):8080 -> bad-request");
   });
 
   it("marks a connection haproxy itself ended before a request arrived", () => {
@@ -397,7 +397,7 @@ describe("renderCommunicationDetailsBody", () => {
       ],
       t,
     );
-    expect(rendered.includes("⚠️ 00:00.000: HTTPS a.example.com:443 -> no-request")).toBe(true);
+    expect(rendered).toContain("⚠️ 00:00.000: HTTPS a.example.com:443 -> no-request");
   });
 
   it("keeps the method of a request whose target no URL fits", () => {
@@ -418,9 +418,7 @@ describe("renderCommunicationDetailsBody", () => {
       ],
       t,
     );
-    expect(
-      rendered.includes("🚫 00:00.000: OPTIONS HTTPS registry.npmjs.org:443 -> not-allowed"),
-    ).toBe(true);
+    expect(rendered).toContain("🚫 00:00.000: OPTIONS HTTPS registry.npmjs.org:443 -> not-allowed");
   });
 
   it('falls back to a bare "no request" when such a connection names no reason', () => {
@@ -449,9 +447,7 @@ describe("renderCommunicationDetailsBody", () => {
       ],
       t,
     );
-    expect(
-      rendered.includes("⚠️ 00:00.000: GET https://a.example.com/pkg.tgz -> origin-aborted"),
-    ).toBe(true);
+    expect(rendered).toContain("⚠️ 00:00.000: GET https://a.example.com/pkg.tgz -> origin-aborted");
   });
 
   it('falls back to a bare "failed" when such a connection names no reason', () => {
@@ -591,7 +587,7 @@ describe("renderCommunicationDetailsBody elapsed time", () => {
       [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       t,
     );
-    expect(md.includes("00:00.000:")).toBe(true);
+    expect(md).toContain("00:00.000:");
   });
 
   it("widens to HH:MM:SS.mmm once elapsed passes an hour", () => {
@@ -599,7 +595,7 @@ describe("renderCommunicationDetailsBody elapsed time", () => {
       [{ time: t + 3600, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       t,
     );
-    expect(md.includes("01:00:00.000:")).toBe(true);
+    expect(md).toContain("01:00:00.000:");
   });
 
   it("falls back to absolute UTC when there is no start time to be relative to", () => {
@@ -607,7 +603,7 @@ describe("renderCommunicationDetailsBody elapsed time", () => {
       [{ time: t, action: "allow", protocol: "tls", host: "a", port: 1, bytes: 1 }],
       undefined,
     );
-    expect(md.includes("00:00.000:")).toBe(false);
-    expect(md.includes("Z:")).toBe(true);
+    expect(md).not.toContain("00:00.000:");
+    expect(md).toContain("Z:");
   });
 });
