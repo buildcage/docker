@@ -40,8 +40,8 @@ BUILDX_BUILD = docker buildx build --no-cache --builder $(BUILDER_NAME) --platfo
 # excluded because none of those targets touches it.
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export COMPOSE_PROJECT_NAME := buildcage-project$(BUILDCAGE_WORKTREE_SUFFIX)
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export BUILDCAGE_BUILD_TEST_HOOKS := 1
-# Read by compose.yaml's container_name, report/src/main.ts, src/post.ts and
-# test/assert-post.sh.
+# Read by compose.yaml's container_name, report/src/lib/inputs.ts,
+# src/lib/inputs.ts (for the post step) and test/assert-post.sh.
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export BUILDER_NAME := $(BUILDER_NAME)
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export INPUT_BUILDER_NAME := $(BUILDER_NAME)
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export TEST_IMAGE := $(TEST_IMAGE)

@@ -47,7 +47,8 @@ export function buildComposeEnv(
     PROXY_ENGINE: proxyEngine,
     // Read by buildcage-runc in each RUN step; universal has no CA to leave.
     FAIL_ON_CA_RESIDUE: String(failOnCaResidue),
-    // Newline separated: a URL rule contains a space.
+    // Newline separated, since a URL rule contains a space; the other rule
+    // inputs are joined the same way.
     ALLOWED_HTTPS_RULES: httpsRules.join("\n"),
     ALLOWED_HTTP_RULES: httpRules.join("\n"),
     ALLOWED_IP_RULES: ipRules.join("\n"),

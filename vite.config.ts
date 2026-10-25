@@ -5,8 +5,8 @@ import { defineConfig } from "vite-plus";
 const generatedOutputs = ["dist/**", "report/dist/**"];
 
 // Recorded/golden fixtures are captured data the tests compare or parse
-// verbatim, so reformatting any of them breaks those tests, even ones that
-// happen to be safe today.
+// verbatim, so none of them is reformatted, even one whose tests would
+// survive it.
 const fixtures = ["**/__fixtures__/**"];
 
 // Vendored third-party code, reviewed as a diff against upstream: the seccomp

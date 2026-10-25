@@ -4,9 +4,9 @@
  *
  * wildcard-rules.ts rejects that, requiring a label containing `*` to be
  * exactly `*` or `**`. Setup checks every host rule against that grammar
- * (see parseRulesOrThrow), so only a URL rule reaches this one with a wildcard
- * inside a label, and widening it cannot change what the `universal` engine
- * accepts.
+ * (see parseRulesOrThrow), so through the action only a URL rule reaches this
+ * one with a wildcard inside a label. Rules handed to the image directly, as a
+ * local run does, skip that check.
  *
  * The wildcard vocabulary is otherwise unchanged, and keeps the same meaning
  * wherever it appears in a label:
