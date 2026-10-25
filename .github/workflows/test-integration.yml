@@ -19,6 +19,7 @@ permissions: {}
 jobs:
   changes:
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -63,6 +64,9 @@ jobs:
     # only on pull_request); a skipped need otherwise skips the job unevaluated.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test == 'true') }}
     runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
+    # Well above a normal run; without a limit a hung builder holds a runner
+    # for six hours.
+    timeout-minutes: 15
     permissions:
       contents: read
 
@@ -182,6 +186,7 @@ jobs:
 
   targets:
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     permissions:
       contents: read
     name: "integration: every make target has a job"
@@ -206,7 +211,8 @@ jobs:
   # list whenever the matrix changes.
   integration-tests-passed:
     name: Integration tests passed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
     needs: [changes, targets, test]
     if: always()
     permissions: {}
