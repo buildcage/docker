@@ -973,7 +973,7 @@ func TestCoverKeystoreMarksAHalfWrittenKeystore(t *testing.T) {
 	mustWriteFile(t, filepath.Join(scratch, "cacerts"),
 		string(keystore(2, trustedEntry(2, "digicert", otherDER))))
 	b := &dirBind{scratchDir: scratch, containerDir: "/x"}
-	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
 
 	b.coverKeystore("cacerts", testCA)
 

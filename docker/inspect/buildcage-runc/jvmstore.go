@@ -124,9 +124,9 @@ func findJVMKeystores(s *spec) []string {
 // insertIntoKeystore adds a trusted-certificate entry for the CA to the keystore
 // at path, rewriting it in place. Like removeFromBinaryStore it reads the file
 // once and dispatches on its format. On success it returns the keystore's
-// pre-injection bytes for the caller to restore later. An error before the
-// write leaves the keystore untouched for the caller to report, so the step's
-// JVM does not trust the CA; one from the write itself wraps
+// pre-injection bytes for the caller to restore later. An error that wrote
+// nothing leaves the keystore untouched for the caller to report, so the
+// step's JVM does not trust the CA; one after part of the write wraps
 // errKeystoreHalfWritten.
 func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 	ders := certificateDERs(ca)
@@ -167,12 +167,17 @@ func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 
-	if _, err := f.WriteAt(injected, 0); err != nil {
+	if n, err := f.WriteAt(injected, 0); err != nil {
+		if n == 0 {
+			return nil, err // nothing written, so the keystore is as it was
+		}
 		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
 	}
-	// A failed truncate may leave the old tail after a shorter rewrite.
-	if err := f.Truncate(int64(len(injected))); err != nil {
-		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
+	// Only a shorter rewrite leaves an old tail to cut; a JKS always grows.
+	if int64(len(injected)) < size {
+		if err := f.Truncate(int64(len(injected))); err != nil {
+			return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
+		}
 	}
 	return content, nil
 }

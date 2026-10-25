@@ -10,6 +10,8 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
 
 // writeRootfsKeystore places raw keystore bytes at a container path inside
@@ -257,24 +259,53 @@ func TestInsertIntoKeystoreReportsAReadFailure(t *testing.T) {
 	}
 }
 
+// A write that fails before writing anything leaves the keystore as it was, so
+// it is not reported as half-written.
 func TestInsertIntoKeystoreReportsAWriteFailure(t *testing.T) {
-	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
+	pristine := keystore(2, trustedEntry(2, "digicert", otherDER))
+	path := mustWriteKeystore(t, pristine)
 	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
 	_, err := insertIntoKeystore(path, testCA)
-	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
-		t.Fatalf("got %v, want the write failure as a half-written keystore", err)
+	if !errors.Is(err, errBrokenFile) || errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the write failure, not a half-written keystore", err)
+	}
+	if got, _ := os.ReadFile(path); !bytes.Equal(got, pristine) {
+		t.Error("the keystore changed though nothing was written")
 	}
 }
 
-func TestInsertIntoKeystoreReportsATruncateFailure(t *testing.T) {
+func TestInsertIntoKeystoreReportsAShortWrite(t *testing.T) {
 	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
-	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
 	original, err := insertIntoKeystore(path, testCA)
 	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
-		t.Fatalf("got %v, want the truncate failure as a half-written keystore", err)
+		t.Fatalf("got %v, want the short write as a half-written keystore", err)
 	}
 	if original != nil {
 		t.Error("returned the original bytes for a keystore it left half-written")
+	}
+}
+
+// A JKS rewrite only grows, so there is no tail to cut and no truncate to fail.
+func TestInsertIntoKeystoreSkipsTheTruncateForAGrowingRewrite(t *testing.T) {
+	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+	if _, err := insertIntoKeystore(path, testCA); err != nil {
+		t.Fatalf("got %v, want the grown keystore written without a truncate", err)
+	}
+}
+
+// A rewrite shorter than the keystore it replaces has a tail to cut, and a
+// failed truncate leaves it there. Re-encoding a PKCS#12 can shrink it.
+func TestInsertIntoKeystoreReportsATruncateFailure(t *testing.T) {
+	path := mustWritePKCS12(t, passwordlessStore(t, testCert(t, "digicert")))
+	old := encodePKCS12
+	encodePKCS12 = func([]pkcs12.TrustStoreEntry, string, bool) ([]byte, error) { return []byte("short"), nil }
+	t.Cleanup(func() { encodePKCS12 = old })
+	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+	_, err := insertIntoKeystore(path, certPEM(testCert(t, "buildcage")))
+	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the truncate failure as a half-written keystore", err)
 	}
 }
 
@@ -299,7 +330,7 @@ func TestInjectAbandonsAHalfWrittenKeystore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
 
 	_, err = inject(bundle, testCA)
 	if !errors.Is(err, errKeystoreHalfWritten) ||
@@ -709,7 +740,7 @@ func TestInjectAbandonsAHalfWrittenKeystoreInsideTheStoreDir(t *testing.T) {
 	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/lib/security"))
 	mustSymlink(t, "/etc/ssl/certs/java/cacerts",
 		filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
-	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
 
 	_, err := inject(bundle, testCA)
 	if !errors.Is(err, errKeystoreHalfWritten) ||
