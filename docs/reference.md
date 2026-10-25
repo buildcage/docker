@@ -157,14 +157,14 @@ destination named, which is why it is worth running `audit` first.
 ## Rule syntax
 
 `allowed_url_rules` and `allowed_tls_rules` need `proxy_engine: inspect`. The host rules work with
-either engine.
+every engine.
 
 ### URL rules: `allowed_url_rules`
 
 A rule is a method list, a space, then a URL pattern. Because a rule contains a space, this input is
 newline-separated. The method is required, so a rule always states what it permits. A `#` at the
 start of a line, or after whitespace, begins a comment that runs to the end of the line, and a blank
-line is ignored, which helps once the list gets long. A `#` with no space before it is not a
+line is ignored, so a long list can be split into groups. A `#` with no space before it is not a
 comment: since `#` never legitimately appears in a rule (it is part of no host or URL, and a
 fragment never travels with a request), it is reported as a mistake rather than silently trimmed.
 
@@ -190,11 +190,11 @@ allowed_url_rules: |
 ```
 
 Methods are separated by `|` or `,`, and `*` means any method. The port may be left out when it is
-the scheme's default, and a pattern with no path allows any path on that host. A `#` fragment is
-refused: it never travels with a request, so a rule carrying one could only match nothing. So is a
-query string (a `?` followed by text holding `=` or `&`), since a rule matches the path alone and
-the query is never compared, and a user name before an `@` in the host, which no request's Host
-carries.
+the scheme's default, and a pattern with no path allows any path on that host. A pattern may not
+carry a `#` fragment, which never travels with a request, so a rule carrying one could only match
+nothing; a query string (a `?` followed by text holding `=` or `&`), since a rule matches the path
+alone and the query is never compared; or a user name before an `@` in the host, which no request's
+`Host` carries.
 
 | Pattern | In a domain                                       | In a path                     |
 | ------- | ------------------------------------------------- | ----------------------------- |
@@ -289,13 +289,13 @@ resolver blocked has no port at all, nothing having been connected to. `telemetr
 
 `known_blocked_rules` lists traffic that is expected to be blocked, so a build isn't failed over a
 block you already know about (see [Report action inputs](#report-action-inputs)). It does not
-allow anything: the traffic stays blocked. That is the point for a telemetry endpoint you want
-blocked but not treated as an error, where allowing it would let the request through.
+allow anything: the traffic stays blocked. Use it for a telemetry endpoint you want blocked without
+failing the step, where allowing it would let the request through.
 
 Unlike the allow inputs it is newline-separated, one rule per line, because a line can be either
 form:
 
-- a **host rule** (`host:port`, the syntax above), which works on either engine; and
+- a **host rule** (`host:port`, the syntax above), which works on every engine; and
 - a **URL rule** (a method and a URL, the [`allowed_url_rules`](#url-rules-allowed_url_rules)
   syntax), which needs `proxy_engine: inspect`, the only engine that sees a method or a path.
 
@@ -329,7 +329,7 @@ Because a URL rule matches nothing on an engine that never sees a method or a pa
 Connections made straight to an address never go through DNS, so they are allowed separately from
 any domain. IPv4 only, in decimal without leading zeros (`10.0.0.1`, not `010.0.0.1`, which HAProxy
 reads as octal) and with a prefix length of 0 to 32; setup refuses anything else. A rule can be an
-address, a CIDR block, a wildcard or a `~` regex, the same on both engines:
+address, a CIDR block, a wildcard or a `~` regex, the same on every engine:
 
 ```yaml
 allowed_ip_rules: |
@@ -343,12 +343,13 @@ A rule is matched against the address the connection goes to, never a name the c
 so a rule naming a host is refused at setup. A `~` rule is not checked for this: write it against
 the address and port as digits, since one that names a host matches nothing. A range that covers the
 proxy's own address, which every name resolves to inside the cage, still leaves a connection made
-through a name to the domain rules. Either way the connection is tunnelled without inspection: once
-an `ip:port` pair is allowed, any TCP-based protocol can use that path. It is connected as soon as
-it arrives, without waiting for the client to send anything, so a protocol where the server speaks
-first (SMTP, MySQL) works too. It goes to the address the client connected to whatever name it
-carries (under `inspect`, even one an `allowed_tls_rules` entry names), and the report lists it
-under the `IP` rule type. Prefer a domain rule where the destination has a stable name.
+through a name to the domain rules. A connection an IP rule allows is tunneled without inspection:
+once an `ip:port` pair is allowed, any TCP-based protocol can use that path. The proxy connects
+upstream as soon as the connection arrives, without waiting for the client to send anything, so a
+protocol where the server speaks first (SMTP, MySQL) works too. The connection goes to the address
+the client connected to, whatever name it carries (under `inspect`, even one an `allowed_tls_rules`
+entry names), and the report lists it under the `IP` rule type. Prefer a domain rule where the
+destination has a stable name.
 
 A connection passed through this way or by `allowed_tls_rules`, any allowed HTTPS connection under
 `universal`, and an upgraded WebSocket are closed after an hour with nothing sent either way, so an
@@ -356,10 +357,9 @@ idle ssh session or pooled database connection stays open until then.
 
 ### TLS passthrough: `allowed_tls_rules`
 
-For TLS traffic that isn't HTTPS, and for HTTPS that must not be decrypted, such as gRPC: `inspect`
-answers no ALPN, so a client that requires HTTP/2 fails. The SNI and port are
-checked and the connection passes through undecrypted, so the build validates the origin's own
-certificate:
+Use this for TLS traffic that isn't HTTPS, and for HTTPS that must not be decrypted, such as gRPC:
+`inspect` answers no ALPN, so a client that requires HTTP/2 fails. The SNI and port are checked and
+the connection passes through undecrypted, so the build validates the origin's own certificate:
 
 ```yaml
 allowed_tls_rules: |
@@ -372,8 +372,8 @@ work. Comments follow the same rule as [`allowed_url_rules`](#url-rules-allowed_
 the start of a line, or after whitespace, runs to the end of the line, and a `#` with no space
 before it is reported as a mistake rather than silently trimmed, since `#` is part of no host. The
 second rule above is the shape to use for a JVM build whose keystore Buildcage cannot inject into
-(one sealed with a password other than the JDK default); a JVM already
-in the base image otherwise trusts the injected CA without a passthrough.
+(one sealed with a password other than the JDK default); a JVM already in the base image otherwise
+trusts the injected CA without a passthrough.
 
 ### Regular expressions
 
@@ -440,8 +440,7 @@ with anything but letters, digits, `.`, `_` and `-` in it never reaches a rule, 
 
 A top-level `|` is not supported in either a host rule or a URL rule. The anchors would bind to one
 branch each, and a URL rule's two halves are compiled separately, so a choice spanning them has no
-meaning.
-Keep the `|` inside a group, or write one rule per alternative:
+meaning. Keep the `|` inside a group, or write one rule per alternative:
 
 ```yaml
 # not supported
@@ -475,11 +474,10 @@ optionally fails the job when blocked connections are found. Every input is opti
 retention that is not a whole number above zero, fails the step before the report is written.
 
 In restrict mode the step fails when blocked connections are detected, and the workflow fails with
-it.
-In audit mode, blocked connections (protocol errors, for instance) are reported but never fail the
-step.
+it. In audit mode, blocked connections (protocol errors, for instance) are reported but never fail
+the step.
 
-When every blocked connection matches a `known_blocked_rules` rule, the step no longer fails even
+When every blocked connection matches a `known_blocked_rules` rule, the step does not fail, even
 with `fail_on_blocked: true`, and a `::notice::` is emitted instead of `::error::`; any unmatched
 blocked connection still fails the step. Matching is per request, so a row that counts several
 requests to one host counts as expected only when a rule accounts for every one of them: a URL rule
@@ -496,8 +494,8 @@ A name the build looked up and never connected to gets a row of its own, with `D
 and no port (folded like any other row when a `known_blocked_rules` rule matches it). Under
 `inspect` that is the only trace of a name the build reached for and did not use, which is how a
 rule wider than the build needs shows up. A name that was connected to has no such row: the
-connection is already there. One whose every connection ended before a request keeps it, as the
-[ones nobody decided](#the-ones-nobody-decided) reach no table.
+connection is already there. A name whose every connection ended before a request keeps that row,
+since the [ones nobody decided](#the-ones-nobody-decided) reach no table.
 
 ## Blocked service names
 
@@ -526,12 +524,12 @@ request are blocked like any other.
 
 Under `universal`, only a plaintext connection made through a name gets this far, and nothing names
 it before its request does, so its host reads `(unknown)`. Under `inspect`, the host is the name
-from the handshake's SNI. Without one, the address the
-connection was sent to stands in, and the row's rule type reads `IP`: an address the build wrote out
-itself is one only `allowed_ip_rules` could have passed through. The exception is Buildcage's own
-address, where every name-based connection lands because the resolver answers each name with it.
-That address names nothing, so the host reads `(unknown)`. The address is recorded either way, in
-the `destination` field of the [traffic artifact](#traffic-artifact).
+from the handshake's SNI. Without one, the address the connection was sent to stands in, and the
+row's rule type reads `IP`: an address the build wrote out itself is one only `allowed_ip_rules`
+could have passed through. The exception is Buildcage's own address, where every name-based
+connection lands because the resolver answers each name with it. That address names nothing, so the
+host reads `(unknown)`. The address is recorded either way, in the `destination` field of the
+[traffic artifact](#traffic-artifact).
 
 A row carries no method or URL where no request line ever parsed. `missing-host-header` is the
 exception: that one did parse, so it keeps the method and the path it asked for. Its URL is built
@@ -552,25 +550,25 @@ a host no rule allows.
 ⚠️ 00:11.407: HTTPS untrusted-ca.example.com:443 -> client-timeout
 ```
 
-| Reason              | What happened                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| `client-aborted`    | the client closed without sending a request, after the TLS handshake if there was one |
-| `client-tls-failed` | the TLS handshake with the client failed (`inspect` only)                             |
-| `client-timeout`    | it held the connection open instead, until the timeout expired                        |
+| Reason              | What happened                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| `client-aborted`    | the client closed without sending a request, after the TLS handshake if there was one   |
+| `client-tls-failed` | the TLS handshake with the client failed (`inspect` only)                               |
+| `client-timeout`    | the client held the connection open without sending a request until the timeout expired |
 
 The commonest cause is a container with no `ca-certificates`: the client cannot verify the
 certificate the `inspect` engine signs with, so every HTTPS request to that host ends at the
-handshake: as `client-tls-failed`, or as `client-aborted` from a client that closes just after it
-instead. The build's own output says so first, as a certificate verification error; installing
+handshake, as `client-tls-failed`, or as `client-aborted` from a client that closes just after it.
+The build's own output says so first, as a certificate verification error; installing
 `ca-certificates`, or otherwise letting the client trust the CA, is what lets the requests through.
-An `allowed_https_rules` entry changes nothing, the host having resolved and been dialled already.
+An `allowed_https_rules` entry changes nothing: the host has already resolved and been dialed.
 
 A `client-aborted` or `client-timeout` is shown only where its host completed no other connection.
 Where the same host also completed one, the close is a keepalive pool cleaning up after its work
 rather than a failure, so it is left out of Communication details as noise. A `client-tls-failed` is
 always shown, since another client reaching the host says nothing of whether this one trusts the CA.
 The raw [traffic artifact](#traffic-artifact) keeps every one either way. None of them fails the
-step, not even with `fail_on_blocked: true`: no rule blocked it, so `known_blocked_rules` has
+step, not even with `fail_on_blocked: true`: no rule blocked them, so `known_blocked_rules` has
 nothing to match, and nothing reached an origin. A `::warning::` annotation gives the count of those
 shown.
 
@@ -603,17 +601,18 @@ annotation, and they fail the step under `fail_on_blocked: true` like any other 
 `bad-request` is most often a protocol that is not HTTP at all and where the client speaks first,
 such as PostgreSQL or `git://`, on a port no `allowed_ip_rules` or `allowed_tls_rules` entry
 covers: anything that is not a TLS handshake is handed to the plain-HTTP stage, which reads it as a
-request and blocks it. Both are blocked in `audit` mode too, as the same check is under
-`universal`, since a request naming no host has nothing to connect to whatever the rules say.
+request and blocks it. `bad-request` and `missing-host-header` are blocked in `audit` mode too, as
+the same check is under `universal`, since a request naming no host has nothing to connect to,
+whatever the rules say.
 
 `ip-not-allowed` is a connection to an address such as `203.0.113.9:8443` that ended before its
 request: a client that does not trust the CA, or one waiting for the server to speak first. A client
 sends no SNI to an address, so the certificate the proxy answers with matches no name, and nothing
 that checks it gets further, in `audit` too. `universal` in `restrict` blocks the same connection
 on arrival. A close on an address and port that also had a request read is a keepalive close and
-stays out of the report.
-Plain HTTP sent to an address with a `Host` naming some other host is the exception: the log records
-where that request went, not the address, so its keepalive close is counted here.
+stays out of the report. Plain HTTP sent to an address with a `Host` naming some other host is the
+exception: the log records where that request went, not the address, so its keepalive close is
+counted here.
 
 What clears one is a rule, though not a host rule. For traffic that is not HTTP, add the port to
 `allowed_ip_rules` or the name to `allowed_tls_rules`, and the connection is passed through
@@ -622,12 +621,12 @@ name from the SNI or an address; a row reading `(unknown)` names nothing a rule 
 against, so the passthrough rule is the only way to clear that one.
 
 `sni-not-allowed` is the same kind of connection carrying an SNI. The name is judged as the
-resolver judges one looked up through DNS, against the host of every rule except `allowed_ip_rules`
-on any port, except that a trailing dot is kept. Through DNS, the same attempt is blocked as
-`dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through DNS: usually a
-client that does not trust the CA, pointed at an address by `/etc/hosts` or `curl --resolve`.
-`audit` blocks no name, so it blocks no SNI. A rule allowing the host clears one, as does a
-`known_blocked_rules` entry.
+resolver judges one looked up through DNS, against the host of every rule but `allowed_ip_rules`,
+on any port; the one difference is that a trailing dot is kept. Through DNS, the same attempt is
+blocked as `dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through
+DNS: usually a client that does not trust the CA, pointed at an address by `/etc/hosts` or
+`curl --resolve`. `audit` blocks no name, so it blocks no SNI. A rule allowing the host clears one,
+as does a `known_blocked_rules` entry.
 
 Under `universal`, a connection through a name that is not a TLS handshake is also read as HTTP. ssh
 or `git://` to a name is blocked as `bad-request`, in `audit` too, and a client waiting for the
@@ -648,24 +647,24 @@ a failure. **Communication details** shows each with ⚠️ too:
 ⚠️ 00:13.771: GET https://mirror.example.com/index -> origin-no-response
 ```
 
-| Reason               | What happened                                                         |
-| -------------------- | --------------------------------------------------------------------- |
-| `origin-no-response` | the connection was made, and no usable response headers came back     |
-| `origin-aborted`     | the response started and the transfer was cut short                   |
-| `dns-failed`         | the name resolved nowhere upstream, no rule having blocked it         |
-| `origin-unreachable` | a connection carrying no certificate of Buildcage's could not be made |
+| Reason               | What happened                                                                  |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `origin-no-response` | the connection was made, and no usable response headers came back              |
+| `origin-aborted`     | the response started and the transfer was cut short                            |
+| `dns-failed`         | the name resolved nowhere upstream, no rule having blocked it                  |
+| `origin-unreachable` | a connection on which Buildcage checks no origin certificate could not be made |
 
 What the first two have in common is a connection that completed, which is where the origin's
 certificate was checked: whatever went wrong afterwards went wrong with an origin Buildcage had
 authenticated. `dns-failed` never reached a connection, and neither a plaintext request nor a
-passthrough has a certificate of Buildcage's behind it: the first is carried as it was sent, the
+passthrough has an origin certificate Buildcage checked: the first is carried as it was sent, the
 second is relayed for the build to judge rather than decrypted.
 
 `universal` writes its decision before the connection is made and never sees what became of it, so
 `dns-failed` is the only one of the four it can report. `audit` reports them the same way, though
-nothing there was allowed by a rule either: what the table says is that the rules are not what
-stopped these. The rules `audit` suggests for `restrict` include these hosts too, since the next run
-will ask for them again.
+no rule allowed anything there either: the table says only that the rules did not stop these. The
+rules `audit` suggests for `restrict` include these hosts too, since the next run will ask for them
+again.
 
 **A connection Buildcage never completed is not here.** It is blocked, it is in Blocked Hosts, and
 it does fail the step:

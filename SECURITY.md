@@ -2,7 +2,7 @@
 
 ## Scope
 
-I welcome reports about both proxy engines (`universal` and `inspect`):
+I welcome reports about every proxy engine:
 
 - **Proxy bypass**: ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#domain-fronting))
 - **Network isolation escape**: bypassing CNI isolation or iptables rules to reach the internet directly
@@ -18,20 +18,20 @@ The following are **out of scope** (please report to the respective projects ins
 
 ## Supported Versions
 
-| Version   | Supported          |
-| --------- | ------------------ |
-| 4.x       | :white_check_mark: |
-| 1.x – 3.x | :x:                |
+| Version    | Supported          |
+| ---------- | ------------------ |
+| 4.x        | :white_check_mark: |
+| 1.x to 3.x | :x:                |
 
 ## Verifying Releases
 
 Buildcage ships one Docker image at `ghcr.io/buildcage/docker`, published per engine: release
 `vX.Y.Z` is tagged `X.Y.Z-inspect` for the default `inspect` engine and `X.Y.Z-universal` for the
-universal engine (the image tag drops the release tag's leading `v` and carries the engine suffix).
-Each release is signed
-keylessly with [cosign](https://github.com/sigstore/cosign) and carries a GitHub build-provenance
-attestation, both issued via GitHub Actions OIDC at release time. There is no long-lived signing key
-to leak or rotate. The `setup` action verifies this automatically, in-process, on every run (see
+`universal` engine (the image tag drops the release tag's leading `v` and carries the engine
+suffix). Each release is signed keylessly with [cosign](https://github.com/sigstore/cosign) and
+carries a GitHub build-provenance attestation, both issued via GitHub Actions OIDC at release time.
+There is no long-lived signing key to leak or rotate. The `setup` action verifies this
+automatically, in-process, on every run (see
 [Image Provenance Verification](./docs/security.md#image-provenance-verification) for exactly how);
 to verify a release manually instead:
 

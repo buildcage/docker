@@ -72,12 +72,10 @@ into the Dockerfile, so they are reviewable source, and they are resolved before
 covers them is ordinary supply chain practice: reviewing the Dockerfile, and pinning base images and
 the `# syntax=` frontend by digest rather than by a floating tag.
 
-`ADD <url>`, image and git sources stay unaffected on every engine.
-
 ## How the cage works
 
-`universal` and `inspect` share the arrangement below, and differ only in how much of a connection
-they can read.
+Every engine shares the arrangement below; the engines differ only in how much of a connection they
+can read.
 
 ### Every RUN step runs on its own network
 
@@ -101,15 +99,13 @@ the proxy resolves that name itself and rewrites the destination to the result (
 or an SNI naming one host while the connection aims at another all reach the server the name belongs
 to: destination spoofing is removed rather than detected. A connection an `allowed_ip_rules` entry
 covers is the one exception: that rule names the address itself, so the connection goes there
-whatever name it carries. A name with anything but letters, digits,
-`.`, `_` and `-` in it never reaches a rule, in `audit` too: `universal` blocks such an SNI
-(`invalid-sni`) or plaintext `Host` (`invalid-host`), and `inspect` never passes one through and
-blocks such a `Host` (`invalid-host`).
-A `:` in the name could otherwise let a `~` rule's port pattern match a name the proxy then looks up.
+whatever name it carries. A name with anything but letters, digits, `.`, `_` and `-` in it never
+reaches a rule, in `audit` too: `universal` blocks such an SNI (`invalid-sni`) or plaintext `Host`
+(`invalid-host`), and `inspect` never passes one through and blocks such a `Host` (`invalid-host`).
+Otherwise a `:` in the name could let a `~` rule's port pattern match a name the proxy resolves.
 
-That order is an invariant, not an optimisation. Reversed, resolution would become the exfiltration
-channel the resolver below exists to prevent, so a name a request would be blocked for never
-triggers a real DNS query.
+That order is an invariant. Reversed, resolution would become the exfiltration channel the resolver
+below exists to prevent, so a name a request would be blocked for never triggers a real DNS query.
 
 Where the proxy resolves is the container's own `/etc/resolv.conf`. On a runner that is Docker's
 embedded DNS forwarding to the runner's own resolvers, so a name only an internal resolver knows
@@ -135,35 +131,36 @@ fall back, such as a `mongodb+srv://` connection string, does not work inside th
 
 An allowlisted name that resolves to loopback, link-local (AWS/GCP/Azure IMDS), CGNAT (Alibaba
 IMDS), the IETF protocol block (Oracle IMDS), Azure's WireServer (`168.63.129.16`), the proxy's own
-network (`198.19.255.0/24`, where the build's RUN steps also sit), or **an address the runner itself holds** is blocked, reported as `internal-address`, in `audit` too. A name under an
+network (`198.19.255.0/24`, where the build's RUN steps also sit), or **an address the runner
+itself holds** is blocked, reported as `internal-address`, in `audit` too. A name under an
 attacker's control, or DNS for an allowlisted domain that has been compromised, therefore cannot
 turn the proxy into a route to cloud metadata or back into the runner. The rest of RFC1918 is
 deliberately exempt: a name pointing at an internal mirror is a real, intended setup.
 
 The runner's addresses come from two places, because neither sees all of them: the action reads the
 runner's interfaces before starting the builder, and the engine adds the gateway of the network
-Docker then put it on, which did not exist when the action looked. The engine also adds the
-builder's own address on that network, which Docker's DNS returns for the builder's service and
-container names, so a request naming them cannot loop the proxy into itself. A published container port is
-DNAT'd, so it answers on every one of them.
+Docker then put it on, which did not exist when the action looked. A published container port is
+DNAT'd, so it answers on every runner address. The engine also adds the builder's own address on
+that network, which Docker's DNS returns for the builder's service and container names, so a request
+naming them cannot loop the proxy into itself.
 
-Two consequences worth knowing:
+This has two consequences:
 
-- **An internal mirror running on the runner itself is no longer reachable by name.** Name it with
-  `allowed_ip_rules` instead, which skips this guard. The same applies to a public name
-  that resolves to the runner's own public address, which a self-hosted runner may well have.
-- The list is read once at startup, and on a containerised runner it holds that container's
+- **An internal mirror running on the runner itself is not reachable by name.** Name it with
+  `allowed_ip_rules` instead, which skips this guard. The same applies to a public name that
+  resolves to the runner's own public address, which a self-hosted runner may well have.
+- The list is read once at startup, and on a containerized runner it holds that container's
   addresses rather than the real host's.
 
 This guard is about a _name_ landing somewhere it never should. Under `inspect`, a rule whose host
-is a literal address, such as `169.254.169.254:80`, exempts the requests it matches, in `audit` too,
-except in the proxy's own network (`198.19.255.0/24`) and on port `10024` of any internal address: a
-rule naming the proxy's listener would loop it into itself. A wildcard or regex that merely admits
-the address, `**:80` or `~^.*:80$`, is not. Under `universal`, no rule does. Reaching a cloud
-metadata endpoint directly, the way any AWS or GCP SDK does, is not what this is meant to stop, and
-`allowed_ip_rules` is the intended path for it. That path skips this guard except for the listener:
-a connection to port `10024` of an internal address is blocked there too, whatever the IP rules say
-and in `audit` as well.
+is a literal address, such as `169.254.169.254:80`, exempts the requests it matches from this guard,
+in `audit` too. A wildcard or regex that merely admits the address, `**:80` or `~^.*:80$`, does not.
+The exemption never covers the proxy's own network (`198.19.255.0/24`) or port `10024` of any
+internal address, since a rule naming the proxy's listener would loop it into itself. Under
+`universal`, no rule exempts a request. Reaching a cloud metadata endpoint directly, the way any AWS
+or GCP SDK does, is not what this is meant to stop, and `allowed_ip_rules` is the intended path for
+it. That path skips this guard except for the listener: a connection to port `10024` of an internal
+address is blocked there too, whatever the IP rules say and in `audit` as well.
 
 ### Only TCP gets out
 
@@ -242,30 +239,29 @@ Three mechanisms make that enforceable:
   container from the CA certificate alone. The wrapper never parses the step's own database: it only
   copies its files, and takes out of `pkcs11.txt` exactly the bytes it appended. A database the
   step's user cannot write is left alone, and Chromium there does not trust the CA. Injection
-  happens at exec time, never touches LLB, and so cannot affect a cache key. Before the step's layer is committed, the wrapper reads that layer back
-  and takes the certificate, and the anchor, out of every text file carrying it as PEM, every JKS
-  or PKCS#12 trust store carrying it (a PKCS#12 one opened with no password or `changeit`, and
-  resealed in the format it came in, so an older JDK that wrote it can still read it), each
-  bare DER a trust store splits the bundle into (Mono's
+  happens at exec time, never touches LLB, and so cannot affect a cache key. Before the step's layer
+  is committed, the wrapper reads that layer back and takes the certificate, and the anchor, out of
+  every text file carrying it as PEM, every JKS or PKCS#12 trust store carrying it (a PKCS#12 one
+  opened with no password or `changeit`, and resealed in the format it came in, so an older JDK
+  that wrote it can still read it), each bare DER a trust store splits the bundle into (Mono's
   `cert-sync` writes one per certificate), and the EFI signature database RHEL's `update-ca-trust`
   writes. A copy it finds but cannot remove fails the build, or only warns under
-  `fail_on_ca_residue: false`, which leaves it in the image: one
-  in a JKS keystore sealed with a password other than `changeit` or in a key's own chain, one
-  inside any other binary, the PEM re-wrapped (escaped into JSON, indented in YAML, on one line or
-  in lines of 48 characters or more), a certificate the proxy issued (saved from a server trust-on-first-use), or a PKCS#12 trust store
-  holding such a certificate that opens with no password or `changeit`. A copy it cannot read stays
-  in the image: one in a compressed archive, hex-dumped, re-wrapped outside a PEM block in shorter
-  lines, in a keystore encrypted under another password, or in a
-  PKCS#12 naming more than a million key-derivation iterations. Those are not failed on, since
+  `fail_on_ca_residue: false`, which leaves it in the image: one in a JKS keystore sealed with a
+  password other than `changeit` or in a key's own chain, one inside any other binary, the PEM
+  re-wrapped (escaped into JSON, indented in YAML, on one line or in lines of 48 characters or
+  more), a certificate the proxy issued (saved from a server trust-on-first-use), or a PKCS#12
+  trust store holding such a certificate that opens with no password or `changeit`. A copy it
+  cannot read stays in the image: one in a compressed archive, hex-dumped, re-wrapped outside a
+  PEM block in shorter lines, in a keystore encrypted under another password, or in a PKCS#12
+  naming more than a million key-derivation iterations. Those are not failed on, since
   dependencies ship encrypted test keystores and failing on them would break builds that never
   touched the CA. Reading the layer back needs BuildKit's `overlayfs` snapshotter, which the builder
   is pinned to. Startup test-mounts an overlay under BuildKit's state directory and fails setup when
   Docker's data root cannot hold one, such as a data root that is itself on overlayfs. A step whose
   upper directory the wrapper still cannot find does not run, whatever `fail_on_ca_residue` says.
-  The layer is read back
-  whatever the step exited with. The wrapper fails a step through its exit code, 1 or the step's own
-  non-zero one, so an LLB whose `ValidExitCodes` accepts that code lets the failure through; the
-  Dockerfile frontend never sets `ValidExitCodes`.
+  The layer is read back whatever the step exited with. The wrapper fails a step through its exit
+  code, 1 or the step's own non-zero one, so an LLB whose `ValidExitCodes` accepts that code lets
+  the failure through; the Dockerfile frontend never sets `ValidExitCodes`.
 
 A wide host rule paired with a narrow path or method does not narrow the DNS side. DNS has no notion
 of a path, so a name under an allowed `*.example.com` is logged as allowed the moment it is looked
@@ -288,7 +284,7 @@ the steps. The post step's `docker compose down` removes the container, and the 
 | Asks for any name, on or off the allowlist                                                         | Answered locally with the proxy's own address; the query is never forwarded, allowed or not                                                                  |
 | Requests a host no rule covers                                                                     | Blocked, origin never contacted; `inspect` records the URL it asked for                                                                                      |
 | Requests a path or method no rule covers                                                           | **403** under `inspect`, recorded with its URL; `universal` reads neither and enforces on the host                                                           |
-| Walks out of an allowed path with `..` or `%2e%2e`                                                 | **403**: the path is normalised before the rules see it, and a `..` joined to an encoded separator or `;` is blocked, as is any backslash                    |
+| Walks out of an allowed path with `..` or `%2e%2e`                                                 | **403**: the path is normalized before the rules see it, and a `..` joined to an encoded separator or `;` is blocked, as is any backslash                    |
 | Sends an allowed name while aiming elsewhere, or points `/etc/hosts` at an address of its choosing | Reaches the address the proxy resolved; the build's own choice of address is discarded                                                                       |
 | Puts an address in the `Host` header                                                               | Taken as the destination once a rule allows it; an internal one only if a rule names it as its host                                                          |
 | Allowlists a name that resolves to an internal address                                             | Blocked if it lands on loopback, link-local, the proxy itself, an address the runner holds, or another never-public range, in `audit` too                    |
@@ -299,7 +295,7 @@ the steps. The post step's `docker compose down` removes the container, and the 
 | Uses DNS over TLS or DNS over HTTPS                                                                | Redirected to the proxy like any other TCP and checked on its SNI, so an outside resolver is reachable only if its own host and port are allowlisted         |
 | Tunnels over ICMP, raw UDP or QUIC, or falls back to IPv6                                          | Dropped before the proxy; only TCP is redirected to it, and the proxy reaches allowed names over IPv4                                                        |
 | Connects to a raw address                                                                          | Checked against `allowed_ip_rules`, and blocked when nothing matches                                                                                         |
-| Speaks something that is not HTTP to a port no rule covers                                         | Read as a request by the stage it is handed to and blocked, on both engines, and counted as blocked like any other                                           |
+| Speaks something that is not HTTP to a port no rule covers                                         | Read as a request by the stage it is handed to and blocked, and counted as blocked like any other                                                            |
 | Ignores the proxy variables entirely                                                               | No effect: interception is at the network level, not opt-in                                                                                                  |
 | Sends `*` as its method, `Host` or path in audit, to plant a wildcard in the suggested rules       | Left out of the suggested `allowed_url_rules` and listed beside it, so pasting them never permits more than the build sent                                   |
 | Floods the proxy log until earlier entries rotate away                                             | A log that no longer starts where a real run does is not accepted as a complete record: the step fails under `restrict` with `fail_on_blocked` (the default) |
@@ -356,9 +352,9 @@ dropped honestly.
 
 ### No SLSA provenance
 
-Neither `universal` nor `inspect` produces SLSA provenance: attaching one would mean modifying
-BuildKit itself. The traffic artifact (see [Report action](../README.md#report-action)) carries URL,
-method, status and size as an observation record, but no content digest.
+Buildcage produces no SLSA provenance: attaching one would mean modifying BuildKit itself. The
+traffic artifact (see [Report action](../README.md#report-action)) carries URL, method, status and
+size as an observation record, but no content digest.
 
 ## Credentials in a URL
 
@@ -403,8 +399,7 @@ it widens two.
 
 - **`SYS_ADMIN`, `NET_ADMIN` and `SYS_PTRACE`, on top of Docker's default set.** The BuildKit OCI
   worker mounts, creates namespaces and manages a cgroup for each `RUN` step. `NET_ADMIN` covers
-  iptables and the CNI bridge under `universal` and `inspect`. runc reads `/proc/PID/ns/mnt` to set a
-  step's mount namespace up.
+  iptables and the CNI bridge. runc reads `/proc/PID/ns/mnt` to set a step's mount namespace up.
 - **Seccomp is Docker's own default profile**, where `privileged` switches filtering off entirely.
   The only additions are the two things that profile refuses at every capability and runc still
   needs: `pivot_root`, and the three `keyctl` operations runc performs per step. Everything outside
@@ -461,13 +456,13 @@ else in this section.
 Pinning versions, lockfiles, review, least-privilege tokens, and a dependency cooldown each cover
 something an allowlist does not. Pinning by digest belongs here too, for base images and for a
 `# syntax=` frontend alike, since buildkitd resolves both itself, off the isolated network (see
-[What buildkitd fetches itself](#what-buildkitd-fetches-itself)). Buildcage is one layer among them,
-not a replacement for any.
+[What buildkitd fetches itself](#what-buildkitd-fetches-itself)). Buildcage adds a layer to these
+and replaces none of them.
 
 ## Image Provenance Verification
 
-Buildcage decides what the build can reach, so it is fair to ask what says the Buildcage image is
-the one this repository published.
+Buildcage decides what the build can reach, so the action has to establish that the image it runs
+is the one this repository published.
 
 Each release's image is bound to the CI workflow that built it by [Sigstore](https://sigstore.dev)
 keyless signing, and the setup action verifies that binding at startup. The signature covers the
@@ -526,7 +521,7 @@ issued during a real workflow run on the real repository.
 
 ### Verification Limitations
 
-Verification establishes where the image came from. Here is what it leaves uncovered.
+Verification establishes where the image came from, and leaves the following uncovered:
 
 - **The build before signing is a smoke test, not the test suite.** It proves the released image
   starts and enforces on a single allowed and a single blocked host, per engine and per
@@ -540,10 +535,10 @@ Verification establishes where the image came from. Here is what it leaves uncov
 - **A floating tag is a pointer someone else moves.** Under `@v4` or `@v4.0` the signing identity
   accepts any release in that series, so the tag can also be moved back to an older one. Both the
   registry tag and the git tag are writable by whoever publishes releases, which is the reason to
-  prefer a commit SHA: it puts you in charge of when you move.
+  prefer a commit SHA: the image changes only when you change the pin.
 - **The registry decides which signed image gets verified.** Everything after the tag lookup is
   bound to the digest it returned, so content substituted later makes verification **fail** rather
-  than falsely pass, leaving no time-of-check/time-of-use gap. What remains is the tag lookup
+  than falsely pass, and there is no time-of-check/time-of-use gap. What remains is the tag lookup
   itself: an attacker with write access to the registry could repoint the tag, but only at an image
   this repository's release workflow genuinely signed.
 - **Sigstore has to be reachable.** Verification depends on the Rekor transparency log and the

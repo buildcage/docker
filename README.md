@@ -63,7 +63,7 @@ A runner that falls short fails while the builder starts, before any `RUN` step 
 Buildcage starts a BuildKit builder in your job. Point Docker Buildx at it as a remote driver and
 build as usual. Run once in [`audit`](#operation-modes) mode to collect what the build reaches, then
 switch to `restrict`. The examples below use the default `inspect` engine; [Engines](#engines)
-covers the choice between the two.
+covers the choice of engine.
 
 ### 1. Find out what the build reaches
 
@@ -143,12 +143,12 @@ compatibility](#ca-trust-and-compatibility)).
 `universal` reads only the SNI. Rules match on host and port, so `registry.npmjs.org:443` is the
 most one can say, the report shows host and port, and the build's own TLS is left untouched.
 
-Start with `inspect`. Reach for `universal` when a host's certificate cannot be re-signed, such as a
-tool that pins one or ships a trust store Buildcage cannot inject into: either for the whole build,
-or for that host alone with an `allowed_tls_rules` passthrough.
+Start with `inspect`. When a tool pins a certificate or ships a trust store Buildcage cannot inject
+into, its host cannot be re-signed: switch the whole build to `universal`, or pass that host alone
+through with `allowed_tls_rules`.
 
-Both intercept at the network level, so a tool that ignores `HTTP_PROXY` is covered either way, and
-both apply to `RUN` steps. What buildkitd fetches for itself stays outside: see
+Every engine intercepts at the network level, so a tool that ignores `HTTP_PROXY` is covered too,
+and only `RUN` steps go through it. What buildkitd fetches for itself stays outside: see
 [Limitations](#limitations).
 
 ## Inputs
@@ -174,7 +174,7 @@ builds.
 If you forget a domain the build needs, `restrict` blocks it and the report step fails with the
 destination named, which is why it is worth running `audit` first.
 
-`audit` also lets a connection made straight to an address through. Under `universal` that includes
+`audit` also lets through a connection made straight to an address. Under `universal` that includes
 cloud metadata (`169.254.169.254`) and the runner's own addresses; `inspect` still blocks those
 unless a rule names the address as its host.
 
@@ -211,7 +211,7 @@ allowed_tls_rules: |
 ```
 
 `allowed_ip_rules` covers connections made straight to an address, which never go through DNS. A
-rule may be an address, a CIDR block or a wildcard, on either engine:
+rule may be an address, a CIDR block or a wildcard, on every engine:
 
 ```yaml
 allowed_ip_rules: |
@@ -244,16 +244,17 @@ heading or a rule can carry its reason. It works the same in every rule input.
 ### Destinations you expect to stay blocked
 
 A noisy dependency, or a domain you are deliberately keeping off the allowlist to confirm it stays
-blocked, belongs in `known_blocked_rules`. Those rows move to the report's collapsed **Known Blocked
-Hosts** and stop failing the job, and the destination stays unreachable:
+blocked, belongs in `known_blocked_rules`. Their rows move to the report's collapsed **Known Blocked
+Hosts** and do not fail the job; the destination stays unreachable:
 
 ```yaml
 known_blocked_rules: |
   telemetry.example.com
 ```
 
-A name blocked at resolution, before any connection, has no port. A bare `telemetry.example.com` (or
-`telemetry.example.com:*`) covers it; `telemetry.example.com:443` does not, since no port was involved.
+A name blocked at resolution, before any connection, has no port. A bare `telemetry.example.com`
+(or `telemetry.example.com:*`) covers it; `telemetry.example.com:443` does not, since no port was
+involved.
 
 One rule per line, and on `inspect` a line can also be a URL rule (a method and a URL, the
 `allowed_url_rules` syntax) to acknowledge a single endpoint on a host whose other traffic is
@@ -307,12 +308,12 @@ address that only `inspect` sees. The fields are listed in
 
 <img src="assets/diagram-overview.png" alt="How Buildcage restricts what a build can reach" width="1000">
 
-BuildKit itself is unpatched. Buildcage starts it with a network configuration that puts every `RUN`
-step on its own network, and wraps its runtime so the build CA is mounted into a step for as long as
-that step runs. Name lookups and traffic from there reach the resolver and the proxy in the builder
-container, at the network level, so a tool that ignores the proxy environment variables is covered as
-well. The figure is the `inspect` engine; `universal` follows the same path without terminating TLS,
-and so needs no CA.
+BuildKit itself is unpatched. Buildcage starts it with a network configuration that puts every
+`RUN` step on its own network, and wraps its runtime so the build CA is mounted into a step for as
+long as that step runs. Name lookups and traffic from there reach the resolver and the proxy in the
+builder container, at the network level, so a tool that ignores the proxy environment variables is
+covered as well. The figure is the `inspect` engine; `universal` follows the same path without
+terminating TLS, and so needs no CA.
 
 Buildx needs `driver: remote` because the builder is a second BuildKit, but multi-stage builds,
 caching and the image that comes out are unaffected, and nothing Buildcage does reaches the LLB or a
@@ -333,19 +334,19 @@ store already. A variable the base image or the Dockerfile already set is append
 redirected. `GIT_SSL_CAINFO`, `npm_config_cafile`, `AWS_CA_BUNDLE`, `CARGO_HTTP_CAINFO` and
 `BUNDLE_SSL_CA_CERT` are appended to the same way when set, and otherwise left unset. Neither the
 CA nor the variables are left in the image layers, except a copy a step hides where it cannot be
-read (see [Limitations](#limitations)). The CA is also left in the
-distribution's own anchor directory, so a step that installs `ca-certificates` partway through keeps
-trusting it once `update-ca-certificates` has rebuilt the bundle from scratch. On SUSE, GnuTLS reads
+read (see [Limitations](#limitations)). For the step, the CA is also placed in the distribution's
+own anchor directory, so a step that installs `ca-certificates` partway through keeps trusting it
+once `update-ca-certificates` has rebuilt the bundle from scratch. On SUSE, GnuTLS reads
 `/var/lib/ca-certificates/pem` instead of the bundle, so the CA goes into that directory for the
 step as well. A JVM already in the base image reads none of those variables and only its own
 keystore, so the CA is added there too, to `$JAVA_HOME/lib/security/cacerts` and that of the first
 `java` on `PATH`, in whichever shape it ships (JKS or PKCS#12), for the step and taken back out
-before the layer is committed, letting `mvn`, `gradle` and `java` reach the proxy without
-`proxy_engine: universal`. Chromium, including the
-`chrome-headless-shell` that Puppeteer, Playwright and Remotion download, reads only its compiled-in
-root store and the NSS database in `$HOME`, so for each step that database's `pkcs11.txt` gains a
-read-only slot on a database holding only the CA, taken back out before the layer is committed. The
-database itself stays the step's own, with whatever the step writes to it.
+before the layer is committed. `mvn`, `gradle` and `java` then reach the proxy without
+`proxy_engine: universal`. Chromium, including the `chrome-headless-shell` that Puppeteer,
+Playwright and Remotion download, reads only its compiled-in root store and the NSS database in
+`$HOME`, so for each step that database's `pkcs11.txt` gains a read-only slot on a database holding
+only the CA, taken back out before the layer is committed. The database itself stays the step's own,
+with whatever the step writes to it.
 
 The full table, with what each variable points at when the step has a system CA store and when it
 has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this cannot cover is in
@@ -354,14 +355,13 @@ has none, is in [Reference](./docs/reference.md#ca-trust-variables). What this c
 ## Scope
 
 Buildcage controls _where_ your build can connect, not _what code_ it runs. A malicious package
-delivered through an allowed domain still runs. Treat it as one layer in a defense-in-depth
-strategy, a last line of defense so that if something slips through your other measures, at least it
-can't call home.
+delivered through an allowed domain still runs. Treat it as one layer among your other measures: if
+something gets past them, it still cannot reach a destination outside the allowlist.
 
-An allowlist also cannot stop anything leaving through a service you had to allow anyway. That is a
-structural limit. What it does stop is traffic to a destination that is not on the list, and
-infrastructure an attacker set up is normally not on it, because the build has no reason to reach
-it. That is also the hardest kind of leak to find afterwards.
+An allowlist also cannot stop anything leaving through a service you had to allow anyway. What it
+does stop is traffic to a destination that is not on the list, and infrastructure an attacker set
+up is normally not on it, because the build has no reason to reach it. That is also the hardest kind
+of leak to find afterwards.
 
 An allowlist generated from an audit run already blocks every destination the audit did not record.
 Whether to go further depends on what the build has access to:
@@ -423,12 +423,12 @@ reported as blocked; see
   which judges the SNI and port only. A client that falls back to HTTP/1.1, such as curl, works.
 - The JVM (Java, Kotlin, Scala) reads only its own keystore rather than the CA-trust variables. A
   JDK already in the image at `$JAVA_HOME` or behind the first `java` on `PATH` is handled: the CA is
-  added to its keystore for the step and removed before the layer is committed. A keystore sealed
-  with a password other than the JDK default still falls back to `proxy_engine: universal`:
-  Buildcage will not rewrite it. No other JDK trusts the CA, such as one further along `PATH`, a
-  Gradle toolchain under `~/.gradle/jdks` or one the step itself downloads (an `sdk install`, an
-  unpacked tarball). Fetch it in an earlier `RUN` step and put it first on `PATH` or on `JAVA_HOME`
-  with `ENV`:
+  added to its keystore for the step and removed before the layer is committed. A JDK whose keystore
+  is sealed with a password other than the JDK default needs `proxy_engine: universal` or an
+  `allowed_tls_rules` passthrough: Buildcage will not rewrite that keystore. Any other JDK does not
+  trust the CA: one further along `PATH`, a Gradle toolchain under `~/.gradle/jdks`, or one the step
+  itself downloads (an `sdk install`, an unpacked tarball). Fetch it in an earlier `RUN` step and
+  put it first on `PATH` or on `JAVA_HOME` with `ENV`:
 
   ```dockerfile
   RUN tar xzf jdk-21.tar.gz -C /opt/java && /opt/java/jdk-21/bin/java -jar fetch.jar   # fails
@@ -439,11 +439,10 @@ reported as blocked; see
 
 - Chromium trusts the CA through a slot added to the NSS database it reads: `~/.pki/nssdb` when it
   exists, else `~/.local/share/pki/nssdb`, else a new `~/.pki/nssdb`, which Chromium then fills and
-  the image keeps, as it would under a Chromium before M146. A Chromium before M146 does not read
-  `~/.local/share/pki/nssdb`, so use M146 or later where that is the database. A new database
-  belongs to the home's
-  owner, so under someone else's home, such as `www-data`'s `/var/www`, Chromium does not open it
-  and does not trust the CA. An existing database the step's user cannot write, such as root's used
+  the image keeps. A Chromium before M146 reads only `~/.pki/nssdb`, so where the image has only
+  `~/.local/share/pki/nssdb`, use M146 or later. A new database belongs to the home's owner, so
+  under someone else's home, such as `www-data`'s `/var/www`, Chromium does not open it and does
+  not trust the CA. An existing database the step's user cannot write, such as root's used
   after `USER`, takes no slot, since Chromium would not open it either, and the step warns; use
   `proxy_engine: universal` for Chromium there.
 - Only the NSS database under the `HOME` the step starts with carries the slot. Chromium started
@@ -471,12 +470,12 @@ reported as blocked; see
   ```
 
 - A copy of the CA left in a step's layer is removed. One that cannot be, such as in a JKS keystore
-  sealed with a password other than `changeit`, fails the build (`fail_on_ca_residue: false` makes it
-  a warning, see [CA residue](./docs/reference.md#ca-residue)). A copy that cannot be read, in a compressed archive or a keystore encrypted under a password other than
-  none or `changeit` or naming more than a million key-derivation iterations, is not found and stays
-  in the image, as is one hex-dumped or re-encoded as base64 outside a PEM block in lines shorter
-  than 48 characters. See
-  [Security Details](./docs/security.md#inspect-proxy-engine).
+  sealed with a password other than `changeit`, fails the build (`fail_on_ca_residue: false` makes
+  it a warning, see [CA residue](./docs/reference.md#ca-residue)). A copy that cannot be read, in a
+  compressed archive or a keystore encrypted under a password other than none or `changeit` or
+  naming more than a million key-derivation iterations, is not found and stays in the image, as does
+  one hex-dumped or re-encoded as base64 outside a PEM block in lines shorter than 48 characters.
+  See [Security Details](./docs/security.md#inspect-proxy-engine).
 - `audit` terminates TLS as well. It drops the rules, not the interception, so a tool that cannot
   accept the CA fails in `audit` exactly as it would in `restrict`.
 - An image with no system CA store (`scratch`, distroless, or `debian:*-slim` before
@@ -516,11 +515,11 @@ reported as blocked; see
   build: { command: "vp build", untrackedEnv: ["NODE_EXTRA_CA_CERTS"] },
   ```
 
-- The CA goes into a copy of each directory holding a bundle it is added to (the CA store's, and
-  each one a CA variable points into), and the copy is mounted over the directory for the step's
-  duration. When one of them holds another, only the outer one is mounted. Removing or renaming a
-  mounted directory fails, while what is inside it behaves normally and what the step writes there
-  is copied back when it ends:
+- Each directory holding a bundle the CA is added to (the CA store's, and each one a CA variable
+  points into) is copied, the CA goes into the copy, and the copy is mounted over the directory
+  while the step runs. When one such directory is inside another, only the outer one is mounted.
+  Removing or renaming a mounted directory fails, while what is inside it behaves normally and what
+  the step writes there is copied back when it ends:
 
   ```dockerfile
   RUN rm -rf /etc/ssl/certs        # fails: the directory is a mount point
@@ -534,11 +533,11 @@ reported as blocked; see
   `/etc/ssl/certs` and adds no mount point, while on RHEL, Fedora and their derivatives
   `/etc/pki/ca-trust/extracted/java` is one.
 
-- A custom CA path that is unexpectedly large (more than 20 MiB or 512 files) has injection skipped
-  for that variable only, the same degradation as when no CA bundle is found at all. A system CA
+- A custom CA path whose directory holds more than 20 MiB or 512 files has injection skipped for
+  that variable only, the same degradation as when no CA bundle is found at all. A system CA
   bundle whose directory holds more than 64 MiB or 4,096 files, or is the container root, is
   treated as no bundle at all.
-- Neither engine produces SLSA provenance. The traffic artifact is an observation record with no
+- Buildcage produces no SLSA provenance. The traffic artifact is an observation record with no
   content digest.
 
 ### On the runner itself

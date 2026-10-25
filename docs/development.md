@@ -87,7 +87,7 @@ make test_integration_buildkit_universal_known_blocked
 # Builds for the host's architecture and for the other one
 make test_integration_buildkit_multiarch
 # Brings the builder up alone, with no build running, and probes :10024/:53
-# from the compose network and from the host -- both engines
+# from the compose network and from the host, for each engine
 make test_integration_buildkit_listener_scope
 ```
 
@@ -119,34 +119,32 @@ files as the Node run, so `src/core/lib/acl/`'s line coverage is already account
 
 ### Running the suite from several git worktrees
 
-One Docker daemon serves every worktree and namespaces nothing per worktree: the
-builder container, the buildx builder, the Compose project and the built image
-all have one fixed name, so a second worktree's `setup_buildkit_*` tears down the
-first one's builder without saying so.
+One Docker daemon serves every worktree and namespaces nothing per worktree. The builder container,
+the buildx builder, the Compose project and the built image would otherwise each have one fixed
+name, and a second worktree's `setup_buildkit_*` would tear down the first one's builder without
+saying so.
 
-The fixtures' addresses are not part of that problem. Each assigns its own
-`10.200.0.x` inside its own network namespace instead of taking one from Compose
-IPAM (see each fixture's entrypoint, and `test/test-net-addr/attach.sh`, which the test overlays
-wrap the builder's own entrypoint with),
-so the daemon never allocates `10.200.0.0/24` and every worktree uses the same
-addresses. That is why the assertions name those addresses literally.
+Nothing has to be configured to avoid that. The Makefile takes the worktree's name from
+`git rev-parse --git-dir` and suffixes the builder, the buildx builder, the Compose project, the
+image tags and the `/tmp` paths with it, so a worktree named `wt2` uses `buildcage-wt2` and
+`buildcage-project-wt2`. The main checkout has no worktree name and keeps the unsuffixed names used
+everywhere else in this document. `BUILDCAGE_WORKTREE_SUFFIX` and `TEST_NET_SUBNET` override the
+derived values.
 
-A fresh worktree needs `vp install` before any target that runs `report/src` or
-`src/post.ts`: `node_modules` is per checkout, and the integration targets run
-both straight from source.
-
-Nothing has to be configured for it. The Makefile takes the worktree's name from
-`git rev-parse --git-dir` and suffixes the builder, the buildx builder, the
-Compose project, the image tags and the `/tmp` paths with it, so a worktree named
-`wt2` uses `buildcage-wt2` and `buildcage-project-wt2`. The main checkout has no
-worktree name and keeps the unsuffixed names used everywhere else in this
-document. `BUILDCAGE_WORKTREE_SUFFIX` and `TEST_NET_SUBNET` override the derived values.
+The fixtures' addresses need no suffix. Each assigns its own `10.200.0.x` inside its own network
+namespace instead of taking one from Compose IPAM (see each fixture's entrypoint, and
+`test/test-net-addr/attach.sh`, which the test overlays run in front of the builder's entrypoint),
+so the daemon never allocates `10.200.0.0/24` and every worktree uses the same addresses. That is
+why the assertions name those addresses literally.
 
 `test-net`'s subnet comes from the same name, and appears in no assertion. It is
 pinned rather than left to Docker because `test/test-net-addr` finds the
 builder's interface on it by that subnet. Two worktrees whose names happen to
 pick the same subnet fail with `Pool overlaps with other one on this address
 space`; rename one, or set `TEST_NET_SUBNET`.
+
+A fresh worktree needs `vp install` before any target that runs `report/src` or `src/post.ts`:
+`node_modules` is per checkout, and the integration targets run both straight from source.
 
 The builder's CNI bridge is `198.19.255.0/24`, from the `198.18.0.0/15` block
 RFC 2544 reserves for benchmarking: outside Docker's default address pools, so
@@ -164,13 +162,13 @@ themselves against changes that aren't published yet.
 Sigstore verification requires a real, published GHCR image, so the setup action normally can't
 run against an unpublished branch or local changes. This repo's own CI (`test_action` job in
 `.github/workflows/test-e2e.yml`) tests the real `setup`/`report` actions end-to-end against a
-locally built image instead, via a build-time-gated mechanism: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run
-build` compiles `dist/main.cjs` where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable.
-The override logic lives in its own module (`src/core/lib/provenance/local-image-override.ts`), loaded
-only via a dynamic `import()` gated by that build-time flag. Without the flag (i.e. every
-normal/committed build), rolldown's own module-graph tree-shaking excludes that entire file from
-the bundle. It is physically absent, not just unreachable. A CI check (`unit_test` job)
-and the pre-commit hook additionally confirm a normal build's `dist` never mentions
+locally built image instead: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` compiles `dist/main.cjs`
+where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
+module (`src/core/lib/provenance/local-image-override.ts`), loaded only via a dynamic `import()`
+gated by that build-time flag. Without the flag (i.e. every normal/committed build), rolldown's own
+module-graph tree-shaking excludes that entire file from the bundle, so the override code is absent
+from `dist/` rather than unreachable in it. A CI check (`unit_test` job) and the pre-commit hook
+also confirm a normal build's `dist` never mentions
 `BUILDCAGE_BUILD_TEST_HOOKS`, `BUILDCAGE_LOCAL_IMAGE_REF`, or any `BUILDCAGE_TEST_*` or
 `BUILDCAGE_RUN_DEBUG_*` name.
 
@@ -187,7 +185,7 @@ See [security.md](./security.md#verification-limitations) for more details.
 ## Formatting & Linting
 
 Formatting, linting, and type-aware linting are handled by [vp (Vite+)](https://viteplus.dev/),
-installed globally on your machine like `pnpm`/`corepack` rather than through `pnpm exec`:
+installed globally on your machine:
 
 ```bash
 curl -fsSL https://vite.plus | bash   # macOS/Linux
@@ -269,12 +267,12 @@ reader splitting a URL back apart would take the host for `registry.npmjs.org-`.
 prints as `-` too. The log keeps the `Host` as sent; the report lowercases it and drops one trailing
 dot, as the rules do before matching it.
 
-`ts` is HAProxy's termination state and `reason` the block reason where the rule that blocked
-knew one the line could not otherwise show. `tlserr` carries haproxy's own error from the handshake
-with the origin, which is what tells a connection the proxy would not make from one it could not
-make; the passthrough stage terminates no TLS and logs no such field. `fcerr` is haproxy's error
-on the client connection; an `SSL_*` one on a line with no request is shown as `client-tls-failed`,
-except `SSL_FATAL`, a broken record after the handshake.
+`ts` is HAProxy's termination state. `reason` is set when a block has a reason the other fields do
+not show. `tlserr` carries HAProxy's own error from the handshake with the origin, which is what
+tells a connection the proxy would not make from one it could not make; the passthrough stage
+terminates no TLS and logs no such field. `fcerr` is HAProxy's error on the client connection; an
+`SSL_*` one on a line with no request is shown as `client-tls-failed`. `SSL_FATAL` is not: it marks
+a broken record after the handshake.
 
 What the report makes of those is in
 [Requests that never arrived whole](./reference.md#requests-that-never-arrived-whole), for a
@@ -353,7 +351,7 @@ among others; `make help` lists them all.
 │   │                         # licenses/alpine-packages.txt does not cover
 │   ├── seccomp/              # The builder container's seccomp profile and gen-profile.mjs,
 │   │                         # read by the Docker client on the runner, not copied into an image
-│   ├── common/               # Image files both engines share: s6 services, init-iptables,
+│   ├── common/               # Image files the engines share: s6 services, init-iptables,
 │   │                         # cni.conflist
 │   ├── universal/            # proxy_engine: universal: BuildKit, HAProxy, CoreDNS, s6-overlay
 │   └── inspect/              # proxy_engine: inspect: the same, plus buildcage-runc/ (Go
@@ -365,12 +363,12 @@ among others; `make help` lists them all.
 ├── docs/                     # reference.md, development.md, security.md, plus the
 │                             # rules.md/inspect-engine.md link stubs
 ├── licenses/                 # gen-license-file.mjs, which regenerates THIRD_PARTY_LICENSES_NPM
-│                             # during `vp run build`, and what .glf.jsonc substitutes in.
-│                             # Its license texts (GPL, LGPL, MPL, Apache, and those of curl,
-│                             # QuickJS-ng, the s6-overlay family and the Alpine packages in
-│                             # alpine/) are copied into the images, with THIRD_PARTY_LICENSES_NPM
-│                             # and alpine-packages.txt, which maps each installed Alpine package
-│                             # to them
+│                             # during `vp run build`, and buffers.txt, the text .glf.jsonc
+│                             # supplies for a package that publishes none. Its license texts
+│                             # (GPL, LGPL, MPL, Apache, and those of curl, QuickJS-ng, the
+│                             # s6-overlay family and the Alpine packages in alpine/) are copied
+│                             # into the images with THIRD_PARTY_LICENSES_NPM, and
+│                             # alpine-packages.txt maps each installed Alpine package to its text
 ├── compose.yaml              # Local-dev compose config (dockerfile selected by PROXY_ENGINE)
 └── Makefile                  # Operational commands
 ```
