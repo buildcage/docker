@@ -4,14 +4,121 @@ This document covers local development, testing, and the project structure of Bu
 
 ## Contents
 
-- [Local Usage](#local-usage)
-- [Testing](#testing)
-- [Local Development](#local-development)
 - [Formatting & Linting](#formatting--linting)
-- [Viewing Logs](#viewing-logs)
-- [Makefile Commands](#makefile-commands)
 - [Directory Structure](#directory-structure)
+- [Local Usage](#local-usage)
+- [Local Development](#local-development)
+- [Testing](#testing)
+- [Makefile Commands](#makefile-commands)
+- [Viewing Logs](#viewing-logs)
 - [Troubleshooting](#troubleshooting)
+
+## Formatting & Linting
+
+Formatting, linting, and type-aware linting are handled by [vp (Vite+)](https://viteplus.dev/),
+installed globally on your machine:
+
+```bash
+curl -fsSL https://vite.plus | bash   # macOS/Linux
+# Windows: irm https://viteplus.dev/install.ps1 | iex
+```
+
+The project pins its own toolchain version via the `vite-plus` devDependency in `package.json`
+(the same way `packageManager` pins `pnpm`), and the globally installed `vp` binary detects and
+delegates to that pinned version automatically, so plain `vp ...` commands are reproducible without
+going through `pnpm exec`.
+
+```bash
+vp check       # format + lint + type-aware lint (read-only; what CI runs)
+vp check --fix # same, but auto-fixes format/lint issues in place
+vp lint --fix
+vp fmt --write
+```
+
+`vp run typecheck` (`tsc`) remains the authoritative full type check; `vp check`'s type-aware
+linting (via `oxlint-tsgolint`) catches a subset of type-driven issues fast but doesn't replace it.
+
+Running `vp install` (in place of `pnpm install`) automatically sets up a pre-commit hook, via the
+`prepare` script, that formats and lints your staged files (`vite.config.ts`'s `staged` config)
+before each commit, auto-fixing and re-staging what it can.
+
+## Directory Structure
+
+```text
+.
+├── action.yml                # Setup action entry (node24 → dist/main.cjs, dist/post.cjs)
+├── src/                      # Setup action source (ESM): verify provenance, resolve the image
+│   │                         # ref, compose up. src/main.ts is only the entry guard
+│   ├── lib/                  # The setup action's own modules; setup-step.ts is the step itself
+│   ├── report/               # Report code only this action needs (#report/*)
+│   └── core/                 # Code shared across both actions
+│       ├── lib/              # acl/ (rule parsing and the proxy config generators) is built for
+│       │                     # both runtimes, and so is anything it imports (errors.ts,
+│       │                     # line-comments.ts, log/proxy-address.ts). The rest of log/, and
+│       │                     # report/, docker/, provenance/ and actions/, are Node-only, and
+│       │                     # test/test-shim.ts is the node:test-alike shim *.test.ts uses
+│       │                     # under either runtime
+│       └── scripts/          # QuickJS only: each engine's config generator, the test runner
+│                             # and qjs's type declarations
+├── dist/                     # Bundled output (rolldown → CommonJS), committed. dist/qjs,
+│                             # dist/qjs-test and dist/report-action are gitignored scratch
+├── docker/                   # proxy_engine build contexts
+│   ├── compose.action.yaml   # Runtime compose file the action uses (verified, digest-pinned
+│   │                         # image ref), distinct from the top-level compose.yaml below
+│   ├── collect-go-licenses.sh
+│   │                         # Copies the license files of what a Go binary links
+│   ├── check-alpine-licenses.sh
+│   │                         # Fails the image build on an Alpine package that
+│   │                         # licenses/alpine-packages.txt does not cover
+│   ├── seccomp/              # The builder container's seccomp profile and gen-profile.mjs,
+│   │                         # read by the Docker client on the runner, not copied into an image
+│   ├── common/               # Image files the engines share: s6 services, init-iptables,
+│   │                         # cni.conflist
+│   ├── universal/            # proxy_engine: universal: BuildKit, HAProxy, CoreDNS, s6-overlay
+│   └── inspect/              # proxy_engine: inspect: the same, plus buildcage-runc/ (Go
+│                             # module: CA trust at exec time)
+├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode}, plus the fixture
+│                             # containers. helpers.sh carries what every assert script shares
+├── compose.test-*.yaml       # Test override config, one per engine
+├── report/                   # Report action: action.yml, src/ (ESM), dist/ (rolldown → CommonJS)
+├── docs/                     # reference.md, development.md, security.md, plus the
+│                             # rules.md/inspect-engine.md link stubs
+├── licenses/                 # gen-license-file.mjs, which regenerates THIRD_PARTY_LICENSES_NPM
+│                             # during `vp run build`, and buffers.txt, the text .glf.jsonc
+│                             # supplies for a package that publishes none. Its license texts
+│                             # (GPL, LGPL, MPL, Apache, and those of curl, QuickJS-ng, the
+│                             # s6-overlay family and the Alpine packages in alpine/) are copied
+│                             # into the images with THIRD_PARTY_LICENSES_NPM, and
+│                             # alpine-packages.txt maps each installed Alpine package to its text
+├── compose.yaml              # Local-dev compose config (dockerfile selected by PROXY_ENGINE)
+└── Makefile                  # Operational commands
+```
+
+Every engine directory carries a `scripts/report-action.node.ts`, which runs under Node on the
+runner after the report action copies it out of the image. Each engine's config generator is
+`src/core/scripts/gen-configs-<engine>.qjs.ts`: it runs under QuickJS when the container starts and
+writes haproxy.cfg and the Corefile from the rules, through the generators in `src/core/lib/acl/`
+(`haproxy-config.ts` for `inspect`, `haproxy-universal-config.ts` for `universal`). rolldown bundles
+it into `/opt/buildcage/scripts/gen-configs.js` at image build time, and `tsconfig.qjs.json`
+type-checks it.
+
+Each Dockerfile copies `docker/common/files/` first and the engine's own `files/` on top. An engine
+keeps only what differs: `THIRD_PARTY_LICENSES`, `buildkitd.toml`, the `init-cfg` script that
+generates its configs and, for `inspect`, the `init-overlay-check` service. A path in both would be
+settled silently by copy order, so `src/core/lib/docker/engine-files.test.ts` rejects one.
+
+`buildcage-runc` takes `go-pkcs12` from the
+[buildcage/go-pkcs12](https://github.com/buildcage/go-pkcs12) fork through a `replace` in its
+`go.mod`. The fork adds `DecodeTrustStoreEntries`, since a keystore rewrite must keep the aliases,
+and `MaxIterations`, which the sweep sets to a million so a keystore naming more key-derivation
+iterations is left unread instead of stalling the build. Its `vX.Y.Z-buildcage.N` tags are upstream
+`vX.Y.Z` plus those additions.
+
+The CNI plugins and CoreDNS are downloaded at a pinned version and checked against one SHA256 per
+architecture, both set as `ARG`s in each engine's Dockerfile. Renovate updates the version and the
+SHA256 lines together, taking the digests from the release's own checksum files; the `digestVersion`
+in the comment above each SHA256 line tells it which release that digest belongs to. A bump by hand
+changes all of them: the version line, each SHA256 line and each `digestVersion`.
 
 ## Local Usage
 
@@ -63,6 +170,34 @@ make clean_buildkit
 targets use (see the target-specific exports near the top of the Makefile). Running
 `node report/src/main.ts` directly, without going through `make`, won't find the running builder
 container. Raw builder logs are also available via `docker compose logs builder`.
+
+## Local Development
+
+Local Usage above runs the builder image. This is about running the setup and report actions
+themselves against changes that aren't published yet.
+
+Sigstore verification requires a real, published GHCR image, so the setup action normally can't
+run against an unpublished branch or local changes. This repo's own CI (`test_action` job in
+`.github/workflows/test-e2e.yml`) tests the real `setup`/`report` actions end-to-end against a
+locally built image instead: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` compiles `dist/main.cjs`
+where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
+module (`src/core/lib/provenance/local-image-override.ts`), loaded only via a dynamic `import()`
+gated by that build-time flag. Without the flag (i.e. every normal/committed build), rolldown's own
+module-graph tree-shaking excludes that entire file from the bundle, so the override code is absent
+from `dist/` rather than unreachable in it. A CI check (`unit_test` job) and the pre-commit hook
+also confirm a normal build's `dist` never mentions
+`BUILDCAGE_BUILD_TEST_HOOKS`, `BUILDCAGE_LOCAL_IMAGE_REF`, or any `BUILDCAGE_TEST_*` or
+`BUILDCAGE_RUN_DEBUG_*` name.
+
+To exercise it locally:
+
+1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine).
+2. `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build`
+3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set (e.g. via `act`, or by
+   invoking `node dist/main.cjs` directly with the relevant `INPUT_*` env vars). Never commit a
+   `dist/main.cjs` built this way: run `vp run build` again (without the flag) before committing.
+
+See [security.md](./security.md#verification-limitations) for more details.
 
 ## Testing
 
@@ -154,62 +289,26 @@ no network Docker allocates on its own overlaps it. A daemon whose
 the builder. If the builder starts failing to reach the network for no apparent
 reason, check that subnet with `docker network inspect`.
 
-## Local Development
+## Makefile Commands
 
-Local Usage above runs the builder image. This is about running the setup and report actions
-themselves against changes that aren't published yet.
+`make help` lists every target with its own description. The ones you type most:
 
-Sigstore verification requires a real, published GHCR image, so the setup action normally can't
-run against an unpublished branch or local changes. This repo's own CI (`test_action` job in
-`.github/workflows/test-e2e.yml`) tests the real `setup`/`report` actions end-to-end against a
-locally built image instead: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` compiles `dist/main.cjs`
-where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
-module (`src/core/lib/provenance/local-image-override.ts`), loaded only via a dynamic `import()`
-gated by that build-time flag. Without the flag (i.e. every normal/committed build), rolldown's own
-module-graph tree-shaking excludes that entire file from the bundle, so the override code is absent
-from `dist/` rather than unreachable in it. A CI check (`unit_test` job) and the pre-commit hook
-also confirm a normal build's `dist` never mentions
-`BUILDCAGE_BUILD_TEST_HOOKS`, `BUILDCAGE_LOCAL_IMAGE_REF`, or any `BUILDCAGE_TEST_*` or
-`BUILDCAGE_RUN_DEBUG_*` name.
+| Command                                          | Description                                                            |
+| ------------------------------------------------ | ---------------------------------------------------------------------- |
+| `make setup_buildkit_{engine}_{mode}`            | Start a builder, for any engine x `{audit,restrict}`                   |
+| `make report_buildkit`                           | Show the report for the currently running builder                      |
+| `make clean_buildkit`                            | Stop and remove the builder's containers/images and the buildx builder |
+| `make test_unit`                                 | Every unit test, the QuickJS ones included (needs Docker)              |
+| `make test_unit_coverage`                        | Every Node unit test in one run, with a coverage report                |
+| `make test_unit_go_coverage`                     | buildcage-runc's tests, with its filtered coverage checked             |
+| `make test_integration_buildkit`                 | Every `test_integration_buildkit_*` target in turn                     |
+| `make test_integration_buildkit_{engine}_{mode}` | One engine and mode (start, build, verify, clean up)                   |
+| `make seccomp_profile`                           | Re-vendor the builder's seccomp profile from moby/profiles             |
 
-To exercise it locally:
-
-1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine).
-2. `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build`
-3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set (e.g. via `act`, or by
-   invoking `node dist/main.cjs` directly with the relevant `INPUT_*` env vars). Never commit a
-   `dist/main.cjs` built this way: run `vp run build` again (without the flag) before committing.
-
-See [security.md](./security.md#verification-limitations) for more details.
-
-## Formatting & Linting
-
-Formatting, linting, and type-aware linting are handled by [vp (Vite+)](https://viteplus.dev/),
-installed globally on your machine:
-
-```bash
-curl -fsSL https://vite.plus | bash   # macOS/Linux
-# Windows: irm https://viteplus.dev/install.ps1 | iex
-```
-
-The project pins its own toolchain version via the `vite-plus` devDependency in `package.json`
-(the same way `packageManager` pins `pnpm`), and the globally installed `vp` binary detects and
-delegates to that pinned version automatically, so plain `vp ...` commands are reproducible without
-going through `pnpm exec`.
-
-```bash
-vp check       # format + lint + type-aware lint (read-only; what CI runs)
-vp check --fix # same, but auto-fixes format/lint issues in place
-vp lint --fix
-vp fmt --write
-```
-
-`vp run typecheck` (`tsc`) remains the authoritative full type check; `vp check`'s type-aware
-linting (via `oxlint-tsgolint`) catches a subset of type-driven issues fast but doesn't replace it.
-
-Running `vp install` (in place of `pnpm install`) automatically sets up a pre-commit hook, via the
-`prepare` script, that formats and lints your staged files (`vite.config.ts`'s `staged` config)
-before each commit, auto-fixing and re-staging what it can.
+The integration set also holds `inspect_debian_{audit,restrict}` (an apt build that starts with no
+CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them unedited),
+`inspect_byte_exact`, `universal_restrict_no_traffic`, `universal_known_blocked` and `multiarch`,
+among others; `make help` lists them all.
 
 ## Viewing Logs
 
@@ -299,105 +398,6 @@ marks the report incomplete. To read it by hand:
 docker compose exec builder curl -s --unix-socket /var/run/haproxy-health.sock \
   'http://localhost/metrics?scope=global' | grep dropped_logs
 ```
-
-## Makefile Commands
-
-`make help` lists every target with its own description. The ones you type most:
-
-| Command                                          | Description                                                            |
-| ------------------------------------------------ | ---------------------------------------------------------------------- |
-| `make setup_buildkit_{engine}_{mode}`            | Start a builder, for any engine x `{audit,restrict}`                   |
-| `make report_buildkit`                           | Show the report for the currently running builder                      |
-| `make clean_buildkit`                            | Stop and remove the builder's containers/images and the buildx builder |
-| `make test_unit`                                 | Every unit test, the QuickJS ones included (needs Docker)              |
-| `make test_unit_coverage`                        | Every Node unit test in one run, with a coverage report                |
-| `make test_unit_go_coverage`                     | buildcage-runc's tests, with its filtered coverage checked             |
-| `make test_integration_buildkit`                 | Every `test_integration_buildkit_*` target in turn                     |
-| `make test_integration_buildkit_{engine}_{mode}` | One engine and mode (start, build, verify, clean up)                   |
-| `make seccomp_profile`                           | Re-vendor the builder's seccomp profile from moby/profiles             |
-
-The integration set also holds `inspect_debian_{audit,restrict}` (an apt build that starts with no
-CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them unedited),
-`inspect_byte_exact`, `universal_restrict_no_traffic`, `universal_known_blocked` and `multiarch`,
-among others; `make help` lists them all.
-
-## Directory Structure
-
-```text
-.
-├── action.yml                # Setup action entry (node24 → dist/main.cjs, dist/post.cjs)
-├── src/                      # Setup action source (ESM): verify provenance, resolve the image
-│   │                         # ref, compose up. src/main.ts is only the entry guard
-│   ├── lib/                  # The setup action's own modules; setup-step.ts is the step itself
-│   ├── report/               # Report code only this action needs (#report/*)
-│   └── core/                 # Code shared across both actions
-│       ├── lib/              # acl/ (rule parsing and the proxy config generators) is built for
-│       │                     # both runtimes, and so is anything it imports (errors.ts,
-│       │                     # line-comments.ts, log/proxy-address.ts). The rest of log/, and
-│       │                     # report/, docker/, provenance/ and actions/, are Node-only, and
-│       │                     # test/test-shim.ts is the node:test-alike shim *.test.ts uses
-│       │                     # under either runtime
-│       └── scripts/          # QuickJS only: each engine's config generator, the test runner
-│                             # and qjs's type declarations
-├── dist/                     # Bundled output (rolldown → CommonJS), committed. dist/qjs,
-│                             # dist/qjs-test and dist/report-action are gitignored scratch
-├── docker/                   # proxy_engine build contexts
-│   ├── compose.action.yaml   # Runtime compose file the action uses (verified, digest-pinned
-│   │                         # image ref), distinct from the top-level compose.yaml below
-│   ├── collect-go-licenses.sh
-│   │                         # Copies the license files of what a Go binary links
-│   ├── check-alpine-licenses.sh
-│   │                         # Fails the image build on an Alpine package that
-│   │                         # licenses/alpine-packages.txt does not cover
-│   ├── seccomp/              # The builder container's seccomp profile and gen-profile.mjs,
-│   │                         # read by the Docker client on the runner, not copied into an image
-│   ├── common/               # Image files the engines share: s6 services, init-iptables,
-│   │                         # cni.conflist
-│   ├── universal/            # proxy_engine: universal: BuildKit, HAProxy, CoreDNS, s6-overlay
-│   └── inspect/              # proxy_engine: inspect: the same, plus buildcage-runc/ (Go
-│                             # module: CA trust at exec time)
-├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode}, plus the fixture
-│                             # containers. helpers.sh carries what every assert script shares
-├── compose.test-*.yaml       # Test override config, one per engine
-├── report/                   # Report action: action.yml, src/ (ESM), dist/ (rolldown → CommonJS)
-├── docs/                     # reference.md, development.md, security.md, plus the
-│                             # rules.md/inspect-engine.md link stubs
-├── licenses/                 # gen-license-file.mjs, which regenerates THIRD_PARTY_LICENSES_NPM
-│                             # during `vp run build`, and buffers.txt, the text .glf.jsonc
-│                             # supplies for a package that publishes none. Its license texts
-│                             # (GPL, LGPL, MPL, Apache, and those of curl, QuickJS-ng, the
-│                             # s6-overlay family and the Alpine packages in alpine/) are copied
-│                             # into the images with THIRD_PARTY_LICENSES_NPM, and
-│                             # alpine-packages.txt maps each installed Alpine package to its text
-├── compose.yaml              # Local-dev compose config (dockerfile selected by PROXY_ENGINE)
-└── Makefile                  # Operational commands
-```
-
-Every engine directory carries a `scripts/report-action.node.ts`, which runs under Node on the
-runner after the report action copies it out of the image. Each engine's config generator is
-`src/core/scripts/gen-configs-<engine>.qjs.ts`: it runs under QuickJS when the container starts and
-writes haproxy.cfg and the Corefile from the rules, through the generators in `src/core/lib/acl/`
-(`haproxy-config.ts` for `inspect`, `haproxy-universal-config.ts` for `universal`). rolldown bundles
-it into `/opt/buildcage/scripts/gen-configs.js` at image build time, and `tsconfig.qjs.json`
-type-checks it.
-
-Each Dockerfile copies `docker/common/files/` first and the engine's own `files/` on top. An engine
-keeps only what differs: `THIRD_PARTY_LICENSES`, `buildkitd.toml`, the `init-cfg` script that
-generates its configs and, for `inspect`, the `init-overlay-check` service. A path in both would be
-settled silently by copy order, so `src/core/lib/docker/engine-files.test.ts` rejects one.
-
-`buildcage-runc` takes `go-pkcs12` from the
-[buildcage/go-pkcs12](https://github.com/buildcage/go-pkcs12) fork through a `replace` in its
-`go.mod`. The fork adds `DecodeTrustStoreEntries`, since a keystore rewrite must keep the aliases,
-and `MaxIterations`, which the sweep sets to a million so a keystore naming more key-derivation
-iterations is left unread instead of stalling the build. Its `vX.Y.Z-buildcage.N` tags are upstream
-`vX.Y.Z` plus those additions.
-
-The CNI plugins and CoreDNS are downloaded at a pinned version and checked against one SHA256 per
-architecture, both set as `ARG`s in each engine's Dockerfile. Renovate updates the version and the
-SHA256 lines together, taking the digests from the release's own checksum files; the `digestVersion`
-in the comment above each SHA256 line tells it which release that digest belongs to. A bump by hand
-changes all of them: the version line, each SHA256 line and each `digestVersion`.
 
 ## Troubleshooting
 
