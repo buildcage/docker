@@ -2,8 +2,8 @@
 
 This document is the threat model behind Buildcage: what it governs, how a build is kept to its
 allowlist, and where it stops short. For how to configure the action, see the
-[README](../README.md); for implementation internals (the supervisor binary, RPC plumbing, log
-parsing), see the [Development Guide](./development.md). For a high-level overview, see
+[README](../README.md); for working on Buildcage itself, see the
+[Development Guide](./development.md). For a high-level overview, see
 [buildcage.github.io](https://buildcage.github.io/).
 
 ## Contents
@@ -525,7 +525,7 @@ Verification establishes where the image came from, and leaves the following unc
   development. Tree-shaking drops that module out of every normal build, and a CI check inspects the
   published `dist/` to confirm it names none of the test-hook variables, so no `env:` a consumer
   sets can reach it.
-  See [development.md](./development.md#local-development).
+  See [development.md](./development.md#the-actions-against-an-unpublished-image).
 
 Tampering with the container after startup is a separate question, and is covered under
 [Threat model](#threat-model) above.

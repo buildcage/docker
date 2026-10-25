@@ -1,209 +1,152 @@
 # Development Guide
 
-This document covers local development, testing, and the project structure of Buildcage.
+This page is for working on Buildcage itself: setting up, finding your way around the repository,
+running and testing it locally, and what to keep in mind when changing it. What Buildcage does is
+in the [README](../README.md), the [Reference](./reference.md) and the
+[Security Details](./security.md).
 
 ## Contents
 
-- [Formatting & Linting](#formatting--linting)
-- [Directory Structure](#directory-structure)
-- [Local Usage](#local-usage)
-- [Local Development](#local-development)
+- [Getting set up](#getting-set-up)
+- [Repository layout](#repository-layout)
+- [Running it locally](#running-it-locally)
 - [Testing](#testing)
-- [Makefile Commands](#makefile-commands)
-- [Viewing Logs](#viewing-logs)
-- [Troubleshooting](#troubleshooting)
+- [Rules when changing code](#rules-when-changing-code)
+- [Debugging](#debugging)
 
-## Formatting & Linting
+## Getting set up
 
-Formatting, linting, and type-aware linting are handled by [vp (Vite+)](https://viteplus.dev/),
-installed globally on your machine:
+The toolchain is [vp (Vite+)](https://viteplus.dev/), installed globally:
 
 ```bash
 curl -fsSL https://vite.plus | bash   # macOS/Linux
 # Windows: irm https://viteplus.dev/install.ps1 | iex
 ```
 
-The project pins its own toolchain version via the `vite-plus` devDependency in `package.json`
-(the same way `packageManager` pins `pnpm`), and the globally installed `vp` binary detects and
-delegates to that pinned version automatically, so plain `vp ...` commands are reproducible without
-going through `pnpm exec`.
+`vp` delegates to the version the `vite-plus` devDependency in `package.json` pins, so plain
+`vp …` commands are reproducible. Run `vp install`, not `pnpm install`, in each checkout: it
+installs `node_modules` and sets up a pre-commit hook that formats and lints the staged files
+(`vite.config.ts`'s `staged` config), fixing and re-staging what it can. The builder, the QuickJS
+unit tests and the integration tests also need Docker, and `buildcage-runc`'s tests need Go.
 
 ```bash
-vp check       # format + lint + type-aware lint (read-only; what CI runs)
-vp check --fix # same, but auto-fixes format/lint issues in place
-vp lint --fix
-vp fmt --write
+vp check          # format, lint and type-aware lint, read-only (what CI runs)
+vp check --fix    # the same, fixing what it can
+vp run typecheck  # tsc, the authoritative type check
+vp run build      # rolldown → the committed dist/ bundles
 ```
 
-`vp run typecheck` (`tsc`) remains the authoritative full type check; `vp check`'s type-aware
-linting (via `oxlint-tsgolint`) catches a subset of type-driven issues fast but doesn't replace it.
+`vp check`'s type-aware lint catches a subset of type errors quickly but does not replace
+`vp run typecheck`. Build with `vp run build`, never `vp build`.
 
-Running `vp install` (in place of `pnpm install`) automatically sets up a pre-commit hook, via the
-`prepare` script, that formats and lints your staged files (`vite.config.ts`'s `staged` config)
-before each commit, auto-fixing and re-staging what it can.
-
-## Directory Structure
+## Repository layout
 
 ```text
 .
-├── action.yml                # Setup action entry (node24 → dist/main.cjs, dist/post.cjs)
-├── src/                      # Setup action source (ESM): verify provenance, resolve the image
-│   │                         # ref, compose up. src/main.ts is only the entry guard
-│   ├── lib/                  # The setup action's own modules; setup-step.ts is the step itself
-│   ├── report/               # Report code only this action needs (#report/*)
-│   └── core/                 # Code shared across both actions
-│       ├── lib/              # acl/ (rule parsing and the proxy config generators) is built for
-│       │                     # both runtimes, and so is anything it imports (errors.ts,
-│       │                     # line-comments.ts, log/proxy-address.ts). The rest of log/, and
-│       │                     # report/, docker/, provenance/ and actions/, are Node-only, and
-│       │                     # test/test-shim.ts is the node:test-alike shim *.test.ts uses
-│       │                     # under either runtime
-│       └── scripts/          # QuickJS only: each engine's config generator, the test runner
-│                             # and qjs's type declarations
-├── dist/                     # Bundled output (rolldown → CommonJS), committed. dist/qjs,
-│                             # dist/qjs-test and dist/report-action are gitignored scratch
-├── docker/                   # proxy_engine build contexts
-│   ├── compose.action.yaml   # Runtime compose file the action uses (verified, digest-pinned
-│   │                         # image ref), distinct from the top-level compose.yaml below
-│   ├── collect-go-licenses.sh
-│   │                         # Copies the license files of what a Go binary links
-│   ├── check-alpine-licenses.sh
-│   │                         # Fails the image build on an Alpine package that
-│   │                         # licenses/alpine-packages.txt does not cover
-│   ├── seccomp/              # The builder container's seccomp profile and gen-profile.mjs,
-│   │                         # read by the Docker client on the runner, not copied into an image
-│   ├── common/               # Image files the engines share: s6 services, init-iptables,
-│   │                         # cni.conflist
-│   ├── universal/            # proxy_engine: universal: BuildKit, HAProxy, CoreDNS, s6-overlay
-│   └── inspect/              # proxy_engine: inspect: the same, plus buildcage-runc/ (Go
-│                             # module: CA trust at exec time)
-├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode}, plus the fixture
-│                             # containers. helpers.sh carries what every assert script shares
-├── compose.test-*.yaml       # Test override config, one per engine
-├── report/                   # Report action: action.yml, src/ (ESM), dist/ (rolldown → CommonJS)
-├── docs/                     # reference.md, development.md, security.md, plus the
-│                             # rules.md/inspect-engine.md link stubs
-├── licenses/                 # gen-license-file.mjs, which regenerates THIRD_PARTY_LICENSES_NPM
-│                             # during `vp run build`, and buffers.txt, the text .glf.jsonc
-│                             # supplies for a package that publishes none. Its license texts
-│                             # (GPL, LGPL, MPL, Apache, and those of curl, QuickJS-ng, the
-│                             # s6-overlay family and the Alpine packages in alpine/) are copied
-│                             # into the images with THIRD_PARTY_LICENSES_NPM, and
-│                             # alpine-packages.txt maps each installed Alpine package to its text
-├── compose.yaml              # Local-dev compose config (dockerfile selected by PROXY_ENGINE)
-└── Makefile                  # Operational commands
+├── action.yml              # Setup action entry (node24 → dist/main.cjs, dist/post.cjs)
+├── src/                    # Setup action source (ESM); src/main.ts is only the entry guard
+│   ├── lib/                # The setup action's own modules; setup-step.ts is the step itself
+│   ├── report/             # Report code only this action needs (#report/*)
+│   └── core/
+│       ├── lib/            # acl/ and what it imports also run under QuickJS; the rest is Node-only
+│       └── scripts/        # QuickJS only: the config generators, the test runner, qjs's types
+├── dist/                   # Bundled output (rolldown → CommonJS), committed
+├── report/                 # Report action: action.yml, src/, dist/
+├── docker/
+│   ├── common/             # Image files every engine shares: s6 services, init-iptables
+│   ├── universal/          # proxy_engine: universal (BuildKit, HAProxy, CoreDNS, s6-overlay)
+│   ├── inspect/            # proxy_engine: inspect, the same plus buildcage-runc/ (Go)
+│   ├── seccomp/            # The builder's seccomp profile, applied by the runner's Docker
+│   ├── compose.action.yaml # The compose file the action runs, with the digest-pinned image
+│   └── *-licenses.sh       # License collection and checks run at image build time
+├── test/                   # Dockerfile.* and assert-*.sh per engine and mode, and the fixtures
+├── compose.yaml            # Local compose config (the Dockerfile is chosen by PROXY_ENGINE)
+├── compose.test-*.yaml     # Test overrides, one per engine
+├── licenses/               # License texts copied into the images, and the npm license generator
+├── docs/
+└── Makefile
 ```
 
-Every engine directory carries a `scripts/report-action.node.ts`, which runs under Node on the
-runner after the report action copies it out of the image. Each engine's config generator is
-`src/core/scripts/gen-configs-<engine>.qjs.ts`: it runs under QuickJS when the container starts and
-writes haproxy.cfg and the Corefile from the rules, through the generators in `src/core/lib/acl/`
-(`haproxy-config.ts` for `inspect`, `haproxy-universal-config.ts` for `universal`). rolldown bundles
-it into `/opt/buildcage/scripts/gen-configs.js` at image build time, and `tsconfig.qjs.json`
-type-checks it.
+Each engine's config generator is `src/core/scripts/gen-configs-<engine>.qjs.ts`. It runs under
+QuickJS when the container starts and writes haproxy.cfg and the Corefile from the rules, through
+the generators in `src/core/lib/acl/` (`haproxy-config.ts` for `inspect`,
+`haproxy-universal-config.ts` for `universal`). Every engine directory also carries a
+`scripts/report-action.node.ts`, which the report action copies out of the image and runs under
+Node on the runner.
 
-Each Dockerfile copies `docker/common/files/` first and the engine's own `files/` on top. An engine
-keeps only what differs: `THIRD_PARTY_LICENSES`, `buildkitd.toml`, the `init-cfg` script that
-generates its configs and, for `inspect`, the `init-overlay-check` service. A path in both would be
-settled silently by copy order, so `src/core/lib/docker/engine-files.test.ts` rejects one.
+## Running it locally
 
-`buildcage-runc` takes `go-pkcs12` from the
-[buildcage/go-pkcs12](https://github.com/buildcage/go-pkcs12) fork through a `replace` in its
-`go.mod`. The fork adds `DecodeTrustStoreEntries`, since a keystore rewrite must keep the aliases,
-and `MaxIterations`, which the sweep sets to a million so a keystore naming more key-derivation
-iterations is left unread instead of stalling the build. Its `vX.Y.Z-buildcage.N` tags are upstream
-`vX.Y.Z` plus those additions.
-
-The CNI plugins and CoreDNS are downloaded at a pinned version and checked against one SHA256 per
-architecture, both set as `ARG`s in each engine's Dockerfile. Renovate updates the version and the
-SHA256 lines together, taking the digests from the release's own checksum files; the `digestVersion`
-in the comment above each SHA256 line tells it which release that digest belongs to. A bump by hand
-changes all of them: the version line, each SHA256 line and each `digestVersion`.
-
-## Local Usage
-
-You can run Buildcage locally without GitHub Actions using Docker Compose and Make.
-
-GitHub Actions inputs are lowercase (`proxy_mode`); the environment variables for local usage are
-the uppercase form of the same names (`PROXY_MODE`).
-
-### Starting the Builder
-
-There's one `setup_buildkit_{engine}_{mode}` target per (`universal`, `inspect`) x
-(`audit`, `restrict`) combination:
+Action inputs become uppercase environment variables locally (`proxy_mode` is `PROXY_MODE`). There
+is one `setup_buildkit_{engine}_{mode}` target per engine and mode, and each sets `PROXY_ENGINE`,
+which picks the engine's Dockerfile in `compose.yaml`:
 
 ```bash
 make setup_buildkit_universal_audit
-make setup_buildkit_universal_restrict
-make setup_buildkit_inspect_audit
 make setup_buildkit_inspect_restrict
+ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443" make setup_buildkit_universal_restrict
 ```
 
-**Start with custom domains** (restrict mode only):
+A whole run:
 
 ```bash
-ALLOWED_HTTPS_RULES="github.com:443 npmjs.org:443 example.com:443" make setup_buildkit_universal_restrict
+make setup_buildkit_universal_audit                                      # 1. start the builder
+docker buildx build --builder buildcage --progress=plain -f Dockerfile . # 2. build
+make report_buildkit                                                     # 3. show the report
+make clean_buildkit                                                      # 4. clean up
 ```
 
-Each target sets `PROXY_ENGINE`, which picks the build context at image build time through
-`compose.yaml`'s `build.dockerfile: docker/${PROXY_ENGINE:-inspect}/Dockerfile` (see
-[Engines](../README.md#engines)).
+Run the report through `make report_buildkit` rather than `node report/src/main.ts` by hand: the
+Makefile exports the same `COMPOSE_PROJECT_NAME` and `BUILDCAGE_BUILD_TEST_HOOKS` to it as to the
+setup targets, and without them the report does not find the builder.
 
-### End-to-End Workflow
+### The actions against an unpublished image
 
-```bash
-# 1. Start Buildcage
-make setup_buildkit_universal_audit
-
-# 2. Build
-docker buildx build --builder buildcage --progress=plain -f Dockerfile .
-
-# 3. View report
-make report_buildkit
-
-# 4. Clean up
-make clean_buildkit
-```
-
-`make report_buildkit` runs `node report/src/main.ts` with the same
-`COMPOSE_PROJECT_NAME`/`BUILDCAGE_BUILD_TEST_HOOKS` override the `setup_buildkit_*`/`clean_buildkit`
-targets use (see the target-specific exports near the top of the Makefile). Running
-`node report/src/main.ts` directly, without going through `make`, won't find the running builder
-container. Raw builder logs are also available via `docker compose logs builder`.
-
-## Local Development
-
-Local Usage above runs the builder image. This is about running the setup and report actions
-themselves against changes that aren't published yet.
-
-Sigstore verification requires a real, published GHCR image, so the setup action normally can't
-run against an unpublished branch or local changes. This repo's own CI (`test_action` job in
-`.github/workflows/test-e2e.yml`) tests the real `setup`/`report` actions end-to-end against a
-locally built image instead: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` compiles `dist/main.cjs`
-where the `BUILDCAGE_LOCAL_IMAGE_REF` override is reachable. The override logic lives in its own
-module (`src/core/lib/provenance/local-image-override.ts`), loaded only via a dynamic `import()`
-gated by that build-time flag. Without the flag (i.e. every normal/committed build), rolldown's own
-module-graph tree-shaking excludes that entire file from the bundle, so the override code is absent
-from `dist/` rather than unreachable in it. A CI check (`unit_test` job) and the pre-commit hook
-also confirm a normal build's `dist` never mentions
-`BUILDCAGE_BUILD_TEST_HOOKS`, `BUILDCAGE_LOCAL_IMAGE_REF`, or any `BUILDCAGE_TEST_*` or
-`BUILDCAGE_RUN_DEBUG_*` name.
-
-To exercise it locally:
+Sigstore verification needs a real, published GHCR image, so the setup action cannot normally run
+against local changes. A test-hook build lets it: `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build`
+produces a `dist/main.cjs` that honors `BUILDCAGE_LOCAL_IMAGE_REF`. CI's `test_action` job in
+`.github/workflows/test-e2e.yml` runs the real `setup` and `report` actions this way.
 
 1. Build the image: `docker compose build` (set `PROXY_ENGINE` to select the engine).
 2. `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build`
-3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set (e.g. via `act`, or by
-   invoking `node dist/main.cjs` directly with the relevant `INPUT_*` env vars). Never commit a
-   `dist/main.cjs` built this way: run `vp run build` again (without the flag) before committing.
+3. Run it with `BUILDCAGE_LOCAL_IMAGE_REF=<image ref from step 1>` set, through `act` or by
+   invoking `node dist/main.cjs` with the relevant `INPUT_*` variables.
 
-See [security.md](./security.md#verification-limitations) for more details.
+Run `vp run build` again, without the flag, before committing; see
+[Rules when changing code](#rules-when-changing-code).
 
 ## Testing
 
-Most `setup_buildkit_{engine}_{mode}` targets have a matching
-`test_integration_buildkit_{engine}_{mode}` target (start → build the matching
-`test/Dockerfile.*` → verify → clean up):
+`make help` lists every target with its own description.
+
+### Unit tests and coverage
+
+```bash
+make test_unit               # every unit test, the QuickJS and Go ones included
+make test_unit_coverage      # every Node unit test in one run, with a report in coverage/
+make test_unit_go_coverage   # buildcage-runc's tests, with its filtered coverage checked
+vp test run src/core/lib/acl # the Node tests whose path contains the argument
+```
+
+The Node threshold is 100% on all four counters, so anything added without a test fails CI, which
+pastes `coverage/summary.txt` into the job summary. Code that is deliberately not tested carries a
+`/* v8 ignore */` comment saying why, which keeps that decision in the source rather than buried in
+a percentage. Only two things qualify: code whose body lives outside the process, and the default
+implementation behind a seam whose callers are already tested.
+
+`make test_unit_go_coverage` holds `buildcage-runc` to `RUNC_COVERAGE_THRESHOLD` in the Makefile,
+which is 100, after `test/covfilter` drops the blocks `//coverage:ignore start` / `stop` markers
+cover. A marker covering a statement the tests do reach, or covering none at all, fails the run the
+same way a gap does, so the list of what is deliberately untested cannot quietly stop being true.
+Go measures statements rather than branches, so even at 100 this is a weaker claim than the Node
+side's.
+
+The QuickJS run (`make test_unit_qjs`) is not measured separately. It executes the same `.test.ts`
+files as the Node run, so `src/core/lib/acl/`'s coverage is already accounted for.
+
+### Integration tests
+
+Each `test_integration_buildkit_*` target starts a builder, builds the matching
+`test/Dockerfile.*`, checks the result and cleans up:
 
 ```bash
 make test_integration_buildkit_universal_audit
@@ -212,229 +155,113 @@ make test_integration_buildkit_inspect_restrict
 # Debian/apt build, which starts with no CA store at all
 make test_integration_buildkit_inspect_debian_audit
 make test_integration_buildkit_inspect_debian_restrict
-# Asserts an inspect audit run, then enforces the rules it generated unedited.
-# There is no inspect_audit target of its own: this builds the same
-# test/Dockerfile.inspect-audit in the same audit mode, so the audit-mode
-# assertions belong to its first phase.
+# An inspect audit run, then its generated rules enforced unedited (holds the audit-mode checks)
 make test_integration_buildkit_inspect_roundtrip
 # known_blocked_rules against fail_on_blocked, both matched and unmatched
 make test_integration_buildkit_universal_known_blocked
 # Builds for the host's architecture and for the other one
 make test_integration_buildkit_multiarch
-# Brings the builder up alone, with no build running, and probes :10024/:53
-# from the compose network and from the host, for each engine
+# Brings the builder up alone and probes :10024/:53 from the compose network and the host
 make test_integration_buildkit_listener_scope
 ```
 
-`make help` lists every target. `make test_integration_buildkit` runs all of them, one after
-another. CI runs them in a few jobs, several targets side by side in each, every one under its own
-worktree suffix and test-net subnet (`.github/workflows/test-integration.yml`), with a check that
-none is left out. The architecture they build for differs too: `TEST_PLATFORM` is `linux/arm64`
-for the development machines, and CI overrides it with the runner's own.
+`make help` lists the rest, such as `inspect_byte_exact` and `universal_restrict_no_traffic`, and
+`make test_integration_buildkit` runs all of them in turn. CI runs them in a few jobs, several
+targets side by side in each, every one under its own worktree suffix and test-net subnet
+(`.github/workflows/test-integration.yml`), with a check that none is left out. `TEST_PLATFORM` is
+`linux/arm64` locally, and CI sets it to the runner's own architecture.
 
-### Unit test coverage
+### Several worktrees at once
 
-`make test_unit_coverage` runs every Node-side unit test in a single vitest pass and writes a
-report to `coverage/`. CI runs the same target and pastes `coverage/summary.txt` into the job
-summary. The threshold is 100% on all four counters, so anything added without a test fails the
-run. Code that is deliberately not tested carries a `/* v8 ignore */` comment saying why, which
-keeps that decision in the source rather than buried in a percentage. Only two things qualify: code
-whose body lives outside the process, and the default implementation behind a seam whose callers
-are already tested.
+One Docker daemon serves every worktree, so the builder container, the buildx builder, the Compose
+project and the built image would otherwise collide. The Makefile takes the worktree's name from
+`git rev-parse --git-dir` and suffixes all of them, and the `/tmp` paths, with it: a worktree named
+`wt2` uses `buildcage-wt2` and `buildcage-project-wt2`. The main checkout keeps the unsuffixed
+names. `BUILDCAGE_WORKTREE_SUFFIX` and `TEST_NET_SUBNET` override the derived values.
 
-`make test_unit_go_coverage` does the same for `buildcage-runc`: `go test -coverprofile`, then
-`test/covfilter` over the result, which drops the blocks `//coverage:ignore start` / `stop` markers
-cover and holds what is left to `RUNC_COVERAGE_THRESHOLD` in the Makefile. The threshold is 100. A
-marker covering a statement the tests do reach, or covering none at all, fails the run the same way
-a gap does, so the list of what is deliberately untested cannot quietly stop being true. Go measures
-statements rather than branches, so even at 100 this is a weaker claim than the Node side's.
+The fixtures' addresses need no suffix. Each fixture assigns its own `10.200.0.x` inside its own
+network namespace (see each fixture's entrypoint, and `test/test-net-addr/attach.sh`, which the
+test overlays run in front of the builder's entrypoint), so every worktree uses the same addresses,
+and the assertions name them literally. `test-net`'s subnet is derived from the worktree name too;
+two names that happen to pick the same one fail with `Pool overlaps with other one on this address
+space`, so rename one or set `TEST_NET_SUBNET`.
 
-The QuickJS run (`make test_unit_qjs`) is not measured separately. It executes the same `.test.ts`
-files as the Node run, so `src/core/lib/acl/`'s line coverage is already accounted for above.
+A fresh worktree needs `vp install` before any target that runs `report/src` or `src/post.ts`,
+since the integration targets run both straight from source.
 
-### Running the suite from several git worktrees
+## Rules when changing code
 
-One Docker daemon serves every worktree and namespaces nothing per worktree. The builder container,
-the buildx builder, the Compose project and the built image would otherwise each have one fixed
-name, and a second worktree's `setup_buildkit_*` would tear down the first one's builder without
-saying so.
+- **`dist/` is committed.** After changing anything under `src/` or `report/src/`, run
+  `vp run build` and commit the bundles with the change; CI's "Check dist is up to date" step
+  rebuilds and compares them. The bundles are never formatted or linted.
+- **A test-hook build never ships.** The `BUILDCAGE_LOCAL_IMAGE_REF` override lives in
+  `src/core/lib/provenance/local-image-override.ts`, reached only through a dynamic `import()`
+  gated by `BUILDCAGE_BUILD_TEST_HOOKS` at build time, so a normal build tree-shakes it out. CI and
+  the pre-commit hook fail a `dist/` that names `BUILDCAGE_BUILD_TEST_HOOKS`,
+  `BUILDCAGE_LOCAL_IMAGE_REF`, or any `BUILDCAGE_TEST_*` or `BUILDCAGE_RUN_DEBUG_*` name. A new
+  test hook goes behind the same gate.
+- **`acl/` runs under QuickJS too.** `src/core/lib/acl/`, everything it imports,
+  `src/core/lib/test/` and `src/core/scripts/` also run inside the image under QuickJS
+  (`tsconfig.qjs.json`), so they cannot use Node's APIs. `make test_unit_qjs` runs the tests under
+  `src/core/lib/acl/` there.
+- **An engine keeps only what differs.** Each Dockerfile copies `docker/common/files/` first and
+  the engine's own `files/` on top. A path in both would be settled silently by copy order, so
+  `src/core/lib/docker/engine-files.test.ts` rejects one.
+- **Pinned downloads move together.** The CNI plugins and CoreDNS are downloaded at a pinned
+  version and checked against one SHA256 per architecture, set as `ARG`s in each engine's
+  Dockerfile. Renovate updates the version and the SHA256 lines together, taking the digests from
+  the release's own checksum files; the `digestVersion` in the comment above each SHA256 line tells
+  it which release that digest belongs to. A bump by hand changes all of them.
+- **`go-pkcs12` comes from a fork.** `buildcage-runc` takes it from
+  [buildcage/go-pkcs12](https://github.com/buildcage/go-pkcs12) through a `replace` in its
+  `go.mod`. The fork adds `DecodeTrustStoreEntries`, since a keystore rewrite must keep the
+  aliases, and `MaxIterations`, which the sweep sets to a million so a keystore naming more
+  key-derivation iterations is left unread instead of stalling the build. Its `vX.Y.Z-buildcage.N`
+  tags are upstream `vX.Y.Z` plus those additions.
+- **The seccomp profile is vendored.** `make seccomp_profile` regenerates it from moby/profiles.
 
-Nothing has to be configured to avoid that. The Makefile takes the worktree's name from
-`git rev-parse --git-dir` and suffixes the builder, the buildx builder, the Compose project, the
-image tags and the `/tmp` paths with it, so a worktree named `wt2` uses `buildcage-wt2` and
-`buildcage-project-wt2`. The main checkout has no worktree name and keeps the unsuffixed names used
-everywhere else in this document. `BUILDCAGE_WORKTREE_SUFFIX` and `TEST_NET_SUBNET` override the
-derived values.
+## Debugging
 
-The fixtures' addresses need no suffix. Each assigns its own `10.200.0.x` inside its own network
-namespace instead of taking one from Compose IPAM (see each fixture's entrypoint, and
-`test/test-net-addr/attach.sh`, which the test overlays run in front of the builder's entrypoint),
-so the daemon never allocates `10.200.0.0/24` and every worktree uses the same addresses. That is
-why the assertions name those addresses literally.
-
-`test-net`'s subnet comes from the same name, and appears in no assertion. It is
-pinned rather than left to Docker because `test/test-net-addr` finds the
-builder's interface on it by that subnet. Two worktrees whose names happen to
-pick the same subnet fail with `Pool overlaps with other one on this address
-space`; rename one, or set `TEST_NET_SUBNET`.
-
-A fresh worktree needs `vp install` before any target that runs `report/src` or `src/post.ts`:
-`node_modules` is per checkout, and the integration targets run both straight from source.
-
-The builder's CNI bridge is `198.19.255.0/24`, from the `198.18.0.0/15` block
-RFC 2544 reserves for benchmarking: outside Docker's default address pools, so
-no network Docker allocates on its own overlaps it. A daemon whose
-`default-address-pools` covers that range can still hand it to the Compose
-`default` network, and a network shadowed that way is unreachable from inside
-the builder. If the builder starts failing to reach the network for no apparent
-reason, check that subnet with `docker network inspect`.
-
-## Makefile Commands
-
-`make help` lists every target with its own description. The ones you type most:
-
-| Command                                          | Description                                                            |
-| ------------------------------------------------ | ---------------------------------------------------------------------- |
-| `make setup_buildkit_{engine}_{mode}`            | Start a builder, for any engine x `{audit,restrict}`                   |
-| `make report_buildkit`                           | Show the report for the currently running builder                      |
-| `make clean_buildkit`                            | Stop and remove the builder's containers/images and the buildx builder |
-| `make test_unit`                                 | Every unit test, the QuickJS ones included (needs Docker)              |
-| `make test_unit_coverage`                        | Every Node unit test in one run, with a coverage report                |
-| `make test_unit_go_coverage`                     | buildcage-runc's tests, with its filtered coverage checked             |
-| `make test_integration_buildkit`                 | Every `test_integration_buildkit_*` target in turn                     |
-| `make test_integration_buildkit_{engine}_{mode}` | One engine and mode (start, build, verify, clean up)                   |
-| `make seccomp_profile`                           | Re-vendor the builder's seccomp profile from moby/profiles             |
-
-The integration set also holds `inspect_debian_{audit,restrict}` (an apt build that starts with no
-CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them unedited),
-`inspect_byte_exact`, `universal_restrict_no_traffic`, `universal_known_blocked` and `multiarch`,
-among others; `make help` lists them all.
-
-## Viewing Logs
+### Logs
 
 ```bash
-# All communication logs
-docker compose logs builder
-
-# Real-time log monitoring
-docker compose logs -f builder
-```
-
-**Log format (`universal`):**
-
-```
-buildcage 1787471970500 [ALLOWED] (HTTPS) "github.com:443" - 1024
-buildcage 1787471971200 [BLOCKED] (HTTPS) "malicious.com:443" not-allowed 0
-buildcage 1787471972000 [AUDIT] (HTTP) "npmjs.org:80" - 812 ts=-- dst=104.16.0.35:80
-buildcage 1787471973000 [-] (HTTP) "-" - 0 ts=PR dst=198.19.255.1:22
-```
-
-Fields: `buildcage <epoch-ms> [status] (rule) "domain:port" reason bytes`. The
-millisecond epoch orders the timeline and times each line against the startup
-marker; `bytes` is `%B`, the only per-connection detail a passthrough sees.
-The log keeps `domain` as sent; the report lowercases it, as the rules ignore
-case when matching it.
-
-A plaintext connection made through a name is relayed to a second frontend,
-`http_in`, whose lines also carry `ts`, HAProxy's termination state, and `dst`.
-Where no request parsed, no rule ran and the fields read `[-] (HTTP) "-" -`.
-What the report makes of those is in
-[Requests that never arrived whole](./reference.md#requests-that-never-arrived-whole).
-
-`universal` also reads the resolver's log (`/var/log/coredns`), since a name CoreDNS blocked never
-reaches HAProxy at all: it is the only trace of a name looked up but never connected to.
-
-**`inspect`'s proxy log is richer**, since it terminates TLS and sees each request whole; it reads the
-same resolver log alongside it:
-
-```bash
+docker compose logs builder    # the builder's output; -f to follow
 docker compose exec builder cat /var/log/haproxy/current
 docker compose exec builder cat /var/log/coredns/current
 ```
 
-HAProxy's log carries one line per request, oldest first, with its method, status, size, the `Host`
-header it carried, and its request target last:
+The proxy's line formats are the `log-format` lines the generators in `src/core/lib/acl/` write,
+and `src/core/lib/log/` parses them back. A line from each engine looks like this:
 
 ```
+buildcage 1787471970500 [ALLOWED] (HTTPS) "github.com:443" - 1024
 buildcage 1787471975123 https GET 200 708 ts=-- reason=- tlserr=- dst=104.16.1.34:443 fcerr=- sni=registry.npmjs.org host=registry.npmjs.org /express
-buildcage 1787471976000 pass tls 3421 ts=-- reason=- dst=10.200.0.100:5432 sni=db.example.com
 ```
 
-`host` and the target are two fields rather than one URL because a request target need not be a
-path: `OPTIONS *` and a `CONNECT`'s authority are both legal, and both leave the target as `-`, so a
-reader splitting a URL back apart would take the host for `registry.npmjs.org-`. A missing `Host`
-prints as `-` too. The log keeps the `Host` as sent; the report lowercases it and drops one trailing
-dot, as the rules do before matching it.
+Each log is an s6-log directory: `current` rotates into a timestamped archive at 1MB, up to 100
+archives kept. The report reads every archive, so `current` alone shows only what came after the
+last rotation.
 
-`ts` is HAProxy's termination state. `reason` is set when a block has a reason the other fields do
-not show. `tlserr` carries HAProxy's own error from the handshake with the origin, which is what
-tells a connection the proxy would not make from one it could not make; the passthrough stage
-terminates no TLS and logs no such field. `fcerr` is HAProxy's error on the client connection; an
-`SSL_*` one on a line with no request is shown as `client-tls-failed`. `SSL_FATAL` is not: it marks
-a broken record after the handshake.
-
-What the report makes of those is in
-[Requests that never arrived whole](./reference.md#requests-that-never-arrived-whole), for a
-connection that never delivered a whole request, and in
-[Connections that failed](./reference.md#connections-that-failed), for one the rules allowed that
-then came to nothing.
-
-Each log is an s6-log directory rather than a single file: `current` rotates into a timestamped
-archive once it crosses 1MB, up to 100 archives kept. A line from HAProxy is split only past 32KB,
-and one from CoreDNS past s6-log's default of 8KB. The report reads every archive, oldest first,
-then `current`, so early traffic is never dropped just because a later part of the same run pushed
-the log past a rotation. Reading `current` by hand, as above, only shows what has accumulated since
-the most recent one.
-
-HAProxy writes to s6-log through a pipe without blocking, so a line it cannot write at once is
-dropped rather than delayed, and nothing in the log marks where. A thread that keeps finding another
-mid-write on the pipe drops its line, so HAProxy runs one thread (`nbthread 1`). A stalled s6-log
-can still fill the pipe, so `pipesz` widens it from 64KB to 1MB before HAProxy starts. HAProxy
-counts the lines it drops itself: its `health` socket serves the Prometheus exporter, and the report
-reads `haproxy_process_dropped_logs_total` from it. A nonzero count, or one the report cannot read,
-marks the report incomplete. To read it by hand:
+HAProxy drops a log line it cannot write at once rather than wait, and counts the lines it drops;
+the report reads that count and marks itself incomplete when it is not zero. To read it by hand:
 
 ```bash
 docker compose exec builder curl -s --unix-socket /var/run/haproxy-health.sock \
   'http://localhost/metrics?scope=global' | grep dropped_logs
 ```
 
-## Troubleshooting
+### The setup step fails with "never became ready"
 
-If you encounter issues, try reproducing the problem locally to get detailed logs:
+The builder came up but `buildctl debug workers` never succeeded inside it. The step prints the
+container log; locally:
 
-1. **Check logs:**
+```bash
+docker inspect --format '{{json .State.Health}}' buildcage
+```
 
-   ```bash
-   docker compose logs builder
-   ```
+### The builder cannot reach the network
 
-2. **Run in audit mode** to understand your build's network behavior:
-
-   ```bash
-   make clean_buildkit
-   make setup_buildkit_universal_audit
-   docker buildx build --builder buildcage --no-cache -f Dockerfile .
-   docker compose logs builder
-   ```
-
-3. **TLS/certificate errors under `proxy_engine: inspect`**: if a `RUN` step fails with a
-   certificate error there but works fine under `universal`, the tool likely pins a certificate or
-   ships its own trust store rather than reading the CA-trust environment variables Buildcage sets.
-   A JDK already in the image at `JAVA_HOME` or behind the first `java` on `PATH` is handled
-   (`buildcage-runc` injects into its keystore, JKS or PKCS#12); any other JDK is not, and a keystore
-   sealed with a password other than the JDK default still needs `universal`. Chromium is handled by
-   adding a slot to its NSS database; one the step's user cannot write takes none, and Chromium
-   there needs `universal`. See [Limitations](../README.md#limitations).
-
-4. **The setup step fails with "never became ready"**: the builder came up but `buildctl debug
-   workers` never succeeded inside it. The step prints the container log; locally:
-
-   ```bash
-   docker inspect --format '{{json .State.Health}}' buildcage
-   ```
-
-5. **Open an issue** at [github.com/buildcage/docker/issues](https://github.com/buildcage/docker/issues) with:
-   - Your Dockerfile
-   - The audit mode report output
-   - Full error messages from `docker compose logs builder`
+The builder's CNI bridge is `198.19.255.0/24`, from the `198.18.0.0/15` block RFC 2544 reserves
+for benchmarking, outside Docker's default address pools. A daemon whose `default-address-pools`
+covers that range can still hand it to the Compose `default` network, which the builder then
+cannot reach. Check that subnet with `docker network inspect`.
