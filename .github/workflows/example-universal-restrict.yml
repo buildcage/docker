@@ -3,11 +3,49 @@ name: Example (universal engine, restrict mode)
 on:
   workflow_dispatch:
 
+  # Renovate moves the pin below to each new release, so that pull request
+  # runs the release through the same path a user's workflow takes: the image
+  # pulled by tag and its signature verified.
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/example-universal-restrict.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:
+  # Renovate sees the release's tag as soon as it is pushed, while
+  # docker-publish.yml is still building and signing that tag's images, and
+  # the example would fail on an image that is not signed yet.
+  release_image:
+    runs-on: ubuntu-slim
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+
+      - name: Wait for the pinned release's images
+        if: github.event_name == 'pull_request'
+        uses: ./.github/actions/wait-for-release-image
+        with:
+          workflow: .github/workflows/example-universal-restrict.yml
+
   build:
+    needs: release_image
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
 
