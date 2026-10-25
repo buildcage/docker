@@ -22,16 +22,15 @@ services:
     security_opt:
       - seccomp=./seccomp/builder.json
       - apparmor=unconfined
-    # Pinned, not left to the daemon's default-cgroupns-mode: under `host` the
-    # remount in each engine's init-cgroup would land on the host's own cgroup
-    # tree.
+    # Pinned, not left to the daemon's default-cgroupns-mode: under `host`
+    # init-cgroup's remount would land on the host's own cgroup tree.
     cgroup: private
     environment:
       - PROXY_MODE=${PROXY_MODE:-restrict}
       - ALLOWED_HTTPS_RULES=${ALLOWED_HTTPS_RULES:-}
       - ALLOWED_HTTP_RULES=${ALLOWED_HTTP_RULES:-}
       - ALLOWED_IP_RULES=${ALLOWED_IP_RULES:-}
-      # inspect only: it is the one engine that can see a method or a path.
+      # inspect only: URL and TLS rules.
       - ALLOWED_URL_RULES=${ALLOWED_URL_RULES:-}
       - ALLOWED_TLS_RULES=${ALLOWED_TLS_RULES:-}
       - KNOWN_BLOCKED_RULES=${KNOWN_BLOCKED_RULES:-}
@@ -41,9 +40,8 @@ services:
       # inspect only: whether a copy of the CA left in a layer fails the build.
       - FAIL_ON_CA_RESIDUE=${FAIL_ON_CA_RESIDUE:-true}
     # `--wait` would otherwise return on "running" alone, which says nothing
-    # about buildkitd. buildctl works in both engines. No restart policy
-    # goes with it: a container that stopped itself has to stay stopped for the
-    # wait to see it.
+    # about buildkitd. No restart policy goes with it: a container that
+    # stopped itself has to stay stopped for the wait to see it.
     healthcheck:
       test: ["CMD", "buildctl", "debug", "workers"]
       interval: 5s

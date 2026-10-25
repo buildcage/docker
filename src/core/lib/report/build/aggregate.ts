@@ -213,11 +213,10 @@ export interface ReducedTimeline {
 }
 
 /**
- * Turn a timeline into the report's three host tables, the reduction both
- * engines share. `discovery` and `incomplete` events reach neither table (no
- * rule decided them; the timeline still keeps them). A lookup a connection
- * already covers is dropped, and a failed connection is kept apart from
- * blocks (see TrafficAction).
+ * Turn a timeline into the report's three host tables. `discovery` and
+ * `incomplete` events reach none of them (no rule decided them; the timeline
+ * still keeps them). A lookup a connection already covers is dropped, and a
+ * failed connection is kept apart from blocks (see TrafficAction).
  *
  * Blocked events are kept whole rather than reduced to host rows first:
  * annotateKnownBlocked matches a URL rule against the method and path a host
@@ -247,11 +246,11 @@ export function reduceTimeline(
 }
 
 /**
- * The report data both engines build identically from their already-started
- * log scans: read them concurrently, merge into one timeline, reduce it, and
- * judge whether the logs are a complete record. Only the proxy scan differs
- * between engines (inspect decrypts, universal reads SNI/Host), so each caller
- * passes its own and shares everything else.
+ * Builds the report data from the already-started log scans: reads them
+ * concurrently, merges them into one timeline, reduces it, and judges whether
+ * the logs are a complete record. Only the proxy scan differs (inspect
+ * decrypts, universal reads SNI/Host), so each caller passes its own and
+ * shares everything else.
  */
 export async function assembleReportData<E extends ReportData["engine"]>(
   engine: E,

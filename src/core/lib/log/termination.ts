@@ -1,5 +1,5 @@
 /** What haproxy's termination state says about a request that never arrived
- *  whole, shared by both engines' HTTP stages. */
+ *  whole, shared by the engines' HTTP stages. */
 
 /**
  * What haproxy logs where the method would be when the bytes it read parsed as
@@ -13,9 +13,9 @@ export const BAD_REQUEST_METHOD = "<BADREQ>";
  * What ended a connection before a whole request had arrived, or undefined when
  * one arrived or this proxy is the one that ended it.
  *
- * Phase `R` is the proxy still reading the request line and headers, and both
- * engines' HTTP stages resolve the Host and connect only once one has parsed,
- * so nothing left this proxy. `C` is the client closing and `c` its own timeout
+ * Phase `R` is the proxy still reading the request line and headers, and the
+ * HTTP stages resolve the Host and connect only once one has parsed, so
+ * nothing left this proxy. `C` is the client closing and `c` its own timeout
  * expiring, neither of which a rule had a say in. `P` is this proxy answering,
  * which is a decision however little of the request it had, so the caller names
  * it instead. Anything else in that phase is haproxy's own doing, an internal

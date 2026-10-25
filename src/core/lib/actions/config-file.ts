@@ -138,9 +138,9 @@ function isMergeKey(key: unknown, doc: Document): boolean {
 }
 
 /**
- * Each key's value node in the document's top map, by the key's text, a merge
- * key's maps giving the keys the map does not set, the first of them first,
- * as toJS() merges them.
+ * Each key's value node in the document's top map, by the key's text. A key
+ * the map does not set comes from its merge key's maps, the first one that
+ * sets it winning, as toJS() merges them.
  */
 function valueNodes(doc: Document): Map<string, unknown> {
   // A map merged many times is read once.

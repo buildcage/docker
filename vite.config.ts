@@ -4,11 +4,9 @@ import { defineConfig } from "vite-plus";
 // up to date" CI step); never lint or format generated output.
 const generatedOutputs = ["dist/**", "report/dist/**"];
 
-// Recorded/golden fixtures: some (e.g. core/lib/log/__fixtures__/*.json) are
-// parsed line-by-line to mimic buildctl's real NDJSON-ish log output, so
-// pretty-printing them breaks that line structure and fails the tests that
-// read them. Fixtures are captured data, not authored code: never reformat
-// any of them, even ones that happen to be safe today.
+// Recorded/golden fixtures are captured data the tests compare or parse
+// verbatim, so none of them is reformatted, even one whose tests would
+// survive it.
 const fixtures = ["**/__fixtures__/**"];
 
 // Vendored third-party code, reviewed as a diff against upstream: the seccomp
@@ -47,9 +45,9 @@ export default defineConfig({
     },
     overrides: [{ files: annotateCallers, rules: { "no-restricted-imports": "off" } }],
     options: {
-      // typescript is already at v7 (typescript-go), so tsgolint's type-aware
-      // rules apply directly. `vp run typecheck` (tsc) stays the authoritative
-      // full type check; typeCheck (still experimental) is left off here.
+      // typescript v7 (typescript-go) lets tsgolint's type-aware rules apply
+      // directly. `vp run typecheck` (tsc) is the authoritative type check;
+      // the experimental typeCheck is left off.
       typeAware: true,
     },
   },

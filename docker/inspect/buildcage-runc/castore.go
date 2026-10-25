@@ -67,7 +67,7 @@ var errNotACertificate = errors.New("not a certificate")
 // cannot be used to reach outside.
 //
 // The wrapper runs as root on the host while the rootfs comes from an image
-// the build chose, so a link placed at one of the paths below would otherwise
+// the build chose, so a link placed at a path the wrapper writes would otherwise
 // direct an append onto a host file. Absolute links are therefore followed
 // from the rootfs rather than from the host's own root, and the result is
 // checked to be inside it either way.

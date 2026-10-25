@@ -1,6 +1,7 @@
 /**
- * Parsers for the `inspect` engine's two logs, whose formats are emitted by
- * haproxy-config.ts and coredns-config.ts. Seven kinds of line:
+ * Parsers for the `inspect` engine's proxy log and the resolver log every
+ * engine shares, whose formats are emitted by haproxy-config.ts and
+ * coredns-config.ts. Seven kinds of line:
  *
  *   buildcage <ms> https <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wb=<r|-> [<name>.<field>=<v|-> ...]] fcerr=<name|-> sni=<name|-> host=<authority|-> <target|->
  *   buildcage <ms> http <method> <status> <bytes> ts=<st> reason=<r> tlserr=<n|-> dst=<addr>:<port> [wb=<r|-> [<name>.<field>=<v|-> ...]] host=<authority|-> <target|->
@@ -15,9 +16,10 @@
  * rule could ever take away. It stays in the resolver log alone.
  *
  * The passthrough line is the only record of undecrypted traffic; the dns line
- * the only record of a blocked name, which never reaches the proxy. Only the
- * https line carries an SNI, since only that stage terminates TLS. A client
- * handshake that failed writes that line too, with fcerr naming the failure.
+ * the only record of a blocked name, which never reaches the proxy. Of the
+ * request lines, only https carries an SNI, since only that stage terminates
+ * TLS. A client handshake that failed writes that line too, with fcerr naming
+ * the failure.
  */
 
 import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
@@ -47,8 +49,8 @@ export type { TrafficAction, TrafficEvent, TrafficProtocol } from "./traffic-eve
 const REQUEST =
   /^buildcage (?<ms>\d+) (?<scheme>https?) (?<method>\S+) (?<status>-?\d+) (?<bytes>\d+) ts=(?<ts>\S*) reason=(?<reason>\S+) tlserr=(?<tlserr>\S+) dst=(?<dstHost>\S+):(?<dstPort>\d+) (?:wb=(?<wb>\S+) )?(?<ext>(?:[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*=\S+ )*)(?:fcerr=(?<fcerr>\S+) )?(?:sni=(?<sni>\S+) )?host=(?<host>\S+) (?<target>\S+)$/;
 
-/** REQUEST's named groups. wb, fcerr and sni are logged only by a stage an
- *  action extends; the plain stage omits them, so they can be absent. */
+/** REQUEST's named groups. wb is logged only by a stage an action extends,
+ *  fcerr and sni only by the https stage, so they can be absent. */
 interface RequestFields {
   ms: string;
   scheme: string;

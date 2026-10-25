@@ -12,8 +12,7 @@ export interface DescribeReportOutcomesOptions {
 
 /**
  * Every annotation a finished report calls for, in the order they should be
- * emitted. Both actions build their annotations from here, so neither can grow
- * one the other lacks; an action adds its own only for a check of its own.
+ * emitted. An action adds its own annotation only for a check of its own.
  *
  * The blocked-connections check always speaks, if only with level "none": it is
  * the one that decides the step's outcome. Anything after it is an aside about
@@ -54,8 +53,8 @@ export function countUndecidedRequests(report: ReportData): number {
  * collapsed Communication details section is their only trace and a reader who
  * never opens it would not know a request had gone nowhere.
  *
- * The wording avoids "incomplete", which the report already uses for a log
- * whose beginning is gone (see describeBlockedOutcome): two warnings about
+ * The wording avoids "incomplete", which the report already uses for logs
+ * that are not a full record (see describeBlockedOutcome): two warnings about
  * different things would otherwise read as one, and "this report may not be a
  * full record" is a far bigger claim than "one request went nowhere".
  */

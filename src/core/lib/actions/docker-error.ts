@@ -38,10 +38,10 @@ export function capturedStderr(e: unknown): string {
 /**
  * Turns a caught `docker` invocation error into an actionable message,
  * pointing at the runner requirement instead of surfacing execFileSync's
- * opaque "Command failed: docker ...args..." text. Deliberately doesn't
- * echo `e.message` when stderr was inherited (already visible live in the
- * Actions log): only captured stderr (e.g. from a piped call) is included,
- * since otherwise nothing points the reader back to it.
+ * opaque "Command failed: docker ...args..." text. Never echoes `e.message`.
+ * Inherited stderr is already in the Actions log, so the message points back
+ * to it; captured stderr (e.g. from a piped call) was seen nowhere, so it is
+ * included.
  */
 export function describeDockerFailure(
   e: unknown,

@@ -2,9 +2,6 @@
  * The `#` comment rule for the rule inputs (allowed_*_rules,
  * known_blocked_rules). A comment starts at a `#` that is at the start of a
  * line or preceded by whitespace, and runs to the end of the line.
- *
- * (isolated-run's write_through takes only whole-line `#` comments, since a
- * path may legitimately contain a `#` or a space.)
  */
 
 /**

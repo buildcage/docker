@@ -18,10 +18,10 @@ const ownCAPath = "/dev/buildcage-ca.pem"
 // The distinction between the kinds is what the variable means to the tool
 // that reads it: NODE_EXTRA_CA_CERTS and DENO_CERT are added to a built-in
 // set, so pointing them at a file holding only this CA leaves everything
-// else trusted, store or no store. The others replace the bundle outright:
-// with a store, they are pointed at it (which by then carries the CA plus
-// the real public roots); with no store there is nothing left that still
-// carries those roots, so they fall back to the same proxy-CA-only file
+// else trusted, store or no store. The others replace the bundle outright.
+// With a store, those this sets are pointed at it, which by then carries the
+// CA plus the real public roots; with no store there is nothing left that
+// still carries those roots, so they fall back to the same proxy-CA-only file
 // NODE_EXTRA_CA_CERTS/DENO_CERT use. That covers ordinary HTTP(S) traffic
 // (inspect re-signs all of it with this same CA) but not a passthrough
 // connection's real certificate; see README.md#limitations for exactly which
@@ -199,7 +199,8 @@ type injection struct {
 //
 // The layer is read back whatever the step exited with: BuildKit commits it
 // for a non-zero exit the LLB's ValidExitCodes allows, and keeps a failed
-// step's layer for debugging.
+// step's layer for debugging. An error here fails the step only when the exit
+// code it leaves is not in ValidExitCodes, which a Dockerfile cannot set.
 func (in *injection) finish() error {
 	var firstErr error
 	for _, b := range in.binds {
@@ -343,9 +344,7 @@ func bindLimit(hostDir string, parts []string, store systemStore) mirrorLimit {
 }
 
 // bindCovering returns the bind whose mirrored directory contains containerDir,
-// or nil. A JVM keystore that resolves inside a directory a store bind already
-// mirrors is folded into that bind rather than bound separately, which the
-// store's mount would otherwise shadow.
+// or nil.
 func bindCovering(binds []*dirBind, containerDir string) *dirBind {
 	for _, b := range binds {
 		if containerDir == b.containerDir || strings.HasPrefix(containerDir, b.containerDir+"/") {

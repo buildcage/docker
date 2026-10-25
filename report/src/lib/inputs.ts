@@ -5,8 +5,8 @@
  *
  * Separate from src/lib/inputs.ts because this is a separate action with a
  * separate bundle: importing the setup action's would pull rule parsing into
- * report's dist for one string. The default they must agree on is shared as a
- * constant instead.
+ * report's dist. What the two must agree on, resolveBuilderName, lives in
+ * src/report/report-source.ts.
  */
 import * as core from "@actions/core";
 

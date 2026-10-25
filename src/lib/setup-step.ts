@@ -40,8 +40,7 @@ import { readSetupInputs } from "./inputs.ts";
 import { readLocalImageOverride } from "./local-image.ts";
 import { BUILDER_NAME_STATE } from "./post-cleanup.ts";
 
-// Resolved from the bundle's own location: dist/main.cjs sits one directory
-// above docker/.
+// Resolved from the bundle's own location: dist/ is a sibling of docker/.
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const COMPOSE_FILE = join(__dirname, "../docker/compose.action.yaml");
 

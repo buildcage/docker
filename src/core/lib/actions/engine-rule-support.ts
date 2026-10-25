@@ -1,10 +1,11 @@
 import { InvalidInputError, type ProxyEngine } from "./inputs.ts";
 
 /**
- * Only `inspect` terminates TLS, so it's the only engine that can see an HTTP
- * method or a path, which makes `allowed_url_rules` and `allowed_tls_rules`
- * no-ops on `universal`. Called once at setup, before the proxy starts, so a
- * mismatch is caught immediately instead of silently not enforcing.
+ * Only `inspect` terminates TLS: it alone sees a method or a path
+ * (`allowed_url_rules`) and has decrypted traffic to exempt
+ * (`allowed_tls_rules`), so both are no-ops on `universal`. Called once at
+ * setup, before the proxy starts, so a mismatch is caught immediately instead
+ * of silently not enforcing.
  *
  * In `restrict` mode this is an error: a rule that looks like it protects the
  * step but can't actually be enforced is worse than no rule at all. In

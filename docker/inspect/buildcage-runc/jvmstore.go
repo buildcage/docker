@@ -25,14 +25,15 @@ import (
 	"syscall"
 )
 
-// errNotAKeystore means the file discovery pointed at does not begin with
-// either keystore magic, so injection has nothing it knows how to write.
+// errNotAKeystore means the file discovery pointed at is neither a JKS nor
+// shaped like a PKCS#12, so injection has nothing it knows how to write.
 var errNotAKeystore = errors.New("not a JKS or PKCS#12 keystore")
 
 // The alias of the injected entry in either keystore shape, and its creation
 // time in a JKS. The time is fixed so the entry is byte-for-byte the same every
-// build, which keeps the gatekeeper comparing like with like; the alias only
-// has to not collide with one the keystore already uses.
+// build, which keeps finish's unchanged check (manifestsEqual against the
+// baseline) comparing like with like; the alias only has to not collide with
+// one the keystore already uses.
 const (
 	injectedAlias        = "buildcage-proxy-ca"
 	injectedCreationTime = 1700000000000
@@ -86,8 +87,8 @@ func javaOnPath(s *spec) (string, bool) {
 // the rootfs: JAVA_HOME's first, then that of the first java on PATH. Each is
 // deduplicated by where it resolves, so a distribution's JDKs, which link to
 // one shared keystore, have it injected once. Other JDKs in the image are left
-// alone: a keystore's directory is a mount point for the step, so no later
-// step could remove them.
+// alone: binding a keystore's directory makes it a mount point, which the step
+// could then not remove.
 func findJVMKeystores(s *spec) []string {
 	var dirs []string
 	if home := s.env["JAVA_HOME"]; home != "" {
@@ -116,10 +117,10 @@ func findJVMKeystores(s *spec) []string {
 
 // insertIntoKeystore adds a trusted-certificate entry for the CA to the keystore
 // at path, rewriting it in place. Like removeFromBinaryStore it reads the file
-// once and dispatches on its magic. On success it returns the keystore's
-// pre-injection bytes for the caller to restore later. An error leaves the
-// keystore untouched for the caller to report, so the step's JVM does not trust
-// the CA.
+// once and dispatches on its format. On success it returns the keystore's
+// pre-injection bytes for the caller to restore later. An error before the
+// write leaves the keystore untouched for the caller to report, so the step's
+// JVM does not trust the CA.
 func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 	ders := certificateDERs(ca)
 	if len(ders) == 0 {

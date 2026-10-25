@@ -2,8 +2,8 @@ import type { AggregatedEntry } from "../log/aggregate.ts";
 import type { TrafficEvent } from "../log/traffic-event.ts";
 import type { AnnotatedBlockedRow } from "./build/aggregate.ts";
 
-/** Echoed back verbatim rather than re-derived: only the container's own
- *  env (or, for run, its own action input) reflects what was configured. */
+/** Echoed back verbatim from the action's configuration rather than
+ *  re-derived, since nothing else reflects what was configured. */
 export interface GenReportParameters {
   mode: string;
   allowedHttpsRules: string[];
@@ -32,15 +32,15 @@ export interface ReportDataCommon {
    *  apart from `blocked` and left out of `blockedCount`; see TrafficAction. */
   failed: AggregatedEntry[];
 
-  /** Raw blocked-event count: both engines count log lines rather than
-   *  aggregated rows, so it can be larger than blocked.length. */
+  /** Raw blocked-event count: log lines rather than aggregated rows, so it
+   *  can be larger than blocked.length. */
   blockedCount: number;
 
-  /** False iff the log is not a complete record of the run: its beginning is
-   *  gone, a decision line could not be read, it never carried a trace of a
-   *  real one (haproxy.ts's headIntact and unparsed), or the proxy dropped a
-   *  line or could not say whether it did (proxy-dropped-logs.ts). Anything written from
-   *  this flag has to name every one of them, since the flag itself does not say
+  /** False iff the logs are not a complete record of the run: either log's
+   *  beginning is gone or it is empty, a line of ours could not be read (each
+   *  scan's headIntact and unparsed), or the proxy dropped a line or could not
+   *  say whether it did (proxy-dropped-logs.ts). Anything written from this
+   *  flag has to name every one of them, since the flag itself does not say
    *  which applied. The report fails closed rather than passing off what
    *  survived as everything. */
   logLooksPlausible: boolean;

@@ -1,7 +1,7 @@
 /**
- * Compiles buildcage's rule strings into the matchers both engines' haproxy.cfg
- * and the Corefile are built from. Pure data: the generators turn the result
- * into config text, and this module knows nothing about that text.
+ * Compiles buildcage's rule strings into the matchers haproxy.cfg and the
+ * Corefile are built from. Pure data: the generators turn the result into
+ * config text, and this module knows nothing about that text.
  */
 
 import { IPV4_OR_CIDR, OCTET, isIpRuleAddress } from "./ipv4.ts";
@@ -260,8 +260,7 @@ function compileIpRules(rules: string[] | undefined): CompiledIpRule[] {
   const out: CompiledIpRule[] = [];
   (rules ?? []).forEach((rule, index) => {
     if (rule.startsWith("~")) {
-      // Validates: the regex compiles and it names a port. See
-      // hostRuleToMatcher for why this is checked here too.
+      // Validates: the regex compiles and it names a port.
       splitRawRegexHost(rule);
       out.push({
         id: `ip${index}`,

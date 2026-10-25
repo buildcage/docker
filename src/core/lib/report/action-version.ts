@@ -3,9 +3,9 @@ import type { Docker } from "#core/lib/docker/client.ts";
 /**
  * Best-effort `org.opencontainers.image.version` label read, converted back
  * into the `vX.Y.Z` git tag it was published from (the label itself is the
- * bare Docker tag, e.g. `3.1.4-inspect` for a non-universal engine; see
- * image-tag.ts). A `docker inspect` failure here must not fail the whole
- * report over one comment.
+ * bare Docker tag, e.g. `3.1.4-inspect`; see image-tag.ts).
+ * A `docker inspect` failure here must not fail the whole report over one
+ * comment.
  */
 export function readActionVersion(
   docker: Docker,

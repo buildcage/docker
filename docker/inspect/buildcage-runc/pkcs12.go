@@ -3,9 +3,8 @@ package main
 // PKCS#12 is the other shape a JVM keystore comes in: newer JDKs ship
 // $JAVA_HOME/lib/security/cacerts as a PKCS#12 trust store rather than the JKS
 // older ones use, and keystore.type defaults to pkcs12 from JDK 9 on. The DER
-// sits among the container's own bytes the same way it does in a JKS, so no PEM
-// removal reaches it, and until this the sweep could detect a copy there but not
-// take it out, which failed the build (errUnstrippableCA).
+// sits among the file's own bytes the same way it does in a JKS, so no PEM
+// removal reaches it.
 //
 // The JDK's own cacerts carries no MAC (the password guards only the MAC, and
 // the certificate bags are never encrypted), so it decodes under the empty
@@ -126,7 +125,7 @@ var encodePKCS12 = func(entries []pkcs12.TrustStoreEntry, password string, legac
 
 // pkcs12With returns a PKCS#12 trust store holding everything in content plus
 // a trusted certificate for each der, under the password content opened with.
-// content is already known to begin with the PKCS#12 magic. A store
+// content already looks like a PKCS#12 (looksLikePKCS12). A store
 // decodePKCS12 will not open is one this cannot rewrite, so injection is
 // skipped for it and the step's JVM is left not trusting the CA.
 func pkcs12With(content []byte, ders [][]byte) ([]byte, error) {
@@ -146,7 +145,7 @@ func pkcs12With(content []byte, ders [][]byte) ([]byte, error) {
 
 // pkcs12Without returns a PKCS#12 trust store holding everything in content but
 // the certificate, under the password content opened with, and reports whether
-// it removed anything. content is already known to begin with the PKCS#12 magic.
+// it removed anything. content already looks like a PKCS#12 (looksLikePKCS12).
 //
 // A store decodePKCS12 will not open (a key with its chain, or a trust store
 // under another password), or one holding the DER among its bytes but not as a
@@ -160,9 +159,8 @@ func pkcs12Without(content []byte, ders [][]byte) ([]byte, bool, error) {
 		logf("a PKCS#12 keystore this cannot decode as a trust store: %v", err)
 		return nil, false, nil
 	}
-	// Captured before the delete: slices.DeleteFunc rewrites entries' backing
-	// array in place and returns a shorter slice, leaving entries' own length
-	// unchanged, so comparing kept against it is what says a copy was found.
+	// slices.DeleteFunc rewrites entries in place, so the count is taken first;
+	// kept coming back shorter is what says a copy was found.
 	before := len(entries)
 	kept := slices.DeleteFunc(entries, func(entry pkcs12.TrustStoreEntry) bool {
 		return holdsAnyDER(entry.Cert.Raw, ders)

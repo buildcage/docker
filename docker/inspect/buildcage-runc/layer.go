@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-// errUnstrippableCA means a copy of the certificate is in a container this
+// errUnstrippableCA means a copy of the certificate is in a file format this
 // cannot rewrite. Detection covers every format; removal does not, and the
 // difference fails the build rather than passing silently.
 var errUnstrippableCA = errors.New("the certificate is in a format this cannot strip")
@@ -346,9 +346,7 @@ func stripCA(path string, ca []byte, marks caMarks) (bool, error) {
 // Reading it back is the check that matters: the guarantee is about what
 // BuildKit commits, not about what the removals above believed they did.
 //
-// upper is the layer found when the injection began, not one located afresh: a
-// mount table that read cleanly at inject but fails to now would otherwise
-// report no layer and let the anchors' scattered copies through unswept.
+// upper is the layer found when the injection began (see injection.upper).
 func stripLayer(rootfs, upper string, ca, nssAppended []byte) error {
 	if upper == "" {
 		return errLayerUnread

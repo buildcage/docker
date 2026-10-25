@@ -83,10 +83,10 @@ async function* streamDockerLines(
 
   const rl = createInterface({ input: child.stdout!, crlfDelay: Infinity });
 
-  // True only if stdout was drained to EOF on its own, not if the consumer
-  // broke out early: only then is the child worth killing. A consumer that
-  // stops early leaves the generator inside the finally, so nothing below it
-  // runs for that case.
+  // False unless stdout was read to EOF: after an early break by the consumer
+  // or a stream error, the child may still be running and has to be killed.
+  // That exit leaves the generator inside the finally, so nothing below it
+  // runs.
   let exhausted = false;
   try {
     for await (const line of rl) {
