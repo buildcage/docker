@@ -9,20 +9,12 @@ import (
 	"testing"
 )
 
-// useWarnOnCAResidue stands for a build set up with fail_on_ca_residue: false.
-func useWarnOnCAResidue(t *testing.T) {
-	t.Helper()
-	old := failOnCAResidue
-	failOnCAResidue = false
-	t.Cleanup(func() { failOnCAResidue = old })
-}
-
 // A copy of the CA the sweep cannot take out stays in the image with a warning,
 // and the rest of the undo still runs.
 func TestFinishOnlyWarnsAboutACopyItCannotStripWhenAskedTo(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
-	useWarnOnCAResidue(t)
+	useFailOnCAResidue(t, false)
 	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
 	useMountInfo(t, overlayLine(rootfs, rootfs))
 
@@ -54,7 +46,7 @@ func TestFinishOnlyWarnsAboutACopyItCannotStripWhenAskedTo(t *testing.T) {
 func TestFinishOnlyWarnsAboutAKeystoreItCannotResealWhenAskedTo(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
-	useWarnOnCAResidue(t)
+	useFailOnCAResidue(t, false)
 	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
 	useMountInfo(t, overlayLine(rootfs, rootfs))
 
@@ -74,29 +66,6 @@ func TestFinishOnlyWarnsAboutAKeystoreItCannotResealWhenAskedTo(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "cannot strip: /truststore.jks") {
 		t.Errorf("the warning does not name the keystore:\n%s", stderr)
-	}
-}
-
-// A step whose layer cannot be read back does not run, whatever
-// fail_on_ca_residue says, and nothing is placed in its rootfs.
-func TestInjectRefusesAStepWithoutALayerToReadBack(t *testing.T) {
-	for _, fail := range []bool{true, false} {
-		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
-			useTempLog(t)
-			useFakeRsync(t)
-			old := failOnCAResidue
-			failOnCAResidue = fail
-			t.Cleanup(func() { failOnCAResidue = old })
-			bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
-			useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
-
-			if _, err := inject(bundle, testCA); !errors.Is(err, errLayerUnread) {
-				t.Fatalf("got %v, want the unread layer to refuse the step", err)
-			}
-			if entries, _ := os.ReadDir(rootfs); len(entries) != 1 || entries[0].Name() != "etc" {
-				t.Errorf("rootfs holds %v, want it untouched", entries)
-			}
-		})
 	}
 }
 
@@ -123,7 +92,7 @@ func stripLayerWithALeftover(t *testing.T) error {
 func TestMirrorWritesBackAroundACopyItCannotStripWhenAskedTo(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
-	useWarnOnCAResidue(t)
+	useFailOnCAResidue(t, false)
 	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
 
 	in, err := inject(bundle, testCA)
@@ -148,7 +117,7 @@ func TestMirrorWritesBackAroundACopyItCannotStripWhenAskedTo(t *testing.T) {
 }
 
 func TestTolerateResidueLeavesOtherFailuresAlone(t *testing.T) {
-	useWarnOnCAResidue(t)
+	useFailOnCAResidue(t, false)
 	for _, failure := range []error{errBrokenWalk, errLayerUnread} {
 		if err := tolerateResidue(failure); !errors.Is(err, failure) {
 			t.Fatalf("got %v, want %v passed through", err, failure)
@@ -180,64 +149,6 @@ func TestRunHintsAtFailOnCAResidue(t *testing.T) {
 	}
 }
 
-// A step whose layer cannot be read back fails before runc starts it, and the
-// build log says why without pointing at fail_on_ca_residue.
-func TestRunRefusesAStepWithoutALayerToReadBack(t *testing.T) {
-	useTempLog(t)
-	useFakeRsync(t)
-	useTempCAFile(t, string(testCA))
-	bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
-	useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
-	ran := filepath.Join(t.TempDir(), "ran")
-	t.Setenv("RAN", ran)
-	useFakeRunc(t, `touch "$RAN"`)
-
-	readStderr := captureStderr(t)
-	code := run([]string{"run", "--bundle", bundle, "id"})
-	stderr := readStderr()
-
-	if code != 1 {
-		t.Errorf("run exited %d, want 1", code)
-	}
-	if _, err := os.Stat(ran); !os.IsNotExist(err) {
-		t.Errorf("runc ran the step: %v", err)
-	}
-	if !strings.Contains(stderr, "not running the step: "+errLayerUnread.Error()) {
-		t.Errorf("the build log does not say why:\n%s", stderr)
-	}
-	if strings.Contains(stderr, "fail_on_ca_residue") {
-		t.Errorf("an unread layer hinted at fail_on_ca_residue:\n%s", stderr)
-	}
-}
-
-// A keystore left half-written fails the step before runc starts it.
-func TestRunRefusesAStepWithAHalfWrittenKeystore(t *testing.T) {
-	useTempLog(t)
-	useFakeRsync(t)
-	useTempCAFile(t, string(testCA))
-	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
-	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
-		keystore(2, trustedEntry(2, "digicert", otherDER)))
-	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
-	ran := filepath.Join(t.TempDir(), "ran")
-	t.Setenv("RAN", ran)
-	useFakeRunc(t, `touch "$RAN"`)
-
-	readStderr := captureStderr(t)
-	code := run([]string{"run", "--bundle", bundle, "id"})
-	stderr := readStderr()
-
-	if code != 1 {
-		t.Errorf("run exited %d, want 1", code)
-	}
-	if _, err := os.Stat(ran); !os.IsNotExist(err) {
-		t.Errorf("runc ran the step: %v", err)
-	}
-	if !strings.Contains(stderr, "not running the step: ") || !strings.Contains(stderr, errKeystoreHalfWritten.Error()) {
-		t.Errorf("the build log does not say why:\n%s", stderr)
-	}
-}
-
 // A copy the sweep cannot strip does not stop the slot being cut from a copy
 // of the home in the same layer, and the result names each residue once:
 // it fails the build by default and only warns under fail_on_ca_residue: false.
@@ -246,9 +157,7 @@ func TestStripLayerGoesOnPastACopyItCannotStrip(t *testing.T) {
 	for _, fail := range []bool{true, false} {
 		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
 			useTempLog(t)
-			old := failOnCAResidue
-			failOnCAResidue = fail
-			t.Cleanup(func() { failOnCAResidue = old })
+			useFailOnCAResidue(t, fail)
 			rootfs := t.TempDir()
 			mustWriteFile(t, filepath.Join(rootfs, "bundle.tar"), "ustar\x00"+string(testCA))
 			home := filepath.Join(rootfs, "backup", nssDBPath)

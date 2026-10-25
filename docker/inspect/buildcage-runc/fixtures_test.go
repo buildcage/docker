@@ -187,3 +187,11 @@ func useTempLog(t *testing.T) {
 		ownLog.Reset()
 	})
 }
+
+// useFailOnCAResidue stands for a build set up with fail_on_ca_residue: fail.
+func useFailOnCAResidue(t *testing.T, fail bool) {
+	t.Helper()
+	old := failOnCAResidue
+	failOnCAResidue = fail
+	t.Cleanup(func() { failOnCAResidue = old })
+}

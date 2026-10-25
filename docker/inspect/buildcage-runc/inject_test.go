@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -1032,5 +1034,26 @@ func TestInjectBindsSUSEsCertDirWithoutAStore(t *testing.T) {
 	scratch, _ := findMount(t, loadMounts(t, bundle), "/var/lib/ca-certificates/pem")["source"].(string)
 	if got := mustRead(t, filepath.Join(scratch, suseCertName)); got != string(testCA) {
 		t.Fatalf("the directory's copy holds %q, want the CA alone", got)
+	}
+}
+
+// A step whose layer cannot be read back does not run, whatever
+// fail_on_ca_residue says, and nothing is placed in its rootfs.
+func TestInjectRefusesAStepWithoutALayerToReadBack(t *testing.T) {
+	for _, fail := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
+			useTempLog(t)
+			useFakeRsync(t)
+			useFailOnCAResidue(t, fail)
+			bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+			useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
+
+			if _, err := inject(bundle, testCA); !errors.Is(err, errLayerUnread) {
+				t.Fatalf("got %v, want the unread layer to refuse the step", err)
+			}
+			if entries, _ := os.ReadDir(rootfs); len(entries) != 1 || entries[0].Name() != "etc" {
+				t.Errorf("rootfs holds %v, want it untouched", entries)
+			}
+		})
 	}
 }

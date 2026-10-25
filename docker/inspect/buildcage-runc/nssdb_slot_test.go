@@ -616,7 +616,7 @@ func TestStripLayerReportsAnEditedNSSSlot(t *testing.T) {
 		!strings.Contains(err.Error(), "/backup/pkcs11.txt (still names "+nssCADBDir+")") {
 		t.Fatalf("got %v, want the edited slot reported", err)
 	}
-	useWarnOnCAResidue(t)
+	useFailOnCAResidue(t, false)
 	if err := tolerateResidue(err); err != nil {
 		t.Fatalf("got %v, want only a warning under fail_on_ca_residue: false", err)
 	}
