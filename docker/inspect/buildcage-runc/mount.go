@@ -314,9 +314,9 @@ func checkMirrorable(root string, maxBytes int64, maxFiles int) error {
 }
 
 // restoreUnchangedMtimes resets an untouched entry's mtime to what it was
-// before mirroring. Without this, rsync's own mtime-preserving write-back
-// would see a real difference (same content, different mtime) and copy the
-// file up even though the step never touched it.
+// before mirroring. --checksum keeps the write-back from rewriting a file
+// whose content is the same, but -a still carries the mtime the injection
+// round trip left on it over to the rootfs, for a file the step never touched.
 func restoreUnchangedMtimes(original, current []fileEntry, scratchDir string) error {
 	byPath := make(map[string]fileEntry, len(original))
 	for _, e := range original {
