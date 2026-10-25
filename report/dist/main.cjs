@@ -24438,7 +24438,7 @@ var CHAR_0, CHAR_9, CHAR_MINUS, MINUS_SET, init_anynum = __esmMin((() => {
 	]);
 }));
 //#endregion
-//#region node_modules/.pnpm/strnum@2.4.2/node_modules/strnum/strnum.js
+//#region node_modules/.pnpm/strnum@2.5.1/node_modules/strnum/strnum.js
 function toNumber(str, options = {}) {
 	if (options = Object.assign({}, consider, options), !str || typeof str != "string") return str;
 	let trimmedStr = str.trim();
@@ -24447,12 +24447,15 @@ function toNumber(str, options = {}) {
 	if (options.hex && hexRegex.test(trimmedStr)) return parse_int(trimmedStr, 16);
 	if (options.binary && binRegex.test(trimmedStr)) return parse_int(trimmedStr, 2);
 	if (options.octal && octRegex.test(trimmedStr)) return parse_int(trimmedStr, 8);
-	if (!isFinite(trimmedStr)) return handleInfinity(str, Number(trimmedStr), options);
+	if (!isFinite(trimmedStr)) {
+		let num = Number(trimmedStr);
+		return Number.isNaN(num) ? str : handleInfinity(str, num, options);
+	}
 	if (trimmedStr.includes("e") || trimmedStr.includes("E")) return resolveEnotation(str, trimmedStr, options);
 	{
 		let match = numRegex.exec(trimmedStr);
 		if (match) {
-			let sign = match[1] || "", leadingZeros = match[2], numTrimmedByZeros = trimZeros(match[3]), decimalAdjacentToLeadingZeros = sign ? str[leadingZeros.length + 1] === "." : str[leadingZeros.length] === ".";
+			let sign = match[1] || "", leadingZeros = match[2], numTrimmedByZeros = trimZeros(match[3]), decimalAdjacentToLeadingZeros = sign ? trimmedStr[leadingZeros.length + 1] === "." : trimmedStr[leadingZeros.length] === ".";
 			if (!options.leadingZeros && (leadingZeros.length > 1 || leadingZeros.length === 1 && !decimalAdjacentToLeadingZeros)) return str;
 			{
 				let num = Number(trimmedStr), parsedStr = String(num);
@@ -24470,8 +24473,8 @@ function resolveEnotation(str, trimmedStr, options) {
 	if (!options.eNotation) return str;
 	let notation = trimmedStr.match(eNotationRegx);
 	if (notation) {
-		let sign = notation[1] || "", eChar = notation[3].indexOf("e") === -1 ? "E" : "e", leadingZeros = notation[2], eAdjacentToLeadingZeros = sign ? str[leadingZeros.length + 1] === eChar : str[leadingZeros.length] === eChar;
-		return leadingZeros.length > 1 && eAdjacentToLeadingZeros ? str : leadingZeros.length === 1 && (notation[3].startsWith(`.${eChar}`) || notation[3][0] === eChar) ? Number(trimmedStr) : leadingZeros.length > 0 ? options.leadingZeros && !eAdjacentToLeadingZeros ? (trimmedStr = (notation[1] || "") + notation[3], Number(trimmedStr)) : str : Number(trimmedStr);
+		let sign = notation[1] || "", eChar = notation[3].indexOf("e") === -1 ? "E" : "e", leadingZeros = notation[2], eAdjacentToLeadingZeros = sign ? trimmedStr[leadingZeros.length + 1] === eChar : trimmedStr[leadingZeros.length] === eChar;
+		return leadingZeros.length > 1 && eAdjacentToLeadingZeros ? str : leadingZeros.length === 1 && (notation[3].startsWith(`.${eChar}`) || notation[3][0] === eChar) ? Number(trimmedStr) : leadingZeros.length > 0 ? options.leadingZeros && !eAdjacentToLeadingZeros ? Number(trimmedStr) : str : Number(trimmedStr);
 	}
 	return str;
 }
