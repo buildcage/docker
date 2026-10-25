@@ -223,7 +223,7 @@ front of it; `inspect` terminates TLS and reads the request. For choosing betwee
 
 ### Universal proxy engine
 
-<img src="../assets/diagram-architecture-universal.png" alt="Universal proxy engine architecture" width="611" height="490">
+<img src="../assets/diagram-architecture-universal.png" alt="Universal proxy engine architecture" width="611" height="544">
 
 The engine to fall back to when something in the build cannot accept the `inspect` engine's CA. It
 decrypts nothing: HAProxy classifies each connection by what it can read at the front of it, then
