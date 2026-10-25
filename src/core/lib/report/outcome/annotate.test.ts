@@ -33,23 +33,14 @@ describe("applyOutcomeAnnotations", () => {
     process.exitCode = previousExitCode;
   });
 
-  it("emits an error annotation for level error", () => {
-    const { annotation, calls } = recorder();
-    applyOutcomeAnnotations(annotation, [emission({ level: "error", message: "blocked" })]);
-    expect(calls).toStrictEqual([["error", "blocked"]]);
-  });
-
-  it("emits a notice annotation for level notice", () => {
-    const { annotation, calls } = recorder();
-    applyOutcomeAnnotations(annotation, [emission({ level: "notice", message: "audited" })]);
-    expect(calls).toStrictEqual([["notice", "audited"]]);
-  });
-
-  it("emits a warning annotation for level warning", () => {
-    const { annotation, calls } = recorder();
-    applyOutcomeAnnotations(annotation, [emission({ level: "warning", message: "no request" })]);
-    expect(calls).toStrictEqual([["warning", "no request"]]);
-  });
+  it.each([{ level: "error" }, { level: "warning" }, { level: "notice" }] as const)(
+    "emits a $level annotation for level $level",
+    ({ level }) => {
+      const { annotation, calls } = recorder();
+      applyOutcomeAnnotations(annotation, [emission({ level })]);
+      expect(calls).toStrictEqual([[level, "outcome"]]);
+    },
+  );
 
   it("emits nothing for level none", () => {
     const { annotation, calls } = recorder();

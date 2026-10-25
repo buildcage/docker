@@ -10,27 +10,27 @@ import {
 } from "./wildcard-rules.ts";
 
 describe("wildcardToRegex", () => {
-  it("exact domain: dots escaped", () => {
+  it("escapes the dots of an exact domain", () => {
     expect(wildcardToRegex("example.com:443")).toBe("example\\.com:443");
   });
 
-  it("single wildcard *", () => {
+  it("turns * into exactly one label", () => {
     expect(wildcardToRegex("*.example.com:443")).toBe("[^.]+\\.example\\.com:443");
   });
 
-  it("double wildcard **", () => {
+  it("turns ** into one or more labels", () => {
     expect(wildcardToRegex("**.example.com:443")).toBe(".+\\.example\\.com:443");
   });
 
-  it("question mark ?", () => {
+  it("turns ? into one character other than a dot", () => {
     expect(wildcardToRegex("exampl?.com:443")).toBe("exampl[^.]\\.com:443");
   });
 
-  it("multiple wildcards", () => {
+  it("converts each wildcard label of a rule on its own", () => {
     expect(wildcardToRegex("*.*.example.com:443")).toBe("[^.]+\\.[^.]+\\.example\\.com:443");
   });
 
-  it("rejects mixed * in part", () => {
+  it("rejects a * that shares its label with other characters", () => {
     expect(() => wildcardToRegex("w*.example.com:443")).toThrow(/Invalid wildcard/);
   });
 
@@ -79,7 +79,7 @@ describe("wildcardToRegex", () => {
     expect(() => wildcardToRegex("10.0.0.0/33:443")).toThrow(/Invalid CIDR block/);
   });
 
-  it("wildcard port *", () => {
+  it("turns a * port into any number", () => {
     expect(wildcardToRegex("example.com:*")).toBe("example\\.com:\\d+");
   });
 
@@ -95,7 +95,7 @@ describe("convertRule", () => {
     expect(convertRule("*.example.com:8443")).toBe("^[^.]+\\.example\\.com:8443$");
   });
 
-  it("regex rule (~ prefix): returned as-is without ~", () => {
+  it("passes a ~ regex rule through without its ~", () => {
     expect(convertRule("~^custom\\.regex:443$")).toBe("^custom\\.regex:443$");
   });
 
@@ -133,57 +133,57 @@ describe("convertRule", () => {
     expect(convertRule("~a\\.com:443\\\\$")).toBe("^a\\.com:443\\\\$");
   });
 
-  it("rejects invalid regex (~ prefix)", () => {
+  it("rejects a ~ regex rule that does not compile", () => {
     expect(() => convertRule("~^(unclosed")).toThrow(/Invalid regex/);
   });
 
-  it("rejects a regex rule (~ prefix) with no port", () => {
+  it("rejects an anchored ~ regex rule with no port", () => {
     expect(() => convertRule("~^example\\.com$")).toThrow(/a port is always required/);
   });
 
-  it("rejects a regex rule (~ prefix) with no port even without anchors", () => {
+  it("rejects an unanchored ~ regex rule with no port", () => {
     expect(() => convertRule("~example\\.com")).toThrow(/a port is always required/);
   });
 });
 
 describe("convertRule: regex behavior", () => {
-  it("* matches single-level subdomain only", () => {
+  it("matches * against a single-level subdomain only", () => {
     const re = new RegExp(convertRule("*.example.com:443"));
-    expect(re.test("sub.example.com:443")).toBeTruthy();
-    expect(!re.test("deep.sub.example.com:443")).toBeTruthy();
-    expect(!re.test("example.com:443")).toBeTruthy();
+    expect(re.test("sub.example.com:443")).toBe(true);
+    expect(re.test("deep.sub.example.com:443")).toBe(false);
+    expect(re.test("example.com:443")).toBe(false);
   });
 
-  it("** matches multi-level subdomains", () => {
+  it("matches ** against subdomains of any depth, but not the bare domain", () => {
     const re = new RegExp(convertRule("**.example.com:443"));
-    expect(re.test("sub.example.com:443")).toBeTruthy();
-    expect(re.test("deep.sub.example.com:443")).toBeTruthy();
-    expect(!re.test("example.com:443")).toBeTruthy();
+    expect(re.test("sub.example.com:443")).toBe(true);
+    expect(re.test("deep.sub.example.com:443")).toBe(true);
+    expect(re.test("example.com:443")).toBe(false);
   });
 
-  it("? matches exactly one non-dot character", () => {
+  it("matches ? against exactly one non-dot character", () => {
     const re = new RegExp(convertRule("exampl?.com:443"));
-    expect(re.test("example.com:443")).toBeTruthy();
-    expect(!re.test("exampl.com:443")).toBeTruthy();
-    expect(!re.test("examplee.com:443")).toBeTruthy();
+    expect(re.test("example.com:443")).toBe(true);
+    expect(re.test("exampl.com:443")).toBe(false);
+    expect(re.test("examplee.com:443")).toBe(false);
   });
 
-  it("exact domain does not match subdomains", () => {
+  it("matches an exact domain but none of its subdomains", () => {
     const re = new RegExp(convertRule("example.com:443"));
-    expect(re.test("example.com:443")).toBeTruthy();
-    expect(!re.test("sub.example.com:443")).toBeTruthy();
+    expect(re.test("example.com:443")).toBe(true);
+    expect(re.test("sub.example.com:443")).toBe(false);
   });
 
-  it("port mismatch is rejected", () => {
+  it("does not match the same host on another port", () => {
     const re = new RegExp(convertRule("example.com:443"));
-    expect(!re.test("example.com:8443")).toBeTruthy();
+    expect(re.test("example.com:8443")).toBe(false);
   });
 
-  it("wildcard port matches any port", () => {
+  it("matches a * port against any numeric port", () => {
     const re = new RegExp(convertRule("example.com:*"));
-    expect(re.test("example.com:443")).toBeTruthy();
-    expect(re.test("example.com:8080")).toBeTruthy();
-    expect(!re.test("example.com:abc")).toBeTruthy();
+    expect(re.test("example.com:443")).toBe(true);
+    expect(re.test("example.com:8080")).toBe(true);
+    expect(re.test("example.com:abc")).toBe(false);
   });
 });
 
@@ -225,6 +225,11 @@ describe("splitRuleTokens comments", () => {
 });
 
 describe("parseAndValidateRules", () => {
+  it("returns no rules for an unset or empty input", () => {
+    expect(parseAndValidateRules(undefined)).toStrictEqual([]);
+    expect(parseAndValidateRules("")).toStrictEqual([]);
+  });
+
   it("returns raw (unconverted) rule tokens", () => {
     expect(parseAndValidateRules("example.com:443 *.foo.com:8443")).toStrictEqual([
       "example.com:443",

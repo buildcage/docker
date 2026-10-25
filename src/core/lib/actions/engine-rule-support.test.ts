@@ -4,160 +4,104 @@ import {
   checkKnownBlockedUrlRuleSupport,
   checkUrlAndTlsRuleSupport,
 } from "./engine-rule-support.ts";
-import { InvalidInputError } from "./inputs.ts";
+import { InvalidInputError, type ProxyEngine } from "./inputs.ts";
 
-describe("checkUrlAndTlsRuleSupport", () => {
-  it("does nothing on inspect, regardless of mode or rules", () => {
-    const warn = vi.fn();
-    expect(() =>
-      checkUrlAndTlsRuleSupport(
-        {
-          proxyEngine: "inspect",
-          proxyMode: "restrict",
-          urlRules: ["GET https://example.com"],
-          tlsRules: ["example.com:443"],
-        },
-        warn,
-      ),
-    ).not.toThrow();
+const URL_RULE = "GET https://example.com";
+const TLS_RULE = "example.com:443";
+const KNOWN_BLOCKED_URL_RULE = "POST https://api.example.com/telemetry";
+
+type Outcome = "none" | "warn" | "throw";
+
+/** Runs a check and reports what it did: nothing, one warning, or an INVALID_PROXY_ENGINE error. */
+function outcomeOf(check: (warn: (message: string) => void) => void): {
+  outcome: Outcome;
+  message?: string;
+} {
+  const warn = vi.fn();
+  try {
+    check(warn);
+  } catch (e) {
     expect(warn).not.toHaveBeenCalled();
-  });
-
-  it("does nothing when no url/tls rules are given, regardless of engine or mode", () => {
-    const warn = vi.fn();
-    expect(() =>
-      checkUrlAndTlsRuleSupport(
-        { proxyEngine: "universal", proxyMode: "restrict", urlRules: [], tlsRules: [] },
-        warn,
-      ),
-    ).not.toThrow();
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  it("throws INVALID_PROXY_ENGINE in restrict mode when the engine can't enforce url rules", () => {
-    const warn = vi.fn();
-    expect(() =>
-      checkUrlAndTlsRuleSupport(
-        {
-          proxyEngine: "universal",
-          proxyMode: "restrict",
-          urlRules: ["GET https://example.com"],
-          tlsRules: [],
-        },
-        warn,
-      ),
-    ).toThrow(
+    expect(e).toStrictEqual(
       expect.objectContaining({ name: InvalidInputError.name, code: "INVALID_PROXY_ENGINE" }),
     );
-    expect(warn).not.toHaveBeenCalled();
-  });
+    return { outcome: "throw", message: (e as Error).message };
+  }
+  if (warn.mock.calls.length === 0) return { outcome: "none" };
+  expect(warn).toHaveBeenCalledTimes(1);
+  return { outcome: "warn", message: warn.mock.calls[0][0] };
+}
 
-  it("mentions only the rule inputs actually set", () => {
-    expect(() =>
-      checkUrlAndTlsRuleSupport(
-        {
-          proxyEngine: "universal",
-          proxyMode: "restrict",
-          urlRules: [],
-          tlsRules: ["example.com:443"],
-        },
-        vi.fn(),
-      ),
-    ).toThrow(/allowed_tls_rules/);
-  });
-
-  it("mentions both inputs when both are set", () => {
-    try {
-      checkUrlAndTlsRuleSupport(
-        {
-          proxyEngine: "universal",
-          proxyMode: "restrict",
-          urlRules: ["GET https://example.com"],
-          tlsRules: ["example.com:443"],
-        },
-        vi.fn(),
+describe("checkUrlAndTlsRuleSupport", () => {
+  it.each<[ProxyEngine, string, string[], string[], Outcome]>([
+    ["inspect", "restrict", [URL_RULE], [TLS_RULE], "none"],
+    ["inspect", "audit", [URL_RULE], [TLS_RULE], "none"],
+    ["universal", "restrict", [], [], "none"],
+    ["universal", "audit", [], [], "none"],
+    ["universal", "restrict", [URL_RULE], [], "throw"],
+    ["universal", "restrict", [], [TLS_RULE], "throw"],
+    ["universal", "audit", [URL_RULE], [], "warn"],
+    ["universal", "audit", [], [TLS_RULE], "warn"],
+  ])(
+    "on %s in %s mode with url %j and tls %j: %s",
+    (proxyEngine, proxyMode, urlRules, tlsRules, expected) => {
+      const { outcome } = outcomeOf((warn) =>
+        checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn),
       );
-      expect.unreachable();
-    } catch (e) {
-      expect((e as Error).message).toMatch(/allowed_url_rules and allowed_tls_rules/);
-    }
-  });
+      expect(outcome).toBe(expected);
+    },
+  );
 
-  it("warns instead of throwing in audit mode", () => {
-    const warn = vi.fn();
-    expect(() =>
-      checkUrlAndTlsRuleSupport(
-        {
-          proxyEngine: "universal",
-          proxyMode: "audit",
-          urlRules: ["GET https://example.com"],
-          tlsRules: [],
-        },
-        warn,
-      ),
-    ).not.toThrow();
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toMatch(/allowed_url_rules/);
-  });
+  it.each<[string, string[], string[], Outcome, RegExp]>([
+    ["restrict", [URL_RULE], [], "throw", /^allowed_url_rules has no effect/],
+    ["restrict", [], [TLS_RULE], "throw", /^allowed_tls_rules has no effect/],
+    [
+      "restrict",
+      [URL_RULE],
+      [TLS_RULE],
+      "throw",
+      /^allowed_url_rules and allowed_tls_rules have no effect/,
+    ],
+    ["audit", [URL_RULE], [], "warn", /^allowed_url_rules has no effect/],
+    ["audit", [], [TLS_RULE], "warn", /^allowed_tls_rules has no effect/],
+    [
+      "audit",
+      [URL_RULE],
+      [TLS_RULE],
+      "warn",
+      /^allowed_url_rules and allowed_tls_rules have no effect/,
+    ],
+  ])(
+    "names only the rule inputs actually set (%s, url %j, tls %j)",
+    (proxyMode, urlRules, tlsRules, expected, pattern) => {
+      const { outcome, message } = outcomeOf((warn) =>
+        checkUrlAndTlsRuleSupport(
+          { proxyEngine: "universal", proxyMode, urlRules, tlsRules },
+          warn,
+        ),
+      );
+      expect(outcome).toBe(expected);
+      expect(message).toMatch(pattern);
+    },
+  );
 });
 
 describe("checkKnownBlockedUrlRuleSupport", () => {
-  it("does nothing on inspect", () => {
-    const warn = vi.fn();
-    expect(() =>
-      checkKnownBlockedUrlRuleSupport(
-        {
-          proxyEngine: "inspect",
-          proxyMode: "restrict",
-          knownBlockedUrlRules: ["POST https://api.example.com/telemetry"],
-        },
-        warn,
-      ),
-    ).not.toThrow();
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  it("does nothing when no URL lines are present, whatever the engine", () => {
-    const warn = vi.fn();
-    expect(() =>
-      checkKnownBlockedUrlRuleSupport(
-        { proxyEngine: "universal", proxyMode: "restrict", knownBlockedUrlRules: [] },
-        warn,
-      ),
-    ).not.toThrow();
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  it("throws INVALID_PROXY_ENGINE in restrict mode on a non-inspect engine", () => {
-    const warn = vi.fn();
-    expect(() =>
-      checkKnownBlockedUrlRuleSupport(
-        {
-          proxyEngine: "universal",
-          proxyMode: "restrict",
-          knownBlockedUrlRules: ["POST https://api.example.com/telemetry"],
-        },
-        warn,
-      ),
-    ).toThrow(
-      expect.objectContaining({ name: InvalidInputError.name, code: "INVALID_PROXY_ENGINE" }),
-    );
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  it("warns instead of throwing in audit mode", () => {
-    const warn = vi.fn();
-    expect(() =>
-      checkKnownBlockedUrlRuleSupport(
-        {
-          proxyEngine: "universal",
-          proxyMode: "audit",
-          knownBlockedUrlRules: ["POST https://api.example.com/telemetry"],
-        },
-        warn,
-      ),
-    ).not.toThrow();
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toMatch(/known_blocked_rules/);
-  });
+  it.each<[ProxyEngine, string, string[], Outcome]>([
+    ["inspect", "restrict", [KNOWN_BLOCKED_URL_RULE], "none"],
+    ["inspect", "audit", [KNOWN_BLOCKED_URL_RULE], "none"],
+    ["universal", "restrict", [], "none"],
+    ["universal", "audit", [], "none"],
+    ["universal", "restrict", [KNOWN_BLOCKED_URL_RULE], "throw"],
+    ["universal", "audit", [KNOWN_BLOCKED_URL_RULE], "warn"],
+  ])(
+    "on %s in %s mode with URL lines %j: %s",
+    (proxyEngine, proxyMode, knownBlockedUrlRules, expected) => {
+      const { outcome, message } = outcomeOf((warn) =>
+        checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedUrlRules }, warn),
+      );
+      expect(outcome).toBe(expected);
+      if (outcome !== "none") expect(message).toMatch(/known_blocked_rules/);
+    },
+  );
 });

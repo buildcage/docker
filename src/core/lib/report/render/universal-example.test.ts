@@ -7,11 +7,11 @@ const REPO = "owner/repo";
 const REF = "v1";
 
 describe("buildUniversalRestrictExample", () => {
-  it("empty array → empty string", () => {
+  it("renders nothing for an empty row list", () => {
     expect(buildUniversalRestrictExample([], REPO)).toBe("");
   });
 
-  it("null/undefined → empty string", () => {
+  it("renders nothing when the rows are null or undefined", () => {
     expect(buildUniversalRestrictExample(null, REPO)).toBe("");
     expect(buildUniversalRestrictExample(undefined, REPO)).toBe("");
   });
