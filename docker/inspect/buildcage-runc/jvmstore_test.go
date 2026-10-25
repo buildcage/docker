@@ -289,7 +289,8 @@ func TestInsertIntoKeystoreReportsAShortWrite(t *testing.T) {
 func TestInsertIntoKeystoreReportsACloseFailure(t *testing.T) {
 	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
 	useBrokenBundleFile(t, &brokenFile{failClose: true})
-	if _, err := insertIntoKeystore(path, testCA); !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
+	_, err := insertIntoKeystore(path, testCA)
+	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
 		t.Fatalf("got %v, want the close failure as a half-written keystore", err)
 	}
 }
@@ -776,8 +777,8 @@ func TestInjectLogsAFailureToUndoTheInjection(t *testing.T) {
 	}
 }
 
-// The keystore inside the store mirror being left half-written abandons the
-// store's bind too: nothing reaches the real store or keystore.
+// A half-written keystore inside the store mirror abandons the store's bind
+// too, so nothing reaches the real store or keystore.
 func TestInjectAbandonsAHalfWrittenKeystoreInsideTheStoreDir(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})

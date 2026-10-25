@@ -32,9 +32,8 @@ var errNotAKeystore = errors.New("not a JKS or PKCS#12 keystore")
 
 // errKeystoreHalfWritten means writing the CA into the mirror's copy of a
 // keystore failed partway, so the copy holds neither its old bytes nor the
-// injected ones and the step must not run with it. The image's own keystore is
-// never written here.
-var errKeystoreHalfWritten = errors.New("adding the CA to the wrapper's copy of this keystore failed partway; the image's own keystore is unchanged")
+// injected ones and the step must not run with it.
+var errKeystoreHalfWritten = errors.New("adding the CA to the wrapper's copy of this keystore failed partway (the image's own keystore is unchanged)")
 
 // The alias of the injected entry in either keystore shape, and its creation
 // time in a JKS. The time is fixed so the entry is byte-for-byte the same every

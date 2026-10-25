@@ -324,7 +324,8 @@ keystores:
 
 // abandon undoes an injection whose step will not run. The mirrors hold only
 // the injection's own writes, a half-written keystore among them, so they are
-// dropped unwritten, and finish takes out the rest.
+// dropped unwritten; finish then removes the CA-only file, the anchors and the
+// directories the injection created.
 func (in *injection) abandon() error {
 	for _, b := range in.binds {
 		b.cleanup()

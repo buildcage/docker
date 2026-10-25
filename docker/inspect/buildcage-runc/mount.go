@@ -356,7 +356,7 @@ func (b *dirBind) prepare(ca []byte) error {
 				// A keystore that cannot be injected into (an unusual format, or a
 				// PKCS#12 under a password of its own) leaves the step's JVM not
 				// trusting the CA rather than failing the build. One left
-				// half-written stops the injection, which inject abandons.
+				// half-written makes inject abandon the injection.
 				original, err := insertIntoKeystore(target, ca)
 				if errors.Is(err, errKeystoreHalfWritten) {
 					return fmt.Errorf("%s: %w", filepath.Join(b.containerDir, name), err)
