@@ -29,6 +29,11 @@ import (
 // shaped like a PKCS#12, so injection has nothing it knows how to write.
 var errNotAKeystore = errors.New("not a JKS or PKCS#12 keystore")
 
+// errKeystoreHalfWritten means writing the CA into a keystore failed partway,
+// so the file holds neither its old bytes nor the injected ones and the step
+// must not run with it.
+var errKeystoreHalfWritten = errors.New("the keystore was left half-written")
+
 // The alias of the injected entry in either keystore shape, and its creation
 // time in a JKS. The time is fixed so the entry is byte-for-byte the same every
 // build, which keeps finish's unchanged check (manifestsEqual against the
@@ -120,7 +125,8 @@ func findJVMKeystores(s *spec) []string {
 // once and dispatches on its format. On success it returns the keystore's
 // pre-injection bytes for the caller to restore later. An error before the
 // write leaves the keystore untouched for the caller to report, so the step's
-// JVM does not trust the CA.
+// JVM does not trust the CA; one from the write itself wraps
+// errKeystoreHalfWritten.
 func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 	ders := certificateDERs(ca)
 	if len(ders) == 0 {
@@ -161,8 +167,10 @@ func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 	}
 
 	if _, err := f.WriteAt(injected, 0); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w: %w", path, errKeystoreHalfWritten, err)
 	}
-	// Returns content alongside a Truncate error; the caller ignores it there.
-	return content, f.Truncate(int64(len(injected)))
+	if err := f.Truncate(int64(len(injected))); err != nil {
+		return nil, fmt.Errorf("%s: %w: %w", path, errKeystoreHalfWritten, err)
+	}
+	return content, nil
 }

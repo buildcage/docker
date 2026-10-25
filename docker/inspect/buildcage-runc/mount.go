@@ -83,6 +83,10 @@ type dirBind struct {
 	// a keystore, so one the step never changed is restored from these instead.
 	keystoreOriginals map[string][]byte
 
+	// halfWritten is set when a keystore in the mirror was left half-written
+	// (errKeystoreHalfWritten); inject then abandons the injection.
+	halfWritten error
+
 	// Set for Chromium's NSS database (nssdb.go): what was appended to the
 	// mirror's pkcs11.txt, whether the directory had one before, and the
 	// scratch directory holding both the mirror and the CA-only database
@@ -351,8 +355,13 @@ func (b *dirBind) prepare(ca []byte) error {
 			if b.keystore {
 				// A keystore that cannot be injected into (an unusual format, or a
 				// PKCS#12 under a password of its own) leaves the step's JVM not
-				// trusting the CA rather than failing the build.
+				// trusting the CA rather than failing the build. One left
+				// half-written does fail it, through inject.
 				original, err := insertIntoKeystore(target, ca)
+				if errors.Is(err, errKeystoreHalfWritten) {
+					b.halfWritten = err
+					continue
+				}
 				if err != nil {
 					logf("cannot inject the CA into keystore %s: %v; leaving it untouched", name, err)
 					continue
@@ -463,6 +472,10 @@ func (b *dirBind) finish() error {
 func (b *dirBind) coverKeystore(rel string, ca []byte) {
 	target := filepath.Join(b.scratchDir, rel)
 	original, err := insertIntoKeystore(target, ca)
+	if errors.Is(err, errKeystoreHalfWritten) {
+		b.halfWritten = err
+		return
+	}
 	if err != nil {
 		logf("cannot inject the CA into keystore %s: %v; leaving it untouched", rel, err)
 		return

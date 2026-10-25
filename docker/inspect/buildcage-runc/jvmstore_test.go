@@ -258,8 +258,45 @@ func TestInsertIntoKeystoreReportsAReadFailure(t *testing.T) {
 func TestInsertIntoKeystoreReportsAWriteFailure(t *testing.T) {
 	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
 	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
-	if _, err := insertIntoKeystore(path, testCA); !errors.Is(err, errBrokenFile) {
-		t.Fatalf("got %v, want the write failure", err)
+	_, err := insertIntoKeystore(path, testCA)
+	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the write failure as a half-written keystore", err)
+	}
+}
+
+func TestInsertIntoKeystoreReportsATruncateFailure(t *testing.T) {
+	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+	original, err := insertIntoKeystore(path, testCA)
+	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the truncate failure as a half-written keystore", err)
+	}
+	if original != nil {
+		t.Error("returned the original bytes for a keystore it left half-written")
+	}
+}
+
+// A keystore left half-written stops the step before it runs: the mirror is
+// dropped unwritten and the real keystore keeps its bytes.
+func TestInjectAbandonsAHalfWrittenKeystore(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
+	pristine := keystore(2, trustedEntry(2, "digicert", otherDER))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts", pristine)
+	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+
+	if _, err := inject(bundle, testCA); !errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the half-written keystore", err)
+	}
+	real, err := os.ReadFile(filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(real, pristine) {
+		t.Error("the real keystore was changed")
+	}
+	if left, err := os.ReadDir(scratchRoot); err != nil || len(left) != 0 {
+		t.Errorf("scratch directories left behind: %v %v", left, err)
 	}
 }
 

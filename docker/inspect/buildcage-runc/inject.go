@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -295,10 +296,27 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("cannot update the process spec: %v", err)
 	}
 
-	return &injection{
+	in := &injection{
 		rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
 		upper: upper, nssAppended: nssAppended,
-	}, nil
+	}
+	for _, b := range binds {
+		if b.halfWritten != nil {
+			return nil, errors.Join(b.halfWritten, in.abandon())
+		}
+	}
+	return in, nil
+}
+
+// abandon undoes an injection whose step will not run. The mirrors are dropped
+// unwritten, since a half-written keystore in one must not reach the layer and
+// the step has changed nothing else, and finish takes out the rest.
+func (in *injection) abandon() error {
+	for _, b := range in.binds {
+		b.cleanup()
+	}
+	in.binds = nil
+	return in.finish()
 }
 
 // bindTargets binds each group of CA targets, nested groups folded into the

@@ -935,7 +935,7 @@ func TestFinishWritesNothingBackWhenItCannotResetAnMtime(t *testing.T) {
 
 // coverKeystore folds a keystore that sits inside an already-mirrored directory
 // into that bind: it injects into the mirror's copy and re-captures the baseline
-// so the gatekeeper counts the injection.
+// so finish's unchanged check counts the injection.
 func TestCoverKeystoreInjectsAndRecapturesBaseline(t *testing.T) {
 	scratch := t.TempDir()
 	mustMkdirAll(t, filepath.Join(scratch, "java"))
@@ -965,6 +965,20 @@ func TestCoverKeystoreLeavesBaselineWhenInjectionFails(t *testing.T) {
 
 	if b.baseline != nil {
 		t.Fatal("the baseline was re-captured though the injection failed")
+	}
+}
+
+func TestCoverKeystoreMarksAHalfWrittenKeystore(t *testing.T) {
+	scratch := t.TempDir()
+	mustWriteFile(t, filepath.Join(scratch, "cacerts"),
+		string(keystore(2, trustedEntry(2, "digicert", otherDER))))
+	b := &dirBind{scratchDir: scratch, containerDir: "/x"}
+	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+
+	b.coverKeystore("cacerts", testCA)
+
+	if !errors.Is(b.halfWritten, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the bind marked half-written", b.halfWritten)
 	}
 }
 
