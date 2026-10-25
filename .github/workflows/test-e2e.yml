@@ -19,6 +19,7 @@ permissions: {}
 jobs:
   changes:
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -57,6 +58,11 @@ jobs:
               - 'src/**'
               - 'report/**'
               - 'action.yml'
+              - '.github/actions/assert-post-cleanup/**'
+              - 'test/helpers.sh'
+              - 'test/assert-post.sh'
+              - 'test/assert-action-audit-summary.sh'
+              - 'test/assert-inspect-traffic-artifact.mjs'
 
   # Exercises the real setup/report actions end-to-end (uses: ./,
   # uses: ./report) against an image built from this branch, no registry
@@ -67,6 +73,9 @@ jobs:
     # only on pull_request); a skipped need otherwise skips the job unevaluated.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test_action == 'true') }}
     runs-on: ubuntu-latest
+    # Well above a normal run; without a limit a hung builder holds a runner
+    # for six hours.
+    timeout-minutes: 15
     permissions:
       contents: read
 
@@ -74,8 +83,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Also runs the audit-mode builder below.
           - proxy_engine: universal
             build_engine: universal
+          # Also runs the known_blocked_rules builder below, on the default
+          # engine.
           - proxy_engine: inspect
             build_engine: inspect
 
@@ -86,6 +98,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # Before every setup step, so its post hook runs after theirs.
+      - name: Check the setup post hooks remove every builder
+        uses: ./.github/actions/assert-post-cleanup
+        with:
+          record: ${{ runner.temp }}/buildcage-builders
 
       - uses: ./.github/actions/setup-vp
 
@@ -98,7 +116,7 @@ jobs:
         id: local_image
         run: echo "ref=$(docker compose config --images builder)" >> "$GITHUB_OUTPUT"
 
-      - name: Rebuild setup action with the local-image test hook enabled
+      - name: Rebuild the actions with the test hooks enabled
         env:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
         run: vp run build
@@ -142,7 +160,14 @@ jobs:
           allowed_tls_rules: ${{ matrix.proxy_engine == 'inspect' && 'github.com:443' || '' }}
           allowed_url_rules: ${{ steps.url_rules.outputs.value }}
 
+      # Right after each setup step, so a later failure or a timeout still
+      # leaves the check above something to check.
+      - name: Record the builder for the post hook check
+        if: ${{ !cancelled() }}
+        run: .github/actions/assert-post-cleanup/record.sh "$RUNNER_TEMP/buildcage-builders"
+
       - name: Set up Docker Buildx
+        id: buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           driver: remote
@@ -193,6 +218,7 @@ jobs:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
+          builder: ${{ steps.buildx.outputs.name }}
           context: /tmp/build-context
           push: false
           no-cache: true
@@ -220,71 +246,15 @@ jobs:
 
       - name: Verify the traffic artifact
         if: matrix.proxy_engine == 'inspect'
-        run: |
-          node -e '
-            const rows = JSON.parse(require("node:fs").readFileSync("/tmp/buildcage-traffic/traffic.json", "utf8"));
-            const blocked = rows.some(
-              (r) => r.action === "block" && r.host === "example.com" && r.url === "https://example.com/some/path",
-            );
-            const passthrough = rows.some(
-              (r) => r.protocol === "tls" && r.host === "github.com" && r.bytes > 0,
-            );
-            const methodBlocked = rows.some(
-              (r) => r.action === "block" && r.host === "registry.npmjs.org" && r.method === "POST",
-            );
-            if (!blocked) {
-              console.log("::error::example.com/some/path was not recorded as blocked in the traffic artifact");
-              process.exit(1);
-            }
-            if (!passthrough) {
-              console.log("::error::github.com was not recorded as an undecrypted TLS passthrough");
-              process.exit(1);
-            }
-            if (!methodBlocked) {
-              console.log("::error::the POST to registry.npmjs.org was not recorded as blocked by allowed_url_rules");
-              process.exit(1);
-            }
-            console.log("example.com blocked, github.com passed through undecrypted, and the out-of-rule POST was blocked");
-          '
+        run: node test/assert-inspect-traffic-artifact.mjs /tmp/buildcage-traffic/traffic.json
 
-      # No cleanup step: ephemeral runner, and setup's post-hook already
-      # stops the container.
-
-  # Separate job from test_action: known_blocked_rules is a setup input, so it
-  # has to be named when the builder starts, and test_action's own report step
-  # turns fail_on_blocked off. Here fail_on_blocked stays at its default and
-  # the step has to pass anyway, which is what the input is for. The inputs
-  # come from config_file, whose builder_name the report has to read back to
-  # find the builder.
-  test_action_known_blocked:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test_action == 'true') }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    name: "e2e: test (action, known_blocked_rules, config_file)"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-vp
-
-      - name: Build local buildcage image
-        run: docker compose build builder
-
-      - name: Resolve local image ref
-        id: local_image
-        run: echo "ref=$(docker compose config --images builder)" >> "$GITHUB_OUTPUT"
-
-      - name: Rebuild setup action with the local-image test hook enabled
-        env:
-          BUILDCAGE_BUILD_TEST_HOOKS: "1"
-        run: vp run build
-
-      - name: Write the config file
+      # known_blocked_rules is a setup input, so it has to be named when the
+      # builder starts, and the report above turns fail_on_blocked off. Here
+      # fail_on_blocked stays at its default and the step has to pass anyway,
+      # which is what the input is for. The inputs come from config_file, whose
+      # builder_name the report has to read back to find the builder.
+      - name: Write the known_blocked_rules config file
+        if: matrix.proxy_engine == 'inspect'
         run: |
           mkdir -p e2e-config
           cat > e2e-config/buildcage.yml <<'YAML'
@@ -296,31 +266,40 @@ jobs:
             example.com:443
           YAML
 
-      - name: Start Buildcage builder via the real setup action
-        id: buildcage
+      - name: Start the known_blocked_rules builder from the config file
+        if: matrix.proxy_engine == 'inspect'
+        id: from_file
         uses: ./
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
         with:
           config_file: e2e-config/buildcage.yml
 
+      - name: Record the builder for the post hook check
+        if: ${{ !cancelled() && matrix.proxy_engine == 'inspect' }}
+        run: .github/actions/assert-post-cleanup/record.sh "$RUNNER_TEMP/buildcage-builders"
+
       - name: Verify the builder_name output is the one the config file sets
+        if: matrix.proxy_engine == 'inspect'
         env:
-          BUILDER_NAME: ${{ steps.buildcage.outputs.builder_name }}
+          BUILDER_NAME: ${{ steps.from_file.outputs.builder_name }}
         run: |
           test "$BUILDER_NAME" = buildcage-from-file ||
             { echo "::error::builder_name output is '$BUILDER_NAME'"; exit 1; }
 
-      - name: Set up Docker Buildx
+      - name: Set up Docker Buildx for the known_blocked_rules builder
+        if: matrix.proxy_engine == 'inspect'
+        id: buildx_from_file
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           driver: remote
-          endpoint: docker-container://${{ steps.buildcage.outputs.builder_name }}
+          endpoint: docker-container://${{ steps.from_file.outputs.builder_name }}
 
-      - name: Create test Dockerfile
+      - name: Create the known_blocked_rules test Dockerfile
+        if: matrix.proxy_engine == 'inspect'
         run: |
-          mkdir -p /tmp/build-context
-          cat <<'EOF' > /tmp/build-context/Dockerfile
+          mkdir -p /tmp/known-blocked-context
+          cat <<'EOF' > /tmp/known-blocked-context/Dockerfile
           FROM node:24-alpine
           # One ordinary allowed request, so the report has both kinds to judge.
           RUN wget -q -O /dev/null --timeout=10 https://registry.npmjs.org/
@@ -332,23 +311,87 @@ jobs:
               fi
           EOF
 
-      - name: Build test image
+      - name: Build the known_blocked_rules test image
+        if: matrix.proxy_engine == 'inspect'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           DOCKER_BUILD_CHECKS_ANNOTATIONS: false
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
-          context: /tmp/build-context
+          builder: ${{ steps.buildx_from_file.outputs.name }}
+          context: /tmp/known-blocked-context
           push: false
           no-cache: true
 
       # fail_on_blocked left at its default (true). The step must still pass:
       # every blocked connection matched known_blocked_rules.
-      - name: Show proxy report
+      - name: Show the known_blocked_rules proxy report
+        if: matrix.proxy_engine == 'inspect'
         uses: ./report
         with:
           config_file: e2e-config/buildcage.yml
+
+      # Audit mode's Job Summary carries the restrict-mode example a user
+      # copies, which nothing else here renders through the real actions.
+      - name: Start the audit-mode builder
+        if: matrix.proxy_engine == 'universal'
+        uses: ./
+        env:
+          BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
+        with:
+          builder_name: buildcage-audit
+          proxy_mode: audit
+          proxy_engine: universal
+
+      - name: Record the builder for the post hook check
+        if: ${{ !cancelled() && matrix.proxy_engine == 'universal' }}
+        run: .github/actions/assert-post-cleanup/record.sh "$RUNNER_TEMP/buildcage-builders"
+
+      - name: Set up Docker Buildx for the audit-mode builder
+        if: matrix.proxy_engine == 'universal'
+        id: buildx_audit
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver: remote
+          endpoint: docker-container://buildcage-audit
+
+      - name: Create the audit-mode test Dockerfile
+        if: matrix.proxy_engine == 'universal'
+        run: |
+          mkdir -p /tmp/audit-context
+          cat <<'EOF' > /tmp/audit-context/Dockerfile
+          FROM node:24-alpine
+          RUN wget -q -O /dev/null --timeout=10 https://registry.npmjs.org/
+          RUN wget -q -O /dev/null --timeout=10 http://example.com/
+          EOF
+
+      - name: Build the audit-mode test image
+        if: matrix.proxy_engine == 'universal'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          builder: ${{ steps.buildx_audit.outputs.name }}
+          context: /tmp/audit-context
+          push: false
+          no-cache: true
+
+      - name: Show the audit-mode proxy report
+        if: matrix.proxy_engine == 'universal'
+        uses: ./report
+        env:
+          BUILDCAGE_TEST_SUMMARY_FILE: ${{ runner.temp }}/audit-summary.md
+        with:
+          builder_name: buildcage-audit
+
+      - name: Verify the audit-mode Job Summary
+        if: matrix.proxy_engine == 'universal'
+        env:
+          BUILDCAGE_TEST_SUMMARY_FILE: ${{ runner.temp }}/audit-summary.md
+        run: ./test/assert-action-audit-summary.sh
 
   # Single, stably-named required status check for branch protection: the
   # jobs above vary their own names by matrix entry (e2e: test (action,
@@ -356,8 +399,9 @@ jobs:
   # without listing every combination.
   e2e-tests-passed:
     name: E2E tests passed
-    runs-on: ubuntu-latest
-    needs: [changes, test_action, test_action_known_blocked]
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    needs: [changes, test_action]
     if: always()
     permissions: {}
     steps:
