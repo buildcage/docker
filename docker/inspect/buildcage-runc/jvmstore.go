@@ -166,11 +166,13 @@ func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 
+	// Unnamed: the caller knows the keystore by its path in the container.
 	if _, err := f.WriteAt(injected, 0); err != nil {
-		return nil, fmt.Errorf("%s: %w: %w", path, errKeystoreHalfWritten, err)
+		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, err)
 	}
+	// A failed truncate may leave the old tail after a shorter rewrite.
 	if err := f.Truncate(int64(len(injected))); err != nil {
-		return nil, fmt.Errorf("%s: %w: %w", path, errKeystoreHalfWritten, err)
+		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, err)
 	}
 	return content, nil
 }

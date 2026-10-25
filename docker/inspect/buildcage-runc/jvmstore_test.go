@@ -283,10 +283,23 @@ func TestInjectAbandonsAHalfWrittenKeystore(t *testing.T) {
 	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
 	pristine := keystore(2, trustedEntry(2, "digicert", otherDER))
 	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts", pristine)
-	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+	before, err := os.ReadFile(filepath.Join(bundle, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
 
-	if _, err := inject(bundle, testCA); !errors.Is(err, errKeystoreHalfWritten) {
-		t.Fatalf("got %v, want the half-written keystore", err)
+	_, err = inject(bundle, testCA)
+	if !errors.Is(err, errKeystoreHalfWritten) ||
+		!strings.Contains(err.Error(), "/opt/java/lib/security/cacerts") {
+		t.Fatalf("got %v, want the half-written keystore named by its container path", err)
+	}
+	after, err := os.ReadFile(filepath.Join(bundle, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Error("the spec was saved for a step that will not run")
 	}
 	real, err := os.ReadFile(filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
 	if err != nil {

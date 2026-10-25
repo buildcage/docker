@@ -356,11 +356,10 @@ func (b *dirBind) prepare(ca []byte) error {
 				// A keystore that cannot be injected into (an unusual format, or a
 				// PKCS#12 under a password of its own) leaves the step's JVM not
 				// trusting the CA rather than failing the build. One left
-				// half-written does fail it, through inject.
+				// half-written stops the injection, which inject abandons.
 				original, err := insertIntoKeystore(target, ca)
 				if errors.Is(err, errKeystoreHalfWritten) {
-					b.halfWritten = err
-					continue
+					return fmt.Errorf("%s: %w", filepath.Join(b.containerDir, name), err)
 				}
 				if err != nil {
 					logf("cannot inject the CA into keystore %s: %v; leaving it untouched", name, err)
@@ -473,7 +472,7 @@ func (b *dirBind) coverKeystore(rel string, ca []byte) {
 	target := filepath.Join(b.scratchDir, rel)
 	original, err := insertIntoKeystore(target, ca)
 	if errors.Is(err, errKeystoreHalfWritten) {
-		b.halfWritten = err
+		b.halfWritten = fmt.Errorf("%s: %w", filepath.Join(b.containerDir, rel), err)
 		return
 	}
 	if err != nil {

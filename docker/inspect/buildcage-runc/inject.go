@@ -291,19 +291,20 @@ func inject(bundle string, ca []byte) (*injection, error) {
 	}
 	created.add(nssCreated.dirs)
 
-	s.setEnv(plan.env)
-	if err := s.save(); err != nil {
-		logf("cannot update the process spec: %v", err)
-	}
-
 	in := &injection{
 		rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
 		upper: upper, nssAppended: nssAppended,
 	}
+	// Before the spec is saved, so a step that will not run leaves it as it was.
 	for _, b := range binds {
 		if b.halfWritten != nil {
 			return nil, errors.Join(b.halfWritten, in.abandon())
 		}
+	}
+
+	s.setEnv(plan.env)
+	if err := s.save(); err != nil {
+		logf("cannot update the process spec: %v", err)
 	}
 	return in, nil
 }
@@ -401,6 +402,11 @@ func prepareBind(s *spec, bundle, hostDir string, names []string, ca []byte, lim
 		keystore:     keystore,
 	}
 	if err := b.prepare(ca); err != nil {
+		if errors.Is(err, errKeystoreHalfWritten) {
+			// Unmounted, for inject to abandon with the rest.
+			b.halfWritten = err
+			return b
+		}
 		logf("cannot prepare CA injection for %s: %v", containerDir, err)
 		b.cleanup()
 		return nil

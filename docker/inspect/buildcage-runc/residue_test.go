@@ -218,7 +218,7 @@ func TestRunRefusesAStepWithAHalfWrittenKeystore(t *testing.T) {
 	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
 	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
 		keystore(2, trustedEntry(2, "digicert", otherDER)))
-	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
 	ran := filepath.Join(t.TempDir(), "ran")
 	t.Setenv("RAN", ran)
 	useFakeRunc(t, `touch "$RAN"`)

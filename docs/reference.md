@@ -846,7 +846,8 @@ A JVM reads none of these variables, only its own keystore. The CA is added, for
 `$JAVA_HOME/lib/security/cacerts` and to that of the first `java` on `PATH`, in whichever shape it
 ships (JKS or PKCS#12), and taken back out before the layer is committed. A keystore sealed with a
 password other than the JDK default is not rewritten, so that JDK does not trust the CA. Any other
-JDK, one further along `PATH` or one the step itself downloads, keeps its keystore as it is.
+JDK, one further along `PATH` or one the step itself downloads, keeps its keystore as it is. If
+writing the CA into a keystore fails partway, the step does not run.
 
 ### Chromium
 
