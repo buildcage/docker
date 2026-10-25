@@ -12,6 +12,7 @@ and links here for the details.
 - [Operation modes](#operation-modes)
 - [Rule syntax](#rule-syntax)
 - [Report action inputs](#report-action-inputs)
+- [Report details](#report-details)
 - [Blocked service names](#blocked-service-names)
 - [Requests that never arrived whole](#requests-that-never-arrived-whole)
 - [Connections that failed](#connections-that-failed)
@@ -485,11 +486,20 @@ requests to one host counts as expected only when a rule accounts for every one 
 that names one endpoint leaves the host's other blocked requests to fail the step. The matched rows
 go under **Known Blocked Hosts**, collapsed below the allowed hosts, instead of Blocked Hosts.
 
-The matched rows are also folded into one row per rule, named after the rule and counting the hosts
-behind it (`*.example.com:* (12 hosts)`). A rule covering noisy traffic then costs the table one
-line however many hosts it names, which matters most when the noise puts its payload in the name
-itself and every request brings a new long hostname. The individual hosts stay in **Communication
-details**.
+## Report details
+
+An alert under the report's title counts what needs a look: requests blocked, connections that
+failed and requests nothing acted on. It is a CAUTION when a request was blocked unexpectedly or the
+report is incomplete and a WARNING otherwise. With nothing to count, or only requests blocked as
+expected, there is no alert. Whatever was blocked unexpectedly is listed first with the reason,
+marked 🚫, in one table with any connection that failed, marked ⚠️, under **Blocked Hosts**,
+**Failed Hosts** or both, whichever it holds.
+
+The rows `known_blocked_rules` matched are folded into one row per rule, named after the rule and
+counting the hosts behind it (`*.example.com:* (12 hosts)`). A rule covering noisy traffic then
+costs the table one line however many hosts it names, which matters most when the noise puts its
+payload in the name itself and every request brings a new long hostname. The individual hosts stay
+in **Communication details**.
 
 A name the build looked up and never connected to gets a row of its own, with `DNS` as the rule kind
 and no port (folded like any other row when a `known_blocked_rules` rule matches it). Under
@@ -820,9 +830,25 @@ The file holding only this CA is bound read-only at `/dev/buildcage-ca.pem`, on 
 runc gives every container, so it never reaches a layer. A step that already mounts something at
 that path gets none of the variables that would point there.
 
-On SUSE, GnuTLS reads the certificate directory `/var/lib/ca-certificates/pem` instead of the
-bundle. When the image has it, the CA is added there for the step and taken back out before the
-layer is committed.
+For the step, the CA is also placed in the distribution's own anchor directory, so a step that
+installs `ca-certificates` partway through keeps trusting it once `update-ca-certificates` has
+rebuilt the bundle from scratch. On SUSE, GnuTLS reads the certificate directory
+`/var/lib/ca-certificates/pem` instead of the bundle. When the image has it, the CA is added there
+for the step and taken back out before the layer is committed.
+
+Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
+so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
+reach.
+
+### JVM keystores
+
+A JVM reads none of these variables, only its own keystore. The CA is added, for the step, to
+`$JAVA_HOME/lib/security/cacerts` and to that of the first `java` on `PATH`, in whichever shape it
+ships (JKS or PKCS#12), and taken back out before the layer is committed. A keystore sealed with a
+password other than the JDK default is not rewritten, so that JDK does not trust the CA. Any other
+JDK, one further along `PATH` or one the step itself downloads, keeps its keystore as it is.
+
+### Chromium
 
 Chromium reads none of these, only its compiled-in root store and the NSS database in `$HOME`.
 Every Chromium version reads `~/.pki/nssdb` when it exists, and M146 and later read
@@ -839,11 +865,37 @@ step wrote that file too. A file that still names `/dev/buildcage-nssdb` afterwa
 1 MiB and so is not read, counts as CA residue. A database the step's user cannot write takes no
 slot, and the step warns that Chromium will not trust the proxy there. `HOME` comes from the step's
 environment, or from the image's `/etc/passwd` when that is empty, as runc does, and is read once as
-the step starts: a `HOME` the step changes, or another user it switches to, gets no slot.
+the step starts: a `HOME` the step changes, or another user it switches to, gets no slot. A `USER`
+instruction is followed, as long as no `ENV HOME` pins the home.
 
-Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
-so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
-reach, and what a step can't do to its CA store while it is mounted.
+A new database belongs to the home's owner, so under someone else's home, such as `www-data`'s
+`/var/www`, Chromium does not open it and does not trust the CA. An existing database the step's
+user cannot write, such as root's used after `USER`, takes no slot either, since Chromium would not
+open it. The database Chromium fills stays in the image like any other file in the home.
+
+A step that changes the CA's own trust in the database (`certutil -M`), or exports it and imports it
+back, copies the CA into the step's database, which fails the build as a copy the wrapper cannot
+take out. The database's directory is a mount point while the step runs, created if the home has no
+database, so the step cannot remove it (`rm -rf ~/.pki`), clone into the home, or remove the home's
+dotfiles (`rm -rf ~/.[!.]*`).
+
+### Mounted directories
+
+Each directory holding a bundle the CA is added to (the CA store's, and each one a CA variable
+points into) is copied, the CA goes into the copy, and the copy is mounted over the directory while
+the step runs. When one such directory is inside another, only the outer one is mounted. Removing
+or renaming a mounted directory fails, while what is inside it behaves normally, and what the step
+writes there is copied back when it ends.
+
+The same goes for the directory holding the keystore of a JDK at `$JAVA_HOME` or behind the first
+`java` on `PATH`, unless it is inside the CA store's mount. A JDK with a keystore of its own has its
+`lib/security` mounted, so a step cannot remove that JDK while it is on `PATH` or `JAVA_HOME`. A
+distribution JDK links to a shared keystore: Debian's is inside `/etc/ssl/certs` and adds no mount
+point, while on RHEL, Fedora and their derivatives `/etc/pki/ca-trust/extracted/java` is one.
+
+A custom CA path whose directory holds more than 20 MiB or 512 files has injection skipped for that
+variable only, the same as when no CA bundle is found at all. A system CA bundle whose directory
+holds more than 64 MiB or 4,096 files, or is the container root, is treated as no bundle at all.
 
 ### CA residue
 
