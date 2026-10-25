@@ -31,7 +31,9 @@ func useNSSTemplate(t *testing.T) {
 }
 
 // stepUser is a uid and gid the test process can hand files to: any when it
-// runs as root, only its own otherwise.
+// runs as root, only its own otherwise. Not as root, a file the code forgot to
+// hand over has that owner anyway, so ownership checks built on it prove the
+// hand-over only in a root run.
 func stepUser() (uid, gid int) {
 	if os.Geteuid() == 0 {
 		return 1000, 1000
@@ -454,6 +456,8 @@ func TestReadNSSTemplateReportsAFileItCannotRead(t *testing.T) {
 }
 
 // A new database is the home's, not a step user's who could not have made it.
+// Not as root, the home's owner is the test process, which owns whatever it
+// creates, so this run shows only that nothing went to the step user.
 func TestNSSDBSlotCreatesTheDatabaseForTheHomesOwner(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)

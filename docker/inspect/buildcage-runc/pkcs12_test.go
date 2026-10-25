@@ -2,74 +2,16 @@ package main
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
-	"encoding/pem"
 	"errors"
-	"math/big"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
-	"time"
 
 	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
-
-// passwordlessStore is a cacerts written the way the JDK ships one: no MAC, the
-// certificate bags unencrypted, so it opens under the empty password.
-func passwordlessStore(t *testing.T, certs ...*x509.Certificate) []byte {
-	t.Helper()
-	data, err := pkcs12.Passwordless.EncodeTrustStore(certs, "")
-	if err != nil {
-		t.Fatalf("encoding a trust store: %v", err)
-	}
-	return data
-}
-
-// keytoolStore is a trust store the way keytool creates one: sealed under
-// changeit, its entry under an alias of its own. Re-encoding draws a fresh salt,
-// so the round trip never reproduces these bytes, the churn
-// restoreUntouchedKeystores prevents.
-func keytoolStore(t *testing.T, alias string, cert *x509.Certificate) []byte {
-	t.Helper()
-	data, err := pkcs12.Modern.EncodeTrustStoreEntries(
-		[]pkcs12.TrustStoreEntry{{Cert: cert, FriendlyName: alias}}, keystorePassword)
-	if err != nil {
-		t.Fatalf("encoding a named trust store: %v", err)
-	}
-	return data
-}
-
-// encryptedStore is a Modern trust store: its certificate bags are PBES2
-// encrypted under a password of its own, so decodePKCS12 cannot open it. It
-// stands in for a keystore a step replaced with one of its own that this cannot
-// rewrite.
-func encryptedStore(t *testing.T, certs ...*x509.Certificate) []byte {
-	t.Helper()
-	data, err := pkcs12.Modern.EncodeTrustStore(certs, "a-real-password")
-	if err != nil {
-		t.Fatalf("encoding an encrypted trust store: %v", err)
-	}
-	return data
-}
-
-func certPEM(cert *x509.Certificate) []byte {
-	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
-}
-
-func mustWritePKCS12(t *testing.T, content []byte) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "cacerts")
-	if err := os.WriteFile(path, content, 0o644); err != nil {
-		t.Fatalf("writing %s: %v", path, err)
-	}
-	return path
-}
 
 // A JDK's own cacerts carries no MAC, so it decodes under the empty password
 // even though it is nominally "changeit"-sealed. This is the property the whole
@@ -448,39 +390,6 @@ func TestEncodePKCS12NamesAnEntryWithoutAnAlias(t *testing.T) {
 	if got := aliasesOf(t, out); !slices.Equal(got, []string{"CN=first", "kept"}) {
 		t.Errorf("aliases = %q, want [CN=first kept]", got)
 	}
-}
-
-func testLeaf(t *testing.T, ca *x509.Certificate, caKey *ecdsa.PrivateKey, host string) (*x509.Certificate, *ecdsa.PrivateKey) {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("generating a key: %v", err)
-	}
-	tmpl := &x509.Certificate{
-		SerialNumber: big.NewInt(8),
-		Subject:      pkix.Name{CommonName: host},
-		DNSNames:     []string{host},
-		NotBefore:    time.Unix(1700000000, 0),
-		NotAfter:     time.Unix(1900000000, 0),
-	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, ca, &key.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("creating the leaf: %v", err)
-	}
-	cert, err := x509.ParseCertificate(der)
-	if err != nil {
-		t.Fatalf("parsing the leaf: %v", err)
-	}
-	return cert, key
-}
-
-func mustEncodeTrustStore(t *testing.T, enc *pkcs12.Encoder, password string, certs ...*x509.Certificate) []byte {
-	t.Helper()
-	data, err := enc.EncodeTrustStore(certs, password)
-	if err != nil {
-		t.Fatalf("encoding a trust store: %v", err)
-	}
-	return data
 }
 
 func TestFileHoldsCAReadsAnEncryptedPKCS12ItCanOpen(t *testing.T) {

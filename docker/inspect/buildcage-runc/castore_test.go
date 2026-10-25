@@ -307,13 +307,6 @@ func TestAppendCASeparatesACertificateFromAnUnterminatedBundle(t *testing.T) {
 	}
 }
 
-// filler is content removeCA has to leave alone, sized to the byte so a
-// certificate lands at an exact offset.
-func filler(n int) string {
-	const line = "FILLER-LINE\n"
-	return strings.Repeat(line, n/len(line)+1)[:n]
-}
-
 // A step can leave the bundle far larger than one window, so the certificate
 // has to come out exactly wherever it falls relative to a boundary.
 func TestRemoveCAStripsACertificateAcrossWindowBoundaries(t *testing.T) {

@@ -14,24 +14,6 @@ import (
 	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
 
-// writeRootfsKeystore places raw keystore bytes at a container path inside
-// rootfs, creating the directories on the way.
-func writeRootfsKeystore(t *testing.T, rootfs, containerPath string, content []byte) {
-	t.Helper()
-	abs := filepath.Join(rootfs, strings.TrimPrefix(containerPath, "/"))
-	mustMkdirAll(t, filepath.Dir(abs))
-	mustWriteFile(t, abs, string(content))
-}
-
-// writeJava places an executable java at path, creating its directory.
-func writeJava(t *testing.T, path string) {
-	t.Helper()
-	mustMkdirAll(t, filepath.Dir(path))
-	if err := os.WriteFile(path, []byte("java"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func hasPath(paths []string, want string) bool {
 	for _, p := range paths {
 		if p == want {

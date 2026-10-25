@@ -34,15 +34,6 @@ func injectSlot(t *testing.T, pkcs11 *string) (in *injection, bundle, rootfs, mi
 
 func ptr(s string) *string { return &s }
 
-func mustRead(t *testing.T, path string) string {
-	t.Helper()
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(got)
-}
-
 func TestNSSDBSlotGoesIntoANewDatabaseAndComesBackOut(t *testing.T) {
 	in, bundle, rootfs, mirror := injectSlot(t, nil)
 	uid, gid := stepUser()

@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+// Fakes and toggles shared across the package's test files, each pointing the
+// code at a test's own state, and the file helpers that set that state up.
+// Data builders live in fixtures_test.go.
+
 // TestMain points the package's own log somewhere disposable for the whole
 // run. logf writes to logFile and appends to ownLog, both package level, and
 // the injection tests reach it without setting out to: six of them log while
@@ -235,6 +239,15 @@ func mustWriteFile(t *testing.T, path, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func mustRead(t *testing.T, path string) string {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(got)
 }
 
 // mustAppendFile stands in for whatever writes to a file the wrapper already
@@ -469,4 +482,35 @@ func captureStderr(t *testing.T) func() string {
 		r.Close()
 		return string(out)
 	}
+}
+
+// useMountInfo hands upperDirOf these lines instead of the test process's own
+// mount table, which holds no overlay over a temporary directory.
+func useMountInfo(t *testing.T, lines ...string) {
+	t.Helper()
+	old := readMountInfo
+	readMountInfo = func() ([]byte, error) { return []byte(strings.Join(lines, "\n") + "\n"), nil }
+	t.Cleanup(func() { readMountInfo = old })
+}
+
+// useTempLog points logf and the dump at a file the test owns, since a test
+// process usually can't write the real host path.
+func useTempLog(t *testing.T) {
+	t.Helper()
+	oldFile, oldTag := logFile, logTag
+	logFile = filepath.Join(t.TempDir(), "runc.log")
+	logTag = "[this-step]"
+	ownLog.Reset()
+	t.Cleanup(func() {
+		logFile, logTag = oldFile, oldTag
+		ownLog.Reset()
+	})
+}
+
+// useFailOnCAResidue stands for a build set up with fail_on_ca_residue: fail.
+func useFailOnCAResidue(t *testing.T, fail bool) {
+	t.Helper()
+	old := failOnCAResidue
+	failOnCAResidue = fail
+	t.Cleanup(func() { failOnCAResidue = old })
 }

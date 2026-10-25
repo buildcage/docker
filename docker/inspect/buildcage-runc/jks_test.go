@@ -11,26 +11,6 @@ import (
 	"testing"
 )
 
-// The fixtures below are the format written out: a keystore small enough to
-// read at a glance, rather than the 160 KB one a distribution ships. Building
-// them here is also what says what each field is.
-
-func javaUTF(s string) []byte {
-	return append(binary.BigEndian.AppendUint16(nil, uint16(len(s))), s...)
-}
-
-// trustedEntry is tag 2: the one a trust store rebuild adds the CA as.
-func trustedEntry(version uint32, alias string, der []byte) []byte {
-	entry := binary.BigEndian.AppendUint32(nil, 2)
-	entry = append(entry, javaUTF(alias)...)
-	entry = binary.BigEndian.AppendUint64(entry, 1700000000000)
-	if version > 1 {
-		entry = append(entry, javaUTF("X.509")...)
-	}
-	entry = binary.BigEndian.AppendUint32(entry, uint32(len(der)))
-	return append(entry, der...)
-}
-
 // keyEntry is tag 1, whose certificates are a chain behind a wrapped private
 // key rather than anything the trust store put there.
 func keyEntry(version uint32, alias string, key []byte, chain ...[]byte) []byte {
@@ -48,25 +28,6 @@ func keyEntry(version uint32, alias string, key []byte, chain ...[]byte) []byte 
 		entry = append(entry, der...)
 	}
 	return entry
-}
-
-// keystore seals the entries the way the JDK does, so the parser meets a file
-// it would accept.
-func keystore(version uint32, entries ...[]byte) []byte {
-	out := append([]byte{}, keystoreMagic...)
-	out = binary.BigEndian.AppendUint32(out, version)
-	out = binary.BigEndian.AppendUint32(out, uint32(len(entries)))
-	for _, entry := range entries {
-		out = append(out, entry...)
-	}
-	return append(out, keystoreDigest(out)...)
-}
-
-func mustWriteKeystore(t *testing.T, content []byte) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "cacerts")
-	mustWriteFile(t, path, string(content))
-	return path
 }
 
 // The case the whole format is here for: a rebuild put the CA in the JVM's own

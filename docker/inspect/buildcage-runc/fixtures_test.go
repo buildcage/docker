@@ -6,18 +6,23 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/binary"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
 
-// Fixtures shared across the package's test files: certificate data, bundles
-// laid out the way BuildKit hands them over, and the mount table and log a
-// test points the code at.
+// Data builders shared across the package's test files: certificates, trust
+// stores and keystores, bundles laid out the way BuildKit hands them over, and
+// mountinfo lines. Fakes and toggles live in helpers_test.go.
 
 // The lines a certificate is armoured between, spelled out here because the
 // code itself only knows the shape of them and not the label.
@@ -79,6 +84,153 @@ func testCert(t *testing.T, cn string) *x509.Certificate {
 func testIssuer(t *testing.T, nonce string) (*x509.Certificate, *ecdsa.PrivateKey) {
 	t.Helper()
 	return selfSignedCA(t, 7, pkix.Name{CommonName: "buildcage proxy CA", SerialNumber: nonce})
+}
+
+func certPEM(cert *x509.Certificate) []byte {
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+}
+
+func testLeaf(t *testing.T, ca *x509.Certificate, caKey *ecdsa.PrivateKey, host string) (*x509.Certificate, *ecdsa.PrivateKey) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generating a key: %v", err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(8),
+		Subject:      pkix.Name{CommonName: host},
+		DNSNames:     []string{host},
+		NotBefore:    time.Unix(1700000000, 0),
+		NotAfter:     time.Unix(1900000000, 0),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, ca, &key.PublicKey, caKey)
+	if err != nil {
+		t.Fatalf("creating the leaf: %v", err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatalf("parsing the leaf: %v", err)
+	}
+	return cert, key
+}
+
+// passwordlessStore is a cacerts written the way the JDK ships one: no MAC, the
+// certificate bags unencrypted, so it opens under the empty password.
+func passwordlessStore(t *testing.T, certs ...*x509.Certificate) []byte {
+	t.Helper()
+	data, err := pkcs12.Passwordless.EncodeTrustStore(certs, "")
+	if err != nil {
+		t.Fatalf("encoding a trust store: %v", err)
+	}
+	return data
+}
+
+// keytoolStore is a trust store the way keytool creates one: sealed under
+// changeit, its entry under an alias of its own. Re-encoding draws a fresh salt,
+// so the round trip never reproduces these bytes, the churn
+// restoreUntouchedKeystores prevents.
+func keytoolStore(t *testing.T, alias string, cert *x509.Certificate) []byte {
+	t.Helper()
+	data, err := pkcs12.Modern.EncodeTrustStoreEntries(
+		[]pkcs12.TrustStoreEntry{{Cert: cert, FriendlyName: alias}}, keystorePassword)
+	if err != nil {
+		t.Fatalf("encoding a named trust store: %v", err)
+	}
+	return data
+}
+
+// encryptedStore is a Modern trust store: its certificate bags are PBES2
+// encrypted under a password of its own, so decodePKCS12 cannot open it. It
+// stands in for a keystore a step replaced with one of its own that this cannot
+// rewrite.
+func encryptedStore(t *testing.T, certs ...*x509.Certificate) []byte {
+	t.Helper()
+	data, err := pkcs12.Modern.EncodeTrustStore(certs, "a-real-password")
+	if err != nil {
+		t.Fatalf("encoding an encrypted trust store: %v", err)
+	}
+	return data
+}
+
+func mustEncodeTrustStore(t *testing.T, enc *pkcs12.Encoder, password string, certs ...*x509.Certificate) []byte {
+	t.Helper()
+	data, err := enc.EncodeTrustStore(certs, password)
+	if err != nil {
+		t.Fatalf("encoding a trust store: %v", err)
+	}
+	return data
+}
+
+func mustWritePKCS12(t *testing.T, content []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "cacerts")
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("writing %s: %v", path, err)
+	}
+	return path
+}
+
+// The JKS fixtures are the format written out: a keystore small enough to
+// read at a glance, rather than the 160 KB one a distribution ships. Building
+// them here is also what says what each field is.
+func javaUTF(s string) []byte {
+	return append(binary.BigEndian.AppendUint16(nil, uint16(len(s))), s...)
+}
+
+// trustedEntry is tag 2: the one a trust store rebuild adds the CA as.
+func trustedEntry(version uint32, alias string, der []byte) []byte {
+	entry := binary.BigEndian.AppendUint32(nil, 2)
+	entry = append(entry, javaUTF(alias)...)
+	entry = binary.BigEndian.AppendUint64(entry, 1700000000000)
+	if version > 1 {
+		entry = append(entry, javaUTF("X.509")...)
+	}
+	entry = binary.BigEndian.AppendUint32(entry, uint32(len(der)))
+	return append(entry, der...)
+}
+
+// keystore seals the entries the way the JDK does, so the parser meets a file
+// it would accept.
+func keystore(version uint32, entries ...[]byte) []byte {
+	out := append([]byte{}, keystoreMagic...)
+	out = binary.BigEndian.AppendUint32(out, version)
+	out = binary.BigEndian.AppendUint32(out, uint32(len(entries)))
+	for _, entry := range entries {
+		out = append(out, entry...)
+	}
+	return append(out, keystoreDigest(out)...)
+}
+
+func mustWriteKeystore(t *testing.T, content []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "cacerts")
+	mustWriteFile(t, path, string(content))
+	return path
+}
+
+// writeRootfsKeystore places raw keystore bytes at a container path inside
+// rootfs, creating the directories on the way.
+func writeRootfsKeystore(t *testing.T, rootfs, containerPath string, content []byte) {
+	t.Helper()
+	abs := filepath.Join(rootfs, strings.TrimPrefix(containerPath, "/"))
+	mustMkdirAll(t, filepath.Dir(abs))
+	mustWriteFile(t, abs, string(content))
+}
+
+// writeJava places an executable java at path, creating its directory.
+func writeJava(t *testing.T, path string) {
+	t.Helper()
+	mustMkdirAll(t, filepath.Dir(path))
+	if err := os.WriteFile(path, []byte("java"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// filler is content removeCA has to leave alone, sized to the byte so a
+// certificate lands at an exact offset.
+func filler(n int) string {
+	const line = "FILLER-LINE\n"
+	return strings.Repeat(line, n/len(line)+1)[:n]
 }
 
 // newBundleNoStore lays out a bundle with no CA store at all under
@@ -163,35 +315,4 @@ func mountLine(mountPoint, fstype, superOptions string) string {
 
 func overlayLine(mountPoint, upper string) string {
 	return mountLine(mountPoint, "overlay", "rw,lowerdir=/l,upperdir="+upper+",workdir=/w,nouserxattr")
-}
-
-// useMountInfo hands upperDirOf these lines instead of the test process's own
-// mount table, which holds no overlay over a temporary directory.
-func useMountInfo(t *testing.T, lines ...string) {
-	t.Helper()
-	old := readMountInfo
-	readMountInfo = func() ([]byte, error) { return []byte(strings.Join(lines, "\n") + "\n"), nil }
-	t.Cleanup(func() { readMountInfo = old })
-}
-
-// useTempLog points logf and the dump at a file the test owns, since a test
-// process usually can't write the real host path.
-func useTempLog(t *testing.T) {
-	t.Helper()
-	oldFile, oldTag := logFile, logTag
-	logFile = filepath.Join(t.TempDir(), "runc.log")
-	logTag = "[this-step]"
-	ownLog.Reset()
-	t.Cleanup(func() {
-		logFile, logTag = oldFile, oldTag
-		ownLog.Reset()
-	})
-}
-
-// useFailOnCAResidue stands for a build set up with fail_on_ca_residue: fail.
-func useFailOnCAResidue(t *testing.T, fail bool) {
-	t.Helper()
-	old := failOnCAResidue
-	failOnCAResidue = fail
-	t.Cleanup(func() { failOnCAResidue = old })
 }
