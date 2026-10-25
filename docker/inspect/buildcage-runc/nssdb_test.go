@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 )
 
 var testNSSTemplate = map[string]string{
@@ -501,33 +502,6 @@ func TestNSSDBIsLeftAloneWhenTheDirectoriesCannotBeCreated(t *testing.T) {
 	assertNoMountAt(t, bundle, "/root/.pki/nssdb")
 }
 
-func TestProcessUser(t *testing.T) {
-	for name, tc := range map[string]struct {
-		process  map[string]any
-		uid, gid int
-	}{
-		"numbers":      {map[string]any{"user": map[string]any{"uid": 1000, "gid": 100}}, 1000, 100},
-		"no user":      {map[string]any{}, 0, 0},
-		"not a number": {map[string]any{"user": map[string]any{"uid": 1.5, "gid": "x"}}, 0, 0},
-	} {
-		t.Run(name, func(t *testing.T) {
-			bundle, _ := newBundleNoStore(t, nil)
-			setSpecField(t, bundle, "process", func(proc map[string]any) {
-				for k, v := range tc.process {
-					proc[k] = v
-				}
-			})
-			s, err := loadSpec(bundle)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if uid, gid := s.processUser(); uid != tc.uid || gid != tc.gid {
-				t.Fatalf("got %d:%d, want %d:%d", uid, gid, tc.uid, tc.gid)
-			}
-		})
-	}
-}
-
 // failWalkUnder is for scratch directories, whose names a test cannot know.
 func failWalkUnder(t *testing.T, root string) {
 	t.Helper()
@@ -576,4 +550,40 @@ func TestNSSDBIsLeftAloneWhenItsParentCannotBeRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNoSlot(t, in)
+}
+
+type fakeInfo struct {
+	fs.FileInfo
+	mode     fs.FileMode
+	uid, gid uint32
+}
+
+func (f fakeInfo) Mode() fs.FileMode { return f.mode }
+func (f fakeInfo) Sys() any          { return &syscall.Stat_t{Uid: f.uid, Gid: f.gid} }
+func (f fakeInfo) ModTime() time.Time {
+	return time.Time{}
+}
+
+func TestWritableBy(t *testing.T) {
+	for name, tc := range map[string]struct {
+		info fakeInfo
+		uid  int
+		want bool
+	}{
+		"root":                        {fakeInfo{mode: 0o500, uid: 1}, 0, true},
+		"the owner":                   {fakeInfo{mode: 0o200, uid: 7}, 7, true},
+		"the owner, read-only":        {fakeInfo{mode: 0o577, uid: 7}, 7, false},
+		"the group":                   {fakeInfo{mode: 0o020, uid: 1, gid: 7}, 7, true},
+		"the group, read-only":        {fakeInfo{mode: 0o757, uid: 1, gid: 7}, 7, false},
+		"a supplementary group":       {fakeInfo{mode: 0o020, uid: 1, gid: 9}, 7, true},
+		"anyone else":                 {fakeInfo{mode: 0o002, uid: 1, gid: 1}, 7, true},
+		"anyone else, not writable":   {fakeInfo{mode: 0o775, uid: 1, gid: 1}, 7, false},
+		"the owner ignores its group": {fakeInfo{mode: 0o570, uid: 7, gid: 7}, 7, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := writableBy(tc.info, tc.uid, 7, []int{9}); got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
 }
