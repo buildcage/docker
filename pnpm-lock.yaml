@@ -2475,8 +2475,8 @@ packages:
       vite-plus:
         optional: true
 
-  p-map@7.1.0:
-    resolution: {integrity: sha512-HaSJ9hNZOxTUSATfB48Qi7U2+GF1eECjI39nkeLmCWQrSOYr1z4NepR0rpWiZO77pYwUWU2cJ5NIgsmoFCsYDQ==}
+  p-map@7.1.1:
+    resolution: {integrity: sha512-6Lh3jQPLthYujSrlw6ccWXBGZTkoTCz27Hd92g79LH/kjAbgoEu0t442cCCNbegPSJsA0lwDX8z0bcKtkpA32g==}
     engines: {node: '>=18'}
 
   package-json-from-dist@1.0.1:
@@ -2758,8 +2758,8 @@ packages:
     resolution: {integrity: sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w==}
     engines: {node: '>=12'}
 
-  strnum@2.4.2:
-    resolution: {integrity: sha512-rDG3Ah4TV0k1hWvLSzkZtMmLN9+eS+h3knq4MP6A42Y3Yh5qGNnOUs1jJkoSr8FG5dsL28c7KgkIBzSEykqtuw==}
+  strnum@2.5.1:
+    resolution: {integrity: sha512-UM4nTLWzQiDBseVxUGxN0wJzIk0UU89Qi7pKXz9qISo+lhviJikTuikBsK/oFRlpvYHvSdz0TVoLyQ+sEpYwxA==}
 
   supports-color@7.2.0:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
@@ -4156,7 +4156,7 @@ snapshots:
       minipass-collect: 2.0.1
       minipass-flush: 1.0.7
       minipass-pipeline: 1.2.4
-      p-map: 7.1.0
+      p-map: 7.1.1
       ssri: 14.0.0
 
   call-bind-apply-helpers@1.0.2:
@@ -4439,7 +4439,7 @@ snapshots:
       fast-xml-builder: 1.3.1
       is-unsafe: 2.0.2
       path-expression-matcher: 1.6.2
-      strnum: 2.4.2
+      strnum: 2.5.1
       xml-naming: 0.3.0
 
   fdir@6.5.0(picomatch@4.0.7):
@@ -5102,7 +5102,7 @@ snapshots:
       oxlint-tsgolint: 7.0.2004
       vite-plus: 1.4.0(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(typescript@7.0.2)(yaml@2.9.1)
 
-  p-map@7.1.0: {}
+  p-map@7.1.1: {}
 
   package-json-from-dist@1.0.1: {}
 
@@ -5474,7 +5474,7 @@ snapshots:
     dependencies:
       ansi-regex: 6.4.0
 
-  strnum@2.4.2:
+  strnum@2.5.1:
     dependencies:
       anynum: 1.0.1
 
