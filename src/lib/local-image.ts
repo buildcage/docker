@@ -6,8 +6,9 @@ import type { LocalImageOverride } from "../core/lib/provenance/local-image-over
 
 /**
  * Gates a local-image override used only by this repo's own CI/dev testing
- * (test_action in .github/workflows/test-e2e.yml, and verify-image in
- * docker-publish.yml, where the image is not signed yet), never by a consumer
+ * (the setup_buildkit_* targets the integration tests run, test_action in
+ * .github/workflows/test-e2e.yml, and verify-image in docker-publish.yml, where
+ * the image is not signed yet), never by a consumer
  * of a published action. rolldown's replacePlugin substitutes
  * BUILDCAGE_BUILD_TEST_HOOKS with the build's own env, so without that flag the
  * condition is constant-false and the dynamic import below is tree-shaken out
