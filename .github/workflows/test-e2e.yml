@@ -60,7 +60,7 @@ jobs:
 
   # Exercises the real setup/report actions end-to-end (uses: ./,
   # uses: ./report) against an image built from this branch, no registry
-  # involved; see docs/development.md#local-development.
+  # involved; see docs/development.md#the-actions-against-an-unpublished-image.
   test_action:
     needs: changes
     # !cancelled() forces this to evaluate when `changes` is skipped (it runs
