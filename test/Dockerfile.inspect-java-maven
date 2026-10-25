@@ -1,12 +1,12 @@
 # The real-tool companion to Dockerfile.inspect-java: a Maven base image, with
-# its own JVM (a PKCS#12 cacerts), resolving a dependency over HTTPS -- the
+# its own JVM (a PKCS#12 cacerts), resolving a dependency over HTTPS: the
 # package fetch a Java build actually does, rather than the raw handshake the
 # probe fixture makes. Maven's own HTTPS client meets the proxy's re-signed
 # certificate (every repository is mirrored to the allowed origin, see
 # inspect-java-maven-settings.xml), so it gets past the handshake only if the
 # wrapper added the proxy CA to the JVM keystore for the step. A certificate
 # error fails the build; a content error, since the origin is not a real Maven
-# repository, proves the TLS leg passed -- the same split the apt fixture uses.
+# repository, proves the TLS leg passed, the same split the apt fixture uses.
 #
 # FROM is deliberately not governed by this engine
 # (see docs/security.md#what-buildkitd-fetches-itself), so this pull succeeds

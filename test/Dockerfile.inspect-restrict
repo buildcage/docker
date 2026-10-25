@@ -9,8 +9,10 @@
 # succeeds whatever the rules say.
 FROM alpine/curl@sha256:1a4d725751c5bd50297ee243db5d4df8ac5aabdf7030dd40dcec3bc3fdaa1cfa
 
-# The runc wrapper puts the proxy's CA in the system store, so no --insecure is
-# needed except where a rule deliberately passes TLS through undecrypted.
+# The runc wrapper puts the proxy's CA in the system store, so a request the
+# proxy terminates needs no --insecure. The passthrough cases need it, as does
+# the forged-Host case, whose address URL names no host the certificate could
+# match; the SSRF cases pass it so that only the status decides them.
 SHELL ["/bin/sh", "-c"]
 
 # `S` prints the body, `C` the status. A test asserts on both: a 200 that
@@ -18,20 +20,7 @@ SHELL ["/bin/sh", "-c"]
 ENV S='curl -sS --max-time 10'
 ENV C='curl -sS -o /dev/null -w %{http_code} --max-time 10'
 
-# ---------------------------------------------------------------------------
-# Rules under test (compose.test-inspect.yaml):
-#   allowed_url_rules:
-#     GET https://allowed.example.com/public/**
-#     GET https://allowed.example.com:9443/public/**
-#     GET|POST https://api.example.com/v1/*
-#     GET https://*.wildcard.example.com/public/**
-#   allowed_https_rules: sub.wildcard.example.com:443 absent.example.com:443
-#                        v6only.example.com:443 metadata.example.com:443
-#                        runner.example.com:443 impostor.example.com:443
-#                        deadend.example.com:443
-#   allowed_http_rules:  allowed.example.com:80
-#   allowed_tls_rules:   tlspass.example.com:443
-# ---------------------------------------------------------------------------
+# Rules under test: see compose.test-inspect.yaml.
 
 RUN echo "=== [URL rule - path allowed] ===" && \
     OUT=$($S https://allowed.example.com/public/pkg.tgz) && \
@@ -440,8 +429,8 @@ RUN echo "=== [Direct IP - allowed, server speaks first] ===" && \
     echo "$OUT" && \
     case "$OUT" in 220\ *) echo "OK" ;; *) echo "FAILED: no greeting within 3s" && exit 1 ;; esac
 
-# Same address, a port only the URL rule's :80 default would cover, which proves
-# the ~regex ip rule's own literal port (9080) is enforced, not "any port".
+# Same address on a port no rule names, which proves the ~regex ip rule's own
+# literal port (9080) is enforced, not "any port".
 RUN echo "=== [Regex IP rule - other port not covered] ===" && \
     CODE=$($C http://10.200.0.100:8080/anything) && \
     echo "status=$CODE" && \

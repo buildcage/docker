@@ -476,8 +476,9 @@ func TestRemoveCARefusesADirectory(t *testing.T) {
 }
 
 // "/" survives filepath.Clean as a path with nothing in it. A variable set to
-// it resolves to the rootfs itself, which containerPathOf then refuses to bind
-// over, rather than to some path made from an empty component.
+// it resolves to the rootfs itself, which containerPathOf maps to "/" and
+// prepareBind then refuses to bind over, rather than to some path made from an
+// empty component.
 func TestResolveInRootResolvesTheRootItself(t *testing.T) {
 	root := t.TempDir()
 
@@ -734,8 +735,7 @@ func TestFindInFileIsANoOpOnAnEmptyRange(t *testing.T) {
 	}
 }
 
-// The scan carries len(needle)-1 bytes between reads, so a failure in any read
-// but the first still has to come back rather than be taken for "not found".
+// A failed read comes back as an error rather than being taken for "not found".
 func TestFindInFileReportsAFailedRead(t *testing.T) {
 	path := withCA(t)
 	f, err := os.Open(path)

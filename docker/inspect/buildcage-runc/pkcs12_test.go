@@ -211,8 +211,8 @@ func TestPKCS12WithoutUndecodable(t *testing.T) {
 	}
 }
 
-// The DER a scan matched is in the file's bytes but not as a decoded trusted
-// certificate: nothing is removed and the caller is left to report it.
+// A store whose trusted certificates do not include the CA has nothing removed,
+// and the caller is left to report it.
 func TestPKCS12WithoutCertNotAmongEntries(t *testing.T) {
 	root := testCert(t, "digicert")
 	ca := testCert(t, "buildcage")
@@ -255,8 +255,7 @@ func TestPKCS12WithoutRemovesLastCert(t *testing.T) {
 }
 
 // removeFromBinaryStore reads the file once and dispatches on its magic: a
-// PKCS#12 keystore holding the CA is rewritten in place, the gap that used to
-// fail the build.
+// PKCS#12 keystore holding the CA is rewritten in place.
 func TestRemoveFromKeystoreStripsPKCS12(t *testing.T) {
 	ca := testCert(t, "buildcage")
 	root := testCert(t, "digicert")
@@ -307,7 +306,7 @@ func TestRemoveFromKeystorePKCS12Error(t *testing.T) {
 }
 
 // The sweep reaches the PKCS#12 rewrite through stripCA: a PKCS#12 cacerts
-// holding the CA is stripped rather than failing the build as it did before.
+// holding the CA is stripped rather than failing the build.
 func TestStripCARewritesPKCS12(t *testing.T) {
 	ca := testCert(t, "buildcage")
 	root := testCert(t, "digicert")

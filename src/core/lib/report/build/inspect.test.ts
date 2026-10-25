@@ -235,8 +235,8 @@ describe("buildInspectReportData", () => {
   });
 
   it("still blocks a request that did name a host", async () => {
-    // Same termination state as the two above, told apart by the reason and
-    // by the method haproxy logs where a request never parsed.
+    // Same termination state as BAD_REQUEST and NO_HOST, told apart by the
+    // reason and by the method haproxy logs where a request never parsed.
     const r = await buildInspectReportData([START, BLOCKED], [], reportParams(), 0);
     expect(r.blockedCount).toBe(1);
     expect(r.blocked[0].host).toBe("evil.example.com");

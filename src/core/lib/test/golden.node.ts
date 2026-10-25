@@ -7,7 +7,8 @@
  * else moved.
  *
  * Node-only: it reads the fixture off disk.
- * Nothing under acl/ imports it, so the qjs bundle never pulls it in.
+ * Only *.golden.test.ts files import it, and rolldown.scripts.config.js keeps
+ * those out of the qjs bundle.
  *
  * Refresh deliberately, after reading the diff the failure prints:
  *   UPDATE_GOLDEN=1 vp test run <path>

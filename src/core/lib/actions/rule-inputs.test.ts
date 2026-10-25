@@ -47,8 +47,8 @@ describe("readRuleInputs", () => {
     );
   });
 
-  // Compiled on every engine, even the one that ignores them, so a typo fails
-  // here rather than silently doing nothing inside the proxy.
+  // Compiled whatever the engine, so a typo fails here rather than silently
+  // doing nothing inside the proxy.
   it("rejects a malformed URL rule even though only inspect enforces one", () => {
     expect(() => readRuleInputs(inputs({ allowed_url_rules: "GET not-a-url" }))).toThrow(
       expect.objectContaining({ code: "INVALID_RULES" }),

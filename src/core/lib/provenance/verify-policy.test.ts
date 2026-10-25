@@ -18,7 +18,8 @@ function makeSAN(ref: string) {
 // ── buildVerifyOptions ────────────────────────────────────────────────────────
 //
 // The generated options are checked by converting certificateIdentityURI to a
-// RegExp and matching sample SAN strings, the same test cosign would apply.
+// RegExp and matching sample SAN strings, as @sigstore/verify matches
+// subjectAlternativeName.
 
 describe("buildVerifyOptions: version tag", () => {
   function getOpts(ref: string): VerifyBundleOptions {

@@ -96,8 +96,8 @@ describe("passthrough", () => {
   });
 
   it("waits for a ClientHello split across segments before accepting plaintext", () => {
-    // In one rule, `{ req.len gt 0 }` matches the first segment of a
-    // ClientHello and sends TLS down the plaintext path.
+    // Folded into one rule with the TLS check, `{ req.len gt 0 }` would match
+    // the first segment of a ClientHello and send TLS down the plaintext path.
     const tls = config.indexOf("tcp-request content accept if { req.ssl_hello_type 1 }\n");
     const plain = config.indexOf("tcp-request content accept if { req.len gt 0 }\n");
     expect(tls !== -1 && tls < plain).toBe(true);

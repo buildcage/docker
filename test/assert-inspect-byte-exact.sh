@@ -2,9 +2,10 @@
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 
-# Builds the same Dockerfile under universal and inspect with a shared
-# SOURCE_DATE_EPOCH, and checks the resulting layers are byte-identical:
-# path, type, mode, owner, size, symlink targets, content, and mtime.
+# Compares two images built from the same Dockerfile under universal and
+# inspect with a shared SOURCE_DATE_EPOCH (see the Makefile's byte-exact
+# target), and checks their layers are byte-identical: path, type, mode,
+# owner, size, symlink targets, content, and mtime.
 
 IMAGE_A="${1:?usage: $0 IMAGE_A IMAGE_B}"
 IMAGE_B="${2:?usage: $0 IMAGE_A IMAGE_B}"

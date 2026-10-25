@@ -1,6 +1,6 @@
 /**
- * The registry client itself has no test file: it is exercised through the
- * pull token, the manifest digest and the config-label reads that use it.
+ * registryClient has no tests of its own: the manifest-digest and config-label
+ * reads here and the bundle reads in oci-bundle.test.ts exercise it.
  */
 import { createHash } from "node:crypto";
 

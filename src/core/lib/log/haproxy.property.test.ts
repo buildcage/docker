@@ -5,11 +5,11 @@ import { aggregate } from "./aggregate.ts";
 import { scanHaproxyLog } from "./haproxy.ts";
 
 describe("scanHaproxyLog: properties", () => {
-  // A well-formed line always becomes exactly one event with the right action:
+  // A well-formed line becomes at most one event with the right action:
   // BLOCKED → block (or failed for a dns-failed reason); ALLOWED/AUDIT → an
   // event only when it matches the decision `isAudit` selects, else dropped.
   // The host comes out as the rules match it, whatever case the log carried.
-  it("a valid line always becomes exactly one event in the right shape", async () => {
+  it("a valid line becomes at most one event, in the right shape", async () => {
     const decision = fc.constantFrom("ALLOWED", "BLOCKED", "AUDIT");
     const isAudit = fc.boolean();
     const ruleType = fc.constantFrom("HTTPS", "HTTP", "IP", "UNKNOWN");

@@ -56,7 +56,7 @@ describe("listHostIpv4Addresses", () => {
     expect(addresses).toStrictEqual(["192.168.65.3"]);
   });
 
-  it("reads the pre-v18 numeric family spelling", () => {
+  it("reads the numeric family Node 18.0 to 18.3 reported", () => {
     const addresses = listHostIpv4Addresses({
       networkInterfaces: fake({
         eth0: [info({ address: "192.168.65.3", family: 4 as unknown as "IPv4" })],

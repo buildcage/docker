@@ -269,8 +269,8 @@ func TestSweepDirRemovesAFileTheStripEmpties(t *testing.T) {
 	if _, err := os.Stat(anchor); !os.IsNotExist(err) {
 		t.Fatalf("the emptied file was left behind: %v", err)
 	}
-	// The bundle carried a real certificate too, so it is emptied of nothing
-	// and stays.
+	// The bundle carried a real certificate too, so it is not left empty and
+	// stays.
 	if got, _ := os.ReadFile(bundle); string(got) != string(otherCA) {
 		t.Fatalf("the bundle was disturbed: %q", got)
 	}

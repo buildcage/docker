@@ -402,7 +402,7 @@ describe("hasProxyStarted", () => {
     expect(hasProxyStarted([])).toBe(false);
   });
 
-  it("still matches now that the marker carries a timestamp", () => {
+  it("matches the marker with its timestamp", () => {
     expect(hasProxyStarted(["buildcage haproxy starting 1787471970000"])).toBe(true);
   });
 });

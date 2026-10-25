@@ -243,9 +243,7 @@ describe("runReportAction's fail_on_blocked fallback", () => {
     expect((await runReadingInput(value)).exitCode).toBe(exitCode);
   });
 
-  // The integration scripts and the Makefile's report targets run the script
-  // without action.yml's defaults.
-  it("falls back to action.yml's own default when the input is absent", async () => {
+  it("reads an absent input as the documented default, true", async () => {
     const { exitCode, lines } = await runReadingInput();
     expect(exitCode).toBe(1);
     expect(lines.some((l) => l.startsWith("::warning::"))).toBe(false);

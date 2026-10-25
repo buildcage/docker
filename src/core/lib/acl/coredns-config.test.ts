@@ -67,11 +67,6 @@ function reverseBlock(config: string): string {
   return config.slice(start, config.indexOf("\n}\n", start) + 3);
 }
 
-// ---------------------------------------------------------------------------
-// Nothing is ever forwarded, but a name is still logged as allowed or denied,
-// and that decision has to match the rules and nothing more, or a name
-// outside them would be misreported as allowed.
-// ---------------------------------------------------------------------------
 describe("readiness", () => {
   for (const mode of ["audit", "restrict"] as const) {
     it(`exposes a loopback health endpoint exactly once in ${mode} mode`, () => {
@@ -84,6 +79,11 @@ describe("readiness", () => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Nothing is ever forwarded, but a name is still logged as allowed or denied,
+// and that decision has to match the rules and nothing more, or a name
+// outside them would be misreported as allowed.
+// ---------------------------------------------------------------------------
 describe("allowlist scope", () => {
   it("logs only names matching the rule as allowed, not the whole parent domain", () => {
     // `*` is one label, so the resolver must not degrade to a suffix match on
@@ -317,9 +317,9 @@ describe("reverse lookups", () => {
   });
 
   it("records the lookup under a verb of its own, neither allowed nor denied", () => {
-    // inspect.ts reads the allowed and denied verbs only, which is what keeps
-    // this out of the report: a row for a reverse zone could never be taken
-    // away by writing a rule, there being no rule that can name one.
+    // log/inspect.ts has no parser for this verb, which is what keeps this out
+    // of the report: a row for a reverse zone could never be taken away by
+    // writing a rule, there being no rule that can name one.
     const block = reverseBlock(gen({ httpsRules: ["a.example.com:443"] }));
     expect(block.includes('"buildcage dns reverse name={name}"')).toBe(true);
     expect(block.includes("dns allowed")).toBe(false);

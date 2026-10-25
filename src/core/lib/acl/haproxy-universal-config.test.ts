@@ -44,8 +44,8 @@ describe("rule lists", () => {
   const config = gen({ httpsRules: HTTPS, httpRules: HTTP, ipRules: IP });
 
   it("matches each rule with the regex convertRule gives it", () => {
-    // Setup validates rules with convertRule, so this is the regex each rule
-    // has always been matched with.
+    // Setup validates rules with convertRule, so the proxy matches the very
+    // regex setup accepted.
     expect(patterns(config, "is_https_allowed")).toStrictEqual(HTTPS.map(convertRule));
     expect(patterns(config, "is_http_allowed")).toStrictEqual(HTTP.map(convertRule));
     expect(patterns(config, "is_ip_match")).toStrictEqual(IP.map(convertRule));

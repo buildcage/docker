@@ -247,8 +247,7 @@ describe("the internal-address guard", () => {
   it("blocks a resolved destination that lands on an internal address", () => {
     // The rules check the name; nothing checks where it resolves. A name that
     // resolves to cloud metadata or the proxy itself would otherwise have the
-    // proxy connect there from its own network position. Confirmed against a
-    // build: an allowlisted name pointing at 169.254.169.254 reached it.
+    // proxy connect there from its own network position.
     expect(
       FULL_CONFIG.includes(
         "acl dst_internal var(txn.dst) -m ip 0.0.0.0/8 127.0.0.0/8 169.254.0.0/16",
@@ -264,7 +263,8 @@ describe("the internal-address guard", () => {
   });
 
   it("includes the proxy's own address in the internal set, against a loop", () => {
-    // gateway.example.com -> 198.19.255.1 (the proxy) made it connect to itself.
+    // A name resolving to 198.19.255.1, the proxy itself, would make it
+    // connect to itself.
     const acl = FULL_CONFIG.split("\n").find((l) => l.includes("acl dst_internal"))!;
     expect(acl.trim().endsWith("198.19.255.1")).toBe(true);
   });
@@ -277,7 +277,8 @@ describe("the internal-address guard", () => {
   it("extends the internal set with the runner's own addresses, as a second acl of the same name", () => {
     // RFC1918 is allowed on purpose for an internal mirror, so without this an
     // allowlisted name resolving to the runner reaches its published ports.
-    // A file, not more words: HAProxy truncates a long acl line silently.
+    // A file, not more words: HAProxy refuses to start on an acl line past
+    // MAX_LINE_ARGS words.
     const withHost = gen({ ...FULL, hostAddressFile: "/etc/haproxy/rules/host_addrs.lst" });
     const guards = withHost
       .split("\n")
@@ -294,8 +295,8 @@ describe("the internal-address guard", () => {
   });
 
   it("emits no host-address acl when no file is given, rather than an unreadable path", () => {
-    // This generator is only ever called by inspect's init-cfg, which always
-    // writes the file, so an absent path means the two are out of step.
+    // Only setup's rule check leaves the file out, and it never starts HAProxy
+    // on the result; inspect's init-cfg always writes one.
     expect(FULL_CONFIG.includes("-m ip -f")).toBe(false);
   });
 
@@ -476,7 +477,6 @@ describe("the path the rules see", () => {
     // `.` is unreserved, so `%2e%2e` is not a dot-dot segment until it has been
     // decoded. Stripping first leaves it intact: the rules see a path that
     // never leaves /public/, and the origin resolves it somewhere else.
-    // Verified against a real build: it returned PRIVATE with a 200.
     const decode = FULL_CONFIG.indexOf("normalize-uri percent-decode-unreserved");
     const strip = FULL_CONFIG.indexOf("normalize-uri path-strip-dotdot");
     expect(decode !== -1 && decode < strip).toBe(true);

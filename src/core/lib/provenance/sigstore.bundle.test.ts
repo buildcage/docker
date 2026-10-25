@@ -42,9 +42,7 @@ describe("verifyBundle on a published bundle", () => {
   });
 
   it("rejects it for another repository", async () => {
-    await expect(verifyAs("v4.0.4", "buildcage/isolated-run")).rejects.toThrow(
-      /verification failed/,
-    );
+    await expect(verifyAs("v4.0.4", "buildcage/other")).rejects.toThrow(/verification failed/);
   });
 
   it("rejects it for another tag", async () => {

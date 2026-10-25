@@ -146,8 +146,8 @@ func TestRemoveCreatedDirsRefusesAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
 
-	// Something outside the rootfs the old undo would have unlinked by following
-	// an absolute symlink out of it.
+	// Something outside the rootfs that an undo following the absolute symlink
+	// would unlink.
 	outside := t.TempDir()
 	mustMkdirAll(t, filepath.Join(outside, "anchors"))
 
@@ -165,8 +165,8 @@ func TestRemoveCreatedDirsRefusesAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	}
 }
 
-// A path that resolves to a symlink or is otherwise not writable is left for
-// the step; createCA reports it rather than following it.
+// Anything already at the anchor path, a symlink included, is the image's or
+// the step's: createCA refuses it rather than writing over or through it.
 func TestCreateCARefusesAnExistingPath(t *testing.T) {
 	rootfs := t.TempDir()
 	dir := filepath.Join(rootfs, "etc", "pki", "trust", "anchors")

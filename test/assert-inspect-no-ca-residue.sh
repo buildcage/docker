@@ -2,7 +2,7 @@
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 
-# Regression guard for the inspect engine's per-RUN-step CA injection
+# Checks the inspect engine's per-RUN-step CA injection
 # (docker/inspect/buildcage-runc/inject.go): the environment it sets lives only
 # in the transient OCI process spec, never in what BuildKit commits, and the
 # certificate is taken back out of the step's own layer, by reading that layer
@@ -41,9 +41,9 @@ else
   pass "no buildcage CA in any CA bundle or anchor directory"
 fi
 
-# An anchor directory the injection created goes with the anchor. Neither test
-# fixture's base image ships /etc/pki at all, so anything left there is the
-# injection's, empty directory included.
+# An anchor directory the injection created goes with the anchor. No fixture's
+# base image ships /etc/pki at all, so anything left there is the injection's,
+# empty directory included.
 if docker run --rm "$IMAGE" sh -c 'test -d /etc/pki'; then
   fail "an anchor directory the injection created is still in the built image"
 else

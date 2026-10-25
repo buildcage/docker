@@ -83,9 +83,10 @@ RUN echo "=== [Direct IP - blocked] ===" && \
     echo "Testing direct IP access to 10.200.0.100 (should be blocked by haproxy)..." && \
     (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by haproxy (expected)"
 
-# allowed_ip_rules names 10.200.0.100:8443 alone. The SNI is the client's to
-# choose, so it must decide neither way: a name there must not block the
-# allowed address, and the allowed address there must not open another one.
+# allowed_ip_rules names no port of 10.200.0.101, and only 8443 and 2525 of
+# 10.200.0.100. The SNI is the client's to choose, so it must decide neither
+# way: a name there must not block the allowed address, and the allowed address
+# there must not open another one.
 RUN echo "=== [Direct IP - allowed, SNI names a host] ===" && \
     (node --no-deprecation -e 'require("tls").connect({ host: process.argv[1], port: 8443, servername: process.argv[2], rejectUnauthorized: false }, () => process.exit(0)).on("error", () => process.exit(1)).setTimeout(5000, () => process.exit(1))' 10.200.0.100 allowed.example.com && echo "✓ 10.200.0.100:8443: OK") || (echo "✗ 10.200.0.100:8443: FAILED" && exit 1)
 
