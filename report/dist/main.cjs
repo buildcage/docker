@@ -1509,9 +1509,9 @@ var require_identity$1 = __commonJSMin(((exports) => {
 		resolve(src, onError) {
 			if (typeof node_buffer$1.Buffer == "function") return node_buffer$1.Buffer.from(src, "base64");
 			if (typeof atob == "function") {
-				let str = atob(src.replace(/[\n\r]/g, "")), buffer$5 = new Uint8Array(str.length);
-				for (let i = 0; i < str.length; ++i) buffer$5[i] = str.charCodeAt(i);
-				return buffer$5;
+				let str = atob(src.replace(/[\n\r]/g, "")), buffer$7 = new Uint8Array(str.length);
+				for (let i = 0; i < str.length; ++i) buffer$7[i] = str.charCodeAt(i);
+				return buffer$7;
 			}
 			return onError("This environment does not support reading binary tags; either Buffer or atob is required"), src;
 		},
@@ -5828,16 +5828,19 @@ var DecodedURL, init_proxy = __esmMin((() => {
 	};
 	module.exports = Dispatcher;
 })), require_dispatcher_base = __commonJSMin(((exports, module) => {
-	let Dispatcher = require_dispatcher(), { ClientDestroyedError, ClientClosedError, InvalidArgumentError } = require_errors$2(), { kDestroy, kClose, kClosed, kDestroyed, kDispatch, kInterceptors } = require_symbols$4(), kOnDestroyed = Symbol("onDestroyed"), kOnClosed = Symbol("onClosed"), kInterceptedDispatch = Symbol("Intercepted Dispatch"), kWebSocketOptions = Symbol("webSocketOptions");
+	let buffer$5 = require("node:buffer"), Dispatcher = require_dispatcher(), { ClientDestroyedError, ClientClosedError, InvalidArgumentError } = require_errors$2(), { kDestroy, kClose, kClosed, kDestroyed, kDispatch, kInterceptors } = require_symbols$4(), kOnDestroyed = Symbol("onDestroyed"), kOnClosed = Symbol("onClosed"), kInterceptedDispatch = Symbol("Intercepted Dispatch"), kWebSocketOptions = Symbol("webSocketOptions"), kEventSourceOptions = Symbol("eventSourceOptions");
 	module.exports = class extends Dispatcher {
 		constructor(opts) {
-			super(), this[kDestroyed] = !1, this[kOnDestroyed] = null, this[kClosed] = !1, this[kOnClosed] = [], this[kWebSocketOptions] = opts?.webSocket ?? {};
+			super(), this[kDestroyed] = !1, this[kOnDestroyed] = null, this[kClosed] = !1, this[kOnClosed] = [], this[kWebSocketOptions] = opts?.webSocket ?? {}, this[kEventSourceOptions] = opts?.eventSource ?? {};
 		}
 		get webSocketOptions() {
 			return {
 				maxFragments: this[kWebSocketOptions].maxFragments ?? 131072,
 				maxPayloadSize: this[kWebSocketOptions].maxPayloadSize ?? 134217728
 			};
+		}
+		get eventSourceOptions() {
+			return { maxEventSize: this[kEventSourceOptions].maxEventSize ?? buffer$5.kStringMaxLength };
 		}
 		get destroyed() {
 			return this[kDestroyed];
@@ -7971,7 +7974,6 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 	}
 	async function connectH1(client, socket) {
 		client[kSocket] = socket, llhttpInstance || (llhttpInstance = await llhttpPromise, llhttpPromise = null), socket[kNoRef] = !1, socket[kWriting] = !1, socket[kReset] = !1, socket[kBlocking] = !1, socket[kIdleSocketValidation] = 0, socket[kIdleSocketValidationTimeout] = null, socket[kSocketUsed] = !1, socket[kParser] = new Parser(client, socket, llhttpInstance), addListener(socket, "error", function(err) {
-			assert$20(err.code !== "ERR_TLS_CERT_ALTNAME_INVALID");
 			let parser = this[kParser];
 			if (err.code === "ECONNRESET" && parser.statusCode && !parser.shouldKeepAlive) {
 				let parserErr = parser.finish();
@@ -8260,7 +8262,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 				}
 			}
 		}), session.unref(), client[kHTTP2Session] = session, socket[kHTTP2Session] = session, util.addListener(socket, "error", function(err) {
-			assert$19(err.code !== "ERR_TLS_CERT_ALTNAME_INVALID"), this[kError] = err, this[kClient][kOnError](err);
+			this[kError] = err, this[kClient][kOnError](err);
 		}), util.addListener(socket, "end", function() {
 			util.destroy(this, new SocketError("other side closed", util.getSocketInfo(this)));
 		}), util.addListener(socket, "close", function() {
@@ -8295,7 +8297,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		socket?.destroyed === !1 && (client[kSize] === 0 && client[kMaxConcurrentStreams] === 0 ? (socket.unref(), client[kHTTP2Session].unref()) : (socket.ref(), client[kHTTP2Session].ref()));
 	}
 	function onHttp2SessionError(err) {
-		assert$19(err.code !== "ERR_TLS_CERT_ALTNAME_INVALID"), this[kSocket][kError] = err, this[kClient][kOnError](err);
+		this[kSocket][kError] = err, this[kClient][kOnError](err);
 	}
 	function onHttp2FrameError(type, code, id) {
 		if (id === 0) {
@@ -8553,8 +8555,11 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		return client[kPipelining] ?? client[kHTTPContext]?.defaultPipelining ?? 1;
 	}
 	var Client = class extends DispatcherBase {
-		constructor(url, { interceptors, maxHeaderSize, headersTimeout, socketTimeout, requestTimeout, connectTimeout, bodyTimeout, idleTimeout, keepAlive, keepAliveTimeout, maxKeepAliveTimeout, keepAliveMaxTimeout, keepAliveTimeoutThreshold, socketPath, pipelining, tls, strictContentLength, maxCachedSessions, maxRedirections, connect, maxRequestsPerClient, localAddress, maxResponseSize, autoSelectFamily, autoSelectFamilyAttemptTimeout, maxConcurrentStreams, allowH2, webSocket } = {}) {
-			if (super({ webSocket }), keepAlive !== void 0) throw new InvalidArgumentError("unsupported keepAlive, use pipelining=0 instead");
+		constructor(url, { interceptors, maxHeaderSize, headersTimeout, socketTimeout, requestTimeout, connectTimeout, bodyTimeout, idleTimeout, keepAlive, keepAliveTimeout, maxKeepAliveTimeout, keepAliveMaxTimeout, keepAliveTimeoutThreshold, socketPath, pipelining, tls, strictContentLength, maxCachedSessions, maxRedirections, connect, maxRequestsPerClient, localAddress, maxResponseSize, autoSelectFamily, autoSelectFamilyAttemptTimeout, maxConcurrentStreams, allowH2, webSocket, eventSource } = {}) {
+			if (super({
+				webSocket,
+				eventSource
+			}), keepAlive !== void 0) throw new InvalidArgumentError("unsupported keepAlive, use pipelining=0 instead");
 			if (socketTimeout !== void 0) throw new InvalidArgumentError("unsupported socketTimeout, use headersTimeout & bodyTimeout instead");
 			if (requestTimeout !== void 0) throw new InvalidArgumentError("unsupported requestTimeout, use headersTimeout & bodyTimeout instead");
 			if (idleTimeout !== void 0) throw new InvalidArgumentError("unsupported idleTimeout, use keepAliveTimeout instead");
@@ -9019,13 +9024,14 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 		return opts && opts.connections === 1 ? new Client(origin, opts) : new Pool(origin, opts);
 	}
 	module.exports = class extends DispatcherBase {
-		constructor({ factory = defaultFactory, maxRedirections = 0, connect, ...options } = {}) {
+		constructor({ factory = defaultFactory, maxRedirections = 0, connect, tls, ...options } = {}) {
 			if (typeof factory != "function") throw new InvalidArgumentError("factory must be a function.");
 			if (connect != null && typeof connect != "function" && typeof connect != "object") throw new InvalidArgumentError("connect must be a function or an object");
 			if (!Number.isInteger(maxRedirections) || maxRedirections < 0) throw new InvalidArgumentError("maxRedirections must be a positive number");
-			super(options), connect && typeof connect != "function" && (connect = { ...connect }), this[kInterceptors] = options.interceptors?.Agent && Array.isArray(options.interceptors.Agent) ? options.interceptors.Agent : [createRedirectInterceptor({ maxRedirections })], this[kOptions] = {
+			super(options), connect && typeof connect != "function" && (connect = { ...connect }), tls && typeof tls != "function" && (tls = { ...tls }), this[kInterceptors] = options.interceptors?.Agent && Array.isArray(options.interceptors.Agent) ? options.interceptors.Agent : [createRedirectInterceptor({ maxRedirections })], this[kOptions] = {
 				...util.deepClone(options),
-				connect
+				connect,
+				tls
 			}, this[kOptions].interceptors = options.interceptors ? { ...options.interceptors } : void 0, this[kMaxRedirections] = maxRedirections, this[kFactory] = factory, this[kClients] = new Map(), this[kOnDrain] = (origin, targets) => {
 				this.emit("drain", origin, [this, ...targets]);
 			}, this[kOnConnect] = (origin, targets) => {
@@ -11965,7 +11971,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 			stream,
 			source: null,
 			length: null
-		}, fetchParams.controller.onAborted = onAborted, fetchParams.controller.on("terminated", onAborted), fetchParams.controller.resume = async () => {
+		}, fetchParams.controller.resume || fetchParams.controller.on("terminated", onAborted), fetchParams.controller.resume = async () => {
 			for (;;) {
 				let bytes, isFailure;
 				try {
@@ -12019,11 +12025,11 @@ ${pendingInterceptorsFormatter.format(pending)}
 					if (status < 200) return;
 					let location = "", headersList = new HeadersList();
 					for (let i = 0; i < rawHeaders.length; i += 2) headersList.append(bufferToLowerCasedHeaderName(rawHeaders[i]), rawHeaders[i + 1].toString("latin1"), !0);
-					location = headersList.get("location", !0), this.body = new Readable$6({ read: resume });
+					location = headersList.get("location", !0);
 					let decoders = [], willFollow = location && request.redirect === "follow" && redirectStatusSet.has(status);
 					if (request.method !== "HEAD" && request.method !== "CONNECT" && !nullBodyStatus.includes(status) && !willFollow) {
 						let contentEncoding = headersList.get("content-encoding", !0), codings = contentEncoding ? contentEncoding.toLowerCase().split(",") : [];
-						if (codings.length > 5) return reject(Error(`too many content-encodings in response: ${codings.length}, maximum allowed is 5`)), !0;
+						if (codings.length > 5) return this.abort(Error(`too many content-encodings in response: ${codings.length}, maximum allowed is 5`)), !0;
 						for (let i = codings.length - 1; i >= 0; --i) {
 							let coding = codings[i].trim();
 							if (coding === "x-gzip" || coding === "gzip") decoders.push(zlib$3.createGunzip({
@@ -12044,6 +12050,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 							}
 						}
 					}
+					this.body = new Readable$6({ read: resume });
 					let onError = this.onError.bind(this);
 					return resolve({
 						status,
@@ -12060,7 +12067,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 					return timingInfo.encodedBodySize += bytes.byteLength, this.body.push(bytes);
 				},
 				onComplete() {
-					this.abort && fetchParams.controller.off("terminated", this.abort), fetchParams.controller.onAborted && fetchParams.controller.off("terminated", fetchParams.controller.onAborted), fetchParams.controller.ended = !0, this.body.push(null);
+					this.abort && fetchParams.controller.off("terminated", this.abort), fetchParams.controller.ended = !0, this.body.push(null);
 				},
 				onError(error) {
 					this.abort && fetchParams.controller.off("terminated", this.abort), this.body?.destroy(error), fetchParams.controller.terminate(error), reject(error);
@@ -13838,8 +13845,16 @@ ${pendingInterceptorsFormatter.format(pending)}
 			} else if (this.#state === parserStates.READ_DATA) {
 				if (this.#byteOffset < this.#info.payloadLength) return callback();
 				let body = this.consume(this.#info.payloadLength);
-				if (isControlFrame(this.#info.opcode)) this.#loop = this.parseControlFrame(body), this.#state = parserStates.INFO;
-				else if (this.#info.compressed) {
+				if (isControlFrame(this.#info.opcode)) {
+					this.#loop = this.parseControlFrame(body), this.#state = parserStates.INFO;
+					let socket = this.ws[kResponse].socket;
+					if (this.#loop && socket.writableNeedDrain) {
+						this.#loop = !1, socket.once("drain", () => {
+							this.destroyed || (this.#loop = !0, this.run(callback));
+						});
+						return;
+					}
+				} else if (this.#info.compressed) {
 					this.#extensions.get("permessage-deflate").decompress(body, this.#info.fin, (error, data) => {
 						if (error) {
 							let code = error instanceof MessageSizeExceededError ? 1009 : 1007;
@@ -14196,11 +14211,11 @@ ${pendingInterceptorsFormatter.format(pending)}
 		delay
 	};
 })), require_eventsource_stream = __commonJSMin(((exports, module) => {
-	let { Transform: Transform$4 } = require("node:stream"), { isASCIINumber, isValidLastEventId } = require_util$4(), BOM = [
+	let buffer$4 = require("node:buffer"), { Transform: Transform$4 } = require("node:stream"), { isASCIINumber, isValidLastEventId } = require_util$4(), BOM = [
 		239,
 		187,
 		191
-	], DATA = Buffer.from("data"), EVENT = Buffer.from("event"), ID = Buffer.from("id"), RETRY = Buffer.from("retry");
+	], defaultMaxEventSize = buffer$4.kStringMaxLength, DATA = Buffer.from("data"), EVENT = Buffer.from("event"), ID = Buffer.from("id"), RETRY = Buffer.from("retry");
 	function isASCIINumberBytes(buffer, start) {
 		if (start >= buffer.length) return !1;
 		for (let i = start; i < buffer.length; i++) if (buffer[i] < 48 || buffer[i] > 57) return !1;
@@ -14215,6 +14230,10 @@ ${pendingInterceptorsFormatter.format(pending)}
 		for (let i = 0; i < length; i++) if (line[i] !== field[i]) return !1;
 		return !0;
 	}
+	function createMaxEventSizeExceededError() {
+		let error = Error("EventSource message size exceeded");
+		return error.aborted = !1, error;
+	}
 	module.exports = { EventSourceStream: class extends Transform$4 {
 		state = null;
 		checkBOM = !0;
@@ -14225,6 +14244,18 @@ ${pendingInterceptorsFormatter.format(pending)}
 		pos = 0;
 		lineChunkIndex = 0;
 		linePos = 0;
+		lineLength = 0;
+		eventSize = 0;
+		eventFieldSizes = {
+			data: 0,
+			event: 0,
+			id: 0,
+			retry: 0
+		};
+		dataLineCount = 0;
+		maxEventSize;
+		maxDataLines;
+		maxBufferedChunks;
 		event = {
 			data: void 0,
 			event: void 0,
@@ -14232,10 +14263,13 @@ ${pendingInterceptorsFormatter.format(pending)}
 			retry: void 0
 		};
 		constructor(options = {}) {
-			options.readableObjectMode = !0, super(options), this.state = options.eventSourceSettings || {}, options.push && (this.push = options.push);
+			options.readableObjectMode = !0, super(options), this.state = options.eventSourceSettings || {}, this.maxEventSize = options.maxEventSize ?? defaultMaxEventSize;
+			let parserItemLimit = this.maxEventSize > 0 ? Math.min(131072, Math.max(1024, Math.floor(this.maxEventSize / 128))) : 0;
+			this.maxDataLines = parserItemLimit, this.maxBufferedChunks = parserItemLimit, options.push && (this.push = options.push);
 		}
 		_transform(chunk, _encoding, callback) {
 			if (chunk.length === 0) callback();
+			else if (this.maxEventSize > 0 && this.chunks.length >= this.maxBufferedChunks && chunk[0] !== 10 && chunk[0] !== 13) callback(createMaxEventSizeExceededError());
 			else if (this.chunks.push(chunk), this.checkBOM && this.handleBOM()) callback();
 			else {
 				for (; this.hasCurrentByte();) {
@@ -14253,10 +14287,28 @@ ${pendingInterceptorsFormatter.format(pending)}
 							continue;
 						}
 						this.eventEndCheck = !1;
-					} else byte === 10 || byte === 13 ? (byte === 13 && (this.crlfCheck = !0), this.parseLine(this.readLine(), this.event), this.consumeCurrentByte(), this.eventEndCheck = !0) : this.advanceCursor();
+					} else if (byte === 10 || byte === 13) {
+						byte === 13 && (this.crlfCheck = !0);
+						try {
+							this.parseLine(this.readLine(), this.event);
+						} catch (error) {
+							callback(error);
+							return;
+						}
+						this.consumeCurrentByte(), this.eventEndCheck = !0;
+					} else {
+						if (this.maxEventSize > 0 && ++this.lineLength > this.maxEventSize + 7) {
+							callback(createMaxEventSizeExceededError());
+							return;
+						}
+						this.advanceCursor();
+					}
 				}
 				callback();
 			}
+		}
+		_destroy(error, callback) {
+			this.chunks.length = 0, this.clearEvent(), super._destroy(error, callback);
 		}
 		parseLine(line, event) {
 			if (line.length === 0) return;
@@ -14264,14 +14316,17 @@ ${pendingInterceptorsFormatter.format(pending)}
 			if (colonPosition === 0) return;
 			let fieldLength = line.length, valueStart = line.length;
 			if (colonPosition !== -1 && (fieldLength = colonPosition, valueStart = colonPosition + 1, line[valueStart] === 32 && ++valueStart), isFieldName(line, fieldLength, DATA)) {
+				if (this.maxEventSize > 0 && this.dataLineCount >= this.maxDataLines) throw createMaxEventSizeExceededError();
+				let valueBytes = line.length - valueStart, dataSize = this.eventFieldSizes.data + (event.data === void 0 ? 0 : 1) + valueBytes;
+				this.setEventFieldSize("data", dataSize);
 				let value = line.toString("utf8", valueStart);
-				event.data === void 0 ? event.data = value : event.data += `\n${value}`;
-			} else if (isFieldName(line, fieldLength, RETRY)) isASCIINumberBytes(line, valueStart) && (event.retry = line.toString("utf8", valueStart));
-			else if (isFieldName(line, fieldLength, ID)) isValidLastEventIdBytes(line, valueStart) && (event.id = line.toString("utf8", valueStart));
-			else if (isFieldName(line, fieldLength, EVENT)) {
-				let value = line.toString("utf8", valueStart);
-				value.length > 0 && (event.event = value);
-			}
+				event.data === void 0 ? event.data = value : event.data += `\n${value}`, this.dataLineCount++;
+			} else isFieldName(line, fieldLength, RETRY) ? isASCIINumberBytes(line, valueStart) && (this.setEventFieldSize("retry", line.length - valueStart), event.retry = line.toString("utf8", valueStart)) : isFieldName(line, fieldLength, ID) ? isValidLastEventIdBytes(line, valueStart) && (this.setEventFieldSize("id", line.length - valueStart), event.id = line.toString("utf8", valueStart)) : isFieldName(line, fieldLength, EVENT) && valueStart < line.length && (this.setEventFieldSize("event", line.length - valueStart), event.event = line.toString("utf8", valueStart));
+		}
+		setEventFieldSize(field, size) {
+			let eventSize = this.eventSize - this.eventFieldSizes[field] + size;
+			if (this.maxEventSize > 0 && eventSize > this.maxEventSize) throw createMaxEventSizeExceededError();
+			this.eventSize = eventSize, this.eventFieldSizes[field] = size;
 		}
 		processEvent(event) {
 			event.retry && isASCIINumber(event.retry) && (this.state.reconnectionTime = parseInt(event.retry, 10)), event.id && isValidLastEventId(event.id) && (this.state.lastEventId = event.id), event.data !== void 0 && this.push({
@@ -14284,7 +14339,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 			});
 		}
 		clearEvent() {
-			this.event.data = void 0, this.event.event = void 0, this.event.id = void 0, this.event.retry = void 0;
+			this.event.data = void 0, this.event.event = void 0, this.event.id = void 0, this.event.retry = void 0, this.eventSize = 0, this.dataLineCount = 0, this.eventFieldSizes.data = 0, this.eventFieldSizes.event = 0, this.eventFieldSizes.id = 0, this.eventFieldSizes.retry = 0;
 		}
 		hasPendingEvent() {
 			return this.event.data !== void 0 || this.event.event !== void 0 || this.event.id !== void 0 || this.event.retry !== void 0;
@@ -14302,10 +14357,13 @@ ${pendingInterceptorsFormatter.format(pending)}
 			for (this.pos++; this.chunkIndex < this.chunks.length && this.pos >= this.chunks[this.chunkIndex].length;) this.chunkIndex++, this.pos = 0;
 		}
 		syncLineStartToCursor() {
-			this.lineChunkIndex = this.chunkIndex, this.linePos = this.pos, this.dropConsumedChunks();
+			this.lineChunkIndex = this.chunkIndex, this.linePos = this.pos, this.lineLength = 0, this.dropConsumedChunks();
 		}
 		dropConsumedChunks() {
-			for (; this.lineChunkIndex > 0;) this.chunks.shift(), this.lineChunkIndex--, this.chunkIndex--;
+			if (this.lineChunkIndex > 0) {
+				let consumed = this.lineChunkIndex;
+				this.chunks.splice(0, consumed), this.lineChunkIndex = 0, this.chunkIndex -= consumed;
+			}
 			this.chunkIndex === this.chunks.length && (this.chunks.length = 0, this.chunkIndex = 0, this.pos = 0, this.lineChunkIndex = 0, this.linePos = 0);
 		}
 		readLine() {
@@ -14338,7 +14396,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 		}
 	} };
 })), require_eventsource = __commonJSMin(((exports, module) => {
-	let { pipeline } = require("node:stream"), { fetching } = require_fetch(), { makeRequest } = require_request(), { webidl } = require_webidl(), { EventSourceStream } = require_eventsource_stream(), { parseMIMEType } = require_data_url(), { createFastMessageEvent } = require_events(), { isNetworkError } = require_response(), { delay } = require_util$4(), { kEnumerableProperty } = require_util$11(), { environmentSettingsObject } = require_util$10(), experimentalWarned = !1, defaultReconnectionTime = 3e3;
+	let { pipeline } = require("node:stream"), { fetching } = require_fetch(), { makeRequest } = require_request(), { webidl } = require_webidl(), { EventSourceStream } = require_eventsource_stream(), { parseMIMEType } = require_data_url(), { createFastMessageEvent } = require_events(), { isNetworkError } = require_response(), { delay } = require_util$4(), { kEnumerableProperty } = require_util$11(), { environmentSettingsObject } = require_util$10(), { getGlobalDispatcher } = require_global(), experimentalWarned = !1, defaultReconnectionTime = 3e3;
 	var EventSource = class EventSource extends EventTarget {
 		#events = {
 			open: null,
@@ -14415,6 +14473,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 				this.#readyState = 1, this.dispatchEvent(new Event("open")), this.#state.origin = response.urlList[response.urlList.length - 1].origin;
 				let eventSourceStream = new EventSourceStream({
 					eventSourceSettings: this.#state,
+					maxEventSize: this.#dispatcher.eventSourceOptions?.maxEventSize,
 					push: (event) => {
 						this.dispatchEvent(createFastMessageEvent(event.type, event.options));
 					}
@@ -14486,7 +14545,8 @@ ${pendingInterceptorsFormatter.format(pending)}
 		defaultValue: () => !1
 	}, {
 		key: "dispatcher",
-		converter: webidl.converters.any
+		converter: webidl.converters.any,
+		defaultValue: () => getGlobalDispatcher()
 	}]), module.exports = {
 		EventSource,
 		defaultReconnectionTime
@@ -47702,9 +47762,9 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	}, Readable.prototype.setEncoding = function(enc) {
 		let decoder = new StringDecoder(enc);
 		this._readableState.decoder = decoder, this._readableState.encoding = this._readableState.decoder.encoding;
-		let buffer$4 = this._readableState.buffer, content = "";
-		for (let data of buffer$4) content += decoder.write(data);
-		return buffer$4.clear(), content !== "" && buffer$4.push(content), this._readableState.length = content.length, this;
+		let buffer$6 = this._readableState.buffer, content = "";
+		for (let data of buffer$6) content += decoder.write(data);
+		return buffer$6.clear(), content !== "" && buffer$6.push(content), this._readableState.length = content.length, this;
 	};
 	function computeNewHighWaterMark(n) {
 		if (n > 1073741824) throw new ERR_OUT_OF_RANGE("size", "<= 1GiB", n);

@@ -3,6 +3,22 @@ trustPolicy: no-downgrade
 minimumReleaseAge: 20160 # 2 weeks
 minimumReleaseAgeExclude:
   - source-map-js@1.2.2
+  - undici@6.29.1 || 8.12.2
+  - postcss@8.5.30
+  - zod@4.6.6
+  - ip-address@10.7.4
+  # vite-plus 1.4.0 pins its toolchain to exact versions released with it,
+  # and pnpm takes no version on a name pattern, so these are exempt by name.
+  # Drop them once 1.4.0 is two weeks old (2026-11-06).
+  - vite-plus
+  - "@voidzero-dev/*"
+  - vitest
+  - "@vitest/*"
+  - oxlint
+  - "@oxlint/*"
+  - oxfmt
+  - "@oxfmt/*"
+  - "@oxc-project/*"
 
 # Lets tsc/rolldown resolve these, even though they're only vite-plus's
 # transitive dependencies. chai/@types/chai are vitest's own expect()
