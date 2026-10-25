@@ -4263,7 +4263,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 The following npm packages may be included in this product:
 
  - undici-types@7.24.6
- - undici@6.29.0
+ - undici@6.29.1
 
 These packages each contain the following license:
 
