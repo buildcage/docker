@@ -180,8 +180,7 @@ func TestRunFailsAStepWhoseWriteBackFailed(t *testing.T) {
 	t.Setenv("SCRATCH_ROOT", scratchRoot)
 	// sh does not glob a redirection target, so the loop resolves it first.
 	useFakeRunc(t, `for f in "$SCRATCH_ROOT"/*/ca-certificates.crt; do echo REGENERATED > "$f"; done`)
-	// 1 is prepare's mirror and 2 is the write-back's dry run, so 3 is the apply.
-	failRsyncOn(t, 3)
+	failRsyncWhen(t, isRsyncApply)
 
 	readStderr := captureStderr(t)
 	code := run([]string{"run", "--bundle", bundle, "id"})
@@ -192,6 +191,9 @@ func TestRunFailsAStepWhoseWriteBackFailed(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "CA write-back failed for") {
 		t.Errorf("the failure did not reach stderr:\n%s", stderr)
+	}
+	if strings.Contains(stderr, "fail_on_ca_residue") {
+		t.Errorf("a failed write-back hinted at fail_on_ca_residue:\n%s", stderr)
 	}
 }
 

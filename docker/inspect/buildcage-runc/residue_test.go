@@ -238,22 +238,6 @@ func TestRunRefusesAStepWithAHalfWrittenKeystore(t *testing.T) {
 	}
 }
 
-func TestRunDoesNotHintAtFailOnCAResidueForOtherFailures(t *testing.T) {
-	useTempLog(t)
-	useFakeRsync(t)
-	useTempCAFile(t, string(testCA))
-	bundle, _ := newBundle(t, []string{"PATH=/usr/bin"})
-	t.Setenv("SCRATCH_ROOT", scratchRoot)
-	useFakeRunc(t, `for f in "$SCRATCH_ROOT"/*/ca-certificates.crt; do echo REGENERATED > "$f"; done`)
-	failRsyncOn(t, 3)
-
-	readStderr := captureStderr(t)
-	run([]string{"run", "--bundle", bundle, "id"})
-	if stderr := readStderr(); strings.Contains(stderr, "fail_on_ca_residue") {
-		t.Errorf("a failed write-back hinted at fail_on_ca_residue:\n%s", stderr)
-	}
-}
-
 // A copy the sweep cannot strip does not stop the slot being cut from a copy
 // of the home in the same layer, and the result names each residue once:
 // it fails the build by default and only warns under fail_on_ca_residue: false.
