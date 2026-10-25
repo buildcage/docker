@@ -164,6 +164,9 @@ to match whatever it is named. The setup action's `builder_name` output holds th
 The inputs can also live in a YAML file next to the Dockerfile, named by `config_file`. See
 [Config file](./docs/reference.md#config-file).
 
+A `#` starts a comment at the start of a line or after whitespace, so a group of rules can carry a
+heading or a rule can carry its reason. It works the same in every rule input.
+
 ### Operation modes
 
 `proxy_mode: audit` logs every destination the build reaches and blocks nothing. `restrict`, the
@@ -237,9 +240,6 @@ allowed_http_rules: |
 allowed_ip_rules: |
   192.168.1.10:443
 ```
-
-A `#` starts a comment at the start of a line or after whitespace, so a group of rules can carry a
-heading or a rule can carry its reason. It works the same in every rule input.
 
 ### Destinations you expect to stay blocked
 
@@ -387,6 +387,8 @@ data, or source you do not publish. For the full threat model, see
   neither reaches the report or the traffic artifact. A request fronted behind an allowed SNI is
   invisible to it as well, while `inspect` matches on the real `Host` and blocks it. See
   [Domain fronting](./docs/security.md#domain-fronting).
+- Buildcage produces no SLSA provenance. The traffic artifact is an observation record with no
+  content digest.
 
 ### Protocols
 
@@ -537,8 +539,6 @@ reported as blocked; see
   that variable only, the same degradation as when no CA bundle is found at all. A system CA
   bundle whose directory holds more than 64 MiB or 4,096 files, or is the container root, is
   treated as no bundle at all.
-- Buildcage produces no SLSA provenance. The traffic artifact is an observation record with no
-  content digest.
 
 ### On the runner itself
 
