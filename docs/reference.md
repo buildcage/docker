@@ -868,10 +868,10 @@ environment, or from the image's `/etc/passwd` when that is empty, as runc does,
 the step starts: a `HOME` the step changes, or another user it switches to, gets no slot. A `USER`
 instruction is followed, as long as no `ENV HOME` pins the home.
 
-A new database belongs to the home's owner, so under someone else's home, such as `www-data`'s
-`/var/www`, Chromium does not open it and does not trust the CA. An existing database the step's
-user cannot write, such as root's used after `USER`, takes no slot either, since Chromium would not
-open it. The database Chromium fills stays in the image like any other file in the home.
+Under someone else's home, such as `www-data`'s `/var/www`, the new database is not the step user's
+to write, so Chromium does not open it and does not trust the CA. Root's database used after `USER`
+takes no slot for the same reason. The database Chromium fills stays in the image like any other
+file in the home.
 
 A step that changes the CA's own trust in the database (`certutil -M`), or exports it and imports it
 back, copies the CA into the step's database, which fails the build as a copy the wrapper cannot

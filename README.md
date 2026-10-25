@@ -329,15 +329,17 @@ container, whose private key never leaves that container
   `ca-certificates` partway through keeps trusting it.
 - The variables Node, Deno, OpenSSL, Python `requests` and pip read: `NODE_EXTRA_CA_CERTS`,
   `DENO_CERT`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `PIP_CERT`, and `CURL_CA_BUNDLE` in a step
-  with no system CA store. A variable the base image or the Dockerfile already set, git's, npm's and
-  the AWS CLI's among them, is appended to rather than redirected.
+  with no system CA store. A variable the base image or the Dockerfile already set is appended to
+  rather than redirected, and so are `GIT_SSL_CAINFO`, `npm_config_cafile`, `AWS_CA_BUNDLE`,
+  `CARGO_HTTP_CAINFO` and `BUNDLE_SSL_CA_CERT`, which are otherwise left unset.
 - The keystore of a JVM already in the base image, at `$JAVA_HOME` and behind the first `java` on
   `PATH`, so `mvn`, `gradle` and `java` reach the proxy without `proxy_engine: universal`.
 - The NSS database in `$HOME` that Chromium reads, including the `chrome-headless-shell` that
   Puppeteer, Playwright and Remotion download.
 
 All of it is taken back out before the layer is committed, so neither the CA nor the variables are
-left in the image, except a copy a step hides where it cannot be read. How each one is done is in
+left in the image, except a copy a step hides where it cannot be read, or one it cannot take out
+under `fail_on_ca_residue: false`. How each one is done is in
 [CA trust variables](./docs/reference.md#ca-trust-variables), and what this cannot cover is in
 [Limitations](#under-the-inspect-engine), below.
 
@@ -434,12 +436,12 @@ reported as blocked; see
   RUN java -jar fetch.jar                                                              # fine
   ```
 
-- Chromium trusts the CA only through the NSS database under the `HOME` the step starts with, and
-  only one the step's user can write. Chromium started with another `HOME` (`HOME=/tmp chromium`) or
-  as another user (`su`, `gosu`, `sudo -u`) does not trust it: switch users with `USER` and leave
-  `HOME` alone within the step. A Chromium before M146 reads only `~/.pki/nssdb`. A database the
-  step's user cannot write takes no slot, and the step warns; use `proxy_engine: universal` for
-  Chromium there. See [Chromium](./docs/reference.md#chromium).
+- Chromium trusts the CA only through the NSS database under the `HOME` the step starts with.
+  Chromium started with another `HOME` (`HOME=/tmp chromium`) or as another user (`su`, `gosu`,
+  `sudo -u`) does not trust it: switch users with `USER` and leave `HOME` alone within the step. A
+  Chromium before M146 reads only `~/.pki/nssdb`. A database the step's user cannot write takes no
+  slot, and the step warns; use `proxy_engine: universal` for Chromium there. See
+  [Chromium](./docs/reference.md#chromium).
 - A Firefox carrying Mozilla's own root list, such as Playwright's or the one Selenium drives, reads
   a per-profile database and does not trust the CA; use `proxy_engine: universal` or an
   `allowed_tls_rules` passthrough for it.
