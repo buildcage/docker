@@ -316,73 +316,10 @@ test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests ag
 	  ./test/assert-inspect-chromium.sh $(TEST_IMAGE)
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
-# Each case hides a copy of the CA the sweep finds but cannot remove, and must
-# fail the build naming the file and pointing at fail_on_ca_residue. With it
-# false, the same copy only warns. The control writes an unrelated encrypted
-# keystore and must build. The resealed case must build with the CA taken out
-# and the keystore still sealed under changeit.
 .PHONY: test_integration_buildkit_inspect_hidden_ca
 test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that hides a copy of the CA the sweep cannot remove
 	@echo "Running inspect-engine hidden CA copy tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
-	  $(MAKE) setup_buildkit_inspect_audit
-	@for case in leaf json; do \
-	  echo "=== A copy of the CA the sweep cannot take out: $$case ==="; \
-	  if $(BUILDX_BUILD) \
-	      --build-arg CASE=$$case \
-	      -f test/Dockerfile.inspect-hidden-ca test/ \
-	      > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1; then \
-	    echo "FAIL: the build committed a copy of the CA ($$case)"; exit 1; \
-	  fi; \
-	  if ! grep -q "cannot strip: /app/" $(SCRATCH_PREFIX)-hidden-ca.log; then \
-	    tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; \
-	    echo "FAIL: the build failed, but not on the copy of the CA ($$case)"; exit 1; \
-	  fi; \
-	  if ! grep -q "hint: .*fail_on_ca_residue: false" $(SCRATCH_PREFIX)-hidden-ca.log; then \
-	    tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; \
-	    echo "FAIL: the failure does not point at fail_on_ca_residue ($$case)"; exit 1; \
-	  fi; \
-	  echo "PASS: the build failed on the copy of the CA, pointing at fail_on_ca_residue ($$case)"; \
-	done
-	@echo "=== An encrypted keystore that is not the CA's ==="
-	@$(BUILDX_BUILD) \
-	  --build-arg CASE=control \
-	  -f test/Dockerfile.inspect-hidden-ca test/
-	@echo "PASS: the build kept a keystore that is not the CA's"
-	@echo "=== A keystore under changeit the sweep takes the CA out of ==="
-	@$(BUILDX_BUILD) \
-	  --build-arg CASE=resealed \
-	  -f test/Dockerfile.inspect-hidden-ca test/ \
-	  --load -t $(TEST_IMAGE)
-	@listing=$$(docker run --rm $(TEST_IMAGE) keytool -list -keystore /app/trust.p12 -storepass changeit) \
-	  || { echo "FAIL: the resealed keystore does not open under changeit"; exit 1; }; \
-	if echo "$$listing" | grep -qi buildcage; then \
-	  echo "FAIL: the resealed keystore still trusts the CA"; exit 1; \
-	fi; \
-	roots=$$(echo "$$listing" | grep -c trustedCertEntry || true); \
-	if [ "$${roots:-0}" -lt 100 ]; then \
-	  echo "FAIL: the resealed keystore kept only $$roots roots"; exit 1; \
-	fi; \
-	named=$$(echo "$$listing" | grep trustedCertEntry | grep -c ' \[jdk\],' || true); \
-	if [ "$$named" != "$$roots" ]; then \
-	  echo "FAIL: only $$named of $$roots roots kept their [jdk] alias"; exit 1; \
-	fi; \
-	if docker run --rm $(TEST_IMAGE) keytool -list -keystore /app/trust.p12 -storepass not-the-password >/dev/null 2>&1; then \
-	  echo "FAIL: the resealed keystore opens without changeit"; exit 1; \
-	fi; \
-	echo "PASS: the sweep took the CA out, kept $$roots roots under their aliases, and resealed under changeit"
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
-	@echo "=== fail_on_ca_residue: false, where the same copy only warns ==="
-	@FAIL_ON_CA_RESIDUE=false COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
-	  $(MAKE) setup_buildkit_inspect_audit
-	@$(BUILDX_BUILD) \
-	  --build-arg CASE=leaf \
-	  -f test/Dockerfile.inspect-hidden-ca test/ \
-	  > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1 \
-	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: the copy of the CA failed the build"; exit 1; }
-	@grep -q "buildcage: warning: .*cannot strip: /app/" $(SCRATCH_PREFIX)-hidden-ca.log \
-	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: no warning names the copy of the CA"; exit 1; }
-	@echo "PASS: the build carried on past the copy of the CA, warning about it"
+	@./test/run-inspect-hidden-ca.sh
 	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_inspect_byte_exact
