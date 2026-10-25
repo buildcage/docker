@@ -51,6 +51,16 @@ builder_log() {
   docker compose exec builder cat "/var/log/$1/current" 2>/dev/null
 }
 
+# build_builder_image <engine> <image> [compose build options...]: builds
+# <engine>'s builder image from compose.yaml, tagged <image>. Run from the
+# repository root.
+build_builder_image() {
+  local engine="$1" image="$2"
+  shift 2
+  PROXY_ENGINE="$engine" BUILDCAGE_BUILDER_IMAGE="$image" \
+    docker compose -f compose.yaml build "$@" builder
+}
+
 # Escapes a URL for the grep -E patterns below, where it is matched literally.
 esc() { printf '%s' "$1" | sed 's/[][\.*^$?+(){}|/]/\\&/g'; }
 

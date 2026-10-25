@@ -53,8 +53,6 @@ jobs:
             test:
               - *docker
               - *workflow
-              - 'compose.test-universal.yaml'
-              - 'compose.test-inspect.yaml'
               - 'test/**'
               - 'report/src/**'
 
@@ -84,18 +82,18 @@ jobs:
             # Brings a builder up with no build running and no fixture
             # network, so its buildcage0 never exists.
             target5: test_integration_buildkit_listener_scope
-            test_compose_file: compose.test-universal.yaml
+            test_compose_file: docker/compose.action.test-universal.yaml
           # Java and Chromium both keep the CPU busy, so they go in different jobs.
           - mode: inspect-restrict, inspect-debian-audit, inspect-chromium-audit
             target1: test_integration_buildkit_inspect_restrict
             target2: test_integration_buildkit_inspect_debian_audit
             target3: test_integration_buildkit_inspect_chromium_audit
-            test_compose_file: compose.test-inspect.yaml
+            test_compose_file: docker/compose.action.test-inspect.yaml
           - mode: inspect-java-audit, inspect-hidden-ca, inspect-debian-restrict
             target1: test_integration_buildkit_inspect_java_audit
             target2: test_integration_buildkit_inspect_hidden_ca
             target3: test_integration_buildkit_inspect_debian_restrict
-            test_compose_file: compose.test-inspect.yaml
+            test_compose_file: docker/compose.action.test-inspect.yaml
           - mode: inspect round trip, inspect byte-exact, multiarch
             runner: ubuntu-24.04-arm
             platform: linux/arm64
@@ -105,7 +103,7 @@ jobs:
             target1: test_integration_buildkit_inspect_roundtrip
             target2: test_integration_buildkit_inspect_byte_exact
             target3: test_integration_buildkit_multiarch
-            test_compose_file: compose.test-inspect.yaml
+            test_compose_file: docker/compose.action.test-inspect.yaml
 
     name: "integration: test (${{ matrix.mode }})"
 
@@ -119,8 +117,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # The targets run report/src/main.ts and src/post.ts straight from
-      # source, and both import @actions/core, so node_modules must exist.
+      # The targets run src/main.ts, report/src/main.ts and src/post.ts
+      # straight from source, so node_modules must exist.
       - uses: ./.github/actions/setup-vp
 
       - name: Set up QEMU

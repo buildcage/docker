@@ -21,20 +21,17 @@ TEST_IMAGE="${TEST_IMAGE:-buildcage-test}"
 TEST_PLATFORM="${TEST_PLATFORM:-linux/arm64}"
 export BUILDER_NAME
 
-COMPOSE="compose.yaml:compose.test-inspect.yaml"
+export BUILDCAGE_TEST_COMPOSE_OVERLAY=docker/compose.action.test-inspect.yaml
 LOG=$(mktemp -t buildcage-hidden-ca-XXXXXX.log)
 
 start() {
-  COMPOSE_FILE="$COMPOSE" PROXY_ENGINE=inspect PROXY_MODE=audit \
-    docker compose -p "$COMPOSE_PROJECT_NAME" up -d --wait --build >/dev/null
-  docker buildx rm "$BUILDER_NAME" >/dev/null 2>&1 || true
-  docker buildx create --bootstrap --name "$BUILDER_NAME" \
-    --driver remote "docker-container://$BUILDER_NAME" >/dev/null
+  ./test/setup-builder.sh inspect audit
 }
 
 stop() {
   docker buildx rm "$BUILDER_NAME" >/dev/null 2>&1 || true
-  docker compose -p "$COMPOSE_PROJECT_NAME" -f compose.yaml -f compose.test-inspect.yaml down -v --rmi all
+  docker compose -p "$COMPOSE_PROJECT_NAME" \
+    -f docker/compose.action.yaml -f "$BUILDCAGE_TEST_COMPOSE_OVERLAY" down -v --rmi local
   docker rmi "$TEST_IMAGE" >/dev/null 2>&1 || true
 }
 

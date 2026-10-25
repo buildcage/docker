@@ -1,8 +1,7 @@
 #!/bin/bash
 # Verifies src/post.ts (run by the caller beforehand) removed the builder
-# container: post.ts's own down only knows docker/compose.action.yaml's
-# "builder" service. BUILDKIT_VOLUME is the container's /var/lib/buildkit
-# volume, read before post.ts ran.
+# container and its /var/lib/buildkit volume, BUILDKIT_VOLUME, read before
+# post.ts ran.
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 

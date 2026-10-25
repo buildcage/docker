@@ -58,10 +58,10 @@ vp run build      # rolldown → the committed dist/ bundles
 │   ├── inspect/            # proxy_engine: inspect, the same plus buildcage-runc/ (Go)
 │   ├── seccomp/            # The builder's seccomp profile, applied by the runner's Docker
 │   ├── compose.action.yaml # The compose file the action runs, with the digest-pinned image
+│   ├── compose.action.test-*.yaml # Fixture overlays on it, one per engine
 │   └── *-licenses.sh       # License collection and checks run at image build time
 ├── test/                   # Dockerfile.* and assert-*.sh per engine and mode, and the fixtures
-├── compose.yaml            # Local compose config (the Dockerfile is chosen by PROXY_ENGINE)
-├── compose.test-*.yaml     # Test overrides, one per engine
+├── compose.yaml            # Builds the builder image from source (PROXY_ENGINE picks the Dockerfile)
 ├── licenses/               # License texts copied into the images, and the npm license generator
 ├── docs/
 └── Makefile
@@ -77,8 +77,10 @@ Node on the runner.
 ## Running it locally
 
 Action inputs become uppercase environment variables locally (`proxy_mode` is `PROXY_MODE`). There
-is one `setup_buildkit_{engine}_{mode}` target per engine and mode, and each sets `PROXY_ENGINE`,
-which picks the engine's Dockerfile in `compose.yaml`:
+is one `setup_buildkit_{engine}_{mode}` target per engine and mode. Each builds the engine's image
+through `compose.yaml`, then starts it through the setup action itself (`src/main.ts`, run by
+`test/setup-builder.sh` with the local-image test hook), so the inputs are parsed and
+`docker/compose.action.yaml` is run as in a workflow:
 
 ```bash
 make setup_buildkit_universal_audit
@@ -165,6 +167,11 @@ make test_integration_buildkit_multiarch
 make test_integration_buildkit_listener_scope
 ```
 
+A target that needs the fixtures sets `BUILDCAGE_TEST_COMPOSE_OVERLAY` to
+`docker/compose.action.test-<engine>.yaml`, which the setup step layers on the shipped compose
+file: the builder runs as it ships, plus the fixture network. The rules those tests run under are
+in `test/fixture-rules-<engine>.sh`, given to the setup step as inputs.
+
 `make help` lists the rest, such as `inspect_byte_exact` and `universal_restrict_no_traffic`, and
 `make test_integration_buildkit` runs all of them in turn. CI runs them in a few jobs, several
 targets side by side in each, every one under its own worktree suffix and test-net subnet
@@ -186,8 +193,8 @@ and the assertions name them literally. `test-net`'s subnet is derived from the 
 two names that happen to pick the same one fail with `Pool overlaps with other one on this address
 space`, so rename one or set `TEST_NET_SUBNET`.
 
-A fresh worktree needs `vp install` before any target that runs `report/src` or `src/post.ts`,
-since the integration targets run both straight from source.
+A fresh worktree needs `vp install` before any `setup_buildkit_*` or integration target, since
+they run `src/main.ts`, `report/src` and `src/post.ts` straight from source.
 
 ## Rules when changing code
 
@@ -224,10 +231,15 @@ since the integration targets run both straight from source.
 
 ### Logs
 
+The builder is `buildcage` in the main checkout and carries the worktree suffix in a linked one
+(see [Several worktrees at once](#several-worktrees-at-once)); `make -s print_builder_name`
+prints the name for the checkout it runs in.
+
 ```bash
-docker compose logs builder    # the builder's output; -f to follow
-docker compose exec builder cat /var/log/haproxy/current
-docker compose exec builder cat /var/log/coredns/current
+B=$(make -s print_builder_name)
+docker logs "$B"    # the builder's output; -f to follow
+docker exec "$B" cat /var/log/haproxy/current
+docker exec "$B" cat /var/log/coredns/current
 ```
 
 The proxy's line formats are the `log-format` lines the generators in `src/core/lib/acl/` write,
@@ -246,7 +258,7 @@ HAProxy drops a log line it cannot write at once rather than wait, and counts th
 the report reads that count and marks itself incomplete when it is not zero. To read it by hand:
 
 ```bash
-docker compose exec builder curl -s --unix-socket /var/run/haproxy-health.sock \
+docker exec "$B" curl -s --unix-socket /var/run/haproxy-health.sock \
   'http://localhost/metrics?scope=global' | grep dropped_logs
 ```
 
@@ -256,7 +268,7 @@ The builder came up but `buildctl debug workers` never succeeded inside it. The 
 container log; locally:
 
 ```bash
-docker inspect --format '{{json .State.Health}}' buildcage
+docker inspect --format '{{json .State.Health}}' "$B"
 ```
 
 ### The builder cannot reach the network

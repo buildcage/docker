@@ -20,7 +20,7 @@ SHELL ["/bin/sh", "-c"]
 ENV S='curl -sS --max-time 10'
 ENV C='curl -sS -o /dev/null -w %{http_code} --max-time 10'
 
-# Rules under test: see compose.test-inspect.yaml.
+# Rules under test: see fixture-rules-inspect.sh.
 
 RUN echo "=== [URL rule - path allowed] ===" && \
     OUT=$($S https://allowed.example.com/public/pkg.tgz) && \

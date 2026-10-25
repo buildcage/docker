@@ -1,24 +1,22 @@
+# Layered on compose.action.yaml through BUILDCAGE_TEST_COMPOSE_OVERLAY (see
+# src/core/lib/provenance/local-image-override.ts) by the universal-engine
+# integration tests, which reach it only in a build made with
+# BUILDCAGE_BUILD_TEST_HOOKS=1: joins the builder to the fixtures below. Their
+# rules are in ../test/fixture-rules-universal.sh. Paths resolve against this
+# directory, the first compose file's.
 services:
   builder:
     environment:
       - TEST_NET_ADDR=10.200.0.2/24
       - TEST_NET_SUBNET=${TEST_NET_SUBNET:-10.210.0.0/24}
-      # These tests drive compose directly, so this stands in for what the
-      # action computes. Nothing answers on it, so only the guard can block it.
-      - HOST_ADDRESSES=10.200.0.199
-      # The first `~` rule is deliberately written without anchors, so
-      # `not-ok.regex.example.com` being blocked proves they are supplied.
-      - ALLOWED_HTTPS_RULES=allowed.example.com:443 allowed.example.com:8443 *.wildcard.example.com:443 *.wildcard.example.com:8443 ~ok\.regex\.example\.com:443 ~^ports\.regex\.example\.com:(443|8443)$ ~^tlsany\.example\.com:.*$
-      - ALLOWED_HTTP_RULES=allowed.example.com:80 allowed.example.com:8080 *.wildcard.example.com:80 *.wildcard.example.com:8080
-      # 10.200.0.101 is left out, so a connection there that names this
-      # address in its SNI proves the rule sees the destination. :2525 answers
-      # before the client speaks.
-      - ALLOWED_IP_RULES=10.200.0.100:8443 10.200.0.100:2525
+      # What the action computed, plus a fixture address nothing answers on,
+      # so only the guard can block it.
+      - HOST_ADDRESSES=${HOST_ADDRESSES:-} 10.200.0.199
     # Wrapped here rather than in the image: the builder is the product image
     # and carries no test-only setup.
     entrypoint: ["/test-hooks/attach-test-net-addr.sh", "/init"]
     volumes:
-      - ./test/test-net-addr/attach.sh:/test-hooks/attach-test-net-addr.sh:ro
+      - ../test/test-net-addr/attach.sh:/test-hooks/attach-test-net-addr.sh:ro
     # Docker's embedded DNS forwards here, so HAProxy and buildkitd reach the fixture
     # resolver through resolv.conf, as they reach the runner's DNS in a job.
     dns: [10.200.0.53]
@@ -28,7 +26,7 @@ services:
 
   # Test HTTP server (with a self-signed certificate)
   test-server:
-    build: test/test-server
+    build: ../test/test-server
     cap_add:
       - NET_ADMIN
     environment:
@@ -38,7 +36,7 @@ services:
 
   # The same server on an address no rule allows
   test-server-unlisted:
-    build: test/test-server
+    build: ../test/test-server
     cap_add:
       - NET_ADMIN
     environment:
@@ -48,7 +46,7 @@ services:
 
   # DNS used by builder (resolves all domains to test-server)
   test-dns:
-    build: test/test-dns
+    build: ../test/test-dns
     cap_add:
       - NET_ADMIN
     environment:

@@ -28,22 +28,26 @@ dns_answered() {
 
 run_engine() {
   local engine="$1"
-  # Both are global to the daemon, so they carry the Makefile's worktree suffix.
+  # All three are global to the daemon, so they carry the Makefile's worktree
+  # suffix. The image is this script's own, so removing it touches no other.
   local project="buildcage-listener-scope-$engine${BUILDCAGE_WORKTREE_SUFFIX:-}"
   local builder="buildcage-listener-scope${BUILDCAGE_WORKTREE_SUFFIX:-}"
-  local compose=(docker compose -p "$project" -f compose.yaml)
+  local compose=(docker compose -p "$project" -f docker/compose.action.yaml)
+  local image="$project"
 
   echo ""
   echo "=== Listener Scope Assertions ($engine) ==="
   echo ""
 
   cleanup() {
-    BUILDER_NAME="$builder" "${compose[@]}" down -v --rmi local >/dev/null 2>&1 || true
+    BUILDER_NAME="$builder" "${compose[@]}" down -v >/dev/null 2>&1 || true
+    docker rmi "$image" >/dev/null 2>&1 || true
   }
   trap cleanup RETURN
 
-  BUILDER_NAME="$builder" PROXY_ENGINE="$engine" PROXY_MODE=audit \
-    "${compose[@]}" up -d --build --wait
+  build_builder_image "$engine" "$image"
+  BUILDER_NAME="$builder" BUILDCAGE_IMAGE_REF="$image" PROXY_ENGINE="$engine" PROXY_MODE=audit \
+    "${compose[@]}" up -d --pull never --no-build --wait
 
   local net
   net=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$builder")
