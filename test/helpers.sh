@@ -17,18 +17,28 @@
 # renovate: datasource=docker depName=alpine
 TEST_ALPINE_IMAGE="alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
 
-FAILURES=0
+# FAILURES, pass and fail, shared with the scenario scripts inside the cage.
+# shellcheck source-path=SCRIPTDIR
+. "$(dirname "${BASH_SOURCE[0]}")/scenarios/lib.sh"
 
-pass() { echo "  PASS  $1"; }
-
-fail() {
-  echo "  FAIL  $1"
-  FAILURES=$((FAILURES + 1))
+# print_group <title> <text>: a collapsed group in the job log, left out when
+# there is no text. The text is a log or a report, so a workflow command in it
+# is printed rather than run.
+print_group() {
+  [ -n "$2" ] || return 0
+  local token
+  token=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+  echo "::group::$1"
+  echo "::stop-commands::$token"
+  printf '%s\n' "$2"
+  echo "::$token::"
+  echo "::endgroup::"
 }
 
 assert_results() {
   echo ""
   if [ "$FAILURES" -gt 0 ]; then
+    show_diagnostics
     echo "❌ FAILED: $FAILURES assertion(s) failed"
     exit 1
   fi
@@ -44,6 +54,14 @@ assert_report_complete() {
   else
     pass "Report treats the log as complete"
   fi
+}
+
+# What assert_results prints on a failure: what the assertions read, which
+# their own messages only name.
+show_diagnostics() {
+  print_group "haproxy log (buildcage lines)" "$(grep buildcage <<< "${LOGS:-}" || true)"
+  print_group "coredns log (buildcage lines)" "$(grep buildcage <<< "${DNS_LOG:-}" || true)"
+  print_group "Report" "${REPORT_MARKDOWN:-}"
 }
 
 # One of the builder's s6 service logs: haproxy or coredns.

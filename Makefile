@@ -34,6 +34,9 @@ TEST_PLATFORM ?= linux/arm64
 # build is a cross build wherever it runs.
 MULTIARCH_CROSS_PLATFORM ?= $(if $(filter arm64 aarch64,$(shell uname -m)),linux/amd64,linux/arm64)
 BUILDX_BUILD = docker buildx build --no-cache --builder $(BUILDER_NAME) --platform $(TEST_PLATFORM) --progress=plain
+# In place of a failed restrict build's exit: make stops there, before the
+# assertions that would print the proxy's side of the cases that failed.
+BUILD_FAILED = { ./test/print-proxy-diagnostics.sh; exit 1; }
 
 # Compose project name, trusted by src/lib/setup-step.ts,
 # report/src/lib/report-step.ts and src/post.ts via their own
@@ -215,7 +218,7 @@ test_integration_buildkit_universal_restrict: ## Run universal-engine restrict m
 	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(UNIVERSAL_OVERLAY) \
 	  $(MAKE) setup_buildkit_universal_restrict
 	@$(BUILDX_BUILD) -f test/Dockerfile.universal-restrict test/ \
-	  --load -t $(TEST_IMAGE)
+	  --load -t $(TEST_IMAGE) || $(BUILD_FAILED)
 	@node report/src/main.ts || true
 	@./test/assert-universal-restrict.sh
 	@node src/post.ts
@@ -243,7 +246,7 @@ test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode 
 	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(INSPECT_OVERLAY) \
 	  $(MAKE) setup_buildkit_inspect_restrict
 	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-restrict test/ \
-	  --load -t $(TEST_IMAGE)
+	  --load -t $(TEST_IMAGE) || $(BUILD_FAILED)
 	@./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@./test/assert-inspect-no-layer-bloat.sh $(TEST_IMAGE)
 	@node report/src/main.ts || true
