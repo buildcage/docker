@@ -4,10 +4,10 @@
 
 I welcome reports about both proxy engines (`universal` and `inspect`):
 
-- **Proxy bypass (`universal`)**: ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#domain-fronting))
-- **Network isolation escape (`universal`)**: bypassing CNI isolation or iptables rules to reach the internet directly
-- **DNS filtering bypass (`universal`)**: bypassing the DNS redirect mechanism
-- **Rule bypass (`inspect`)**: ways to reach a destination, method or path that the rules do not permit: a request that escapes its path rule, a forged `Host` or SNI that changes where the proxy connects, or a name resolved to somewhere the rules never named
+- **Proxy bypass**: ways to make network connections from `RUN` steps that evade the Buildcage proxy (other than the [known domain fronting limitation](./docs/security.md#domain-fronting))
+- **Network isolation escape**: bypassing CNI isolation or iptables rules to reach the internet directly
+- **DNS filtering bypass**: getting a DNS query, or what it carries, out past the builder's own resolver
+- **Rule bypass**: ways to reach a destination, method or path that the rules do not permit: a request that escapes its path rule under `inspect`, a forged `Host` or SNI that changes where the proxy connects, or a name resolved to somewhere the rules never named
 - **GitHub Actions setup**: vulnerabilities in the `setup` or `report` actions (e.g., injection, credential leak)
 
 The following are **out of scope** (please report to the respective projects instead):

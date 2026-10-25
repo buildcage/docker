@@ -229,7 +229,7 @@ allowed_https_rules: |
   # npm and maven
   registry.npmjs.org:443
   repo.maven.apache.org:443
-  *.internal.example.com:443  # everything on the internal network
+  *.internal.example.com:443  # every host one level under internal.example.com
 
 allowed_http_rules: |
   deb.debian.org:80
@@ -281,10 +281,11 @@ with `if: always()` so a failing build still reports:
 An alert under the report's title counts what needs a look: requests blocked, connections that
 failed and requests nothing acted on. It is a CAUTION when a request was blocked unexpectedly or the
 report is incomplete and a WARNING otherwise. With nothing to count, or only requests blocked as
-expected, there is no alert. Whatever was blocked unexpectedly is listed first, under **Blocked
-Hosts** with the reason, marked 🚫, beside any connection that failed, marked ⚠️. The allowed hosts
-follow, then what `known_blocked_rules` matched, collapsed under **Known Blocked Hosts**. Under
-`inspect`, **Communication details** names the URL of every request, allowed or blocked, with
+expected, there is no alert. Whatever was blocked unexpectedly is listed first with the reason,
+marked 🚫, in one table with any connection that failed, marked ⚠️, under **Blocked Hosts**,
+**Failed Hosts** or both, whichever it holds. The allowed hosts follow, then what
+`known_blocked_rules` matched, collapsed under **Known Blocked Hosts**. Under `inspect`,
+**Communication details** names the URL of every request, allowed or blocked, with
 credential query parameters replaced (see
 [Credentials in a URL](docs/security.md#credentials-in-a-url)). In `audit` mode the summary also
 holds the **Switch to restrict mode** allowlist.
@@ -566,8 +567,8 @@ inspected build. Those hosts are enforced at host-and-port granularity, the same
 
 The report gives it a row with `DNS` as the rule kind and no port. If you want it to stay
 unreachable without failing the job, put the name in `known_blocked_rules`, which is the one input
-where a rule may omit the port. If the build actually needs it, write an ordinary host or URL rule
-and the lookup is reported as allowed.
+where a host rule may omit the port. If the build actually needs it, write an ordinary host or URL
+rule and the lookup is reported as allowed.
 
 **One registry needs several domains. How do I find them all?**
 

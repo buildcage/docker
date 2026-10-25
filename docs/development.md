@@ -58,10 +58,11 @@ make report_buildkit
 make clean_buildkit
 ```
 
-`make report_buildkit` runs `node report/src/main.ts` with the same `COMPOSE_PROJECT_NAME`/`BUILDCAGE_BUILD_TEST_HOOKS`
-override the `setup_buildkit_*`/`clean_buildkit` targets use (see the pattern rule near the top of the
-Makefile). Running `node report/src/main.ts` directly, without going through `make`, won't find the
-running builder container. Raw builder logs are also available via `docker compose logs builder`.
+`make report_buildkit` runs `node report/src/main.ts` with the same
+`COMPOSE_PROJECT_NAME`/`BUILDCAGE_BUILD_TEST_HOOKS` override the `setup_buildkit_*`/`clean_buildkit`
+targets use (see the target-specific exports near the top of the Makefile). Running
+`node report/src/main.ts` directly, without going through `make`, won't find the running builder
+container. Raw builder logs are also available via `docker compose logs builder`.
 
 ## Testing
 
@@ -90,10 +91,11 @@ make test_integration_buildkit_multiarch
 make test_integration_buildkit_listener_scope
 ```
 
-`make help` lists every target. `make test_integration_buildkit` runs all of them, and CI runs each
-in its own job (`.github/workflows/test-integration.yml`), with a check that none is left out. The
-one difference is the architecture they build for: `TEST_PLATFORM` is `linux/arm64` for the
-development machines, and CI overrides it with the runner's own.
+`make help` lists every target. `make test_integration_buildkit` runs all of them, one after
+another. CI runs them in a few jobs, several targets side by side in each, every one under its own
+worktree suffix and test-net subnet (`.github/workflows/test-integration.yml`), with a check that
+none is left out. The architecture they build for differs too: `TEST_PLATFORM` is `linux/arm64`
+for the development machines, and CI overrides it with the runner's own.
 
 ### Unit test coverage
 
@@ -169,7 +171,8 @@ only via a dynamic `import()` gated by that build-time flag. Without the flag (i
 normal/committed build), rolldown's own module-graph tree-shaking excludes that entire file from
 the bundle. It is physically absent, not just unreachable. A CI check (`unit_test` job)
 and the pre-commit hook additionally confirm a normal build's `dist` never mentions
-`BUILDCAGE_BUILD_TEST_HOOKS`, `BUILDCAGE_LOCAL_IMAGE_REF` or any `BUILDCAGE_TEST_*` name.
+`BUILDCAGE_BUILD_TEST_HOOKS`, `BUILDCAGE_LOCAL_IMAGE_REF`, or any `BUILDCAGE_TEST_*` or
+`BUILDCAGE_RUN_DEBUG_*` name.
 
 To exercise it locally:
 
@@ -194,8 +197,7 @@ curl -fsSL https://vite.plus | bash   # macOS/Linux
 The project pins its own toolchain version via the `vite-plus` devDependency in `package.json`
 (the same way `packageManager` pins `pnpm`), and the globally installed `vp` binary detects and
 delegates to that pinned version automatically, so plain `vp ...` commands are reproducible without
-going through `pnpm exec`. This was verified against `vp v0.2.7` / local `vite-plus
-v0.2.5`; if a much newer `vp` behaves differently, that's the version to compare against.
+going through `pnpm exec`.
 
 ```bash
 vp check       # format + lint + type-aware lint (read-only; what CI runs)
@@ -281,10 +283,11 @@ connection that never delivered a whole request, and in
 then came to nothing.
 
 Each log is an s6-log directory rather than a single file: `current` rotates into a timestamped
-archive once it crosses 1MB, up to 100 archives kept, and a line is only ever split past 32KB. The
-report reads every archive, oldest first, then `current`, so early traffic is never dropped just
-because a later part of the same run pushed the log past a rotation. Reading `current` by hand, as
-above, only shows what has accumulated since the most recent one.
+archive once it crosses 1MB, up to 100 archives kept. A line from HAProxy is split only past 32KB,
+and one from CoreDNS past s6-log's default of 8KB. The report reads every archive, oldest first,
+then `current`, so early traffic is never dropped just because a later part of the same run pushed
+the log past a rotation. Reading `current` by hand, as above, only shows what has accumulated since
+the most recent one.
 
 HAProxy writes to s6-log through a pipe without blocking, so a line it cannot write at once is
 dropped rather than delayed, and nothing in the log marks where. A thread that keeps finding another
@@ -317,7 +320,8 @@ docker compose exec builder curl -s --unix-socket /var/run/haproxy-health.sock \
 
 The integration set also holds `inspect_debian_{audit,restrict}` (an apt build that starts with no
 CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them unedited),
-`inspect_byte_exact`, `universal_restrict_no_traffic`, `universal_known_blocked` and `multiarch`.
+`inspect_byte_exact`, `universal_restrict_no_traffic`, `universal_known_blocked` and `multiarch`,
+among others; `make help` lists them all.
 
 ## Directory Structure
 
@@ -330,9 +334,10 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │   ├── report/               # Report code only this action needs (#report/*)
 │   └── core/                 # Code shared across both actions
 │       ├── lib/              # acl/ (rule parsing and the proxy config generators) is built for
-│       │                     # both runtimes, and so is anything it imports — errors.ts today.
-│       │                     # log/, report/, docker/, provenance/ and actions/ are Node-only,
-│       │                     # and test/test-shim.ts is the node:test-alike shim *.test.ts uses
+│       │                     # both runtimes, and so is anything it imports (errors.ts,
+│       │                     # line-comments.ts, log/proxy-address.ts). The rest of log/, and
+│       │                     # report/, docker/, provenance/ and actions/, are Node-only, and
+│       │                     # test/test-shim.ts is the node:test-alike shim *.test.ts uses
 │       │                     # under either runtime
 │       └── scripts/          # QuickJS only: each engine's config generator, the test runner
 │                             # and qjs's type declarations
@@ -350,15 +355,15 @@ CA store), `inspect_roundtrip` (learn rules from an audit run, then enforce them
 │   │                         # read by the Docker client on the runner, not copied into an image
 │   ├── common/               # Image files both engines share: s6 services, init-iptables,
 │   │                         # cni.conflist
-│   ├── universal/            # proxy_engine: universal — BuildKit, HAProxy, CoreDNS, s6-overlay
-│   └── inspect/              # proxy_engine: inspect — HAProxy, CoreDNS, s6-overlay, and
-│                             # buildcage-runc/ (Go module: CA trust at exec time)
+│   ├── universal/            # proxy_engine: universal: BuildKit, HAProxy, CoreDNS, s6-overlay
+│   └── inspect/              # proxy_engine: inspect: the same, plus buildcage-runc/ (Go
+│                             # module: CA trust at exec time)
 ├── test/                     # Dockerfile.*/assert-*.sh per {engine}-{mode}, plus the fixture
 │                             # containers. helpers.sh carries what every assert script shares
 ├── compose.test-*.yaml       # Test override config, one per engine
 ├── report/                   # Report action: action.yml, src/ (ESM), dist/ (rolldown → CommonJS)
-├── docs/                     # development.md, security.md, plus the
-│                             # reference.md/rules.md/inspect-engine.md link stubs
+├── docs/                     # reference.md, development.md, security.md, plus the
+│                             # rules.md/inspect-engine.md link stubs
 ├── licenses/                 # gen-license-file.mjs, which regenerates THIRD_PARTY_LICENSES_NPM
 │                             # during `vp run build`, and what .glf.jsonc substitutes in.
 │                             # Its license texts (GPL, LGPL, MPL, Apache, and those of curl,
