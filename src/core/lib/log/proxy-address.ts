@@ -5,8 +5,7 @@
  * name.
  *
  * Each engine's init script sets it as GATEWAY= and cannot import it, so the
- * test beside this keeps them in sync. Each action tests its own network's
- * gateway outside core.
+ * test beside this keeps them in sync.
  *
  * It sits at the far end of 198.18.0.0/15, the RFC 2544 benchmarking block:
  * outside Docker's default address pools, so no network Docker allocates can

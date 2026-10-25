@@ -2,13 +2,11 @@
  * Full-text comparison against a committed copy of a generator's output.
  *
  * haproxy.cfg, the Corefile and the report Markdown are what actually reach
- * HAProxy, CoreDNS and the Job Summary, and each is produced by one large
- * function. Assertions on substrings say that a directive is present; they
- * cannot say that nothing else moved. A committed full-text copy can, which is
- * what makes splitting those generators up a verifiable change rather than a
- * hopeful one.
+ * HAProxy, CoreDNS and the Job Summary. Assertions on substrings say that a
+ * directive is present; only a committed full-text copy can say that nothing
+ * else moved.
  *
- * Node-only, unlike the rest of this directory: it reads the fixture off disk.
+ * Node-only: it reads the fixture off disk.
  * Nothing under acl/ imports it, so the qjs bundle never pulls it in.
  *
  * Refresh deliberately, after reading the diff the failure prints:

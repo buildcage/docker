@@ -24,7 +24,7 @@ export function listHostIpv4Addresses({
   const found = new Set<string>();
   for (const infos of Object.values(list())) {
     for (const info of infos ?? []) {
-      // Node spelled the family as the number 4 before v18.
+      // Node 18.0 to 18.3 spelled the family as the number 4.
       if (info.family !== "IPv4" && (info.family as unknown) !== 4) continue;
       if (info.internal) continue;
       found.add(info.address);

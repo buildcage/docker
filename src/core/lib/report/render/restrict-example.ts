@@ -18,7 +18,7 @@ export function usesLine(actionRepo: string, actionRef?: string, actionVersion?:
 export interface ExampleStepOptions {
   /** The step's `name:`. Defaults to "Start Buildcage". */
   stepName?: string;
-  /** Version to annotate the `uses:` line with, if known, as `# 3.1.4`. */
+  /** Version to annotate the `uses:` line with, if known, as `# v3.1.4`. */
   actionVersion?: string;
   /** The `run:` input, for an action whose step runs the command itself: the
    *  snippet must then repeat it to stay copy-pasteable on its own. */

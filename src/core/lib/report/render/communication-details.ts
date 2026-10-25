@@ -60,8 +60,7 @@ export function renderCommunicationDetailsBody(
 // ⚠️ covers what went wrong without a rule blocking it: a request that never
 // arrived whole, a connection the origin broke, and a request audit let
 // through that restrict would block. The reason or the note tells them
-// apart; one that came to nothing anyway keeps its own mark. `discovery`
-// keeps ℹ️: a lookup nothing can answer is harmless.
+// apart. `discovery` keeps ℹ️: a lookup nothing can answer is harmless.
 const MARK: Record<string, string> = {
   block: "🚫",
   discovery: "ℹ️",

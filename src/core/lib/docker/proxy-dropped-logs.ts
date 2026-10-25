@@ -9,7 +9,7 @@
  */
 import type { Docker } from "./client.ts";
 
-/** Served by both engines' `health` frontend; see haproxy-sections.ts. */
+/** Served by the proxy's `health` frontend; see haproxy-sections.ts. */
 const SOCKET = "/var/run/haproxy-health.sock";
 const URL = "http://localhost/metrics?scope=global";
 const COUNTER = /^haproxy_process_dropped_logs_total (\d+)$/m;

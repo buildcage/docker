@@ -4,9 +4,9 @@
  * Each engine has one of these scripts baked into its image, copied out of it
  * (not out of the running container) by the `report` action and run on the
  * runner as `node report-action.js <container-id>`, so `report` itself never
- * needs to know an engine's log paths or env var names. The five steps that
- * takes are the same for both; what differs is which logs are read and
- * what extra data is fetched, which is what `ReportActionSpec` carries.
+ * needs to know an engine's log paths or env var names. The steps are the
+ * same for every engine; what differs is which logs are read and what extra
+ * data is fetched, which is what `ReportActionSpec` carries.
  *
  * Lives under src/ rather than beside those scripts so that vite.config.ts's
  * `src/**` test include covers it.

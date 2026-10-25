@@ -35,9 +35,9 @@ var (
 	logFile  = "/var/log/buildcage/runc.log"
 )
 
-// One file carries every step of every build, and BuildKit runs steps
-// concurrently: an offset into it bounds nothing, and a line in it says nothing
-// about which step wrote it.
+// One file carries every step of every build, written concurrently, so each
+// line is tagged with its step and this process keeps its own lines to print on
+// failure.
 var (
 	logTag = fmt.Sprintf("[pid %d]", os.Getpid())
 	ownLog strings.Builder

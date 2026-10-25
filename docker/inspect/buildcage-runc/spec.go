@@ -128,8 +128,9 @@ func (s *spec) setEnv(extra map[string]string) {
 
 func (s *spec) save() error {
 	out, err := json.Marshal(s.raw)
-	// Untested by design: s.raw came out of json.Unmarshal and is only ever
-	// added to with strings and maps, so it holds nothing Marshal can refuse.
+	// Untested by design: s.raw came out of the JSON decoder and is only ever
+	// added to with strings, slices and maps, so it holds nothing Marshal can
+	// refuse.
 	//coverage:ignore start
 	if err != nil {
 		return err

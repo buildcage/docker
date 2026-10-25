@@ -37,7 +37,8 @@ export interface SetupInputs extends RuleInputs {
  *
  * The statement order decides which error surfaces first.
  *
- * @throws {InvalidInputError} if proxy_engine, proxy_mode or fail_on_ca_residue is malformed
+ * @throws {InvalidInputError} if proxy_engine, proxy_mode, fail_on_ca_residue
+ *   or builder_name is malformed
  * @throws {InvalidRulesError} if any rule is malformed
  */
 export function readSetupInputs(getInput: GetInput = core.getInput): SetupInputs {

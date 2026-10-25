@@ -27,10 +27,10 @@ export interface PostCleanupSources {
  * The name comes from GITHUB_STATE first: setup may have read it from
  * config_file, which a later step can change or remove before the job ends.
  * A build cannot write GITHUB_STATE, so the saved name is the one setup used.
- * The input is the fallback for a setup that saved nothing, but not with
- * config_file: the name may be in the file, so the input's could be another
- * job's builder, and a setup that stopped before saving started nothing. Nor
- * with an invalid name, which setup refused before starting anything.
+ * When setup saved nothing, the builder_name input is the fallback, with two
+ * exceptions. With config_file the input's name could be another job's
+ * builder, and a setup that stopped before saving started nothing. With an
+ * invalid name, setup refused before starting anything.
  *
  * `projectNameOverride` is gated to this repo's own CI/dev testing by the
  * caller, which is where that gate stays visible.

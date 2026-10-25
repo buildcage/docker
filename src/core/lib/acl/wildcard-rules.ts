@@ -36,9 +36,8 @@ export function splitRuleTokens(rulesInput: string | undefined): string[] {
 }
 
 /**
- * Split+validate a whitespace-separated rules string, returning the raw
- * (unconverted) rule tokens, for callers that need the original wildcard or
- * `~` regex syntax preserved, such as known_blocked_rules.
+ * Split+validate a whitespace-separated rules string, returning the rule
+ * tokens as written.
  *
  * @throws {Error} if any rule has invalid wildcard/regex syntax
  */
@@ -124,11 +123,11 @@ export function parseAndValidateKnownBlockedRules(rulesInput: string | undefined
 /**
  * Convert a single rule (wildcard or `~`-prefixed regex) to a regex string.
  *
- * The `~` case reuses the `inspect` engine's own validator (a port is always
- * required there too) so both engines reject the same malformed regex the
- * same way, instead of this engine silently accepting a rule that then never
- * matches. anchorRawRegex then makes it cover a whole `host:port`, as a
- * wildcard rule does.
+ * The `~` case runs the same validator compileRuleSet does (a port is always
+ * required there too), so a malformed regex is rejected the same way wherever
+ * it is compiled instead of silently becoming a rule that never matches.
+ * anchorRawRegex then makes it cover a whole `host:port`, as a wildcard rule
+ * does.
  */
 export function convertRule(rule: string): string {
   if (rule.startsWith("~")) {

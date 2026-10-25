@@ -1,14 +1,12 @@
 /**
- * Domain pattern compiler for the `inspect` engine, which allows a wildcard
- * inside a label: `abc*.amazonaws.com`.
+ * Domain and path pattern compiler, which allows a wildcard inside a label:
+ * `abc*.amazonaws.com`.
  *
- * The shared compiler in wildcard-rules.ts rejects that, requiring a label
- * containing `*` to be exactly `*` or `**`. For `universal` that is only
- * a restriction on how a rule can be phrased. For `inspect` it would be a
- * hazard, because the resolver's scope is generated from these same patterns:
- * a rule unable to say "only names beginning with abc" forces the author to
- * write `*.amazonaws.com` instead, widening what is allowed to resolve and
- * therefore what can leak through a DNS query alone.
+ * wildcard-rules.ts rejects that, requiring a label containing `*` to be
+ * exactly `*` or `**`. Setup checks every host rule against that grammar
+ * (see parseRulesOrThrow), so only a URL rule reaches this one with a wildcard
+ * inside a label, and widening it cannot change what the `universal` engine
+ * accepts.
  *
  * The wildcard vocabulary is otherwise unchanged, and keeps the same meaning
  * wherever it appears in a label:
@@ -16,9 +14,6 @@
  *   `**`: one or more characters, dots included
  *   `*` : one or more characters, dots excluded
  *   `?` : a single character, dots excluded
- *
- * Kept separate from wildcard-rules.ts rather than added to it, so widening
- * this grammar cannot change what the `universal` engine accepts.
  */
 
 /** Characters that must be escaped to appear literally in a regex. */
@@ -389,9 +384,8 @@ function checkBraces(text: string, label: string, rule: string): void {
  * @throws {Error} if the text holds class syntax checkClasses refuses, uses an
  *   escape outside PORTABLE_ESCAPE or one checkPortableEscape refuses, holds
  *   group syntax checkGroups refuses, a `{` checkBraces refuses, carries a
- *   top-level `|`, or a host half
- *   holds a character no hostname can or text the resolver's config cannot
- *   quote
+ *   top-level `|`, or a host half holds a character no hostname can or text
+ *   the resolver's config cannot quote
  */
 export function checkRawRegexHalf(
   text: string,
@@ -437,11 +431,11 @@ export function endsAnchored(regex: string): boolean {
 /**
  * Anchor a `~` rule's host half at both ends.
  *
- * Both engines match a `~` rule as a search rather than a full match
- * (HAProxy's `-m reg`, CEL's `matches`), so an unanchored `~example\.com:443`
- * would also admit `evil-example.com:4430`. A URL rule's author cannot write
- * the anchors themselves: the host half's `^` goes to the scheme and its `$`
- * to the path, and a host rule is treated the same way.
+ * A `~` rule is matched as a search rather than a full match (HAProxy's
+ * `-m reg`, CEL's `matches`), so an unanchored `~example\.com:443` would also
+ * admit `evil-example.com:4430`. A URL rule's author cannot write the anchors
+ * themselves: the host half's `^` goes to the scheme and its `$` to the path,
+ * and a host rule is treated the same way.
  *
  * Concatenation suffices because checkRawRegexHalf has already refused a
  * top-level `|`, the one construct it would bind to only half of.
@@ -497,9 +491,9 @@ export function splitDomainFromPortPattern(hostPlusPort: string): {
 /**
  * Extract the host-only fragment from a `~` host rule's raw regex, for the
  * resolver's allowlist: a DNS query carries no port, so whatever names a port
- * is dropped here regardless of its shape. Enforcement uses the raw regex
- * directly instead (see haproxy-rules.ts), matched as one expression against
- * the connection, so this function exists only for coredns-config.ts.
+ * is dropped here regardless of its shape. Enforcement matches the raw regex
+ * as one expression against the connection (see haproxy-rules.ts); every
+ * other caller uses this function only to validate the rule.
  *
  * @throws {Error} if the regex is invalid, it carries a top-level `|`, it
  *   names no port at all (a port is always required), or the host half does

@@ -2,19 +2,16 @@
  * Ambient globals for the QuickJS runtime (quickjs-ng, Alpine 3.24's
  * `quickjs-ng` package) that these scripts run under via `qjs --std -m`.
  *
- * Verified directly against the actual `quickjs-ng` 0.11.0 Alpine package
- * (docker run alpine:3.24.1 + apk add quickjs-ng): the CLI's `--std` flag is
- * required to expose these modules at all, and, unlike Bellard's original
- * QuickJS, the import specifiers are namespaced as "qjs:std"/"qjs:os", not
- * bare "std"/"os" (bare specifiers fail with "could not load module
- * filename 'std'" even with --std passed).
+ * The CLI's `--std` flag is required to expose these modules at all, and,
+ * unlike Bellard's original QuickJS, the import specifiers are namespaced as
+ * "qjs:std"/"qjs:os", not bare "std"/"os" (bare specifiers fail with "could
+ * not load module filename 'std'" even with --std passed).
  *
- * Covers only the APIs this codebase actually calls (verified by grep across
- * src/core/scripts, src/core/lib, docker/inspect/scripts),
- * not a general QuickJS type definition. This file must only ever be visible to
- * tsconfig.qjs.json's program (see its "types": []), since @types/node also
- * declares a module named "os", with an incompatible shape, and the two
- * would collide if this file were ever included alongside it.
+ * Covers only the APIs the scripts call, not a general QuickJS type
+ * definition. This file must only ever be visible to tsconfig.qjs.json's
+ * program (see its "types": []), since @types/node also declares a module
+ * named "os", with an incompatible shape, and the two would collide if this
+ * file were ever included alongside it.
  */
 
 declare module "qjs:std" {

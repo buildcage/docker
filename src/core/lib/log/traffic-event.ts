@@ -1,6 +1,6 @@
 /**
- * The domain model of the `inspect` engine: one thing a build did, produced by
- * the log parser (inspect.ts) and consumed by the report layer.
+ * The report's domain model: one thing a build did, produced by the log
+ * parsers (inspect.ts, haproxy.ts) and consumed by the report layer.
  */
 
 import { ruleHost } from "./authority.ts";

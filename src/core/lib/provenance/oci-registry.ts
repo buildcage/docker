@@ -189,7 +189,7 @@ export interface RegistryClient {
        */
       absentOn404?: boolean;
       /**
-       * The `sha256:<hex>` this document is addressed by. When set, the fetched
+       * The digest this document is addressed by. When set, the fetched
        * bytes are verified against it before they are parsed, so the registry
        * cannot answer a content-addressed read with different content.
        */

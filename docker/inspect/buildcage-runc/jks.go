@@ -3,7 +3,7 @@ package main
 // JKS is what the JDK's own keytool writes, and what every distribution puts
 // the JVM's trusted certificates in. A trust store rebuild on a system that
 // carries a JRE copies the certificate into one of these, where it is the DER
-// among the container's own bytes and no PEM removal can reach it.
+// among the file's own bytes and no PEM removal can reach it.
 //
 //	magic(4)=feedfeed | version(4) | count(4)
 //	entry: tag(4) | alias(UTF) | creation time(8)

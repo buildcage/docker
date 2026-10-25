@@ -6,8 +6,9 @@ import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
 import type { TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 
 export interface HaproxyLogScan {
-  /** Every decision, oldest first: one connection the proxy allowed, audited,
-   *  blocked, or that failed after it was allowed. */
+  /** Every connection, oldest first: one the proxy allowed, audited or blocked,
+   *  one that failed after it was allowed, or one that ended before a whole
+   *  request arrived. */
   events: TrafficEvent[];
   /** Seconds since the epoch the proxy started, from the startup marker, so the
    *  report can time each event relative to it. Undefined when the marker

@@ -1,7 +1,7 @@
 /**
- * Formats a duration in seconds as clock digits, for the inspect engine's
- * report: every event is timestamped relative to when the proxy itself
- * started, not shown as an absolute time.
+ * Formats a duration in seconds as clock digits, for the report: every event
+ * is timestamped relative to when the proxy itself started, not shown as an
+ * absolute time.
  */
 
 interface Parts {

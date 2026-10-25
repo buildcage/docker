@@ -57,8 +57,8 @@ export async function uploadTrafficArtifact(
     upload = uploadViaActionsArtifact,
   }: UploadTrafficArtifactOptions = {},
 ): Promise<void> {
-  // Both engines write the file whenever a traffic artifact is asked for, so a
-  // missing file means the report script died before writing one: nothing to
+  // The report script writes the file whenever a traffic artifact is asked
+  // for, so a missing file means it died before writing one: nothing to
   // upload, and its absence says nothing worth a warning.
   if (!fileExists(file)) return;
   const name = artifactName(builderName);

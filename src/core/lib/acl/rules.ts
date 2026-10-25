@@ -9,8 +9,7 @@ import { parseAndValidateKnownBlockedRules, parseAndValidateRules } from "./wild
 
 /**
  * Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
- * allowed_ip_rules/known_blocked_rules) fails to parse. Shared by the setup
- * and run actions, which both accept the same rule syntax.
+ * allowed_ip_rules/known_blocked_rules) fails to parse.
  */
 export class InvalidRulesError extends ActionError<"INVALID_RULES"> {}
 

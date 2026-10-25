@@ -27,13 +27,12 @@ export interface BuildComposeUpArgsOptions extends ComposeArgsOptions {
 const WAIT_TIMEOUT_SECONDS = 180;
 
 /**
- * Build the `docker compose ... up`/`down` argv, shared by an action's main
- * and post steps.
+ * Build the `docker compose ... up` argv.
  *
- * `-p projectName` is required on both so that fully concurrent steps in
- * the same job (see GitHub Actions' `background`/`wait`/`parallel` step
- * keywords) never share Compose's implicit, directory-derived project name;
- * see compose-project-name.ts's deriveProjectName for why that matters.
+ * `-p projectName` is required on `up` and `down` so that fully concurrent
+ * steps in the same job (see GitHub Actions' `background`/`wait`/`parallel`
+ * step keywords) never share Compose's implicit, directory-derived project
+ * name; see compose-project-name.ts's deriveProjectName for why that matters.
  */
 export function buildComposeUpArgs({
   composeFile,

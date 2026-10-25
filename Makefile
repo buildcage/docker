@@ -32,7 +32,7 @@ TEST_PLATFORM ?= linux/arm64
 MULTIARCH_CROSS_PLATFORM ?= $(if $(filter arm64 aarch64,$(shell uname -m)),linux/amd64,linux/arm64)
 BUILDX_BUILD = docker buildx build --no-cache --builder $(BUILDER_NAME) --platform $(TEST_PLATFORM) --progress=plain
 
-# Compose project name, trusted by report/src/main.ts and
+# Compose project name, trusted by report/src/lib/report-step.ts and
 # src/post.ts via their own BUILDCAGE_BUILD_TEST_HOOKS-gated overrides
 # instead of deriveProjectName("buildcage")
 # (src/core/lib/docker/compose-project-name.ts).
@@ -429,7 +429,7 @@ test_integration_buildkit_universal_known_blocked: ## Check known_blocked_rules 
 # network, so buildcage0 never exists: this is the one target that says where
 # the listeners are unreachable from, rather than that a build reached them.
 .PHONY: test_integration_buildkit_listener_scope
-test_integration_buildkit_listener_scope: ## Check :10024/:53 are unreachable outside buildcage0, for both engines
+test_integration_buildkit_listener_scope: ## Check :10024/:53 are unreachable outside buildcage0
 	@echo "Running listener-scope tests..."
 	@./test/assert-listener-scope.sh
 

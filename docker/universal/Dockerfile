@@ -132,7 +132,7 @@ COPY licenses/s6-overlay/ /opt/buildcage/licenses/s6-overlay/
 COPY licenses/alpine/ /opt/buildcage/licenses/alpine/
 COPY licenses/alpine-packages.txt /opt/buildcage/licenses/
 
-# The services both engines run, then this engine's own files on top.
+# The shared services, then this engine's own files on top.
 COPY docker/common/files/s6-rc.d/       /etc/s6-overlay/s6-rc.d/
 COPY docker/common/files/s6-scripts/    /etc/s6-overlay/scripts/
 COPY docker/universal/files/s6-scripts/ /etc/s6-overlay/scripts/

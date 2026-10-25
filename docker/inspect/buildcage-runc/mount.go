@@ -177,9 +177,9 @@ func mirrorDir(src, dst string) error {
 }
 
 // writeBack mirrors scratchDir onto hostDir. The dry run is logged so a
-// write-back is auditable after the fact; the real failure signal is the
-// second rsync's own exit code; a partial transfer already makes rsync exit
-// non-zero, so this doesn't also diff the two runs' output against each other.
+// write-back is auditable after the fact. Failure is the second rsync's exit
+// code, which a partial transfer already makes non-zero, so the two runs'
+// output is not compared.
 func writeBack(scratchDir, hostDir string) error {
 	args := []string{"-aHAX", "--checksum", "--delete", "--numeric-ids", "--no-specials", "--no-devices", "--itemize-changes"}
 	src, dst := scratchDir+"/", hostDir+"/"
@@ -268,10 +268,10 @@ func hashFile(path string) ([32]byte, error) {
 	return sum, nil
 }
 
-// sameExceptMtime is what "unchanged" means to both callers below: everything
-// a step could have altered, apart from the mtime. The append/strip round
-// trip, and mirroring itself, move mtime on their own, so comparing it would
-// report a change where none was made.
+// sameExceptMtime is what "unchanged" means here: everything a step could have
+// altered, apart from the mtime. The append/strip round trip, and mirroring
+// itself, move mtime on their own, so comparing it would report a change where
+// none was made.
 func (e fileEntry) sameExceptMtime(other fileEntry) bool {
 	return e.path == other.path && e.mode == other.mode &&
 		e.uid == other.uid && e.gid == other.gid &&
@@ -395,8 +395,10 @@ func (b *dirBind) injectIntoMirror(inject func() error) error {
 // only touches the real rootfs directory when the step actually changed it.
 //
 // The write-back is not atomic, so a failure leaves hostDir half-written.
-// That is only safe because the error fails the step, and BuildKit then
-// releases the mutable snapshot instead of committing it.
+// That is only safe because the error fails the step, and BuildKit keeps a
+// failed step's snapshot only for debugging, never as its layer. The exception
+// is raw LLB whose ValidExitCodes allows the exit code this wrapper ends with,
+// since BuildKit sees only that code.
 func (b *dirBind) finish() error {
 	current, err := captureManifest(b.scratchDir)
 	if err != nil {
@@ -454,11 +456,10 @@ func (b *dirBind) finish() error {
 }
 
 // coverKeystore adds the CA to a keystore at rel inside this bind's already-
-// mirrored directory (a Debian JDK's cacerts symlinked into the CA store),
-// rather than binding it separately, which the store mount would shadow. The
-// baseline is re-captured so the gatekeeper counts the injection as part of the
-// mirror's post-injection state; the sweep at finish takes the CA back out of
-// this keystore the same as any other file the mirror carries.
+// mirrored directory. The baseline is re-captured so finish's unchanged check
+// counts the injection as part of the mirror's post-injection state; the sweep
+// at finish takes the CA back out of this keystore the same as any other file
+// the mirror carries.
 func (b *dirBind) coverKeystore(rel string, ca []byte) {
 	target := filepath.Join(b.scratchDir, rel)
 	original, err := insertIntoKeystore(target, ca)

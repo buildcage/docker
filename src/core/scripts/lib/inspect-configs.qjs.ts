@@ -6,8 +6,8 @@
  * never resolves a name for real either way; only HAProxy does, and only once
  * a request has already passed these same rules.
  *
- * The body of each repo's gen-configs entry script, which runs it with or
- * without an extension; see InspectStageExtension.
+ * The body of a gen-configs entry script, which runs it with or without an
+ * extension; see InspectStageExtension.
  *
  * Usage:
  *   qjs --std -m gen-configs.js <haproxy_out> <corefile_out> <proxy_address> \
