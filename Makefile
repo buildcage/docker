@@ -194,9 +194,12 @@ report_buildkit: ## Show the buildcage report for the currently running builder
 INTEGRATION_TARGETS := $(shell sed -nE 's/^(test_integration_buildkit_[a-z0-9_]+):.*/\1/p' $(firstword $(MAKEFILE_LIST)))
 test_integration_buildkit: $(INTEGRATION_TARGETS) ## Run all buildkit integration tests
 
-# The target that verifies post.ts removed the builder. The targets below run
-# post.ts as part of their own teardown where they have one, but the removal
-# does not depend on the engine or the mode, so only this one asserts it.
+# Runs src/post.ts and checks it removed the builder and its /var/lib/buildkit
+# volume, read before post.ts ran. Once per engine and mode.
+POST_AND_ASSERT = volume=$$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/buildkit"}}{{.Name}}{{end}}{{end}}' "$$BUILDER_NAME") && \
+	  node src/post.ts && \
+	  BUILDKIT_VOLUME="$$volume" ./test/assert-post.sh
+
 .PHONY: test_integration_buildkit_universal_audit
 test_integration_buildkit_universal_audit: ## Run universal-engine audit mode tests
 	@echo "Running universal-engine audit mode tests..."
@@ -207,9 +210,7 @@ test_integration_buildkit_universal_audit: ## Run universal-engine audit mode te
 	@node report/src/main.ts
 	@./test/assert-universal-audit.sh
 	@./test/assert-step-port-isolation.sh
-	@volume=$$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/buildkit"}}{{.Name}}{{end}}{{end}}' "$$BUILDER_NAME") && \
-	  node src/post.ts && \
-	  BUILDKIT_VOLUME="$$volume" ./test/assert-post.sh
+	@$(POST_AND_ASSERT)
 	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_universal_restrict
@@ -221,7 +222,7 @@ test_integration_buildkit_universal_restrict: ## Run universal-engine restrict m
 	  --load -t $(TEST_IMAGE) || $(BUILD_FAILED)
 	@node report/src/main.ts || true
 	@./test/assert-universal-restrict.sh
-	@node src/post.ts
+	@$(POST_AND_ASSERT)
 	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_universal_restrict_no_traffic
@@ -233,7 +234,7 @@ test_integration_buildkit_universal_restrict_no_traffic: ## Run universal-engine
 	  --load -t $(TEST_IMAGE)
 	@INPUT_FAIL_ON_BLOCKED=true node report/src/main.ts
 	@./test/assert-universal-restrict-no-traffic.sh
-	@node src/post.ts
+	@$(POST_AND_ASSERT)
 	@$(MAKE) clean_buildkit
 
 # The Alpine build the CA-residue and layer-bloat guards run against. Every
@@ -256,7 +257,7 @@ test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode 
 	@./test/assert-step-port-isolation.sh
 	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-python test/ \
 	  --load -t $(TEST_IMAGE)
-	@node src/post.ts
+	@$(POST_AND_ASSERT)
 	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 # The Debian build those same two guards run against: it starts with no CA
@@ -273,6 +274,7 @@ test_integration_buildkit_inspect_debian_audit: ## Run inspect-engine audit mode
 	@./test/assert-inspect-no-layer-bloat.sh $(TEST_IMAGE)
 	@node report/src/main.ts || true
 	@./test/assert-inspect-debian.sh audit
+	@$(POST_AND_ASSERT)
 	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_inspect_debian_restrict
@@ -364,6 +366,15 @@ test_integration_buildkit_inspect_byte_exact: ## Compare inspect vs universal la
 test_integration_buildkit_inspect_roundtrip: ## Check an inspect audit run, then enforce the rules it generated
 	@echo "Running inspect-engine audit-to-restrict round trip..."
 	@./test/run-inspect-roundtrip.sh
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
+
+# Stops the builder's haproxy, then its coredns, while a RUN step is still
+# running; see test/run-inspect-proxy-down.sh.
+.PHONY: test_integration_buildkit_inspect_proxy_down
+test_integration_buildkit_inspect_proxy_down: ## Check a build's traffic fails and the report fails the step when the proxy stops mid-build
+	@echo "Running inspect-engine proxy-down tests..."
+	@./test/run-inspect-proxy-down.sh
+	@$(POST_AND_ASSERT)
 	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_universal_known_blocked

@@ -84,10 +84,11 @@ jobs:
             target5: test_integration_buildkit_listener_scope
             test_compose_file: docker/compose.action.test-universal.yaml
           # Java and Chromium both keep the CPU busy, so they go in different jobs.
-          - mode: inspect-restrict, inspect-debian-audit, inspect-chromium-audit
+          - mode: inspect-restrict, inspect-debian-audit, inspect-chromium-audit, inspect-proxy-down
             target1: test_integration_buildkit_inspect_restrict
             target2: test_integration_buildkit_inspect_debian_audit
             target3: test_integration_buildkit_inspect_chromium_audit
+            target4: test_integration_buildkit_inspect_proxy_down
             test_compose_file: docker/compose.action.test-inspect.yaml
           - mode: inspect-java-audit, inspect-hidden-ca, inspect-debian-restrict
             target1: test_integration_buildkit_inspect_java_audit

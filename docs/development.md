@@ -160,6 +160,8 @@ make test_integration_buildkit_inspect_debian_audit
 make test_integration_buildkit_inspect_debian_restrict
 # An inspect audit run, then its generated rules enforced unedited (holds the audit-mode checks)
 make test_integration_buildkit_inspect_roundtrip
+# The proxy's services stopped mid-build: the step's traffic and the report must both fail
+make test_integration_buildkit_inspect_proxy_down
 # known_blocked_rules against fail_on_blocked, both matched and unmatched
 make test_integration_buildkit_universal_known_blocked
 # Builds for the host's architecture and for the other one
