@@ -373,90 +373,56 @@ func TestRemoveCAStripsACertificateWithoutItsClosingNewline(t *testing.T) {
 	}
 }
 
-func TestRemoveCARefusesASymlink(t *testing.T) {
-	dir := t.TempDir()
-	outside := filepath.Join(t.TempDir(), "host-secret")
-	mustWriteFile(t, outside, "SECRET")
-	path := filepath.Join(dir, "bundle.pem")
-	mustSymlink(t, outside, path)
+// Neither direction opens anything but a regular file: a symlink is not
+// followed out of the rootfs, a FIFO does not block the open, and a directory
+// fails the open itself.
+func TestBundleEditsRefuseANonRegularFile(t *testing.T) {
+	for _, edit := range []struct {
+		name string
+		fn   func(path string, ca []byte) error
+	}{{"appendCA", appendCA}, {"removeCA", removeCA}} {
+		for name, tc := range map[string]struct {
+			arrange func(t *testing.T, path string) (check func(t *testing.T))
+			want    error
+		}{
+			"a symlink": {func(t *testing.T, path string) func(t *testing.T) {
+				outside := filepath.Join(t.TempDir(), "host-secret")
+				mustWriteFile(t, outside, "SECRET")
+				mustSymlink(t, outside, path)
+				return func(t *testing.T) {
+					if got, err := os.ReadFile(outside); err != nil || string(got) != "SECRET" {
+						t.Fatalf("the symlink target was modified: %q, %v", got, err)
+					}
+				}
+			}, errNotRegular},
+			"a FIFO": {func(t *testing.T, path string) func(t *testing.T) {
+				if err := syscall.Mkfifo(path, 0o644); err != nil {
+					t.Skipf("mkfifo unavailable: %v", err)
+				}
+				return func(*testing.T) {}
+			}, errNotRegular},
+			"a directory": {func(t *testing.T, path string) func(t *testing.T) {
+				mustMkdirAll(t, path)
+				return func(*testing.T) {}
+			}, syscall.EISDIR},
+		} {
+			t.Run(edit.name+" on "+name, func(t *testing.T) {
+				path := filepath.Join(t.TempDir(), "bundle.pem")
+				check := tc.arrange(t, path)
 
-	if err := removeCA(path, testCA); !errors.Is(err, errNotRegular) {
-		t.Fatalf("got %v, want errNotRegular", err)
-	}
-	got, err := os.ReadFile(outside)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != "SECRET" {
-		t.Fatalf("the symlink target was modified: %q", got)
-	}
-}
-
-func TestAppendCARefusesASymlink(t *testing.T) {
-	dir := t.TempDir()
-	outside := filepath.Join(t.TempDir(), "host-secret")
-	mustWriteFile(t, outside, "SECRET")
-	path := filepath.Join(dir, "bundle.pem")
-	mustSymlink(t, outside, path)
-
-	if err := appendCA(path, testCA); !errors.Is(err, errNotRegular) {
-		t.Fatalf("got %v, want errNotRegular", err)
-	}
-	got, err := os.ReadFile(outside)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != "SECRET" {
-		t.Fatalf("the symlink target was modified: %q", got)
-	}
-}
-
-func TestRemoveCARefusesAFIFOWithoutBlocking(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "bundle.pem")
-	if err := syscall.Mkfifo(path, 0o644); err != nil {
-		t.Skipf("mkfifo unavailable: %v", err)
-	}
-
-	done := make(chan error, 1)
-	go func() { done <- removeCA(path, testCA) }()
-
-	select {
-	case err := <-done:
-		if !errors.Is(err, errNotRegular) {
-			t.Fatalf("got %v, want errNotRegular", err)
+				done := make(chan error, 1)
+				go func() { done <- edit.fn(path, testCA) }()
+				select {
+				case err := <-done:
+					if !errors.Is(err, tc.want) {
+						t.Fatalf("got %v, want %v", err, tc.want)
+					}
+				case <-time.After(5 * time.Second):
+					t.Fatalf("%s blocked opening %s", edit.name, name)
+				}
+				check(t)
+			})
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("removeCA blocked opening a FIFO")
-	}
-}
-
-func TestAppendCARefusesAFIFOWithoutBlocking(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "bundle.pem")
-	if err := syscall.Mkfifo(path, 0o644); err != nil {
-		t.Skipf("mkfifo unavailable: %v", err)
-	}
-
-	done := make(chan error, 1)
-	go func() { done <- appendCA(path, testCA) }()
-
-	select {
-	case err := <-done:
-		if !errors.Is(err, errNotRegular) {
-			t.Fatalf("got %v, want errNotRegular", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("appendCA blocked opening a FIFO")
-	}
-}
-
-func TestRemoveCARefusesADirectory(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "bundle.pem")
-	mustMkdirAll(t, path)
-	if err := removeCA(path, testCA); err == nil {
-		t.Fatal("removeCA succeeded on a directory")
 	}
 }
 
@@ -869,25 +835,26 @@ func TestFileHoldsCALeavesAnotherCAAlone(t *testing.T) {
 // testCA's DER is a placeholder that does not parse, so it has no subject.
 func TestCAMarksOfACertificateThatDoesNotParse(t *testing.T) {
 	marks := caMarksOf(testCA)
-	if len(marks.ders) != 1 || len(marks.needles) != 2 {
-		t.Fatalf("got %d ders and %d needles, want 1 and 2", len(marks.ders), len(marks.needles))
+	if len(marks.ders) != 1 {
+		t.Fatalf("got %d ders, want 1", len(marks.ders))
 	}
-	if string(marks.needles[1]) != "QlVJTERDQUdFLUNB" {
-		t.Errorf("the base64 needle is %q", marks.needles[1])
-	}
+	wantNeedles(t, marks, marks.ders[0], []byte("QlVJTERDQUdFLUNB"))
 }
 
 func TestCAMarksOfTakesABase64Prefix(t *testing.T) {
 	ca, _ := testIssuer(t, "this run")
 	marks := caMarksOf(certPEM(ca))
-	if len(marks.needles) != 3 {
-		t.Fatalf("got %d needles, want the DER, the subject and a base64 line", len(marks.needles))
-	}
-	if !bytes.Equal(marks.needles[1], ca.RawSubject) {
-		t.Error("the second needle is not the CA's subject")
-	}
-	if got := string(marks.needles[2]); got != base64.StdEncoding.EncodeToString(ca.Raw)[:base64PrefixLength] {
-		t.Errorf("the base64 needle is %q", got)
+	prefix := base64.StdEncoding.EncodeToString(ca.Raw)[:base64PrefixLength]
+	wantNeedles(t, marks, ca.Raw, ca.RawSubject, []byte(prefix))
+}
+
+// wantNeedles checks the needles in order: findAnyInFile looks for the later
+// ones only ahead of an earlier one's match, so the order sets how much of a
+// file each search reads.
+func wantNeedles(t *testing.T, marks caMarks, want ...[]byte) {
+	t.Helper()
+	if !slices.EqualFunc(marks.needles, want, bytes.Equal) {
+		t.Errorf("needles are %q, want %q", marks.needles, want)
 	}
 }
 
