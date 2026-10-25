@@ -13,8 +13,13 @@ export function buildDockerCpArgs({
 }
 
 export interface ComposeArgsOptions {
-  composeFile: string;
+  /** Layered in order, each `-f` overriding the ones before it. */
+  composeFiles: readonly string[];
   projectName: string;
+}
+
+function fileArgs(composeFiles: readonly string[]): string[] {
+  return composeFiles.flatMap((file) => ["-f", file]);
 }
 
 export interface BuildComposeUpArgsOptions extends ComposeArgsOptions {
@@ -35,14 +40,13 @@ const WAIT_TIMEOUT_SECONDS = 180;
  * name; see compose-project-name.ts's deriveProjectName for why that matters.
  */
 export function buildComposeUpArgs({
-  composeFile,
+  composeFiles,
   projectName,
   pullPolicy,
 }: BuildComposeUpArgsOptions): string[] {
   return [
     "compose",
-    "-f",
-    composeFile,
+    ...fileArgs(composeFiles),
     "-p",
     projectName,
     "up",
@@ -64,14 +68,13 @@ export interface BuildComposeLogsArgsOptions extends ComposeArgsOptions {
 /** Build the `docker compose ... logs` argv. Goes through Compose rather than
  *  `docker logs` so it still reads a container that has exited. */
 export function buildComposeLogsArgs({
-  composeFile,
+  composeFiles,
   projectName,
   tail,
 }: BuildComposeLogsArgsOptions): string[] {
   return [
     "compose",
-    "-f",
-    composeFile,
+    ...fileArgs(composeFiles),
     "-p",
     projectName,
     "logs",
@@ -86,6 +89,6 @@ export function buildComposeLogsArgs({
  * `-v` removes the anonymous volume an image's VOLUME gets on each `up`
  * (moby/buildkit's /var/lib/buildkit), which would otherwise pile up.
  */
-export function buildComposeDownArgs({ composeFile, projectName }: ComposeArgsOptions): string[] {
-  return ["compose", "-f", composeFile, "-p", projectName, "down", "-v"];
+export function buildComposeDownArgs({ composeFiles, projectName }: ComposeArgsOptions): string[] {
+  return ["compose", ...fileArgs(composeFiles), "-p", projectName, "down", "-v"];
 }

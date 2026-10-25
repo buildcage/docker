@@ -99,6 +99,27 @@ describe("planPostCleanup", () => {
     expect(args).toContain("buildcage-eeb358f947ee");
   });
 
+  // Layered as setup layered it, so the down also takes the overlay's fixtures.
+  it("layers the test overlay setup started with on the compose file", () => {
+    const { args } = plan(
+      COMPOSE_FILE,
+      undefined,
+      {},
+      {
+        composeOverlay: "/repo/docker/compose.action.test-inspect.yaml",
+        getInput: inputs({ builder_name: "second" }),
+      },
+    );
+
+    expect(args.slice(0, 5)).toStrictEqual([
+      "compose",
+      "-f",
+      COMPOSE_FILE,
+      "-f",
+      "/repo/docker/compose.action.test-inspect.yaml",
+    ]);
+  });
+
   it("uses the override outright when this repo's own testing supplies one", () => {
     const { args } = plan(
       COMPOSE_FILE,

@@ -16,19 +16,19 @@ describe("readLocalImageOverride", () => {
     expect(result).toStrictEqual({
       imageRef: "buildcage-builder",
       pullPolicy: "never",
-      composeFile: undefined,
+      composeOverlay: undefined,
     });
   });
 
-  it("also carries BUILDCAGE_TEST_COMPOSE_FILE when set", () => {
+  it("also carries BUILDCAGE_TEST_COMPOSE_OVERLAY when set", () => {
     const result = readLocalImageOverride({
       BUILDCAGE_LOCAL_IMAGE_REF: "buildcage-builder",
-      BUILDCAGE_TEST_COMPOSE_FILE: "docker/compose.action.test-inspect.yaml",
+      BUILDCAGE_TEST_COMPOSE_OVERLAY: "docker/compose.action.test-inspect.yaml",
     });
     expect(result).toStrictEqual({
       imageRef: "buildcage-builder",
       pullPolicy: "never",
-      composeFile: "docker/compose.action.test-inspect.yaml",
+      composeOverlay: "docker/compose.action.test-inspect.yaml",
     });
   });
 });

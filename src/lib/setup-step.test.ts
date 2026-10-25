@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { COMPOSE_FILE } from "../compose-file.ts";
 import { SetupError } from "./errors.ts";
-import { runSetupStep, COMPOSE_FILE, type SetupStepDeps } from "./setup-step.ts";
+import { runSetupStep, type SetupStepDeps } from "./setup-step.ts";
 
 // Every collaborator is tested in its own file; what is left to check here is
 // the order they run in, what each one is handed, and which of them still run
@@ -38,7 +39,11 @@ const ENV = {
  *  report derives from its own builder_name input. */
 const PROJECT_NAME = "buildcage-eeb358f947ee";
 
+let prevHooks: string | undefined;
+
 beforeEach(() => {
+  prevHooks = process.env.BUILDCAGE_BUILD_TEST_HOOKS;
+  delete process.env.BUILDCAGE_BUILD_TEST_HOOKS;
   vi.resetAllMocks();
   mocks.readSetupInputs.mockReturnValue(inputsWith());
   mocks.readLocalImageOverride.mockResolvedValue(null);
@@ -48,6 +53,12 @@ beforeEach(() => {
   mocks.builderStartError.mockReturnValue(
     new SetupError("builder never came up", "BUILDER_NOT_READY"),
   );
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  if (prevHooks === undefined) delete process.env.BUILDCAGE_BUILD_TEST_HOOKS;
+  else process.env.BUILDCAGE_BUILD_TEST_HOOKS = prevHooks;
 });
 
 /** What readSetupInputs returns, with `overrides` on top of a minimal run. */
@@ -212,13 +223,39 @@ describe("runSetupStep", () => {
   });
 
   it("skips provenance verification when a local override names an image", async () => {
-    mocks.readLocalImageOverride.mockResolvedValue({ imageRef: "local:dev", pullPolicy: "never" });
+    mocks.readLocalImageOverride.mockResolvedValue({
+      imageRef: "local:dev",
+      pullPolicy: "never",
+      composeOverlay: undefined,
+    });
 
     await runSetupStep(ENV, deps);
 
     expect(mocks.verifyImageDigestOrThrow).not.toHaveBeenCalled();
     expect(dockerArgs(1)).toStrictEqual(expect.arrayContaining(["--pull", "never"]));
+    expect(dockerArgs(1).slice(0, 3)).toStrictEqual(["compose", "-f", COMPOSE_FILE]);
     expect(mocks.runDocker.mock.calls[1]![1]).toMatchObject({ BUILDCAGE_IMAGE_REF: "local:dev" });
+  });
+
+  // Layered rather than substituted, so a test overlay cannot drift from what ships.
+  it("layers a local override's compose overlay on the shipped compose file", async () => {
+    mocks.readLocalImageOverride.mockResolvedValue({
+      imageRef: "local:dev",
+      pullPolicy: "never",
+      composeOverlay: "/repo/docker/compose.action.test-inspect.yaml",
+    });
+
+    await runSetupStep(ENV, deps);
+
+    for (const n of [0, 1]) {
+      expect(dockerArgs(n).slice(0, 5)).toStrictEqual([
+        "compose",
+        "-f",
+        COMPOSE_FILE,
+        "-f",
+        "/repo/docker/compose.action.test-inspect.yaml",
+      ]);
+    }
   });
 
   // The rule-support warning goes to the emitter nothing can suppress.
@@ -294,10 +331,23 @@ describe("runSetupStep", () => {
     // report derives the same name from its own builder_name input to find
     // this container with `docker ps --filter`.
     it("runs under the project name report derives from the same builder name", async () => {
+      vi.stubEnv("COMPOSE_PROJECT_NAME", "somebody-elses-project");
+
       await runSetupStep(ENV, deps);
 
       expect(dockerArgs(0)).toContain(PROJECT_NAME);
       expect(dockerArgs(1)).toContain(PROJECT_NAME);
+    });
+
+    // This repo's own test hook, which report and post honour the same way.
+    it("takes COMPOSE_PROJECT_NAME as given in a build with test hooks", async () => {
+      process.env.BUILDCAGE_BUILD_TEST_HOOKS = "1";
+      vi.stubEnv("COMPOSE_PROJECT_NAME", "buildcage-project");
+
+      await runSetupStep(ENV, deps);
+
+      expect(dockerArgs(0)).toContain("buildcage-project");
+      expect(dockerArgs(1)).toContain("buildcage-project");
     });
 
     it("is never started when the teardown itself fails", async () => {
@@ -326,7 +376,7 @@ describe("runSetupStep", () => {
       await expect(runSetupStep(ENV, deps)).rejects.toThrow("builder never came up");
       expect(mocks.builderStartError.mock.calls[0]![0]).toBe(cause);
       expect(mocks.builderStartError.mock.calls[0]![1]).toMatchObject({
-        composeFile: COMPOSE_FILE,
+        composeFiles: [COMPOSE_FILE],
         projectName: PROJECT_NAME,
         builderName: "buildcage",
       });

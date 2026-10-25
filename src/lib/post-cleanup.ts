@@ -4,6 +4,7 @@ import { InvalidInputError } from "#core/lib/actions/inputs.ts";
 import { buildComposeDownArgs } from "#core/lib/docker/args.ts";
 import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
 
+import { withComposeOverlay } from "../compose-file.ts";
 import { readBuilderName, type GetInput } from "./inputs.ts";
 
 /** The GITHUB_STATE key setup saves the builder name under. */
@@ -17,6 +18,8 @@ export interface PostCleanupPlan {
 export interface PostCleanupSources {
   /** The builder name setup saved to GITHUB_STATE, empty when it saved none. */
   savedBuilderName?: string;
+  /** The test overlay setup layered on the compose file, in a test-hook build. */
+  composeOverlay?: string;
   /** Omitted, the real inputs are read. */
   getInput?: GetInput;
 }
@@ -39,7 +42,7 @@ export function planPostCleanup(
   composeFile: string,
   projectNameOverride: string | undefined,
   env: NodeJS.ProcessEnv,
-  { savedBuilderName, getInput = core.getInput }: PostCleanupSources = {},
+  { savedBuilderName, composeOverlay, getInput = core.getInput }: PostCleanupSources = {},
 ): PostCleanupPlan | undefined {
   if (!savedBuilderName && getInput("config_file")) return undefined;
   let builderName = savedBuilderName;
@@ -53,7 +56,10 @@ export function planPostCleanup(
   }
   const projectName = resolveProjectName(builderName, projectNameOverride);
   return {
-    args: buildComposeDownArgs({ composeFile, projectName }),
+    args: buildComposeDownArgs({
+      composeFiles: withComposeOverlay(composeFile, composeOverlay),
+      projectName,
+    }),
     env: { ...env, BUILDER_NAME: builderName },
   };
 }
