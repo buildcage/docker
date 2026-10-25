@@ -138,9 +138,9 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           case "$TAG" in
             *-*)
-              echo "This is a **prerelease** tag — do NOT tick **Publish this Action to the GitHub Marketplace**. Marketplace publishing is for stable releases only." >> "$GITHUB_STEP_SUMMARY"
+              echo "This is a **prerelease** tag: do NOT tick **Publish this Action to the GitHub Marketplace**. Marketplace publishing is for stable releases only." >> "$GITHUB_STEP_SUMMARY"
               ;;
             *)
-              echo "Tick **Publish this Action to the GitHub Marketplace** on the draft's own page before publishing — the release API has no field for it, so it has to be set by hand every time." >> "$GITHUB_STEP_SUMMARY"
+              echo "Tick **Publish this Action to the GitHub Marketplace** on the draft's own page before publishing; the release API has no field for it, so it has to be set by hand every time." >> "$GITHUB_STEP_SUMMARY"
               ;;
           esac

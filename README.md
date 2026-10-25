@@ -122,8 +122,8 @@ doesn't pass unnoticed.
 
 ### Example workflows
 
-Each pair builds the same Dockerfile with and without rules:
-`inspect` on an apt and npm build ([audit](.github/workflows/example-inspect-audit.yml) ·
+Each pair runs a build in audit, then in restrict with the rules audit reported and one request they
+block: `inspect` on an apt and npm build ([audit](.github/workflows/example-inspect-audit.yml) ·
 [restrict](.github/workflows/example-inspect-restrict.yml)), `universal` on a Maven build
 ([audit](.github/workflows/example-universal-audit.yml) ·
 [restrict](.github/workflows/example-universal-restrict.yml)).

@@ -32,11 +32,9 @@ jobs:
             dockerfile: docker/inspect/Dockerfile
     outputs:
       tag: ${{ steps.version.outputs.tag }}
-      # Matrix legs sharing one output name would clobber each other (last
-      # completed leg wins), so each leg instead writes to a step-output key
-      # suffixed with its own matrix.engine value, which keeps the two from
-      # colliding and carries each one into this job's own (statically-declared)
-      # outputs.
+      # Matrix legs sharing one output name would overwrite each other (the
+      # last leg to finish wins), so each leg writes a key named after its
+      # engine.
       digest-universal: ${{ steps.digest.outputs['universal'] }}
       digest-inspect: ${{ steps.digest.outputs['inspect'] }}
 
@@ -142,10 +140,10 @@ jobs:
           ENGINE: ${{ matrix.engine }}
         run: echo "${ENGINE}=${DIGEST}" >> "$GITHUB_OUTPUT"
 
-  # Gates signing on the pushed image actually building. A release build resolves
-  # its packages and base image again, so a green PR says nothing about what this
-  # tag carries; signing only what has built keeps a broken image unusable, since
-  # the setup action refuses an unsigned one.
+  # Gates signing on the pushed image working as a builder. A release build
+  # resolves its packages and base image again, so a green PR says nothing about
+  # what this tag carries; leaving a broken image unsigned keeps it unusable,
+  # since the setup action refuses an unsigned one.
   #
   # Real hosts, not the fixtures: trusting their self-signed certificate takes a
   # BUILDCAGE_TEST_HOOKS build, which a released image deliberately is not.

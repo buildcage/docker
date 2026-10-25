@@ -13,7 +13,8 @@ jobs:
 
     steps:
       # inspect decrypts, so it logs each request's method and full URL, and
-      # the report's "Switch to restrict mode" section returns allowed_url_rules.
+      # the report's "Switch to restrict mode" section lists them as
+      # allowed_url_rules.
       - name: Start Buildcage builder
         uses: buildcage/docker@0e382c9c236fb24e60ccce9dba512a67b270b8bf # v4.3.0
         with:
