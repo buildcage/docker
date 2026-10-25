@@ -270,14 +270,20 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		dir := filepath.Dir(keystore)
 		keystoresByDir[dir] = append(keystoresByDir[dir], filepath.Base(keystore))
 	}
-	// A keystore left half-written stops the injection there, before the spec
-	// is saved, so a step that will not run leaves it as it was.
-	abandonFor := func(b *dirBind) (*injection, error) {
-		in := &injection{
+	// What finishes the injection, from the binds and directories so far.
+	current := func() *injection {
+		return &injection{
 			rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
 			upper: upper,
 		}
-		return nil, errors.Join(b.halfWritten, in.abandon())
+	}
+	// A keystore left half-written stops the injection there, before the spec
+	// is saved, so a step that will not run leaves it as it was.
+	abandonFor := func(b *dirBind) (*injection, error) {
+		if err := current().abandon(); err != nil {
+			logf("undoing the CA injection: %v", err)
+		}
+		return nil, b.halfWritten
 	}
 	for hostDir, names := range keystoresByDir {
 		containerDir := containerPathOf(s.rootfs, hostDir)
@@ -310,10 +316,9 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("cannot update the process spec: %v", err)
 	}
 
-	return &injection{
-		rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
-		upper: upper, nssAppended: nssAppended,
-	}, nil
+	in := current()
+	in.nssAppended = nssAppended
+	return in, nil
 }
 
 // abandon undoes an injection whose step will not run. The mirrors are dropped

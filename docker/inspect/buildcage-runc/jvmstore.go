@@ -169,7 +169,8 @@ func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 
 	if n, err := f.WriteAt(injected, 0); err != nil {
 		if n == 0 {
-			return nil, err // nothing written, so the keystore is as it was
+			// Nothing written, so the keystore is as it was.
+			return nil, withoutPath(err)
 		}
 		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
 	}

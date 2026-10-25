@@ -293,6 +293,17 @@ func TestInsertIntoKeystoreSkipsTheTruncateForAGrowingRewrite(t *testing.T) {
 	if _, err := insertIntoKeystore(path, testCA); err != nil {
 		t.Fatalf("got %v, want the grown keystore written without a truncate", err)
 	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := keystoreWith(keystore(2, trustedEntry(2, "digicert", otherDER)), certificateDERs(testCA))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Error("the grown keystore is not exactly the rewrite")
+	}
 }
 
 // A rewrite shorter than the keystore it replaces has a tail to cut, and a
@@ -727,6 +738,33 @@ func TestPKCS12WithInsertsEveryCert(t *testing.T) {
 	}
 	if len(certs) != 3 {
 		t.Fatalf("got %d certificates, want the original plus two", len(certs))
+	}
+}
+
+// Undoing the injection can fail too; that goes to the log on its own line,
+// and the error inject returns is still the half-written keystore alone.
+func TestInjectLogsAFailureToUndoTheInjection(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
+	old := walkDir
+	walkDir = func(dir string, fn fs.WalkDirFunc) error {
+		if dir == rootfs {
+			return errBrokenWalk // the sweep of the step's layer
+		}
+		return old(dir, fn)
+	}
+	t.Cleanup(func() { walkDir = old })
+
+	_, err := inject(bundle, testCA)
+	if !errors.Is(err, errKeystoreHalfWritten) || errors.Is(err, errBrokenWalk) {
+		t.Fatalf("got %v, want the half-written keystore alone", err)
+	}
+	if !strings.Contains(ownLog.String(), "undoing the CA injection: ") {
+		t.Errorf("the failure to undo was not logged:\n%s", ownLog.String())
 	}
 }
 

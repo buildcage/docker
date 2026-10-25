@@ -922,8 +922,9 @@ Two things fail the build by default, pointing at `fail_on_ca_residue`:
   [CA trust variables](#ca-trust-variables))
 
 With `fail_on_ca_residue: false` both only warn, and the copy or the slot stays in the image. Whatever
-the setting, a step whose layer the wrapper cannot read back does not run, and an error reading the
-layer back or restoring it fails the build.
+the setting, a step whose layer the wrapper cannot read back does not run, nor does one whose JVM
+keystore the wrapper left half-written while adding the CA, and an error reading the layer back or
+restoring it fails the build.
 
 A copy the wrapper cannot read is never found, so it stays in the image whatever the setting: one in
 a compressed archive, hex-dumped, re-wrapped outside a PEM block in shorter lines, in a keystore
