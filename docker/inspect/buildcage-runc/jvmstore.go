@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -28,6 +29,11 @@ import (
 // errNotAKeystore means the file discovery pointed at is neither a JKS nor
 // shaped like a PKCS#12, so injection has nothing it knows how to write.
 var errNotAKeystore = errors.New("not a JKS or PKCS#12 keystore")
+
+// errKeystoreHalfWritten means writing the CA into the mirror's copy of a
+// keystore failed partway, so the copy holds neither its old bytes nor the
+// injected ones and the step must not run with it.
+var errKeystoreHalfWritten = errors.New("adding the CA to the wrapper's copy of this keystore failed partway (the image's own keystore is unchanged)")
 
 // The alias of the injected entry in either keystore shape, and its creation
 // time in a JKS. The time is fixed so the entry is byte-for-byte the same every
@@ -118,9 +124,10 @@ func findJVMKeystores(s *spec) []string {
 // insertIntoKeystore adds a trusted-certificate entry for the CA to the keystore
 // at path, rewriting it in place. Like removeFromBinaryStore it reads the file
 // once and dispatches on its format. On success it returns the keystore's
-// pre-injection bytes for the caller to restore later. An error before the
-// write leaves the keystore untouched for the caller to report, so the step's
-// JVM does not trust the CA.
+// pre-injection bytes for the caller to restore later. An error that wrote
+// nothing leaves the keystore untouched for the caller to report, so the
+// step's JVM does not trust the CA; one after part of the write wraps
+// errKeystoreHalfWritten.
 func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 	ders := certificateDERs(ca)
 	if len(ders) == 0 {
@@ -160,9 +167,32 @@ func insertIntoKeystore(path string, ca []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 
-	if _, err := f.WriteAt(injected, 0); err != nil {
-		return nil, err
+	if n, err := f.WriteAt(injected, 0); err != nil {
+		if n == 0 {
+			// Nothing written, so the keystore is as it was.
+			return nil, withoutPath(err)
+		}
+		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
 	}
-	// Returns content alongside a Truncate error; the caller ignores it there.
-	return content, f.Truncate(int64(len(injected)))
+	// Only a shorter rewrite leaves an old tail to cut; a JKS always grows.
+	if int64(len(injected)) < size {
+		if err := f.Truncate(int64(len(injected))); err != nil {
+			return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
+		}
+	}
+	// Some filesystems (NFS among them) report a failed write only at close.
+	if err := f.Close(); err != nil {
+		return nil, fmt.Errorf("%w: %w", errKeystoreHalfWritten, withoutPath(err))
+	}
+	return content, nil
+}
+
+// withoutPath drops the scratch path an *fs.PathError carries, since the
+// caller names the keystore by its path in the container.
+func withoutPath(err error) error {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return pathErr.Err
+	}
+	return err
 }

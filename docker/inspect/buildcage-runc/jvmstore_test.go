@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+
+	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
 
 // writeRootfsKeystore places raw keystore bytes at a container path inside
@@ -255,11 +259,120 @@ func TestInsertIntoKeystoreReportsAReadFailure(t *testing.T) {
 	}
 }
 
+// A write that fails before writing anything leaves the keystore as it was, so
+// it is not reported as half-written.
 func TestInsertIntoKeystoreReportsAWriteFailure(t *testing.T) {
-	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
+	pristine := keystore(2, trustedEntry(2, "digicert", otherDER))
+	path := mustWriteKeystore(t, pristine)
 	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
-	if _, err := insertIntoKeystore(path, testCA); !errors.Is(err, errBrokenFile) {
-		t.Fatalf("got %v, want the write failure", err)
+	_, err := insertIntoKeystore(path, testCA)
+	if !errors.Is(err, errBrokenFile) || errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the write failure, not a half-written keystore", err)
+	}
+	if got, _ := os.ReadFile(path); !bytes.Equal(got, pristine) {
+		t.Error("the keystore changed though nothing was written")
+	}
+}
+
+func TestInsertIntoKeystoreReportsAShortWrite(t *testing.T) {
+	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
+	original, err := insertIntoKeystore(path, testCA)
+	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the short write as a half-written keystore", err)
+	}
+	if original != nil {
+		t.Error("returned the original bytes for a keystore it left half-written")
+	}
+}
+
+func TestInsertIntoKeystoreReportsACloseFailure(t *testing.T) {
+	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{failClose: true})
+	_, err := insertIntoKeystore(path, testCA)
+	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the close failure as a half-written keystore", err)
+	}
+}
+
+// A JKS rewrite only grows, so there is no tail to cut and no truncate to fail.
+func TestInsertIntoKeystoreSkipsTheTruncateForAGrowingRewrite(t *testing.T) {
+	path := mustWriteKeystore(t, keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+	if _, err := insertIntoKeystore(path, testCA); err != nil {
+		t.Fatalf("got %v, want the grown keystore written without a truncate", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := keystoreWith(keystore(2, trustedEntry(2, "digicert", otherDER)), certificateDERs(testCA))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Error("the grown keystore is not exactly the rewrite")
+	}
+}
+
+// A rewrite shorter than the keystore it replaces has a tail to cut, and a
+// failed truncate leaves it there. Re-encoding a PKCS#12 can shrink it.
+func TestInsertIntoKeystoreReportsATruncateFailure(t *testing.T) {
+	path := mustWritePKCS12(t, passwordlessStore(t, testCert(t, "digicert")))
+	old := encodePKCS12
+	encodePKCS12 = func([]pkcs12.TrustStoreEntry, string, bool) ([]byte, error) { return []byte("short"), nil }
+	t.Cleanup(func() { encodePKCS12 = old })
+	useBrokenBundleFile(t, &brokenFile{failTruncate: true})
+	_, err := insertIntoKeystore(path, certPEM(testCert(t, "buildcage")))
+	if !errors.Is(err, errBrokenFile) || !errors.Is(err, errKeystoreHalfWritten) {
+		t.Fatalf("got %v, want the truncate failure as a half-written keystore", err)
+	}
+}
+
+func TestWithoutPathDropsTheScratchPath(t *testing.T) {
+	err := withoutPath(&fs.PathError{Op: "write", Path: "/scratch/cacerts", Err: syscall.ENOSPC})
+	if !errors.Is(err, syscall.ENOSPC) || strings.Contains(err.Error(), "/scratch") {
+		t.Errorf("got %v, want ENOSPC without the scratch path", err)
+	}
+	if got := withoutPath(errBrokenFile); got != errBrokenFile {
+		t.Errorf("got %v, want an error without a path passed through", got)
+	}
+}
+
+// A keystore left half-written stops the step before it runs: the mirror is
+// dropped unwritten and the real keystore keeps its bytes.
+func TestInjectAbandonsAHalfWrittenKeystore(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
+	pristine := keystore(2, trustedEntry(2, "digicert", otherDER))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts", pristine)
+	before, err := os.ReadFile(filepath.Join(bundle, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
+
+	_, err = inject(bundle, testCA)
+	if !errors.Is(err, errKeystoreHalfWritten) ||
+		!strings.Contains(err.Error(), "/opt/java/lib/security/cacerts") {
+		t.Fatalf("got %v, want the half-written keystore named by its container path", err)
+	}
+	after, err := os.ReadFile(filepath.Join(bundle, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Error("the spec was saved for a step that will not run")
+	}
+	real, err := os.ReadFile(filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(real, pristine) {
+		t.Error("the real keystore was changed")
+	}
+	if left, err := os.ReadDir(scratchRoot); err != nil || len(left) != 0 {
+		t.Errorf("scratch directories left behind: %v %v", left, err)
 	}
 }
 
@@ -634,6 +747,69 @@ func TestPKCS12WithInsertsEveryCert(t *testing.T) {
 	}
 	if len(certs) != 3 {
 		t.Fatalf("got %d certificates, want the original plus two", len(certs))
+	}
+}
+
+// Undoing the injection can fail too; that goes to the log on its own line,
+// and the error inject returns is still the half-written keystore alone.
+func TestInjectLogsAFailureToUndoTheInjection(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
+	old := walkDir
+	walkDir = func(dir string, fn fs.WalkDirFunc) error {
+		if dir == rootfs {
+			return errBrokenWalk // the sweep of the step's layer
+		}
+		return old(dir, fn)
+	}
+	t.Cleanup(func() { walkDir = old })
+
+	_, err := inject(bundle, testCA)
+	if !errors.Is(err, errKeystoreHalfWritten) || errors.Is(err, errBrokenWalk) {
+		t.Fatalf("got %v, want the half-written keystore alone", err)
+	}
+	if !strings.Contains(ownLog.String(), "undoing the CA injection: ") {
+		t.Errorf("the failure to undo was not logged:\n%s", ownLog.String())
+	}
+}
+
+// A half-written keystore inside the store mirror abandons the store's bind
+// too, so nothing reaches the real store or keystore.
+func TestInjectAbandonsAHalfWrittenKeystoreInsideTheStoreDir(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	pristine := keystore(2, trustedEntry(2, "digicert", otherDER))
+	writeRootfsKeystore(t, rootfs, "/etc/ssl/certs/java/cacerts", pristine)
+	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/lib/security"))
+	mustSymlink(t, "/etc/ssl/certs/java/cacerts",
+		filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	before, err := os.ReadFile(filepath.Join(bundle, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
+
+	_, err = inject(bundle, testCA)
+	if !errors.Is(err, errKeystoreHalfWritten) ||
+		!strings.Contains(err.Error(), "/etc/ssl/certs/java/cacerts") {
+		t.Fatalf("got %v, want the half-written keystore named by its container path", err)
+	}
+	if after, _ := os.ReadFile(filepath.Join(bundle, "config.json")); !bytes.Equal(after, before) {
+		t.Error("the spec was saved for a step that will not run")
+	}
+	real, err := os.ReadFile(filepath.Join(rootfs, "etc/ssl/certs/java/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(real, pristine) {
+		t.Error("the real keystore was changed")
+	}
+	if left, err := os.ReadDir(scratchRoot); err != nil || len(left) != 0 {
+		t.Errorf("scratch directories left behind: %v %v", left, err)
 	}
 }
 

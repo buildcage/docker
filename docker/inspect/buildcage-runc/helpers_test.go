@@ -68,9 +68,11 @@ type brokenFile struct {
 	bundleFile
 	failReadAt   int  // fail the nth ReadAt, counting from 1
 	failWriteAt  int  // likewise for WriteAt
+	shortWriteAt int  // write half of the nth WriteAt, then fail it
 	failWrite    int  // likewise for WriteString
 	failStat     bool // fail Stat outright
 	failTruncate bool // likewise for Truncate
+	failClose    bool // close for real, but report a failure
 	notRegular   bool // succeed, but report something other than a regular file
 	reads        int
 	writes       int
@@ -92,6 +94,10 @@ func (b *brokenFile) WriteAt(p []byte, off int64) (int, error) {
 	if b.writes == b.failWriteAt {
 		return 0, errBrokenFile
 	}
+	if b.writes == b.shortWriteAt {
+		n, _ := b.bundleFile.WriteAt(p[:len(p)/2], off)
+		return n, errBrokenFile
+	}
 	return b.bundleFile.WriteAt(p, off)
 }
 
@@ -108,6 +114,14 @@ func (b *brokenFile) Truncate(size int64) error {
 		return errBrokenFile
 	}
 	return b.bundleFile.Truncate(size)
+}
+
+func (b *brokenFile) Close() error {
+	err := b.bundleFile.Close()
+	if b.failClose {
+		return errBrokenFile
+	}
+	return err
 }
 
 func (b *brokenFile) Stat() (fs.FileInfo, error) {

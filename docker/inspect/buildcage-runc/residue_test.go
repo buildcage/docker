@@ -210,6 +210,34 @@ func TestRunRefusesAStepWithoutALayerToReadBack(t *testing.T) {
 	}
 }
 
+// A keystore left half-written fails the step before runc starts it.
+func TestRunRefusesAStepWithAHalfWrittenKeystore(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	useTempCAFile(t, string(testCA))
+	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
+	ran := filepath.Join(t.TempDir(), "ran")
+	t.Setenv("RAN", ran)
+	useFakeRunc(t, `touch "$RAN"`)
+
+	readStderr := captureStderr(t)
+	code := run([]string{"run", "--bundle", bundle, "id"})
+	stderr := readStderr()
+
+	if code != 1 {
+		t.Errorf("run exited %d, want 1", code)
+	}
+	if _, err := os.Stat(ran); !os.IsNotExist(err) {
+		t.Errorf("runc ran the step: %v", err)
+	}
+	if !strings.Contains(stderr, "not running the step: ") || !strings.Contains(stderr, errKeystoreHalfWritten.Error()) {
+		t.Errorf("the build log does not say why:\n%s", stderr)
+	}
+}
+
 func TestRunDoesNotHintAtFailOnCAResidueForOtherFailures(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)

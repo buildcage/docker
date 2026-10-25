@@ -183,7 +183,7 @@ func setupInjection(sub, bundle string) (*injection, error) {
 		return nil, nil
 	}
 	injected, err := inject(bundle, ca)
-	if errors.Is(err, errLayerUnread) {
+	if errors.Is(err, errLayerUnread) || errors.Is(err, errKeystoreHalfWritten) {
 		return nil, err
 	}
 	if err != nil {
