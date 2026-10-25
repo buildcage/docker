@@ -23,7 +23,7 @@ Buildcage governs the code that runs inside a `RUN` step: a dependency's `postin
 script, a compiler plugin, none of which the Dockerfile author reviewed. It decides which
 destinations that code can reach, and records what it tried.
 
-Three things sit outside that model by design.
+Four things sit outside that model by design.
 
 - **Whoever writes the Dockerfile and the workflow.** The allowlist is configured alongside them, by
   the same people, so Buildcage is not a control against them. A `config_file` is no different. On
@@ -31,6 +31,9 @@ Three things sit outside that model by design.
   pull request's own code, so `config_file` is refused there. On other events it is read from
   whatever the workflow checked out, so whoever can write that copy sets the rules.
 - **What buildkitd fetches for itself**, [below](#what-buildkitd-fetches-itself).
+- **What a step reads.** Buildcage restricts where a `RUN` step can send data, not what it can read:
+  a secret mounted with `RUN --mount=type=secret`, a build argument and the build context are all
+  the step's to read. It cannot send them to a destination outside the allowlist.
 - **Another step in the same job.** Running between `setup` and `report`, an untrusted step can
   reach the proxy container through `docker exec` or `docker cp`, or the host filesystem directly on
   a passwordless-sudo runner, and rewrite the traffic log. `report` marks a log that doesn't start
@@ -115,13 +118,24 @@ embedded DNS forwarding to the runner's own resolvers, so a name only an interna
 still resolves, and the query follows the runner's own DNS policy. There is no search-domain
 expansion, so a rule has to name a host in full.
 
-### DNS never leaves the job
+### A lookup alone never leaves the job
 
 The resolver inside the cage has no upstream at all, and answers every query, on the allowlist or
 not, with the proxy's own address. A lookup by itself therefore cannot carry anything out:
 `SECRET-DATA.attacker.example` would otherwise reach an attacker's own nameserver the moment it was
 forwarded. Answering a name outside the allowlist the same way as one inside is deliberate too, so
 that the request which follows is recorded with its URL before it is blocked.
+
+The proxy's own lookups do reach a nameserver outside the job: once the rules admit a request, the
+proxy resolves the name it carried. Under `*.example.com`, a name like `<data>.example.com` is
+resolved the moment the request is allowed, so its labels reach that domain's authoritative
+nameserver even if `inspect` then blocks the request on its path. In `audit`, where nothing is
+blocked, every name the build asks for is resolved this way. A literal host, or a narrow wildcard,
+limits which names leave the job; see [Rule syntax](./reference.md#rule-syntax).
+
+DNS has no notion of a path, so the local answer to a name under an allowed `*.example.com`
+is logged as allowed before any path is known. Only the log line reflects that: the request that
+follows is still checked, and one its path does not allow never reaches an origin.
 
 No discovery record is returned either. Having no upstream, the resolver has nothing to answer an
 `SRV`, `TXT`, `TLSA` or `URI` query with, which is load-bearing rather than incidental:
@@ -170,9 +184,8 @@ address is blocked there too, whatever the IP rules say and in `audit` as well.
 Everything that is not TCP is dropped before it reaches the proxy, so ICMP, raw UDP and QUIC have no
 exit path at all; port 53 to the gateway, which is the resolver, is the one exception. IPv6 is
 dropped the same way, AAAA lookups are answered with no records, and the proxy
-reaches allowed names over IPv4 only. The cost of that last part is an allowed name with AAAA
-records and no A record: it never resolves here, fails on every attempt, in `audit` too, and is
-reported as `dns-failed` with no rule able to clear it.
+reaches allowed names over IPv4 only, so a name with no A record never resolves (see
+[Protocols](../README.md#protocols)).
 
 ## What the builder container runs with
 
@@ -263,43 +276,24 @@ Three mechanisms make that enforceable:
   back to the real one only if the step actually changed it. It also leaves the certificate in the
   distribution's anchor directory, so a step that installs `ca-certificates` part-way through keeps
   trusting it once the bundle is rebuilt, and adds it, the same mirrored way, to the keystore each
-  JDK at `$JAVA_HOME` or behind the first `java` on `PATH` reads (in either the JKS or PKCS#12
-  shape it ships), which no CA-trust variable would reach. Chromium reads neither, only the NSS
-  database in `$HOME`, so the wrapper appends to that database's `pkcs11.txt`, in a mirror like the
-  CA store's, a read-only slot on a database holding only the CA, made by `certutil` in the proxy
-  container from the CA certificate alone. The wrapper never parses the step's own database: it only
-  copies its files, and takes out of `pkcs11.txt` exactly the bytes it appended. A database the
-  step's user cannot write is left alone, and Chromium there does not trust the CA. Injection
-  happens at exec time, never touches LLB, and so cannot affect a cache key. Before the step's layer
-  is committed, the wrapper reads that layer back and takes the certificate, and the anchor, out of
-  every text file carrying it as PEM, every JKS or PKCS#12 trust store carrying it (a PKCS#12 one
-  opened with no password or `changeit`, and resealed in the format it came in, so an older JDK
-  that wrote it can still read it), each bare DER a trust store splits the bundle into (Mono's
-  `cert-sync` writes one per certificate), and the EFI signature database RHEL's `update-ca-trust`
-  writes. A copy it finds but cannot remove fails the build, or only warns under
-  `fail_on_ca_residue: false`, which leaves it in the image: one in a JKS keystore sealed with a
-  password other than `changeit` or in a key's own chain, one inside any other binary, the PEM
-  re-wrapped (escaped into JSON, indented in YAML, on one line or in lines of 48 characters or
-  more), a certificate the proxy issued (saved from a server trust-on-first-use), or a PKCS#12
-  trust store holding such a certificate that opens with no password or `changeit`. A copy it
-  cannot read stays in the image: one in a compressed archive, hex-dumped, re-wrapped outside a
-  PEM block in shorter lines, in a keystore encrypted under another password, or in a PKCS#12
-  naming more than a million key-derivation iterations. Those are not failed on, since
-  dependencies ship encrypted test keystores and failing on them would break builds that never
-  touched the CA. Reading the layer back needs BuildKit's `overlayfs` snapshotter, which the builder
-  is pinned to. Startup test-mounts an overlay under BuildKit's state directory and fails setup when
-  Docker's data root cannot hold one, such as a data root that is itself on overlayfs. A step whose
-  upper directory the wrapper still cannot find does not run, whatever `fail_on_ca_residue` says.
-  The layer is read back whatever the step exited with. The wrapper fails a step through its exit
-  code, 1 or the step's own non-zero one, so an LLB whose `ValidExitCodes` accepts that code lets
-  the failure through; the Dockerfile frontend never sets `ValidExitCodes`.
+  JDK at `$JAVA_HOME` or behind the first `java` on `PATH` reads, which no CA-trust variable would
+  reach. Chromium reads neither, only the NSS database in `$HOME`, so the wrapper appends to that
+  database's `pkcs11.txt`, in a mirror like the CA store's, a read-only slot on a database holding
+  only the CA. The wrapper never parses the step's own database: it only copies its files, and takes
+  out of `pkcs11.txt` exactly the bytes it appended. Injection happens at exec time, never touches
+  LLB, and so cannot affect a cache key. See
+  [CA trust variables](./reference.md#ca-trust-variables).
 
-A wide host rule paired with a narrow path or method does not narrow the DNS side. DNS has no notion
-of a path, so a name under an allowed `*.example.com` is logged as allowed the moment it is looked
-up, before any path is known. The request that follows is still blocked and still never reaches an
-origin; only the log line reflects the host-only nature of that decision. See
-[Rule syntax](./reference.md#rule-syntax) for how to write a host pattern that doesn't widen this
-more than intended.
+The wrapper also keeps the CA out of the image. Before a step's layer is committed, it reads the
+layer back, whatever the step exited with, and takes out every copy of the CA it finds. A copy it
+finds but cannot remove fails the build, unless `fail_on_ca_residue: false` turns that into a
+warning; a copy it cannot read, such as one in a compressed archive, stays in the image.
+[CA residue](./reference.md#ca-residue) lists both kinds. Reading the layer back needs BuildKit's
+`overlayfs` snapshotter, which the builder is pinned to: setup fails when Docker's data root cannot
+hold an overlay mount, and a step whose upper directory the wrapper cannot find does not run,
+whatever `fail_on_ca_residue` says. The wrapper fails a step through its exit code, 1 or the step's
+own non-zero one, so an LLB whose `ValidExitCodes` accepts that code lets the failure through; the
+Dockerfile frontend never sets `ValidExitCodes`.
 
 #### The CA and its private key
 
@@ -311,13 +305,10 @@ the steps. The post step's `docker compose down` removes the container, and the 
 ### `inspect` cannot work with everything, in either mode
 
 TLS is terminated, so a tool that pins a certificate, or ships a bundled trust store it never lets
-the system update, will not work. The JVM (Java, Kotlin, Scala) reads only its own keystore rather
-than the CA-trust variables; a JVM already in the base image is handled by injecting into that
-keystore, but one sealed with a password other than the JDK default falls back to `universal`.
-Chromium's NSS database is given a read-only slot trusting the CA; one the step's user cannot
-write takes none, so Chromium there needs `universal`.
-See [Limitations](../README.md#limitations) for the rest of the
-compatibility picture.
+the system update, will not work. The JVM and Chromium read their own trust stores rather than the
+system one, and only some of those stores get the CA.
+[Under the `inspect` engine](../README.md#under-the-inspect-engine) says which, along with the rest
+of the compatibility picture.
 
 `audit` is not a passive observer here either. TLS is terminated in both modes, so a tool that
 cannot accept the CA fails under `audit` exactly as it would under `restrict`. What `audit` drops is
@@ -390,21 +381,10 @@ into a query string reaches everyone who can read the run. GitHub masks the valu
 workflow secrets, which leaves the ones it does not: a presigned URL's signature, a token minted
 during the build, or a secret whose URL-encoded form no longer matches what was registered.
 
-The value of a query parameter named `access_key`, `access_token`, `api_key`, `api_token`, `auth`,
-`authorization`, `auth_token`, `client_secret`, `code`, `credential`, `credentials`, `id_token`,
-`jwt`, `key`, `passwd`, `password`, `pat`, `private_token`, `pwd`, `refresh_token`, `secret`,
-`session`, `session_token`, `sig`, `signature`, `subscription-key`, `token`, `x-amz-security-token`,
-`x-amz-signature`, `x-api-key` or `x-goog-signature` is therefore replaced. The name is matched
-ignoring case, `-`, `_`, `.` and any trailing `[...]`, so `api_key`, `api-key`, `api.key`, `apiKey`,
-`APIKEY` and `api_key[0][]` are one name. What the brackets hold is not looked at, so `user[password]`
-keeps its value. A parameter starts after `&`, `;` or any `?`, so one in a URL carried inside
-another's value is replaced too. The replaced value runs to the next `&`, so a `;` or `?` inside a
-secret does not leave the rest of it showing:
-
-```
-✅ 00:04.212: GET https://cdn.example.com/x.tar.gz?X-Amz-Signature=***&X-Amz-Expires=3600 -> 200 (4.1MB)
-🚫 00:05.003: POST https://evil.example.com/?d=BASE64PAYLOAD -> not-allowed
-```
+The value of a query parameter with a credential's name, such as `token`, `sig` or
+`X-Amz-Signature`, is therefore replaced with `***`.
+[Hidden query parameters](./reference.md#hidden-query-parameters) lists the names and how they are
+matched.
 
 Everything else is printed as it was sent, parameter names included, so most of what a blocked
 request tried to send is still there. Two things this does not cover: a credential in the path,
@@ -434,13 +414,8 @@ Pay particular attention to general-purpose destinations: a gist host, object st
 that can create repositories. They accept uploads as readily as they serve downloads, which is what
 makes them useful for sending data out.
 
-A wildcard host widens the DNS side too. The resolver inside the cage answers locally and forwards
-nothing (see [DNS never leaves the job](#dns-never-leaves-the-job)), but a request the rules admit is
-resolved upstream by the proxy against the runner's own DNS before it connects. Under `*.example.com`
-a name like `<data>.example.com` is resolved the moment the request is allowed, so its labels reach
-that domain's authoritative nameserver even if the request is then blocked on its path. In `audit`,
-where nothing is blocked, every name the build asks for is resolved this way. A literal host, or a
-narrow wildcard, limits which names leave the job.
+A wildcard host also widens which names the proxy looks up outside the job; see
+[A lookup alone never leaves the job](#a-lookup-alone-never-leaves-the-job).
 
 ### Reduce what has to be reachable
 
