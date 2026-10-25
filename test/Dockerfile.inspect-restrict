@@ -10,9 +10,9 @@
 FROM alpine/curl@sha256:1a4d725751c5bd50297ee243db5d4df8ac5aabdf7030dd40dcec3bc3fdaa1cfa
 
 # The runc wrapper puts the proxy's CA in the system store, so a request the
-# proxy terminates needs no --insecure. The passthrough cases need it, and the
-# forged-Host and SSRF cases pass it so that only the body or status decides
-# them.
+# proxy terminates needs no --insecure. The passthrough cases need it, as does
+# the forged-Host case, whose address URL names no host the certificate could
+# match; the SSRF cases pass it so that only the status decides them.
 SHELL ["/bin/sh", "-c"]
 
 # `S` prints the body, `C` the status. A test asserts on both: a 200 that

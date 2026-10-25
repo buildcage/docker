@@ -817,7 +817,7 @@ func TestInjectSkipsADirectoryPrepareRefuses(t *testing.T) {
 	findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")
 }
 
-// A store too large to mirror never gets the CA, so the variables point at the
+// A store too large to mirror never gets the CA, so SSL_CERT_FILE points at the
 // proxy-CA-only file rather than at it.
 func TestInjectFallsBackWhenTheStoreCannotBeMirrored(t *testing.T) {
 	useFakeRsync(t)
