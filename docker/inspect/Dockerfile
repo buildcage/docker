@@ -84,8 +84,6 @@ LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
 RUN apk add --no-cache --upgrade ca-certificates-bundle
 
 # nss-tools provides certutil for init-cfg's NSS database.
-# util-linux-misc provides pipesz for s6-rc.d/haproxy/run; the base already
-# carries it.
 RUN apk add --no-cache \
       s6-overlay \
       openssl \
@@ -93,7 +91,6 @@ RUN apk add --no-cache \
       iptables \
       curl \
       quickjs-ng \
-      util-linux-misc \
       rsync
 
 # haproxy carries what this engine needs in one binary: it tells a TLS
