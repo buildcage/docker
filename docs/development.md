@@ -61,6 +61,7 @@ vp run build      # rolldown → the committed dist/ bundles
 │   ├── compose.action.test-*.yaml # Fixture overlays on it, one per engine
 │   └── *-licenses.sh       # License collection and checks run at image build time
 ├── test/                   # Dockerfile.* and assert-*.sh per engine and mode, and the fixtures
+│   └── scenarios/          # Each engine's restrict-mode cases, run in one RUN step
 ├── compose.yaml            # Builds the builder image from source (PROXY_ENGINE picks the Dockerfile)
 ├── licenses/               # License texts copied into the images, and the npm license generator
 ├── docs/

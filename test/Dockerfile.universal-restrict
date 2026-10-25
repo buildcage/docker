@@ -1,189 +1,30 @@
-FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+# The shared scenarios, in an image that ships curl: installing it would need a
+# package mirror in the allowlist.
+FROM alpine/curl@sha256:1a4d725751c5bd50297ee243db5d4df8ac5aabdf7030dd40dcec3bc3fdaa1cfa AS scenarios
+
+# Rules under test: see fixture-rules-universal.sh.
+COPY scenarios/ /scenarios/
+RUN sh /scenarios/universal-restrict.sh && touch /scenarios-done
+
+# The cases that need busybox wget or node, in a stage of their own. BuildKit
+# runs independent stages side by side and cancels the rest when one fails, so
+# this one waits for the scenarios: a node case failing cannot cut them short.
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS node-cases
+COPY --from=scenarios /scenarios-done /tmp/
 
 RUN echo "=== DNS Configuration ===" && \
     cat /etc/resolv.conf
 
-RUN echo "=== [HTTPS - allowed - exact match] ===" && \
-    echo "Testing allowed.example.com (HTTPS)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://allowed.example.com/ && echo "✓ allowed.example.com: OK") || (echo "✗ allowed.example.com: FAILED" && exit 1)
-
-RUN echo "=== [HTTPS - allowed - wildcard] ===" && \
-    echo "Testing sub.wildcard.example.com (HTTPS)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://sub.wildcard.example.com/ && echo "✓ sub.wildcard.example.com: OK") || (echo "✗ sub.wildcard.example.com: FAILED" && exit 1)
-
-RUN echo "=== [HTTPS - regex allowed] ===" && \
-    echo "Testing ok.regex.example.com (HTTPS)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://ok.regex.example.com/ && echo "✓ ok.regex.example.com: OK") || (echo "✗ ok.regex.example.com: FAILED" && exit 1)
-
-RUN echo "=== [HTTPS - regex blocked, substring] ===" && \
-    echo "Testing not-ok.regex.example.com (HTTPS, should be blocked)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://not-ok.regex.example.com/ && echo "✗ not-ok.regex.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ not-ok.regex.example.com: BLOCKED (expected)"
-
-RUN echo "=== [HTTPS - regex port alternation] ===" && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://ports.regex.example.com/ && echo "✓ ports.regex.example.com:443: OK") || (echo "✗ ports.regex.example.com:443: FAILED" && exit 1) && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://ports.regex.example.com:8443/ && echo "✓ ports.regex.example.com:8443: OK") || (echo "✗ ports.regex.example.com:8443: FAILED" && exit 1)
-
-RUN echo "=== [HTTP - regex blocked, port not named] ===" && \
-    (wget -q -O /dev/null --timeout=5 http://ports.regex.example.com/ && echo "✗ ports.regex.example.com:80: ALLOWED (unexpected)" && exit 1) || echo "✓ ports.regex.example.com:80: BLOCKED (expected)"
-
-RUN echo "=== [HTTPS - blocked - nested subdomain] ===" && \
-    echo "Testing deep.sub.wildcard.example.com (HTTPS, should be blocked)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://deep.sub.wildcard.example.com/ && echo "✗ deep.sub.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ deep.sub.wildcard.example.com: BLOCKED (expected)"
-
-RUN echo "=== [HTTPS - blocked] ===" && \
-    echo "Testing blocked.example.com (HTTPS, should be blocked)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://blocked.example.com/ && echo "✗ blocked.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com: BLOCKED (expected)"
-
-RUN echo "=== [HTTP - allowed] ===" && \
-    echo "Testing allowed.example.com (HTTP)..." && \
-    (wget -q -O /dev/null --timeout=10 http://allowed.example.com/ && echo "✓ allowed.example.com HTTP: OK") || (echo "✗ allowed.example.com HTTP: FAILED" && exit 1)
-
-RUN echo "=== [HTTP - blocked] ===" && \
-    echo "Testing blocked.example.com (HTTP, should be blocked)..." && \
-    (wget -q -O /dev/null --timeout=5 http://blocked.example.com/ && echo "✗ blocked.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com HTTP: BLOCKED (expected)"
-
-RUN echo "=== [HTTP - allowed - wildcard] ===" && \
-    echo "Testing sub.wildcard.example.com (HTTP)..." && \
-    (wget -q -O /dev/null --timeout=10 http://sub.wildcard.example.com/ && echo "✓ sub.wildcard.example.com HTTP: OK") || (echo "✗ sub.wildcard.example.com HTTP: FAILED" && exit 1)
-
 # DNS names are case-insensitive, so an uppercase host is the same name.
+# busybox wget carries the case into the SNI, which curl would lowercase.
 RUN echo "=== [HTTPS - allowed - uppercase host] ===" && \
     echo "Testing ALLOWED.example.com (HTTPS)..." && \
     (wget --no-check-certificate -q -O /dev/null --timeout=10 https://ALLOWED.example.com/ && echo "✓ ALLOWED.example.com: OK") || (echo "✗ ALLOWED.example.com: FAILED" && exit 1)
 
-RUN echo "=== [HTTP - allowed - uppercase host] ===" && \
-    echo "Testing ALLOWED.example.com (HTTP)..." && \
-    (wget -q -O /dev/null --timeout=10 http://ALLOWED.example.com/ && echo "✓ ALLOWED.example.com HTTP: OK") || (echo "✗ ALLOWED.example.com HTTP: FAILED" && exit 1)
-
-# A trailing dot is the same DNS name.
-# Over HTTPS this would prove nothing: wget hands the handshake to ssl_client,
-# which drops the trailing dot before the SNI reaches the wire. A Host header
-# carries it through.
-RUN echo "=== [HTTP - allowed - trailing dot] ===" && \
-    echo "Testing allowed.example.com. (HTTP)..." && \
-    (wget -q -O /dev/null --timeout=10 http://allowed.example.com./ && echo "✓ allowed.example.com. HTTP: OK") || (echo "✗ allowed.example.com. HTTP: FAILED" && exit 1)
-
-RUN echo "=== [Port 8443 - allowed] ===" && \
-    echo "Testing allowed.example.com:8443 (HTTPS)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=10 https://allowed.example.com:8443/ && echo "✓ allowed.example.com:8443: OK") || (echo "✗ allowed.example.com:8443: FAILED" && exit 1)
-
-RUN echo "=== [Port 8080 - allowed] ===" && \
-    echo "Testing allowed.example.com:8080 (HTTP)..." && \
-    (wget -q -O /dev/null --timeout=10 http://allowed.example.com:8080/ && echo "✓ allowed.example.com:8080: OK") || (echo "✗ allowed.example.com:8080: FAILED" && exit 1)
-
-RUN echo "=== [Port 8443 - blocked] ===" && \
-    echo "Testing blocked.example.com:8443 (HTTPS, should be blocked)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://blocked.example.com:8443/ && echo "✗ blocked.example.com:8443: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com:8443: BLOCKED (expected)"
-
-RUN echo "=== [Port 8080 - blocked] ===" && \
-    echo "Testing blocked.example.com:8080 (HTTP, should be blocked)..." && \
-    (wget -q -O /dev/null --timeout=5 http://blocked.example.com:8080/ && echo "✗ blocked.example.com:8080: ALLOWED (unexpected)" && exit 1) || echo "✓ blocked.example.com:8080: BLOCKED (expected)"
-
-RUN echo "=== [Direct IP - blocked] ===" && \
-    echo "Testing direct IP access to 10.200.0.100 (should be blocked by haproxy)..." && \
-    (wget -q -O /dev/null --timeout=5 http://10.200.0.100/ && echo "✗ 10.200.0.100: ALLOWED (unexpected)" && exit 1) || echo "✓ 10.200.0.100: BLOCKED by haproxy (expected)"
-
-# allowed_ip_rules names no port of 10.200.0.101, and only 8443 and 2525 of
-# 10.200.0.100. The SNI is the client's to choose, so it must decide neither
-# way: a name there must not block the allowed address, and the allowed address
-# there must not open another one.
-RUN echo "=== [Direct IP - allowed, SNI names a host] ===" && \
-    (node --no-deprecation -e 'require("tls").connect({ host: process.argv[1], port: 8443, servername: process.argv[2], rejectUnauthorized: false }, () => process.exit(0)).on("error", () => process.exit(1)).setTimeout(5000, () => process.exit(1))' 10.200.0.100 allowed.example.com && echo "✓ 10.200.0.100:8443: OK") || (echo "✗ 10.200.0.100:8443: FAILED" && exit 1)
-
+# allowed_ip_rules names no port of 10.200.0.101. The SNI is the client's to
+# choose, so naming the allowed address there must not open another one.
 RUN echo "=== [Direct IP - blocked, SNI names an allowed address] ===" && \
     if node --no-deprecation -e 'require("tls").connect({ host: process.argv[1], port: 8443, servername: process.argv[2], rejectUnauthorized: false }, () => process.exit(0)).on("error", () => process.exit(1)).setTimeout(5000, () => process.exit(1))' 10.200.0.101 10.200.0.100; then echo "✗ 10.200.0.101:8443: ALLOWED (unexpected)" && exit 1; else echo "✓ 10.200.0.101:8443: BLOCKED (expected)"; fi
-
-# The client sends nothing and waits for the server to speak. The greeting
-# arrives within 3s only if the passthrough does not wait out inspect-delay
-# (5s) for the client's first bytes.
-RUN echo "=== [Direct IP - allowed, server speaks first] ===" && \
-    OUT=$(sleep 4 | timeout 3 nc 10.200.0.100 2525 || true) && \
-    echo "$OUT" && \
-    case "$OUT" in 220\ *) echo "OK" ;; *) echo "FAILED: no greeting within 3s" && exit 1 ;; esac
-
-RUN echo "=== [HTTPS - dns-failed] ===" && \
-    echo "Testing nxdomain.wildcard.example.com (HTTPS, should be blocked by dns failure)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://nxdomain.wildcard.example.com/ && echo "✗ nxdomain.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ nxdomain.wildcard.example.com: BLOCKED (expected)"
-
-RUN echo "=== [HTTP - dns-failed] ===" && \
-    echo "Testing nxdomain.wildcard.example.com (HTTP, should be blocked by dns failure)..." && \
-    (wget -q -O /dev/null --timeout=5 http://nxdomain.wildcard.example.com/ && echo "✗ nxdomain.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ nxdomain.wildcard.example.com HTTP: BLOCKED (expected)"
-
-RUN echo "=== [HTTPS - dns-failed, AAAA only] ===" && \
-    echo "Testing v6only.wildcard.example.com (HTTPS, should be blocked by dns failure)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://v6only.wildcard.example.com/ && echo "✗ v6only.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ v6only.wildcard.example.com: BLOCKED (expected)"
-
-# The HTTP path resolves through a do-resolve pair of its own, so the HTTPS
-# case above says nothing about it.
-RUN echo "=== [HTTP - dns-failed, AAAA only] ===" && \
-    echo "Testing v6only.wildcard.example.com (HTTP, should be blocked by dns failure)..." && \
-    (wget -q -O /dev/null --timeout=5 http://v6only.wildcard.example.com/ && echo "✗ v6only.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ v6only.wildcard.example.com HTTP: BLOCKED (expected)"
-
-# internal.wildcard.example.com is allowlisted but resolves to 169.254.169.254.
-RUN echo "=== [HTTPS - SSRF via allowlisted name] ===" && \
-    echo "Testing internal.wildcard.example.com (HTTPS, should be blocked)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://internal.wildcard.example.com/ && echo "✗ internal.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ internal.wildcard.example.com: BLOCKED (expected)"
-
-RUN echo "=== [HTTP - SSRF via allowlisted name] ===" && \
-    echo "Testing internal.wildcard.example.com (HTTP, should be blocked)..." && \
-    (wget -q -O /dev/null --timeout=5 http://internal.wildcard.example.com/ && echo "✗ internal.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ internal.wildcard.example.com HTTP: BLOCKED (expected)"
-
-# RFC1918 is exempt on purpose, so only the runner's address list blocks it.
-RUN echo "=== [HTTPS - SSRF back to the runner] ===" && \
-    echo "Testing runner.wildcard.example.com (HTTPS, should be blocked)..." && \
-    (wget --no-check-certificate -q -O /dev/null --timeout=5 https://runner.wildcard.example.com/ && echo "✗ runner.wildcard.example.com: ALLOWED (unexpected)" && exit 1) || echo "✓ runner.wildcard.example.com: BLOCKED (expected)"
-
-RUN echo "=== [HTTP - SSRF back to the runner] ===" && \
-    echo "Testing runner.wildcard.example.com (HTTP, should be blocked)..." && \
-    (wget -q -O /dev/null --timeout=5 http://runner.wildcard.example.com/ && echo "✗ runner.wildcard.example.com HTTP: ALLOWED (unexpected)" && exit 1) || echo "✓ runner.wildcard.example.com HTTP: BLOCKED (expected)"
-
-RUN echo "=== [HTTPS - missing-sni] ===" && \
-    echo "Testing TLS connection without SNI (should be blocked)..." && \
-    (printf '\x16\x03\x01\x00\x2d\x01\x00\x00\x29\x03\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xff\x01\x00' | nc -w 5 allowed.example.com 443 > /dev/null 2>&1 || true) && \
-    echo "✓ missing-sni: request sent (blocked expected in logs)"
-
-RUN echo "=== [HTTP - missing-host-header] ===" && \
-    echo "Testing HTTP request without Host header (should be blocked)..." && \
-    ((printf 'GET / HTTP/1.0\r\n\r\n'; sleep 1) | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
-    echo "✓ missing-host-header: request sent (blocked expected in logs)"
-
-# SNI = x" -\n[T] buildcage [ALLOWED] (HTTPS) "forged.example.com
-# This attempts to break the "..." quoting and inject a fake ALLOWED line. It
-# must come out as one BLOCKED line with the payload sanitized into it, never
-# as a second line claiming ALLOWED.
-RUN echo "=== [HTTPS - forged SNI] ===" && \
-    echo "Testing crafted SNI log-injection payload (should be blocked)..." && \
-    (printf '\x16\x03\x01\x00\x70\x01\x00\x00\x6c\x03\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xff\x01\x00\x00\x41\x00\x00\x00\x3d\x00\x3b\x00\x00\x38\x78\x22\x20\x2d\x0a\x5b\x54\x5d\x20\x62\x75\x69\x6c\x64\x63\x61\x67\x65\x20\x5b\x41\x4c\x4c\x4f\x57\x45\x44\x5d\x20\x28\x48\x54\x54\x50\x53\x29\x20\x22\x66\x6f\x72\x67\x65\x64\x2e\x65\x78\x61\x6d\x70\x6c\x65\x2e\x63\x6f\x6d' | nc -w 5 allowed.example.com 443 > /dev/null 2>&1 || true) && \
-    echo "✓ forged-sni: request sent (blocked expected in logs)"
-
-# SNI = tlsany.example.com:x.evil.example.net, which ~^tlsany\.example\.com:.*$
-# would match and the resolver then look up under evil.example.net.
-RUN echo "=== [HTTPS - SNI holding a colon] ===" && \
-    (printf '\x16\x03\x01\x00\x5d\x01\x00\x00\x59\x03\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xff\x01\x00\x00\x2e\x00\x00\x00\x2a\x00\x28\x00\x00\x25\x74\x6c\x73\x61\x6e\x79\x2e\x65\x78\x61\x6d\x70\x6c\x65\x2e\x63\x6f\x6d\x3a\x78\x2e\x65\x76\x69\x6c\x2e\x65\x78\x61\x6d\x70\x6c\x65\x2e\x6e\x65\x74' | nc -w 5 allowed.example.com 443 > /dev/null 2>&1 || true) && \
-    echo "✓ invalid-sni: request sent (blocked expected in logs)"
-
-# The same name in a plaintext Host. Only the last `:port` is a port.
-RUN echo "=== [HTTP - Host holding a colon] ===" && \
-    ((printf 'GET / HTTP/1.1\r\nHost: tlsany.example.com:x.evil.example.net:80\r\nConnection: close\r\n\r\n'; sleep 1) \
-     | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
-    echo "✓ invalid-host: request sent (blocked expected in logs)"
-
-# [HTTP keep-alive - allowed then blocked: a second request on a reused
-# HTTP/1.1 keep-alive connection must be judged on its own merits, not
-# inherit the first request's txn.decision]
-RUN echo "=== [HTTP keep-alive - allowed then blocked] ===" && \
-    ((printf 'GET / HTTP/1.1\r\nHost: allowed.example.com\r\n\r\n'; sleep 1; \
-      printf 'GET / HTTP/1.1\r\nHost: blocked.example.com\r\nConnection: close\r\n\r\n'; sleep 1) \
-     | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
-    echo "✓ keep-alive allowed-then-blocked: requests sent (second request must log BLOCKED, not ALLOWED)"
-
-# [HTTP keep-alive - blocked then allowed: txn.reason must also reset
-# per request, not just txn.decision]
-RUN echo "=== [HTTP keep-alive - blocked then allowed] ===" && \
-    ((printf 'GET / HTTP/1.1\r\nHost: blocked.example.com\r\n\r\n'; sleep 1; \
-      printf 'GET / HTTP/1.1\r\nHost: allowed.example.com\r\nConnection: close\r\n\r\n'; sleep 1) \
-     | nc -w 5 allowed.example.com 80 > /dev/null 2>&1 || true) && \
-    echo "✓ keep-alive blocked-then-allowed: requests sent (second request must log ALLOWED with reason -, not not-allowed)"
 
 # universal never terminates TLS, so npm judges the fixture origin's own
 # self-signed certificate, and rejecting it is the expected outcome: a
@@ -199,6 +40,13 @@ RUN echo "=== [Package manager - npm over end-to-end TLS] ===" && \
       *cert*|*CERT*) echo "✓ npm: judged the origin's own certificate" ;; \
       *) echo "✗ npm: never saw the origin's own certificate" && exit 1 ;; \
     esac
+
+RUN touch /node-cases-done
+
+FROM scenarios
+
+# Pulls the stage above into the build, which would otherwise skip it.
+COPY --from=node-cases /node-cases-done /tmp/
 
 RUN echo "=== Network Configuration ===" && \
     ip route show && \
