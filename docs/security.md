@@ -34,9 +34,10 @@ Three things sit outside that model by design.
 - **What buildkitd fetches for itself**, [below](#what-buildkitd-fetches-itself).
 - **Another step in the same job.** Running between `setup` and `report`, an untrusted step can
   reach the proxy container through `docker exec` or `docker cp`, or the host filesystem directly on
-  a passwordless-sudo runner, and rewrite the traffic log. `report` refuses a log that doesn't start
-  where a real proxy run would, which catches wholesale erasure, but not a format-aware forgery.
-  The defense here is procedural: don't place an untrusted step between `setup` and `report`.
+  a passwordless-sudo runner, and rewrite the traffic log. `report` marks a log that doesn't start
+  where a real proxy run would as incomplete, and fails the step for it under `restrict` with
+  `fail_on_blocked`, which catches wholesale erasure but not a format-aware forgery. The defense
+  here is procedural: don't place an untrusted step between `setup` and `report`.
 
 One gap does sit inside the model. The report action reads `config_file` again after the build, so
 when a build's `--output type=local` export lands on the file, a `RUN` step decides what the report
@@ -328,10 +329,10 @@ pattern that has changed.
 
 ### Passthrough rules are an uninspected pipe
 
-Under `universal` and `inspect`, `allowed_tls_rules` and `allowed_ip_rules` are passed through as
-raw TCP and recorded with a byte count and nothing more. Once an `ip:port` pair is allowlisted, any
-TCP-based protocol can use that path, and its protocol is never checked. Prefer domain rules, and
-keep `allowed_ip_rules` for destinations that genuinely have no stable hostname.
+`allowed_tls_rules` and `allowed_ip_rules` are passed through as raw TCP and recorded with a byte
+count and nothing more. Once an `ip:port` pair is allowlisted, any TCP-based protocol can use that
+path, and its protocol is never checked. Prefer domain rules, and keep `allowed_ip_rules` for
+destinations that genuinely have no stable hostname.
 
 `universal` sees nothing inside any tunnel, not only these: a rule reaches as far as a host and a
 port, so the method and the path are neither enforced nor reported.

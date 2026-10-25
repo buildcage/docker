@@ -379,8 +379,9 @@ in the base image otherwise trusts the injected CA without a passthrough.
 
 Prefix a rule with `~` to use a regular expression. A host rule's pattern is matched against
 `domain:port` as one expression, so the port is part of the pattern and can be a regex itself. It
-cannot be left out: either engine refuses a `~` host rule with no `:` in it, since what the pattern
-is matched against always carries the port.
+cannot be left out, except in `known_blocked_rules`, which reads a `~` rule with no port as any
+port: every other input refuses a `~` host rule with no `:` in it, since what the pattern is matched
+against always carries the port.
 
 | Rule                              | Effect                                                     |
 | --------------------------------- | ---------------------------------------------------------- |
