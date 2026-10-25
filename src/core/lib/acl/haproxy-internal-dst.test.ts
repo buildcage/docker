@@ -1,5 +1,6 @@
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { internalDstAcl } from "./haproxy-internal-dst.ts";
+import { INTERNAL_RANGES } from "./haproxy-rules.ts";
 
 const ADDRS = ["127.0.0.0/8", "169.254.0.0/16", "198.19.255.1"];
 
@@ -39,6 +40,13 @@ describe("the internal-destination acl", () => {
       "    acl ip_dst_internal dst -m ip 127.0.0.0/8 169.254.0.0/16 198.19.255.1",
       "    acl ip_dst_internal dst -m ip -f /run/h.lst",
     ]);
+  });
+});
+
+describe("the built-in internal ranges", () => {
+  it("include Azure's WireServer, which sits outside every never-public range", () => {
+    // GitHub-hosted runners are Azure VMs, where 168.63.129.16 serves the guest agent.
+    expect(INTERNAL_RANGES).toContain("168.63.129.16/32");
   });
 });
 

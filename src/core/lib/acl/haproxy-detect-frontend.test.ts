@@ -1,11 +1,8 @@
+import { PROXY_ADDRESS } from "../log/proxy-address.ts";
+import { expectInOrder, FULL_RULES as FULL } from "../test/config-text.ts";
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { detectFrontend, type DetectFrontendSpec } from "./haproxy-detect-frontend.ts";
 import { compileRuleSet, INTERNAL_RANGES, type RuleInputs } from "./haproxy-rules.ts";
-
-const FULL: RuleInputs = {
-  ipRules: ["10.0.0.5:5432"],
-  tlsRules: ["db.example.com:443"],
-};
 
 /** The detect frontend for these rules, as the generated config carries it. */
 function detect(inputs: RuleInputs = {}, options: Partial<DetectFrontendSpec> = {}): string {
@@ -17,7 +14,7 @@ function detect(inputs: RuleInputs = {}, options: Partial<DetectFrontendSpec> = 
     ipRules: ip,
     tlsHosts: tls,
     internalAddrs: INTERNAL_RANGES,
-    proxyAddress: "198.19.255.1",
+    proxyAddress: PROXY_ADDRESS,
     ...options,
   }).join("\n");
 }
@@ -40,9 +37,7 @@ describe("passthrough", () => {
     // An ip rule's connection is accepted before it, so txn.pass means a tls rule.
     expect(config.split(capture).length).toBe(2);
     expect(config).toContain(`${capture} if { var(txn.pass) -m found }`);
-    expect(config.indexOf(capture) > config.indexOf("accept if { var(txn.pass) -m found }")).toBe(
-      true,
-    );
+    expectInOrder(config, ["accept if { var(txn.pass) -m found }", capture]);
     expect(detect({ ipRules: ["10.0.0.5:5432"] })).not.toContain("set-var(txn.sni)");
   });
 
@@ -78,17 +73,19 @@ describe("passthrough", () => {
     // `tcp-request content accept` stops the rest of the content rules, so a
     // set-var or do-resolve placed after it never runs, silently, with the
     // passthrough still working but going to the client's own address.
-    const resolve = config.indexOf("tcp-request content do-resolve");
-    const accept = config.indexOf("tcp-request content accept if { req.ssl_hello_type 1 }");
-    expect(resolve !== -1 && resolve < accept).toBe(true);
+    expectInOrder(config, [
+      "tcp-request content do-resolve",
+      "tcp-request content accept if { req.ssl_hello_type 1 }",
+    ]);
   });
 
   it("waits for a ClientHello split across segments before accepting plaintext", () => {
     // Folded into one rule with the TLS check, `{ req.len gt 0 }` would match
     // the first segment of a ClientHello and send TLS down the plaintext path.
-    const tls = config.indexOf("tcp-request content accept if { req.ssl_hello_type 1 }\n");
-    const plain = config.indexOf("tcp-request content accept if { req.len gt 0 }\n");
-    expect(tls !== -1 && tls < plain).toBe(true);
+    expectInOrder(config, [
+      "tcp-request content accept if { req.ssl_hello_type 1 }\n",
+      "tcp-request content accept if { req.len gt 0 }\n",
+    ]);
   });
 
   it("passes an ip rule's connection through without waiting for the client to speak", () => {
@@ -118,10 +115,11 @@ describe("passthrough", () => {
     // The ip rule names the address itself, so the SNI neither redirects nor
     // blocks it; the tls rule's resolution never runs for it.
     const overlap = detect({ ...FULL, ipRules: ["10.0.0.0/8:443"] });
-    const accept = overlap.indexOf("tcp-request content accept if { var(txn.pass) -m found }");
-    expect(accept).not.toBe(-1);
-    expect(overlap.indexOf("set-var(txn.pass) int(1) if tls0_sni") > accept).toBe(true);
-    expect(overlap.indexOf("tcp-request content do-resolve") > accept).toBe(true);
+    expectInOrder(overlap, [
+      "tcp-request content accept if { var(txn.pass) -m found }",
+      "set-var(txn.pass) int(1) if tls0_sni",
+      "tcp-request content do-resolve",
+    ]);
   });
 
   it("connects a passthrough where it resolved the SNI, not where the client aimed", () => {
@@ -138,6 +136,28 @@ describe("passthrough", () => {
     );
   });
 
+  it("resolves the SNI a tls rule passed, connects there, then refuses an internal destination", () => {
+    // The pass flag is set only once an SNI matched, and it is the entire
+    // rule check the resolution sits behind: a passthrough has no path or
+    // method. set-dst has to come before the guard so the log shows the
+    // address that tripped it.
+    expectInOrder(config, [
+      "set-var(txn.pass) int(1) if tls0_sni",
+      "tcp-request content do-resolve(txn.dst,buildcage,ipv4) req.ssl_sni,lower if { var(txn.pass) -m found }",
+      "tcp-request content set-dst var(txn.dst)",
+      "acl pass_dst_internal var(txn.dst) -m ip",
+      "tcp-request content reject if { var(txn.pass) -m found } pass_dst_internal",
+    ]);
+  });
+
+  it("records a passthrough's name, size and destination, its only trace", () => {
+    // Nothing decrypts one, so there is no request line to fall back on.
+    expect(config).toContain(
+      'log-format "buildcage %[date(0,ms)] pass %[var(txn.proto)] %B ts=%ts ' +
+        'reason=%[var(txn.reason)] dst=%[dst]:%[dst_port] sni=%[var(txn.sni)]"',
+    );
+  });
+
   it("sends both to a tcp backend that never terminates", () => {
     expect(config).toContain("tcp-request content set-var(txn.pass) int(1) if ip0_dst ip0_port");
     expect(config).toContain("tcp-request content set-var(txn.pass) int(1) if tls0_sni");
@@ -146,9 +166,7 @@ describe("passthrough", () => {
   });
 
   it("selects that backend below the accept, where the file reads as it runs", () => {
-    const accept = config.indexOf("tcp-request content accept");
-    const select = config.indexOf("use_backend passthrough");
-    expect(accept !== -1 && accept < select).toBe(true);
+    expectInOrder(config, ["tcp-request content accept", "use_backend passthrough"]);
   });
 
   it("omits the port acl when the rule names every port", () => {
@@ -234,6 +252,15 @@ describe("ip rules and the proxy's own address", () => {
     const self = "{ var(txn.pass) -m found } ip_dst_internal { dst_port 10024 }";
     expect(result).toContain(`set-var(txn.reason) str(internal-address) if ${self}\n`);
     expect(result).toContain(`tcp-request content reject if ${self}\n`);
+  });
+});
+
+describe("classifying a connection", () => {
+  it("classifies by the first bytes, so no port is declared in advance", () => {
+    // This is what lets audit record everything without being configured.
+    const config = detect();
+    expect(config).toContain("acl is_tls req.ssl_hello_type 1");
+    expect(config).toContain("use_backend to_tls if is_tls");
   });
 });
 

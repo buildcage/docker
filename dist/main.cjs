@@ -12225,7 +12225,7 @@ function ruleBlock(rules, mode, scheme) {
 }
 //#endregion
 //#region src/core/lib/acl/haproxy-rules.ts
-const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`, INTERNAL_RANGES = [
+const HOST_IS_ADDRESS = `^${IPV4}$`, INTERNAL_RANGES = [
 	"0.0.0.0/8",
 	"127.0.0.0/8",
 	"169.254.0.0/16",

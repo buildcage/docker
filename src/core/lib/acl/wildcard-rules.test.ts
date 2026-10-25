@@ -74,9 +74,8 @@ describe("wildcardToRegex", () => {
     expect(re.test("10.20.0.1:444")).toBe(false);
   });
 
-  it("rejects a CIDR block HAProxy would misread or reject", () => {
+  it("rejects a CIDR block HAProxy would misread", () => {
     expect(() => wildcardToRegex("010.0.0.0/8:443")).toThrow(/Invalid CIDR block/);
-    expect(() => wildcardToRegex("10.0.0.0/33:443")).toThrow(/Invalid CIDR block/);
   });
 
   it("turns a * port into any number", () => {

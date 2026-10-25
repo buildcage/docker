@@ -12,15 +12,14 @@
  */
 import { describe, it } from "vitest";
 
+import { PROXY_ADDRESS } from "../log/proxy-address.ts";
 import { expectMatchesGolden } from "../test/golden.node.ts";
 import { generateHaproxyConfig, type HaproxyConfigOptions } from "./haproxy-config.ts";
 import { buildUrlRules } from "./url-rules.ts";
 
-const PROXY = "198.19.255.1";
-
 const CASES: Record<string, HaproxyConfigOptions> = {
   // Only the required option: the skeleton every other case is a delta from.
-  defaults: { proxyAddress: PROXY },
+  defaults: { proxyAddress: PROXY_ADDRESS },
 
   // One rule of every kind.
   "restrict-full": {
@@ -28,7 +27,7 @@ const CASES: Record<string, HaproxyConfigOptions> = {
     httpRules: ["b.example.com:80"],
     ipRules: ["10.0.0.5:5432"],
     tlsRules: ["db.example.com:443"],
-    proxyAddress: PROXY,
+    proxyAddress: PROXY_ADDRESS,
   },
 
   // Same rules, nothing blocked, so the mode branch runs through every stage.
@@ -38,7 +37,7 @@ const CASES: Record<string, HaproxyConfigOptions> = {
     httpRules: ["b.example.com:80"],
     ipRules: ["10.0.0.5:5432"],
     tlsRules: ["db.example.com:443"],
-    proxyAddress: PROXY,
+    proxyAddress: PROXY_ADDRESS,
   },
 
   // Method + path matching, which is the inspect engine's whole reason to exist.
@@ -52,13 +51,13 @@ const CASES: Record<string, HaproxyConfigOptions> = {
         "GET https://169.254.169.254/latest/meta-data/*",
       ].join("\n"),
     ),
-    proxyAddress: PROXY,
+    proxyAddress: PROXY_ADDRESS,
   },
 
   // The internal-destination guard's file-backed half.
   "restrict-host-address-file": {
     httpsRules: ["a.example.com:443"],
-    proxyAddress: PROXY,
+    proxyAddress: PROXY_ADDRESS,
     hostAddressFile: "/etc/haproxy/host-addrs.lst",
   },
 
@@ -66,7 +65,7 @@ const CASES: Record<string, HaproxyConfigOptions> = {
   "restrict-wildcards": {
     httpsRules: ["*.example.com:443", "**.example.org:*", "plain.example.net:443"],
     tlsRules: ["~^db[0-9]+\\.example\\.com$:5432"],
-    proxyAddress: PROXY,
+    proxyAddress: PROXY_ADDRESS,
   },
 };
 

@@ -1,3 +1,5 @@
+import { PROXY_ADDRESS } from "../log/proxy-address.ts";
+import { expectInOrder } from "../test/config-text.ts";
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import {
   escapeForCel,
@@ -7,7 +9,7 @@ import {
 import { compileRuleSet, type RuleInputs } from "./haproxy-rules.ts";
 import { buildUrlRules } from "./url-rules.ts";
 
-const BASE = { proxyAddress: "198.19.255.1" };
+const BASE = { proxyAddress: PROXY_ADDRESS };
 
 /** Rules and Corefile options in one bag, split apart by `gen` below. */
 type CaseOptions = RuleInputs & Partial<CorednsConfigOptions>;
@@ -44,6 +46,13 @@ function regexOf(exprLine: string): RegExp {
   const pattern = exprLine.replace(/\\\\/g, "\\");
   const body = pattern.slice(pattern.indexOf("'") + 1, pattern.lastIndexOf("'"));
   return body.startsWith("(?i)") ? new RegExp(body.slice(4), "i") : new RegExp(body);
+}
+
+/** From the first `marker` on; throws when it is missing, so a renamed marker fails the test. */
+function fromMarker(text: string, marker: string): string {
+  const start = text.indexOf(marker);
+  if (start < 0) throw new Error(`no ${marker}`);
+  return text.slice(start);
 }
 
 /** From a view's declaration to the end of the block holding it. */
@@ -197,7 +206,7 @@ describe("denied names", () => {
 
   it("answers locally, so the query is never forwarded", () => {
     // The deny block has no forward directive of its own.
-    const denyBlock = config.slice(config.indexOf("# Everything else"));
+    const denyBlock = fromMarker(config, "# Everything else");
     expect(denyBlock).not.toContain("forward");
   });
 
@@ -205,8 +214,8 @@ describe("denied names", () => {
     // Scoped to the deny block specifically: the allow block above it has its
     // own AAAA template, identical in shape, and a plain indexOf would find that
     // one first.
-    const denyBlock = config.slice(config.indexOf("# Everything else"));
-    const aaaaBlock = denyBlock.slice(denyBlock.indexOf("template IN AAAA"));
+    const denyBlock = fromMarker(config, "# Everything else");
+    const aaaaBlock = fromMarker(denyBlock, "template IN AAAA");
     expect(aaaaBlock).not.toContain("answer");
     expect(denyBlock).not.toContain("rcode NXDOMAIN");
   });
@@ -215,8 +224,8 @@ describe("denied names", () => {
     // A type that reaches no template at all is answered SERVFAIL, which says
     // the server is broken and the query worth retrying: musl waits out its
     // whole resolver timeout on one. NODATA blocks it without the wait.
-    const denyBlock = config.slice(config.indexOf("# Everything else"));
-    const anyBlock = denyBlock.slice(denyBlock.indexOf("template IN ANY"));
+    const denyBlock = fromMarker(config, "# Everything else");
+    const anyBlock = fromMarker(denyBlock, "template IN ANY");
     expect(denyBlock).toContain("template IN ANY");
     expect(anyBlock).not.toContain("answer");
   });
@@ -224,10 +233,8 @@ describe("denied names", () => {
   it("keeps the A template ahead of the catch-all, which matches every type", () => {
     // CoreDNS takes the first template that matches, so the order in the file
     // is what stops IN ANY from answering an A query with NODATA.
-    const denyBlock = config.slice(config.indexOf("# Everything else"));
-    expect(denyBlock.indexOf("template IN A {") < denyBlock.indexOf("template IN ANY {")).toBe(
-      true,
-    );
+    const denyBlock = fromMarker(config, "# Everything else");
+    expectInOrder(denyBlock, ["template IN A {", "template IN ANY {"]);
   });
 
   it("labels the two paths distinguishably in the log", () => {
@@ -247,7 +254,7 @@ describe("denied names", () => {
 describe("allowed names", () => {
   const config = gen({ httpsRules: ["a.example.com:443"] });
   const allowBlock = blockOf(config, "view allowlist");
-  const denyBlock = config.slice(config.indexOf("# Everything else"));
+  const denyBlock = fromMarker(config, "# Everything else");
   // Both blocks share proxyAnswerLines() in the generator, so comparing them
   // proves they cannot drift apart, which re-asserting each block's shape
   // separately would not.
@@ -432,13 +439,13 @@ describe("service-discovery names", () => {
     // CoreDNS takes the first block whose view matches, and the deny block has
     // no view at all, so order is what decides this.
     const config = gen(RULES);
-    expect(config.indexOf("view discovery") < config.indexOf("view allowlist")).toBe(true);
-    expect(config.indexOf("view discovery") < config.indexOf("buildcage dns denied")).toBe(true);
+    expectInOrder(config, ["view discovery", "view allowlist"]);
+    expectInOrder(config, ["view discovery", "buildcage dns denied"]);
   });
 
   it("comes before the catch-all in audit mode too", () => {
     const config = gen({ mode: "audit" });
-    expect(config.indexOf("view discovery") < config.indexOf("buildcage dns allowed")).toBe(true);
+    expectInOrder(config, ["view discovery", "buildcage dns allowed"]);
   });
 });
 
@@ -458,8 +465,7 @@ describe("blocked service names", () => {
     // Someone who did write a rule naming a service name gets what they asked
     // for; only names no rule covers reach this block.
     const config = gen({ httpsRules: ["deb.debian.org:443"] });
-    expect(config.indexOf("view allowlist") < config.indexOf("view service")).toBe(true);
-    expect(config.indexOf("view service") < config.indexOf("buildcage dns denied")).toBe(true);
+    expectInOrder(config, ["view allowlist", "view service", "buildcage dns denied"]);
   });
 
   it("takes every service name, under any host", () => {
