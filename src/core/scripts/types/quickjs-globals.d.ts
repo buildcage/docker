@@ -8,10 +8,10 @@
  * not load module filename 'std'" even with --std passed).
  *
  * Covers only the APIs the QuickJS code calls (all that tsconfig.qjs.json
- * checks), not a general QuickJS type definition. This file must only ever be visible to tsconfig.qjs.json's
- * program (see its "types": []), since @types/node also declares a module
- * named "os", with an incompatible shape, and the two would collide if this
- * file were ever included alongside it.
+ * checks), not a general QuickJS type definition. This file must only ever be
+ * visible to tsconfig.qjs.json's program (see its "types": []), since
+ * @types/node also declares a module named "os", with an incompatible shape,
+ * and the two would collide if this file were ever included alongside it.
  */
 
 declare module "qjs:std" {
