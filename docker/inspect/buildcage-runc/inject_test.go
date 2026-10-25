@@ -579,13 +579,8 @@ func TestInjectWritesBackWhenTheStepChangesTheStore(t *testing.T) {
 	scratchDir, _ := mount["source"].(string)
 	mustWriteFile(t, filepath.Join(scratchDir, "ca-certificates.crt"), "REGENERATED\n")
 
-	calls := countRsync(t)
-
 	if err := restore.finish(); err != nil {
 		t.Fatal(err)
-	}
-	if *calls != 2 {
-		t.Fatalf("got %d rsync invocations for the write-back, want 2 (dry run, then apply)", *calls)
 	}
 
 	got, err := os.ReadFile(filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt"))
@@ -612,7 +607,7 @@ func TestInjectWriteBackFailurePropagates(t *testing.T) {
 	scratchDir, _ := mount["source"].(string)
 	mustWriteFile(t, filepath.Join(scratchDir, "ca-certificates.crt"), "REGENERATED\n")
 
-	failRsyncOn(t, 2) // the apply, right after a successful dry run
+	failRsyncWhen(t, isRsyncApply)
 
 	if err := restore.finish(); err == nil {
 		t.Fatal("expected the write-back failure to propagate")
@@ -635,7 +630,7 @@ func TestInjectWriteBackFailureKeepsTheSweepFailureInTheLog(t *testing.T) {
 	scratchDir, _ := mount["source"].(string)
 	mustWriteFile(t, filepath.Join(scratchDir, "ca-certificates.crt"), "REGENERATED\n")
 	mustWriteFile(t, filepath.Join(rootfs, "cacerts.bin"), "EFI-VAR\x00"+string(testDER))
-	failRsyncOn(t, 2)
+	failRsyncWhen(t, isRsyncApply)
 
 	if err := restore.finish(); err == nil || isCAResidue(err) {
 		t.Fatalf("got %v, want the write-back failure", err)

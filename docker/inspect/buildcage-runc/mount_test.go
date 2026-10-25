@@ -505,8 +505,8 @@ func TestWriteBackReportsAFailedDryRun(t *testing.T) {
 	useFakeRsync(t)
 	scratch, hostDir := t.TempDir(), t.TempDir()
 	mustWriteFile(t, filepath.Join(scratch, "ca-certificates.crt"), "REGENERATED\n")
-	// failRsyncOn first, so the counter wraps it and sees every call.
-	failRsyncOn(t, 1)
+	// failRsyncWhen first, so the counter wraps it and sees every call.
+	failRsyncWhen(t, isRsyncDryRun)
 	calls := countRsync(t)
 
 	if err := writeBack(scratch, hostDir); err == nil {
@@ -514,6 +514,44 @@ func TestWriteBackReportsAFailedDryRun(t *testing.T) {
 	}
 	if *calls != 1 {
 		t.Errorf("got %d rsync invocations, want 1: the apply must not follow a failed dry run", *calls)
+	}
+}
+
+// The fakes pick out a call by its arguments, so each matcher has to accept
+// the call it names, as the code makes it, and no other.
+func TestRsyncMatchersRecogniseEachCall(t *testing.T) {
+	useFakeRsync(t)
+	var calls [][]string
+	orig := runRsync
+	runRsync = func(args []string) ([]byte, error) {
+		calls = append(calls, args)
+		return orig(args)
+	}
+	t.Cleanup(func() { runRsync = orig })
+	hostDir := t.TempDir()
+	scratch := filepath.Join(scratchRoot, "mirror")
+
+	if err := mirrorDir(hostDir, scratch); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeBack(scratch, hostDir); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"mirror", "dry run", "apply"}
+	if len(calls) != len(want) {
+		t.Fatalf("got %d rsync calls, want %d: %v", len(calls), len(want), calls)
+	}
+	for i, args := range calls {
+		got := map[string]bool{"mirror": isRsyncMirror(args), "dry run": isRsyncDryRun(args), "apply": isRsyncApply(args)}
+		for name, matched := range got {
+			if matched != (name == want[i]) {
+				t.Errorf("call %d, the %s, %v: %s matcher says %v", i, want[i], args, name, matched)
+			}
+		}
+	}
+	if rsyncSrc([]string{"--version"}) != "" || rsyncDst(nil) != "" {
+		t.Error("a call without operands should have no source or destination")
 	}
 }
 
@@ -588,7 +626,7 @@ func TestPrepareReportsAMirrorThatFailed(t *testing.T) {
 	useFakeRsync(t)
 	b, _ := newCAStoreBind(t)
 	// prepare already ran once in the fixture; run it again with rsync failing.
-	failRsyncOn(t, 1)
+	failRsyncWhen(t, isRsyncMirror)
 
 	if err := b.prepare(testCA); err == nil {
 		t.Fatal("expected the mirror's failure to propagate")

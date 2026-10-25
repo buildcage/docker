@@ -259,8 +259,8 @@ func TestNSSDBIsSkippedWhenTheSlotCannotBeAdded(t *testing.T) {
 		"a mount where the CA database goes": func(t *testing.T, bundle, _ string) {
 			mountAt(t, bundle, nssCADBDir+"/x")
 		},
-		"a mirror that cannot be made": func(t *testing.T, _, _ string) {
-			failRsyncOn(t, 1)
+		"a mirror that cannot be made": func(t *testing.T, _, legacy string) {
+			failRsyncWhen(t, func(args []string) bool { return rsyncSrc(args) == legacy })
 		},
 		"a mirror that cannot be read": func(t *testing.T, _, _ string) {
 			failWalkUnderOnce(t, scratchRoot)
