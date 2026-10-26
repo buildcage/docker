@@ -12890,6 +12890,7 @@ async function runSetupStep(env, overrides = {}) {
 	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
 	warning && warn(warning);
 	let { proxyEngine, builderName, proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readSetupInputs();
+	for (let name of ["config_file", ...CONFIG_FILE_INPUTS.known]) delete env[`INPUT_${name.toUpperCase()}`];
 	log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutput("builder_name", builderName), checkUrlAndTlsRuleSupport({
 		proxyEngine,
 		proxyMode,

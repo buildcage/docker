@@ -157,6 +157,11 @@ export async function runSetupStep(
     tlsRules,
     knownBlockedRules,
   } = readSetupInputs();
+  // Every input is read. A list input config_file added to can be past the
+  // 128 KiB one variable may hold, and each docker command run from here would
+  // otherwise inherit it and fail to start with E2BIG.
+  for (const name of ["config_file", ...CONFIG_FILE_INPUTS.known])
+    delete env[`INPUT_${name.toUpperCase()}`];
   log(`Proxy engine: ${proxyEngine}`);
   // For post; see planPostCleanup. Without the runner's state file there is
   // no post step.
