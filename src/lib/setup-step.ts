@@ -29,7 +29,7 @@ import {
   type VerifyImageDigestOptions,
   type ResolvedImage,
 } from "#core/lib/provenance/verify-image.ts";
-import { CONFIG_FILE_INPUTS } from "#report/report-source.ts";
+import { CONFIG_FILE_INPUTS, dropListInputs } from "#report/report-source.ts";
 
 import { COMPOSE_FILE, withComposeOverlay } from "../compose-file.ts";
 import { builderStartError } from "./builder-diagnostics.ts";
@@ -157,11 +157,7 @@ export async function runSetupStep(
     tlsRules,
     knownBlockedRules,
   } = readSetupInputs();
-  // Every input is read. A list input config_file added to can be past the
-  // 128 KiB one variable may hold, and each docker command run from here would
-  // otherwise inherit it and fail to start with E2BIG.
-  for (const name of ["config_file", ...CONFIG_FILE_INPUTS.known])
-    delete env[`INPUT_${name.toUpperCase()}`];
+  dropListInputs(env);
   log(`Proxy engine: ${proxyEngine}`);
   // For post; see planPostCleanup. Without the runner's state file there is
   // no post step.

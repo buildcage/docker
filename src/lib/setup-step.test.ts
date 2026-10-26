@@ -295,18 +295,17 @@ describe("runSetupStep", () => {
     });
   });
 
-  it("drops this action's inputs from env once read, so no docker command inherits them", async () => {
-    const env = {
-      ...ENV,
-      INPUT_CONFIG_FILE: "c.yml",
-      INPUT_ALLOWED_HTTPS_RULES: "example.com:443\n".repeat(10_000),
-      INPUT_FAIL_ON_BLOCKED: "false",
-      INPUT_DIR: "the workflow's own",
-    };
+  it("keeps the list inputs config_file appended to out of every docker command", async () => {
+    mocks.applyConfigFile.mockImplementation((env: NodeJS.ProcessEnv) => {
+      env.INPUT_ALLOWED_HTTPS_RULES = "# a comment\n".repeat(20_000);
+    });
+    const env = { ...ENV, INPUT_CONFIG_FILE: "c.yml" };
     await runSetupStep(env, deps);
 
-    expect(env).toStrictEqual({ ...ENV, INPUT_DIR: "the workflow's own" });
-    expect(mocks.runDocker.mock.calls[0]![1]).not.toHaveProperty("INPUT_ALLOWED_HTTPS_RULES");
+    expect(mocks.runDocker).toHaveBeenCalledTimes(2);
+    for (const [, dockerEnv] of mocks.runDocker.mock.calls) {
+      expect(dockerEnv).not.toHaveProperty("INPUT_ALLOWED_HTTPS_RULES");
+    }
   });
 
   it("logs every rule list the builder was configured with", async () => {

@@ -79,6 +79,18 @@ describe("runReportStep", () => {
     expect(mocks.warn).not.toHaveBeenCalled();
   });
 
+  it("keeps the list inputs config_file appended to out of the script's environment", async () => {
+    mocks.applyConfigFile.mockImplementation((env: NodeJS.ProcessEnv) => {
+      env.INPUT_ALLOWED_HTTPS_RULES = "# a comment\n".repeat(20_000);
+    });
+    const env = { INPUT_CONFIG_FILE: "c.yml", INPUT_FAIL_ON_BLOCKED: "false" };
+    await runReportStep(env, deps);
+    expect(mocks.runReportScript.mock.calls[0][2].env).toStrictEqual({
+      INPUT_CONFIG_FILE: "c.yml",
+      INPUT_FAIL_ON_BLOCKED: "false",
+    });
+  });
+
   it("warns of the config_file inputs the workflow overrode", async () => {
     mocks.applyConfigFile.mockReturnValue({
       path: "/w/c.yml",

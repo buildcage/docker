@@ -15341,6 +15341,9 @@ const LIST_INPUTS = [
 	],
 	lists: LIST_INPUTS
 };
+function dropListInputs(env) {
+	for (let name of LIST_INPUTS) delete env[`INPUT_${name.toUpperCase()}`];
+}
 function capturedStderr(e) {
 	let err = e && typeof e == "object" ? e : {};
 	return typeof err.stderr == "string" ? err.stderr.trim() : "";
@@ -63450,7 +63453,9 @@ async function runReportStep(env, overrides = {}) {
 	warning && warn(warning);
 	let builderName = readBuilderName();
 	checkFailOnBlocked();
-	let trafficArtifact = readTrafficArtifactInputs(), projectName = resolveProjectName(builderName, void 0), containerId = findReportSourceContainer(createDocker(), projectName, builderName), scratchDir = makeScratchDir(), trafficFile = trafficArtifact.upload ? (0, node_path.join)(scratchDir, "traffic.json") : void 0;
+	let trafficArtifact = readTrafficArtifactInputs();
+	dropListInputs(env);
+	let projectName = resolveProjectName(builderName, void 0), containerId = findReportSourceContainer(createDocker(), projectName, builderName), scratchDir = makeScratchDir(), trafficFile = trafficArtifact.upload ? (0, node_path.join)(scratchDir, "traffic.json") : void 0;
 	try {
 		let reportActionPath = (0, node_path.join)(scratchDir, "report-action.js");
 		copyFromContainerImage(containerId, "/opt/buildcage/scripts/report-action.js", reportActionPath), process.exitCode = runReportScript(reportActionPath, containerId, {

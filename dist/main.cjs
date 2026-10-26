@@ -11913,7 +11913,13 @@ const LIST_INPUTS = [
 		"traffic_artifact_retention_days"
 	],
 	lists: LIST_INPUTS
-}, __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
+};
+function dropListInputs(env) {
+	for (let name of LIST_INPUTS) delete env[`INPUT_${name.toUpperCase()}`];
+}
+//#endregion
+//#region src/compose-file.ts
+const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
 function withComposeOverlay(composeFile, overlay) {
 	return overlay ? [composeFile, overlay] : [composeFile];
 }
@@ -12890,8 +12896,7 @@ async function runSetupStep(env, overrides = {}) {
 	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
 	warning && warn(warning);
 	let { proxyEngine, builderName, proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readSetupInputs();
-	for (let name of ["config_file", ...CONFIG_FILE_INPUTS.known]) delete env[`INPUT_${name.toUpperCase()}`];
-	log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutput("builder_name", builderName), checkUrlAndTlsRuleSupport({
+	dropListInputs(env), log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutput("builder_name", builderName), checkUrlAndTlsRuleSupport({
 		proxyEngine,
 		proxyMode,
 		urlRules,

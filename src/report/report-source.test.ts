@@ -5,7 +5,12 @@ import { parse } from "yaml";
 
 import { InvalidInputError } from "#core/lib/actions/inputs.ts";
 
-import { CONFIG_FILE_INPUTS, DEFAULT_BUILDER_NAME, resolveBuilderName } from "./report-source.ts";
+import {
+  CONFIG_FILE_INPUTS,
+  DEFAULT_BUILDER_NAME,
+  dropListInputs,
+  resolveBuilderName,
+} from "./report-source.ts";
 
 function inputsOf(path: string): string[] {
   return Object.keys((parse(readFileSync(path, "utf8")) as { inputs: object }).inputs);
@@ -36,5 +41,14 @@ describe("resolveBuilderName", () => {
     expect(() => resolveBuilderName(name)).toThrow(
       expect.objectContaining({ name: InvalidInputError.name, code: "INVALID_BUILDER_NAME" }),
     );
+  });
+});
+
+describe("dropListInputs", () => {
+  it("removes every list input and leaves the rest", () => {
+    const env: NodeJS.ProcessEnv = { INPUT_BUILDER_NAME: "b", INPUT_DIR: "d" };
+    for (const name of CONFIG_FILE_INPUTS.lists) env[`INPUT_${name.toUpperCase()}`] = "x";
+    dropListInputs(env);
+    expect(env).toStrictEqual({ INPUT_BUILDER_NAME: "b", INPUT_DIR: "d" });
   });
 });

@@ -68,3 +68,12 @@ export const CONFIG_FILE_INPUTS: ConfigFileInputs = {
   ],
   lists: LIST_INPUTS,
 };
+
+/**
+ * Removes the list inputs from env, for a step that has read them. config_file
+ * appends to them, and a variable over 128 KiB makes every exec that inherits
+ * it fail with E2BIG.
+ */
+export function dropListInputs(env: NodeJS.ProcessEnv): void {
+  for (const name of LIST_INPUTS) delete env[`INPUT_${name.toUpperCase()}`];
+}
