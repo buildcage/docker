@@ -17,7 +17,11 @@ import { applyConfigFile } from "#core/lib/actions/config-file.ts";
 import { readTrafficArtifactInputs } from "#core/lib/actions/inputs.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
 import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
-import { CONFIG_FILE_INPUTS, REPORT_ACTION_SCRIPT_PATH } from "#report/report-source.ts";
+import {
+  CONFIG_FILE_INPUTS,
+  REPORT_ACTION_SCRIPT_PATH,
+  dropListInputs,
+} from "#report/report-source.ts";
 
 import { copyFromContainerImage } from "./copy-from-image.ts";
 import { findReportSourceContainer } from "./find-report-source.ts";
@@ -106,6 +110,7 @@ export async function runReportStep(
   const builderName = readBuilderName();
   checkFailOnBlocked();
   const trafficArtifact = readTrafficArtifactInputs();
+  dropListInputs(env);
   // The COMPOSE_PROJECT_NAME override is gated to this repo's own CI/dev
   // testing. The gate reads process.env, not the passed env, so rolldown's
   // replacePlugin folds it to a constant at build time and tree-shakes the

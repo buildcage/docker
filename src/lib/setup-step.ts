@@ -29,7 +29,7 @@ import {
   type VerifyImageDigestOptions,
   type ResolvedImage,
 } from "#core/lib/provenance/verify-image.ts";
-import { CONFIG_FILE_INPUTS } from "#report/report-source.ts";
+import { CONFIG_FILE_INPUTS, dropListInputs } from "#report/report-source.ts";
 
 import { COMPOSE_FILE, withComposeOverlay } from "../compose-file.ts";
 import { builderStartError } from "./builder-diagnostics.ts";
@@ -157,6 +157,7 @@ export async function runSetupStep(
     tlsRules,
     knownBlockedRules,
   } = readSetupInputs();
+  dropListInputs(env);
   log(`Proxy engine: ${proxyEngine}`);
   // For post; see planPostCleanup. Without the runner's state file there is
   // no post step.

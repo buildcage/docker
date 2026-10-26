@@ -295,6 +295,19 @@ describe("runSetupStep", () => {
     });
   });
 
+  it("keeps the list inputs config_file appended to out of every docker command", async () => {
+    mocks.applyConfigFile.mockImplementation((env: NodeJS.ProcessEnv) => {
+      env.INPUT_ALLOWED_HTTPS_RULES = "# a comment\n".repeat(20_000);
+    });
+    const env = { ...ENV, INPUT_CONFIG_FILE: "c.yml" };
+    await runSetupStep(env, deps);
+
+    expect(mocks.runDocker).toHaveBeenCalledTimes(2);
+    for (const [, dockerEnv] of mocks.runDocker.mock.calls) {
+      expect(dockerEnv).not.toHaveProperty("INPUT_ALLOWED_HTTPS_RULES");
+    }
+  });
+
   it("logs every rule list the builder was configured with", async () => {
     await runSetupStep(ENV, deps);
 
