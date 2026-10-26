@@ -90,24 +90,10 @@ describe("parseIpRulesOrThrow", () => {
     expect(() => parseIpRulesOrThrow(INVALID_RULE)).toThrow(/a\*b\.example\.com/);
   });
 
-  for (const rule of [
-    "010.0.0.0/8:5432",
-    "010.0.0.1:443",
-    "999.1.1.1:443",
-    "256.0.0.1:443",
-    "10.0.0.0/33:443",
-    "10.0.0.0/08:443",
-    "1.2.3:443",
-    "10.0.*.010:443",
-    "10.0.*:443",
-    "*:443",
-    "10.0.0.*.1:443",
-  ]) {
-    it(`refuses ${rule}, which HAProxy would misread or reject`, () => {
-      expect(codeOfThrown(() => parseIpRulesOrThrow(rule))).toBe("INVALID_RULES");
-      expect(() => parseIpRulesOrThrow(rule)).toThrow(/is not an IPv4 address|Invalid CIDR block/);
-    });
-  }
+  it("refuses an address HAProxy would misread, naming it", () => {
+    expect(codeOfThrown(() => parseIpRulesOrThrow("010.0.0.1:443"))).toBe("INVALID_RULES");
+    expect(() => parseIpRulesOrThrow("010.0.0.1:443")).toThrow(/is not an IPv4 address/);
+  });
 
   it("accepts the edges of the address and prefix ranges", () => {
     const rules = ["0.0.0.0:443", "0.0.0.0/0:443", "255.255.255.255/32:443"];

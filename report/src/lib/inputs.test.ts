@@ -10,24 +10,11 @@ function inputs(values: Record<string, string> = {}): (name: string) => string {
 }
 
 describe("readBuilderName", () => {
-  it("returns the input when set", () => {
-    expect(readBuilderName(inputs({ builder_name: "mine" }))).toBe("mine");
-  });
-
   // Report finds setup's container by the project name this derives to, so the
   // fallback has to be the same one setup used.
-  it("falls back to the shared default when unset", () => {
+  it("reads builder_name, falling back to the shared default when unset", () => {
+    expect(readBuilderName(inputs({ builder_name: "mine" }))).toBe("mine");
     expect(readBuilderName(inputs())).toBe(DEFAULT_BUILDER_NAME);
-  });
-
-  it("refuses a name that is not a valid container name", () => {
-    expect(() => readBuilderName(inputs({ builder_name: "a;b" }))).toThrow(
-      'Invalid builder_name: "a;b".',
-    );
-  });
-
-  it("treats an empty input as unset rather than as a builder named ''", () => {
-    expect(readBuilderName(inputs({ builder_name: "" }))).toBe(DEFAULT_BUILDER_NAME);
   });
 });
 

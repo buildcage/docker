@@ -41,7 +41,7 @@ else
 fi
 echo ""
 
-# /private/** is outside allowed_url_rules (see compose.test-inspect.yaml),
+# /private/** is outside allowed_url_rules (see fixture-rules-inspect.sh),
 # and the fixture answers any path with 200, so the status recorded here is
 # the proxy's decision and nothing else.
 OUTSIDE_REQUEST="host=allowed\.example\.com /private/debian"

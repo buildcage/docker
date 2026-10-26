@@ -4,7 +4,10 @@ import { builderStartError, type BuilderDiagnosticsDeps } from "./builder-diagno
 import { SetupError } from "./errors.ts";
 
 const OPTIONS = {
-  composeFile: "/action/docker/compose.action.yaml",
+  composeFiles: [
+    "/action/docker/compose.action.yaml",
+    "/repo/docker/compose.action.test-universal.yaml",
+  ],
   projectName: "buildcage",
   builderName: "buildcage",
   composeEnv: { BUILDER_NAME: "buildcage" },
@@ -74,8 +77,7 @@ describe("builderStartError", () => {
     expect(calls[1]).toStrictEqual({
       args: [
         "compose",
-        "-f",
-        OPTIONS.composeFile,
+        ...OPTIONS.composeFiles.flatMap((file) => ["-f", file]),
         "-p",
         OPTIONS.projectName,
         "logs",

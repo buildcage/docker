@@ -17,8 +17,6 @@ const configs = [
     input: "src/main.ts",
     file: "dist/main.cjs",
     plugins: mainPlugins,
-    // sigstore uses dynamic imports; inline them so dist is a single file.
-    codeSplitting: false,
   },
   {
     input: "src/post.ts",
@@ -29,14 +27,11 @@ const configs = [
     input: "report/src/main.ts",
     file: "report/dist/main.cjs",
     plugins: mainPlugins,
-    // @actions/artifact is imported dynamically, so a run that asks for no
-    // artifact never loads it; inline it so dist stays a single file.
-    codeSplitting: false,
   },
 ];
 
 export default defineConfig(
-  configs.map(({ input, file, plugins, codeSplitting = true }) => ({
+  configs.map(({ input, file, plugins }) => ({
     input,
     external: [/^node:/],
     platform: "node",
@@ -47,7 +42,10 @@ export default defineConfig(
     output: {
       file,
       format: "cjs",
-      codeSplitting,
+      // Each bundle is one file, with what it imports dynamically inlined:
+      // sigstore, @actions/artifact (which a run that asks for no artifact
+      // never loads) and, in a test-hook build, the local-image override.
+      codeSplitting: false,
       comments: false,
       minify: {
         compress: true,

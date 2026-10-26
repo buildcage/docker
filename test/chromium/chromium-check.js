@@ -9,7 +9,8 @@ const [url, expect = "trusted"] = process.argv.slice(2);
 (async () => {
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME_HEADLESS_SHELL,
-    // A RUN step has no user namespace to sandbox with, and a small /dev/shm.
+    // Chromium's own sandbox needs a user namespace or its setuid helper, and
+    // neither is available here; /dev/shm may be small too.
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
   let outcome;

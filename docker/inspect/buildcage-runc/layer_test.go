@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
+
+	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
 
 // mustHardLink gives one file two names, which is what an overlay's upper
@@ -19,28 +20,6 @@ func mustHardLink(t *testing.T, from, to string) {
 	if err := os.Link(from, to); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// mountLine is the shape /proc/self/mountinfo writes, taken from a real build:
-//
-//	339 508 0:114 / /var/lib/buildkit/.../rootfs rw,relatime - overlay overlay
-//	rw,lowerdir=...,upperdir=.../snapshots/4/fs,workdir=...,uuid=on,nouserxattr
-func mountLine(mountPoint, fstype, superOptions string) string {
-	return fmt.Sprintf("339 508 0:114 / %s rw,relatime shared:1 - %s overlay %s",
-		mountPoint, fstype, superOptions)
-}
-
-func overlayLine(mountPoint, upper string) string {
-	return mountLine(mountPoint, "overlay", "rw,lowerdir=/l,upperdir="+upper+",workdir=/w,nouserxattr")
-}
-
-// useMountInfo hands upperDirOf these lines instead of the test process's own
-// mount table, which holds no overlay over a temporary directory.
-func useMountInfo(t *testing.T, lines ...string) {
-	t.Helper()
-	old := readMountInfo
-	readMountInfo = func() ([]byte, error) { return []byte(strings.Join(lines, "\n") + "\n"), nil }
-	t.Cleanup(func() { readMountInfo = old })
 }
 
 func TestUpperDirOfReadsTheStepsOwnLayer(t *testing.T) {
@@ -760,5 +739,88 @@ func TestSweepDirReportsAKeystoreItCannotReseal(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "zz-bundle.pem")); !os.IsNotExist(err) {
 		t.Error("the sweep stopped before the copy after the keystore")
+	}
+}
+
+// The sweep reaches the PKCS#12 rewrite through stripCA: a PKCS#12 cacerts
+// holding the CA is stripped rather than failing the build.
+func TestStripCARewritesPKCS12(t *testing.T) {
+	ca := testCert(t, "buildcage")
+	root := testCert(t, "digicert")
+	caPEM := certPEM(ca)
+	path := mustWritePKCS12(t, passwordlessStore(t, root, ca))
+	left, err := stripCA(path, caPEM, caMarksOf(caPEM))
+	if err != nil {
+		t.Fatalf("stripCA: %v", err)
+	}
+	if left {
+		t.Error("stripCA left the CA in a PKCS#12 keystore it can rewrite")
+	}
+}
+
+// A file shaped like a PKCS#12 that carries the CA's DER in the clear but will
+// not decode: the DER is found, the keystore rewrite cannot reach it, and
+// stripCA reports it left rather than passing the build. It fails closed only
+// because the DER is actually present; an encrypted store hides the DER instead,
+// so it is never a strip candidate.
+func TestStripCAUnstrippableWhenUndecodable(t *testing.T) {
+	ca := testCert(t, "buildcage")
+	caPEM := certPEM(ca)
+	path := mustWritePKCS12(t, append([]byte{0x30, 0x82}, ca.Raw...))
+	left, err := stripCA(path, caPEM, caMarksOf(caPEM))
+	if err != nil {
+		t.Fatalf("stripCA: %v", err)
+	}
+	if !left {
+		t.Error("stripCA cleared a keystore it cannot decode though the DER is present")
+	}
+}
+
+// stripCA hands a rewrite error back rather than swallowing it: a write that
+// fails mid-rewrite leaves the layer possibly still carrying the CA, so the
+// build must not proceed.
+func TestStripCAPropagatesPKCS12Error(t *testing.T) {
+	ca := testCert(t, "buildcage")
+	root := testCert(t, "digicert")
+	caPEM := certPEM(ca)
+	path := mustWritePKCS12(t, passwordlessStore(t, root, ca))
+	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
+	if _, err := stripCA(path, caPEM, caMarksOf(caPEM)); !errors.Is(err, errBrokenFile) {
+		t.Fatalf("want the write failure propagated, got %v", err)
+	}
+}
+
+// What detection opens under changeit, stripCA takes the CA back out of.
+func TestStripCAStripsAChangeitSealedPKCS12(t *testing.T) {
+	ca, _ := testIssuer(t, "this run")
+	root := testCert(t, "digicert")
+	caPEM := certPEM(ca)
+	path := mustWritePKCS12(t, mustEncodeTrustStore(t, pkcs12.Modern, keystorePassword, root, ca))
+	left, err := stripCA(path, caPEM, caMarksOf(caPEM))
+	if err != nil {
+		t.Fatalf("stripCA: %v", err)
+	}
+	if left {
+		t.Error("stripCA left the CA in a changeit-sealed trust store")
+	}
+	if found, err := fileHoldsCA(path, caMarksOf(caPEM).needles); err != nil || found {
+		t.Errorf("after the strip: found=%v err=%v", found, err)
+	}
+}
+
+// A certificate the proxy issued is found by the CA's name but is not the CA,
+// so there is nothing to take out and it is reported.
+func TestStripCAReportsAnEncryptedPKCS12ItCannotRewrite(t *testing.T) {
+	ca, caKey := testIssuer(t, "this run")
+	leaf, _ := testLeaf(t, ca, caKey, "app.example")
+	root := testCert(t, "digicert")
+	caPEM := certPEM(ca)
+	store := mustEncodeTrustStore(t, pkcs12.Modern, keystorePassword, root, leaf)
+	left, err := stripCA(mustWritePKCS12(t, store), caPEM, caMarksOf(caPEM))
+	if err != nil {
+		t.Fatalf("stripCA: %v", err)
+	}
+	if !left {
+		t.Error("stripCA cleared a keystore it cannot rewrite")
 	}
 }

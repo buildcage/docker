@@ -174,12 +174,12 @@ describe("describeReportOutcomes", () => {
       failOnBlocked: false,
       engineLabel: "sandbox",
     });
-    expect(warning.message.includes("buildcage sandbox")).toBe(true);
+    expect(warning.message).toContain("buildcage sandbox");
   });
 
   it("avoids the word the report already uses for a log that lost its beginning", () => {
     const [, warning] = describeReportOutcomes(inspect([incomplete]), options);
-    expect(warning.message.includes("incomplete")).toBe(false);
+    expect(warning.message).not.toContain("incomplete");
   });
 
   it("notices connections that failed after the rules allowed them", () => {

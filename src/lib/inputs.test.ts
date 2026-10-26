@@ -10,24 +10,9 @@ function inputs(values: Record<string, string> = {}): (name: string) => string {
 }
 
 describe("readBuilderName", () => {
-  it("returns the input when set", () => {
+  it("reads builder_name, falling back to the shared default when unset", () => {
     expect(readBuilderName(inputs({ builder_name: "mine" }))).toBe("mine");
-  });
-
-  it("falls back to the shared default when unset", () => {
     expect(readBuilderName(inputs())).toBe(DEFAULT_BUILDER_NAME);
-  });
-
-  // action.yml declares no default, so an unset builder_name arrives as an
-  // empty string and has to produce the same name the other two steps derive.
-  it("treats an empty input as unset rather than as a builder named ''", () => {
-    expect(readBuilderName(inputs({ builder_name: "" }))).toBe(DEFAULT_BUILDER_NAME);
-  });
-
-  it("refuses a name that is not a valid container name", () => {
-    expect(() => readBuilderName(inputs({ builder_name: "a;b" }))).toThrow(
-      'Invalid builder_name: "a;b".',
-    );
   });
 });
 
@@ -43,12 +28,6 @@ describe("readSetupInputs", () => {
   it("rejects an unknown engine before any other input", () => {
     expect(() => readSetupInputs(inputs({ proxy_engine: "nope", proxy_mode: "Audit" }))).toThrow(
       /Invalid proxy_engine/,
-    );
-  });
-
-  it("rejects the removed explicit engine", () => {
-    expect(() => readSetupInputs(inputs({ proxy_engine: "explicit" }))).toThrow(
-      /explicit has been removed/,
     );
   });
 

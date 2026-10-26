@@ -9,8 +9,6 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import * as core from "@actions/core";
 
@@ -24,7 +22,7 @@ import {
 } from "#core/lib/actions/engine-rule-support.ts";
 import { logRules, withLogGroup } from "#core/lib/actions/log.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
-import { deriveProjectName } from "#core/lib/docker/compose-project-name.ts";
+import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
 import { resolveBuildcageImageRef } from "#core/lib/provenance/image-ref.ts";
 import {
   verifyImageDigestOrThrow,
@@ -33,6 +31,7 @@ import {
 } from "#core/lib/provenance/verify-image.ts";
 import { CONFIG_FILE_INPUTS } from "#report/report-source.ts";
 
+import { COMPOSE_FILE, withComposeOverlay } from "../compose-file.ts";
 import { builderStartError } from "./builder-diagnostics.ts";
 import { buildComposeEnv } from "./compose-env.ts";
 import { SetupError } from "./errors.ts";
@@ -40,16 +39,12 @@ import { readSetupInputs } from "./inputs.ts";
 import { readLocalImageOverride } from "./local-image.ts";
 import { BUILDER_NAME_STATE } from "./post-cleanup.ts";
 
-// Resolved from the bundle's own location: dist/ is a sibling of docker/.
-const __dirname = dirname(fileURLToPath(import.meta.url));
-export const COMPOSE_FILE = join(__dirname, "../docker/compose.action.yaml");
-
 /**
  * The steps this function sequences. Declared rather than imported straight
  * into the body so a test can watch the order and the arguments without
  * standing in for a dozen modules at once; each one is tested in its own file.
  *
- * Pure steps are left out on purpose and run for real (deriveProjectName,
+ * Pure steps are left out on purpose and run for real (resolveProjectName,
  * buildComposeEnv, resolveBuildcageImageRef, describeDockerFailure, and the
  * argv builders): what a test wants to see of those is the value that reached
  * the next step, not the call.
@@ -202,8 +197,14 @@ export async function runSetupStep(
   log(`buildcage: image: ${imageRef}`);
 
   // So report can independently derive the same project name from its own
-  // builder_name input and find this container via `docker ps --filter`.
-  const projectName = deriveProjectName(builderName);
+  // builder_name input and find this container via `docker ps --filter`. The
+  // COMPOSE_PROJECT_NAME override is this repo's own test hook, gated the same
+  // way as report's, so a published dist never reads it.
+  const projectName = resolveProjectName(
+    builderName,
+    process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1" ? process.env.COMPOSE_PROJECT_NAME : undefined,
+  );
+  const composeFiles = withComposeOverlay(COMPOSE_FILE, localOverride?.composeOverlay);
 
   const composeEnv = buildComposeEnv(
     {
@@ -225,7 +226,7 @@ export async function runSetupStep(
   // Always before the `up`: a builder a previous run left behind carries that
   // run's ACL rules, and compose would keep it rather than recreate it.
   try {
-    runDocker(buildComposeDownArgs({ composeFile: COMPOSE_FILE, projectName }), composeEnv);
+    runDocker(buildComposeDownArgs({ composeFiles, projectName }), composeEnv);
   } catch (e) {
     throw new SetupError(
       describeDockerFailure(e, { operation: "docker compose down" }),
@@ -234,13 +235,10 @@ export async function runSetupStep(
   }
 
   try {
-    runDocker(
-      buildComposeUpArgs({ composeFile: COMPOSE_FILE, projectName, pullPolicy }),
-      composeEnv,
-    );
+    runDocker(buildComposeUpArgs({ composeFiles, projectName, pullPolicy }), composeEnv);
   } catch (e) {
     throw builderStartError(e, {
-      composeFile: COMPOSE_FILE,
+      composeFiles,
       projectName,
       builderName,
       composeEnv,

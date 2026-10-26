@@ -4,7 +4,7 @@
  * config text, and this module knows nothing about that text.
  */
 
-import { IPV4_OR_CIDR, OCTET, isIpRuleAddress } from "./ipv4.ts";
+import { IPV4, IPV4_OR_CIDR, isIpRuleAddress } from "./ipv4.ts";
 import {
   anchorRawRegex,
   checkPort,
@@ -19,7 +19,7 @@ import { convertRule } from "./wildcard-rules.ts";
  * matches is used as the destination unresolved, so nothing that is not an
  * address may pass.
  */
-export const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`;
+export const HOST_IS_ADDRESS = `^${IPV4}$`;
 
 /**
  * Ranges a resolved name may not point at, blocked to stop an allowlisted name

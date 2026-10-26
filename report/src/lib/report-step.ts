@@ -8,7 +8,7 @@
  * Those are only visible from here, so this is where they are tested.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -127,6 +127,17 @@ export async function runReportStep(
     copyFromContainerImage(containerId, REPORT_ACTION_SCRIPT_PATH, reportActionPath);
 
     process.exitCode = runReportScript(reportActionPath, containerId, { trafficFile, env });
+    // This repo's e2e reads the Job Summary from here: a later step cannot
+    // read GITHUB_STEP_SUMMARY back. Gated like COMPOSE_PROJECT_NAME above.
+    // A script that failed before writing one leaves no file to copy.
+    if (
+      process.env.BUILDCAGE_BUILD_TEST_HOOKS === "1" &&
+      env.BUILDCAGE_TEST_SUMMARY_FILE &&
+      env.GITHUB_STEP_SUMMARY &&
+      existsSync(env.GITHUB_STEP_SUMMARY)
+    ) {
+      copyFileSync(env.GITHUB_STEP_SUMMARY, env.BUILDCAGE_TEST_SUMMARY_FILE);
+    }
   } finally {
     // Uploaded from here so every path that ran the script keeps the file:
     // a failing run is when it is most wanted.

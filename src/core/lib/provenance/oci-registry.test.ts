@@ -16,6 +16,7 @@ import {
 } from "#core/lib/test/registry-stub.ts";
 
 import {
+  assertRegistryOk,
   fetchManifestDigest,
   fetchRegistryToken,
   fetchImageConfigLabels,
@@ -40,6 +41,42 @@ function manifestHead(status: number, digestValue: string | null): FetchLikeResp
   };
 }
 
+describe("assertRegistryOk", () => {
+  const check = (status: number, onFailure: "TRANSIENT" | "NOT_FOUND") =>
+    Promise.resolve().then(() =>
+      assertRegistryOk({ ok: status >= 200 && status < 300, status }, "the blob", onFailure),
+    );
+
+  it("lets a successful response through", async () => {
+    await expect(check(200, "NOT_FOUND")).resolves.toBeUndefined();
+  });
+
+  it.each([
+    [500, "TRANSIENT", "TRANSIENT", /^Transient error fetching the blob: HTTP 500$/],
+    [503, "NOT_FOUND", "TRANSIENT", /^Transient error fetching the blob: HTTP 503$/],
+    [
+      401,
+      "NOT_FOUND",
+      "TRANSIENT",
+      /^Registry denied access to the blob: HTTP 401\. .*authenticated/,
+    ],
+    [
+      403,
+      "NOT_FOUND",
+      "TRANSIENT",
+      /^Registry denied access to the blob: HTTP 403\. .*authenticated/,
+    ],
+    [404, "TRANSIENT", "TRANSIENT", /^Failed to fetch the blob: HTTP 404$/],
+    [418, "NOT_FOUND", "NOT_FOUND", /^Failed to fetch the blob: HTTP 418$/],
+    [418, "TRANSIENT", "TRANSIENT", /^Failed to fetch the blob: HTTP 418$/],
+  ] as const)(
+    "reads HTTP %i, for a caller that falls back to %s, as %s",
+    async (status, onFailure, code, message) => {
+      await expectVerifyError(check(status, onFailure), code, message);
+    },
+  );
+});
+
 describe("fetchManifestDigest", () => {
   const call = (_fetch: FetchLike) =>
     fetchManifestDigest("ghcr.io", "owner/repo", "2.1.0", "token", _fetch);
@@ -61,26 +98,11 @@ describe("fetchManifestDigest", () => {
     );
   });
 
-  it("throws TRANSIENT on 5xx", async () => {
+  it("reads any other failure through the registry status ladder as TRANSIENT, naming the image", async () => {
     await expectVerifyError(
-      call(async () => manifestHead(500, null)),
+      call(async () => manifestHead(418, null)),
       "TRANSIENT",
-    );
-  });
-
-  it("throws TRANSIENT with an auth hint on 401", async () => {
-    await expectVerifyError(
-      call(async () => manifestHead(401, null)),
-      "TRANSIENT",
-      /authenticated/,
-    );
-  });
-
-  it("throws TRANSIENT with an auth hint on 403", async () => {
-    await expectVerifyError(
-      call(async () => manifestHead(403, null)),
-      "TRANSIENT",
-      /authenticated/,
+      /^Failed to fetch manifest for ghcr\.io\/owner\/repo:2\.1\.0: HTTP 418$/,
     );
   });
 
@@ -114,13 +136,6 @@ describe("fetchManifestDigest", () => {
 
   it("throws TRANSIENT on network error", async () => {
     await expectVerifyError(call(networkFailure), "TRANSIENT");
-  });
-
-  it("throws TRANSIENT for a non-ok status that is not 404, 401/403 or 5xx", async () => {
-    await expectVerifyError(
-      call(async () => manifestHead(418, null)),
-      "TRANSIENT",
-    );
   });
 });
 
@@ -325,13 +340,6 @@ describe("fetchImageConfigLabels", () => {
     );
   });
 
-  it("throws TRANSIENT on 5xx", async () => {
-    await expectVerifyError(
-      call(stubRegistry({ [`/manifests/${DIGEST}`]: failsWith(503) })),
-      "TRANSIENT",
-    );
-  });
-
   it("throws NOT_FOUND, naming the image, on 404", async () => {
     await expectVerifyError(
       call(stubRegistry({ [`/manifests/${DIGEST}`]: failsWith(404) })),
@@ -340,11 +348,11 @@ describe("fetchImageConfigLabels", () => {
     );
   });
 
-  it("throws TRANSIENT with an auth hint on 403", async () => {
+  it("reads any other failure through the registry status ladder as TRANSIENT", async () => {
     await expectVerifyError(
-      call(stubRegistry({ [`/manifests/${DIGEST}`]: failsWith(403) })),
+      call(stubRegistry({ [`/manifests/${DIGEST}`]: failsWith(418) })),
       "TRANSIENT",
-      /authenticated/,
+      /HTTP 418/,
     );
   });
 
@@ -390,13 +398,6 @@ describe("fetchImageConfigLabels", () => {
       await expectVerifyError(callWith(manifestDig, registry), "VERIFY_FAILED", /Malformed digest/);
       expect(registry.urls).toHaveLength(1);
     }
-  });
-
-  it("throws TRANSIENT for a non-ok status the registry JSON reader does not name", async () => {
-    await expectVerifyError(
-      call(stubRegistry({ [`/manifests/${DIGEST}`]: failsWith(418) })),
-      "TRANSIENT",
-    );
   });
 
   it("wraps a network failure as TRANSIENT rather than letting it escape untyped", async () => {

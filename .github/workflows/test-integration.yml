@@ -19,6 +19,7 @@ permissions: {}
 jobs:
   changes:
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -53,8 +54,6 @@ jobs:
             test:
               - *docker
               - *workflow
-              - 'compose.test-universal.yaml'
-              - 'compose.test-inspect.yaml'
               - 'test/**'
               - 'report/src/**'
 
@@ -65,6 +64,9 @@ jobs:
     # only on pull_request); a skipped need otherwise skips the job unevaluated.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.test == 'true') }}
     runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
+    # Well above a normal run; without a limit a hang holds a runner for six
+    # hours.
+    timeout-minutes: 15
     permissions:
       contents: read
 
@@ -84,19 +86,20 @@ jobs:
             # Brings a builder up with no build running and no fixture
             # network, so its buildcage0 never exists.
             target5: test_integration_buildkit_listener_scope
-            test_compose_file: compose.test-universal.yaml
+            test_compose_file: docker/compose.action.test-universal.yaml
           # Java and Chromium both keep the CPU busy, so they go in different jobs.
-          - mode: inspect-restrict, inspect-debian-audit, inspect-chromium-audit
+          - mode: inspect-restrict, inspect-debian-audit, inspect-chromium-audit, inspect-proxy-down
             target1: test_integration_buildkit_inspect_restrict
             target2: test_integration_buildkit_inspect_debian_audit
             target3: test_integration_buildkit_inspect_chromium_audit
-            test_compose_file: compose.test-inspect.yaml
+            target4: test_integration_buildkit_inspect_proxy_down
+            test_compose_file: docker/compose.action.test-inspect.yaml
           - mode: inspect-java-audit, inspect-hidden-ca, inspect-debian-restrict
             target1: test_integration_buildkit_inspect_java_audit
             target2: test_integration_buildkit_inspect_hidden_ca
             target3: test_integration_buildkit_inspect_debian_restrict
-            test_compose_file: compose.test-inspect.yaml
-          - mode: inspect round trip, inspect byte-exact, multiarch
+            test_compose_file: docker/compose.action.test-inspect.yaml
+          - mode: inspect round trip, inspect byte-exact, multiarch, HAProxy configs
             runner: ubuntu-24.04-arm
             platform: linux/arm64
             # The cross-platform half of the multiarch target runs the built
@@ -105,7 +108,9 @@ jobs:
             target1: test_integration_buildkit_inspect_roundtrip
             target2: test_integration_buildkit_inspect_byte_exact
             target3: test_integration_buildkit_multiarch
-            test_compose_file: compose.test-inspect.yaml
+            # Builds each engine's image and starts none.
+            target4: test_integration_buildkit_haproxy_configs
+            test_compose_file: docker/compose.action.test-inspect.yaml
 
     name: "integration: test (${{ matrix.mode }})"
 
@@ -119,8 +124,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # The targets run report/src/main.ts and src/post.ts straight from
-      # source, and both import @actions/core, so node_modules must exist.
+      # The targets run src/main.ts, report/src/main.ts and src/post.ts
+      # straight from source, so node_modules must exist.
       - uses: ./.github/actions/setup-vp
 
       - name: Set up QEMU
@@ -181,6 +186,7 @@ jobs:
 
   targets:
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     permissions:
       contents: read
     name: "integration: every make target has a job"
@@ -205,7 +211,8 @@ jobs:
   # list whenever the matrix changes.
   integration-tests-passed:
     name: Integration tests passed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
     needs: [changes, targets, test]
     if: always()
     permissions: {}

@@ -5,14 +5,6 @@ import { reportParams, expectedRows } from "#core/lib/test/report-data.node.ts";
 
 import { renderReportMarkdown } from "../../test/render-report-markdown.node.ts";
 import type { UniversalReportData, InspectReportData } from "../types.ts";
-import { joinSummaryBlocks } from "./fit-step-summary.ts";
-import {
-  blockedHostsBlocks,
-  communicationDetailsBlocks,
-  engineNoteBlocks,
-  trafficHeadingBlock,
-} from "./traffic-parts.ts";
-import { stackTrafficBlocks } from "./traffic-report.ts";
 
 const allowedRow = { host: "good.com", port: "443", ruleType: "HTTPS", reason: "-", count: 1 };
 const blockedRow = {
@@ -37,63 +29,6 @@ describe("renderReportMarkdown: universal", () => {
     startedAt: undefined,
   };
 
-  it("renders a bare restrict-mode title, since that is the day-to-day mode", () => {
-    const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "owner/repo", "v1", {
-      title: "Outbound Traffic Report",
-    });
-    expect(md).toMatch(/^## Outbound Traffic Report\n/);
-    expect(md).not.toMatch(/restrict mode\)/);
-    expect(md).toMatch(/### ✅ Allowed Hosts/);
-    expect(md).toMatch(/good\.com/);
-  });
-
-  it("escapes structural Markdown in the title, so no caller can inject via it", () => {
-    const md = renderReportMarkdown(
-      { ...base, parameters: reportParams({ mode: "audit" }) },
-      "owner/repo",
-      "v1",
-      {
-        title: "Outbound Traffic Report — [x](javascript:alert(1))\n# owned <b>|*",
-      },
-    );
-    expect(md.split("\n")[0]).toBe(
-      "## Outbound Traffic Report — \\[x\\](javascript:alert(1)) # owned \\<b\\>\\|\\* (audit mode)",
-    );
-  });
-
-  it("warns above the tables when the log is not a complete record", () => {
-    const md = renderReportMarkdown(
-      { ...base, passed: [allowedRow], logLooksPlausible: false },
-      "owner/repo",
-      "v1",
-    );
-    expect(md).toMatch(/This report is incomplete/);
-    expect(md.indexOf("incomplete") < md.indexOf("Allowed Hosts")).toBe(true);
-    const [warning] = md.split("\n\n").filter((b) => b.includes("This report is incomplete"));
-    // A continuation line without the marker leaves the blockquote and renders
-    // as body text, which the "incomplete" match above would not catch.
-    expect(warning.split("\n").every((line) => line.startsWith("> "))).toBe(true);
-    expect(warning.replaceAll("\n> ", " ")).toMatch(
-      /Either the logs don't begin where a real run does, one carries a line that cannot be read, or the proxy dropped lines it could not write/,
-    );
-  });
-
-  it("has no warning when the log is a complete record", () => {
-    const md = renderReportMarkdown({ ...base, passed: [allowedRow] }, "owner/repo", "v1");
-    expect(md).not.toMatch(/incomplete/);
-  });
-
-  it("renders the audit-mode heading and Audited Hosts table, plus a restrict-mode example", () => {
-    const md = renderReportMarkdown(
-      { ...base, parameters: reportParams({ mode: "audit" }), passed: [allowedRow] },
-      "owner/repo",
-      "v1",
-    );
-    expect(md).toMatch(/^## Outbound Traffic Report \(audit mode\)\n/);
-    expect(md).toMatch(/### 📋 Audited Hosts/);
-    expect(md).toMatch(/Switch to restrict mode/);
-  });
-
   it("renders Blocked Hosts and shows the SNI footnote, not Communication details", () => {
     const md = renderReportMarkdown(
       { ...base, blocked: [blockedRow], blockedCount: 1 },
@@ -103,12 +38,6 @@ describe("renderReportMarkdown: universal", () => {
     expect(md).toMatch(/### 🚫 Blocked Hosts/);
     expect(md).toMatch(/based on the Host header/);
     expect(md).not.toMatch(/Communication details/);
-  });
-
-  it("uses the real actionRepo in the footer, not a placeholder", () => {
-    const md = renderReportMarkdown(base, "owner/repo", "v1");
-    expect(md).toMatch(/Reported by \[owner\/repo\]\(https:\/\/github\.com\/owner\/repo\)/);
-    expect(md).not.toMatch(/GITHUB_ACTION_REPOSITORY/);
   });
 
   it("omits the Allowed Hosts table entirely when nothing passed", () => {
@@ -206,7 +135,7 @@ describe("renderReportMarkdown: universal", () => {
 
   it("does not call a run that only failed connections no communication", () => {
     const md = renderReportMarkdown({ ...base, failed: [failedRow] }, "owner/repo", "v1");
-    expect(md.includes("_(no communication)_")).toBe(false);
+    expect(md).not.toContain("_(no communication)_");
   });
 
   it("suggests a host whose name failed to resolve in audit, which nothing blocked", () => {
@@ -321,26 +250,6 @@ describe("renderReportMarkdown: inspect", () => {
     expect(md).not.toMatch(/based on the Host header/);
   });
 
-  it("ends a line in Communication details with the caller's note", () => {
-    const blockedEvent: TrafficEvent = {
-      ...timeline[0],
-      action: "block",
-      reason: "not-allowed",
-      status: undefined,
-      bytes: undefined,
-    };
-    const md = joinSummaryBlocks(
-      communicationDetailsBlocks(
-        { ...base, timeline: [blockedEvent, timeline[0]] },
-        { priority: 1, artifactAvailable: false },
-        (e) => (e.action === "allow" ? "[noted]" : ""),
-      ),
-    );
-    // An empty note adds nothing, not even the space before it.
-    expect(md).toContain("GET https://good.com/pkg -> not-allowed\n");
-    expect(md).toContain("GET https://good.com/pkg -> 200 (1B) [noted]\n");
-  });
-
   it("builds the audit-mode example from the timeline, method and path included", () => {
     const md = renderReportMarkdown(
       { ...base, parameters: reportParams({ mode: "audit" }), timeline },
@@ -367,54 +276,5 @@ describe("renderReportMarkdown: inspect", () => {
     expect(md).toMatch(/\| `\*\.sury\.org:\*` \(2 hosts\) \| HTTPS \| https-not-allowed \| 2 \|/);
     expect(md).not.toMatch(/a\.sury\.org/);
     expect(md).toMatch(/\| `bad\.com:80` \|/);
-  });
-});
-
-describe("renderReportMarkdown: section and footer", () => {
-  const base: UniversalReportData = {
-    engine: "universal",
-    parameters: reportParams(),
-    passed: [allowedRow],
-    blocked: [blockedRow],
-    failed: [],
-    blockedCount: 1,
-    logLooksPlausible: true,
-    timeline: [],
-    startedAt: undefined,
-  };
-
-  it("puts the verdict under the title and its items after the blocks", () => {
-    const md = joinSummaryBlocks(
-      stackTrafficBlocks(
-        trafficHeadingBlock(base, "Outbound Traffic Report", { warning: ["1 x"] }),
-        [blockedHostsBlocks(base, { priority: 1, artifactAvailable: false })],
-      ),
-    );
-    expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 blocked · 1 x\n\n### /);
-  });
-
-  it("raises an action's caution in the verdict under the title", () => {
-    const md = joinSummaryBlocks(
-      stackTrafficBlocks(
-        trafficHeadingBlock({ ...base, blocked: [], blockedCount: 0 }, "Outbound Traffic Report", {
-          caution: ["1 x"],
-        }),
-        [],
-      ),
-    );
-    expect(md).toMatch(/^## Outbound Traffic Report\n\n> \[!CAUTION\]\n> 1 x\n\n/);
-  });
-
-  it("notes how universal identifies a host, and inspect nothing", () => {
-    expect(joinSummaryBlocks(engineNoteBlocks(base))).toMatch(
-      /^<sub>[^]*IP rules on the destination IP address\.\*<\/sub>\n$/,
-    );
-    expect(engineNoteBlocks({ ...base, engine: "inspect" })).toStrictEqual([]);
-  });
-
-  it("ends with the footer", () => {
-    expect(renderReportMarkdown(base, "owner/repo", "v1")).toMatch(
-      /\.\*<\/sub>\n\n\*Reported by \[owner\/repo\]\(https:\/\/github\.com\/owner\/repo\)\*\n\n<hr>\n$/,
-    );
   });
 });

@@ -109,14 +109,19 @@ describe("readTrafficArtifactInputs", () => {
 });
 
 describe("resolveProxyEngine", () => {
-  it("defaults to inspect for undefined or an empty string", () => {
+  it("defaults to inspect when unset, empty or blank", () => {
     expect(resolveProxyEngine(undefined)).toBe("inspect");
     expect(resolveProxyEngine("")).toBe("inspect");
+    expect(resolveProxyEngine("   ")).toBe("inspect");
   });
 
   it("accepts each engine that has an image of its own", () => {
     expect(resolveProxyEngine("universal")).toBe("universal");
     expect(resolveProxyEngine("inspect")).toBe("inspect");
+  });
+
+  it("ignores surrounding whitespace around an engine name", () => {
+    expect(resolveProxyEngine(" inspect ")).toBe("inspect");
   });
 
   it("refuses a value that is not an engine, casing included", () => {

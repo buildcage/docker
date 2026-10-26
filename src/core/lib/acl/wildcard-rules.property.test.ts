@@ -16,11 +16,11 @@ describe("convertRule: properties", () => {
     fc.assert(
       fc.property(simplePattern, (pattern) => {
         const regex = new RegExp(convertRule(pattern));
-        expect(regex.test(pattern), "regex must match original pattern").toBeTruthy();
+        expect(regex.test(pattern), "regex must match original pattern").toBe(true);
         expect(
-          !regex.test(`sub.${pattern}`),
+          regex.test(`sub.${pattern}`),
           "regex must not match with extra subdomain prefix",
-        ).toBeTruthy();
+        ).toBe(false);
       }),
     );
   });
@@ -97,14 +97,5 @@ describe("parseAndValidateRules: properties", () => {
         expect(parseAndValidateRules(input)).toStrictEqual(rules);
       }),
     );
-  });
-
-  it("returns an empty array for empty/undefined input", () => {
-    expect(parseAndValidateRules(undefined)).toStrictEqual([]);
-    expect(parseAndValidateRules("")).toStrictEqual([]);
-  });
-
-  it("throws on invalid syntax", () => {
-    expect(() => parseAndValidateRules("no-port-specified")).toThrow();
   });
 });

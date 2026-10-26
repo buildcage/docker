@@ -1,0 +1,104 @@
+/**
+ * Query parameters whose value is a credential often enough that printing it
+ * is the greater risk: a presigned URL's signature or an API key reaches
+ * everyone who can read the run, and GitHub masks only values registered as
+ * workflow secrets.
+ *
+ * Matched on the name alone, ignoring case, `-`, `_`, `.` and any trailing
+ * `[...]`, so a parameter this does not name keeps its value. That covers most
+ * of what a blocked request was trying to send, but not an exfiltration
+ * payload the sender happened to call `code` or `key`; the traffic artifact and
+ * the proxy's own log keep every value verbatim, and are where a suspected
+ * payload is read.
+ */
+export const CREDENTIAL_PARAMS: ReadonlySet<string> = new Set([
+  "accesskey",
+  "accesstoken",
+  "apikey",
+  "apitoken",
+  "auth",
+  "authorization",
+  "authtoken",
+  "clientsecret",
+  "code",
+  "credential",
+  "credentials",
+  "idtoken",
+  "jwt",
+  "key",
+  "passwd",
+  "password",
+  "pat",
+  "privatetoken",
+  "pwd",
+  "refreshtoken",
+  "secret",
+  "session",
+  "sessiontoken",
+  "sig",
+  "signature",
+  "subscriptionkey",
+  "token",
+  "xamzsecuritytoken",
+  "xamzsignature",
+  "xapikey",
+  "xgoogsignature",
+]);
+
+/** `api-key`, `api_key`, `api.key`, `apiKey`, `APIKEY` and `api_key[0][]` all read as one name. */
+function credentialName(name: string): string {
+  return withoutIndexes(name).toLowerCase().replace(/[-_.]/g, "");
+}
+
+// A scan back from the end rather than a regex, which backtracks
+// quadratically on a long run of unclosed `[`.
+function withoutIndexes(name: string): string {
+  let end = name.length;
+  while (name[end - 1] === "]") {
+    const open = name.lastIndexOf("[", end - 1);
+    if (open < 0) break;
+    end = open;
+  }
+  return name.slice(0, end);
+}
+
+/**
+ * A parameter name within one `&`-separated part: at its start, after the `;`
+ * some servers split on too, or after a later `?`, which opens the query of a
+ * URL carried in a value.
+ */
+const PARAM_NAME = /(^|[;?])([^;?=]*)=/g;
+
+/**
+ * One `&`-separated part with its first credential's value replaced through to
+ * the part's end, since a `;` or `?` after it may be part of the secret.
+ */
+function redactPart(part: string): string {
+  for (const match of part.matchAll(PARAM_NAME)) {
+    if (!CREDENTIAL_PARAMS.has(credentialName(match[2]))) continue;
+    const value = match.index + match[0].length;
+    return value === part.length ? part : `${part.slice(0, value)}***`;
+  }
+  return part;
+}
+
+/**
+ * The URL with those values replaced and everything else left alone, so the
+ * host, the path and the parameter names still read as they were sent. An
+ * empty value stays empty rather than becoming `***`, which would claim a
+ * secret that was never there.
+ */
+export function redactCredentialQuery(url: string): string {
+  const start = url.indexOf("?");
+  if (start === -1) return url;
+  const hash = url.indexOf("#", start);
+  const end = hash === -1 ? url.length : hash;
+
+  const query = url
+    .slice(start + 1, end)
+    .split("&")
+    .map(redactPart)
+    .join("&");
+
+  return url.slice(0, start + 1) + query + url.slice(end);
+}

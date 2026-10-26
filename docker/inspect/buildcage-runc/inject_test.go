@@ -1,57 +1,16 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 )
-
-// newBundleNoStore lays out a bundle with no CA store at all under
-// rootfs/etc/ssl/certs, the node:*-slim shape: no OS trust store, only
-// Node's own bundled roots, which findSystemStore cannot find.
-func newBundleNoStore(t *testing.T, env []string) (bundle, rootfs string) {
-	t.Helper()
-	bundle = t.TempDir()
-	rootfs = filepath.Join(bundle, "rootfs")
-	// /etc exists, as it does in any real base image (passwd, hostname, ...);
-	// only etc/ssl/certs and its siblings are absent, which is what actually
-	// makes findSystemStore fail.
-	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
-
-	config := map[string]any{
-		"root":    map[string]any{"path": "rootfs"},
-		"process": map[string]any{"env": toAny(env)},
-	}
-	raw, err := json.Marshal(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustWriteFile(t, filepath.Join(bundle, "config.json"), string(raw))
-	// inject refuses a step whose layer it cannot read back.
-	useMountInfo(t, overlayLine(rootfs, rootfs))
-	return bundle, rootfs
-}
-
-// newBundle is the same bundle with one system CA candidate in the rootfs,
-// which is what the store-present half of the decision table needs.
-func newBundle(t *testing.T, env []string) (bundle, rootfs string) {
-	t.Helper()
-	bundle, rootfs = newBundleNoStore(t, env)
-	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ssl", "certs"))
-	mustWriteFile(t, filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt"), "ORIGINAL-ROOTS\n")
-	return bundle, rootfs
-}
-
-func toAny(env []string) []any {
-	out := make([]any, len(env))
-	for i, e := range env {
-		out[i] = e
-	}
-	return out
-}
 
 func loadEnv(t *testing.T, bundle string) map[string]string {
 	t.Helper()
@@ -60,33 +19,6 @@ func loadEnv(t *testing.T, bundle string) map[string]string {
 		t.Fatal(err)
 	}
 	return s.env
-}
-
-func loadMounts(t *testing.T, bundle string) []map[string]any {
-	t.Helper()
-	s, err := loadSpec(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, _ := s.raw["mounts"].([]any)
-	mounts := make([]map[string]any, 0, len(raw))
-	for _, m := range raw {
-		if entry, ok := m.(map[string]any); ok {
-			mounts = append(mounts, entry)
-		}
-	}
-	return mounts
-}
-
-func findMount(t *testing.T, mounts []map[string]any, dest string) map[string]any {
-	t.Helper()
-	for _, m := range mounts {
-		if m["destination"] == dest {
-			return m
-		}
-	}
-	t.Fatalf("no mount for %s", dest)
-	return nil
 }
 
 // ownCASource fails the test unless a file is bound read-only at ownCAPath, and
@@ -579,13 +511,8 @@ func TestInjectWritesBackWhenTheStepChangesTheStore(t *testing.T) {
 	scratchDir, _ := mount["source"].(string)
 	mustWriteFile(t, filepath.Join(scratchDir, "ca-certificates.crt"), "REGENERATED\n")
 
-	calls := countRsync(t)
-
 	if err := restore.finish(); err != nil {
 		t.Fatal(err)
-	}
-	if *calls != 2 {
-		t.Fatalf("got %d rsync invocations for the write-back, want 2 (dry run, then apply)", *calls)
 	}
 
 	got, err := os.ReadFile(filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt"))
@@ -612,7 +539,7 @@ func TestInjectWriteBackFailurePropagates(t *testing.T) {
 	scratchDir, _ := mount["source"].(string)
 	mustWriteFile(t, filepath.Join(scratchDir, "ca-certificates.crt"), "REGENERATED\n")
 
-	failRsyncOn(t, 2) // the apply, right after a successful dry run
+	failRsyncWhen(t, isRsyncApply)
 
 	if err := restore.finish(); err == nil {
 		t.Fatal("expected the write-back failure to propagate")
@@ -635,7 +562,7 @@ func TestInjectWriteBackFailureKeepsTheSweepFailureInTheLog(t *testing.T) {
 	scratchDir, _ := mount["source"].(string)
 	mustWriteFile(t, filepath.Join(scratchDir, "ca-certificates.crt"), "REGENERATED\n")
 	mustWriteFile(t, filepath.Join(rootfs, "cacerts.bin"), "EFI-VAR\x00"+string(testDER))
-	failRsyncOn(t, 2)
+	failRsyncWhen(t, isRsyncApply)
 
 	if err := restore.finish(); err == nil || isCAResidue(err) {
 		t.Fatalf("got %v, want the write-back failure", err)
@@ -1109,5 +1036,467 @@ func TestInjectBindsSUSEsCertDirWithoutAStore(t *testing.T) {
 	scratch, _ := findMount(t, loadMounts(t, bundle), "/var/lib/ca-certificates/pem")["source"].(string)
 	if got := mustRead(t, filepath.Join(scratch, suseCertName)); got != string(testCA) {
 		t.Fatalf("the directory's copy holds %q, want the CA alone", got)
+	}
+}
+
+// A step whose layer cannot be read back does not run, whatever
+// fail_on_ca_residue says, and nothing is placed in its rootfs.
+func TestInjectRefusesAStepWithoutALayerToReadBack(t *testing.T) {
+	for _, fail := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
+			useTempLog(t)
+			useFakeRsync(t)
+			useFailOnCAResidue(t, fail)
+			bundle, rootfs := newBundleNoStore(t, []string{"PATH=/usr/bin"})
+			useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
+
+			if _, err := inject(bundle, testCA); !errors.Is(err, errLayerUnread) {
+				t.Fatalf("got %v, want the unread layer to refuse the step", err)
+			}
+			if entries, _ := os.ReadDir(rootfs); len(entries) != 1 || entries[0].Name() != "etc" {
+				t.Errorf("rootfs holds %v, want it untouched", entries)
+			}
+		})
+	}
+}
+
+// inject discovers the base image's JVM keystore and adds the CA to the scratch
+// mirror bound over it, never the real file, the same as the system store.
+func TestInjectAddsCAToTheJVMKeystore(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore.finish()
+
+	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
+	scratch, _ := mount["source"].(string)
+	mirrored, err := os.ReadFile(filepath.Join(scratch, "cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(mirrored, []byte(injectedAlias)) || !bytes.Contains(mirrored, testDER) {
+		t.Fatal("the CA was not inserted into the mirrored keystore")
+	}
+
+	real, err := os.ReadFile(filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(real, []byte(injectedAlias)) {
+		t.Fatal("the real keystore was modified before the step touched it")
+	}
+}
+
+// jssecacerts overrides cacerts, so both keystores in a JDK's security directory
+// get the CA, not cacerts alone.
+func TestInjectAddsCAToBothJVMKeystores(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/jssecacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore.finish()
+
+	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
+	scratch, _ := mount["source"].(string)
+	for _, name := range []string{"cacerts", "jssecacerts"} {
+		mirrored, err := os.ReadFile(filepath.Join(scratch, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(mirrored, []byte(injectedAlias)) || !bytes.Contains(mirrored, testDER) {
+			t.Errorf("the CA was not inserted into the mirrored %s", name)
+		}
+	}
+}
+
+// A step that never touches the keystore leaves the real file alone: finish
+// finds the mirror unchanged from its post-injection baseline.
+func TestInjectLeavesAnUntouchedKeystoreAlone(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	original := keystore(2, trustedEntry(2, "digicert", otherDER))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts", original)
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, original) {
+		t.Fatal("the real keystore was written to even though nothing changed")
+	}
+}
+
+// A second JDK on PATH beside JAVA_HOME's gets the CA in a bind of its own, and
+// both real keystores are left as they were.
+func TestInjectCoversASecondJDK(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java/main", "PATH=/opt/java/other/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	original := keystore(2, trustedEntry(2, "digicert", otherDER))
+	for _, jdk := range []string{"main", "other"} {
+		writeRootfsKeystore(t, rootfs, "/opt/java/"+jdk+"/lib/security/cacerts", original)
+	}
+	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/other/bin"))
+	writeJava(t, filepath.Join(rootfs, "opt/java/other/bin/java"))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mounts := loadMounts(t, bundle)
+	for _, jdk := range []string{"main", "other"} {
+		scratchDir, _ := findMount(t, mounts, "/opt/java/"+jdk+"/lib/security")["source"].(string)
+		got, err := os.ReadFile(filepath.Join(scratchDir, "cacerts"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(got, testDER) {
+			t.Errorf("the %s JDK's keystore did not get the CA", jdk)
+		}
+	}
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+	for _, jdk := range []string{"main", "other"} {
+		if got, _ := os.ReadFile(filepath.Join(rootfs, "opt/java", jdk, "lib/security/cacerts")); !bytes.Equal(got, original) {
+			t.Errorf("the %s JDK's real keystore was changed", jdk)
+		}
+	}
+}
+
+// Only the JDK a bare `java` runs, the first executable java on PATH, has its
+// keystore injected: one further along PATH gets no CA and no mount, so a later
+// step can still remove it.
+func TestInjectSkipsAJDKFurtherAlongPath(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/opt/stub/bin:/opt/jdk-21/bin:/opt/jdk-17/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	for _, jdk := range []string{"jdk-21", "jdk-17"} {
+		writeRootfsKeystore(t, rootfs, "/opt/"+jdk+"/lib/security/cacerts",
+			keystore(2, trustedEntry(2, "digicert", otherDER)))
+		writeJava(t, filepath.Join(rootfs, "opt", jdk, "bin/java"))
+	}
+	mustMkdirAll(t, filepath.Join(rootfs, "opt/stub/bin"))
+	mustWriteFile(t, filepath.Join(rootfs, "opt/stub/bin/java"), "not executable")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mounts := loadMounts(t, bundle)
+	findMount(t, mounts, "/opt/jdk-21/lib/security")
+	if hasMount(mounts, "/opt/jdk-17/lib/security") {
+		t.Error("the JDK further along PATH has its keystore directory mounted")
+	}
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A step that changes the keystore gets its change written back with the proxy
+// CA taken out and its own additions kept.
+func TestInjectWritesBackWhenTheStepChangesTheKeystore(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
+	scratch, _ := mount["source"].(string)
+	// The step adds its own root to the already CA-injected keystore.
+	stepStore := keystore(2,
+		trustedEntry(2, "digicert", otherDER),
+		trustedEntry(2, "steproot", []byte("STEP-ROOT")),
+		trustedEntry(2, injectedAlias, testDER))
+	mustWriteFile(t, filepath.Join(scratch, "cacerts"), string(stepStore))
+
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(got, testDER) {
+		t.Fatal("the proxy CA was left in the written-back keystore")
+	}
+	if !bytes.Contains(got, []byte("STEP-ROOT")) {
+		t.Fatal("the step's own root was lost in the write-back")
+	}
+}
+
+// A PKCS#12 keystore the step never touched must be committed byte for byte as
+// an unproxied build would have it, even when something else in its directory
+// triggers the write-back. Taking the proxy CA back out re-encodes the store,
+// which does not reproduce its bytes.
+func TestInjectRestoresAnUntouchedKeystoreBesideAChange(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	// A real CA, since injecting into a PKCS#12 parses it, unlike the JKS tests'
+	// stand-in bytes.
+	ca := certPEM(testCert(t, "buildcage"))
+	original := keytoolStore(t, "keytool-alias", testCert(t, "digicert"))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts", original)
+	// A sibling the step will change, so the directory is written back at all.
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/other", []byte("BEFORE\n"))
+
+	restore, err := inject(bundle, ca)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
+	scratch, _ := mount["source"].(string)
+	mustWriteFile(t, filepath.Join(scratch, "other"), "AFTER\n")
+
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, original) {
+		t.Fatal("the untouched keystore was churned by the inject/strip round trip")
+	}
+	if sib, _ := os.ReadFile(filepath.Join(rootfs, "opt/java/lib/security/other")); string(sib) != "AFTER\n" {
+		t.Fatalf("the step's change to the sibling was lost: %q", sib)
+	}
+}
+
+// A keystore the step deleted is not restored: it is gone from the mirror, so
+// the write-back takes it out of the image rather than putting it back.
+func TestInjectDoesNotRestoreADeletedKeystore(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	ca := certPEM(testCert(t, "buildcage"))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keytoolStore(t, "keytool-alias", testCert(t, "digicert")))
+
+	restore, err := inject(bundle, ca)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
+	scratch, _ := mount["source"].(string)
+	if err := os.Remove(filepath.Join(scratch, "cacerts")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(rootfs, "opt/java/lib/security/cacerts")); !os.IsNotExist(err) {
+		t.Fatalf("the deleted keystore came back: %v", err)
+	}
+}
+
+// Failing to restore the pristine keystore fails the step: a half-written
+// keystore must not reach the image, so this is fail-closed like the write-back.
+func TestInjectFailsWhenItCannotRestoreAKeystore(t *testing.T) {
+	useFakeRsync(t)
+	old := writeMirrorFile
+	writeMirrorFile = func(string, []byte, os.FileMode) error { return errBrokenFile }
+	t.Cleanup(func() { writeMirrorFile = old })
+
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	ca := certPEM(testCert(t, "buildcage"))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keytoolStore(t, "keytool-alias", testCert(t, "digicert")))
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/other", []byte("BEFORE\n"))
+
+	restore, err := inject(bundle, ca)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
+	scratch, _ := mount["source"].(string)
+	mustWriteFile(t, filepath.Join(scratch, "other"), "AFTER\n")
+
+	if err := restore.finish(); !errors.Is(err, errBrokenFile) {
+		t.Fatalf("got %v, want the restore failure to fail the step", err)
+	}
+}
+
+// A keystore that cannot be injected into (here a PKCS#12 under a password of
+// its own) is bound but left un-injected, so the step's JVM simply does
+// not trust the CA rather than the build failing.
+func TestInjectSkipsAnUninjectableKeystore(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		encryptedStore(t, testCert(t, "root")))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore.finish()
+
+	mount := findMount(t, loadMounts(t, bundle), "/opt/java/lib/security")
+	scratch, _ := mount["source"].(string)
+	mirrored, err := os.ReadFile(filepath.Join(scratch, "cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(mirrored, testDER) {
+		t.Fatal("something was injected into a keystore that cannot take it")
+	}
+}
+
+// A keystore left half-written stops the step before it runs: the mirror is
+// dropped unwritten and the real keystore keeps its bytes. One inside the store
+// directory takes the store's bind down with it.
+func TestInjectAbandonsAHalfWrittenKeystore(t *testing.T) {
+	const javaCacerts = "/opt/java/lib/security/cacerts"
+	for name, tc := range map[string]struct {
+		newBundle func(t *testing.T, env []string) (string, string)
+		keystore  string
+	}{
+		"in the JDK's own directory":    {newBundleNoStore, javaCacerts},
+		"inside the CA store directory": {newBundle, "/etc/ssl/certs/java/cacerts"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			useFakeRsync(t)
+			bundle, rootfs := tc.newBundle(t, []string{"JAVA_HOME=/opt/java"})
+			pristine := keystore(2, trustedEntry(2, "digicert", otherDER))
+			writeRootfsKeystore(t, rootfs, tc.keystore, pristine)
+			if tc.keystore != javaCacerts {
+				mustMkdirAll(t, filepath.Join(rootfs, filepath.Dir(javaCacerts)))
+				mustSymlink(t, tc.keystore, filepath.Join(rootfs, javaCacerts))
+			}
+			before, err := os.ReadFile(filepath.Join(bundle, "config.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
+
+			_, err = inject(bundle, testCA)
+			if !errors.Is(err, errKeystoreHalfWritten) || !strings.Contains(err.Error(), tc.keystore) {
+				t.Fatalf("got %v, want the half-written keystore named by its container path", err)
+			}
+			after, err := os.ReadFile(filepath.Join(bundle, "config.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(after, before) {
+				t.Error("the spec was saved for a step that will not run")
+			}
+			real, err := os.ReadFile(filepath.Join(rootfs, tc.keystore))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(real, pristine) {
+				t.Error("the real keystore was changed")
+			}
+			if left, err := os.ReadDir(scratchRoot); err != nil || len(left) != 0 {
+				t.Errorf("scratch directories left behind: %v %v", left, err)
+			}
+		})
+	}
+}
+
+// Undoing the injection can fail too; that goes to the log on its own line,
+// and the error inject returns is still the half-written keystore alone.
+func TestInjectLogsAFailureToUndoTheInjection(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newBundleNoStore(t, []string{"JAVA_HOME=/opt/java"})
+	writeRootfsKeystore(t, rootfs, "/opt/java/lib/security/cacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+	useBrokenBundleFile(t, &brokenFile{shortWriteAt: 1})
+	old := walkDir
+	walkDir = func(dir string, fn fs.WalkDirFunc) error {
+		if dir == rootfs {
+			return errBrokenWalk // the sweep of the step's layer
+		}
+		return old(dir, fn)
+	}
+	t.Cleanup(func() { walkDir = old })
+
+	_, err := inject(bundle, testCA)
+	if !errors.Is(err, errKeystoreHalfWritten) || errors.Is(err, errBrokenWalk) {
+		t.Fatalf("got %v, want the half-written keystore alone", err)
+	}
+	if !strings.Contains(ownLog.String(), "undoing the CA injection: ") {
+		t.Errorf("the failure to undo was not logged:\n%s", ownLog.String())
+	}
+}
+
+// A Debian JDK's cacerts is a symlink into the CA store directory, which the
+// store's own bind already mirrors; the CA goes into that mirror's copy of the
+// keystore rather than a second bind the store mount would shadow.
+func TestInjectCoversAKeystoreInsideTheStoreDir(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"JAVA_HOME=/opt/java"})
+	writeRootfsKeystore(t, rootfs, "/etc/ssl/certs/java/cacerts",
+		keystore(2, trustedEntry(2, "digicert", otherDER)))
+	mustMkdirAll(t, filepath.Join(rootfs, "opt/java/lib/security"))
+	mustSymlink(t, "/etc/ssl/certs/java/cacerts",
+		filepath.Join(rootfs, "opt/java/lib/security/cacerts"))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore.finish()
+
+	// One bind covers the store directory; the keystore is not bound separately.
+	for _, m := range loadMounts(t, bundle) {
+		if m["destination"] == "/etc/ssl/certs/java" {
+			t.Fatal("the keystore was bound separately, which the store mount shadows")
+		}
+	}
+
+	mount := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")
+	scratch, _ := mount["source"].(string)
+	mirrored, err := os.ReadFile(filepath.Join(scratch, "java", "cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(mirrored, []byte(injectedAlias)) || !bytes.Contains(mirrored, testDER) {
+		t.Fatal("the CA was not inserted into the keystore inside the store mirror")
+	}
+
+	real, err := os.ReadFile(filepath.Join(rootfs, "etc/ssl/certs/java/cacerts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(real, []byte(injectedAlias)) {
+		t.Fatal("the real keystore was modified before the step touched it")
 	}
 }

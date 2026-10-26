@@ -52,11 +52,9 @@ describe("rule lists", () => {
   });
 
   it("escapes a backslash for the config parser", () => {
-    expect(
-      lines(config).includes(
-        "acl is_https_allowed var(txn.sni_port) -m reg -i ^api[0-9]+\\\\.example\\\\.com:443$",
-      ),
-    ).toBe(true);
+    expect(lines(config)).toContain(
+      "acl is_https_allowed var(txn.sni_port) -m reg -i ^api[0-9]+\\\\.example\\\\.com:443$",
+    );
   });
 
   it("names the rule each acl line came from", () => {
@@ -99,23 +97,23 @@ describe("audit", () => {
   });
 
   it("logs AUDIT where restrict logs ALLOWED", () => {
-    expect(config.includes("str(ALLOWED)")).toBe(false);
+    expect(config).not.toContain("str(ALLOWED)");
     expect(lines(config).filter((l) => l.includes("str(AUDIT)")).length).toBe(3);
     expect(lines(gen()).filter((l) => l.includes("str(ALLOWED)")).length).toBe(3);
   });
 
   it("accepts an unmatched IP connection only in audit", () => {
     const accept = "tcp-request content accept if !is_dns_routed !is_ip_match";
-    expect(lines(config).includes(accept)).toBe(true);
-    expect(lines(gen()).includes(accept)).toBe(false);
+    expect(lines(config)).toContain(accept);
+    expect(lines(gen())).not.toContain(accept);
   });
 });
 
 describe("resolver", () => {
   it("resolves through the container's own /etc/resolv.conf", () => {
     const config = gen();
-    expect(lines(config).includes("parse-resolv-conf")).toBe(true);
-    expect(config.includes("nameserver")).toBe(false);
+    expect(lines(config)).toContain("parse-resolv-conf");
+    expect(config).not.toContain("nameserver");
   });
 
   it("retries a failed resolution on the path no inspect-delay caps", () => {
@@ -147,7 +145,7 @@ describe("a connection to the proxy's own listener", () => {
       const all = lines(gen({ mode, ipRules: ["0.0.0.0/0:*"] }));
       const self = "!is_dns_routed is_ip_match ip_dst_internal { dst_port 10024 }";
       const reject = all.indexOf(`tcp-request content reject if ${self}`);
-      expect(all.includes(`acl ip_dst_internal dst -m ip -f ${HOST_FILE}`)).toBe(true);
+      expect(all).toContain(`acl ip_dst_internal dst -m ip -f ${HOST_FILE}`);
       expect(all[reject - 1]).toBe(
         `tcp-request content set-var(txn.reason) str(internal-address) if ${self}`,
       );
@@ -161,7 +159,7 @@ describe("outbound_proxy", () => {
   const all = lines(gen());
 
   it("recognises a connection that came through a name by the proxy's address", () => {
-    expect(all.includes(`acl is_dns_routed dst ${PROXY_ADDRESS}`)).toBe(true);
+    expect(all).toContain(`acl is_dns_routed dst ${PROXY_ADDRESS}`);
   });
 
   it("matches IP rules against a variable set once, from dst", () => {
@@ -173,7 +171,7 @@ describe("outbound_proxy", () => {
   });
 
   it("matches the SNI as sent, so a trailing dot is not dropped", () => {
-    expect(all.includes("tcp-request content set-var(txn.sni) req_ssl_sni if is_tls")).toBe(true);
+    expect(all).toContain("tcp-request content set-var(txn.sni) req_ssl_sni if is_tls");
   });
 
   it("blocks an SNI that is not a hostname before the allowlist or the resolver acts on it", () => {
@@ -221,15 +219,15 @@ describe("a plaintext request's Host", () => {
     it(`is blocked in ${mode} when it is not a hostname, before the allowlist or the resolver`, () => {
       const all = lines(gen({ mode, httpRules: HTTP }));
       const reject = all.findIndex((l) => l.startsWith(deny) && l.endsWith(" if !host_is_name"));
-      expect(reject !== -1).toBe(true);
-      expect(reject < all.findIndex((l) => l.includes("if !is_http_allowed"))).toBe(true);
-      expect(reject < all.findIndex((l) => l.startsWith("http-request do-resolve"))).toBe(true);
+      expect(reject).not.toBe(-1);
+      expect(reject).toBeLessThan(all.findIndex((l) => l.includes("if !is_http_allowed")));
+      expect(reject).toBeLessThan(all.findIndex((l) => l.startsWith("http-request do-resolve")));
     });
   }
 
   it("is checked once its port is gone, as inspect checks it", () => {
     const set = "http-request set-var(txn.host_only) hdr(host),host_only,regsub(\\.$,)";
-    expect(lines(gen()).includes(set)).toBe(true);
+    expect(lines(gen())).toContain(set);
   });
 });
 

@@ -7,10 +7,15 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
+
+// Fakes and toggles shared across the package's test files, each pointing the
+// code at a test's own state, and the file helpers that set that state up.
+// Data builders live in fixtures_test.go.
 
 // TestMain points the package's own log somewhere disposable for the whole
 // run. logf writes to logFile and appends to ownLog, both package level, and
@@ -236,6 +241,15 @@ func mustWriteFile(t *testing.T, path, content string) {
 	}
 }
 
+func mustRead(t *testing.T, path string) string {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(got)
+}
+
 // mustAppendFile stands in for whatever writes to a file the wrapper already
 // owns: a step adding its own certificates, or a neighbouring step's line
 // landing in the shared log.
@@ -301,17 +315,62 @@ func useFakeRsync(t *testing.T) {
 // fakeRsyncCopy stands in for `rsync -a[HAX] [--checksum] [--delete] ... src/ dst/`:
 // it only looks at the last two arguments and replaces dst wholesale with
 // src's tree, which is close enough to mirrorDir/writeBack's actual usage for
-// unit tests to observe the resulting on-disk state.
+// unit tests to observe the resulting on-disk state. A dry run (-n) changes
+// nothing, so only the apply that follows it can make a write-back land.
 func fakeRsyncCopy(args []string) ([]byte, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("not enough args: %v", args)
 	}
-	src := strings.TrimSuffix(args[len(args)-2], "/")
-	dst := strings.TrimSuffix(args[len(args)-1], "/")
+	src, dst := rsyncSrc(args), rsyncDst(args)
+	if isRsyncDryRun(args) {
+		return []byte("dry run: " + src + " -> " + dst + "\n"), nil
+	}
 	if err := os.RemoveAll(dst); err != nil {
 		return nil, err
 	}
 	return nil, copyTree(src, dst)
+}
+
+func rsyncSrc(args []string) string { return rsyncOperand(args, 2) }
+func rsyncDst(args []string) string { return rsyncOperand(args, 1) }
+
+// rsyncOperand is the nth argument from the end, or "" for a call too short
+// to have one.
+func rsyncOperand(args []string, fromEnd int) string {
+	if len(args) < fromEnd {
+		return ""
+	}
+	return strings.TrimSuffix(args[len(args)-fromEnd], "/")
+}
+
+// rsyncOptions is what comes before the "--" that mirrorDir and writeBack
+// put ahead of their operands.
+func rsyncOptions(args []string) []string {
+	if i := slices.Index(args, "--"); i >= 0 {
+		return args[:i]
+	}
+	return args
+}
+
+// The matchers below go by the options mirrorDir and writeBack pass, spelled
+// exactly as they pass them; TestRsyncMatchersRecogniseEachCall keeps them in
+// step with the code.
+
+// isRsyncWriteBack matches either half of writeBack: only it deletes.
+func isRsyncWriteBack(args []string) bool { return slices.Contains(rsyncOptions(args), "--delete") }
+
+func isRsyncDryRun(args []string) bool {
+	return isRsyncWriteBack(args) && slices.Contains(rsyncOptions(args), "-n")
+}
+
+// isRsyncApply matches the write-back that changes the rootfs.
+func isRsyncApply(args []string) bool {
+	return isRsyncWriteBack(args) && !slices.Contains(rsyncOptions(args), "-n")
+}
+
+// isRsyncMirror matches prepare's copy of a host directory into scratch.
+func isRsyncMirror(args []string) bool {
+	return !isRsyncWriteBack(args) && withinDir(rsyncDst(args), scratchRoot)
 }
 
 func copyTree(src, dst string) error {
@@ -361,15 +420,16 @@ func countRsync(t *testing.T) *int {
 	return &calls
 }
 
-// failRsyncOn makes the nth rsync call from here fail, so a test can pick
-// which half of a write-back breaks. Every other call still runs.
-func failRsyncOn(t *testing.T, n int) {
+// failRsyncWhen fails the first later rsync call that match accepts, so a
+// test names the call it breaks rather than counting to it. Every other call
+// still runs.
+func failRsyncWhen(t *testing.T, match func(args []string) bool) {
 	t.Helper()
-	calls := 0
+	failed := false
 	orig := runRsync
 	runRsync = func(args []string) ([]byte, error) {
-		calls++
-		if calls == n {
+		if !failed && match(args) {
+			failed = true
 			return []byte("boom"), fmt.Errorf("simulated rsync failure")
 		}
 		return orig(args)
@@ -422,4 +482,35 @@ func captureStderr(t *testing.T) func() string {
 		r.Close()
 		return string(out)
 	}
+}
+
+// useMountInfo hands upperDirOf these lines instead of the test process's own
+// mount table, which holds no overlay over a temporary directory.
+func useMountInfo(t *testing.T, lines ...string) {
+	t.Helper()
+	old := readMountInfo
+	readMountInfo = func() ([]byte, error) { return []byte(strings.Join(lines, "\n") + "\n"), nil }
+	t.Cleanup(func() { readMountInfo = old })
+}
+
+// useTempLog points logf and the dump at a file the test owns, since a test
+// process usually can't write the real host path.
+func useTempLog(t *testing.T) {
+	t.Helper()
+	oldFile, oldTag := logFile, logTag
+	logFile = filepath.Join(t.TempDir(), "runc.log")
+	logTag = "[this-step]"
+	ownLog.Reset()
+	t.Cleanup(func() {
+		logFile, logTag = oldFile, oldTag
+		ownLog.Reset()
+	})
+}
+
+// useFailOnCAResidue stands for a build set up with fail_on_ca_residue: fail.
+func useFailOnCAResidue(t *testing.T, fail bool) {
+	t.Helper()
+	old := failOnCAResidue
+	failOnCAResidue = fail
+	t.Cleanup(func() { failOnCAResidue = old })
 }

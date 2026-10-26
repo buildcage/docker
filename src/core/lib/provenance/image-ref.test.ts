@@ -16,11 +16,4 @@ describe("resolveBuildcageImageRef", () => {
       resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "MyOrg/MyRepo" }),
     ).toBe(`ghcr.io/myorg/myrepo@${digest}`);
   });
-
-  it("derives the repository from actionRepository alone, there being no override to pass", () => {
-    const digest = "sha256:" + "c".repeat(64);
-    expect(resolveBuildcageImageRef({ imageDigest: digest, actionRepository: "Owner/Repo" })).toBe(
-      `ghcr.io/owner/repo@${digest}`,
-    );
-  });
 });

@@ -1,0 +1,15 @@
+name: Assert post cleanup
+description: Check, once every later step's post hook has run, that the recorded builders are gone
+# Post hooks run in reverse step order, so this one runs after the post hook of
+# every setup step that follows it in the job. Callers must run
+# actions/checkout first: post.mjs runs test/assert-post.sh from the checkout.
+
+inputs:
+  record:
+    description: File of "<builder name> <buildkit volume>" lines, written by record.sh after each setup step
+    required: true
+
+runs:
+  using: node24
+  main: main.mjs
+  post: post.mjs

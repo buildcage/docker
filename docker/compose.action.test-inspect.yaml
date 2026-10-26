@@ -1,0 +1,85 @@
+# Layered on compose.action.yaml through BUILDCAGE_TEST_COMPOSE_OVERLAY (see
+# src/core/lib/provenance/local-image-override.ts) by the inspect-engine
+# integration tests, which reach it only in a build made with
+# BUILDCAGE_BUILD_TEST_HOOKS=1: joins the builder to the fixtures below. Their
+# rules are in ../test/fixture-rules-inspect.sh. Paths resolve against this
+# directory, the first compose file's.
+services:
+  # Unlike the universal overlay, the builder needs to trust the fixtures'
+  # certificate: this engine verifies the origin when it connects, so a
+  # self-signed test server would otherwise be a 503 in every case and nothing
+  # downstream would be exercised.
+  builder:
+    environment:
+      TEST_NET_ADDR: 10.200.0.2/24
+      TEST_NET_SUBNET: ${TEST_NET_SUBNET:-10.210.0.0/24}
+      # What the action computed, plus a fixture address nothing answers on,
+      # so only the guard can block it.
+      HOST_ADDRESSES: ${HOST_ADDRESSES:-} 10.200.0.199
+      # Honoured only by an image built with BUILDCAGE_TEST_HOOKS=1 (see
+      # docker/inspect/Dockerfile), which setup-builder.sh builds for this file.
+      BUILDCAGE_EXTRA_CA_FILE: /test-fixtures/test-server-cert.pem
+    volumes:
+      - ../test/test-server-inspect/cert.pem:/test-fixtures/test-server-cert.pem:ro
+      - ../test/test-net-addr/attach.sh:/test-hooks/attach-test-net-addr.sh:ro
+    # Wrapped here rather than in the image: the builder is the product image
+    # and carries no test-only setup.
+    entrypoint: ["/test-hooks/attach-test-net-addr.sh", "/init"]
+    # Docker's embedded DNS forwards here, so HAProxy and buildkitd reach the fixture
+    # resolver through resolv.conf, as they reach the runner's DNS in a job.
+    dns: [10.200.0.53]
+    networks:
+      default:
+      test-net:
+
+  # The origin every allowed name resolves to. Distinguishes paths and echoes
+  # the method, so a path or method rule can be seen to have actually applied.
+  test-server:
+    build: ../test/test-server-inspect
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - TEST_NET_ADDR=10.200.0.100/24
+    networks:
+      test-net:
+
+  # A second origin, with a certificate no CA the proxy holds signed. A request
+  # served here came from the client's own choice of destination rather than
+  # from the proxy's resolution.
+  test-server-impostor:
+    build: ../test/test-server-impostor
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - TEST_NET_ADDR=10.200.0.101/24
+    networks:
+      test-net:
+
+  # Echoes whatever UDP it is sent. A build must not be able to reach it, and
+  # a container beside it must, or "unreachable" would prove nothing.
+  test-udp-echo:
+    build: ../test/test-udp-echo
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - TEST_NET_ADDR=10.200.0.102/24
+    networks:
+      test-net:
+
+  # Upstream for the builder's HAProxy, through Docker's embedded DNS, once a
+  # request has already passed the rules; CoreDNS itself never forwards here.
+  test-dns:
+    build: ../test/test-dns-inspect
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - TEST_NET_ADDR=10.200.0.53/24
+    networks:
+      test-net:
+
+networks:
+  # Pinned rather than auto-assigned: test-net-addr finds the interface by it.
+  test-net:
+    ipam:
+      config:
+        - subnet: ${TEST_NET_SUBNET:-10.210.0.0/24}

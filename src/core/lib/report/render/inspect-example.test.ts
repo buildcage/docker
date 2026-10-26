@@ -77,7 +77,7 @@ describe("what the rules permit", () => {
 
   it("never invents a method that was not seen", () => {
     const lines = buildUrlRuleLines([req("GET", "https://a.example.com/x")]);
-    expect(lines.join("\n").includes("*")).toBe(false);
+    expect(lines.join("\n")).not.toContain("*");
     expect(permits(lines, "DELETE", "https://a.example.com/x")).toBe(false);
   });
 
@@ -334,8 +334,8 @@ describe("buildInspectRestrictExample", () => {
 
   it("uses a literal block, since rules are separated by newlines", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2");
-    expect(md.includes("allowed_url_rules: |\n")).toBe(true);
-    expect(md.includes("proxy_engine")).toBe(false);
+    expect(md).toContain("allowed_url_rules: |\n");
+    expect(md).not.toContain("proxy_engine");
   });
 
   it("renders nothing when nothing was observed and no tls/ip rules were configured", () => {
@@ -347,12 +347,12 @@ describe("buildInspectRestrictExample", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       allowedIpRules: ["10.0.0.5:5432"],
     });
-    expect(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/.test(md)).toBe(true);
+    expect(md).toMatch(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/);
 
     const md2 = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       allowedTlsRules: ["db.internal.example.com:8443"],
     });
-    expect(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/.test(md2)).toBe(true);
+    expect(md2).toMatch(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/);
   });
 
   it("lists what it left out under the snippet, escaped and without the query", () => {
@@ -367,11 +367,11 @@ describe("buildInspectRestrictExample", () => {
       "v2",
     );
     const [snippet, rest] = md.split("```\n\n");
-    expect(snippet.includes("*")).toBe(false);
+    expect(snippet).not.toContain("*");
     expect(rest).toContain("| `*` | `https://github.com/**` | method |");
     expect(rest).toContain("| `PUT` | `https://*.s3.amazonaws.com/**` | host |");
     expect(rest.match(/github\.com/g)).toHaveLength(1);
-    expect(rest.includes("SECRET")).toBe(false);
+    expect(rest).not.toContain("SECRET");
   });
 
   it("caps the list, pointing at Communication details for the rest", () => {
@@ -379,7 +379,7 @@ describe("buildInspectRestrictExample", () => {
     const md = buildInspectRestrictExample(many, "owner/repo", "v2");
     expect(md.match(/\| `GET` \| /g)).toHaveLength(20);
     expect(md).toContain("…and 5 more, listed in Communication details.");
-    expect(md.includes("allowed_url_rules")).toBe(false);
+    expect(md).not.toContain("allowed_url_rules");
   });
 
   it("still renders a section for tls/ip rules alone, with no observed traffic", () => {
@@ -387,9 +387,9 @@ describe("buildInspectRestrictExample", () => {
       allowedIpRules: ["10.0.0.5:5432"],
       allowedTlsRules: ["db.internal.example.com:8443"],
     });
-    expect(md.includes("allowed_url_rules")).toBe(false);
-    expect(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/.test(md)).toBe(true);
-    expect(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/.test(md)).toBe(true);
+    expect(md).not.toContain("allowed_url_rules");
+    expect(md).toMatch(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/);
+    expect(md).toMatch(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/);
   });
 
   it("ends with a run: block when a runCommand is given, same as universal-example.ts", () => {
@@ -412,6 +412,6 @@ describe("buildInspectRestrictExample", () => {
 
   it("omits the run: block when no runCommand is given", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2");
-    expect(md.includes("run: |")).toBe(false);
+    expect(md).not.toContain("run: |");
   });
 });

@@ -10,9 +10,7 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 	enumerable: !0
 }) : target, mod));
 //#endregion
-let node_fs = require("node:fs"), node_url = require("node:url"), node_child_process = require("node:child_process"), node_path = require("node:path");
-node_path = __toESM(node_path, 1);
-let os = require("os");
+let node_fs = require("node:fs"), node_url = require("node:url"), node_child_process = require("node:child_process"), os = require("os");
 os = __toESM(os, 1);
 let crypto$1 = require("crypto");
 crypto$1 = __toESM(crypto$1, 1);
@@ -24,6 +22,8 @@ let events = require("events");
 events = __toESM(events, 1);
 let node_crypto = require("node:crypto"), child_process = require("child_process");
 child_process = __toESM(child_process, 1), require("timers");
+let node_path = require("node:path");
+node_path = __toESM(node_path, 1);
 let node_os = require("node:os");
 node_os = __toESM(node_os, 1);
 let node_fs_promises = require("node:fs/promises");
@@ -5174,11 +5174,15 @@ function withLogGroup(title, fn) {
 		console.log("::endgroup::");
 	}
 }
-function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
+//#endregion
+//#region src/core/lib/docker/args.ts
+function fileArgs(composeFiles) {
+	return composeFiles.flatMap((file) => ["-f", file]);
+}
+function buildComposeUpArgs({ composeFiles, projectName, pullPolicy }) {
 	return [
 		"compose",
-		"-f",
-		composeFile,
+		...fileArgs(composeFiles),
 		"-p",
 		projectName,
 		"up",
@@ -5192,11 +5196,10 @@ function buildComposeUpArgs({ composeFile, projectName, pullPolicy }) {
 		"--quiet-pull"
 	];
 }
-function buildComposeLogsArgs({ composeFile, projectName, tail }) {
+function buildComposeLogsArgs({ composeFiles, projectName, tail }) {
 	return [
 		"compose",
-		"-f",
-		composeFile,
+		...fileArgs(composeFiles),
 		"-p",
 		projectName,
 		"logs",
@@ -5205,11 +5208,10 @@ function buildComposeLogsArgs({ composeFile, projectName, tail }) {
 		String(tail)
 	];
 }
-function buildComposeDownArgs({ composeFile, projectName }) {
+function buildComposeDownArgs({ composeFiles, projectName }) {
 	return [
 		"compose",
-		"-f",
-		composeFile,
+		...fileArgs(composeFiles),
 		"-p",
 		projectName,
 		"down",
@@ -5220,6 +5222,9 @@ function buildComposeDownArgs({ composeFile, projectName }) {
 //#region src/core/lib/docker/compose-project-name.ts
 function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
+}
+function resolveProjectName(builderName, composeProjectNameOverride) {
+	return composeProjectNameOverride || deriveProjectName(builderName);
 }
 //#endregion
 //#region src/core/lib/provenance/image-ref.ts
@@ -11908,7 +11913,10 @@ const LIST_INPUTS = [
 		"traffic_artifact_retention_days"
 	],
 	lists: LIST_INPUTS
-};
+}, __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
+function withComposeOverlay(composeFile, overlay) {
+	return overlay ? [composeFile, overlay] : [composeFile];
+}
 //#endregion
 //#region src/core/lib/docker/health.ts
 function buildDockerInspectStateArgs(containerName) {
@@ -11961,10 +11969,10 @@ const captureDockerViaExec = (args, env) => (0, node_child_process.execFileSync)
 		env
 	});
 };
-function builderStartError(e, { composeFile, projectName, builderName, composeEnv }, deps = {}) {
+function builderStartError(e, { composeFiles, projectName, builderName, composeEnv }, deps = {}) {
 	let state = readBuilderState(builderName, composeEnv, deps);
 	return state ? (printBuilderLog({
-		composeFile,
+		composeFiles,
 		projectName,
 		composeEnv
 	}, deps), new SetupError(describeContainerStartFailure(state, {
@@ -11983,11 +11991,11 @@ function reportInspectFailure(e) {
 	let stderr = capturedStderr(e);
 	stderr && !/no such object/i.test(stderr) && console.log(`buildcage: could not read the builder container's state: ${stderr}`);
 }
-function printBuilderLog({ composeFile, projectName, composeEnv }, { printDocker = printDockerViaExec }) {
+function printBuilderLog({ composeFiles, projectName, composeEnv }, { printDocker = printDockerViaExec }) {
 	withLogGroup("buildcage: Builder container log", () => {
 		try {
 			printDocker(buildComposeLogsArgs({
-				composeFile,
+				composeFiles,
 				projectName,
 				tail: 100
 			}), composeEnv);
@@ -12225,7 +12233,7 @@ function ruleBlock(rules, mode, scheme) {
 }
 //#endregion
 //#region src/core/lib/acl/haproxy-rules.ts
-const HOST_IS_ADDRESS = `^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`, INTERNAL_RANGES = [
+const HOST_IS_ADDRESS = `^${IPV4}$`, INTERNAL_RANGES = [
 	"0.0.0.0/8",
 	"127.0.0.0/8",
 	"169.254.0.0/16",
@@ -12840,7 +12848,7 @@ async function readLocalImageOverride(env, log = console.log) {
 }
 //#endregion
 //#region src/lib/post-cleanup.ts
-const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml"), realDeps = {
+const realDeps = {
 	applyConfigFile,
 	readSetupInputs,
 	readLocalImageOverride,
@@ -12894,7 +12902,7 @@ async function runSetupStep(env, overrides = {}) {
 	}, warn), withLogGroup("buildcage: Configured ACL Rules", () => {
 		logRules("HTTPS", httpsRules), logRules("HTTP", httpRules), logRules("IP", ipRules), logRules("URL", urlRules), logRules("TLS", tlsRules), logRules("Known blocked", knownBlockedRules);
 	});
-	let { imageRef, pullPolicy } = await readLocalImageOverride(env, log) ?? await resolveVerifiedImage({
+	let localOverride = await readLocalImageOverride(env, log), { imageRef, pullPolicy } = localOverride ?? await resolveVerifiedImage({
 		actionRef,
 		actionRepo,
 		proxyEngine
@@ -12903,7 +12911,7 @@ async function runSetupStep(env, overrides = {}) {
 		log
 	});
 	log(`buildcage: image: ${imageRef}`);
-	let projectName = deriveProjectName(builderName), composeEnv = buildComposeEnv({
+	let projectName = resolveProjectName(builderName, void 0), composeFiles = withComposeOverlay(COMPOSE_FILE, localOverride?.composeOverlay), composeEnv = buildComposeEnv({
 		builderName,
 		proxyMode,
 		proxyEngine,
@@ -12918,7 +12926,7 @@ async function runSetupStep(env, overrides = {}) {
 	}, env);
 	try {
 		runDocker(buildComposeDownArgs({
-			composeFile: COMPOSE_FILE,
+			composeFiles,
 			projectName
 		}), composeEnv);
 	} catch (e) {
@@ -12926,13 +12934,13 @@ async function runSetupStep(env, overrides = {}) {
 	}
 	try {
 		runDocker(buildComposeUpArgs({
-			composeFile: COMPOSE_FILE,
+			composeFiles,
 			projectName,
 			pullPolicy
 		}), composeEnv);
 	} catch (e) {
 		throw builderStartError(e, {
-			composeFile: COMPOSE_FILE,
+			composeFiles,
 			projectName,
 			builderName,
 			composeEnv

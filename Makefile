@@ -1,6 +1,7 @@
-COMPOSE_FILE ?= compose.yaml
+UNIVERSAL_OVERLAY := docker/compose.action.test-universal.yaml
+INSPECT_OVERLAY := docker/compose.action.test-inspect.yaml
 # Lets a target name the overlay its own clean_buildkit has to tear down.
-TEST_COMPOSE_FILE ?= compose.test-universal.yaml
+TEST_COMPOSE_FILE ?= $(UNIVERSAL_OVERLAY)
 
 # These names, and test-net's subnet, are global to the daemon: a linked
 # worktree's run would otherwise tear down the main checkout's builder. The
@@ -17,6 +18,8 @@ BUILDCAGE_WORKTREE_SUFFIX ?= $(if $(WORKTREE_SLUG),-$(WORKTREE_SLUG))
 TEST_NET_SUBNET ?= $(if $(WORKTREE_NAME),$(shell printf '%s' '$(WORKTREE_NAME)' | cksum | awk '{printf "10.%d.%d.0/24", $$1 % 40 + 210, int($$1 / 40) % 254 + 1}'),10.210.0.0/24)
 BUILDER_NAME ?= buildcage$(BUILDCAGE_WORKTREE_SUFFIX)
 TEST_IMAGE ?= buildcage-test$(BUILDCAGE_WORKTREE_SUFFIX)
+# compose.yaml's image name, whichever engine was built last.
+BUILDER_IMAGE := buildcage-builder$(BUILDCAGE_WORKTREE_SUFFIX)
 QJS_TEST_IMAGE ?= buildcage-qjs-test$(BUILDCAGE_WORKTREE_SUFFIX)
 BYTE_EXACT_INSPECT := buildcage-byte-exact-inspect$(BUILDCAGE_WORKTREE_SUFFIX)
 BYTE_EXACT_UNIVERSAL := buildcage-byte-exact-universal$(BUILDCAGE_WORKTREE_SUFFIX)
@@ -31,17 +34,20 @@ TEST_PLATFORM ?= linux/arm64
 # build is a cross build wherever it runs.
 MULTIARCH_CROSS_PLATFORM ?= $(if $(filter arm64 aarch64,$(shell uname -m)),linux/amd64,linux/arm64)
 BUILDX_BUILD = docker buildx build --no-cache --builder $(BUILDER_NAME) --platform $(TEST_PLATFORM) --progress=plain
+# In place of a failed restrict build's exit: make stops there, before the
+# assertions that would print the proxy's side of the cases that failed.
+BUILD_FAILED = { ./test/print-proxy-diagnostics.sh; exit 1; }
 
-# Compose project name, trusted by report/src/lib/report-step.ts and
-# src/post.ts via their own BUILDCAGE_BUILD_TEST_HOOKS-gated overrides
-# instead of deriveProjectName("buildcage")
-# (src/core/lib/docker/compose-project-name.ts).
+# Compose project name, trusted by src/lib/setup-step.ts,
+# report/src/lib/report-step.ts and src/post.ts via their own
+# BUILDCAGE_BUILD_TEST_HOOKS-gated overrides instead of
+# deriveProjectName("buildcage") (src/core/lib/docker/compose-project-name.ts).
 # Scoped to the targets that touch this Compose project; test_unit_* is
 # excluded because none of those targets touches it.
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export COMPOSE_PROJECT_NAME := buildcage-project$(BUILDCAGE_WORKTREE_SUFFIX)
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export BUILDCAGE_BUILD_TEST_HOOKS := 1
-# Read by compose.yaml's container_name, report/src/lib/inputs.ts,
-# src/lib/inputs.ts (for the post step) and test/assert-post.sh.
+# Read by test/setup-builder.sh, report/src/lib/inputs.ts, src/lib/inputs.ts
+# (for the post step) and test/assert-post.sh.
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export BUILDER_NAME := $(BUILDER_NAME)
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export INPUT_BUILDER_NAME := $(BUILDER_NAME)
 setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_buildkit: export TEST_IMAGE := $(TEST_IMAGE)
@@ -49,6 +55,11 @@ setup_buildkit_% test_integration_buildkit_% example_% clean_buildkit report_bui
 # Read by test/run-inspect-roundtrip.sh, which builds without going through a
 # recipe of its own.
 test_integration_buildkit_%: export TEST_PLATFORM := $(TEST_PLATFORM)
+# What test/setup-builder.sh hands the setup step, for src/post.ts to read the
+# same way: its down then layers the same overlay and takes the fixtures too.
+test_integration_buildkit_universal_%: export BUILDCAGE_TEST_COMPOSE_OVERLAY := $(UNIVERSAL_OVERLAY)
+test_integration_buildkit_inspect_%: export BUILDCAGE_TEST_COMPOSE_OVERLAY := $(INSPECT_OVERLAY)
+test_integration_buildkit_%: export BUILDCAGE_LOCAL_IMAGE_REF := $(BUILDER_IMAGE)
 
 .PHONY: help
 help:
@@ -148,28 +159,27 @@ setup_buildkit_universal_restrict: ## Start universal engine in restrict mode
 setup_buildkit_inspect_audit: ## Start inspect proxy engine in audit mode
 setup_buildkit_inspect_restrict: ## Start inspect proxy engine in restrict mode
 
-# Only this target starts with default rules; ALLOWED_HTTPS_RULES replaces them.
+# Only this target starts with default rules, and only without a fixture;
+# ALLOWED_HTTPS_RULES replaces them.
 setup_buildkit_universal_restrict: DEFAULT_ALLOWED_HTTPS_RULES := github.com:443 registry.npmjs.org:443 api.github.com:443 objects.githubusercontent.com:443 httpbin.org:443 deb.debian.org:80 *.githubusercontent.com:443
 
+# Through the setup action itself (src/main.ts), as a workflow would run it;
+# see test/setup-builder.sh. A target that names BUILDCAGE_TEST_COMPOSE_OVERLAY
+# also gets that file's fixtures.
 $(SETUP_TARGETS): setup_buildkit_%:
-	@echo "Starting buildcage ($(word 1,$(subst _, ,$*)) engine) in $(if $(filter audit,$(word 2,$(subst _, ,$*))),AUDIT,RESTRICT) mode..."
-	@COMPOSE_FILE=$(COMPOSE_FILE) \
-	  PROXY_ENGINE=$(word 1,$(subst _, ,$*)) \
-	  PROXY_MODE=$(word 2,$(subst _, ,$*)) \
-	  $(if $(DEFAULT_ALLOWED_HTTPS_RULES),ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-$(DEFAULT_ALLOWED_HTTPS_RULES)}") \
-	  docker compose -p $(COMPOSE_PROJECT_NAME) up -d --wait --build
-	@docker buildx rm $(BUILDER_NAME) 2>/dev/null || true
-	@echo "Creating buildx builder..."
-	@docker buildx create --bootstrap \
-		--name $(BUILDER_NAME) \
-		--driver remote docker-container://$(BUILDER_NAME)
+	@$(if $(and $(DEFAULT_ALLOWED_HTTPS_RULES),$(if $(BUILDCAGE_TEST_COMPOSE_OVERLAY),,1)),ALLOWED_HTTPS_RULES="$${ALLOWED_HTTPS_RULES:-$(DEFAULT_ALLOWED_HTTPS_RULES)}") \
+	  ./test/setup-builder.sh $(word 1,$(subst _, ,$*)) $(word 2,$(subst _, ,$*))
 
 .PHONY: clean_buildkit
 clean_buildkit: ## Stop and remove the buildkit builder's containers/images and buildx builder
 	@echo "Stopping and removing all containers..."
 	@docker buildx rm $(BUILDER_NAME) 2>/dev/null || true
-	@docker compose -p $(COMPOSE_PROJECT_NAME) -f compose.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi all
-	@docker rmi $(TEST_IMAGE) 2>/dev/null || true
+	@docker compose -p $(COMPOSE_PROJECT_NAME) -f docker/compose.action.yaml -f $(TEST_COMPOSE_FILE) down -v --rmi local
+	@docker rmi $(TEST_IMAGE) $(BUILDER_IMAGE) 2>/dev/null || true
+
+.PHONY: print_builder_name
+print_builder_name: ## Print the builder container's name, which carries the worktree suffix
+	@echo $(BUILDER_NAME)
 
 .PHONY: report_buildkit
 report_buildkit: ## Show the buildcage report for the currently running builder
@@ -184,46 +194,47 @@ report_buildkit: ## Show the buildcage report for the currently running builder
 INTEGRATION_TARGETS := $(shell sed -nE 's/^(test_integration_buildkit_[a-z0-9_]+):.*/\1/p' $(firstword $(MAKEFILE_LIST)))
 test_integration_buildkit: $(INTEGRATION_TARGETS) ## Run all buildkit integration tests
 
-# The target that verifies post.ts removed the builder. The targets below run
-# post.ts as part of their own teardown where they have one, but the removal
-# does not depend on the engine or the mode, so only this one asserts it.
+# Runs src/post.ts and checks it removed the builder and its /var/lib/buildkit
+# volume, read before post.ts ran. Once per engine and mode.
+POST_AND_ASSERT = volume=$$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/buildkit"}}{{.Name}}{{end}}{{end}}' "$$BUILDER_NAME") && \
+	  node src/post.ts && \
+	  BUILDKIT_VOLUME="$$volume" ./test/assert-post.sh
+
 .PHONY: test_integration_buildkit_universal_audit
 test_integration_buildkit_universal_audit: ## Run universal-engine audit mode tests
 	@echo "Running universal-engine audit mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(UNIVERSAL_OVERLAY) \
 	  $(MAKE) setup_buildkit_universal_audit
 	@$(BUILDX_BUILD) -f test/Dockerfile.universal-audit test/ \
 	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts
 	@./test/assert-universal-audit.sh
 	@./test/assert-step-port-isolation.sh
-	@volume=$$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/buildkit"}}{{.Name}}{{end}}{{end}}' "$$BUILDER_NAME") && \
-	  node src/post.ts && \
-	  BUILDKIT_VOLUME="$$volume" ./test/assert-post.sh
+	@$(POST_AND_ASSERT)
 	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_universal_restrict
 test_integration_buildkit_universal_restrict: ## Run universal-engine restrict mode tests
 	@echo "Running universal-engine restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(UNIVERSAL_OVERLAY) \
 	  $(MAKE) setup_buildkit_universal_restrict
 	@$(BUILDX_BUILD) -f test/Dockerfile.universal-restrict test/ \
-	  --load -t $(TEST_IMAGE)
+	  --load -t $(TEST_IMAGE) || $(BUILD_FAILED)
 	@node report/src/main.ts || true
 	@./test/assert-universal-restrict.sh
-	@node src/post.ts
+	@$(POST_AND_ASSERT)
 	@$(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_universal_restrict_no_traffic
 test_integration_buildkit_universal_restrict_no_traffic: ## Run universal-engine restrict mode tests with zero outbound traffic
 	@echo "Running universal-engine restrict mode tests with zero outbound traffic..."
-	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(UNIVERSAL_OVERLAY) \
 	  $(MAKE) setup_buildkit_universal_restrict
 	@$(BUILDX_BUILD) -f test/Dockerfile.universal-restrict-no-traffic test/ \
 	  --load -t $(TEST_IMAGE)
 	@INPUT_FAIL_ON_BLOCKED=true node report/src/main.ts
 	@./test/assert-universal-restrict-no-traffic.sh
-	@node src/post.ts
+	@$(POST_AND_ASSERT)
 	@$(MAKE) clean_buildkit
 
 # The Alpine build the CA-residue and layer-bloat guards run against. Every
@@ -233,10 +244,10 @@ test_integration_buildkit_universal_restrict_no_traffic: ## Run universal-engine
 .PHONY: test_integration_buildkit_inspect_restrict
 test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode tests
 	@echo "Running inspect-engine restrict mode tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(INSPECT_OVERLAY) \
 	  $(MAKE) setup_buildkit_inspect_restrict
 	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-restrict test/ \
-	  --load -t $(TEST_IMAGE)
+	  --load -t $(TEST_IMAGE) || $(BUILD_FAILED)
 	@./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@./test/assert-inspect-no-layer-bloat.sh $(TEST_IMAGE)
 	@node report/src/main.ts || true
@@ -246,8 +257,8 @@ test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode 
 	@./test/assert-step-port-isolation.sh
 	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-python test/ \
 	  --load -t $(TEST_IMAGE)
-	@node src/post.ts
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+	@$(POST_AND_ASSERT)
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 # The Debian build those same two guards run against: it starts with no CA
 # store at all, which is the case Alpine cannot cover. The restrict run below
@@ -255,7 +266,7 @@ test_integration_buildkit_inspect_restrict: ## Run inspect-engine restrict mode 
 .PHONY: test_integration_buildkit_inspect_debian_audit
 test_integration_buildkit_inspect_debian_audit: ## Run inspect-engine audit mode tests against a Debian (apt) build
 	@echo "Running inspect-engine audit mode tests (Debian/apt)..."
-	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(INSPECT_OVERLAY) \
 	  $(MAKE) setup_buildkit_inspect_audit
 	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-debian test/ \
 	  --load -t $(TEST_IMAGE)
@@ -263,18 +274,19 @@ test_integration_buildkit_inspect_debian_audit: ## Run inspect-engine audit mode
 	@./test/assert-inspect-no-layer-bloat.sh $(TEST_IMAGE)
 	@node report/src/main.ts || true
 	@./test/assert-inspect-debian.sh audit
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+	@$(POST_AND_ASSERT)
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_inspect_debian_restrict
 test_integration_buildkit_inspect_debian_restrict: ## Run inspect-engine restrict mode tests against a Debian (apt) build
 	@echo "Running inspect-engine restrict mode tests (Debian/apt)..."
-	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(INSPECT_OVERLAY) \
 	  $(MAKE) setup_buildkit_inspect_restrict
 	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-debian test/ \
 	  --load -t $(TEST_IMAGE)
 	@node report/src/main.ts || true
 	@./test/assert-inspect-debian.sh restrict
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 # The base-image JVM case: a JDK already present reads only its own keystore,
 # so the wrapper injects the proxy CA there for the step. Built over both shapes
@@ -284,7 +296,7 @@ test_integration_buildkit_inspect_debian_restrict: ## Run inspect-engine restric
 .PHONY: test_integration_buildkit_inspect_java_audit
 test_integration_buildkit_inspect_java_audit: ## Run inspect-engine tests against Java base images (JVM keystore injection)
 	@echo "Running inspect-engine audit mode tests (Java base images)..."
-	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(INSPECT_OVERLAY) \
 	  $(MAKE) setup_buildkit_inspect_audit
 	@for base in $(TEST_TEMURIN_PKCS12_IMAGE) $(TEST_TEMURIN_JKS_IMAGE); do \
 	  echo "=== Java base image: $$base ==="; \
@@ -298,13 +310,13 @@ test_integration_buildkit_inspect_java_audit: ## Run inspect-engine tests agains
 	@$(BUILDX_BUILD) -f test/Dockerfile.inspect-java-maven test/ \
 	  --load -t $(TEST_IMAGE)
 	@NO_APP_STORE_COPIES=1 ./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 # chrome-headless-shell ships for x86-64 only, so this ignores TEST_PLATFORM.
 .PHONY: test_integration_buildkit_inspect_chromium_audit
 test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests against chrome-headless-shell (NSS database injection)
 	@echo "Running inspect-engine audit mode tests (chrome-headless-shell)..."
-	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(INSPECT_OVERLAY) \
 	  $(MAKE) setup_buildkit_inspect_audit
 	@docker buildx build --no-cache \
 	  --builder $(BUILDER_NAME) \
@@ -314,82 +326,19 @@ test_integration_buildkit_inspect_chromium_audit: ## Run inspect-engine tests ag
 	@NO_APP_STORE_COPIES=1 ./test/assert-inspect-no-ca-residue.sh $(TEST_IMAGE)
 	@BUILDER_NAME=$(BUILDER_NAME) TEST_PLATFORM=linux/amd64 \
 	  ./test/assert-inspect-chromium.sh $(TEST_IMAGE)
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
-# Each case hides a copy of the CA the sweep finds but cannot remove, and must
-# fail the build naming the file and pointing at fail_on_ca_residue. With it
-# false, the same copy only warns. The control writes an unrelated encrypted
-# keystore and must build. The resealed case must build with the CA taken out
-# and the keystore still sealed under changeit.
 .PHONY: test_integration_buildkit_inspect_hidden_ca
 test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that hides a copy of the CA the sweep cannot remove
 	@echo "Running inspect-engine hidden CA copy tests..."
-	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
-	  $(MAKE) setup_buildkit_inspect_audit
-	@for case in leaf json; do \
-	  echo "=== A copy of the CA the sweep cannot take out: $$case ==="; \
-	  if $(BUILDX_BUILD) \
-	      --build-arg CASE=$$case \
-	      -f test/Dockerfile.inspect-hidden-ca test/ \
-	      > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1; then \
-	    echo "FAIL: the build committed a copy of the CA ($$case)"; exit 1; \
-	  fi; \
-	  if ! grep -q "cannot strip: /app/" $(SCRATCH_PREFIX)-hidden-ca.log; then \
-	    tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; \
-	    echo "FAIL: the build failed, but not on the copy of the CA ($$case)"; exit 1; \
-	  fi; \
-	  if ! grep -q "hint: .*fail_on_ca_residue: false" $(SCRATCH_PREFIX)-hidden-ca.log; then \
-	    tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; \
-	    echo "FAIL: the failure does not point at fail_on_ca_residue ($$case)"; exit 1; \
-	  fi; \
-	  echo "PASS: the build failed on the copy of the CA, pointing at fail_on_ca_residue ($$case)"; \
-	done
-	@echo "=== An encrypted keystore that is not the CA's ==="
-	@$(BUILDX_BUILD) \
-	  --build-arg CASE=control \
-	  -f test/Dockerfile.inspect-hidden-ca test/
-	@echo "PASS: the build kept a keystore that is not the CA's"
-	@echo "=== A keystore under changeit the sweep takes the CA out of ==="
-	@$(BUILDX_BUILD) \
-	  --build-arg CASE=resealed \
-	  -f test/Dockerfile.inspect-hidden-ca test/ \
-	  --load -t $(TEST_IMAGE)
-	@listing=$$(docker run --rm $(TEST_IMAGE) keytool -list -keystore /app/trust.p12 -storepass changeit) \
-	  || { echo "FAIL: the resealed keystore does not open under changeit"; exit 1; }; \
-	if echo "$$listing" | grep -qi buildcage; then \
-	  echo "FAIL: the resealed keystore still trusts the CA"; exit 1; \
-	fi; \
-	roots=$$(echo "$$listing" | grep -c trustedCertEntry || true); \
-	if [ "$${roots:-0}" -lt 100 ]; then \
-	  echo "FAIL: the resealed keystore kept only $$roots roots"; exit 1; \
-	fi; \
-	named=$$(echo "$$listing" | grep trustedCertEntry | grep -c ' \[jdk\],' || true); \
-	if [ "$$named" != "$$roots" ]; then \
-	  echo "FAIL: only $$named of $$roots roots kept their [jdk] alias"; exit 1; \
-	fi; \
-	if docker run --rm $(TEST_IMAGE) keytool -list -keystore /app/trust.p12 -storepass not-the-password >/dev/null 2>&1; then \
-	  echo "FAIL: the resealed keystore opens without changeit"; exit 1; \
-	fi; \
-	echo "PASS: the sweep took the CA out, kept $$roots roots under their aliases, and resealed under changeit"
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
-	@echo "=== fail_on_ca_residue: false, where the same copy only warns ==="
-	@FAIL_ON_CA_RESIDUE=false COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
-	  $(MAKE) setup_buildkit_inspect_audit
-	@$(BUILDX_BUILD) \
-	  --build-arg CASE=leaf \
-	  -f test/Dockerfile.inspect-hidden-ca test/ \
-	  > $(SCRATCH_PREFIX)-hidden-ca.log 2>&1 \
-	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: the copy of the CA failed the build"; exit 1; }
-	@grep -q "buildcage: warning: .*cannot strip: /app/" $(SCRATCH_PREFIX)-hidden-ca.log \
-	  || { tail -40 $(SCRATCH_PREFIX)-hidden-ca.log; echo "FAIL: no warning names the copy of the CA"; exit 1; }
-	@echo "PASS: the build carried on past the copy of the CA, warning about it"
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+	@./test/run-inspect-hidden-ca.sh
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_inspect_byte_exact
 test_integration_buildkit_inspect_byte_exact: ## Compare inspect vs universal layer-for-layer, byte for byte
 	@echo "Running inspect-engine byte-exact layer comparison..."
 	@rm -f $(SCRATCH_PREFIX)-byte-exact-inspect.tar $(SCRATCH_PREFIX)-byte-exact-universal.tar
-	@COMPOSE_FILE=compose.yaml:compose.test-inspect.yaml \
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(INSPECT_OVERLAY) \
 	  $(MAKE) setup_buildkit_inspect_audit
 	@docker buildx build --no-cache \
 	  --builder $(BUILDER_NAME) \
@@ -397,8 +346,8 @@ test_integration_buildkit_inspect_byte_exact: ## Compare inspect vs universal la
 	  --build-arg SOURCE_DATE_EPOCH=1700000000 \
 	  --output type=docker,name=$(BYTE_EXACT_INSPECT),rewrite-timestamp=true,unpack=false,dest=$(SCRATCH_PREFIX)-byte-exact-inspect.tar \
 	  --progress=plain -f test/Dockerfile.inspect-byte-exact test/
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
-	@COMPOSE_FILE=compose.yaml:compose.test-universal.yaml \
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
+	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(UNIVERSAL_OVERLAY) \
 	  $(MAKE) setup_buildkit_universal_audit
 	@docker buildx build --no-cache \
 	  --builder $(BUILDER_NAME) \
@@ -406,7 +355,7 @@ test_integration_buildkit_inspect_byte_exact: ## Compare inspect vs universal la
 	  --build-arg SOURCE_DATE_EPOCH=1700000000 \
 	  --output type=docker,name=$(BYTE_EXACT_UNIVERSAL),rewrite-timestamp=true,unpack=false,dest=$(SCRATCH_PREFIX)-byte-exact-universal.tar \
 	  --progress=plain -f test/Dockerfile.inspect-byte-exact test/
-	@TEST_COMPOSE_FILE=compose.test-universal.yaml $(MAKE) clean_buildkit
+	@TEST_COMPOSE_FILE=$(UNIVERSAL_OVERLAY) $(MAKE) clean_buildkit
 	@docker load -i $(SCRATCH_PREFIX)-byte-exact-inspect.tar
 	@docker load -i $(SCRATCH_PREFIX)-byte-exact-universal.tar
 	@./test/assert-inspect-byte-exact.sh $(BYTE_EXACT_UNIVERSAL) $(BYTE_EXACT_INSPECT)
@@ -417,7 +366,16 @@ test_integration_buildkit_inspect_byte_exact: ## Compare inspect vs universal la
 test_integration_buildkit_inspect_roundtrip: ## Check an inspect audit run, then enforce the rules it generated
 	@echo "Running inspect-engine audit-to-restrict round trip..."
 	@./test/run-inspect-roundtrip.sh
-	@TEST_COMPOSE_FILE=compose.test-inspect.yaml $(MAKE) clean_buildkit
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
+
+# Stops the builder's haproxy, then its coredns, while a RUN step is still
+# running; see test/run-inspect-proxy-down.sh.
+.PHONY: test_integration_buildkit_inspect_proxy_down
+test_integration_buildkit_inspect_proxy_down: ## Check a build's traffic fails and the report fails the step when the proxy stops mid-build
+	@echo "Running inspect-engine proxy-down tests..."
+	@./test/run-inspect-proxy-down.sh
+	@$(POST_AND_ASSERT)
+	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_universal_known_blocked
 test_integration_buildkit_universal_known_blocked: ## Check known_blocked_rules against fail_on_blocked
@@ -432,6 +390,14 @@ test_integration_buildkit_universal_known_blocked: ## Check known_blocked_rules 
 test_integration_buildkit_listener_scope: ## Check :10024/:53 are unreachable outside buildcage0
 	@echo "Running listener-scope tests..."
 	@./test/assert-listener-scope.sh
+
+# Needs the engine images, not a running builder: the script builds each under
+# a name of its own and removes it, pass or fail.
+.PHONY: test_integration_buildkit_haproxy_configs
+test_integration_buildkit_haproxy_configs: ## Check every HAProxy config the generators write loads in each engine's image
+	@echo "Running HAProxy config load tests..."
+	@./test/assert-haproxy-configs.sh universal src/core/lib/acl/__fixtures__/haproxy-universal
+	@./test/assert-haproxy-configs.sh inspect src/core/lib/acl/__fixtures__/haproxy
 
 .PHONY: test_integration_buildkit_multiarch
 test_integration_buildkit_multiarch: ## Check the builder's default and cross-platform builds

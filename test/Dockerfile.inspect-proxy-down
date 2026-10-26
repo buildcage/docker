@@ -1,0 +1,9 @@
+# One RUN step, during which test/run-inspect-proxy-down.sh stops the
+# builder's haproxy and then its coredns (see test/proxy-down-step.sh).
+# alpine/curl for the same reason as Dockerfile.inspect-restrict: it ships curl.
+FROM alpine/curl@sha256:1a4d725751c5bd50297ee243db5d4df8ac5aabdf7030dd40dcec3bc3fdaa1cfa
+
+COPY proxy-down-step.sh /proxy-down-step.sh
+COPY scenarios/lib.sh /scenarios/lib.sh
+
+RUN sh /proxy-down-step.sh

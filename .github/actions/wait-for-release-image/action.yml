@@ -1,0 +1,40 @@
+name: Wait for the release image
+description: Wait until docker-publish.yml has published and signed the images of the release a workflow pins
+# Callers must run actions/checkout first, with the workflow file in it, and
+# grant actions: read.
+
+inputs:
+  workflow:
+    description: Workflow file whose pin of this repository's action names the release
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for docker-publish.yml to succeed on the pinned commit
+      shell: bash
+      env:
+        WORKFLOW: ${{ inputs.workflow }}
+        REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        sha=$(grep -oE -m1 "uses: $REPO@[0-9a-f]{40}" "$WORKFLOW" | sed 's/.*@//') || true
+        if [ -z "$sha" ]; then
+          echo "::error::$WORKFLOW pins no commit of $REPO"
+          exit 1
+        fi
+        # The tag's run builds, verifies and signs the images in minutes.
+        for _ in $(seq 40); do
+          runs=$(gh run list --repo "$REPO" --workflow docker-publish.yml --commit "$sha" --json status,conclusion)
+          if jq -e 'any(.[]; .conclusion == "success")' <<< "$runs" > /dev/null; then
+            echo "The images of $sha are published and signed."
+            exit 0
+          fi
+          if jq -e 'length > 0 and all(.[]; .status == "completed")' <<< "$runs" > /dev/null; then
+            echo "::error::every docker-publish.yml run on $sha failed, so its images are not signed"
+            exit 1
+          fi
+          sleep 30
+        done
+        echo "::error::docker-publish.yml did not succeed on $sha within 20 minutes"
+        exit 1

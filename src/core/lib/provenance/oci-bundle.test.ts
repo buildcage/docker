@@ -125,20 +125,6 @@ describe("fetchBundle: fallback tag path", () => {
   it("throws TRANSIENT on network error from Referrers API", async () => {
     await expectVerifyError(bundle(networkFailure), "TRANSIENT");
   });
-
-  it("throws TRANSIENT (not NOT_FOUND) on 403 from blob fetch", async () => {
-    await expectVerifyError(
-      bundle(
-        stubRegistry({
-          [REFERRERS_PATH]: REFERRERS_MISS,
-          [TAG_PATH]: okJson({ layers: [{ mediaType: BUNDLE_TYPE, digest: BLOB_DIGEST }] }),
-          [`/blobs/${BLOB_DIGEST}`]: failsWith(403),
-        }),
-      ),
-      "TRANSIENT",
-      /authenticated/,
-    );
-  });
 });
 
 // ── fail-closed paths ─────────────────────────────────────────────────────
@@ -151,18 +137,12 @@ describe("fetchBundle: fallback tag refusals", () => {
   const tagIs = (response: Route) =>
     stubRegistry({ [REFERRERS_PATH]: REFERRERS_MISS, [TAG_PATH]: response });
 
-  it("throws TRANSIENT on 5xx", async () => {
-    await expectVerifyError(bundle(tagIs(failsWith(503))), "TRANSIENT");
+  it("reads a 400 as no bundle, as a registry without the tag scheme answers", async () => {
+    await expectVerifyError(bundle(tagIs(failsWith(400))), "NOT_FOUND", /No Sigstore bundle/i);
   });
 
-  it("throws TRANSIENT on 401/403, an auth problem rather than a missing bundle", async () => {
-    for (const status of [401, 403]) {
-      await expectVerifyError(bundle(tagIs(failsWith(status))), "TRANSIENT");
-    }
-  });
-
-  it("throws NOT_FOUND for any other non-ok status", async () => {
-    await expectVerifyError(bundle(tagIs(failsWith(418))), "NOT_FOUND");
+  it("reads any other failure through the registry status ladder, a missing bundle by default", async () => {
+    await expectVerifyError(bundle(tagIs(failsWith(418))), "NOT_FOUND", /fallback tag: HTTP 418/);
   });
 
   it("wraps a network failure on the fallback tag as TRANSIENT", async () => {

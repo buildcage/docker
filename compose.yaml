@@ -1,54 +1,12 @@
+# Builds the builder image from this checkout. How it runs is set in
+# docker/compose.action.yaml, the file the action starts it from, and in the
+# test overlays the integration tests layer on it.
+# `make setup_buildkit_*` builds through this, then starts the image through
+# the setup action.
 services:
   builder:
-    container_name: ${BUILDER_NAME:-buildcage}
+    # A test that builds an image of its own names it in BUILDCAGE_BUILDER_IMAGE.
+    image: ${BUILDCAGE_BUILDER_IMAGE:-buildcage-builder${BUILDCAGE_WORKTREE_SUFFIX:-}}
     build:
       context: .
       dockerfile: docker/${PROXY_ENGINE:-inspect}/Dockerfile
-    # Not privileged, unlike docker/setup-buildx-action's own builder: these
-    # three are all BuildKit needs, and a writable host /proc and /sys stay out.
-    # Devices are refused by the device cgroup, which only a step that has
-    # escaped runc could lift; privileged allows them outright.
-    #
-    # BuildKit's OCI worker needs SYS_ADMIN for mounts, namespaces and cgroups.
-    # iptables and CNI networking need NET_ADMIN.
-    # runc needs SYS_PTRACE to reach /proc/PID/ns/mnt when it sets up a step's
-    # mount namespace.
-    cap_add:
-      - SYS_ADMIN
-      - NET_ADMIN
-      - SYS_PTRACE
-    # AppArmor has to be off: docker-default refuses every mount regardless of
-    # capabilities, and a replacement profile would have to be loaded into the
-    # host kernel. Seccomp does not: builder.json is Docker's own default plus
-    # what runc needs (see docker/seccomp/gen-profile.mjs).
-    security_opt:
-      - seccomp=./docker/seccomp/builder.json
-      - apparmor=unconfined
-    # Pinned, not left to the daemon's default-cgroupns-mode: under `host`
-    # init-cgroup's remount would land on the host's own cgroup tree.
-    cgroup: private
-    environment:
-      - PROXY_MODE=${PROXY_MODE:-restrict}
-      - ALLOWED_HTTPS_RULES=${ALLOWED_HTTPS_RULES:-}
-      - ALLOWED_HTTP_RULES=${ALLOWED_HTTP_RULES:-}
-      - ALLOWED_IP_RULES=${ALLOWED_IP_RULES:-}
-      # inspect only: URL and TLS rules.
-      - ALLOWED_URL_RULES=${ALLOWED_URL_RULES:-}
-      - ALLOWED_TLS_RULES=${ALLOWED_TLS_RULES:-}
-      - KNOWN_BLOCKED_RULES=${KNOWN_BLOCKED_RULES:-}
-      # Runner addresses the engine blocks as a resolved destination.
-      - HOST_ADDRESSES=${HOST_ADDRESSES:-}
-      - PROXY_ENGINE=${PROXY_ENGINE:-inspect}
-      # inspect only: whether a copy of the CA left in a layer fails the build.
-      - FAIL_ON_CA_RESIDUE=${FAIL_ON_CA_RESIDUE:-true}
-    # `--wait` would otherwise return on "running" alone, which says nothing
-    # about buildkitd. No restart policy goes with it: a container that
-    # stopped itself has to stay stopped for the wait to see it.
-    healthcheck:
-      test: ["CMD", "buildctl", "debug", "workers"]
-      interval: 5s
-      # Every start pays this before the first probe, and buildkitd answers in ~1.2s.
-      start_interval: 250ms
-      timeout: 10s
-      retries: 3
-      start_period: 120s

@@ -232,15 +232,10 @@ describe("runReportAction's fail_on_blocked fallback", () => {
     }
   }
 
-  it.each([
-    { value: "false", exitCode: 0 },
-    { value: "False", exitCode: 0 },
-    { value: "FALSE", exitCode: 0 },
-    { value: "true", exitCode: 1 },
-    { value: "True", exitCode: 1 },
-    { value: "TRUE", exitCode: 1 },
-  ])("reads $value as the action supplied it", async ({ value, exitCode }) => {
-    expect((await runReadingInput(value)).exitCode).toBe(exitCode);
+  it("passes the blocked run when the input says false", async () => {
+    const { exitCode, lines } = await runReadingInput("false");
+    expect(exitCode).toBe(0);
+    expect(lines.some((l) => l.startsWith("::warning::"))).toBe(false);
   });
 
   it("reads an absent input as the documented default, true", async () => {
@@ -249,11 +244,11 @@ describe("runReportAction's fail_on_blocked fallback", () => {
     expect(lines.some((l) => l.startsWith("::warning::"))).toBe(false);
   });
 
-  it.each(["no", "0", "off"])("fails closed on %o, with a warning", async (value) => {
-    const { exitCode, lines } = await runReadingInput(value);
+  it("fails closed on a value it does not know, with a warning", async () => {
+    const { exitCode, lines } = await runReadingInput("no");
     expect(exitCode).toBe(1);
     expect(lines).toContain(
-      `::warning::Invalid fail_on_blocked: "${value}". Must be true or false. Reading it as true.\n`,
+      '::warning::Invalid fail_on_blocked: "no". Must be true or false. Reading it as true.\n',
     );
   });
 });

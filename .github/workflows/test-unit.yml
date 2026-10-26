@@ -19,6 +19,7 @@ permissions: {}
 jobs:
   changes:
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -64,6 +65,7 @@ jobs:
     # only on pull_request); a skipped need otherwise skips the job unevaluated.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.unit_test == 'true') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     name: "unit: test"
@@ -128,7 +130,8 @@ jobs:
   # list across files, so branch protection targets one job per file instead.
   unit-tests-passed:
     name: Unit tests passed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
     needs: [changes, unit_test]
     if: always()
     permissions: {}

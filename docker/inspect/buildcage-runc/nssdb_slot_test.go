@@ -6,9 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
-	"time"
 )
 
 // injectSlot injects into a bundle whose step user has a home and, when
@@ -35,15 +33,6 @@ func injectSlot(t *testing.T, pkcs11 *string) (in *injection, bundle, rootfs, mi
 }
 
 func ptr(s string) *string { return &s }
-
-func mustRead(t *testing.T, path string) string {
-	t.Helper()
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(got)
-}
 
 func TestNSSDBSlotGoesIntoANewDatabaseAndComesBackOut(t *testing.T) {
 	in, bundle, rootfs, mirror := injectSlot(t, nil)
@@ -259,8 +248,8 @@ func TestNSSDBIsSkippedWhenTheSlotCannotBeAdded(t *testing.T) {
 		"a mount where the CA database goes": func(t *testing.T, bundle, _ string) {
 			mountAt(t, bundle, nssCADBDir+"/x")
 		},
-		"a mirror that cannot be made": func(t *testing.T, _, _ string) {
-			failRsyncOn(t, 1)
+		"a mirror that cannot be made": func(t *testing.T, _, legacy string) {
+			failRsyncWhen(t, func(args []string) bool { return rsyncSrc(args) == legacy })
 		},
 		"a mirror that cannot be read": func(t *testing.T, _, _ string) {
 			failWalkUnderOnce(t, scratchRoot)
@@ -370,56 +359,6 @@ func TestNSSDBIsSkippedWhenTheDatabaseCannotBeListed(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNoSlot(t, in)
-}
-
-type fakeInfo struct {
-	fs.FileInfo
-	mode     fs.FileMode
-	uid, gid uint32
-}
-
-func (f fakeInfo) Mode() fs.FileMode { return f.mode }
-func (f fakeInfo) Sys() any          { return &syscall.Stat_t{Uid: f.uid, Gid: f.gid} }
-func (f fakeInfo) ModTime() time.Time {
-	return time.Time{}
-}
-
-func TestWritableBy(t *testing.T) {
-	for name, tc := range map[string]struct {
-		info fakeInfo
-		uid  int
-		want bool
-	}{
-		"root":                        {fakeInfo{mode: 0o500, uid: 1}, 0, true},
-		"the owner":                   {fakeInfo{mode: 0o200, uid: 7}, 7, true},
-		"the owner, read-only":        {fakeInfo{mode: 0o577, uid: 7}, 7, false},
-		"the group":                   {fakeInfo{mode: 0o020, uid: 1, gid: 7}, 7, true},
-		"the group, read-only":        {fakeInfo{mode: 0o757, uid: 1, gid: 7}, 7, false},
-		"a supplementary group":       {fakeInfo{mode: 0o020, uid: 1, gid: 9}, 7, true},
-		"anyone else":                 {fakeInfo{mode: 0o002, uid: 1, gid: 1}, 7, true},
-		"anyone else, not writable":   {fakeInfo{mode: 0o775, uid: 1, gid: 1}, 7, false},
-		"the owner ignores its group": {fakeInfo{mode: 0o570, uid: 7, gid: 7}, 7, false},
-	} {
-		t.Run(name, func(t *testing.T) {
-			if got := writableBy(tc.info, tc.uid, 7, []int{9}); got != tc.want {
-				t.Fatalf("got %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestProcessGroups(t *testing.T) {
-	bundle, _ := newBundleNoStore(t, nil)
-	setSpecField(t, bundle, "process", func(proc map[string]any) {
-		proc["user"] = map[string]any{"uid": 1, "gid": 2, "additionalGids": []any{3, 4}}
-	})
-	s, err := loadSpec(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := s.processGroups(); len(got) != 2 || got[0] != 3 || got[1] != 4 {
-		t.Fatalf("got %v, want [3 4]", got)
-	}
 }
 
 func TestAppendNSSSlotReportsWhatItCannotDo(t *testing.T) {
@@ -616,7 +555,7 @@ func TestStripLayerReportsAnEditedNSSSlot(t *testing.T) {
 		!strings.Contains(err.Error(), "/backup/pkcs11.txt (still names "+nssCADBDir+")") {
 		t.Fatalf("got %v, want the edited slot reported", err)
 	}
-	useWarnOnCAResidue(t)
+	useFailOnCAResidue(t, false)
 	if err := tolerateResidue(err); err != nil {
 		t.Fatalf("got %v, want only a warning under fail_on_ca_residue: false", err)
 	}

@@ -30,7 +30,7 @@ describe("planPostCleanup", () => {
       "-f",
       COMPOSE_FILE,
       "-p",
-      expect.any(String),
+      "buildcage-16367aacb67a",
       "down",
       "-v",
     ]);
@@ -90,18 +90,34 @@ describe("planPostCleanup", () => {
     expect(() => planPostCleanup(COMPOSE_FILE, undefined, {}, { getInput })).toThrow("boom");
   });
 
-  it("falls back to the default builder name when the input is unset", () => {
-    const { env } = plan(COMPOSE_FILE, undefined, {}, { getInput: inputs() });
+  // Setup and report pin the same name for the default builder, so post takes
+  // down the project they brought up.
+  it("falls back to the default builder and its project when the input is unset", () => {
+    const { args, env } = plan(COMPOSE_FILE, undefined, {}, { getInput: inputs() });
 
     expect(env.BUILDER_NAME).toBe("buildcage");
+    expect(args).toContain("buildcage-eeb358f947ee");
   });
 
-  it("derives the same project name every time for one builder", () => {
-    const getInput = inputs({ builder_name: "second" });
-    const first = plan(COMPOSE_FILE, undefined, {}, { getInput });
-    const second = plan(COMPOSE_FILE, undefined, {}, { getInput });
+  // Layered as setup layered it, so the down also takes the overlay's fixtures.
+  it("layers the test overlay setup started with on the compose file", () => {
+    const { args } = plan(
+      COMPOSE_FILE,
+      undefined,
+      {},
+      {
+        composeOverlay: "/repo/docker/compose.action.test-inspect.yaml",
+        getInput: inputs({ builder_name: "second" }),
+      },
+    );
 
-    expect(first.args).toStrictEqual(second.args);
+    expect(args.slice(0, 5)).toStrictEqual([
+      "compose",
+      "-f",
+      COMPOSE_FILE,
+      "-f",
+      "/repo/docker/compose.action.test-inspect.yaml",
+    ]);
   });
 
   it("uses the override outright when this repo's own testing supplies one", () => {
