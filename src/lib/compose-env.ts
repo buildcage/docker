@@ -1,5 +1,16 @@
 import type { ProxyEngine } from "#core/lib/actions/inputs.ts";
+import type { RuleInputName } from "#core/lib/actions/rule-inputs.ts";
 import { listHostIpv4Addresses } from "#core/lib/docker/host-addresses.ts";
+
+/** The rule inputs the builder gets, each in an environment variable of its own. */
+export const BUILDER_RULE_INPUTS: RuleInputName[] = [
+  "allowed_https_rules",
+  "allowed_http_rules",
+  "allowed_ip_rules",
+  "allowed_url_rules",
+  "allowed_tls_rules",
+  "known_blocked_rules",
+];
 
 export interface ComposeEnvOptions {
   builderName: string;

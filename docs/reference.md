@@ -70,6 +70,11 @@ Setting a rule the engine can't act on is caught before the build starts: `restr
 rule that looks like it protects the build but cannot be enforced is worse than none, and `audit`
 warns and ignores it.
 
+Each of these inputs can hold about 128 KiB of rules, the most Linux passes in one environment
+variable, counted without comments and blank lines and with the `:*` a `known_blocked_rules` rule
+without a port gets. A larger one fails setup before the builder starts; write fewer, broader
+rules, such as [wildcards](#wildcards).
+
 ## Setup action outputs
 
 | Output         | Description                                                                              |

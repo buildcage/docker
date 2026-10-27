@@ -4,6 +4,7 @@ import {
   buildACLRules,
   buildUrlRulesOrThrow,
   checkRulesCompileOrThrow,
+  InvalidRulesError,
   parseKnownBlockedRulesOrThrow,
   parseRulesOrThrow,
 } from "#core/lib/acl/rules.ts";
@@ -55,4 +56,39 @@ export function readRuleInputs(getInput: GetInput = core.getInput): RuleInputs {
     tlsRules,
     knownBlockedRules,
   };
+}
+
+/** Each rule input's list in RuleInputs. */
+const RULE_LISTS = {
+  allowed_https_rules: "httpsRules",
+  allowed_http_rules: "httpRules",
+  allowed_ip_rules: "ipRules",
+  allowed_url_rules: "urlRules",
+  allowed_tls_rules: "tlsRules",
+  known_blocked_rules: "knownBlockedRules",
+} as const satisfies Record<string, keyof RuleInputs>;
+
+export type RuleInputName = keyof typeof RULE_LISTS;
+
+// Linux takes at most 128 KiB in one environment variable, its name, "=" and
+// the closing NUL included, and as much in one argument.
+const ENV_VAR_LIMIT_BYTES = 128 * 1024;
+
+/**
+ * Checks that each named rule input, parsed and joined by newlines, fits in the
+ * environment variable named after it, as the action hands it on. Past that,
+ * starting the engine fails with E2BIG, which says nothing about the rules.
+ *
+ * @throws {InvalidRulesError} for the first input that does not fit
+ */
+export function checkRuleListSizesOrThrow(rules: RuleInputs, names: RuleInputName[]): void {
+  for (const name of names) {
+    const limit = ENV_VAR_LIMIT_BYTES - name.length - 2;
+    const bytes = Buffer.byteLength(rules[RULE_LISTS[name]].join("\n"));
+    if (bytes > limit)
+      throw new InvalidRulesError(
+        `${name} is ${bytes} bytes as parsed, over the ${limit} one environment variable can hold; write fewer, broader rules`,
+        "INVALID_RULES",
+      );
+  }
 }

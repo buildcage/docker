@@ -192,6 +192,16 @@ describe("runSetupStep", () => {
     expect(orderOf(mocks.checkUrlAndTlsRuleSupport)).toBeLessThan(orderOf(mocks.runDocker));
   });
 
+  it("refuses a rule input too long for the builder's environment, before the builder starts", async () => {
+    mocks.readSetupInputs.mockReturnValue(
+      inputsWith({ knownBlockedRules: Array.from({ length: 12_000 }, () => "*.example.com:*") }),
+    );
+
+    await expect(runSetupStep(ENV, deps)).rejects.toThrow("known_blocked_rules is");
+    expect(mocks.checkUrlAndTlsRuleSupport).toHaveBeenCalled();
+    expect(mocks.runDocker).not.toHaveBeenCalled();
+  });
+
   it("checks known_blocked_rules URL lines against the engine, host lines excluded", async () => {
     mocks.readSetupInputs.mockReturnValue(
       inputsWith({
