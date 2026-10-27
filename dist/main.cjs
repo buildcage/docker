@@ -12019,6 +12019,14 @@ function listHostIpv4Addresses({ networkInterfaces: list = node_os.networkInterf
 }
 //#endregion
 //#region src/lib/compose-env.ts
+const BUILDER_RULE_INPUTS = [
+	"allowed_https_rules",
+	"allowed_http_rules",
+	"allowed_ip_rules",
+	"allowed_url_rules",
+	"allowed_tls_rules",
+	"known_blocked_rules"
+];
 function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue, imageRef, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules }, env, hostAddresses = listHostIpv4Addresses) {
 	return {
 		...env,
@@ -12826,6 +12834,20 @@ function readRuleInputs(getInput$4 = getInput) {
 		knownBlockedRules
 	};
 }
+const RULE_LISTS = {
+	allowed_https_rules: "httpsRules",
+	allowed_http_rules: "httpRules",
+	allowed_ip_rules: "ipRules",
+	allowed_url_rules: "urlRules",
+	allowed_tls_rules: "tlsRules",
+	known_blocked_rules: "knownBlockedRules"
+};
+function checkRuleListSizesOrThrow(rules, names) {
+	for (let name of names) {
+		let limit = 131072 - name.length - 2, bytes = Buffer.byteLength(rules[RULE_LISTS[name]].join("\n"));
+		if (bytes > limit) throw new InvalidRulesError(`${name} is ${bytes} bytes without its comments and blank lines, over the ${limit} the proxy can take; cover more names with fewer rules through wildcards`, "INVALID_RULES");
+	}
+}
 //#endregion
 //#region src/lib/engine.ts
 function resolveProxyEngine(input) {
@@ -12834,17 +12856,17 @@ function resolveProxyEngine(input) {
 }
 //#endregion
 //#region src/lib/inputs.ts
-function readBuilderName(getInput$3 = getInput) {
-	return resolveBuilderName(getInput$3("builder_name"));
+function readBuilderName(getInput$2 = getInput) {
+	return resolveBuilderName(getInput$2("builder_name"));
 }
-function readSetupInputs(getInput$2 = getInput) {
-	let proxyEngine = resolveProxyEngine(getInput$2("proxy_engine")), proxyMode = resolveProxyMode(getInput$2("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$2);
-	return {
+function readSetupInputs(getInput$3 = getInput) {
+	let proxyEngine = resolveProxyEngine(getInput$3("proxy_engine")), proxyMode = resolveProxyMode(getInput$3("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$3), builderName = readBuilderName(getInput$3), rules = readRuleInputs(getInput$3);
+	return checkRuleListSizesOrThrow(rules, BUILDER_RULE_INPUTS), {
 		proxyEngine,
-		builderName: readBuilderName(getInput$2),
+		builderName,
 		proxyMode,
 		failOnCaResidue,
-		...readRuleInputs(getInput$2)
+		...rules
 	};
 }
 //#endregion

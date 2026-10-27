@@ -70,6 +70,11 @@ Setting a rule the engine can't act on is caught before the build starts: `restr
 rule that looks like it protects the build but cannot be enforced is worse than none, and `audit`
 warns and ignores it.
 
+Each of these inputs can hold about 128 KiB of rules, counted without comments and blank lines,
+the most Linux passes in one environment variable. A larger one fails setup before the builder
+starts; cover more names with fewer rules through [wildcards](#wildcards). This only matters with
+`config_file`, as a workflow's own value already has to fit for the runner to start the step.
+
 ## Setup action outputs
 
 | Output         | Description                                                                              |

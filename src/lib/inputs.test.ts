@@ -31,6 +31,13 @@ describe("readSetupInputs", () => {
     );
   });
 
+  it("rejects a rule input too long for the builder's environment", () => {
+    const rules = Array.from({ length: 12_000 }, () => "*.example.com:*").join("\n");
+    expect(() => readSetupInputs(inputs({ known_blocked_rules: rules }))).toThrow(
+      "known_blocked_rules is",
+    );
+  });
+
   it("reads builder_name", () => {
     expect(readSetupInputs(inputs({ builder_name: "mine" })).builderName).toBe("mine");
   });
