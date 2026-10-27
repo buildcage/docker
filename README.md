@@ -533,6 +533,14 @@ enforces and records reaches only tools that honor the proxy variables; a tool t
 not covered. Buildcage enforces at the network level instead, so it also covers those tools and can
 act on the method and URL.
 
+**Can I trust the action itself?**
+
+Buildcage relies on being verifiable rather than on being trusted. The source is open for anyone to
+read at any time, and the action runs only what was built from it: each release is immutable, its
+image is built from the release commit and signed, and the action verifies that before it runs.
+Changing what Buildcage does means changing its public source first. See
+[Image provenance verification](./docs/security.md#image-provenance-verification).
+
 ## GitHub's native egress firewall
 
 GitHub is building an egress firewall directly into Actions runners

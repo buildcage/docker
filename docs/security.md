@@ -435,6 +435,13 @@ and replaces none of them.
 
 ## Image provenance verification
 
+Buildcage relies on being verifiable rather than on being trusted. Its source is open to read at any
+time, and what runs is verified to have been built from it. Releases are immutable, and each image
+is built from the release commit by the release workflow and signed by that run, with no step where
+anyone, the maintainers included, can slip in something else. The action verifies that signature
+against the pinned commit before it runs, so changing what Buildcage does means changing its public
+source first.
+
 Buildcage decides what the build can reach, so the action has to establish that the image it runs
 is the one this repository published.
 
