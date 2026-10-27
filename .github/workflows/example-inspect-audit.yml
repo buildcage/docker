@@ -16,7 +16,7 @@ jobs:
       # the report's "Switch to restrict mode" section lists them as
       # allowed_url_rules.
       - name: Start Buildcage builder
-        uses: buildcage/docker@0e382c9c236fb24e60ccce9dba512a67b270b8bf # v4.3.0
+        uses: buildcage/docker@85cfae351eda1cb31743111246e5b291ed3556cb # v4.3.1
         with:
           proxy_mode: audit
           proxy_engine: inspect
@@ -49,4 +49,4 @@ jobs:
 
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@0e382c9c236fb24e60ccce9dba512a67b270b8bf # v4.3.0
+        uses: buildcage/docker/report@85cfae351eda1cb31743111246e5b291ed3556cb # v4.3.1
