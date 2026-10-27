@@ -21,6 +21,7 @@ import {
   checkUrlAndTlsRuleSupport,
 } from "#core/lib/actions/engine-rule-support.ts";
 import { logRules, withLogGroup } from "#core/lib/actions/log.ts";
+import { checkRuleListSizesOrThrow } from "#core/lib/actions/rule-inputs.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
 import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
 import { resolveBuildcageImageRef } from "#core/lib/provenance/image-ref.ts";
@@ -33,7 +34,7 @@ import { CONFIG_FILE_INPUTS, dropListInputs } from "#report/report-source.ts";
 
 import { COMPOSE_FILE, withComposeOverlay } from "../compose-file.ts";
 import { builderStartError } from "./builder-diagnostics.ts";
-import { buildComposeEnv } from "./compose-env.ts";
+import { BUILDER_RULE_INPUTS, buildComposeEnv } from "./compose-env.ts";
 import { SetupError } from "./errors.ts";
 import { readSetupInputs } from "./inputs.ts";
 import { readLocalImageOverride } from "./local-image.ts";
@@ -177,6 +178,12 @@ export async function runSetupStep(
       knownBlockedUrlRules: knownBlockedRules.filter(isKnownBlockedUrlRule),
     },
     warn,
+  );
+  // After the support checks, so a rule the engine cannot use is reported as
+  // that rather than as too long.
+  checkRuleListSizesOrThrow(
+    { httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules },
+    BUILDER_RULE_INPUTS,
   );
 
   withLogGroup("buildcage: Configured ACL Rules", () => {

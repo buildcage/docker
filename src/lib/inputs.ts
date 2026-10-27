@@ -11,14 +11,9 @@ import {
   type ProxyEngine,
   type ProxyMode,
 } from "#core/lib/actions/inputs.ts";
-import {
-  checkRuleListSizesOrThrow,
-  readRuleInputs,
-  type RuleInputs,
-} from "#core/lib/actions/rule-inputs.ts";
+import { readRuleInputs, type RuleInputs } from "#core/lib/actions/rule-inputs.ts";
 import { resolveBuilderName } from "#report/report-source.ts";
 
-import { BUILDER_RULE_INPUTS } from "./compose-env.ts";
 import { resolveProxyEngine } from "./engine.ts";
 
 /** Narrowed to what this module needs, so a test can pass a plain lookup. */
@@ -44,15 +39,17 @@ export interface SetupInputs extends RuleInputs {
  *
  * @throws {InvalidInputError} if proxy_engine, proxy_mode, fail_on_ca_residue
  *   or builder_name is malformed
- * @throws {InvalidRulesError} if any rule is malformed, or a rule input is too
- *   long for the builder's environment
+ * @throws {InvalidRulesError} if any rule is malformed
  */
 export function readSetupInputs(getInput: GetInput = core.getInput): SetupInputs {
   const proxyEngine = resolveProxyEngine(getInput("proxy_engine"));
   const proxyMode = resolveProxyMode(getInput("proxy_mode"));
   const failOnCaResidue = readBooleanInput("fail_on_ca_residue", true, getInput);
-  const builderName = readBuilderName(getInput);
-  const rules = readRuleInputs(getInput);
-  checkRuleListSizesOrThrow(rules, BUILDER_RULE_INPUTS);
-  return { proxyEngine, builderName, proxyMode, failOnCaResidue, ...rules };
+  return {
+    proxyEngine,
+    builderName: readBuilderName(getInput),
+    proxyMode,
+    failOnCaResidue,
+    ...readRuleInputs(getInput),
+  };
 }

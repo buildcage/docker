@@ -89,7 +89,7 @@ describe("checkRuleListSizesOrThrow", () => {
   it("refuses a list a byte over, naming the input and both sizes", () => {
     const rules = { ...empty, httpsRules: rulesOf(LIMIT + 1) };
     expect(() => checkRuleListSizesOrThrow(rules, ["allowed_https_rules"])).toThrow(
-      `allowed_https_rules is ${LIMIT + 1} bytes without its comments and blank lines, over the ${LIMIT} the proxy can take`,
+      `allowed_https_rules is ${LIMIT + 1} bytes as parsed, over the ${LIMIT} one environment variable can hold`,
     );
   });
 

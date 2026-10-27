@@ -75,9 +75,9 @@ export type RuleInputName = keyof typeof RULE_LISTS;
 const ENV_VAR_LIMIT_BYTES = 128 * 1024;
 
 /**
- * Checks that each named rule input, joined by newlines as the proxy gets it,
- * fits in the environment variable named after it. Past that, starting the
- * proxy fails with E2BIG, which says nothing about the rules.
+ * Checks that each named rule input, parsed and joined by newlines, fits in the
+ * environment variable named after it, as the action hands it on. Past that,
+ * starting the engine fails with E2BIG, which says nothing about the rules.
  *
  * @throws {InvalidRulesError} for the first input that does not fit
  */
@@ -87,7 +87,7 @@ export function checkRuleListSizesOrThrow(rules: RuleInputs, names: RuleInputNam
     const bytes = Buffer.byteLength(rules[RULE_LISTS[name]].join("\n"));
     if (bytes > limit)
       throw new InvalidRulesError(
-        `${name} is ${bytes} bytes without its comments and blank lines, over the ${limit} the proxy can take; cover more names with fewer rules through wildcards`,
+        `${name} is ${bytes} bytes as parsed, over the ${limit} one environment variable can hold; write fewer, broader rules`,
         "INVALID_RULES",
       );
   }
