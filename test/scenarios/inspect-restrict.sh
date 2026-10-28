@@ -189,11 +189,11 @@ check_status "GET notallowed.example.com" "$($C https://notallowed.example.com/)
 # A client that completes the handshake and then leaves without sending a
 # request. IMAP waits for the server to speak first, so curl sits on the open
 # connection until it times out (exit 28), as any server-first protocol does
-# in the wild. It is reported as neither allowed nor blocked. A client that
-# closes right after its Finished races the proxy's session tickets and is
-# sometimes logged as a failed handshake instead.
+# in the wild. It is reported as neither allowed nor blocked. Waiting rather
+# than closing on the handshake keeps the close out of a race with the proxy's
+# session tickets.
 echo "=== [Client leaves before sending a request] ==="
-curl -sS -o /dev/null --max-time 2 imaps://aborted.example.com:443/
+curl -sS -o /dev/null --max-time 5 imaps://aborted.example.com:443/
 check_status "IMAPS aborted.example.com (curl exit)" "$?" "28"
 
 # Bytes that are not an HTTP request, on a port no allowed_ip_rules or
