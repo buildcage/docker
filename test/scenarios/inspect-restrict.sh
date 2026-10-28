@@ -187,14 +187,14 @@ echo "=== [Name outside the allowlist] ==="
 check_status "GET notallowed.example.com" "$($C https://notallowed.example.com/)" "403"
 
 # A client that completes the handshake and then leaves without sending a
-# request. Pinning a key the generated certificate cannot have stops curl at
-# exactly that point (exit 90); in the wild it is an image with no CA store.
-# It is reported as neither allowed nor blocked.
+# request. IMAP waits for the server to speak first, so curl sits on the open
+# connection until it times out (exit 28), as any server-first protocol does
+# in the wild. It is reported as neither allowed nor blocked. A client that
+# closes right after its Finished races the proxy's session tickets and is
+# sometimes logged as a failed handshake instead.
 echo "=== [Client leaves before sending a request] ==="
-curl -sS -o /dev/null --max-time 10 \
-  --pinnedpubkey "sha256//47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=" \
-  https://aborted.example.com/
-check_status "GET aborted.example.com (curl exit)" "$?" "90"
+curl -sS -o /dev/null --max-time 2 imaps://aborted.example.com:443/
+check_status "IMAPS aborted.example.com (curl exit)" "$?" "28"
 
 # Bytes that are not an HTTP request, on a port no allowed_ip_rules or
 # allowed_tls_rules entry covers: anything that is not a TLS handshake reaches
