@@ -42,7 +42,7 @@ inputs:
     description: "proxy-engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when a copy of the proxy CA, or its NSS slot, stays in the step's layer. See docs/reference.md#ca-residue."
     required: false
   known-blocked-rules:
-    description: "Traffic expected to be blocked, one rule per line: a host rule (wildcard or ~regex) or, under proxy-engine: inspect, a URL rule. Blocked traffic matching one doesn't fail the report step even when fail-on-blocked is true. See docs/reference.md#blocked-rules-known_blocked_rules."
+    description: "Traffic expected to be blocked, one rule per line: a host rule (wildcard or ~regex) or, under proxy-engine: inspect, a URL rule. Blocked traffic matching one doesn't fail the report step even when fail-on-blocked is true. See docs/reference.md#blocked-rules-known-blocked-rules."
     required: false
     default: ""
 

@@ -26,9 +26,9 @@ destinations that code can reach, and records what it tried.
 Four things sit outside that model by design.
 
 - **Whoever writes the Dockerfile and the workflow.** The allowlist is configured alongside them, by
-  the same people, so Buildcage is not a control against them. A `config_file` is no different. On
+  the same people, so Buildcage is not a control against them. A `config-file` is no different. On
   `pull_request_target`, and `workflow_run` triggered by a pull request, the workspace may hold the
-  pull request's own code, so `config_file` is refused there. On other events it is read from
+  pull request's own code, so `config-file` is refused there. On other events it is read from
   whatever the workflow checked out, so whoever can write that copy sets the rules.
 - **What buildkitd fetches for itself**, [below](#what-buildkitd-fetches-itself).
 - **What a step reads.** Buildcage restricts where a `RUN` step can send data, not what it can read:
@@ -38,12 +38,12 @@ Four things sit outside that model by design.
   reach the proxy container through `docker exec` or `docker cp`, or the host filesystem directly on
   a passwordless-sudo runner, and rewrite the traffic log. `report` marks a log that doesn't start
   where a real proxy run would as incomplete, and fails the step for it under `restrict` with
-  `fail_on_blocked`, which catches wholesale erasure but not a format-aware forgery. The defense
+  `fail-on-blocked`, which catches wholesale erasure but not a format-aware forgery. The defense
   here is procedural: don't place an untrusted step between `setup` and `report`.
 
-One gap does sit inside the model. The report action reads `config_file` again after the build, so
+One gap does sit inside the model. The report action reads `config-file` again after the build, so
 when a build's `--output type=local` export lands on the file, a `RUN` step decides what the report
-reads and can set any report input the workflow leaves unset, `fail_on_blocked: false` among them.
+reads and can set any report input the workflow leaves unset, `fail-on-blocked: false` among them.
 Set those inputs in the workflow, or keep the export away from the file (see [Config
 file](./reference.md#config-file)).
 
@@ -72,11 +72,11 @@ the set of destinations a build needs smaller.
 | Encodes data into DNS queries                                                                      | Answered locally and never forwarded; an outside resolver is unreachable                                                                                     |
 | Uses DNS over TLS or DNS over HTTPS                                                                | Redirected to the proxy like any other TCP and checked on its SNI, so an outside resolver is reachable only if its own host and port are allowlisted         |
 | Tunnels over ICMP, raw UDP or QUIC, or falls back to IPv6                                          | Dropped before the proxy; only TCP is redirected to it, and the proxy reaches allowed names over IPv4                                                        |
-| Connects to a raw address                                                                          | Checked against `allowed_ip_rules`, and blocked when nothing matches                                                                                         |
+| Connects to a raw address                                                                          | Checked against `allowed-ip-rules`, and blocked when nothing matches                                                                                         |
 | Speaks something that is not HTTP to a port no rule covers                                         | Read as a request by the stage it is handed to and blocked, and counted as blocked like any other                                                            |
 | Ignores the proxy variables entirely                                                               | No effect: interception is at the network level, not opt-in                                                                                                  |
-| Sends `*` as its method, `Host` or path in audit, to plant a wildcard in the suggested rules       | Left out of the suggested `allowed_url_rules` and listed beside it, so pasting them never permits more than the build sent                                   |
-| Floods the proxy log until earlier entries rotate away                                             | A log that no longer starts where a real run does is not accepted as a complete record: the step fails under `restrict` with `fail_on_blocked` (the default) |
+| Sends `*` as its method, `Host` or path in audit, to plant a wildcard in the suggested rules       | Left out of the suggested `allowed-url-rules` and listed beside it, so pasting them never permits more than the build sent                                   |
+| Floods the proxy log until earlier entries rotate away                                             | A log that no longer starts where a real run does is not accepted as a complete record: the step fails under `restrict` with `fail-on-blocked` (the default) |
 
 ## The network boundary
 
@@ -103,7 +103,7 @@ A rule matches on the name the request carried, the SNI or the `Host` header. On
 the proxy resolves that name itself and rewrites the destination to the result (`do-resolve` and
 `set-dst`), so the address the build chose is discarded. A forged `Host`, a doctored `/etc/hosts`,
 or an SNI naming one host while the connection aims at another all reach the server the name belongs
-to: destination spoofing is removed rather than detected. A connection an `allowed_ip_rules` entry
+to: destination spoofing is removed rather than detected. A connection an `allowed-ip-rules` entry
 covers is the one exception: that rule names the address itself, so the connection goes there
 whatever name it carries. A name with anything but letters, digits, `.`, `_` and `-` in it never
 reaches a rule, in `audit` too: `universal` blocks such an SNI (`invalid-sni`) or plaintext `Host`
@@ -164,7 +164,7 @@ naming them cannot loop the proxy into itself.
 This has two consequences:
 
 - **An internal mirror running on the runner itself is not reachable by name.** Name it with
-  `allowed_ip_rules` instead, which skips this guard. The same applies to a public name that
+  `allowed-ip-rules` instead, which skips this guard. The same applies to a public name that
   resolves to the runner's own public address, which a self-hosted runner may well have.
 - The list is read once at startup, and on a containerized runner it holds that container's
   addresses rather than the real host's.
@@ -175,7 +175,7 @@ in `audit` too. A wildcard or regex that merely admits the address, `**:80` or `
 The exemption never covers the proxy's own network (`198.19.255.0/24`) or port `10024` of any
 internal address, since a rule naming the proxy's listener would loop it into itself. Under
 `universal`, no rule exempts a request. Reaching a cloud metadata endpoint directly, the way any AWS
-or GCP SDK does, is not what this is meant to stop, and `allowed_ip_rules` is the intended path for
+or GCP SDK does, is not what this is meant to stop, and `allowed-ip-rules` is the intended path for
 it. That path skips this guard except for the listener: a connection to port `10024` of an internal
 address is blocked there too, whatever the IP rules say and in `audit` as well.
 
@@ -230,18 +230,18 @@ decrypts nothing: HAProxy classifies each connection by what it can read at the 
 checks that against the allowlist.
 
 - **HTTPS**: the SNI from the TLS ClientHello, read without terminating the connection, so the build
-  validates the origin's own certificate itself. Checked against `allowed_https_rules`.
-- **HTTP**: the `Host` header, checked against `allowed_http_rules`. A request carrying none is
+  validates the origin's own certificate itself. Checked against `allowed-https-rules`.
+- **HTTP**: the `Host` header, checked against `allowed-http-rules`. A request carrying none is
   blocked with 400, since there is nothing to check it against.
 - **A connection to a bare address**: nothing at all. It skipped DNS, so there is no name to read.
-  It is matched against `allowed_ip_rules` as `ip:port` and, when nothing matches, blocked. The
+  It is matched against `allowed-ip-rules` as `ip:port` and, when nothing matches, blocked. The
   address is the one the connection goes to; an SNI it carries is ignored, since the client chose it.
 
 Because nothing in the build has to trust an injected CA or be told about a proxy, this engine
 covers any language or package manager, a pinned certificate included, with no Dockerfile change.
 
 A connection to a bare address never reaches the [inward-resolution guard](#a-name-may-not-resolve-inward):
-it skips DNS and `do-resolve` entirely, on a separate code path, and `allowed_ip_rules` is what
+it skips DNS and `do-resolve` entirely, on a separate code path, and `allowed-ip-rules` is what
 decides it.
 
 ### Inspect proxy engine
@@ -255,11 +255,11 @@ audit run records everything without being configured for it first.
 
 | Rule                  | What it permits                            | Decided by           | Decrypted |
 | --------------------- | ------------------------------------------ | -------------------- | --------- |
-| `allowed_https_rules` | any method and path on the host, over TLS  | Host header          | yes       |
-| `allowed_http_rules`  | any method and path on the host, plaintext | Host header          | n/a       |
-| `allowed_url_rules`   | the named methods on matching URLs         | Host header and path | yes       |
-| `allowed_tls_rules`   | TLS to the named host and port             | SNI and port         | **no**    |
-| `allowed_ip_rules`    | TCP to the address and port, any protocol  | address and port     | **no**    |
+| `allowed-https-rules` | any method and path on the host, over TLS  | Host header          | yes       |
+| `allowed-http-rules`  | any method and path on the host, plaintext | Host header          | n/a       |
+| `allowed-url-rules`   | the named methods on matching URLs         | Host header and path | yes       |
+| `allowed-tls-rules`   | TLS to the named host and port             | SNI and port         | **no**    |
+| `allowed-ip-rules`    | TCP to the address and port, any protocol  | address and port     | **no**    |
 
 Three mechanisms make that enforceable:
 
@@ -286,12 +286,12 @@ Three mechanisms make that enforceable:
 
 The wrapper also keeps the CA out of the image. Before a step's layer is committed, it reads the
 layer back, whatever the step exited with, and takes out every copy of the CA it finds. A copy it
-finds but cannot remove fails the build, unless `fail_on_ca_residue: false` turns that into a
+finds but cannot remove fails the build, unless `fail-on-ca-residue: false` turns that into a
 warning; a copy it cannot read, such as one in a compressed archive, stays in the image.
 [CA residue](./reference.md#ca-residue) lists both kinds. Reading the layer back needs BuildKit's
 `overlayfs` snapshotter, which the builder is pinned to: setup fails when Docker's data root cannot
 hold an overlay mount, and a step whose upper directory the wrapper cannot find does not run,
-whatever `fail_on_ca_residue` says. The wrapper fails a step through its exit code, 1 or the step's
+whatever `fail-on-ca-residue` says. The wrapper fails a step through its exit code, 1 or the step's
 own non-zero one, so an LLB whose `ValidExitCodes` accepts that code lets the failure through; the
 Dockerfile frontend never sets `ValidExitCodes`.
 
@@ -322,7 +322,7 @@ dropped honestly.
 
 Every engine intercepts `RUN` step traffic and nothing else. buildkitd is not on the isolated
 network, so what the daemon fetches never reaches the proxy, never appears in the report, and never
-trips `fail_on_blocked`:
+trips `fail-on-blocked`:
 
 - **`FROM`** (`docker-image://`), including every stage's base image and any image named in
   `COPY --from=`.
@@ -350,7 +350,7 @@ the real target is inside the tunnel:
 
 For this to work, the allowed domain and the target domain have to sit on the same CDN or hosting
 infrastructure. Closing the gap needs the proxy to terminate TLS and read that header, which is what
-[`inspect`](#inspect-proxy-engine) does: `allowed_url_rules` matches on the real `Host`, so a
+[`inspect`](#inspect-proxy-engine) does: `allowed-url-rules` matches on the real `Host`, so a
 fronted request lands outside any host rule it was written for.
 
 Staying on `universal`, allow as few domains as you can, and prefer a service's own domain
@@ -360,9 +360,9 @@ pattern that has changed.
 
 ### Passthrough rules are an uninspected pipe
 
-`allowed_tls_rules` and `allowed_ip_rules` are passed through as raw TCP and recorded with a byte
+`allowed-tls-rules` and `allowed-ip-rules` are passed through as raw TCP and recorded with a byte
 count and nothing more. Once an `ip:port` pair is allowlisted, any TCP-based protocol can use that
-path, and its protocol is never checked. Prefer domain rules, and keep `allowed_ip_rules` for
+path, and its protocol is never checked. Prefer domain rules, and keep `allowed-ip-rules` for
 destinations that genuinely have no stable hostname.
 
 `universal` sees nothing inside any tunnel, not only these: a rule reaches as far as a host and a
@@ -388,13 +388,13 @@ matched.
 
 Everything else is printed as it was sent, parameter names included, so most of what a blocked
 request tried to send is still there. Two things this does not cover: a credential in the path,
-which `allowed_url_rules` is written against and so cannot be hidden; and one in a parameter the list
+which `allowed-url-rules` is written against and so cannot be hidden; and one in a parameter the list
 does not name. It also replaces an exfiltration payload the sender happened to name `code` or
 `key`, so **read a suspected attempt out of the
 [traffic artifact](./reference.md#traffic-artifact)**, which keeps every value verbatim, rather than
 out of the summary.
 
-An `allowed_url_rules` block suggested by an audit run never carries a query at all: rules match on
+An `allowed-url-rules` block suggested by an audit run never carries a query at all: rules match on
 the path, and a recorded query is as likely to hold a one-off token as anything reusable.
 
 ## Hardening

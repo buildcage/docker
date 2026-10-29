@@ -54,8 +54,8 @@ vp run build      # rolldown → the committed dist/ bundles
 ├── report/                 # Report action: action.yml, src/, dist/
 ├── docker/
 │   ├── common/             # Image files every engine shares: s6 services, init-iptables
-│   ├── universal/          # proxy_engine: universal (BuildKit, HAProxy, CoreDNS, s6-overlay)
-│   ├── inspect/            # proxy_engine: inspect, the same plus buildcage-runc/ (Go)
+│   ├── universal/          # proxy-engine: universal (BuildKit, HAProxy, CoreDNS, s6-overlay)
+│   ├── inspect/            # proxy-engine: inspect, the same plus buildcage-runc/ (Go)
 │   ├── seccomp/            # The builder's seccomp profile, applied by the runner's Docker
 │   ├── compose.action.yaml # The compose file the action runs, with the digest-pinned image
 │   ├── compose.action.test-*.yaml # Fixture overlays on it, one per engine
@@ -77,7 +77,7 @@ Node on the runner.
 
 ## Running it locally
 
-Action inputs become uppercase environment variables locally (`proxy_mode` is `PROXY_MODE`). There
+Action inputs become uppercase environment variables locally (`proxy-mode` is `PROXY_MODE`). There
 is one `setup_buildkit_{engine}_{mode}` target per engine and mode. Each builds the engine's image
 through `compose.yaml`, then starts it through the setup action itself (`src/main.ts`, run by
 `test/setup-builder.sh` with the local-image test hook), so the inputs are parsed and
@@ -164,7 +164,7 @@ make test_integration_buildkit_inspect_debian_restrict
 make test_integration_buildkit_inspect_roundtrip
 # The proxy's services stopped mid-build: the step's traffic and the report must both fail
 make test_integration_buildkit_inspect_proxy_down
-# known_blocked_rules against fail_on_blocked, both matched and unmatched
+# known-blocked-rules against fail-on-blocked, both matched and unmatched
 make test_integration_buildkit_universal_known_blocked
 # Builds for the host's architecture and for the other one
 make test_integration_buildkit_multiarch
