@@ -68,9 +68,9 @@ jobs:
       - name: Start Buildcage builder
         uses: buildcage/docker@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
         with:
-          proxy_mode: restrict
-          proxy_engine: inspect
-          config_file: .github/buildcage-release.yml
+          proxy-mode: restrict
+          proxy-engine: inspect
+          config-file: .github/buildcage-release.yml
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -130,8 +130,8 @@ jobs:
         if: always()
         uses: buildcage/docker/report@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
         with:
-          config_file: .github/buildcage-release.yml
-          fail_on_blocked: true
+          config-file: .github/buildcage-release.yml
+          fail-on-blocked: true
 
       - name: Record the digest under this engine's own key
         id: digest

@@ -56,9 +56,9 @@ jobs:
       - name: Start Buildcage builder
         uses: buildcage/docker@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
         with:
-          proxy_mode: restrict
-          proxy_engine: inspect
-          allowed_url_rules: |
+          proxy-mode: restrict
+          proxy-engine: inspect
+          allowed-url-rules: |
             # apt, over plain HTTP
             GET http://deb.debian.org/debian/**
             GET http://deb.debian.org/debian-security/**
@@ -95,10 +95,10 @@ jobs:
           push: false
           no-cache: true
 
-      # fail_on_blocked is false only because this example blocks on purpose;
+      # fail-on-blocked is false only because this example blocks on purpose;
       # leave it at its default so a real workflow fails on a disallowed request.
       - name: Show proxy report
         if: always()
         uses: buildcage/docker/report@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
         with:
-          fail_on_blocked: false
+          fail-on-blocked: false

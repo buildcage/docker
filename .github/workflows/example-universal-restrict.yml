@@ -56,9 +56,9 @@ jobs:
       - name: Start Buildcage builder
         uses: buildcage/docker@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
         with:
-          proxy_mode: restrict
-          proxy_engine: universal
-          allowed_https_rules: |
+          proxy-mode: restrict
+          proxy-engine: universal
+          allowed-https-rules: |
             repo.maven.apache.org:443
             repository.apache.org:443
 
@@ -86,10 +86,10 @@ jobs:
           push: false
           no-cache: true
 
-      # fail_on_blocked is false only because this example blocks on purpose;
+      # fail-on-blocked is false only because this example blocks on purpose;
       # leave it at its default so a real workflow fails on a disallowed destination.
       - name: Show proxy report
         if: always()
         uses: buildcage/docker/report@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
         with:
-          fail_on_blocked: false
+          fail-on-blocked: false
