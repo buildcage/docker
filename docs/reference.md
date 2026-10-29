@@ -24,7 +24,8 @@ and links here for the details.
 
 `buildcage/docker` starts the builder. Every input is optional. Each one also takes its name spelled
 with underscores (`proxy_mode` for `proxy-mode`), as earlier versions named it. When a workflow sets
-both spellings, the hyphenated one wins and the step warns.
+both spellings, a rule input takes the lines of both, and any other input takes the hyphenated
+value, warning when the two differ.
 
 | Input                | Default     | Description                                                                                                                                                                                 |
 | -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -126,8 +127,9 @@ known-blocked-rules: |
 ```
 
 - Each key is an input name of either action, in either spelling, and each value is written as it
-  would be under `with:`. A key that is neither action's input, an input set under both spellings,
-  a list or a nested mapping fails the step.
+  would be under `with:`. A key that is neither action's input, a list or a nested mapping fails the
+  step, and so does an input set under both spellings, unless a merge key brings in one of them: the
+  file's own key overrides it.
 - Give the same file to the report action, which reads `builder-name`, `fail-on-blocked` and the
   traffic artifact inputs from it when it runs. Leave the file as it is until then, and keep it out
   of the way of a build's `--output type=local` export.
@@ -155,7 +157,7 @@ a Dockerfile that needs its own policy its own `builder-name` and file.
 `audit` allows what the active engine can classify. A connection it cannot classify, such as an HTTP
 request carrying no `Host` header, is still blocked, on each engine's own terms.
 
-Because `audit` enforces nothing, the `allowed_*_rules` have no effect in it; you write them when
+Because `audit` enforces nothing, the `allowed-*-rules` have no effect in it; you write them when
 you move to `restrict`. Any other `proxy-mode` value, a differently cased one included, fails the
 setup.
 
@@ -339,7 +341,7 @@ Because a URL rule matches nothing on an engine that never sees a method or a pa
 `proxy-engine: universal` is refused in `restrict` mode and warned about in `audit`, the same split
 `allowed-url-rules` gets. A host line works on every engine.
 
-> **Migrating from v3.** `known-blocked-rules` was whitespace-separated, so several host rules could
+> **Migrating from v3.** `known_blocked_rules` was whitespace-separated, so several host rules could
 > share a line. It is now newline-separated: put each rule on its own line.
 
 <a id="ip-addresses-allowed_ip_rules"></a>
@@ -482,8 +484,8 @@ refused with an error naming what to write instead.
 ## Report action inputs
 
 `buildcage/docker/report` reads the builder's communication log, writes the Job Summary, and
-optionally fails the job when blocked connections are found. Every input is optional and, as the
-setup action's do, also takes its name spelled with underscores.
+optionally fails the job when blocked connections are found. Every input is optional. Like the setup
+action's inputs, each also takes its name spelled with underscores.
 
 | Input                             | Default     | Description                                                                                        |
 | --------------------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
@@ -544,7 +546,7 @@ what changes is only whether the row fails the step.
    The row moves to Known Blocked Hosts, folded under that rule, and stops failing the step. Nothing
    else changes, and the host stays unreachable.
 
-Naming the service name in an `allowed_*` rule also clears the row, but it is the misleading option:
+Naming the service name in an `allowed-*` rule also clears the row, but it is the misleading option:
 it reads as permission to reach something that nothing can connect to, and the record still does not
 resolve.
 
@@ -719,7 +721,7 @@ in `known-blocked-rules`.
 
 None of the four fails the step, not even with `fail-on-blocked: true`, and a `::notice::` gives the
 count. No rule blocked them, so no rule can clear them either: `known-blocked-rules` has nothing to
-match, and an `allowed_*` entry changes nothing. What clears one is the origin coming back, or the
+match, and an `allowed-*` entry changes nothing. What clears one is the origin coming back, or the
 build reaching for something that is up.
 
 A blocked `DNS` row for the same name means something else entirely: that one is Buildcage's own
