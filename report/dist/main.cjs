@@ -15123,11 +15123,7 @@ function parseConfig(text, path, known) {
 	for (let [name, key] of keys) {
 		let value = js[key];
 		if (value == null) values.set(name, { text: "" });
-		else if ([
-			"string",
-			"number",
-			"boolean"
-		].includes(typeof value)) {
+		else if (typeof value == "string" || typeof value == "number" || typeof value == "boolean") {
 			let text = String(value);
 			values.set(name, {
 				text,

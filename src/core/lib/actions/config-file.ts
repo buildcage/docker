@@ -233,7 +233,11 @@ function parseConfig(
     const value = (js as Record<string, unknown>)[key];
     if (value == null) {
       values.set(name, { text: "" });
-    } else if (["string", "number", "boolean"].includes(typeof value)) {
+    } else if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
       const text = String(value);
       values.set(name, { text, line: lineOf(key, text) });
     } else {
