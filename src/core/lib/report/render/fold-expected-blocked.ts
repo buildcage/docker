@@ -10,7 +10,7 @@ interface ExpectedGroup {
 }
 
 /**
- * Collapse the blocked rows a known_blocked_rules rule matched into one row per
+ * Collapse the blocked rows a known-blocked-rules rule matched into one row per
  * rule, after any row no rule claimed. A rule covering noisy traffic then
  * costs the table one line however many hosts it names.
  */

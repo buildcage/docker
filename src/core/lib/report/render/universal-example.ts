@@ -8,9 +8,9 @@ import {
 } from "./restrict-example.ts";
 
 const ruleTypeToParam: Record<string, string> = {
-  HTTPS: "allowed_https_rules",
-  HTTP: "allowed_http_rules",
-  IP: "allowed_ip_rules",
+  HTTPS: "allowed-https-rules",
+  HTTP: "allowed-http-rules",
+  IP: "allowed-ip-rules",
 };
 
 export type AuditedRow = Pick<AggregatedEntry, "host" | "port" | "ruleType">;
@@ -39,9 +39,9 @@ export function buildUniversalRestrictExample(
   if (groups.size === 0) return "";
 
   let yaml = exampleStepHead(actionRepo, actionRef, step);
-  yaml += "    proxy_mode: restrict\n";
+  yaml += "    proxy-mode: restrict\n";
   // Pasted without it, restrict would run the default engine, inspect.
-  yaml += "    proxy_engine: universal\n";
+  yaml += "    proxy-engine: universal\n";
   for (const [param, rules] of groups) {
     yaml += `    ${param}: >-\n`;
     for (const rule of rules) {

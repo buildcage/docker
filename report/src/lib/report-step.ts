@@ -14,11 +14,13 @@ import { join } from "node:path";
 
 import { annotate } from "#core/lib/actions/annotation.ts";
 import { applyConfigFile } from "#core/lib/actions/config-file.ts";
+import { normalizeInputNames } from "#core/lib/actions/input-names.ts";
 import { readTrafficArtifactInputs } from "#core/lib/actions/inputs.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
 import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
 import {
   CONFIG_FILE_INPUTS,
+  INPUT_NAMES,
   REPORT_ACTION_SCRIPT_PATH,
   dropListInputs,
 } from "#report/report-source.ts";
@@ -104,7 +106,10 @@ export async function runReportStep(
   } = { ...realDeps, ...overrides };
 
   // Before any input is read, and before report-action.js inherits this
-  // environment: it reads fail_on_blocked itself.
+  // environment: it reads fail-on-blocked itself.
+  for (const ignored of normalizeInputNames(env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists)) {
+    warn(ignored);
+  }
   const { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
   if (warning) warn(warning);
   const builderName = readBuilderName();

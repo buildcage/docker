@@ -22,7 +22,7 @@ export interface DetermineBlockedOutcomeOptions {
  * (fail closed).
  *
  * An implausible log decides on its own: what survived says nothing about
- * what was dropped, so known_blocked_rules cannot clear the step.
+ * what was dropped, so known-blocked-rules cannot clear the step.
  */
 export function determineBlockedOutcome({
   isAudit,
@@ -61,7 +61,7 @@ const COUNT_NOUN = "connection(s) and lookup(s)";
  * Build the annotation message text for a blocked-connections check.
  *
  * In audit mode the text always stays the fixed-format base string,
- * regardless of known_blocked_rules matching: audit mode's pass/fail
+ * regardless of known-blocked-rules matching: audit mode's pass/fail
  * outcome is unaffected by matching (see determineBlockedOutcome), so
  * varying the notice text there would be misleading.
  */
@@ -74,9 +74,9 @@ export function buildBlockedMessage({
   const base = `${blockedCount} blocked ${COUNT_NOUN} detected by buildcage ${engineLabel}`;
   if (isAudit) return base;
   const unexpected = blockedRows.filter((row) => !row.expected).length;
-  if (unexpected === blockedRows.length) return base; // nothing matched (incl. known_blocked_rules unset)
-  if (unexpected === 0) return `${base}, all matched known_blocked_rules (expected)`;
-  return `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known_blocked_rules)`;
+  if (unexpected === blockedRows.length) return base; // nothing matched (incl. known-blocked-rules unset)
+  if (unexpected === 0) return `${base}, all matched known-blocked-rules (expected)`;
+  return `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known-blocked-rules)`;
 }
 
 export interface DescribedBlockedOutcome extends BlockedOutcome {

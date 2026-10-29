@@ -211,12 +211,12 @@ jobs:
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.image.outputs.ref }}
         with:
-          builder_name: ${{ env.BUILDER }}
-          proxy_mode: restrict
-          proxy_engine: ${{ matrix.engine }}
+          builder-name: ${{ env.BUILDER }}
+          proxy-mode: restrict
+          proxy-engine: ${{ matrix.engine }}
           # Each engine gets the rule kind it actually enforces on.
-          allowed_https_rules: ${{ matrix.engine == 'universal' && 'example.com:443' || '' }}
-          allowed_url_rules: ${{ matrix.engine == 'inspect' && 'GET|HEAD https://example.com/**' || '' }}
+          allowed-https-rules: ${{ matrix.engine == 'universal' && 'example.com:443' || '' }}
+          allowed-url-rules: ${{ matrix.engine == 'inspect' && 'GET|HEAD https://example.com/**' || '' }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -262,10 +262,10 @@ jobs:
         if: always()
         uses: ./report
         with:
-          builder_name: ${{ env.BUILDER }}
-          fail_on_blocked: false
-          upload_traffic_artifact: true
-          traffic_artifact_retention_days: 1
+          builder-name: ${{ env.BUILDER }}
+          fail-on-blocked: false
+          upload-traffic-artifact: true
+          traffic-artifact-retention-days: 1
 
       - name: Download the traffic artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

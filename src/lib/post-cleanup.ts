@@ -28,10 +28,10 @@ export interface PostCleanupSources {
  * The `docker compose down` the post step runs, for the builder setup named.
  *
  * The name comes from GITHUB_STATE first: setup may have read it from
- * config_file, which a later step can change or remove before the job ends.
+ * config-file, which a later step can change or remove before the job ends.
  * A build cannot write GITHUB_STATE, so the saved name is the one setup used.
- * When setup saved nothing, the builder_name input is the fallback, with two
- * exceptions. With config_file the input's name could be another job's
+ * When setup saved nothing, the builder-name input is the fallback, with two
+ * exceptions. With config-file the input's name could be another job's
  * builder, and a setup that stopped before saving started nothing. With an
  * invalid name, setup refused before starting anything.
  *
@@ -44,7 +44,7 @@ export function planPostCleanup(
   env: NodeJS.ProcessEnv,
   { savedBuilderName, composeOverlay, getInput = core.getInput }: PostCleanupSources = {},
 ): PostCleanupPlan | undefined {
-  if (!savedBuilderName && getInput("config_file")) return undefined;
+  if (!savedBuilderName && getInput("config-file")) return undefined;
   let builderName = savedBuilderName;
   if (!builderName) {
     try {

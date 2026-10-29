@@ -48,7 +48,7 @@ export function parseAndValidateRules(rulesInput: string | undefined): string[] 
 }
 
 /**
- * `known_blocked_rules` only: give a rule that names no port the `:*` the
+ * `known-blocked-rules` only: give a rule that names no port the `:*` the
  * syntax otherwise requires.
  *
  * Every other rule input is matched against a connection, where the port is
@@ -67,7 +67,7 @@ export function completeRulePort(rule: string): string {
 }
 
 /**
- * Split a `known_blocked_rules` input into one rule per line. Unlike the
+ * Split a `known-blocked-rules` input into one rule per line. Unlike the
  * whitespace-separated host rule inputs, this one is newline-separated so a
  * line can be a URL rule, which carries a space between its method and its
  * URL (see isKnownBlockedUrlRule). Each line's `#` comment is dropped first, a
@@ -84,7 +84,7 @@ export function splitKnownBlockedLines(rulesInput: string | undefined): string[]
 }
 
 /**
- * Whether a `known_blocked_rules` line is a URL rule rather than a host rule.
+ * Whether a `known-blocked-rules` line is a URL rule rather than a host rule.
  *
  * A URL rule carries a space between its method and its URL; a host rule is a
  * bare `host:port`. So the space tells them apart, the same split convertUrlRule
@@ -96,7 +96,7 @@ export function isKnownBlockedUrlRule(line: string): boolean {
 }
 
 /**
- * Split+validate `known_blocked_rules`, one rule per line. A host line has its
+ * Split+validate `known-blocked-rules`, one rule per line. A host line has its
  * missing port completed (see completeRulePort) and is returned in completed
  * form; a URL line is validated through the `inspect` engine's own compiler and
  * returned as written. Everything downstream re-classifies a line the same way

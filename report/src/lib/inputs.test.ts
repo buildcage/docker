@@ -12,20 +12,20 @@ function inputs(values: Record<string, string> = {}): (name: string) => string {
 describe("readBuilderName", () => {
   // Report finds setup's container by the project name this derives to, so the
   // fallback has to be the same one setup used.
-  it("reads builder_name, falling back to the shared default when unset", () => {
-    expect(readBuilderName(inputs({ builder_name: "mine" }))).toBe("mine");
+  it("reads builder-name, falling back to the shared default when unset", () => {
+    expect(readBuilderName(inputs({ "builder-name": "mine" }))).toBe("mine");
     expect(readBuilderName(inputs())).toBe(DEFAULT_BUILDER_NAME);
   });
 });
 
 describe("checkFailOnBlocked", () => {
   it.each(["", "false"])("accepts %o", (value) => {
-    expect(() => checkFailOnBlocked(inputs({ fail_on_blocked: value }))).not.toThrow();
+    expect(() => checkFailOnBlocked(inputs({ "fail-on-blocked": value }))).not.toThrow();
   });
 
   it("refuses a typo rather than guessing", () => {
-    expect(() => checkFailOnBlocked(inputs({ fail_on_blocked: "yes" }))).toThrow(
-      'Invalid fail_on_blocked: "yes". Must be true or false.',
+    expect(() => checkFailOnBlocked(inputs({ "fail-on-blocked": "yes" }))).toThrow(
+      'Invalid fail-on-blocked: "yes". Must be true or false.',
     );
   });
 });

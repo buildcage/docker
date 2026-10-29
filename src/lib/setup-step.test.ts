@@ -36,7 +36,7 @@ const ENV = {
 };
 
 /** `buildcage-` + the first 12 hex of sha256("buildcage"): the same name
- *  report derives from its own builder_name input. */
+ *  report derives from its own builder-name input. */
 const PROJECT_NAME = "buildcage-eeb358f947ee";
 
 let prevHooks: string | undefined;
@@ -111,14 +111,48 @@ describe("runSetupStep", () => {
 
     await runSetupStep(ENV, deps);
 
+    expect(mocks.setOutput).toHaveBeenCalledWith("builder-name", "from-file");
     expect(mocks.setOutput).toHaveBeenCalledWith("builder_name", "from-file");
     expect(orderOf(mocks.setOutput)).toBeLessThan(orderOf(mocks.runDocker));
   });
 
-  it("applies config_file to the step's env before reading any input, and warns of what it ignored", async () => {
+  it("reads an input's underscore spelling, before config-file, and warns of one it ignored", async () => {
+    const env = {
+      ...ENV,
+      INPUT_PROXY_MODE: "audit",
+      "INPUT_PROXY-MODE": "restrict",
+      INPUT_CONFIG_FILE: "c.yml",
+    };
+    mocks.applyConfigFile.mockImplementation((seen: NodeJS.ProcessEnv) => {
+      expect(seen).toMatchObject({ "INPUT_CONFIG-FILE": "c.yml", "INPUT_PROXY-MODE": "restrict" });
+      expect(seen).not.toHaveProperty("INPUT_PROXY_MODE");
+    });
+
+    await runSetupStep(env, deps);
+
+    expect(mocks.warn).toHaveBeenCalledWith("Ignored proxy_mode, as proxy-mode is also set.");
+  });
+
+  it("joins a rule input's two spellings", async () => {
+    const env = {
+      ...ENV,
+      INPUT_ALLOWED_HTTPS_RULES: "a.example.com:443",
+      "INPUT_ALLOWED-HTTPS-RULES": "b.example.com:443",
+    };
+    mocks.applyConfigFile.mockImplementation((seen: NodeJS.ProcessEnv) => {
+      expect(seen["INPUT_ALLOWED-HTTPS-RULES"]).toBe("b.example.com:443\na.example.com:443");
+    });
+
+    await runSetupStep(env, deps);
+
+    expect(mocks.applyConfigFile).toHaveBeenCalled();
+    expect(mocks.warn).not.toHaveBeenCalled();
+  });
+
+  it("applies config-file to the step's env before reading any input, and warns of what it ignored", async () => {
     mocks.applyConfigFile.mockReturnValue({
       path: "/home/runner/work/repo/repo/c.yml",
-      warning: "Ignored from config_file c.yml, set by the workflow: proxy_mode",
+      warning: "Ignored from config-file c.yml, set by the workflow: proxy-mode",
       origins: new Map(),
     });
 
@@ -126,11 +160,11 @@ describe("runSetupStep", () => {
 
     expect(mocks.applyConfigFile).toHaveBeenCalledWith(
       ENV,
-      expect.objectContaining({ known: expect.arrayContaining(["builder_name"]) }),
+      expect.objectContaining({ known: expect.arrayContaining(["builder-name"]) }),
     );
     expect(orderOf(mocks.applyConfigFile)).toBeLessThan(orderOf(mocks.readSetupInputs));
     expect(mocks.warn).toHaveBeenCalledWith(
-      "Ignored from config_file c.yml, set by the workflow: proxy_mode",
+      "Ignored from config-file c.yml, set by the workflow: proxy-mode",
     );
   });
 
@@ -197,12 +231,12 @@ describe("runSetupStep", () => {
       inputsWith({ knownBlockedRules: Array.from({ length: 12_000 }, () => "*.example.com:*") }),
     );
 
-    await expect(runSetupStep(ENV, deps)).rejects.toThrow("known_blocked_rules is");
+    await expect(runSetupStep(ENV, deps)).rejects.toThrow("known-blocked-rules is");
     expect(mocks.checkUrlAndTlsRuleSupport).toHaveBeenCalled();
     expect(mocks.runDocker).not.toHaveBeenCalled();
   });
 
-  it("checks known_blocked_rules URL lines against the engine, host lines excluded", async () => {
+  it("checks known-blocked-rules URL lines against the engine, host lines excluded", async () => {
     mocks.readSetupInputs.mockReturnValue(
       inputsWith({
         httpsRules: [],
@@ -305,16 +339,16 @@ describe("runSetupStep", () => {
     });
   });
 
-  it("keeps the list inputs config_file appended to out of every docker command", async () => {
+  it("keeps the list inputs config-file appended to out of every docker command", async () => {
     mocks.applyConfigFile.mockImplementation((env: NodeJS.ProcessEnv) => {
-      env.INPUT_ALLOWED_HTTPS_RULES = "# a comment\n".repeat(20_000);
+      env["INPUT_ALLOWED-HTTPS-RULES"] = "# a comment\n".repeat(20_000);
     });
-    const env = { ...ENV, INPUT_CONFIG_FILE: "c.yml" };
+    const env = { ...ENV, "INPUT_CONFIG-FILE": "c.yml" };
     await runSetupStep(env, deps);
 
     expect(mocks.runDocker).toHaveBeenCalledTimes(2);
     for (const [, dockerEnv] of mocks.runDocker.mock.calls) {
-      expect(dockerEnv).not.toHaveProperty("INPUT_ALLOWED_HTTPS_RULES");
+      expect(dockerEnv).not.toHaveProperty("INPUT_ALLOWED-HTTPS-RULES");
     }
   });
 
@@ -351,7 +385,7 @@ describe("runSetupStep", () => {
       expect(dockerArgs(1)[5]).toBe("up");
     });
 
-    // report derives the same name from its own builder_name input to find
+    // report derives the same name from its own builder-name input to find
     // this container with `docker ps --filter`.
     it("runs under the project name report derives from the same builder name", async () => {
       vi.stubEnv("COMPOSE_PROJECT_NAME", "somebody-elses-project");

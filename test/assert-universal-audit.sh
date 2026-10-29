@@ -94,7 +94,7 @@ assert_rules() {
   actual=$(
     awk -v key="$key:" '
       $1 == key { capture=1; next }
-      capture && /^ *[a-z_]+:/ { exit }
+      capture && /^ *[a-z_-]+:/ { exit }
       capture { print $1 }
     ' <<< "$RULES" | sort | tr '\n' ' '
   )
@@ -107,15 +107,15 @@ assert_rules() {
 }
 
 if grep -qF "Switch to restrict mode" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "proxy_mode: restrict" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "proxy_engine: universal" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "proxy-mode: restrict" <<< "$REPORT_MARKDOWN" \
+  && grep -qF "proxy-engine: universal" <<< "$REPORT_MARKDOWN"; then
   pass "a restrict-mode example was rendered, naming the non-default engine"
 else
   fail "no restrict-mode example was rendered"
 fi
-assert_rules allowed_https_rules "blocked.example.com:443 blocked.example.com:8443 nxdomain.wildcard.example.com:443"
-assert_rules allowed_http_rules "blocked.example.com:80 blocked.example.com:8080 nxdomain.wildcard.example.com:80"
-assert_rules allowed_ip_rules "10.200.0.100:80"
+assert_rules allowed-https-rules "blocked.example.com:443 blocked.example.com:8443 nxdomain.wildcard.example.com:443"
+assert_rules allowed-http-rules "blocked.example.com:80 blocked.example.com:8080 nxdomain.wildcard.example.com:80"
+assert_rules allowed-ip-rules "10.200.0.100:80"
 echo ""
 
 assert_results

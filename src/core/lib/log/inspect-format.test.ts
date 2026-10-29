@@ -363,7 +363,7 @@ describe("the generated log-format and this parser describe the same line", () =
   // The log rewrites only whitespace, quotes and control characters, so a
   // Host of the build's own choosing reaches the log as sent. Reading the
   // authority to decide whether one arrived would let a sender move its own
-  // blocks out of both tables and out of fail_on_blocked, by writing the very
+  // blocks out of both tables and out of fail-on-blocked, by writing the very
   // text the log prints for a Host that never came.
   it.each(["-evil.example.com", "-", "--", "-:443", "-/evil.example.com"])(
     "leaves a block whose sender chose the Host %j a block",

@@ -215,15 +215,24 @@ function exitOnFatalError(context) {
 	};
 }
 //#endregion
-//#region src/compose-file.ts
-const __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
-function withComposeOverlay(composeFile, overlay) {
-	return overlay ? [composeFile, overlay] : [composeFile];
+//#region src/core/lib/actions/input-names.ts
+function inputEnvName(name) {
+	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
 }
-//#endregion
-//#region src/lib/local-image.ts
-async function readLocalImageOverride(env, log = console.log) {
-	return null;
+function legacyInputName(name) {
+	return name.replaceAll("-", "_");
+}
+function normalizeInputNames(env, names, lists = []) {
+	let warnings = [];
+	for (let name of names) {
+		let legacy = legacyInputName(name);
+		if (legacy === name) continue;
+		let legacyEnvName = inputEnvName(legacy), value = env[legacyEnvName] ?? "";
+		if (delete env[legacyEnvName], !value.trim()) continue;
+		let envName = inputEnvName(name), current = env[envName] ?? "";
+		current.trim() ? lists.includes(name) ? env[envName] = `${current}\n${value}` : current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}, as ${name} is also set.`) : env[envName] = value;
+	}
+	return warnings;
 }
 //#endregion
 //#region src/core/lib/actions/inputs.ts
@@ -232,6 +241,42 @@ var InvalidInputError = class extends ActionError {
 		super(message, code);
 	}
 };
+//#endregion
+//#region src/report/report-source.ts
+const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
+function resolveBuilderName(value) {
+	if (value === "") return "buildcage";
+	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder-name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
+	return value;
+}
+const LIST_INPUTS = [
+	"allowed-https-rules",
+	"allowed-http-rules",
+	"allowed-ip-rules",
+	"allowed-url-rules",
+	"allowed-tls-rules",
+	"known-blocked-rules"
+], CONFIG_FILE_INPUTS = {
+	known: [
+		"builder-name",
+		"proxy-mode",
+		"proxy-engine",
+		...LIST_INPUTS,
+		"fail-on-ca-residue",
+		"fail-on-blocked",
+		"upload-traffic-artifact",
+		"traffic-artifact-retention-days"
+	],
+	lists: LIST_INPUTS
+}, INPUT_NAMES = ["config-file", ...CONFIG_FILE_INPUTS.known], __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
+function withComposeOverlay(composeFile, overlay) {
+	return overlay ? [composeFile, overlay] : [composeFile];
+}
+//#endregion
+//#region src/lib/local-image.ts
+async function readLocalImageOverride(env, log = console.log) {
+	return null;
+}
 //#endregion
 //#region src/core/lib/docker/args.ts
 function fileArgs(composeFiles) {
@@ -260,20 +305,12 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[12]?[0-9])", IPV4 = `${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}`;
 RegExp(`^${OCTET}$`), RegExp(`^${IPV4}(?:/${PREFIX})?$`), RegExp(`^${IPV4}/${PREFIX}$`), `${IPV4}`;
 //#endregion
-//#region src/report/report-source.ts
-const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
-function resolveBuilderName(value) {
-	if (value === "") return "buildcage";
-	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder_name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
-	return value;
-}
-//#endregion
 //#region src/lib/inputs.ts
 function readBuilderName(getInput$3 = getInput) {
-	return resolveBuilderName(getInput$3("builder_name"));
+	return resolveBuilderName(getInput$3("builder-name"));
 }
 function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderName, composeOverlay, getInput: getInput$1 = getInput } = {}) {
-	if (!savedBuilderName && getInput$1("config_file")) return;
+	if (!savedBuilderName && getInput$1("config-file")) return;
 	let builderName = savedBuilderName;
 	if (!builderName) try {
 		builderName = readBuilderName(getInput$1);
@@ -296,6 +333,7 @@ function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderNa
 //#endregion
 //#region src/post.ts
 async function main() {
+	normalizeInputNames(process.env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists);
 	let localOverride = await readLocalImageOverride(process.env, () => {}), plan = planPostCleanup(COMPOSE_FILE, void 0, process.env, {
 		savedBuilderName: getState("builder_name"),
 		composeOverlay: localOverride?.composeOverlay

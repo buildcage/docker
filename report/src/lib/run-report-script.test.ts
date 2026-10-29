@@ -49,6 +49,21 @@ describe("runReportScript", () => {
     expect(calls[0].env).toStrictEqual({ ...ENV, BUILDCAGE_TRAFFIC_FILE: TRAFFIC_FILE });
   });
 
+  it("passes fail-on-blocked under its underscore spelling too, for an older image", () => {
+    const { run, calls } = fakeRun();
+
+    runReportScript(SCRIPT, CONTAINER_ID, {
+      env: { ...ENV, "INPUT_FAIL-ON-BLOCKED": "false" },
+      run,
+    });
+
+    expect(calls[0].env).toStrictEqual({
+      ...ENV,
+      "INPUT_FAIL-ON-BLOCKED": "false",
+      INPUT_FAIL_ON_BLOCKED: "false",
+    });
+  });
+
   it("removes an inherited traffic file when no artifact is wanted", () => {
     const { run, calls } = fakeRun();
     const planted = { ...ENV, BUILDCAGE_TRAFFIC_FILE: "/home/runner/leak.json" };

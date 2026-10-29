@@ -53,23 +53,23 @@ describe("checkUrlAndTlsRuleSupport", () => {
   );
 
   it.each<[string, string[], string[], Outcome, RegExp]>([
-    ["restrict", [URL_RULE], [], "throw", /^allowed_url_rules has no effect/],
-    ["restrict", [], [TLS_RULE], "throw", /^allowed_tls_rules has no effect/],
+    ["restrict", [URL_RULE], [], "throw", /^allowed-url-rules has no effect/],
+    ["restrict", [], [TLS_RULE], "throw", /^allowed-tls-rules has no effect/],
     [
       "restrict",
       [URL_RULE],
       [TLS_RULE],
       "throw",
-      /^allowed_url_rules and allowed_tls_rules have no effect/,
+      /^allowed-url-rules and allowed-tls-rules have no effect/,
     ],
-    ["audit", [URL_RULE], [], "warn", /^allowed_url_rules has no effect/],
-    ["audit", [], [TLS_RULE], "warn", /^allowed_tls_rules has no effect/],
+    ["audit", [URL_RULE], [], "warn", /^allowed-url-rules has no effect/],
+    ["audit", [], [TLS_RULE], "warn", /^allowed-tls-rules has no effect/],
     [
       "audit",
       [URL_RULE],
       [TLS_RULE],
       "warn",
-      /^allowed_url_rules and allowed_tls_rules have no effect/,
+      /^allowed-url-rules and allowed-tls-rules have no effect/,
     ],
   ])(
     "names only the rule inputs actually set (%s, url %j, tls %j)",
@@ -101,7 +101,7 @@ describe("checkKnownBlockedUrlRuleSupport", () => {
         checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedUrlRules }, warn),
       );
       expect(outcome).toBe(expected);
-      if (outcome !== "none") expect(message).toMatch(/known_blocked_rules/);
+      if (outcome !== "none") expect(message).toMatch(/known-blocked-rules/);
     },
   );
 });

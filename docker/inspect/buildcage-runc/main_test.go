@@ -178,8 +178,8 @@ func TestRunFailsAStepWhoseWriteBackFailed(t *testing.T) {
 	if !strings.Contains(stderr, "CA write-back failed for") {
 		t.Errorf("the failure did not reach stderr:\n%s", stderr)
 	}
-	if strings.Contains(stderr, "fail_on_ca_residue") {
-		t.Errorf("a failed write-back hinted at fail_on_ca_residue:\n%s", stderr)
+	if strings.Contains(stderr, "fail-on-ca-residue") {
+		t.Errorf("a failed write-back hinted at fail-on-ca-residue:\n%s", stderr)
 	}
 }
 
@@ -271,7 +271,7 @@ func TestRunUndoesInjectionWhenRuncWillNotStart(t *testing.T) {
 }
 
 // A step whose layer cannot be read back fails before runc starts it, and the
-// build log says why without pointing at fail_on_ca_residue.
+// build log says why without pointing at fail-on-ca-residue.
 func TestRunRefusesAStepWithoutALayerToReadBack(t *testing.T) {
 	useTempLog(t)
 	useFakeRsync(t)
@@ -295,8 +295,8 @@ func TestRunRefusesAStepWithoutALayerToReadBack(t *testing.T) {
 	if !strings.Contains(stderr, "not running the step: "+errLayerUnread.Error()) {
 		t.Errorf("the build log does not say why:\n%s", stderr)
 	}
-	if strings.Contains(stderr, "fail_on_ca_residue") {
-		t.Errorf("an unread layer hinted at fail_on_ca_residue:\n%s", stderr)
+	if strings.Contains(stderr, "fail-on-ca-residue") {
+		t.Errorf("an unread layer hinted at fail-on-ca-residue:\n%s", stderr)
 	}
 }
 

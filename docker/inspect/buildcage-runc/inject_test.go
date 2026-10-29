@@ -1040,10 +1040,10 @@ func TestInjectBindsSUSEsCertDirWithoutAStore(t *testing.T) {
 }
 
 // A step whose layer cannot be read back does not run, whatever
-// fail_on_ca_residue says, and nothing is placed in its rootfs.
+// fail-on-ca-residue says, and nothing is placed in its rootfs.
 func TestInjectRefusesAStepWithoutALayerToReadBack(t *testing.T) {
 	for _, fail := range []bool{true, false} {
-		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
+		t.Run(fmt.Sprintf("fail-on-ca-residue %v", fail), func(t *testing.T) {
 			useTempLog(t)
 			useFakeRsync(t)
 			useFailOnCAResidue(t, fail)

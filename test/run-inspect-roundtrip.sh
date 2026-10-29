@@ -2,7 +2,7 @@
 #
 # The audit-then-restrict round trip, which is what the inspect engine is for.
 #
-# Phase 1 runs a build under `audit` and takes the `allowed_url_rules` the
+# Phase 1 runs a build under `audit` and takes the `allowed-url-rules` the
 # report generated from what it saw. Phase 2 restarts under `restrict` with
 # exactly those rules and repeats every request plus a few the first build
 # never made: rules that break the build they were learned from make the
@@ -47,19 +47,19 @@ build test/Dockerfile.inspect-audit
 
 RULES=$(
   GITHUB_STEP_SUMMARY= node report/src/main.ts 2>&1 |
-    # Stops at the next top-level key (allowed_tls_rules/allowed_ip_rules are
+    # Stops at the next top-level key (allowed-tls-rules/allowed-ip-rules are
     # echoed into the same fenced block, see inspect-example.ts) as well as
-    # the closing fence, so only the allowed_url_rules value is captured.
+    # the closing fence, so only the allowed-url-rules value is captured.
     awk '
-      /allowed_url_rules: \|/ { capture=1; next }
-      capture && /^ *(allowed_tls_rules|allowed_ip_rules): \|/ { exit }
+      /allowed-url-rules: \|/ { capture=1; next }
+      capture && /^ *(allowed-tls-rules|allowed-ip-rules): \|/ { exit }
       capture && /```/ { exit }
       capture { print }
     ' | sed 's/^ *//'
 )
 
 if [ -z "$RULES" ]; then
-  echo "❌ FAILED: the audit report generated no allowed_url_rules"
+  echo "❌ FAILED: the audit report generated no allowed-url-rules"
   exit 1
 fi
 

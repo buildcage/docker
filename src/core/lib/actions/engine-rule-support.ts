@@ -2,8 +2,8 @@ import { InvalidInputError, type ProxyEngine } from "./inputs.ts";
 
 /**
  * Only `inspect` terminates TLS: it alone sees a method or a path
- * (`allowed_url_rules`) and has decrypted traffic to exempt
- * (`allowed_tls_rules`), so both are no-ops on `universal`. Called once at
+ * (`allowed-url-rules`) and has decrypted traffic to exempt
+ * (`allowed-tls-rules`), so both are no-ops on `universal`. Called once at
  * setup, before the proxy starts, so a mismatch is caught immediately instead
  * of silently not enforcing.
  *
@@ -29,19 +29,19 @@ export function checkUrlAndTlsRuleSupport(
   if (proxyEngine === "inspect") return;
 
   const unsupported: string[] = [];
-  if (urlRules.length > 0) unsupported.push("allowed_url_rules");
-  if (tlsRules.length > 0) unsupported.push("allowed_tls_rules");
+  if (urlRules.length > 0) unsupported.push("allowed-url-rules");
+  if (tlsRules.length > 0) unsupported.push("allowed-tls-rules");
   if (unsupported.length === 0) return;
 
   const list = unsupported.join(" and ");
   const verb = unsupported.length > 1 ? "have" : "has";
   const reason =
-    `${list} ${verb} no effect with proxy_engine: ${proxyEngine}, which only sees the host ` +
+    `${list} ${verb} no effect with proxy-engine: ${proxyEngine}, which only sees the host ` +
     `and port, never a method or a path.`;
 
   if (proxyMode === "audit") {
     warn(
-      `${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to ` +
+      `${reason} They are ignored for this run. Switch to proxy-engine: inspect if you need to ` +
         `enforce a method or a path.`,
     );
     return;
@@ -49,14 +49,14 @@ export function checkUrlAndTlsRuleSupport(
 
   throw new InvalidInputError(
     `${reason} In restrict mode that means ${list} would not actually be enforced, so the ` +
-      `step would look protected but isn't. Switch to proxy_engine: inspect, or remove ` +
+      `step would look protected but isn't. Switch to proxy-engine: inspect, or remove ` +
       `${list} from your workflow.`,
     "INVALID_PROXY_ENGINE",
   );
 }
 
 /**
- * A URL rule in `known_blocked_rules` (a method and a URL) matches on a method
+ * A URL rule in `known-blocked-rules` (a method and a URL) matches on a method
  * and a path, which only `inspect` sees, so it can never match a block on
  * another engine and acknowledges nothing there. Checked once at setup like
  * checkUrlAndTlsRuleSupport, and split the same way: an error in `restrict`,
@@ -82,20 +82,20 @@ export function checkKnownBlockedUrlRuleSupport(
   if (knownBlockedUrlRules.length === 0) return;
 
   const reason =
-    `known_blocked_rules contains URL rules (a method and a URL) that need proxy_engine: ` +
-    `inspect, which alone sees a method or a path; proxy_engine: ${proxyEngine} sees only the ` +
+    `known-blocked-rules contains URL rules (a method and a URL) that need proxy-engine: ` +
+    `inspect, which alone sees a method or a path; proxy-engine: ${proxyEngine} sees only the ` +
     `host and port, so these rules match no blocked connection and acknowledge nothing.`;
 
   if (proxyMode === "audit") {
     warn(
       `${reason} They are ignored for this run. Drop the method to acknowledge the whole host, ` +
-        `or switch to proxy_engine: inspect.`,
+        `or switch to proxy-engine: inspect.`,
     );
     return;
   }
 
   throw new InvalidInputError(
-    `${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: ` +
+    `${reason} Drop the method to acknowledge the whole host, or switch to proxy-engine: ` +
       `inspect.`,
     "INVALID_PROXY_ENGINE",
   );

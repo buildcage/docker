@@ -182,7 +182,7 @@ const blockedReport: UniversalReportData = {
 };
 
 describe("runReportAction and the blocked outcome", () => {
-  it("leaves the exit code alone when fail_on_blocked is off", async () => {
+  it("leaves the exit code alone when fail-on-blocked is off", async () => {
     const previous = process.exitCode;
     try {
       await run(spec({ build: () => blockedReport }), { failOnBlocked: false });
@@ -192,7 +192,7 @@ describe("runReportAction and the blocked outcome", () => {
     }
   });
 
-  it("fails the step when fail_on_blocked is on and something was blocked", async () => {
+  it("fails the step when fail-on-blocked is on and something was blocked", async () => {
     const previous = process.exitCode;
     try {
       await run(spec({ build: () => blockedReport }), { failOnBlocked: true });
@@ -203,19 +203,20 @@ describe("runReportAction and the blocked outcome", () => {
   });
 });
 
-describe("runReportAction's fail_on_blocked fallback", () => {
+describe("runReportAction's fail-on-blocked fallback", () => {
   /** Runs without deps.failOnBlocked, so the action input is consulted. */
   async function runReadingInput(
     value?: string,
+    name = "INPUT_FAIL-ON-BLOCKED",
   ): Promise<{ exitCode: number | string | undefined; lines: string[] }> {
-    const previousInput = process.env.INPUT_FAIL_ON_BLOCKED;
+    const previousInput = process.env["INPUT_FAIL-ON-BLOCKED"];
     const previousExit = process.exitCode;
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     // core.warning writes here rather than through console.log.
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     try {
-      if (value === undefined) delete process.env.INPUT_FAIL_ON_BLOCKED;
-      else process.env.INPUT_FAIL_ON_BLOCKED = value;
+      if (value === undefined) delete process.env["INPUT_FAIL-ON-BLOCKED"];
+      else process.env[name] = value;
       process.exitCode = 0;
       await runReportAction(spec({ build: () => blockedReport }), {
         containerId: "abc123",
@@ -227,8 +228,8 @@ describe("runReportAction's fail_on_blocked fallback", () => {
       log.mockRestore();
       stdout.mockRestore();
       process.exitCode = previousExit;
-      if (previousInput === undefined) delete process.env.INPUT_FAIL_ON_BLOCKED;
-      else process.env.INPUT_FAIL_ON_BLOCKED = previousInput;
+      if (previousInput === undefined) delete process.env["INPUT_FAIL-ON-BLOCKED"];
+      else process.env["INPUT_FAIL-ON-BLOCKED"] = previousInput;
     }
   }
 
@@ -236,6 +237,12 @@ describe("runReportAction's fail_on_blocked fallback", () => {
     const { exitCode, lines } = await runReadingInput("false");
     expect(exitCode).toBe(0);
     expect(lines.some((l) => l.startsWith("::warning::"))).toBe(false);
+  });
+
+  it("reads the underscore spelling an older report action passes", async () => {
+    const { exitCode } = await runReadingInput("false", "INPUT_FAIL_ON_BLOCKED");
+    expect(exitCode).toBe(0);
+    expect(process.env).not.toHaveProperty("INPUT_FAIL_ON_BLOCKED");
   });
 
   it("reads an absent input as the documented default, true", async () => {
@@ -248,7 +255,7 @@ describe("runReportAction's fail_on_blocked fallback", () => {
     const { exitCode, lines } = await runReadingInput("no");
     expect(exitCode).toBe(1);
     expect(lines).toContain(
-      '::warning::Invalid fail_on_blocked: "no". Must be true or false. Reading it as true.\n',
+      '::warning::Invalid fail-on-blocked: "no". Must be true or false. Reading it as true.\n',
     );
   });
 });

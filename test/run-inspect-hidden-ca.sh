@@ -2,10 +2,10 @@
 #
 # A copy of the CA the layer sweep finds but cannot remove fails the build.
 #
-# Each such case must fail naming the file and pointing at fail_on_ca_residue.
+# Each such case must fail naming the file and pointing at fail-on-ca-residue.
 # The control writes an unrelated encrypted keystore and must build. The
 # resealed case must build with the CA taken out and the keystore still sealed
-# under changeit. Then, with fail_on_ca_residue false, the same copy only warns.
+# under changeit. Then, with fail-on-ca-residue false, the same copy only warns.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -68,9 +68,9 @@ for case in leaf json; do
   fi
   grep -q "cannot strip: /app/" "$LOG" ||
     fail_with_log "the build failed, but not on the copy of the CA ($case)"
-  grep -q "hint: .*fail_on_ca_residue: false" "$LOG" ||
-    fail_with_log "the failure does not point at fail_on_ca_residue ($case)"
-  echo "PASS: the build failed on the copy of the CA, pointing at fail_on_ca_residue ($case)"
+  grep -q "hint: .*fail-on-ca-residue: false" "$LOG" ||
+    fail_with_log "the failure does not point at fail-on-ca-residue ($case)"
+  echo "PASS: the build failed on the copy of the CA, pointing at fail-on-ca-residue ($case)"
 done
 
 echo "=== An encrypted keystore that is not the CA's ==="
@@ -103,7 +103,7 @@ echo "PASS: the sweep took the CA out, kept $roots roots under their aliases, an
 
 stop
 
-echo "=== fail_on_ca_residue: false, where the same copy only warns ==="
+echo "=== fail-on-ca-residue: false, where the same copy only warns ==="
 FAIL_ON_CA_RESIDUE=false start
 build leaf >"$LOG" 2>&1 || fail_with_log "the copy of the CA failed the build"
 grep -q "buildcage: warning: .*cannot strip: /app/" "$LOG" ||

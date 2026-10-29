@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
  *
  * Hashed rather than used verbatim: Compose project names are constrained
  * to `^[a-z0-9][a-z0-9_-]*$`, but the input can be a wider-charset
- * user-supplied `builder_name`. A hex digest is always in-charset
+ * user-supplied `builder-name`. A hex digest is always in-charset
  * regardless, so this never needs to validate its input.
  */
 export function deriveProjectName(containerName: string): string {
@@ -15,7 +15,7 @@ export function deriveProjectName(containerName: string): string {
   return `buildcage-${hash}`;
 }
 
-/** Compose project name for a builder_name, preferring an explicit override
+/** Compose project name for a builder-name, preferring an explicit override
  *  over the deterministic hash-derived name. */
 export function resolveProjectName(
   builderName: string,

@@ -20,7 +20,7 @@ import { resolveProxyEngine } from "./engine.ts";
 export type GetInput = (name: string) => string;
 
 export function readBuilderName(getInput: GetInput = core.getInput): string {
-  return resolveBuilderName(getInput("builder_name"));
+  return resolveBuilderName(getInput("builder-name"));
 }
 
 export interface SetupInputs extends RuleInputs {
@@ -37,14 +37,14 @@ export interface SetupInputs extends RuleInputs {
  *
  * The statement order decides which error surfaces first.
  *
- * @throws {InvalidInputError} if proxy_engine, proxy_mode, fail_on_ca_residue
- *   or builder_name is malformed
+ * @throws {InvalidInputError} if proxy-engine, proxy-mode, fail-on-ca-residue
+ *   or builder-name is malformed
  * @throws {InvalidRulesError} if any rule is malformed
  */
 export function readSetupInputs(getInput: GetInput = core.getInput): SetupInputs {
-  const proxyEngine = resolveProxyEngine(getInput("proxy_engine"));
-  const proxyMode = resolveProxyMode(getInput("proxy_mode"));
-  const failOnCaResidue = readBooleanInput("fail_on_ca_residue", true, getInput);
+  const proxyEngine = resolveProxyEngine(getInput("proxy-engine"));
+  const proxyMode = resolveProxyMode(getInput("proxy-mode"));
+  const failOnCaResidue = readBooleanInput("fail-on-ca-residue", true, getInput);
   return {
     proxyEngine,
     builderName: readBuilderName(getInput),

@@ -215,7 +215,7 @@ function splitRawRegexUrl(
   if (!pathSep) {
     throw new Error(
       `Invalid regex in rule "${rule}": expected a "/" (or "\\/") after "://" to start the path; ` +
-        `a host-only rule belongs in allowed_https_rules instead`,
+        `a host-only rule belongs in allowed-https-rules instead`,
     );
   }
   const pathStart = hostStart + pathSep.index;

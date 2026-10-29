@@ -117,7 +117,7 @@ describe("fitStepSummary", () => {
     const truncated = fitStepSummary(withCommunicationDetails(logLines(200)), {
       limitBytes: SMALL_LIMIT,
     });
-    expect(truncated).toContain("upload_traffic_artifact: true");
+    expect(truncated).toContain("upload-traffic-artifact: true");
   });
 
   it("still fits and still notes the cut even when the fixed parts alone leave no budget", () => {

@@ -13,6 +13,7 @@
  */
 import * as core from "@actions/core";
 
+import { normalizeInputNames } from "#core/lib/actions/input-names.ts";
 import { readBooleanInput } from "#core/lib/actions/inputs.ts";
 import { writeStepSummary } from "#core/lib/actions/write-step-summary.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
@@ -67,15 +68,17 @@ export interface ReportActionDeps {
   docker?: Docker;
   env?: NodeJS.ProcessEnv;
   /** Read from the input when unset, which the report action has already
-   *  merged with config_file. */
+   *  merged with config-file. */
   failOnBlocked?: boolean;
 }
 
 /** Anything other than a false spelling fails closed, and a typo says so. The
  *  report action refuses a typo first; this covers direct runs and an older action. */
 function readFailOnBlocked(): boolean {
+  // A report action from before the hyphenated names passes fail_on_blocked.
+  normalizeInputNames(process.env, ["fail-on-blocked"]);
   try {
-    return readBooleanInput("fail_on_blocked", true, core.getInput);
+    return readBooleanInput("fail-on-blocked", true, core.getInput);
   } catch (e) {
     // readBooleanInput throws only for a value it does not know.
     core.warning(`${errorMessage(e)} Reading it as true.`);

@@ -5,50 +5,96 @@ branding:
   color: blue
 
 inputs:
-  config_file:
+  config-file:
     description: "YAML file, relative to the workspace, setting any input of this action or report. An input the workflow sets wins; rule lists are combined. Pass the same file to report. See docs/reference.md#config-file."
     required: false
     default: ""
-  builder_name:
+  builder-name:
     description: "Name of the builder container. Default buildcage."
     required: false
-  proxy_mode:
-    description: "Traffic policy: audit records every destination the build reaches and blocks nothing (allowed_*_rules have no effect in this mode), or restrict (default) allows only what the rules match and blocks the rest. Run audit once, take the allowlist from its report, then switch to restrict."
+  proxy-mode:
+    description: "Traffic policy: audit records every destination the build reaches and blocks nothing (allowed-*-rules have no effect in this mode), or restrict (default) allows only what the rules match and blocks the rest. Run audit once, take the allowlist from its report, then switch to restrict."
     required: false
-  proxy_engine:
+  proxy-engine:
     description: "Network enforcement engine: inspect (default, terminates TLS to enforce on method and URL) or universal (network-level proxy, needs no CA trust)"
     required: false
-  allowed_https_rules:
+  allowed-https-rules:
     description: "HTTPS allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., '*.example.com:443 ~^custom\\.pattern:443$'"
     required: false
     default: ""
-  allowed_http_rules:
+  allowed-http-rules:
     description: "HTTP allow rules (wildcard or ~regex), separated by whitespace. Port required. e.g., 'example.com:80'"
     required: false
     default: ""
-  allowed_ip_rules:
+  allowed-ip-rules:
     description: "IP address allow rules (address, CIDR block, wildcard or ~regex), separated by whitespace. Port required. e.g., '192.168.1.1:443 10.0.0.1:8080'"
     required: false
     default: ""
+  allowed-url-rules:
+    description: "URL allow rules, one per line, as '<methods> <url>'. Methods are separated by | or , and * means any. Requires proxy-engine: inspect. e.g., 'GET|HEAD https://registry.npmjs.org/**'"
+    required: false
+    default: ""
+  allowed-tls-rules:
+    description: "TLS destinations passed through undecrypted, judged on SNI alone, separated by whitespace. Port required. Requires proxy-engine: inspect. e.g., 'db.example.com:5432'"
+    required: false
+    default: ""
+  fail-on-ca-residue:
+    description: "proxy-engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when a copy of the proxy CA, or its NSS slot, stays in the step's layer. See docs/reference.md#ca-residue."
+    required: false
+  known-blocked-rules:
+    description: "Traffic expected to be blocked, one rule per line: a host rule (wildcard or ~regex) or, under proxy-engine: inspect, a URL rule. Blocked traffic matching one doesn't fail the report step even when fail-on-blocked is true. See docs/reference.md#blocked-rules-known_blocked_rules."
+    required: false
+    default: ""
+
+  # The underscore spelling of each name above, still accepted.
+  config_file:
+    description: "Alias of config-file."
+    required: false
+    default: ""
+  builder_name:
+    description: "Alias of builder-name."
+    required: false
+  proxy_mode:
+    description: "Alias of proxy-mode."
+    required: false
+  proxy_engine:
+    description: "Alias of proxy-engine."
+    required: false
+  allowed_https_rules:
+    description: "Alias of allowed-https-rules."
+    required: false
+    default: ""
+  allowed_http_rules:
+    description: "Alias of allowed-http-rules."
+    required: false
+    default: ""
+  allowed_ip_rules:
+    description: "Alias of allowed-ip-rules."
+    required: false
+    default: ""
   allowed_url_rules:
-    description: "URL allow rules, one per line, as '<methods> <url>'. Methods are separated by | or , and * means any. Requires proxy_engine: inspect. e.g., 'GET|HEAD https://registry.npmjs.org/**'"
+    description: "Alias of allowed-url-rules."
     required: false
     default: ""
   allowed_tls_rules:
-    description: "TLS destinations passed through undecrypted, judged on SNI alone, separated by whitespace. Port required. Requires proxy_engine: inspect. e.g., 'db.example.com:5432'"
+    description: "Alias of allowed-tls-rules."
     required: false
     default: ""
   fail_on_ca_residue:
-    description: "proxy_engine: inspect only. Whether a RUN step fails the build (true, default) or only warns (false) when a copy of the proxy CA, or its NSS slot, stays in the step's layer. See docs/reference.md#ca-residue."
+    description: "Alias of fail-on-ca-residue."
     required: false
   known_blocked_rules:
-    description: "Traffic expected to be blocked, one rule per line: a host rule (wildcard or ~regex) or, under proxy_engine: inspect, a URL rule. Blocked traffic matching one doesn't fail the report step even when fail_on_blocked is true. See docs/reference.md#blocked-rules-known_blocked_rules."
+    description: "Alias of known-blocked-rules."
     required: false
     default: ""
 
 outputs:
-  builder_name:
+  builder-name:
     description: "Name of the builder container, for the Buildx endpoint. See docs/reference.md#setup-action-outputs."
+
+  # The underscore spelling of each name above, set to the same value.
+  builder_name:
+    description: "Alias of builder-name."
 
 runs:
   using: node24

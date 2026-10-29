@@ -4,14 +4,15 @@
  * directly (LABEL/COPY are static text), so keep those values in sync by hand.
  */
 import type { ConfigFileInputs } from "#core/lib/actions/config-file.ts";
+import { inputEnvName } from "#core/lib/actions/input-names.ts";
 import { InvalidInputError } from "#core/lib/actions/inputs.ts";
 
 export const REPORT_SOURCE_LABEL = "io.github.buildcage.report-source";
 export const REPORT_ACTION_SCRIPT_PATH = "/opt/buildcage/scripts/report-action.js";
 
 /**
- * `builder_name` when unset; action.yml declares no default of its own, so
- * config_file can tell unset from set. Part of the contract because setup,
+ * `builder-name` when unset; action.yml declares no default of its own, so
+ * config-file can tell unset from set. Part of the contract because setup,
  * report and post each read the input separately and have to derive the same
  * project name: a value that differed between them would leave report looking
  * for a container setup never named.
@@ -22,8 +23,8 @@ export const DEFAULT_BUILDER_NAME = "buildcage";
 const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
 
 /**
- * `builder_name`, or the default when unset. Checked before setup sets it as
- * an output: config_file may have supplied it, and a workflow can paste the
+ * `builder-name`, or the default when unset. Checked before setup sets it as
+ * an output: config-file may have supplied it, and a workflow can paste the
  * output into a `run:` script.
  *
  * @throws {InvalidInputError} if the name is not a valid container name
@@ -32,7 +33,7 @@ export function resolveBuilderName(value: string): string {
   if (value === "") return DEFAULT_BUILDER_NAME;
   if (!BUILDER_NAME_PATTERN.test(value)) {
     throw new InvalidInputError<"INVALID_BUILDER_NAME">(
-      `Invalid builder_name: ${JSON.stringify(value)}. ` +
+      `Invalid builder-name: ${JSON.stringify(value)}. ` +
         "Must start with a letter or digit and have at least two characters, " +
         "using only letters, digits, '_', '.' and '-'.",
       "INVALID_BUILDER_NAME",
@@ -42,38 +43,41 @@ export function resolveBuilderName(value: string): string {
 }
 
 const LIST_INPUTS = [
-  "allowed_https_rules",
-  "allowed_http_rules",
-  "allowed_ip_rules",
-  "allowed_url_rules",
-  "allowed_tls_rules",
-  "known_blocked_rules",
+  "allowed-https-rules",
+  "allowed-http-rules",
+  "allowed-ip-rules",
+  "allowed-url-rules",
+  "allowed-tls-rules",
+  "known-blocked-rules",
 ];
 
 /**
- * The inputs of setup and report both, since one config_file is handed to
+ * The inputs of setup and report both, since one config-file is handed to
  * each: a key only the other action reads is still not a typo. Part of the
- * contract for the same reason as builder_name.
+ * contract for the same reason as builder-name.
  */
 export const CONFIG_FILE_INPUTS: ConfigFileInputs = {
   known: [
-    "builder_name",
-    "proxy_mode",
-    "proxy_engine",
+    "builder-name",
+    "proxy-mode",
+    "proxy-engine",
     ...LIST_INPUTS,
-    "fail_on_ca_residue",
-    "fail_on_blocked",
-    "upload_traffic_artifact",
-    "traffic_artifact_retention_days",
+    "fail-on-ca-residue",
+    "fail-on-blocked",
+    "upload-traffic-artifact",
+    "traffic-artifact-retention-days",
   ],
   lists: LIST_INPUTS,
 };
 
+/** Every input of setup and report, for normalizeInputNames. */
+export const INPUT_NAMES = ["config-file", ...CONFIG_FILE_INPUTS.known];
+
 /**
- * Removes the list inputs from env, for a step that has read them. config_file
+ * Removes the list inputs from env, for a step that has read them. config-file
  * appends to them, and a variable over 128 KiB makes every exec that inherits
  * it fail with E2BIG.
  */
 export function dropListInputs(env: NodeJS.ProcessEnv): void {
-  for (const name of LIST_INPUTS) delete env[`INPUT_${name.toUpperCase()}`];
+  for (const name of LIST_INPUTS) delete env[inputEnvName(name)];
 }

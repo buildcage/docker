@@ -95,7 +95,7 @@ describe("buildInspectReportData", () => {
   });
 
   it("does not count an origin's own 403 as blocked", async () => {
-    // fail_on_blocked defaults to true, so a registry answering 403 to an
+    // fail-on-blocked defaults to true, so a registry answering 403 to an
     // unauthenticated fetch would otherwise fail a build that was not blocked.
     const relayed =
       "buildcage 3 https GET 403 90 ts=-- reason=- tlserr=- dst=1.1.1.1:443 host=reg.example.com /pkg";
@@ -174,7 +174,7 @@ describe("buildInspectReportData", () => {
   });
 
   it("tables a block sent to an address the build wrote out as an IP row", async () => {
-    // allowed_ip_rules is what would have passed it through, so that is the
+    // allowed-ip-rules is what would have passed it through, so that is the
     // rule kind the row names.
     const toResolver = BAD_REQUEST.replace("dst=198.19.255.1:8080", "dst=8.8.8.8:53");
     const r = await buildInspectReportData([START, toResolver], [], reportParams(), 0);
@@ -185,7 +185,7 @@ describe("buildInspectReportData", () => {
 
   it("counts a client that dropped a connection sent straight to an address", async () => {
     // A client that would not trust the certificate, with no ip rule for the
-    // address: fail_on_blocked has to see it, as it would under universal.
+    // address: fail-on-blocked has to see it, as it would under universal.
     const dropped =
       "buildcage 1787471976000 https <BADREQ> 0 0 ts=CR reason=- tlserr=- dst=203.0.113.9:8443 fcerr=ERESET sni=- host=- -";
     const r = await buildInspectReportData([START, dropped], [], reportParams(), 0);
@@ -286,7 +286,7 @@ describe("buildInspectReportData", () => {
     expect(plain?.reason).toBe("dns-not-allowed");
   });
 
-  it("keeps a blocked service name silenceable by known_blocked_rules", async () => {
+  it("keeps a blocked service name silenceable by known-blocked-rules", async () => {
     // Neither remedy makes the record resolve; this is the one that leaves the
     // rules alone, so it has to keep working on a name with no port.
     const dns = [
@@ -303,7 +303,7 @@ describe("buildInspectReportData", () => {
 
   it("lets a blocked name be declared expected", async () => {
     // The row has no port, so without special handling no writable rule could
-    // ever match it and fail_on_blocked would fail the job with no way out.
+    // ever match it and fail-on-blocked would fail the job with no way out.
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=telemetry.example.com.",
     ];

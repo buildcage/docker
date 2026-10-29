@@ -11,7 +11,7 @@ import { UNKNOWN_HOST } from "./proxy-address.ts";
  *
  * `discovery`, `incomplete` and `failed` are none of those: no rule decided
  * them and none could. Folding any into `block` would put a row in the report
- * no rule could take away, and fail a build under fail_on_blocked over
+ * no rule could take away, and fail a build under fail-on-blocked over
  * something the rules had nothing to say about. A service name is answered
  * empty whatever the rules say, a connection nobody ended on purpose gave a
  * rule nothing to judge, and `failed` is what became of a request the rules had

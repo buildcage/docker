@@ -26,8 +26,8 @@
       - name: Start Buildcage
         uses: owner/repo@v2 # 2.1.0
         with:
-          proxy_mode: restrict
-          allowed_url_rules: |
+          proxy-mode: restrict
+          allowed-url-rules: |
             GET https://a.example.com/pkg.json
             POST https://a.example.com/upload
 ```

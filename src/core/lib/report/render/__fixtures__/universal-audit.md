@@ -26,12 +26,12 @@
       - name: Start Buildcage
         uses: owner/repo@v2 # 2.1.0
         with:
-          proxy_mode: restrict
-          proxy_engine: universal
-          allowed_https_rules: >-
+          proxy-mode: restrict
+          proxy-engine: universal
+          allowed-https-rules: >-
             a.example.com:443
             c.example.com:443
-          allowed_http_rules: >-
+          allowed-http-rules: >-
             b.example.com:80
 ```
 

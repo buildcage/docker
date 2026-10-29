@@ -8,8 +8,8 @@ import { buildUrlRules, type UrlRule } from "./url-rules.ts";
 import { parseAndValidateKnownBlockedRules, parseAndValidateRules } from "./wildcard-rules.ts";
 
 /**
- * Thrown when an ACL rule input (allowed_https_rules/allowed_http_rules/
- * allowed_ip_rules/known_blocked_rules) fails to parse.
+ * Thrown when an ACL rule input (allowed-https-rules/allowed-http-rules/
+ * allowed-ip-rules/known-blocked-rules) fails to parse.
  */
 export class InvalidRulesError extends ActionError<"INVALID_RULES"> {}
 
@@ -25,7 +25,7 @@ export function parseRulesOrThrow(rulesInput: string | undefined): string[] {
 }
 
 /**
- * Same, for `known_blocked_rules`, whose missing ports are completed rather
+ * Same, for `known-blocked-rules`, whose missing ports are completed rather
  * than rejected; see completeRulePort.
  */
 export function parseKnownBlockedRulesOrThrow(rulesInput: string | undefined): string[] {
@@ -52,7 +52,7 @@ const PLACEHOLDER_PROXY_ADDRESS = "192.0.2.1";
  * rule its config generators refuse fails here rather than stopping the
  * container. A regex only HAProxy's PCRE2 or the resolver's RE2 refuses, such
  * as `[\d-z]`, still stops it. Runs every engine's compiler regardless of
- * proxy_engine.
+ * proxy-engine.
  *
  * @throws {InvalidRulesError} if any compiler refuses a rule
  */
@@ -78,7 +78,7 @@ export function checkRulesCompileOrThrow(inputs: RuleInputs): void {
 const IP_RULE_HOST = /^[0-9.*?/]+$/;
 
 /**
- * parseRulesOrThrow for `allowed_ip_rules`, which also refuses a rule that
+ * parseRulesOrThrow for `allowed-ip-rules`, which also refuses a rule that
  * names a host rather than an address.
  */
 export function parseIpRulesOrThrow(rulesInput: string | undefined): string[] {
@@ -88,9 +88,9 @@ export function parseIpRulesOrThrow(rulesInput: string | undefined): string[] {
     const host = rule.slice(0, rule.lastIndexOf(":"));
     if (!IP_RULE_HOST.test(host)) {
       throw new InvalidRulesError(
-        `IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against ` +
-          `the address a connection goes to; allow a name with allowed_https_rules or ` +
-          `allowed_http_rules instead.`,
+        `IP rule "${rule}" names a host, not an address. allowed-ip-rules is matched against ` +
+          `the address a connection goes to; allow a name with allowed-https-rules or ` +
+          `allowed-http-rules instead.`,
         "INVALID_RULES",
       );
     }

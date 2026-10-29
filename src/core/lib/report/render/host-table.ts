@@ -10,7 +10,7 @@ import { codeCell, markdownTable, type ColumnFormat } from "./markdown-table.ts"
  */
 export interface HostTableRow extends AggregatedEntry {
   expected?: boolean;
-  /** The known_blocked_rules rule that marked the row expected, which folded
+  /** The known-blocked-rules rule that marked the row expected, which folded
    *  rows are grouped by (see ../build/aggregate.ts). */
   expectedBy?: string;
   /** Shown after the host, such as the host count of a folded group, whose
@@ -53,6 +53,6 @@ export function renderHostTable(
 export function hostTableTruncationNote(artifactAvailable: boolean): string {
   const rest = artifactAvailable
     ? "the buildcage-traffic artifact uploaded for this run has every request"
-    : "set upload_traffic_artifact: true to get every request as a downloadable artifact";
+    : "set upload-traffic-artifact: true to get every request as a downloadable artifact";
   return `_…truncated: the host tables exceeded GitHub's Job Summary size limit; ${rest}._\n`;
 }

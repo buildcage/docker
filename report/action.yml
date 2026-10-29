@@ -2,17 +2,17 @@ name: "Buildcage Report"
 description: "Write the outbound traffic report to the Job Summary and fail the job when blocked connections are detected"
 
 inputs:
-  config_file:
-    description: "The config_file given to the setup action, read for this action's own inputs. See docs/reference.md#config-file."
+  config-file:
+    description: "The config-file given to the setup action, read for this action's own inputs. See docs/reference.md#config-file."
     required: false
     default: ""
-  builder_name:
+  builder-name:
     description: "Name of the builder container. Default buildcage."
     required: false
-  fail_on_blocked:
+  fail-on-blocked:
     description: "Fail the step if blocked connections are detected. Default true."
     required: false
-  upload_traffic_artifact:
+  upload-traffic-artifact:
     description: >-
       Upload the observed traffic as a JSON artifact named buildcage-traffic, fetchable afterwards by
       whoever turns out to want it: a later job in the same run via actions/download-artifact, or
@@ -20,10 +20,29 @@ inputs:
       including any credential a build embedded in a query or a path, so treat it as sensitive.
       Default false.
     required: false
-  traffic_artifact_retention_days:
+  traffic-artifact-retention-days:
     description: >-
       How long to keep that artifact, in days. Empty uses the repository's own default, and a value
       above the repository maximum is lowered to it, with a warning.
+    required: false
+    default: ""
+
+  # The underscore spelling of each name above, still accepted.
+  config_file:
+    description: "Alias of config-file."
+    required: false
+    default: ""
+  builder_name:
+    description: "Alias of builder-name."
+    required: false
+  fail_on_blocked:
+    description: "Alias of fail-on-blocked."
+    required: false
+  upload_traffic_artifact:
+    description: "Alias of upload-traffic-artifact."
+    required: false
+  traffic_artifact_retention_days:
+    description: "Alias of traffic-artifact-retention-days."
     required: false
     default: ""
 

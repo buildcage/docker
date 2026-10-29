@@ -103,6 +103,6 @@ describe("restrictExampleTruncationNote", () => {
   });
 
   it("suggests turning the artifact on when none was uploaded", () => {
-    expect(restrictExampleTruncationNote(false)).toContain("upload_traffic_artifact: true");
+    expect(restrictExampleTruncationNote(false)).toContain("upload-traffic-artifact: true");
   });
 });

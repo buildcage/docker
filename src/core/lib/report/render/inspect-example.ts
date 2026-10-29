@@ -1,5 +1,5 @@
 /**
- * Turns what an `audit` run observed into `allowed_url_rules` for a `restrict`
+ * Turns what an `audit` run observed into `allowed-url-rules` for a `restrict`
  * run, since which URLs `npm install` reaches cannot be known in advance.
  *
  * A generated rule must never permit more than was observed:
@@ -264,19 +264,19 @@ export function buildInspectRestrictExample(
   }
 
   let yaml = exampleStepHead(actionRepo, actionRef, step);
-  yaml += "    proxy_mode: restrict\n";
+  yaml += "    proxy-mode: restrict\n";
   // A literal block, not a folded one: a URL rule contains a space, so the
   // rules are separated by newlines and folding would join them into one.
   if (lines.length > 0) {
-    yaml += "    allowed_url_rules: |\n";
+    yaml += "    allowed-url-rules: |\n";
     for (const line of lines) yaml += `      ${line}\n`;
   }
   if (allowedTlsRules.length > 0) {
-    yaml += "    allowed_tls_rules: |\n";
+    yaml += "    allowed-tls-rules: |\n";
     for (const rule of allowedTlsRules) yaml += `      ${rule}\n`;
   }
   if (allowedIpRules.length > 0) {
-    yaml += "    allowed_ip_rules: |\n";
+    yaml += "    allowed-ip-rules: |\n";
     for (const rule of allowedIpRules) yaml += `      ${rule}\n`;
   }
   yaml += exampleStepTail(step);

@@ -18,7 +18,7 @@
 import { actionFor, type TrafficEvent } from "./traffic-event.ts";
 
 // CoreDNS escapes a space in a label as `\ `. Names stay escaped, as the
-// Corefile and known_blocked_rules match that same text.
+// Corefile and known-blocked-rules match that same text.
 const DNS_NAME = String.raw`((?:[^\s\\]|\\.)+?)`;
 const DNS = new RegExp(
   String.raw`^(\S+ \S+)\s+.*buildcage dns (allowed|denied) name=${DNS_NAME}\.?$`,

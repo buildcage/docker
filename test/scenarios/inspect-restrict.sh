@@ -1,5 +1,5 @@
 #!/bin/sh
-# proxy_engine: inspect in restrict mode, run inside the cage against the
+# proxy-engine: inspect in restrict mode, run inside the cage against the
 # fixture origins and the rules the test runs the proxy with. What the proxy
 # logged and reported for this traffic is asserted afterwards, outside the
 # cage, so the requests below are kept as they are even where the status alone
@@ -196,8 +196,8 @@ echo "=== [Client leaves before sending a request] ==="
 curl -sS -o /dev/null --max-time 5 imaps://aborted.example.com:443/
 check_status "IMAPS aborted.example.com (curl exit)" "$?" "28"
 
-# Bytes that are not an HTTP request, on a port no allowed_ip_rules or
-# allowed_tls_rules entry covers: anything that is not a TLS handshake reaches
+# Bytes that are not an HTTP request, on a port no allowed-ip-rules or
+# allowed-tls-rules entry covers: anything that is not a TLS handshake reaches
 # the plain stage, which reads it as a request and blocks it. nc rather than
 # curl, which can only speak protocols it knows. The sleep holds stdin open so
 # the FIN does not race the parse and flip the logged ts=PR to ts=CR.
@@ -290,7 +290,7 @@ echo "  queried (a blocked name expected in the report)"
 # No resolver can answer an address, so the proxy takes one in the Host header
 # as it stands rather than asking. Without that a rule naming an address could
 # never be satisfied, and the only way to reach one would be the uninspected
-# passthrough of allowed_ip_rules.
+# passthrough of allowed-ip-rules.
 echo "=== [Address in a URL rule] ==="
 check_ok "GET http://10.200.0.100/pub-by-addr/x" "$($S http://10.200.0.100/pub-by-addr/x)" "ROOT GET"
 
@@ -318,7 +318,7 @@ case "$OUT" in
 esac
 
 # Port 9080, distinct from the :80 the URL rule above already allows, so
-# reaching it proves this ~regex allowed_ip_rules entry's own doing.
+# reaching it proves this ~regex allowed-ip-rules entry's own doing.
 echo "=== [Regex IP rule] ==="
 check_ok "GET http://10.200.0.100:9080/anything" "$($S http://10.200.0.100:9080/anything)" "ROOT GET"
 
@@ -328,7 +328,7 @@ echo "=== [Regex IP rule - other port not covered] ==="
 check_status "GET http://10.200.0.100:8080/anything" "$($C http://10.200.0.100:8080/anything)" "403"
 
 # What a resolver does when a UDP answer comes back truncated. The gateway's
-# :53 is the cage's own resolver; any other is judged by allowed_ip_rules like
+# :53 is the cage's own resolver; any other is judged by allowed-ip-rules like
 # any other address. The reply opens with its length, then the query's own id.
 for r in 198.19.255.1 10.200.0.53; do
   echo "=== [DNS over TCP - $r] ==="

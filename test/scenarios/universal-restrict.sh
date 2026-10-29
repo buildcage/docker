@@ -1,5 +1,5 @@
 #!/bin/sh
-# proxy_engine: universal in restrict mode, run inside the cage against the
+# proxy-engine: universal in restrict mode, run inside the cage against the
 # fixture origin and the rules the test runs the proxy with. What the proxy
 # logged and reported for this traffic is asserted afterwards, outside the
 # cage, so the cases that only send bytes still matter.
@@ -80,7 +80,7 @@ check_blocked "blocked.example.com:8080" "$(blocked_code http://blocked.example.
 echo "=== [Direct IP - blocked] ==="
 check_blocked "10.200.0.100:80" "$(blocked_code http://10.200.0.100/)"
 
-# allowed_ip_rules names only 8443 and 2525 of 10.200.0.100. The SNI is the
+# allowed-ip-rules names only 8443 and 2525 of 10.200.0.100. The SNI is the
 # client's to choose, so a name no rule allows must not block the allowed
 # address.
 echo "=== [Direct IP - allowed, SNI names a host no rule allows] ==="

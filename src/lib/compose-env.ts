@@ -4,12 +4,12 @@ import { listHostIpv4Addresses } from "#core/lib/docker/host-addresses.ts";
 
 /** The rule inputs the builder gets, each in an environment variable of its own. */
 export const BUILDER_RULE_INPUTS: RuleInputName[] = [
-  "allowed_https_rules",
-  "allowed_http_rules",
-  "allowed_ip_rules",
-  "allowed_url_rules",
-  "allowed_tls_rules",
-  "known_blocked_rules",
+  "allowed-https-rules",
+  "allowed-http-rules",
+  "allowed-ip-rules",
+  "allowed-url-rules",
+  "allowed-tls-rules",
+  "known-blocked-rules",
 ];
 
 export interface ComposeEnvOptions {

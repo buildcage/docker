@@ -17,11 +17,11 @@ import { resolveBuilderName } from "#report/report-source.ts";
 export type GetInput = (name: string) => string;
 
 export function readBuilderName(getInput: GetInput = core.getInput): string {
-  return resolveBuilderName(getInput("builder_name"));
+  return resolveBuilderName(getInput("builder-name"));
 }
 
-/** The report script in the image reads fail_on_blocked itself; this only
+/** The report script in the image reads fail-on-blocked itself; this only
  *  refuses a typo before anything runs. */
 export function checkFailOnBlocked(getInput: GetInput = core.getInput): void {
-  readBooleanInput("fail_on_blocked", true, getInput);
+  readBooleanInput("fail-on-blocked", true, getInput);
 }

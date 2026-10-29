@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# known_blocked_rules -> the setup step -> the builder container's environment
+# known-blocked-rules -> the setup step -> the builder container's environment
 # -> the report's exit code.
 #
 # The matching itself is unit-tested (blocked-outcome.test.ts). What this
 # covers is the rest: a rule set through the setup step decides whether
-# fail_on_blocked fails the step, and one that matches nothing does not excuse
+# fail-on-blocked fails the step, and one that matches nothing does not excuse
 # the rest.
 #
 # Two phases over the same two-host build, because the rules are read from the
@@ -28,7 +28,7 @@ TEST_PLATFORM="${TEST_PLATFORM:-linux/arm64}"
 export BUILDER_NAME
 
 export BUILDCAGE_TEST_COMPOSE_OVERLAY=docker/compose.action.test-universal.yaml
-# One rule per line: known_blocked_rules is newline-separated.
+# One rule per line: known-blocked-rules is newline-separated.
 BOTH_HOSTS="blocked.example.com:443
 deep.sub.wildcard.example.com:443"
 ONE_HOST="blocked.example.com:443"
@@ -78,22 +78,22 @@ assert_message() {
 }
 
 echo ""
-echo "=== known_blocked_rules Assertions ==="
+echo "=== known-blocked-rules Assertions ==="
 echo ""
 
 echo "=== Phase 1: every blocked host is named ==="
 run_phase "$BOTH_HOSTS"
 echo ""
-echo "[all matched] fail_on_blocked must not fail the step:"
+echo "[all matched] fail-on-blocked must not fail the step:"
 assert_exit "the report accepted the run" 0
-assert_message "all matched known_blocked_rules (expected)"
+assert_message "all matched known-blocked-rules (expected)"
 echo ""
 
 echo "=== Phase 2: one of the two blocked hosts is named ==="
 run_phase "$ONE_HOST"
 echo ""
-echo "[one unmatched] known_blocked_rules must not excuse the rest:"
+echo "[one unmatched] known-blocked-rules must not excuse the rest:"
 assert_exit "the report failed the step" 1
-assert_message "1 of 2 distinct blocked host(s) unmatched by known_blocked_rules"
+assert_message "1 of 2 distinct blocked host(s) unmatched by known-blocked-rules"
 
 assert_results

@@ -21,7 +21,7 @@ export const COMMUNICATION_DETAILS_CLOSE = "</details>\n";
 export function communicationTruncationNote(artifactAvailable: boolean): string {
   const rest = artifactAvailable
     ? "the buildcage-traffic artifact uploaded for this run has the rest"
-    : "set upload_traffic_artifact: true to get the rest as a downloadable artifact";
+    : "set upload-traffic-artifact: true to get the rest as a downloadable artifact";
   return `_…truncated: the full communication log exceeded GitHub's Job Summary size limit; ${rest}._\n\n`;
 }
 

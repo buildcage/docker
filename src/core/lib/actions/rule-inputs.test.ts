@@ -23,12 +23,12 @@ describe("readRuleInputs", () => {
   it("parses every rule kind, URL rules as their raw text", () => {
     const parsed = readRuleInputs(
       inputs({
-        allowed_https_rules: "a.example.com:443",
-        allowed_http_rules: "b.example.com:80",
-        allowed_ip_rules: "10.0.0.5:5432",
-        allowed_tls_rules: "db.example.com:443",
-        allowed_url_rules: "GET https://a.example.com/pkg.json",
-        known_blocked_rules: "*.sury.org:*",
+        "allowed-https-rules": "a.example.com:443",
+        "allowed-http-rules": "b.example.com:80",
+        "allowed-ip-rules": "10.0.0.5:5432",
+        "allowed-tls-rules": "db.example.com:443",
+        "allowed-url-rules": "GET https://a.example.com/pkg.json",
+        "known-blocked-rules": "*.sury.org:*",
       }),
     );
     expect(parsed).toStrictEqual({
@@ -42,7 +42,7 @@ describe("readRuleInputs", () => {
   });
 
   it("rejects a malformed rule rather than passing it to the proxy", () => {
-    expect(() => readRuleInputs(inputs({ allowed_https_rules: "no-port" }))).toThrow(
+    expect(() => readRuleInputs(inputs({ "allowed-https-rules": "no-port" }))).toThrow(
       expect.objectContaining({ code: "INVALID_RULES" }),
     );
   });
@@ -50,13 +50,13 @@ describe("readRuleInputs", () => {
   // Compiled whatever the engine, so a typo fails here rather than silently
   // doing nothing inside the proxy.
   it("rejects a malformed URL rule even though only inspect enforces one", () => {
-    expect(() => readRuleInputs(inputs({ allowed_url_rules: "GET not-a-url" }))).toThrow(
+    expect(() => readRuleInputs(inputs({ "allowed-url-rules": "GET not-a-url" }))).toThrow(
       expect.objectContaining({ code: "INVALID_RULES" }),
     );
   });
 
   it("rejects a rule the parser accepts but the proxy would refuse", () => {
-    expect(() => readRuleInputs(inputs({ allowed_https_rules: "10.0.0.0/8:443" }))).toThrow(
+    expect(() => readRuleInputs(inputs({ "allowed-https-rules": "10.0.0.0/8:443" }))).toThrow(
       expect.objectContaining({ code: "INVALID_RULES" }),
     );
   });
@@ -83,28 +83,28 @@ describe("checkRuleListSizesOrThrow", () => {
   it("takes a list that fills the variable exactly", () => {
     const rules = { ...empty, httpsRules: rulesOf(LIMIT) };
     expect(rules.httpsRules.join("\n")).toHaveLength(LIMIT);
-    expect(() => checkRuleListSizesOrThrow(rules, ["allowed_https_rules"])).not.toThrow();
+    expect(() => checkRuleListSizesOrThrow(rules, ["allowed-https-rules"])).not.toThrow();
   });
 
   it("refuses a list a byte over, naming the input and both sizes", () => {
     const rules = { ...empty, httpsRules: rulesOf(LIMIT + 1) };
-    expect(() => checkRuleListSizesOrThrow(rules, ["allowed_https_rules"])).toThrow(
-      `allowed_https_rules is ${LIMIT + 1} bytes as parsed, over the ${LIMIT} one environment variable can hold`,
+    expect(() => checkRuleListSizesOrThrow(rules, ["allowed-https-rules"])).toThrow(
+      `allowed-https-rules is ${LIMIT + 1} bytes as parsed, over the ${LIMIT} one environment variable can hold`,
     );
   });
 
   it("counts bytes, not characters", () => {
     const rules = { ...empty, httpsRules: ["é".repeat(Math.ceil(LIMIT / 2))] };
-    expect(() => checkRuleListSizesOrThrow(rules, ["allowed_https_rules"])).toThrow("bytes");
+    expect(() => checkRuleListSizesOrThrow(rules, ["allowed-https-rules"])).toThrow("bytes");
   });
 
   it("checks only the inputs named, each against its own variable's name", () => {
     const rules = { ...empty, ipRules: rulesOf(LIMIT + 1), knownBlockedRules: rulesOf(LIMIT + 1) };
-    expect(() => checkRuleListSizesOrThrow(rules, ["allowed_https_rules"])).not.toThrow();
+    expect(() => checkRuleListSizesOrThrow(rules, ["allowed-https-rules"])).not.toThrow();
     // ALLOWED_IP_RULES is three bytes shorter than ALLOWED_HTTPS_RULES.
-    expect(() => checkRuleListSizesOrThrow(rules, ["allowed_ip_rules"])).not.toThrow();
-    expect(() => checkRuleListSizesOrThrow(rules, ["known_blocked_rules"])).toThrow(
-      "known_blocked_rules is",
+    expect(() => checkRuleListSizesOrThrow(rules, ["allowed-ip-rules"])).not.toThrow();
+    expect(() => checkRuleListSizesOrThrow(rules, ["known-blocked-rules"])).toThrow(
+      "known-blocked-rules is",
     );
   });
 });

@@ -73,7 +73,7 @@ else
   fail "the build failed"
 fi
 
-if grep -q "buildcage: warning: cannot add the proxy CA to Chromium's NSS database under /home/app .*use proxy_engine: universal" <<<"$OUT"; then
+if grep -q "buildcage: warning: cannot add the proxy CA to Chromium's NSS database under /home/app .*use proxy-engine: universal" <<<"$OUT"; then
   pass "the step's output warns that Chromium goes without the CA"
 else
   fail "the build log does not warn that /home/app's database took no slot"

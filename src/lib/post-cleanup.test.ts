@@ -17,12 +17,12 @@ function plan(...args: Parameters<typeof planPostCleanup>): PostCleanupPlan {
 }
 
 describe("planPostCleanup", () => {
-  it("takes down the project for the builder_name input", () => {
+  it("takes down the project for the builder-name input", () => {
     const { args, env } = plan(
       COMPOSE_FILE,
       undefined,
       { PATH: "/usr/bin" },
-      { getInput: inputs({ builder_name: "second" }) },
+      { getInput: inputs({ "builder-name": "second" }) },
     );
 
     expect(args).toStrictEqual([
@@ -37,26 +37,26 @@ describe("planPostCleanup", () => {
     expect(env).toStrictEqual({ PATH: "/usr/bin", BUILDER_NAME: "second" });
   });
 
-  it("takes the name setup saved over the input, which config_file may have set", () => {
+  it("takes the name setup saved over the input, which config-file may have set", () => {
     const { env } = plan(
       COMPOSE_FILE,
       undefined,
       {},
       {
         savedBuilderName: "saved",
-        getInput: inputs({ builder_name: "second" }),
+        getInput: inputs({ "builder-name": "second" }),
       },
     );
 
     expect(env.BUILDER_NAME).toBe("saved");
   });
 
-  it("takes the saved name when config_file is set", () => {
+  it("takes the saved name when config-file is set", () => {
     const { env } = plan(
       COMPOSE_FILE,
       undefined,
       {},
-      { savedBuilderName: "saved", getInput: inputs({ config_file: "buildcage.yml" }) },
+      { savedBuilderName: "saved", getInput: inputs({ "config-file": "buildcage.yml" }) },
     );
 
     expect(env.BUILDER_NAME).toBe("saved");
@@ -64,26 +64,26 @@ describe("planPostCleanup", () => {
 
   // The file may name a builder the input doesn't, and the input's could be
   // another job's.
-  it("takes nothing down when config_file is set but setup saved no name", () => {
+  it("takes nothing down when config-file is set but setup saved no name", () => {
     expect(
       planPostCleanup(
         COMPOSE_FILE,
         undefined,
         {},
-        { getInput: inputs({ config_file: "buildcage.yml", builder_name: "second" }) },
+        { getInput: inputs({ "config-file": "buildcage.yml", "builder-name": "second" }) },
       ),
     ).toBeUndefined();
   });
 
   it("takes nothing down when setup refused the input's name", () => {
     expect(
-      planPostCleanup(COMPOSE_FILE, undefined, {}, { getInput: inputs({ builder_name: "a;b" }) }),
+      planPostCleanup(COMPOSE_FILE, undefined, {}, { getInput: inputs({ "builder-name": "a;b" }) }),
     ).toBeUndefined();
   });
 
   it("lets an unexpected error through", () => {
     const getInput = (name: string) => {
-      if (name === "builder_name") throw new Error("boom");
+      if (name === "builder-name") throw new Error("boom");
       return "";
     };
 
@@ -107,7 +107,7 @@ describe("planPostCleanup", () => {
       {},
       {
         composeOverlay: "/repo/docker/compose.action.test-inspect.yaml",
-        getInput: inputs({ builder_name: "second" }),
+        getInput: inputs({ "builder-name": "second" }),
       },
     );
 
@@ -125,7 +125,7 @@ describe("planPostCleanup", () => {
       COMPOSE_FILE,
       "buildcage-e2e",
       {},
-      { getInput: inputs({ builder_name: "second" }) },
+      { getInput: inputs({ "builder-name": "second" }) },
     );
 
     expect(args).toStrictEqual([
