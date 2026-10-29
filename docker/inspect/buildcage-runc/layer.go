@@ -233,7 +233,7 @@ func sweepDir(listing, root string, ca []byte, marks caMarks) (int, error) {
 		return files, err
 	}
 	// Before the unstrippable copies are reported, so a build that carries on
-	// past them (fail_on_ca_residue: false) still loses the links it removed.
+	// past them (fail-on-ca-residue: false) still loses the links it removed.
 	if err := dropRemovedLinks(listing, root, removed); err != nil {
 		return files, err
 	}

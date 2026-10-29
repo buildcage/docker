@@ -33,7 +33,7 @@ finish() {
   exit
 }
 
-# A lookup over TCP at the fixture resolver, which allowed_ip_rules names: the
+# A lookup over TCP at the fixture resolver, which allowed-ip-rules names: the
 # first 4 bytes of the answer, in hex, end with the query's id.
 QUERY='\000\035\253\315\001\000\000\001\000\000\000\000\000\000\007example\003com\000\000\001\000\001'
 

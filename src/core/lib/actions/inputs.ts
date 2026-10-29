@@ -25,7 +25,7 @@ export class InvalidInputError<Extra extends string = never> extends ActionError
 export type GetInput = (name: string) => string;
 
 /** Not `getBooleanInput`: it cannot tell unset from misspelled. Unset takes the
- *  fallback: action.yml declares no default, so config_file can tell unset from set. */
+ *  fallback: action.yml declares no default, so config-file can tell unset from set. */
 export function readBooleanInput(name: string, fallback: boolean, getInput: GetInput): boolean {
   const value = getInput(name);
   if (value === "") return fallback;
@@ -39,11 +39,11 @@ export function readBooleanInput(name: string, fallback: boolean, getInput: GetI
 
 /** Undefined when unset, which leaves the retention to the repository's own default. */
 export function readRetentionDays(getInput: GetInput): number | undefined {
-  const days = getInput("traffic_artifact_retention_days");
+  const days = getInput("traffic-artifact-retention-days");
   if (days === "") return undefined;
   if (!/^[1-9]\d*$/.test(days)) {
     throw new InvalidInputError(
-      `Invalid traffic_artifact_retention_days: ${JSON.stringify(days)}. ` +
+      `Invalid traffic-artifact-retention-days: ${JSON.stringify(days)}. ` +
         "Must be a whole number of days above zero.",
       "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS",
     );
@@ -63,7 +63,7 @@ export function readTrafficArtifactInputs(
   getInput: GetInput = core.getInput,
 ): TrafficArtifactInputs {
   return {
-    upload: readBooleanInput("upload_traffic_artifact", false, getInput),
+    upload: readBooleanInput("upload-traffic-artifact", false, getInput),
     retentionDays: readRetentionDays(getInput),
   };
 }
@@ -79,13 +79,13 @@ export function resolveProxyEngine(input: string | undefined): ProxyEngine {
   const trimmed = input?.trim() || "inspect";
   if (trimmed === "transparent") {
     throw new InvalidInputError(
-      "proxy_engine: transparent has been renamed. Use proxy_engine: universal.",
+      "proxy-engine: transparent has been renamed. Use proxy-engine: universal.",
       "INVALID_PROXY_ENGINE",
     );
   }
   if (!(ENGINES as readonly string[]).includes(trimmed)) {
     throw new InvalidInputError(
-      `Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`,
+      `Invalid proxy-engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`,
       "INVALID_PROXY_ENGINE",
     );
   }
@@ -103,7 +103,7 @@ export function resolveProxyMode(input: string | undefined): ProxyMode {
   const trimmed = input?.trim() || "restrict";
   if (!(PROXY_MODES as readonly string[]).includes(trimmed)) {
     throw new InvalidInputError(
-      `Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`,
+      `Invalid proxy-mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`,
       "INVALID_PROXY_MODE",
     );
   }

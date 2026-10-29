@@ -20,6 +20,7 @@ import {
   checkKnownBlockedUrlRuleSupport,
   checkUrlAndTlsRuleSupport,
 } from "#core/lib/actions/engine-rule-support.ts";
+import { normalizeInputNames } from "#core/lib/actions/input-names.ts";
 import { logRules, withLogGroup } from "#core/lib/actions/log.ts";
 import { checkRuleListSizesOrThrow } from "#core/lib/actions/rule-inputs.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
@@ -30,7 +31,7 @@ import {
   type VerifyImageDigestOptions,
   type ResolvedImage,
 } from "#core/lib/provenance/verify-image.ts";
-import { CONFIG_FILE_INPUTS, dropListInputs } from "#report/report-source.ts";
+import { CONFIG_FILE_INPUTS, dropListInputs, INPUT_NAMES } from "#report/report-source.ts";
 
 import { COMPOSE_FILE, withComposeOverlay } from "../compose-file.ts";
 import { builderStartError } from "./builder-diagnostics.ts";
@@ -141,7 +142,8 @@ export async function runSetupStep(
   const actionRef = env.GITHUB_ACTION_REF ?? "";
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 
-  // Before any input is read: it rewrites what they all read.
+  // Before any input is read: both rewrite the env every input is read from.
+  for (const ignored of normalizeInputNames(env, INPUT_NAMES)) warn(ignored);
   const { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
   if (warning) warn(warning);
 
@@ -163,9 +165,10 @@ export async function runSetupStep(
   // For post; see planPostCleanup. Without the runner's state file there is
   // no post step.
   if (env.GITHUB_STATE) saveState(BUILDER_NAME_STATE, builderName);
-  // The name may come from config_file, so a workflow cannot always know it
+  // The name may come from config-file, so a workflow cannot always know it
   // for the Buildx endpoint without asking. Set before the builder starts so a
   // step that runs after a failed setup still gets it.
+  setOutput("builder-name", builderName);
   setOutput("builder_name", builderName);
 
   // Before the builder starts, so a rule the engine cannot enforce is reported
@@ -205,7 +208,7 @@ export async function runSetupStep(
   log(`buildcage: image: ${imageRef}`);
 
   // So report can independently derive the same project name from its own
-  // builder_name input and find this container via `docker ps --filter`. The
+  // builder-name input and find this container via `docker ps --filter`. The
   // COMPOSE_PROJECT_NAME override is this repo's own test hook, gated the same
   // way as report's, so a published dist never reads it.
   const projectName = resolveProjectName(

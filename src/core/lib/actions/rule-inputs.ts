@@ -37,13 +37,13 @@ export interface RuleInputs {
  */
 export function readRuleInputs(getInput: GetInput = core.getInput): RuleInputs {
   const rules = buildACLRules({
-    httpsRulesInput: getInput("allowed_https_rules"),
-    httpRulesInput: getInput("allowed_http_rules"),
-    ipRulesInput: getInput("allowed_ip_rules"),
+    httpsRulesInput: getInput("allowed-https-rules"),
+    httpRulesInput: getInput("allowed-http-rules"),
+    ipRulesInput: getInput("allowed-ip-rules"),
   });
-  const knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput("known_blocked_rules"));
-  const urlRulesInput = getInput("allowed_url_rules");
-  const tlsRules = parseRulesOrThrow(getInput("allowed_tls_rules"));
+  const knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput("known-blocked-rules"));
+  const urlRulesInput = getInput("allowed-url-rules");
+  const tlsRules = parseRulesOrThrow(getInput("allowed-tls-rules"));
   const compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
   checkRulesCompileOrThrow({ ...rules, tlsRules, urlRules: compiledUrlRules });
   const urlRules = compiledUrlRules.map((r) => r.raw);
@@ -60,12 +60,12 @@ export function readRuleInputs(getInput: GetInput = core.getInput): RuleInputs {
 
 /** Each rule input's list in RuleInputs. */
 const RULE_LISTS = {
-  allowed_https_rules: "httpsRules",
-  allowed_http_rules: "httpRules",
-  allowed_ip_rules: "ipRules",
-  allowed_url_rules: "urlRules",
-  allowed_tls_rules: "tlsRules",
-  known_blocked_rules: "knownBlockedRules",
+  "allowed-https-rules": "httpsRules",
+  "allowed-http-rules": "httpRules",
+  "allowed-ip-rules": "ipRules",
+  "allowed-url-rules": "urlRules",
+  "allowed-tls-rules": "tlsRules",
+  "known-blocked-rules": "knownBlockedRules",
 } as const satisfies Record<string, keyof RuleInputs>;
 
 export type RuleInputName = keyof typeof RULE_LISTS;

@@ -25,7 +25,7 @@ check(
 );
 check(
   rows.some((r) => r.action === "block" && r.host === "registry.npmjs.org" && r.method === "POST"),
-  "the POST to registry.npmjs.org is recorded as blocked by allowed_url_rules",
+  "the POST to registry.npmjs.org is recorded as blocked by allowed-url-rules",
 );
 
 if (failures > 0) {

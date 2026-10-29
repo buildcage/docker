@@ -35,7 +35,7 @@ const deps = mocks as unknown as ReportStepDeps;
 const SCRATCH = "/tmp/buildcage-report-abc123";
 const CONTAINER = "container-abc123";
 /** `buildcage-` + the first 12 hex of sha256("buildcage"): the same name
- *  setup derives from its own builder_name input. */
+ *  setup derives from its own builder-name input. */
 const PROJECT_NAME = "buildcage-eeb358f947ee";
 
 let prevExitCode: number | string | null | undefined;
@@ -65,12 +65,12 @@ afterEach(() => {
 });
 
 describe("runReportStep", () => {
-  it("applies config_file to the env the script inherits, before reading any input", async () => {
-    const env = { INPUT_CONFIG_FILE: "c.yml" };
+  it("applies config-file to the env the script inherits, before reading any input", async () => {
+    const env = { "INPUT_CONFIG-FILE": "c.yml" };
     await runReportStep(env, deps);
     expect(mocks.applyConfigFile).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ known: expect.arrayContaining(["fail_on_blocked"]) }),
+      expect.objectContaining({ known: expect.arrayContaining(["fail-on-blocked"]) }),
     );
     expect(mocks.applyConfigFile.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.readBuilderName.mock.invocationCallOrder[0]!,
@@ -79,26 +79,40 @@ describe("runReportStep", () => {
     expect(mocks.warn).not.toHaveBeenCalled();
   });
 
-  it("keeps the list inputs config_file appended to out of the script's environment", async () => {
-    mocks.applyConfigFile.mockImplementation((env: NodeJS.ProcessEnv) => {
-      env.INPUT_ALLOWED_HTTPS_RULES = "# a comment\n".repeat(20_000);
-    });
-    const env = { INPUT_CONFIG_FILE: "c.yml", INPUT_FAIL_ON_BLOCKED: "false" };
-    await runReportStep(env, deps);
-    expect(mocks.runReportScript.mock.calls[0][2].env).toStrictEqual({
+  it("reads an input's underscore spelling, before config-file, and warns of one it ignored", async () => {
+    const env = {
       INPUT_CONFIG_FILE: "c.yml",
       INPUT_FAIL_ON_BLOCKED: "false",
+      "INPUT_FAIL-ON-BLOCKED": "true",
+    };
+    await runReportStep(env, deps);
+    expect(mocks.applyConfigFile.mock.calls[0][0]).toStrictEqual({
+      "INPUT_CONFIG-FILE": "c.yml",
+      "INPUT_FAIL-ON-BLOCKED": "true",
+    });
+    expect(mocks.warn).toHaveBeenCalledWith("Ignored fail_on_blocked: fail-on-blocked is set.");
+  });
+
+  it("keeps the list inputs config-file appended to out of the script's environment", async () => {
+    mocks.applyConfigFile.mockImplementation((env: NodeJS.ProcessEnv) => {
+      env["INPUT_ALLOWED-HTTPS-RULES"] = "# a comment\n".repeat(20_000);
+    });
+    const env = { "INPUT_CONFIG-FILE": "c.yml", "INPUT_FAIL-ON-BLOCKED": "false" };
+    await runReportStep(env, deps);
+    expect(mocks.runReportScript.mock.calls[0][2].env).toStrictEqual({
+      "INPUT_CONFIG-FILE": "c.yml",
+      "INPUT_FAIL-ON-BLOCKED": "false",
     });
   });
 
-  it("warns of the config_file inputs the workflow overrode", async () => {
+  it("warns of the config-file inputs the workflow overrode", async () => {
     mocks.applyConfigFile.mockReturnValue({
       path: "/w/c.yml",
-      warning: "Ignored from config_file c.yml, set by the workflow: fail_on_blocked",
+      warning: "Ignored from config-file c.yml, set by the workflow: fail-on-blocked",
     });
-    await runReportStep({ INPUT_CONFIG_FILE: "c.yml" }, deps);
+    await runReportStep({ "INPUT_CONFIG-FILE": "c.yml" }, deps);
     expect(mocks.warn).toHaveBeenCalledWith(
-      "Ignored from config_file c.yml, set by the workflow: fail_on_blocked",
+      "Ignored from config-file c.yml, set by the workflow: fail-on-blocked",
     );
   });
 

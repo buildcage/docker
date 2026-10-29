@@ -86,7 +86,7 @@ jobs:
           # Also runs the audit-mode builder below.
           - proxy_engine: universal
             build_engine: universal
-          # Also runs the known_blocked_rules builder below, on the default
+          # Also runs the known-blocked-rules builder below, on the default
           # engine.
           - proxy_engine: inspect
             build_engine: inspect
@@ -121,7 +121,7 @@ jobs:
           BUILDCAGE_BUILD_TEST_HOOKS: "1"
         run: vp run build
 
-      # allowed_url_rules is newline-separated, which a ${{ }} ternary can't
+      # allowed-url-rules is newline-separated, which a ${{ }} ternary can't
       # carry reliably, so it's built here instead. *, not **, so each rule
       # only matches its one path shape (package metadata / tarball) rather
       # than falling back to matching any path under the host.
@@ -129,7 +129,7 @@ jobs:
       # A scoped package needs its own pair: `*` does not cross a `/`, and
       # `@hono/node-server` puts a second segment where the unscoped shape has
       # one, both in the metadata path and before the `/-/` in the tarball.
-      - name: Choose allowed_url_rules for this engine
+      - name: Choose allowed-url-rules for this engine
         id: url_rules
         run: |
           if [ "${{ matrix.proxy_engine }}" = "inspect" ]; then
@@ -145,20 +145,20 @@ jobs:
             echo "value=" >> "$GITHUB_OUTPUT"
           fi
 
-      # Default builder_name is fine: each matrix entry runs on its own VM.
+      # Default builder-name is fine: each matrix entry runs on its own VM.
       - name: Start Buildcage builder via the real setup action
         uses: ./
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
         with:
-          proxy_mode: restrict
-          proxy_engine: ${{ matrix.proxy_engine }}
-          # inspect uses allowed_url_rules instead, so a host-level rule here
+          proxy-mode: restrict
+          proxy-engine: ${{ matrix.proxy_engine }}
+          # inspect uses allowed-url-rules instead, so a host-level rule here
           # wouldn't prove method/path enforcement actually happened.
-          allowed_https_rules: ${{ matrix.proxy_engine != 'inspect' && 'registry.npmjs.org:443' || '' }}
+          allowed-https-rules: ${{ matrix.proxy_engine != 'inspect' && 'registry.npmjs.org:443' || '' }}
           # inspect only; empty is a no-op otherwise.
-          allowed_tls_rules: ${{ matrix.proxy_engine == 'inspect' && 'github.com:443' || '' }}
-          allowed_url_rules: ${{ steps.url_rules.outputs.value }}
+          allowed-tls-rules: ${{ matrix.proxy_engine == 'inspect' && 'github.com:443' || '' }}
+          allowed-url-rules: ${{ steps.url_rules.outputs.value }}
 
       # Right after each setup step, so a later failure or a timeout still
       # leaves the check above something to check.
@@ -200,7 +200,7 @@ jobs:
           RUN wget -q -O /dev/null https://github.com/
           EOF
 
-      # allowed_url_rules only permits GET|HEAD, so a POST proves the rule is
+      # allowed-url-rules only permits GET|HEAD, so a POST proves the rule is
       # enforced by method, not just by host.
       - name: Add a method-blocked request to the test Dockerfile
         if: matrix.proxy_engine == 'inspect'
@@ -227,11 +227,11 @@ jobs:
         if: always()
         uses: ./report
         with:
-          fail_on_blocked: false
+          fail-on-blocked: false
           # Uploaded for inspect only, whose rows the checks below read; a short
           # retention keeps this e2e run's own artifacts from lingering.
-          upload_traffic_artifact: ${{ matrix.proxy_engine == 'inspect' }}
-          traffic_artifact_retention_days: ${{ matrix.proxy_engine == 'inspect' && '1' || '' }}
+          upload-traffic-artifact: ${{ matrix.proxy_engine == 'inspect' }}
+          traffic-artifact-retention-days: ${{ matrix.proxy_engine == 'inspect' && '1' || '' }}
 
       # GITHUB_STEP_SUMMARY is a separate file per step, so a later step can't
       # read what an earlier one wrote there. This downloads the artifact the
@@ -248,54 +248,57 @@ jobs:
         if: matrix.proxy_engine == 'inspect'
         run: node test/assert-inspect-traffic-artifact.mjs /tmp/buildcage-traffic/traffic.json
 
-      # known_blocked_rules is a setup input, so it has to be named when the
-      # builder starts, and the report above turns fail_on_blocked off. Here
-      # fail_on_blocked stays at its default and the step has to pass anyway,
-      # which is what the input is for. The inputs come from config_file, whose
-      # builder_name the report has to read back to find the builder.
-      - name: Write the known_blocked_rules config file
+      # known-blocked-rules is a setup input, so it has to be named when the
+      # builder starts, and the report above turns fail-on-blocked off. Here
+      # fail-on-blocked stays at its default and the step has to pass anyway,
+      # which is what the input is for. The inputs come from config-file, whose
+      # builder-name the report has to read back to find the builder.
+      - name: Write the known-blocked-rules config file
         if: matrix.proxy_engine == 'inspect'
         run: |
           mkdir -p e2e-config
           cat > e2e-config/buildcage.yml <<'YAML'
-          builder_name: buildcage-from-file
-          proxy_mode: restrict
-          allowed_https_rules: |
+          builder-name: buildcage-from-file
+          proxy-mode: restrict
+          allowed-https-rules: |
             registry.npmjs.org:443
-          known_blocked_rules: |
+          known-blocked-rules: |
             example.com:443
           YAML
 
-      - name: Start the known_blocked_rules builder from the config file
+      - name: Start the known-blocked-rules builder from the config file
         if: matrix.proxy_engine == 'inspect'
         id: from_file
         uses: ./
         env:
           BUILDCAGE_LOCAL_IMAGE_REF: ${{ steps.local_image.outputs.ref }}
         with:
-          config_file: e2e-config/buildcage.yml
+          config-file: e2e-config/buildcage.yml
 
       - name: Record the builder for the post hook check
         if: ${{ !cancelled() && matrix.proxy_engine == 'inspect' }}
         run: .github/actions/assert-post-cleanup/record.sh "$RUNNER_TEMP/buildcage-builders"
 
-      - name: Verify the builder_name output is the one the config file sets
+      - name: Verify both builder name outputs are the one the config file sets
         if: matrix.proxy_engine == 'inspect'
         env:
-          BUILDER_NAME: ${{ steps.from_file.outputs.builder_name }}
+          BUILDER_NAME: ${{ steps.from_file.outputs.builder-name }}
+          LEGACY_BUILDER_NAME: ${{ steps.from_file.outputs.builder_name }}
         run: |
           test "$BUILDER_NAME" = buildcage-from-file ||
-            { echo "::error::builder_name output is '$BUILDER_NAME'"; exit 1; }
+            { echo "::error::builder-name output is '$BUILDER_NAME'"; exit 1; }
+          test "$LEGACY_BUILDER_NAME" = buildcage-from-file ||
+            { echo "::error::builder_name output is '$LEGACY_BUILDER_NAME'"; exit 1; }
 
-      - name: Set up Docker Buildx for the known_blocked_rules builder
+      - name: Set up Docker Buildx for the known-blocked-rules builder
         if: matrix.proxy_engine == 'inspect'
         id: buildx_from_file
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           driver: remote
-          endpoint: docker-container://${{ steps.from_file.outputs.builder_name }}
+          endpoint: docker-container://${{ steps.from_file.outputs.builder-name }}
 
-      - name: Create the known_blocked_rules test Dockerfile
+      - name: Create the known-blocked-rules test Dockerfile
         if: matrix.proxy_engine == 'inspect'
         run: |
           mkdir -p /tmp/known-blocked-context
@@ -303,7 +306,7 @@ jobs:
           FROM node:24-alpine
           # One ordinary allowed request, so the report has both kinds to judge.
           RUN wget -q -O /dev/null --timeout=10 https://registry.npmjs.org/
-          # The only blocked connection, and the one known_blocked_rules names.
+          # The only blocked connection, and the one known-blocked-rules names.
           # The build fails if it is not blocked, so the report step below
           # cannot pass on a build that never had anything blocked.
           RUN if wget -q -O /dev/null --timeout=5 https://example.com/; then \
@@ -311,7 +314,7 @@ jobs:
               fi
           EOF
 
-      - name: Build the known_blocked_rules test image
+      - name: Build the known-blocked-rules test image
         if: matrix.proxy_engine == 'inspect'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
@@ -324,16 +327,17 @@ jobs:
           push: false
           no-cache: true
 
-      # fail_on_blocked left at its default (true). The step must still pass:
-      # every blocked connection matched known_blocked_rules.
-      - name: Show the known_blocked_rules proxy report
+      # fail-on-blocked left at its default (true). The step must still pass:
+      # every blocked connection matched known-blocked-rules.
+      - name: Show the known-blocked-rules proxy report
         if: matrix.proxy_engine == 'inspect'
         uses: ./report
         with:
-          config_file: e2e-config/buildcage.yml
+          config-file: e2e-config/buildcage.yml
 
       # Audit mode's Job Summary carries the restrict-mode example a user
       # copies, which nothing else here renders through the real actions.
+      # These two steps keep the inputs' underscore spellings, still accepted.
       - name: Start the audit-mode builder
         if: matrix.proxy_engine == 'universal'
         uses: ./

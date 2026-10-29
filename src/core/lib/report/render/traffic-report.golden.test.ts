@@ -183,7 +183,7 @@ const CASES: Record<string, ReportData> = {
     blockedCount: 0,
     timeline: [],
   },
-  // The known_blocked_rules rows, folded into one and collapsed below the allowed hosts.
+  // The known-blocked-rules rows, folded into one and collapsed below the allowed hosts.
   "universal-expected": {
     ...universal,
     parameters: params({ knownBlockedRules: ["*.sury.org:*"] }),

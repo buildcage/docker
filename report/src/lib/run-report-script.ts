@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 
+import { inputEnvName, legacyInputName } from "#core/lib/actions/input-names.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 
 import { ReportError } from "./errors.ts";
@@ -25,7 +26,7 @@ export interface RunReportScriptOptions {
 /**
  * Runs report-action.js with stdio inherited and returns the exit status this
  * step should reproduce as its own. It owns everything downstream, down to the
- * fail_on_blocked exit decision, and explains any failure of its own through
+ * fail-on-blocked exit decision, and explains any failure of its own through
  * the stdio it inherited.
  *
  * @throws {ReportError} REPORT_SCRIPT_FAILED when it never ran to completion,
@@ -39,6 +40,10 @@ export function runReportScript(
   // Set or removed, never inherited: an earlier step can put it in the runner's
   // environment through GITHUB_ENV.
   const { BUILDCAGE_TRAFFIC_FILE: _inherited, ...rest } = env;
+  // An image from before the hyphenated names reads only the underscore one.
+  const failOnBlocked = rest[inputEnvName("fail-on-blocked")];
+  if (failOnBlocked !== undefined)
+    rest[inputEnvName(legacyInputName("fail-on-blocked"))] = failOnBlocked;
   try {
     run(
       [scriptPath, containerId],

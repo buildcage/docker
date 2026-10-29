@@ -10,53 +10,57 @@ function inputs(values: Record<string, string> = {}): (name: string) => string {
 }
 
 describe("readBuilderName", () => {
-  it("reads builder_name, falling back to the shared default when unset", () => {
-    expect(readBuilderName(inputs({ builder_name: "mine" }))).toBe("mine");
+  it("reads builder-name, falling back to the shared default when unset", () => {
+    expect(readBuilderName(inputs({ "builder-name": "mine" }))).toBe("mine");
     expect(readBuilderName(inputs())).toBe(DEFAULT_BUILDER_NAME);
   });
 });
 
 describe("readSetupInputs", () => {
-  it("defaults proxy_engine to inspect", () => {
+  it("defaults proxy-engine to inspect", () => {
     expect(readSetupInputs(inputs()).proxyEngine).toBe("inspect");
   });
 
-  it("keeps an explicit proxy_engine", () => {
-    expect(readSetupInputs(inputs({ proxy_engine: "universal" })).proxyEngine).toBe("universal");
+  it("keeps an explicit proxy-engine", () => {
+    expect(readSetupInputs(inputs({ "proxy-engine": "universal" })).proxyEngine).toBe("universal");
   });
 
   it("rejects an unknown engine before any other input", () => {
-    expect(() => readSetupInputs(inputs({ proxy_engine: "nope", proxy_mode: "Audit" }))).toThrow(
-      /Invalid proxy_engine/,
-    );
+    expect(() =>
+      readSetupInputs(inputs({ "proxy-engine": "nope", "proxy-mode": "Audit" })),
+    ).toThrow(/Invalid proxy-engine/);
   });
 
-  it("reads builder_name", () => {
-    expect(readSetupInputs(inputs({ builder_name: "mine" })).builderName).toBe("mine");
+  it("reads builder-name", () => {
+    expect(readSetupInputs(inputs({ "builder-name": "mine" })).builderName).toBe("mine");
   });
 
-  it("rejects an unknown proxy_mode before fail_on_ca_residue and any rule", () => {
+  it("rejects an unknown proxy-mode before fail-on-ca-residue and any rule", () => {
     expect(() =>
       readSetupInputs(
-        inputs({ proxy_mode: "Audit", fail_on_ca_residue: "no", allowed_https_rules: "no-port" }),
+        inputs({
+          "proxy-mode": "Audit",
+          "fail-on-ca-residue": "no",
+          "allowed-https-rules": "no-port",
+        }),
       ),
-    ).toThrow(/Invalid proxy_mode/);
+    ).toThrow(/Invalid proxy-mode/);
   });
 
-  it("reads fail_on_ca_residue", () => {
-    expect(readSetupInputs(inputs({ fail_on_ca_residue: "false" })).failOnCaResidue).toBe(false);
+  it("reads fail-on-ca-residue", () => {
+    expect(readSetupInputs(inputs({ "fail-on-ca-residue": "false" })).failOnCaResidue).toBe(false);
   });
 
   // A typo read as false would let a copy of the CA into the image unannounced.
-  it("rejects a fail_on_ca_residue that is not a boolean", () => {
-    expect(() => readSetupInputs(inputs({ fail_on_ca_residue: "no" }))).toThrow(
-      'Invalid fail_on_ca_residue: "no". Must be true or false.',
+  it("rejects a fail-on-ca-residue that is not a boolean", () => {
+    expect(() => readSetupInputs(inputs({ "fail-on-ca-residue": "no" }))).toThrow(
+      'Invalid fail-on-ca-residue: "no". Must be true or false.',
     );
   });
 
-  it("reads proxy_mode and the rules", () => {
+  it("reads proxy-mode and the rules", () => {
     const parsed = readSetupInputs(
-      inputs({ proxy_mode: "audit", allowed_https_rules: "a.example.com:443" }),
+      inputs({ "proxy-mode": "audit", "allowed-https-rules": "a.example.com:443" }),
     );
     expect(parsed.proxyMode).toBe("audit");
     expect(parsed.httpsRules).toStrictEqual(["a.example.com:443"]);

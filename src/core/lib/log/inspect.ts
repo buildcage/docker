@@ -121,7 +121,7 @@ function isBlock(terminationState: string): boolean {
  * report cannot tell them apart, so it does not claim to: a connection this
  * proxy never completed is one whose origin it never authenticated. A host that
  * is flaky rather than hostile is cleared the way any expected block is, with
- * known_blocked_rules.
+ * known-blocked-rules.
  *
  * `tlsError` is undefined where this proxy checked no certificate at all, and
  * a connection it could not make there hid nothing: the plain stage carries
@@ -193,7 +193,7 @@ function authorityOf(host: string, port: string, scheme: "http" | "https"): stri
 /**
  * The host of a connection that never delivered a whole request: its SNI, the
  * only name such a line carries, or failing that the address it was sent to.
- * The SNI keeps a trailing dot, since the allowed_tls_rules entry that would
+ * The SNI keeps a trailing dot, since the allowed-tls-rules entry that would
  * pass the connection through is matched on it.
  *
  * The address names nothing where it is the proxy's own: CoreDNS answers every
@@ -377,7 +377,7 @@ export async function scanInspectLog(
  * Block a connection sent straight to an address that ended before its
  * request, as `universal` does in restrict mode.
  *
- * No allowed_ip_rules entry covers the address, or the connection would have
+ * No allowed-ip-rules entry covers the address, or the connection would have
  * been passed through. Its client sent no SNI, so the certificate this proxy
  * answered with names nothing and no client that checks it gets further.
  *

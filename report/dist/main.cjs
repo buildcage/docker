@@ -4432,10 +4432,28 @@ var require_identity$1 = __commonJSMin(((exports) => {
 	require_cst();
 	var lexer = require_lexer(), lineCounter = require_line_counter(), parser = require_parser(), publicApi = require_public_api(), visit = require_visit();
 	exports.Composer = composer.Composer, exports.Document = Document.Document, exports.Schema = Schema.Schema, exports.YAMLError = errors.YAMLError, exports.YAMLParseError = errors.YAMLParseError, exports.YAMLWarning = errors.YAMLWarning, exports.Alias = Alias.Alias, exports.isAlias = identity.isAlias, exports.isCollection = identity.isCollection, exports.isDocument = identity.isDocument, exports.isMap = identity.isMap, exports.isNode = identity.isNode, exports.isPair = identity.isPair, exports.isScalar = identity.isScalar, exports.isSeq = identity.isSeq, exports.Pair = Pair.Pair, exports.Scalar = Scalar.Scalar, exports.YAMLMap = YAMLMap.YAMLMap, exports.YAMLSeq = YAMLSeq.YAMLSeq, exports.Lexer = lexer.Lexer, exports.LineCounter = lineCounter.LineCounter, exports.Parser = parser.Parser, exports.parse = publicApi.parse, exports.parseAllDocuments = publicApi.parseAllDocuments, exports.parseDocument = publicApi.parseDocument, exports.stringify = publicApi.stringify, exports.visit = visit.visit, exports.visitAsync = visit.visitAsync;
-}))(), ConfigFileError = class extends ActionError {};
+}))();
 function inputEnvName(name) {
 	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
 }
+function legacyInputName(name) {
+	return name.replaceAll("-", "_");
+}
+function normalizeInputNames(env, names) {
+	let warnings = [];
+	for (let name of names) {
+		let legacy = legacyInputName(name);
+		if (legacy === name) continue;
+		let legacyEnvName = inputEnvName(legacy), value = env[legacyEnvName] ?? "";
+		if (delete env[legacyEnvName], !value.trim()) continue;
+		let current = env[inputEnvName(name)] ?? "";
+		current.trim() ? current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}: ${name} is set.`) : env[inputEnvName(name)] = value;
+	}
+	return warnings;
+}
+//#endregion
+//#region src/core/lib/actions/config-file.ts
+var ConfigFileError = class extends ActionError {};
 function refuseUntrustedEvent(env) {
 	let event = env.GITHUB_EVENT_NAME, triggeredBy;
 	if (event === "workflow_run") {
@@ -4443,18 +4461,18 @@ function refuseUntrustedEvent(env) {
 			let runEvent = JSON.parse((0, node_fs.readFileSync)(env.GITHUB_EVENT_PATH ?? "", "utf8")).workflow_run?.event;
 			triggeredBy = typeof runEvent == "string" ? runEvent : void 0;
 		} catch (e) {
-			throw new ConfigFileError(`config_file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`, "CONFIG_FILE_UNTRUSTED_EVENT");
+			throw new ConfigFileError(`config-file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`, "CONFIG_FILE_UNTRUSTED_EVENT");
 		}
 		if (!triggeredBy?.startsWith("pull_request")) return;
 	} else if (event !== "pull_request_target") return;
-	throw new ConfigFileError(`config_file cannot be used on ${triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event}: the workspace may hold a pull request's code, which could then rewrite its own rules. Set the inputs in the workflow instead.`, "CONFIG_FILE_UNTRUSTED_EVENT");
+	throw new ConfigFileError(`config-file cannot be used on ${triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event}: the workspace may hold a pull request's code, which could then rewrite its own rules. Set the inputs in the workflow instead.`, "CONFIG_FILE_UNTRUSTED_EVENT");
 }
 function isOutside(root, path) {
 	let inside = (0, node_path.relative)(root, path);
 	return inside === ".." || inside.startsWith(`..${node_path.sep}`);
 }
 function resolveConfigPath(path, env) {
-	let pathError = (reason) => new ConfigFileError(`config_file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
+	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
 	if ((0, node_path.isAbsolute)(path)) throw pathError("must be relative to the workspace.");
 	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(workspace, path);
 	if (isOutside(workspace, full)) throw pathError("leads outside the workspace.");
@@ -4491,7 +4509,7 @@ function valueNodes(doc) {
 	return nodesOf(doc.contents);
 }
 function parseConfig(text, path, known) {
-	let invalid = (reason) => new ConfigFileError(`Invalid config_file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$2.LineCounter(), doc = (0, import_dist$2.parseDocument)(text, { lineCounter });
+	let invalid = (reason) => new ConfigFileError(`Invalid config-file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$2.LineCounter(), doc = (0, import_dist$2.parseDocument)(text, { lineCounter });
 	for (let warning of doc.warnings) process.emitWarning(warning);
 	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
 	let js;
@@ -4508,15 +4526,17 @@ function parseConfig(text, path, known) {
 		if (node.type !== import_dist$2.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
 	}, values = new Map();
 	for (let [key, value] of Object.entries(js)) {
-		if (!known.includes(key)) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
-		if (value == null) values.set(key, { text: "" });
+		let name = known.find((input) => key === input || key === legacyInputName(input));
+		if (!name) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
+		if (values.has(name)) throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
+		if (value == null) values.set(name, { text: "" });
 		else if ([
 			"string",
 			"number",
 			"boolean"
 		].includes(typeof value)) {
 			let text = String(value);
-			values.set(key, {
+			values.set(name, {
 				text,
 				line: lineOf(key, text)
 			});
@@ -4525,14 +4545,14 @@ function parseConfig(text, path, known) {
 	return values;
 }
 function applyConfigFile(env, { known, lists }) {
-	let path = env[inputEnvName("config_file")]?.trim() ?? "";
+	let path = env[inputEnvName("config-file")]?.trim() ?? "";
 	if (!path) return;
 	refuseUntrustedEvent(env);
 	let full = resolveConfigPath(path, env), text;
 	try {
 		text = (0, node_fs.readFileSync)(full, "utf8");
 	} catch (e) {
-		throw new ConfigFileError(`config_file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`, "CONFIG_FILE_PATH");
+		throw new ConfigFileError(`config-file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`, "CONFIG_FILE_PATH");
 	}
 	let values = parseConfig(text, path, known), ignored = [], origins = new Map();
 	for (let [name, { text: value, line }] of values) {
@@ -4552,7 +4572,7 @@ function applyConfigFile(env, { known, lists }) {
 	}
 	return ignored.length ? {
 		path: full,
-		warning: `Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`,
+		warning: `Ignored from config-file ${path}, set by the workflow: ${ignored.join(", ")}`,
 		origins
 	} : {
 		path: full,
@@ -15169,15 +15189,15 @@ function readBooleanInput(name, fallback, getInput) {
 	throw new InvalidInputError(`Invalid ${name}: ${JSON.stringify(value)}. Must be true or false.`, "INVALID_BOOLEAN_INPUT");
 }
 function readRetentionDays(getInput) {
-	let days = getInput("traffic_artifact_retention_days");
+	let days = getInput("traffic-artifact-retention-days");
 	if (days !== "") {
-		if (!/^[1-9]\d*$/.test(days)) throw new InvalidInputError(`Invalid traffic_artifact_retention_days: ${JSON.stringify(days)}. Must be a whole number of days above zero.`, "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS");
+		if (!/^[1-9]\d*$/.test(days)) throw new InvalidInputError(`Invalid traffic-artifact-retention-days: ${JSON.stringify(days)}. Must be a whole number of days above zero.`, "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS");
 		return Number(days);
 	}
 }
 function readTrafficArtifactInputs(getInput$3 = getInput) {
 	return {
-		upload: readBooleanInput("upload_traffic_artifact", !1, getInput$3),
+		upload: readBooleanInput("upload-traffic-artifact", !1, getInput$3),
 		retentionDays: readRetentionDays(getInput$3)
 	};
 }
@@ -15318,31 +15338,31 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
 function resolveBuilderName(value) {
 	if (value === "") return "buildcage";
-	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder_name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
+	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder-name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
 	return value;
 }
 const LIST_INPUTS = [
-	"allowed_https_rules",
-	"allowed_http_rules",
-	"allowed_ip_rules",
-	"allowed_url_rules",
-	"allowed_tls_rules",
-	"known_blocked_rules"
+	"allowed-https-rules",
+	"allowed-http-rules",
+	"allowed-ip-rules",
+	"allowed-url-rules",
+	"allowed-tls-rules",
+	"known-blocked-rules"
 ], CONFIG_FILE_INPUTS = {
 	known: [
-		"builder_name",
-		"proxy_mode",
-		"proxy_engine",
+		"builder-name",
+		"proxy-mode",
+		"proxy-engine",
 		...LIST_INPUTS,
-		"fail_on_ca_residue",
-		"fail_on_blocked",
-		"upload_traffic_artifact",
-		"traffic_artifact_retention_days"
+		"fail-on-ca-residue",
+		"fail-on-blocked",
+		"upload-traffic-artifact",
+		"traffic-artifact-retention-days"
 	],
 	lists: LIST_INPUTS
-};
+}, INPUT_NAMES = ["config-file", ...CONFIG_FILE_INPUTS.known];
 function dropListInputs(env) {
-	for (let name of LIST_INPUTS) delete env[`INPUT_${name.toUpperCase()}`];
+	for (let name of LIST_INPUTS) delete env[inputEnvName(name)];
 }
 function capturedStderr(e) {
 	let err = e && typeof e == "object" ? e : {};
@@ -15414,17 +15434,17 @@ function findReportSourceContainer(docker, projectName, builderName) {
 	} catch (e) {
 		throw new ReportError(describeDockerFailure(e, { operation: "docker ps" }), "DOCKER_UNAVAILABLE");
 	}
-	if (ids.length !== 1) throw new ReportError(`Expected exactly one buildcage container for builder_name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder_name?`, "CONTAINER_NOT_FOUND");
+	if (ids.length !== 1) throw new ReportError(`Expected exactly one buildcage container for builder-name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder-name?`, "CONTAINER_NOT_FOUND");
 	return ids[0];
 }
 //#endregion
 //#region report/src/lib/inputs.ts
 init_core();
 function readBuilderName(getInput$2 = getInput) {
-	return resolveBuilderName(getInput$2("builder_name"));
+	return resolveBuilderName(getInput$2("builder-name"));
 }
 function checkFailOnBlocked(getInput$1 = getInput) {
-	readBooleanInput("fail_on_blocked", !0, getInput$1);
+	readBooleanInput("fail-on-blocked", !0, getInput$1);
 }
 //#endregion
 //#region report/src/lib/run-report-script.ts
@@ -15435,7 +15455,8 @@ const runNode = (args, env) => {
 	});
 };
 function runReportScript(scriptPath, containerId, { trafficFile, env = process.env, run = runNode } = {}) {
-	let { BUILDCAGE_TRAFFIC_FILE: _inherited, ...rest } = env;
+	let { BUILDCAGE_TRAFFIC_FILE: _inherited, ...rest } = env, failOnBlocked = rest[inputEnvName("fail-on-blocked")];
+	failOnBlocked !== void 0 && (rest[inputEnvName(legacyInputName("fail-on-blocked"))] = failOnBlocked);
 	try {
 		run([scriptPath, containerId], trafficFile ? {
 			...rest,
@@ -63449,7 +63470,9 @@ async function runReportStep(env, overrides = {}) {
 	let { applyConfigFile, readBuilderName, checkFailOnBlocked, readTrafficArtifactInputs, createDocker, findReportSourceContainer, copyFromContainerImage, runReportScript, uploadTrafficArtifact, makeScratchDir, removeScratchDir, warn } = {
 		...realDeps,
 		...overrides
-	}, { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
+	};
+	for (let ignored of normalizeInputNames(env, INPUT_NAMES)) warn(ignored);
+	let { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
 	warning && warn(warning);
 	let builderName = readBuilderName();
 	checkFailOnBlocked();

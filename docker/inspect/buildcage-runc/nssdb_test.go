@@ -156,7 +156,7 @@ func assertNSSDBSkipped(t *testing.T, in *injection, bundle, dest, stderr string
 	assertNoMountAt(t, bundle, dest)
 	assertNoMountAt(t, bundle, nssCADBDir)
 	if !strings.Contains(stderr, "buildcage: warning: cannot add the proxy CA to Chromium's NSS database") ||
-		!strings.Contains(stderr, "use proxy_engine: universal") {
+		!strings.Contains(stderr, "use proxy-engine: universal") {
 		t.Fatalf("the step's output does not warn that Chromium goes without the CA:\n%s", stderr)
 	}
 }

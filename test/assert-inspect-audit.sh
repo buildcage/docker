@@ -71,7 +71,7 @@ echo "[report] the restrict-mode example built from what was observed:"
 # These rules are meant to be pasted into a restrict run, so they are checked
 # against what the build actually did rather than only for being present.
 if grep -qF "Switch to restrict mode" <<< "$REPORT_MARKDOWN" \
-  && grep -qF "allowed_url_rules: |" <<< "$REPORT_MARKDOWN"; then
+  && grep -qF "allowed-url-rules: |" <<< "$REPORT_MARKDOWN"; then
   pass "the example is offered as URL rules"
 else
   fail "no restrict-mode URL rule example was rendered"
@@ -79,11 +79,11 @@ fi
 
 RULES=$(
   awk '
-    # Stops at the next top-level key (allowed_tls_rules/allowed_ip_rules are
+    # Stops at the next top-level key (allowed-tls-rules/allowed-ip-rules are
     # echoed into the same fenced block, see inspect-example.ts) as well as
-    # the closing fence, so only the allowed_url_rules value is captured.
-    /allowed_url_rules: \|/ { capture=1; next }
-    capture && /^ *(allowed_tls_rules|allowed_ip_rules): \|/ { exit }
+    # the closing fence, so only the allowed-url-rules value is captured.
+    /allowed-url-rules: \|/ { capture=1; next }
+    capture && /^ *(allowed-tls-rules|allowed-ip-rules): \|/ { exit }
     capture && /```/ { exit }
     capture { print }
   ' <<< "$REPORT_MARKDOWN" | sed 's/^ *//'
@@ -125,7 +125,7 @@ echo ""
 
 echo "[report] the traffic artifact:"
 # writeTrafficFile only runs when BUILDCAGE_TRAFFIC_FILE is set, which
-# report/src/main.ts normally does itself from upload_traffic_artifact; set
+# report/src/main.ts normally does itself from upload-traffic-artifact; set
 # it directly here to reach the same path without a real GitHub Actions
 # runtime to upload through.
 BUILDER_CID=$(docker compose ps -q builder)

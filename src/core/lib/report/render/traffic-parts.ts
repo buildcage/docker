@@ -128,7 +128,7 @@ export function trafficHeadingBlock(
   return trafficFrame(top);
 }
 
-/** The blocked hosts no known_blocked_rules rule matched, and the failed ones. */
+/** The blocked hosts no known-blocked-rules rule matched, and the failed ones. */
 export function blockedHostsBlocks(report: ReportData, fit: PartFit): SummaryBlock[] {
   const blocked = report.blocked
     .filter((r) => !r.expected)
@@ -176,7 +176,7 @@ export function passedHostsBlocks(report: ReportData, fit: PartFit): SummaryBloc
 }
 
 /**
- * The blocked hosts a known_blocked_rules rule matched, collapsed: they need
+ * The blocked hosts a known-blocked-rules rule matched, collapsed: they need
  * no action.
  */
 export function knownBlockedBlocks(report: ReportData, fit: PartFit): SummaryBlock[] {

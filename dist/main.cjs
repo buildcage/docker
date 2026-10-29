@@ -496,7 +496,7 @@ function splitRawRegexUrl(regex, rule) {
 	let schemeSep = SCHEME_SEP.exec(regex);
 	if (!schemeSep) throw Error(`Invalid regex in rule "${rule}": expected "://" (or an escaped equivalent like ":\\/\\/ ") separating the scheme from the host, so the host and path can be matched separately`);
 	let schemes = rawRegexSchemes(regex.slice(0, schemeSep.index), rule), hostStart = schemeSep.index + schemeSep[0].length, pathSep = SLASH_TOKEN.exec(regex.slice(hostStart));
-	if (!pathSep) throw Error(`Invalid regex in rule "${rule}": expected a "/" (or "\\/") after "://" to start the path; a host-only rule belongs in allowed_https_rules instead`);
+	if (!pathSep) throw Error(`Invalid regex in rule "${rule}": expected a "/" (or "\\/") after "://" to start the path; a host-only rule belongs in allowed-https-rules instead`);
 	let pathStart = hostStart + pathSep.index, hostPart = regex.slice(hostStart, pathStart), pathPart = regex.slice(pathStart);
 	checkRawRegexHalf(hostPart, "host half", rule, !1), checkRawRegexHalf(pathPart, "path half", rule, !1), rejectUserinfo(hostPart, rule);
 	let { domain: hostOnly } = splitDomainFromPortPattern(hostPart);
@@ -4966,10 +4966,28 @@ var require_identity = __commonJSMin(((exports) => {
 	require_cst();
 	var lexer = require_lexer(), lineCounter = require_line_counter(), parser = require_parser(), publicApi = require_public_api(), visit = require_visit();
 	exports.Composer = composer.Composer, exports.Document = Document.Document, exports.Schema = Schema.Schema, exports.YAMLError = errors.YAMLError, exports.YAMLParseError = errors.YAMLParseError, exports.YAMLWarning = errors.YAMLWarning, exports.Alias = Alias.Alias, exports.isAlias = identity.isAlias, exports.isCollection = identity.isCollection, exports.isDocument = identity.isDocument, exports.isMap = identity.isMap, exports.isNode = identity.isNode, exports.isPair = identity.isPair, exports.isScalar = identity.isScalar, exports.isSeq = identity.isSeq, exports.Pair = Pair.Pair, exports.Scalar = Scalar.Scalar, exports.YAMLMap = YAMLMap.YAMLMap, exports.YAMLSeq = YAMLSeq.YAMLSeq, exports.Lexer = lexer.Lexer, exports.LineCounter = lineCounter.LineCounter, exports.Parser = parser.Parser, exports.parse = publicApi.parse, exports.parseAllDocuments = publicApi.parseAllDocuments, exports.parseDocument = publicApi.parseDocument, exports.stringify = publicApi.stringify, exports.visit = visit.visit, exports.visitAsync = visit.visitAsync;
-}))(), ConfigFileError = class extends ActionError {};
+}))();
 function inputEnvName(name) {
 	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
 }
+function legacyInputName(name) {
+	return name.replaceAll("-", "_");
+}
+function normalizeInputNames(env, names) {
+	let warnings = [];
+	for (let name of names) {
+		let legacy = legacyInputName(name);
+		if (legacy === name) continue;
+		let legacyEnvName = inputEnvName(legacy), value = env[legacyEnvName] ?? "";
+		if (delete env[legacyEnvName], !value.trim()) continue;
+		let current = env[inputEnvName(name)] ?? "";
+		current.trim() ? current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}: ${name} is set.`) : env[inputEnvName(name)] = value;
+	}
+	return warnings;
+}
+//#endregion
+//#region src/core/lib/actions/config-file.ts
+var ConfigFileError = class extends ActionError {};
 function refuseUntrustedEvent(env) {
 	let event = env.GITHUB_EVENT_NAME, triggeredBy;
 	if (event === "workflow_run") {
@@ -4977,18 +4995,18 @@ function refuseUntrustedEvent(env) {
 			let runEvent = JSON.parse((0, node_fs.readFileSync)(env.GITHUB_EVENT_PATH ?? "", "utf8")).workflow_run?.event;
 			triggeredBy = typeof runEvent == "string" ? runEvent : void 0;
 		} catch (e) {
-			throw new ConfigFileError(`config_file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`, "CONFIG_FILE_UNTRUSTED_EVENT");
+			throw new ConfigFileError(`config-file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`, "CONFIG_FILE_UNTRUSTED_EVENT");
 		}
 		if (!triggeredBy?.startsWith("pull_request")) return;
 	} else if (event !== "pull_request_target") return;
-	throw new ConfigFileError(`config_file cannot be used on ${triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event}: the workspace may hold a pull request's code, which could then rewrite its own rules. Set the inputs in the workflow instead.`, "CONFIG_FILE_UNTRUSTED_EVENT");
+	throw new ConfigFileError(`config-file cannot be used on ${triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event}: the workspace may hold a pull request's code, which could then rewrite its own rules. Set the inputs in the workflow instead.`, "CONFIG_FILE_UNTRUSTED_EVENT");
 }
 function isOutside(root, path) {
 	let inside = (0, node_path.relative)(root, path);
 	return inside === ".." || inside.startsWith(`..${node_path.sep}`);
 }
 function resolveConfigPath(path, env) {
-	let pathError = (reason) => new ConfigFileError(`config_file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
+	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
 	if ((0, node_path.isAbsolute)(path)) throw pathError("must be relative to the workspace.");
 	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(workspace, path);
 	if (isOutside(workspace, full)) throw pathError("leads outside the workspace.");
@@ -5025,7 +5043,7 @@ function valueNodes(doc) {
 	return nodesOf(doc.contents);
 }
 function parseConfig(text, path, known) {
-	let invalid = (reason) => new ConfigFileError(`Invalid config_file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$3.LineCounter(), doc = (0, import_dist$3.parseDocument)(text, { lineCounter });
+	let invalid = (reason) => new ConfigFileError(`Invalid config-file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$3.LineCounter(), doc = (0, import_dist$3.parseDocument)(text, { lineCounter });
 	for (let warning of doc.warnings) process.emitWarning(warning);
 	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
 	let js;
@@ -5042,15 +5060,17 @@ function parseConfig(text, path, known) {
 		if (node.type !== import_dist$3.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
 	}, values = new Map();
 	for (let [key, value] of Object.entries(js)) {
-		if (!known.includes(key)) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
-		if (value == null) values.set(key, { text: "" });
+		let name = known.find((input) => key === input || key === legacyInputName(input));
+		if (!name) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
+		if (values.has(name)) throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
+		if (value == null) values.set(name, { text: "" });
 		else if ([
 			"string",
 			"number",
 			"boolean"
 		].includes(typeof value)) {
 			let text = String(value);
-			values.set(key, {
+			values.set(name, {
 				text,
 				line: lineOf(key, text)
 			});
@@ -5059,14 +5079,14 @@ function parseConfig(text, path, known) {
 	return values;
 }
 function applyConfigFile(env, { known, lists }) {
-	let path = env[inputEnvName("config_file")]?.trim() ?? "";
+	let path = env[inputEnvName("config-file")]?.trim() ?? "";
 	if (!path) return;
 	refuseUntrustedEvent(env);
 	let full = resolveConfigPath(path, env), text;
 	try {
 		text = (0, node_fs.readFileSync)(full, "utf8");
 	} catch (e) {
-		throw new ConfigFileError(`config_file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`, "CONFIG_FILE_PATH");
+		throw new ConfigFileError(`config-file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`, "CONFIG_FILE_PATH");
 	}
 	let values = parseConfig(text, path, known), ignored = [], origins = new Map();
 	for (let [name, { text: value, line }] of values) {
@@ -5086,7 +5106,7 @@ function applyConfigFile(env, { known, lists }) {
 	}
 	return ignored.length ? {
 		path: full,
-		warning: `Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`,
+		warning: `Ignored from config-file ${path}, set by the workflow: ${ignored.join(", ")}`,
 		origins
 	} : {
 		path: full,
@@ -5134,14 +5154,14 @@ function readBooleanInput(name, fallback, getInput) {
 const ENGINES = ["universal", "inspect"];
 function resolveProxyEngine$1(input) {
 	let trimmed = input?.trim() || "inspect";
-	if (trimmed === "transparent") throw new InvalidInputError("proxy_engine: transparent has been renamed. Use proxy_engine: universal.", "INVALID_PROXY_ENGINE");
-	if (!ENGINES.includes(trimmed)) throw new InvalidInputError(`Invalid proxy_engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`, "INVALID_PROXY_ENGINE");
+	if (trimmed === "transparent") throw new InvalidInputError("proxy-engine: transparent has been renamed. Use proxy-engine: universal.", "INVALID_PROXY_ENGINE");
+	if (!ENGINES.includes(trimmed)) throw new InvalidInputError(`Invalid proxy-engine: ${JSON.stringify(input)}. Must be one of ${ENGINES.join(", ")}.`, "INVALID_PROXY_ENGINE");
 	return trimmed;
 }
 const PROXY_MODES = ["audit", "restrict"];
 function resolveProxyMode(input) {
 	let trimmed = input?.trim() || "restrict";
-	if (!PROXY_MODES.includes(trimmed)) throw new InvalidInputError(`Invalid proxy_mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`, "INVALID_PROXY_MODE");
+	if (!PROXY_MODES.includes(trimmed)) throw new InvalidInputError(`Invalid proxy-mode: ${JSON.stringify(input)}. Must be one of ${PROXY_MODES.join(", ")}.`, "INVALID_PROXY_MODE");
 	return trimmed;
 }
 //#endregion
@@ -5149,16 +5169,16 @@ function resolveProxyMode(input) {
 function checkUrlAndTlsRuleSupport({ proxyEngine, proxyMode, urlRules, tlsRules }, warn) {
 	if (proxyEngine === "inspect") return;
 	let unsupported = [];
-	if (urlRules.length > 0 && unsupported.push("allowed_url_rules"), tlsRules.length > 0 && unsupported.push("allowed_tls_rules"), unsupported.length === 0) return;
-	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy_engine: ${proxyEngine}, which only sees the host and port, never a method or a path.`;
-	if (proxyMode === "audit") warn(`${reason} They are ignored for this run. Switch to proxy_engine: inspect if you need to enforce a method or a path.`);
-	else throw new InvalidInputError(`${reason} In restrict mode that means ${list} would not actually be enforced, so the step would look protected but isn't. Switch to proxy_engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
+	if (urlRules.length > 0 && unsupported.push("allowed-url-rules"), tlsRules.length > 0 && unsupported.push("allowed-tls-rules"), unsupported.length === 0) return;
+	let list = unsupported.join(" and "), reason = `${list} ${unsupported.length > 1 ? "have" : "has"} no effect with proxy-engine: ${proxyEngine}, which only sees the host and port, never a method or a path.`;
+	if (proxyMode === "audit") warn(`${reason} They are ignored for this run. Switch to proxy-engine: inspect if you need to enforce a method or a path.`);
+	else throw new InvalidInputError(`${reason} In restrict mode that means ${list} would not actually be enforced, so the step would look protected but isn't. Switch to proxy-engine: inspect, or remove ${list} from your workflow.`, "INVALID_PROXY_ENGINE");
 }
 function checkKnownBlockedUrlRuleSupport({ proxyEngine, proxyMode, knownBlockedUrlRules }, warn) {
 	if (proxyEngine === "inspect" || knownBlockedUrlRules.length === 0) return;
-	let reason = `known_blocked_rules contains URL rules (a method and a URL) that need proxy_engine: inspect, which alone sees a method or a path; proxy_engine: ${proxyEngine} sees only the host and port, so these rules match no blocked connection and acknowledge nothing.`;
-	if (proxyMode === "audit") warn(`${reason} They are ignored for this run. Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`);
-	else throw new InvalidInputError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy_engine: inspect.`, "INVALID_PROXY_ENGINE");
+	let reason = `known-blocked-rules contains URL rules (a method and a URL) that need proxy-engine: inspect, which alone sees a method or a path; proxy-engine: ${proxyEngine} sees only the host and port, so these rules match no blocked connection and acknowledge nothing.`;
+	if (proxyMode === "audit") warn(`${reason} They are ignored for this run. Drop the method to acknowledge the whole host, or switch to proxy-engine: inspect.`);
+	else throw new InvalidInputError(`${reason} Drop the method to acknowledge the whole host, or switch to proxy-engine: inspect.`, "INVALID_PROXY_ENGINE");
 }
 //#endregion
 //#region src/core/lib/actions/log.ts
@@ -5929,7 +5949,7 @@ function parseIpRulesOrThrow(rulesInput) {
 	for (let rule of rules) {
 		if (rule.startsWith("~")) continue;
 		let host = rule.slice(0, rule.lastIndexOf(":"));
-		if (!IP_RULE_HOST.test(host)) throw new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed_ip_rules is matched against the address a connection goes to; allow a name with allowed_https_rules or allowed_http_rules instead.`, "INVALID_RULES");
+		if (!IP_RULE_HOST.test(host)) throw new InvalidRulesError(`IP rule "${rule}" names a host, not an address. allowed-ip-rules is matched against the address a connection goes to; allow a name with allowed-https-rules or allowed-http-rules instead.`, "INVALID_RULES");
 		if (!isIpRuleAddress(host)) throw new InvalidRulesError(`IP rule "${rule}" is not an IPv4 address: write four octets, each a decimal from 0 to 255 without a leading zero (10.0.0.1, not 010.0.0.1) or a wildcard (10.0.*.*, or 10.** across dots), and a CIDR prefix from 0 to 32.`, "INVALID_RULES");
 	}
 	return rules;
@@ -5945,10 +5965,10 @@ function buildACLRules({ httpsRulesInput, httpRulesInput, ipRulesInput }) {
 //#region src/core/lib/actions/rule-inputs.ts
 function readRuleInputs(getInput$4 = getInput) {
 	let rules = buildACLRules({
-		httpsRulesInput: getInput$4("allowed_https_rules"),
-		httpRulesInput: getInput$4("allowed_http_rules"),
-		ipRulesInput: getInput$4("allowed_ip_rules")
-	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$4("known_blocked_rules")), urlRulesInput = getInput$4("allowed_url_rules"), tlsRules = parseRulesOrThrow(getInput$4("allowed_tls_rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
+		httpsRulesInput: getInput$4("allowed-https-rules"),
+		httpRulesInput: getInput$4("allowed-http-rules"),
+		ipRulesInput: getInput$4("allowed-ip-rules")
+	}), knownBlockedRules = parseKnownBlockedRulesOrThrow(getInput$4("known-blocked-rules")), urlRulesInput = getInput$4("allowed-url-rules"), tlsRules = parseRulesOrThrow(getInput$4("allowed-tls-rules")), compiledUrlRules = buildUrlRulesOrThrow(urlRulesInput);
 	checkRulesCompileOrThrow({
 		...rules,
 		tlsRules,
@@ -5965,12 +5985,12 @@ function readRuleInputs(getInput$4 = getInput) {
 	};
 }
 const RULE_LISTS = {
-	allowed_https_rules: "httpsRules",
-	allowed_http_rules: "httpRules",
-	allowed_ip_rules: "ipRules",
-	allowed_url_rules: "urlRules",
-	allowed_tls_rules: "tlsRules",
-	known_blocked_rules: "knownBlockedRules"
+	"allowed-https-rules": "httpsRules",
+	"allowed-http-rules": "httpRules",
+	"allowed-ip-rules": "ipRules",
+	"allowed-url-rules": "urlRules",
+	"allowed-tls-rules": "tlsRules",
+	"known-blocked-rules": "knownBlockedRules"
 };
 function checkRuleListSizesOrThrow(rules, names) {
 	for (let name of names) {
@@ -12695,31 +12715,31 @@ async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine }) 
 const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
 function resolveBuilderName(value) {
 	if (value === "") return "buildcage";
-	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder_name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
+	if (!BUILDER_NAME_PATTERN.test(value)) throw new InvalidInputError(`Invalid builder-name: ${JSON.stringify(value)}. Must start with a letter or digit and have at least two characters, using only letters, digits, '_', '.' and '-'.`, "INVALID_BUILDER_NAME");
 	return value;
 }
 const LIST_INPUTS = [
-	"allowed_https_rules",
-	"allowed_http_rules",
-	"allowed_ip_rules",
-	"allowed_url_rules",
-	"allowed_tls_rules",
-	"known_blocked_rules"
+	"allowed-https-rules",
+	"allowed-http-rules",
+	"allowed-ip-rules",
+	"allowed-url-rules",
+	"allowed-tls-rules",
+	"known-blocked-rules"
 ], CONFIG_FILE_INPUTS = {
 	known: [
-		"builder_name",
-		"proxy_mode",
-		"proxy_engine",
+		"builder-name",
+		"proxy-mode",
+		"proxy-engine",
 		...LIST_INPUTS,
-		"fail_on_ca_residue",
-		"fail_on_blocked",
-		"upload_traffic_artifact",
-		"traffic_artifact_retention_days"
+		"fail-on-ca-residue",
+		"fail-on-blocked",
+		"upload-traffic-artifact",
+		"traffic-artifact-retention-days"
 	],
 	lists: LIST_INPUTS
-};
+}, INPUT_NAMES = ["config-file", ...CONFIG_FILE_INPUTS.known];
 function dropListInputs(env) {
-	for (let name of LIST_INPUTS) delete env[`INPUT_${name.toUpperCase()}`];
+	for (let name of LIST_INPUTS) delete env[inputEnvName(name)];
 }
 //#endregion
 //#region src/compose-file.ts
@@ -12824,12 +12844,12 @@ function listHostIpv4Addresses({ networkInterfaces: list = node_os.networkInterf
 //#endregion
 //#region src/lib/compose-env.ts
 const BUILDER_RULE_INPUTS = [
-	"allowed_https_rules",
-	"allowed_http_rules",
-	"allowed_ip_rules",
-	"allowed_url_rules",
-	"allowed_tls_rules",
-	"known_blocked_rules"
+	"allowed-https-rules",
+	"allowed-http-rules",
+	"allowed-ip-rules",
+	"allowed-url-rules",
+	"allowed-tls-rules",
+	"known-blocked-rules"
 ];
 function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue, imageRef, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules }, env, hostAddresses = listHostIpv4Addresses) {
 	return {
@@ -12851,16 +12871,16 @@ function buildComposeEnv({ builderName, proxyMode, proxyEngine, failOnCaResidue,
 //#endregion
 //#region src/lib/engine.ts
 function resolveProxyEngine(input) {
-	if (input?.trim() === "explicit") throw new InvalidInputError("proxy_engine: explicit has been removed. Use proxy_engine: universal (network-level SNI/Host inspection) or inspect (TLS-terminating URL enforcement).", "INVALID_PROXY_ENGINE");
+	if (input?.trim() === "explicit") throw new InvalidInputError("proxy-engine: explicit has been removed. Use proxy-engine: universal (network-level SNI/Host inspection) or inspect (TLS-terminating URL enforcement).", "INVALID_PROXY_ENGINE");
 	return resolveProxyEngine$1(input);
 }
 //#endregion
 //#region src/lib/inputs.ts
 function readBuilderName(getInput$3 = getInput) {
-	return resolveBuilderName(getInput$3("builder_name"));
+	return resolveBuilderName(getInput$3("builder-name"));
 }
 function readSetupInputs(getInput$2 = getInput) {
-	let proxyEngine = resolveProxyEngine(getInput$2("proxy_engine")), proxyMode = resolveProxyMode(getInput$2("proxy_mode")), failOnCaResidue = readBooleanInput("fail_on_ca_residue", !0, getInput$2);
+	let proxyEngine = resolveProxyEngine(getInput$2("proxy-engine")), proxyMode = resolveProxyMode(getInput$2("proxy-mode")), failOnCaResidue = readBooleanInput("fail-on-ca-residue", !0, getInput$2);
 	return {
 		proxyEngine,
 		builderName: readBuilderName(getInput$2),
@@ -12915,10 +12935,12 @@ async function runSetupStep(env, overrides = {}) {
 	let { applyConfigFile, readSetupInputs, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, saveState, setOutput, log, warn } = {
 		...realDeps,
 		...overrides
-	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "", { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
+	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
+	for (let ignored of normalizeInputNames(env, INPUT_NAMES)) warn(ignored);
+	let { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
 	warning && warn(warning);
 	let { proxyEngine, builderName, proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readSetupInputs();
-	dropListInputs(env), log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutput("builder_name", builderName), checkUrlAndTlsRuleSupport({
+	dropListInputs(env), log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutput("builder-name", builderName), setOutput("builder_name", builderName), checkUrlAndTlsRuleSupport({
 		proxyEngine,
 		proxyMode,
 		urlRules,

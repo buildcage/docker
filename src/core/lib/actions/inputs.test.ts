@@ -61,16 +61,16 @@ describe("readRetentionDays", () => {
   });
 
   it("reads a positive whole number of days", () => {
-    expect(readRetentionDays(inputs({ traffic_artifact_retention_days: "7" }))).toBe(7);
+    expect(readRetentionDays(inputs({ "traffic-artifact-retention-days": "7" }))).toBe(7);
   });
 
   it.each(["0", "-1", "7.5", "forever", "1e1", "0x10", "7d", " 7", "07"])("refuses %o", (value) => {
-    expect(() => readRetentionDays(inputs({ traffic_artifact_retention_days: value }))).toThrow(
+    expect(() => readRetentionDays(inputs({ "traffic-artifact-retention-days": value }))).toThrow(
       expect.objectContaining({
         name: InvalidInputError.name,
         code: "INVALID_TRAFFIC_ARTIFACT_RETENTION_DAYS",
         message:
-          `Invalid traffic_artifact_retention_days: ${JSON.stringify(value)}. ` +
+          `Invalid traffic-artifact-retention-days: ${JSON.stringify(value)}. ` +
           "Must be a whole number of days above zero.",
       }),
     );
@@ -88,23 +88,23 @@ describe("readTrafficArtifactInputs", () => {
   it("reads both inputs", () => {
     expect(
       readTrafficArtifactInputs(
-        inputs({ upload_traffic_artifact: "true", traffic_artifact_retention_days: "7" }),
+        inputs({ "upload-traffic-artifact": "true", "traffic-artifact-retention-days": "7" }),
       ),
     ).toStrictEqual({ upload: true, retentionDays: 7 });
   });
 
   it("refuses a typo rather than reading it as a no", () => {
-    expect(() => readTrafficArtifactInputs(inputs({ upload_traffic_artifact: "yes" }))).toThrow(
-      'Invalid upload_traffic_artifact: "yes". Must be true or false.',
+    expect(() => readTrafficArtifactInputs(inputs({ "upload-traffic-artifact": "yes" }))).toThrow(
+      'Invalid upload-traffic-artifact: "yes". Must be true or false.',
     );
   });
 
   it("refuses a bad retention even when nothing is uploaded", () => {
     expect(() =>
       readTrafficArtifactInputs(
-        inputs({ upload_traffic_artifact: "false", traffic_artifact_retention_days: "0" }),
+        inputs({ "upload-traffic-artifact": "false", "traffic-artifact-retention-days": "0" }),
       ),
-    ).toThrow(/Invalid traffic_artifact_retention_days/);
+    ).toThrow(/Invalid traffic-artifact-retention-days/);
   });
 });
 
@@ -134,7 +134,7 @@ describe("resolveProxyEngine", () => {
 
   it("rejects the removed transparent alias, naming universal", () => {
     expect(() => resolveProxyEngine("transparent")).toThrowError(
-      /transparent has been renamed.*proxy_engine: universal/,
+      /transparent has been renamed.*proxy-engine: universal/,
     );
   });
 });

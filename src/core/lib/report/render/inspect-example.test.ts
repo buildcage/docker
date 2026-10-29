@@ -294,7 +294,7 @@ describe("buildUrlRuleLines", () => {
 
   it("proposes nothing for a request whose target was no path", () => {
     // `OPTIONS *` is logged with no URL (see log/inspect.ts's urlOf), and no
-    // allowed_url_rules line can match it: every path matcher wants a leading
+    // allowed-url-rules line can match it: every path matcher wants a leading
     // slash. A rule built from the host alone would be one that does nothing.
     const asterisk: TrafficEvent = {
       time: 1,
@@ -334,8 +334,8 @@ describe("buildInspectRestrictExample", () => {
 
   it("uses a literal block, since rules are separated by newlines", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2");
-    expect(md).toContain("allowed_url_rules: |\n");
-    expect(md).not.toContain("proxy_engine");
+    expect(md).toContain("allowed-url-rules: |\n");
+    expect(md).not.toContain("proxy-engine");
   });
 
   it("renders nothing when nothing was observed and no tls/ip rules were configured", () => {
@@ -343,16 +343,16 @@ describe("buildInspectRestrictExample", () => {
     expect(buildInspectRestrictExample(null, "owner/repo", "v2")).toBe("");
   });
 
-  it("echoes allowed_tls_rules and allowed_ip_rules as configured, not derived from traffic", () => {
+  it("echoes allowed-tls-rules and allowed-ip-rules as configured, not derived from traffic", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       allowedIpRules: ["10.0.0.5:5432"],
     });
-    expect(md).toMatch(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/);
+    expect(md).toMatch(/allowed-ip-rules: \|\n\s+10\.0\.0\.5:5432\n/);
 
     const md2 = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       allowedTlsRules: ["db.internal.example.com:8443"],
     });
-    expect(md2).toMatch(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/);
+    expect(md2).toMatch(/allowed-tls-rules: \|\n\s+db\.internal\.example\.com:8443\n/);
   });
 
   it("lists what it left out under the snippet, escaped and without the query", () => {
@@ -379,7 +379,7 @@ describe("buildInspectRestrictExample", () => {
     const md = buildInspectRestrictExample(many, "owner/repo", "v2");
     expect(md.match(/\| `GET` \| /g)).toHaveLength(20);
     expect(md).toContain("…and 5 more, listed in Communication details.");
-    expect(md).not.toContain("allowed_url_rules");
+    expect(md).not.toContain("allowed-url-rules");
   });
 
   it("still renders a section for tls/ip rules alone, with no observed traffic", () => {
@@ -387,27 +387,27 @@ describe("buildInspectRestrictExample", () => {
       allowedIpRules: ["10.0.0.5:5432"],
       allowedTlsRules: ["db.internal.example.com:8443"],
     });
-    expect(md).not.toContain("allowed_url_rules");
-    expect(md).toMatch(/allowed_ip_rules: \|\n\s+10\.0\.0\.5:5432\n/);
-    expect(md).toMatch(/allowed_tls_rules: \|\n\s+db\.internal\.example\.com:8443\n/);
+    expect(md).not.toContain("allowed-url-rules");
+    expect(md).toMatch(/allowed-ip-rules: \|\n\s+10\.0\.0\.5:5432\n/);
+    expect(md).toMatch(/allowed-tls-rules: \|\n\s+db\.internal\.example\.com:8443\n/);
   });
 
   it("ends with a run: block when a runCommand is given, same as universal-example.ts", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       runCommand: "npm install",
-      extraInputs: ["fail_on_blocked: false"],
+      extraInputs: ["fail-on-blocked: false"],
     });
     expect(md).toContain(
-      "          fail_on_blocked: false\n          run: |\n            npm install\n```",
+      "          fail-on-blocked: false\n          run: |\n            npm install\n```",
     );
   });
 
   it("writes the caller's extra inputs after every rule", () => {
     const md = buildInspectRestrictExample(requests, "owner/repo", "v2", {
       allowedIpRules: ["10.0.0.5:5432"],
-      extraInputs: ["fail_on_blocked: false"],
+      extraInputs: ["fail-on-blocked: false"],
     });
-    expect(md).toContain("10.0.0.5:5432\n          fail_on_blocked: false\n```");
+    expect(md).toContain("10.0.0.5:5432\n          fail-on-blocked: false\n```");
   });
 
   it("omits the run: block when no runCommand is given", () => {

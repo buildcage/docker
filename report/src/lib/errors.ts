@@ -3,14 +3,14 @@ import { ActionError } from "#core/lib/errors.ts";
 /**
  * Intentional error in the report action's own logic. Invalid ACL rule syntax
  * throws InvalidRulesError instead (see core/lib/acl/rules.ts); a malformed
- * builder_name, boolean or retention input throws InvalidInputError (see
+ * builder-name, boolean or retention input throws InvalidInputError (see
  * core/lib/actions/inputs.ts).
  *
  * Codes:
  *   DOCKER_UNAVAILABLE:   docker CLI missing from PATH, or a docker call
  *                         (`ps`, `inspect`, `create`, `cp`) failed
  *   CONTAINER_NOT_FOUND:  `docker ps --filter` didn't find exactly one
- *                         report-source container for this builder_name
+ *                         report-source container for this builder-name
  *   REPORT_SCRIPT_FAILED: report-action.js couldn't even be launched (a
  *                         report-action.js that ran and exited nonzero is
  *                         reproduced via this action's exit code instead)

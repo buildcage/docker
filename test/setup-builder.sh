@@ -3,7 +3,7 @@
 # and starts it through the setup action's own entry point, as a workflow's
 # setup step would, with that image in place of the published one. The rest of
 # the action's inputs come from the uppercase variables the README names
-# (ALLOWED_HTTPS_RULES for allowed_https_rules, and so on).
+# (ALLOWED_HTTPS_RULES for allowed-https-rules, and so on).
 #
 # With BUILDCAGE_TEST_COMPOSE_OVERLAY naming a docker/compose.action.test-*.yaml,
 # the builder also joins that file's fixtures and takes the rules

@@ -25,11 +25,11 @@ summary_contains "| \`registry.npmjs.org:443\` | HTTPS |" "the HTTPS host is in 
 summary_contains "| \`example.com:80\` | HTTP |" "the HTTP host is in the audited table"
 summary_contains "Switch to restrict mode" "a restrict-mode example is rendered"
 summary_contains "uses: buildcage/docker@" "the example uses the setup action"
-summary_contains "proxy_mode: restrict" "the example sets proxy_mode: restrict"
-summary_contains "proxy_engine: universal" "the example names the non-default engine"
-summary_contains "allowed_https_rules:" "the example has allowed_https_rules"
+summary_contains "proxy-mode: restrict" "the example sets proxy-mode: restrict"
+summary_contains "proxy-engine: universal" "the example names the non-default engine"
+summary_contains "allowed-https-rules:" "the example has allowed-https-rules"
 summary_contains "registry.npmjs.org:443" "the example allows the HTTPS host"
-summary_contains "allowed_http_rules:" "the example has allowed_http_rules"
+summary_contains "allowed-http-rules:" "the example has allowed-http-rules"
 summary_contains "example.com:80" "the example allows the HTTP host"
 
 assert_results

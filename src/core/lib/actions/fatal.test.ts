@@ -27,8 +27,8 @@ function runHandler(context: string, err: unknown): { lines: string[]; exitCode:
 
 describe("exitOnFatalError", () => {
   it("prints an ActionError's own message, unlabelled", () => {
-    const { lines } = runHandler("setup", new TestError("builder_name is taken", "SOME_CODE"));
-    expect(lines).toStrictEqual(["::error::builder_name is taken"]);
+    const { lines } = runHandler("setup", new TestError("builder-name is taken", "SOME_CODE"));
+    expect(lines).toStrictEqual(["::error::builder-name is taken"]);
   });
 
   it("labels anything else as unexpected and names the step it escaped from", () => {

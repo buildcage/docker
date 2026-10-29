@@ -361,7 +361,7 @@ describe("reverse lookups", () => {
 // ---------------------------------------------------------------------------
 // Service discovery. No rule can permit one of these: this resolver returns no
 // discovery record to anybody, so a denied row for one could never be taken
-// away by writing a rule, and would fail a build under fail_on_blocked over
+// away by writing a rule, and would fail a build under fail-on-blocked over
 // a lookup the caller falls back from on its own.
 // ---------------------------------------------------------------------------
 describe("service-discovery names", () => {

@@ -21,7 +21,7 @@ RUN echo "=== [HTTPS - allowed - uppercase host] ===" && \
     echo "Testing ALLOWED.example.com (HTTPS)..." && \
     (wget --no-check-certificate -q -O /dev/null --timeout=10 https://ALLOWED.example.com/ && echo "✓ ALLOWED.example.com: OK") || (echo "✗ ALLOWED.example.com: FAILED" && exit 1)
 
-# allowed_ip_rules names no port of 10.200.0.101. The SNI is the client's to
+# allowed-ip-rules names no port of 10.200.0.101. The SNI is the client's to
 # choose, so naming the allowed address there must not open another one.
 RUN echo "=== [Direct IP - blocked, SNI names an allowed address] ===" && \
     if node --no-deprecation -e 'require("tls").connect({ host: process.argv[1], port: 8443, servername: process.argv[2], rejectUnauthorized: false }, () => process.exit(0)).on("error", () => process.exit(1)).setTimeout(5000, () => process.exit(1))' 10.200.0.101 10.200.0.100; then echo "✗ 10.200.0.101:8443: ALLOWED (unexpected)" && exit 1; else echo "✓ 10.200.0.101:8443: BLOCKED (expected)"; fi

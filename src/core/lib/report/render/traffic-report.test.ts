@@ -145,7 +145,7 @@ describe("renderReportMarkdown: universal", () => {
       "owner/repo",
       "v1",
     );
-    expect(md).toMatch(/allowed_https_rules: >-\n\s+flaky\.example\.com:443\n/);
+    expect(md).toMatch(/allowed-https-rules: >-\n\s+flaky\.example\.com:443\n/);
   });
 
   it("uses the title option verbatim, e.g. a run step's em-dash label", () => {
@@ -167,7 +167,7 @@ describe("renderReportMarkdown: universal", () => {
     expect(md).toMatch(/run: \|\n\s+npm install/);
   });
 
-  it("collapses the known_blocked_rules matches into their own details element", () => {
+  it("collapses the known-blocked-rules matches into their own details element", () => {
     const md = renderReportMarkdown(
       {
         ...base,
@@ -194,7 +194,7 @@ describe("renderReportMarkdown: universal", () => {
     expect(md).toMatch(/bad\.com[\s\S]*\n\n### ✅ Allowed Hosts/);
   });
 
-  it("omits the known blocked hosts when no row matched known_blocked_rules", () => {
+  it("omits the known blocked hosts when no row matched known-blocked-rules", () => {
     const md = renderReportMarkdown({ ...base, blocked: [blockedRow] }, "owner/repo", "v1");
     expect(md).not.toMatch(/Known Blocked/);
   });
@@ -257,13 +257,13 @@ describe("renderReportMarkdown: inspect", () => {
       "v1",
       { runCommand: "npm install" },
     );
-    expect(md).not.toMatch(/proxy_engine/);
-    expect(md).toMatch(/allowed_url_rules: \|/);
+    expect(md).not.toMatch(/proxy-engine/);
+    expect(md).toMatch(/allowed-url-rules: \|/);
     expect(md).toMatch(/GET https:\/\/good\.com\/pkg/);
     expect(md).toMatch(/run: \|\n\s+npm install/);
   });
 
-  it("folds known_blocked_rules matches into one row naming the rule", () => {
+  it("folds known-blocked-rules matches into one row naming the rule", () => {
     const md = renderReportMarkdown(
       {
         ...base,

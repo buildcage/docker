@@ -1,5 +1,5 @@
 /**
- * `config_file`: action inputs read from a YAML file in the repository.
+ * `config-file`: action inputs read from a YAML file in the repository.
  *
  * Each value is written into the `INPUT_*` variable `core.getInput` reads, so
  * every reader, a child process included, sees the merged value.
@@ -19,6 +19,8 @@ import {
 } from "yaml";
 
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
+
+import { inputEnvName, legacyInputName } from "./input-names.ts";
 
 export class ConfigFileError extends ActionError<
   "CONFIG_FILE_UNTRUSTED_EVENT" | "CONFIG_FILE_PATH" | "CONFIG_FILE_INVALID"
@@ -53,11 +55,6 @@ export interface AppliedConfigFile {
   origins: Map<string, ConfigValueOrigin>;
 }
 
-/** The variable `core.getInput(name)` reads. */
-function inputEnvName(name: string): string {
-  return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
-}
-
 /**
  * On these events the workflow comes from the default branch, so its own
  * inputs are out of a pull request's reach, but a checkout of the pull
@@ -78,7 +75,7 @@ function refuseUntrustedEvent(env: NodeJS.ProcessEnv): void {
       triggeredBy = typeof runEvent === "string" ? runEvent : undefined;
     } catch (e) {
       throw new ConfigFileError(
-        `config_file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`,
+        `config-file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`,
         "CONFIG_FILE_UNTRUSTED_EVENT",
       );
     }
@@ -88,7 +85,7 @@ function refuseUntrustedEvent(env: NodeJS.ProcessEnv): void {
   }
   const what = triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event;
   throw new ConfigFileError(
-    `config_file cannot be used on ${what}: the workspace may hold a pull request's ` +
+    `config-file cannot be used on ${what}: the workspace may hold a pull request's ` +
       `code, which could then rewrite its own rules. Set the inputs in the workflow instead.`,
     "CONFIG_FILE_UNTRUSTED_EVENT",
   );
@@ -102,7 +99,7 @@ function isOutside(root: string, path: string): boolean {
 /** The file's real path, refusing one outside the workspace. */
 function resolveConfigPath(path: string, env: NodeJS.ProcessEnv): string {
   const pathError = (reason: string) =>
-    new ConfigFileError(`config_file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
+    new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
 
   if (isAbsolute(path)) throw pathError("must be relative to the workspace.");
   const workspace = resolve(env.GITHUB_WORKSPACE || process.cwd());
@@ -177,7 +174,7 @@ function parseConfig(
 ): Map<string, ParsedValue> {
   const invalid = (reason: string) =>
     new ConfigFileError(
-      `Invalid config_file ${JSON.stringify(path)}: ${reason}`,
+      `Invalid config-file ${JSON.stringify(path)}: ${reason}`,
       "CONFIG_FILE_INVALID",
     );
 
@@ -212,14 +209,19 @@ function parseConfig(
   };
   const values = new Map<string, ParsedValue>();
   for (const [key, value] of Object.entries(js)) {
-    if (!known.includes(key)) {
+    // A key in an input's underscore spelling is read as that input.
+    const name = known.find((input) => key === input || key === legacyInputName(input));
+    if (!name) {
       throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
     }
+    if (values.has(name)) {
+      throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
+    }
     if (value == null) {
-      values.set(key, { text: "" });
+      values.set(name, { text: "" });
     } else if (["string", "number", "boolean"].includes(typeof value)) {
       const text = String(value);
-      values.set(key, { text, line: lineOf(key, text) });
+      values.set(name, { text, line: lineOf(key, text) });
     } else {
       throw invalid(`${key} must be a string, as it would be in the workflow.`);
     }
@@ -228,9 +230,9 @@ function parseConfig(
 }
 
 /**
- * Merges `config_file` into `env`'s `INPUT_*` variables. A value the workflow
+ * Merges `config-file` into `env`'s `INPUT_*` variables. A value the workflow
  * set wins; a list input gets both, the workflow's first. Undefined when no
- * config_file was given.
+ * config-file was given.
  *
  * @throws {ConfigFileError} on an untrusted event, a path outside the
  *   workspace or missing, or a file that is not a flat mapping of known
@@ -240,7 +242,7 @@ export function applyConfigFile(
   env: NodeJS.ProcessEnv,
   { known, lists }: ConfigFileInputs,
 ): AppliedConfigFile | undefined {
-  const path = env[inputEnvName("config_file")]?.trim() ?? "";
+  const path = env[inputEnvName("config-file")]?.trim() ?? "";
   if (!path) return undefined;
 
   refuseUntrustedEvent(env);
@@ -250,7 +252,7 @@ export function applyConfigFile(
     text = readFileSync(full, "utf8");
   } catch (e) {
     throw new ConfigFileError(
-      `config_file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`,
+      `config-file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`,
       "CONFIG_FILE_PATH",
     );
   }
@@ -279,7 +281,7 @@ export function applyConfigFile(
   if (!ignored.length) return { path: full, origins };
   return {
     path: full,
-    warning: `Ignored from config_file ${path}, set by the workflow: ${ignored.join(", ")}`,
+    warning: `Ignored from config-file ${path}, set by the workflow: ${ignored.join(", ")}`,
     origins,
   };
 }

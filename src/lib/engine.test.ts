@@ -12,6 +12,6 @@ describe("resolveProxyEngine", () => {
   it("leaves every other value to the shared resolver", () => {
     expect(resolveProxyEngine(undefined)).toBe("inspect");
     expect(resolveProxyEngine("universal")).toBe("universal");
-    expect(() => resolveProxyEngine("Explicit")).toThrow(/Invalid proxy_engine/);
+    expect(() => resolveProxyEngine("Explicit")).toThrow(/Invalid proxy-engine/);
   });
 });

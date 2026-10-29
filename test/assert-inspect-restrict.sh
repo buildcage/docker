@@ -231,7 +231,7 @@ else
 fi
 echo ""
 
-echo "[Regex IP rule] a ~regex allowed_ip_rules entry passes through, on its own port:"
+echo "[Regex IP rule] a ~regex allowed-ip-rules entry passes through, on its own port:"
 if grep -qE "^buildcage [0-9]+ pass tcp [0-9]+ ts=\S+ reason=\S+ dst=10\.200\.0\.100:9080 sni=-$" <<< "$LOGS"; then
   pass "recorded as an undecrypted tcp passthrough, on the rule's own port"
 else
@@ -387,7 +387,7 @@ else
   fail "the Blocked / Failed Hosts table is missing expected rows"
 fi
 # A block made before a whole request arrived is still a block, and counts
-# towards fail_on_blocked. The plain stage has no SNI to name it by: bytes sent
+# towards fail-on-blocked. The plain stage has no SNI to name it by: bytes sent
 # to an address are named by it, as the ip rule that could pass them would be,
 # and a request to a name lands on the proxy's own address, which names nothing.
 if grep -qF '| `10.200.0.100:5432` | IP | 🚫 bad-request |' <<< "$REPORT_MARKDOWN" \
@@ -531,7 +531,7 @@ echo ""
 
 echo "[report] the traffic artifact:"
 # writeTrafficFile only runs when BUILDCAGE_TRAFFIC_FILE is set, which
-# report/src/main.ts normally does itself from upload_traffic_artifact; set
+# report/src/main.ts normally does itself from upload-traffic-artifact; set
 # it directly here to reach the same path without a real GitHub Actions
 # runtime to upload through.
 BUILDER_CID=$(docker compose ps -q builder)

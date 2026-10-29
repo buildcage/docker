@@ -49,7 +49,7 @@ export function countUndecidedRequests(report: ReportData): number {
  * The warning for requests that never reached a rule, or undefined when there
  * were none.
  *
- * Neither host table holds them and `fail_on_blocked` does not either, so the
+ * Neither host table holds them and `fail-on-blocked` does not either, so the
  * collapsed Communication details section is their only trace and a reader who
  * never opens it would not know a request had gone nowhere.
  *

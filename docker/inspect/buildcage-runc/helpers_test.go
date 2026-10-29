@@ -507,7 +507,7 @@ func useTempLog(t *testing.T) {
 	})
 }
 
-// useFailOnCAResidue stands for a build set up with fail_on_ca_residue: fail.
+// useFailOnCAResidue stands for a build set up with fail-on-ca-residue: fail.
 func useFailOnCAResidue(t *testing.T, fail bool) {
 	t.Helper()
 	old := failOnCAResidue

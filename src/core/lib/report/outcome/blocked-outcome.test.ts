@@ -49,7 +49,7 @@ describe("determineBlockedOutcome", () => {
     expect(decide({ isAudit: true })).toStrictEqual({ level: "notice", shouldFail: false });
   });
 
-  it("returns notice (not error) when every blocked row matched known_blocked_rules", () => {
+  it("returns notice (not error) when every blocked row matched known-blocked-rules", () => {
     expect(
       decide({ blockedCount: 3, blockedRows: [{ expected: true }, { expected: true }] }),
     ).toStrictEqual({ level: "notice", shouldFail: false });
@@ -111,7 +111,7 @@ describe("determineBlockedOutcome", () => {
 });
 
 describe("buildBlockedMessage", () => {
-  it("stays the base text when no rows matched known_blocked_rules", () => {
+  it("stays the base text when no rows matched known-blocked-rules", () => {
     expect(message()).toBe("2 blocked connection(s) and lookup(s) detected by buildcage sandbox");
   });
 
@@ -122,13 +122,13 @@ describe("buildBlockedMessage", () => {
         blockedRows: [{ expected: true }, { expected: true }],
         engineLabel: "proxy",
       }),
-    ).toMatch(/all matched known_blocked_rules \(expected\)/);
+    ).toMatch(/all matched known-blocked-rules \(expected\)/);
   });
 
   it("reports the unmatched count when some rows are unexpected", () => {
     expect(
       message({ blockedCount: 3, blockedRows: [{ expected: true }, { expected: false }] }),
-    ).toMatch(/1 of 2 distinct blocked host\(s\) unmatched by known_blocked_rules/);
+    ).toMatch(/1 of 2 distinct blocked host\(s\) unmatched by known-blocked-rules/);
   });
 
   // Audit's outcome never depends on matching (see determineBlockedOutcome),

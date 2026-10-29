@@ -97,6 +97,6 @@ export function restrictExampleBlock(
 export function restrictExampleTruncationNote(artifactAvailable: boolean): string {
   const rest = artifactAvailable
     ? "the buildcage-traffic artifact uploaded for this run has every request to write the rules from"
-    : "set upload_traffic_artifact: true to get every request to write the rules from as a downloadable artifact";
+    : "set upload-traffic-artifact: true to get every request to write the rules from as a downloadable artifact";
   return `_…omitted: the example restrict step is too large for GitHub's Job Summary size limit; ${rest}._\n`;
 }

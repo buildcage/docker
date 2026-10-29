@@ -13,7 +13,7 @@ PORT=10024
 # A resolver falling back to TCP (a truncated answer, a large TXT or DNSSEC
 # record) goes to CoreDNS: the listener cannot read a DNS query and logs a line
 # the report cannot parse. Only the gateway's own :53, so TCP to any other
-# resolver is still redirected, judged by allowed_ip_rules and logged.
+# resolver is still redirected, judged by allowed-ip-rules and logged.
 iptables -t nat -A PREROUTING -i buildcage0 -p tcp -d 198.19.255.1 --dport 53 -j RETURN
 iptables -t nat -A PREROUTING -i buildcage0 -p tcp -j REDIRECT --to-ports "$PORT"
 

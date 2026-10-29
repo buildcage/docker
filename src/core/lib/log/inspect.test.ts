@@ -95,7 +95,7 @@ describe("scanInspectLog", () => {
   it("does not mistake an origin's own 403 or 503 for a block", async () => {
     // A registry answers 403 to an unauthenticated fetch and an origin under
     // load answers 503. Counting those would fail a build where nothing was
-    // blocked, since fail_on_blocked defaults to true.
+    // blocked, since fail-on-blocked defaults to true.
     const relayed = [
       "buildcage 1 https GET 403 120 ts=-- reason=- tlserr=- dst=1.1.1.1:443 host=reg.example.com /pkg",
       "buildcage 2 https GET 503 90 ts=-- reason=- tlserr=- dst=1.1.1.1:443 host=reg.example.com /pkg",

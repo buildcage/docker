@@ -378,8 +378,8 @@ test_integration_buildkit_inspect_proxy_down: ## Check a build's traffic fails a
 	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 
 .PHONY: test_integration_buildkit_universal_known_blocked
-test_integration_buildkit_universal_known_blocked: ## Check known_blocked_rules against fail_on_blocked
-	@echo "Running universal-engine known_blocked_rules tests..."
+test_integration_buildkit_universal_known_blocked: ## Check known-blocked-rules against fail-on-blocked
+	@echo "Running universal-engine known-blocked-rules tests..."
 	@./test/run-universal-known-blocked.sh
 	@$(MAKE) clean_buildkit
 

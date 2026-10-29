@@ -29,7 +29,7 @@ export interface ExpectedFlag {
   expected: boolean;
 }
 
-/** A compiled known_blocked_rules rule and the text a row it covers is grouped
+/** A compiled known-blocked-rules rule and the text a row it covers is grouped
  *  under. */
 interface KnownBlockedMatcher {
   /** Port-completed for a host rule, exactly as written for a URL rule. */
@@ -99,7 +99,7 @@ function matchesUrlRule({ rule, hostRe, pathRe }: CompiledUrlRule, event: Traffi
 }
 
 /**
- * Compile the known_blocked_rules lines into matchers, once per report. A line
+ * Compile the known-blocked-rules lines into matchers, once per report. A line
  * carrying a space is a URL rule (see isKnownBlockedUrlRule); otherwise it is a
  * host rule, whose missing port is completed here too so a value set straight
  * in the environment behaves like one that came through the action's input, and
@@ -137,7 +137,7 @@ interface BlockedAccumulator {
 
 /**
  * Aggregate blocked events into the report's blocked-hosts rows, tagging each
- * row with whether known_blocked_rules accounts for it and the rule that did.
+ * row with whether known-blocked-rules accounts for it and the rule that did.
  *
  * Matching is per event, not per aggregated row: a URL rule marks one request
  * to a host and not another, so a row (which counts several requests to one

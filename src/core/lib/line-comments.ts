@@ -1,6 +1,6 @@
 /**
- * The `#` comment rule for the rule inputs (allowed_*_rules,
- * known_blocked_rules). A comment starts at a `#` that is at the start of a
+ * The `#` comment rule for the rule inputs (allowed-*-rules,
+ * known-blocked-rules). A comment starts at a `#` that is at the start of a
  * line or preceded by whitespace, and runs to the end of the line.
  */
 

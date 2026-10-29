@@ -12,7 +12,7 @@ import {
 export function resolveProxyEngine(input: string | undefined): ProxyEngine {
   if (input?.trim() === "explicit") {
     throw new InvalidInputError(
-      "proxy_engine: explicit has been removed. Use proxy_engine: universal (network-level SNI/Host inspection) or inspect (TLS-terminating URL enforcement).",
+      "proxy-engine: explicit has been removed. Use proxy-engine: universal (network-level SNI/Host inspection) or inspect (TLS-terminating URL enforcement).",
       "INVALID_PROXY_ENGINE",
     );
   }

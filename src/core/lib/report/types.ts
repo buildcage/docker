@@ -20,7 +20,7 @@ export interface ReportDataCommon {
 
   /** restrict mode's allowed traffic or audit mode's audited traffic;
    *  which heading applies is decided from parameters.mode. Never annotated:
-   *  known_blocked_rules only ever marks a blocked row. */
+   *  known-blocked-rules only ever marks a blocked row. */
   passed: AggregatedEntry[];
 
   /** Aggregated blocked-domain rows, already annotated against

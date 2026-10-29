@@ -144,18 +144,18 @@ func TestRunHintsAtFailOnCAResidue(t *testing.T) {
 	if code != 1 {
 		t.Errorf("run exited %d, want 1", code)
 	}
-	if !strings.Contains(stderr, "buildcage: hint:") || !strings.Contains(stderr, "fail_on_ca_residue: false") {
-		t.Errorf("no hint at fail_on_ca_residue:\n%s", stderr)
+	if !strings.Contains(stderr, "buildcage: hint:") || !strings.Contains(stderr, "fail-on-ca-residue: false") {
+		t.Errorf("no hint at fail-on-ca-residue:\n%s", stderr)
 	}
 }
 
 // A copy the sweep cannot strip does not stop the slot being cut from a copy
 // of the home in the same layer, and the result names each residue once:
-// it fails the build by default and only warns under fail_on_ca_residue: false.
+// it fails the build by default and only warns under fail-on-ca-residue: false.
 func TestStripLayerGoesOnPastACopyItCannotStrip(t *testing.T) {
 	own := "library=\nname=NSS Internal PKCS #11 Module\n\n"
 	for _, fail := range []bool{true, false} {
-		t.Run(fmt.Sprintf("fail_on_ca_residue %v", fail), func(t *testing.T) {
+		t.Run(fmt.Sprintf("fail-on-ca-residue %v", fail), func(t *testing.T) {
 			useTempLog(t)
 			useFailOnCAResidue(t, fail)
 			rootfs := t.TempDir()
@@ -181,7 +181,7 @@ func TestStripLayerGoesOnPastACopyItCannotStrip(t *testing.T) {
 			tolerated := tolerateResidue(err)
 			readStderr()
 			if fail != (tolerated != nil) {
-				t.Errorf("got %v under fail_on_ca_residue %v", tolerated, fail)
+				t.Errorf("got %v under fail-on-ca-residue %v", tolerated, fail)
 			}
 		})
 	}

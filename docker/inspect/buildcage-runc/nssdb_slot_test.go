@@ -557,7 +557,7 @@ func TestStripLayerReportsAnEditedNSSSlot(t *testing.T) {
 	}
 	useFailOnCAResidue(t, false)
 	if err := tolerateResidue(err); err != nil {
-		t.Fatalf("got %v, want only a warning under fail_on_ca_residue: false", err)
+		t.Fatalf("got %v, want only a warning under fail-on-ca-residue: false", err)
 	}
 }
 
