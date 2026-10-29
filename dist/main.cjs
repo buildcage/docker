@@ -5023,7 +5023,7 @@ function resolveConfigPath(path, env, baseDir) {
 	try {
 		real = (0, node_fs.realpathSync)(full);
 	} catch {
-		throw pathError("was not found. Check out the repository in an earlier step.");
+		throw pathError(`(${full}) was not found. Check out the repository in an earlier step.`);
 	}
 	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError("leads outside the workspace.");
 	return real;

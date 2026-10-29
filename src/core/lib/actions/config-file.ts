@@ -96,7 +96,11 @@ function isOutside(root: string, path: string): boolean {
   return inside === ".." || inside.startsWith(`..${sep}`);
 }
 
-/** The file's real path, resolved against `baseDir`, refusing one outside the workspace. */
+/**
+ * The file's real path, resolved against `baseDir`, refusing one outside the
+ * workspace. `baseDir` is absolute and spelled as the workspace is, symlinks
+ * kept: `..` and the workspace check go by that spelling.
+ */
 function resolveConfigPath(path: string, env: NodeJS.ProcessEnv, baseDir?: string): string {
   const pathError = (reason: string) =>
     new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
@@ -109,7 +113,7 @@ function resolveConfigPath(path: string, env: NodeJS.ProcessEnv, baseDir?: strin
   try {
     real = realpathSync(full);
   } catch {
-    throw pathError("was not found. Check out the repository in an earlier step.");
+    throw pathError(`(${full}) was not found. Check out the repository in an earlier step.`);
   }
   if (isOutside(realpathSync(workspace), real)) throw pathError("leads outside the workspace.");
   return real;
@@ -252,6 +256,8 @@ function parseConfig(
  * set wins; a list input gets both, the workflow's first. Undefined when no
  * config-file was given. A relative path resolves against `baseDir`, the
  * workspace when it is absent; the file must be in the workspace either way.
+ * `baseDir` is absolute and keeps the workspace's own spelling, not its real
+ * path.
  *
  * @throws {ConfigFileError} on an untrusted event, a path outside the
  *   workspace or missing, or a file that is not a flat mapping of known
