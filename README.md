@@ -69,7 +69,7 @@ covers the choice of engine.
 
 ```yaml
 - name: Start Buildcage in audit mode
-  uses: buildcage/docker@85cfae351eda1cb31743111246e5b291ed3556cb # v4.3.1
+  uses: buildcage/docker@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
   with:
     proxy-mode: audit # Log every destination, block nothing
 
@@ -86,7 +86,7 @@ covers the choice of engine.
 
 - name: Show Buildcage report
   if: always()
-  uses: buildcage/docker/report@85cfae351eda1cb31743111246e5b291ed3556cb # v4.3.1
+  uses: buildcage/docker/report@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
 ```
 
 The [report action](#report-action) writes every destination the build contacted to the Job Summary:
@@ -103,7 +103,7 @@ Paste that allowlist into the setup step and switch the mode:
 
 ```yaml
 - name: Start Buildcage in restrict mode
-  uses: buildcage/docker@85cfae351eda1cb31743111246e5b291ed3556cb # v4.3.1
+  uses: buildcage/docker@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
   with:
     proxy-mode: restrict
     allowed-url-rules: |
@@ -276,7 +276,7 @@ with `if: always()` so a failing build still reports:
 ```yaml
 - name: Show Buildcage report
   if: always()
-  uses: buildcage/docker/report@85cfae351eda1cb31743111246e5b291ed3556cb # v4.3.1
+  uses: buildcage/docker/report@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
 ```
 
 An alert under the report's title counts what needs a look. Whatever was blocked unexpectedly is
