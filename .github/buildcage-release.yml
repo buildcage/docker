@@ -1,5 +1,5 @@
 # The release build's allowlist, read by the Buildcage builder and report in docker-publish.yml.
-allowed_url_rules: |
+allowed-url-rules: |
   # apk package index and packages (haproxy, curl, ...)
   GET https://dl-cdn.alpinelinux.org/alpine/**
 
