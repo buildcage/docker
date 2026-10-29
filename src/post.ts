@@ -6,7 +6,7 @@ import * as core from "@actions/core";
 
 import { exitOnFatalError } from "#core/lib/actions/fatal.ts";
 import { normalizeInputNames } from "#core/lib/actions/input-names.ts";
-import { INPUT_NAMES } from "#report/report-source.ts";
+import { CONFIG_FILE_INPUTS, INPUT_NAMES } from "#report/report-source.ts";
 
 import { COMPOSE_FILE } from "./compose-file.ts";
 import { readLocalImageOverride } from "./lib/local-image.ts";
@@ -20,7 +20,7 @@ const PROJECT_NAME_OVERRIDE_ENABLED = process.env.BUILDCAGE_BUILD_TEST_HOOKS ===
 
 async function main(): Promise<void> {
   // Setup has warned of any underscore spelling it ignored.
-  normalizeInputNames(process.env, INPUT_NAMES);
+  normalizeInputNames(process.env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists);
   // Read as setup read it, so the down also takes the fixtures its overlay started.
   const localOverride = await readLocalImageOverride(process.env, () => {});
   const plan = planPostCleanup(

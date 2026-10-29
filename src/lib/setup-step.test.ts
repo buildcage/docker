@@ -130,7 +130,23 @@ describe("runSetupStep", () => {
 
     await runSetupStep(env, deps);
 
-    expect(mocks.warn).toHaveBeenCalledWith("Ignored proxy_mode: proxy-mode is set.");
+    expect(mocks.warn).toHaveBeenCalledWith("Ignored proxy_mode, as proxy-mode is also set.");
+  });
+
+  it("joins a rule input's two spellings", async () => {
+    const env = {
+      ...ENV,
+      INPUT_ALLOWED_HTTPS_RULES: "a.example.com:443",
+      "INPUT_ALLOWED-HTTPS-RULES": "b.example.com:443",
+    };
+    mocks.applyConfigFile.mockImplementation((seen: NodeJS.ProcessEnv) => {
+      expect(seen["INPUT_ALLOWED-HTTPS-RULES"]).toBe("b.example.com:443\na.example.com:443");
+    });
+
+    await runSetupStep(env, deps);
+
+    expect(mocks.applyConfigFile).toHaveBeenCalled();
+    expect(mocks.warn).not.toHaveBeenCalled();
   });
 
   it("applies config-file to the step's env before reading any input, and warns of what it ignored", async () => {

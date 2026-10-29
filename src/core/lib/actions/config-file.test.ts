@@ -60,6 +60,28 @@ describe("applyConfigFile", () => {
     expect(env["INPUT_PROXY-MODE"]).toBe("audit");
   });
 
+  it.each([
+    ["before", "%YAML 1.1\n---\n<<: {proxy_mode: audit}\nproxy-mode: restrict\n", 4],
+    ["after", "%YAML 1.1\n---\nproxy_mode: restrict\n<<: {proxy-mode: audit}\n", 3],
+  ])(
+    "takes the map's own key over the other spelling a merge key brought in %s it",
+    (_, text, line) => {
+      const env = envFor(writeConfig(text));
+      expect(applyConfigFile(env, INPUTS)?.origins).toEqual(
+        new Map([["proxy-mode", { offset: 0, line }]]),
+      );
+      expect(env["INPUT_PROXY-MODE"]).toBe("restrict");
+    },
+  );
+
+  it("refuses an input both merged maps set, one in each spelling", () => {
+    expectError(
+      envFor(writeConfig("%YAML 1.1\n---\n<<: [{proxy_mode: audit}, {proxy-mode: restrict}]\n")),
+      "CONFIG_FILE_INVALID",
+      'Invalid config-file "buildcage.yml": proxy-mode is set twice, also as proxy_mode.',
+    );
+  });
+
   it("reads a key in an input's underscore spelling as that input", () => {
     const env = envFor(writeConfig("proxy_mode: audit\nknown_blocked_rules: t.example.com\n"), {
       "INPUT_KNOWN-BLOCKED-RULES": "u.example.com",

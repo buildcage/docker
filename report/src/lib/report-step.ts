@@ -107,7 +107,9 @@ export async function runReportStep(
 
   // Before any input is read, and before report-action.js inherits this
   // environment: it reads fail-on-blocked itself.
-  for (const ignored of normalizeInputNames(env, INPUT_NAMES)) warn(ignored);
+  for (const ignored of normalizeInputNames(env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists)) {
+    warn(ignored);
+  }
   const { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
   if (warning) warn(warning);
   const builderName = readBuilderName();

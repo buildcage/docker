@@ -207,16 +207,30 @@ function parseConfig(
     // Any other value's text is on its line only when it is all on that one.
     return value.includes("\n") || lineCounter.linePos(end).line !== at ? undefined : at;
   };
-  const values = new Map<string, ParsedValue>();
-  for (const [key, value] of Object.entries(js)) {
-    // A key in an input's underscore spelling is read as that input.
+  // The top map's own keys, which win over a merge key's as toJS() has it.
+  const own = new Set(
+    (doc.contents as YAMLMap).items
+      .filter(({ key }) => !isMergeKey(key, doc))
+      .map(({ key }) => resolved(key, doc))
+      .filter(isScalar)
+      .map((key) => String(key.value)),
+  );
+  // Each input's key; one in its underscore spelling is read as that input.
+  const keys = new Map<string, string>();
+  for (const key of Object.keys(js)) {
     const name = known.find((input) => key === input || key === legacyInputName(input));
     if (!name) {
       throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
     }
-    if (values.has(name)) {
+    const other = keys.get(name);
+    if (other === undefined || (own.has(key) && !own.has(other))) keys.set(name, key);
+    else if (own.has(key) || !own.has(other)) {
       throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
     }
+  }
+  const values = new Map<string, ParsedValue>();
+  for (const [name, key] of keys) {
+    const value = (js as Record<string, unknown>)[key];
     if (value == null) {
       values.set(name, { text: "" });
     } else if (["string", "number", "boolean"].includes(typeof value)) {

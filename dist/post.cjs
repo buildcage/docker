@@ -222,15 +222,15 @@ function inputEnvName(name) {
 function legacyInputName(name) {
 	return name.replaceAll("-", "_");
 }
-function normalizeInputNames(env, names) {
+function normalizeInputNames(env, names, lists = []) {
 	let warnings = [];
 	for (let name of names) {
 		let legacy = legacyInputName(name);
 		if (legacy === name) continue;
 		let legacyEnvName = inputEnvName(legacy), value = env[legacyEnvName] ?? "";
 		if (delete env[legacyEnvName], !value.trim()) continue;
-		let current = env[inputEnvName(name)] ?? "";
-		current.trim() ? current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}: ${name} is set.`) : env[inputEnvName(name)] = value;
+		let envName = inputEnvName(name), current = env[envName] ?? "";
+		current.trim() ? lists.includes(name) ? env[envName] = `${current}\n${value}` : current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}, as ${name} is also set.`) : env[envName] = value;
 	}
 	return warnings;
 }
@@ -256,7 +256,7 @@ const LIST_INPUTS = [
 	"allowed-url-rules",
 	"allowed-tls-rules",
 	"known-blocked-rules"
-], INPUT_NAMES = ["config-file", ...{
+], CONFIG_FILE_INPUTS = {
 	known: [
 		"builder-name",
 		"proxy-mode",
@@ -268,7 +268,7 @@ const LIST_INPUTS = [
 		"traffic-artifact-retention-days"
 	],
 	lists: LIST_INPUTS
-}.known], __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
+}, INPUT_NAMES = ["config-file", ...CONFIG_FILE_INPUTS.known], __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
 function withComposeOverlay(composeFile, overlay) {
 	return overlay ? [composeFile, overlay] : [composeFile];
 }
@@ -333,7 +333,7 @@ function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderNa
 //#endregion
 //#region src/post.ts
 async function main() {
-	normalizeInputNames(process.env, INPUT_NAMES);
+	normalizeInputNames(process.env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists);
 	let localOverride = await readLocalImageOverride(process.env, () => {}), plan = planPostCleanup(COMPOSE_FILE, void 0, process.env, {
 		savedBuilderName: getState("builder_name"),
 		composeOverlay: localOverride?.composeOverlay

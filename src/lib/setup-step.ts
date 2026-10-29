@@ -20,7 +20,7 @@ import {
   checkKnownBlockedUrlRuleSupport,
   checkUrlAndTlsRuleSupport,
 } from "#core/lib/actions/engine-rule-support.ts";
-import { normalizeInputNames } from "#core/lib/actions/input-names.ts";
+import { normalizeInputNames, setOutputUnderBothNames } from "#core/lib/actions/input-names.ts";
 import { logRules, withLogGroup } from "#core/lib/actions/log.ts";
 import { checkRuleListSizesOrThrow } from "#core/lib/actions/rule-inputs.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
@@ -143,7 +143,9 @@ export async function runSetupStep(
   const actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
 
   // Before any input is read: both rewrite the env every input is read from.
-  for (const ignored of normalizeInputNames(env, INPUT_NAMES)) warn(ignored);
+  for (const ignored of normalizeInputNames(env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists)) {
+    warn(ignored);
+  }
   const { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
   if (warning) warn(warning);
 
@@ -168,8 +170,7 @@ export async function runSetupStep(
   // The name may come from config-file, so a workflow cannot always know it
   // for the Buildx endpoint without asking. Set before the builder starts so a
   // step that runs after a failed setup still gets it.
-  setOutput("builder-name", builderName);
-  setOutput("builder_name", builderName);
+  setOutputUnderBothNames("builder-name", builderName, setOutput);
 
   // Before the builder starts, so a rule the engine cannot enforce is reported
   // once, up front, rather than silently not enforced.

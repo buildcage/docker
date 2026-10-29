@@ -90,7 +90,9 @@ describe("runReportStep", () => {
       "INPUT_CONFIG-FILE": "c.yml",
       "INPUT_FAIL-ON-BLOCKED": "true",
     });
-    expect(mocks.warn).toHaveBeenCalledWith("Ignored fail_on_blocked: fail-on-blocked is set.");
+    expect(mocks.warn).toHaveBeenCalledWith(
+      "Ignored fail_on_blocked, as fail-on-blocked is also set.",
+    );
   });
 
   it("keeps the list inputs config-file appended to out of the script's environment", async () => {

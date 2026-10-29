@@ -4427,158 +4427,12 @@ var require_identity$1 = __commonJSMin(((exports) => {
 		return identity.isDocument(value) && !_replacer ? value.toString(options) : new Document.Document(value, _replacer, options).toString(options);
 	}
 	exports.parse = parse, exports.parseAllDocuments = parseAllDocuments, exports.parseDocument = parseDocument, exports.stringify = stringify;
-})), import_dist$2 = __commonJSMin(((exports) => {
+})), require_dist$4 = __commonJSMin(((exports) => {
 	var composer = require_composer(), Document = require_Document(), Schema = require_Schema(), errors = require_errors$3(), Alias = require_Alias(), identity = require_identity$1(), Pair = require_Pair(), Scalar = require_Scalar(), YAMLMap = require_YAMLMap(), YAMLSeq = require_YAMLSeq();
 	require_cst();
 	var lexer = require_lexer(), lineCounter = require_line_counter(), parser = require_parser(), publicApi = require_public_api(), visit = require_visit();
 	exports.Composer = composer.Composer, exports.Document = Document.Document, exports.Schema = Schema.Schema, exports.YAMLError = errors.YAMLError, exports.YAMLParseError = errors.YAMLParseError, exports.YAMLWarning = errors.YAMLWarning, exports.Alias = Alias.Alias, exports.isAlias = identity.isAlias, exports.isCollection = identity.isCollection, exports.isDocument = identity.isDocument, exports.isMap = identity.isMap, exports.isNode = identity.isNode, exports.isPair = identity.isPair, exports.isScalar = identity.isScalar, exports.isSeq = identity.isSeq, exports.Pair = Pair.Pair, exports.Scalar = Scalar.Scalar, exports.YAMLMap = YAMLMap.YAMLMap, exports.YAMLSeq = YAMLSeq.YAMLSeq, exports.Lexer = lexer.Lexer, exports.LineCounter = lineCounter.LineCounter, exports.Parser = parser.Parser, exports.parse = publicApi.parse, exports.parseAllDocuments = publicApi.parseAllDocuments, exports.parseDocument = publicApi.parseDocument, exports.stringify = publicApi.stringify, exports.visit = visit.visit, exports.visitAsync = visit.visitAsync;
-}))();
-function inputEnvName(name) {
-	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
-}
-function legacyInputName(name) {
-	return name.replaceAll("-", "_");
-}
-function normalizeInputNames(env, names) {
-	let warnings = [];
-	for (let name of names) {
-		let legacy = legacyInputName(name);
-		if (legacy === name) continue;
-		let legacyEnvName = inputEnvName(legacy), value = env[legacyEnvName] ?? "";
-		if (delete env[legacyEnvName], !value.trim()) continue;
-		let current = env[inputEnvName(name)] ?? "";
-		current.trim() ? current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}: ${name} is set.`) : env[inputEnvName(name)] = value;
-	}
-	return warnings;
-}
-//#endregion
-//#region src/core/lib/actions/config-file.ts
-var ConfigFileError = class extends ActionError {};
-function refuseUntrustedEvent(env) {
-	let event = env.GITHUB_EVENT_NAME, triggeredBy;
-	if (event === "workflow_run") {
-		try {
-			let runEvent = JSON.parse((0, node_fs.readFileSync)(env.GITHUB_EVENT_PATH ?? "", "utf8")).workflow_run?.event;
-			triggeredBy = typeof runEvent == "string" ? runEvent : void 0;
-		} catch (e) {
-			throw new ConfigFileError(`config-file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`, "CONFIG_FILE_UNTRUSTED_EVENT");
-		}
-		if (!triggeredBy?.startsWith("pull_request")) return;
-	} else if (event !== "pull_request_target") return;
-	throw new ConfigFileError(`config-file cannot be used on ${triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event}: the workspace may hold a pull request's code, which could then rewrite its own rules. Set the inputs in the workflow instead.`, "CONFIG_FILE_UNTRUSTED_EVENT");
-}
-function isOutside(root, path) {
-	let inside = (0, node_path.relative)(root, path);
-	return inside === ".." || inside.startsWith(`..${node_path.sep}`);
-}
-function resolveConfigPath(path, env) {
-	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
-	if ((0, node_path.isAbsolute)(path)) throw pathError("must be relative to the workspace.");
-	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(workspace, path);
-	if (isOutside(workspace, full)) throw pathError("leads outside the workspace.");
-	let real;
-	try {
-		real = (0, node_fs.realpathSync)(full);
-	} catch {
-		throw pathError("was not found in the workspace. Check out the repository in an earlier step.");
-	}
-	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError("leads outside the workspace.");
-	return real;
-}
-const resolved = (node, doc) => (0, import_dist$2.isAlias)(node) ? node.resolve(doc) : node;
-function isMergeKey(key, doc) {
-	if (!(0, import_dist$2.isScalar)(key) || key.type && key.type !== import_dist$2.Scalar.PLAIN) return !1;
-	let { value } = key;
-	return (value === "<<" || typeof value == "symbol" && value.description === "<<") && doc.schema.tags.some((tag) => tag.tag === "tag:yaml.org,2002:merge" && tag.default);
-}
-function valueNodes(doc) {
-	let read = new Map(), nodesOf = (map) => {
-		let done = read.get(map);
-		if (done) return done;
-		let nodes = new Map(), merged = [];
-		for (let { key, value } of map.items) if (isMergeKey(key, doc)) {
-			let source = resolved(value, doc);
-			merged.push(...(0, import_dist$2.isSeq)(source) ? source.items : [source]);
-		} else {
-			let name = resolved(key, doc);
-			(0, import_dist$2.isScalar)(name) && nodes.set(String(name.value), value);
-		}
-		for (let source of merged.map((node) => resolved(node, doc))) for (let [key, value] of nodesOf(source)) nodes.has(key) || nodes.set(key, value);
-		return read.set(map, nodes), nodes;
-	};
-	return nodesOf(doc.contents);
-}
-function parseConfig(text, path, known) {
-	let invalid = (reason) => new ConfigFileError(`Invalid config-file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$2.LineCounter(), doc = (0, import_dist$2.parseDocument)(text, { lineCounter });
-	for (let warning of doc.warnings) process.emitWarning(warning);
-	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
-	let js;
-	try {
-		js = doc.toJS();
-	} catch (e) {
-		throw invalid(errorMessage(e));
-	}
-	if (js == null) return new Map();
-	if (typeof js != "object" || Array.isArray(js)) throw invalid("the top level must be a mapping of input names to values.");
-	let nodes = valueNodes(doc), lineOf = (key, value) => {
-		let node = resolved(nodes.get(key), doc), [start, end] = node.range, at = lineCounter.linePos(start).line;
-		if (node.type === import_dist$2.Scalar.BLOCK_LITERAL) return at + 1;
-		if (node.type !== import_dist$2.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
-	}, values = new Map();
-	for (let [key, value] of Object.entries(js)) {
-		let name = known.find((input) => key === input || key === legacyInputName(input));
-		if (!name) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
-		if (values.has(name)) throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
-		if (value == null) values.set(name, { text: "" });
-		else if ([
-			"string",
-			"number",
-			"boolean"
-		].includes(typeof value)) {
-			let text = String(value);
-			values.set(name, {
-				text,
-				line: lineOf(key, text)
-			});
-		} else throw invalid(`${key} must be a string, as it would be in the workflow.`);
-	}
-	return values;
-}
-function applyConfigFile(env, { known, lists }) {
-	let path = env[inputEnvName("config-file")]?.trim() ?? "";
-	if (!path) return;
-	refuseUntrustedEvent(env);
-	let full = resolveConfigPath(path, env), text;
-	try {
-		text = (0, node_fs.readFileSync)(full, "utf8");
-	} catch (e) {
-		throw new ConfigFileError(`config-file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`, "CONFIG_FILE_PATH");
-	}
-	let values = parseConfig(text, path, known), ignored = [], origins = new Map();
-	for (let [name, { text: value, line }] of values) {
-		let envName = inputEnvName(name), inline = env[envName] ?? "";
-		if (lists.includes(name)) {
-			let joined = [inline, value].filter((v) => v.trim()).join("\n");
-			env[envName] = joined;
-			let before = joined.slice(0, joined.length - value.length);
-			value.trim() && origins.set(name, {
-				offset: before.split("\n").length - 1,
-				line
-			});
-		} else inline.trim() ? value.trim() && value.trim() !== inline.trim() && ignored.push(name) : (env[envName] = value, value.trim() && origins.set(name, {
-			offset: 0,
-			line
-		}));
-	}
-	return ignored.length ? {
-		path: full,
-		warning: `Ignored from config-file ${path}, set by the workflow: ${ignored.join(", ")}`,
-		origins
-	} : {
-		path: full,
-		origins
-	};
-}
+}));
 //#endregion
 //#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/utils.js
 function toCommandValue(input) {
@@ -15164,7 +15018,160 @@ var ExitCode, init_core = __esmMin((() => {
 	init_command(), init_utils$4(), init_oidc_utils(), init_summary(), init_platform(), (function(ExitCode) {
 		ExitCode[ExitCode.Success = 0] = "Success", ExitCode[ExitCode.Failure = 1] = "Failure";
 	})(ExitCode ||= {});
-}));
+})), import_dist$2 = require_dist$4();
+init_core();
+function inputEnvName(name) {
+	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
+}
+function legacyInputName(name) {
+	return name.replaceAll("-", "_");
+}
+function normalizeInputNames(env, names, lists = []) {
+	let warnings = [];
+	for (let name of names) {
+		let legacy = legacyInputName(name);
+		if (legacy === name) continue;
+		let legacyEnvName = inputEnvName(legacy), value = env[legacyEnvName] ?? "";
+		if (delete env[legacyEnvName], !value.trim()) continue;
+		let envName = inputEnvName(name), current = env[envName] ?? "";
+		current.trim() ? lists.includes(name) ? env[envName] = `${current}\n${value}` : current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}, as ${name} is also set.`) : env[envName] = value;
+	}
+	return warnings;
+}
+//#endregion
+//#region src/core/lib/actions/config-file.ts
+var ConfigFileError = class extends ActionError {};
+function refuseUntrustedEvent(env) {
+	let event = env.GITHUB_EVENT_NAME, triggeredBy;
+	if (event === "workflow_run") {
+		try {
+			let runEvent = JSON.parse((0, node_fs.readFileSync)(env.GITHUB_EVENT_PATH ?? "", "utf8")).workflow_run?.event;
+			triggeredBy = typeof runEvent == "string" ? runEvent : void 0;
+		} catch (e) {
+			throw new ConfigFileError(`config-file cannot be used: the workflow_run event payload could not be read (${errorMessage(e)}).`, "CONFIG_FILE_UNTRUSTED_EVENT");
+		}
+		if (!triggeredBy?.startsWith("pull_request")) return;
+	} else if (event !== "pull_request_target") return;
+	throw new ConfigFileError(`config-file cannot be used on ${triggeredBy ? `workflow_run triggered by ${triggeredBy}` : event}: the workspace may hold a pull request's code, which could then rewrite its own rules. Set the inputs in the workflow instead.`, "CONFIG_FILE_UNTRUSTED_EVENT");
+}
+function isOutside(root, path) {
+	let inside = (0, node_path.relative)(root, path);
+	return inside === ".." || inside.startsWith(`..${node_path.sep}`);
+}
+function resolveConfigPath(path, env) {
+	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
+	if ((0, node_path.isAbsolute)(path)) throw pathError("must be relative to the workspace.");
+	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(workspace, path);
+	if (isOutside(workspace, full)) throw pathError("leads outside the workspace.");
+	let real;
+	try {
+		real = (0, node_fs.realpathSync)(full);
+	} catch {
+		throw pathError("was not found in the workspace. Check out the repository in an earlier step.");
+	}
+	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError("leads outside the workspace.");
+	return real;
+}
+const resolved = (node, doc) => (0, import_dist$2.isAlias)(node) ? node.resolve(doc) : node;
+function isMergeKey(key, doc) {
+	if (!(0, import_dist$2.isScalar)(key) || key.type && key.type !== import_dist$2.Scalar.PLAIN) return !1;
+	let { value } = key;
+	return (value === "<<" || typeof value == "symbol" && value.description === "<<") && doc.schema.tags.some((tag) => tag.tag === "tag:yaml.org,2002:merge" && tag.default);
+}
+function valueNodes(doc) {
+	let read = new Map(), nodesOf = (map) => {
+		let done = read.get(map);
+		if (done) return done;
+		let nodes = new Map(), merged = [];
+		for (let { key, value } of map.items) if (isMergeKey(key, doc)) {
+			let source = resolved(value, doc);
+			merged.push(...(0, import_dist$2.isSeq)(source) ? source.items : [source]);
+		} else {
+			let name = resolved(key, doc);
+			(0, import_dist$2.isScalar)(name) && nodes.set(String(name.value), value);
+		}
+		for (let source of merged.map((node) => resolved(node, doc))) for (let [key, value] of nodesOf(source)) nodes.has(key) || nodes.set(key, value);
+		return read.set(map, nodes), nodes;
+	};
+	return nodesOf(doc.contents);
+}
+function parseConfig(text, path, known) {
+	let invalid = (reason) => new ConfigFileError(`Invalid config-file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$2.LineCounter(), doc = (0, import_dist$2.parseDocument)(text, { lineCounter });
+	for (let warning of doc.warnings) process.emitWarning(warning);
+	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
+	let js;
+	try {
+		js = doc.toJS();
+	} catch (e) {
+		throw invalid(errorMessage(e));
+	}
+	if (js == null) return new Map();
+	if (typeof js != "object" || Array.isArray(js)) throw invalid("the top level must be a mapping of input names to values.");
+	let nodes = valueNodes(doc), lineOf = (key, value) => {
+		let node = resolved(nodes.get(key), doc), [start, end] = node.range, at = lineCounter.linePos(start).line;
+		if (node.type === import_dist$2.Scalar.BLOCK_LITERAL) return at + 1;
+		if (node.type !== import_dist$2.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
+	}, own = new Set(doc.contents.items.filter(({ key }) => !isMergeKey(key, doc)).map(({ key }) => resolved(key, doc)).filter(import_dist$2.isScalar).map((key) => String(key.value))), keys = new Map();
+	for (let key of Object.keys(js)) {
+		let name = known.find((input) => key === input || key === legacyInputName(input));
+		if (!name) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
+		let other = keys.get(name);
+		if (other === void 0 || own.has(key) && !own.has(other)) keys.set(name, key);
+		else if (own.has(key) || !own.has(other)) throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
+	}
+	let values = new Map();
+	for (let [name, key] of keys) {
+		let value = js[key];
+		if (value == null) values.set(name, { text: "" });
+		else if ([
+			"string",
+			"number",
+			"boolean"
+		].includes(typeof value)) {
+			let text = String(value);
+			values.set(name, {
+				text,
+				line: lineOf(key, text)
+			});
+		} else throw invalid(`${key} must be a string, as it would be in the workflow.`);
+	}
+	return values;
+}
+function applyConfigFile(env, { known, lists }) {
+	let path = env[inputEnvName("config-file")]?.trim() ?? "";
+	if (!path) return;
+	refuseUntrustedEvent(env);
+	let full = resolveConfigPath(path, env), text;
+	try {
+		text = (0, node_fs.readFileSync)(full, "utf8");
+	} catch (e) {
+		throw new ConfigFileError(`config-file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`, "CONFIG_FILE_PATH");
+	}
+	let values = parseConfig(text, path, known), ignored = [], origins = new Map();
+	for (let [name, { text: value, line }] of values) {
+		let envName = inputEnvName(name), inline = env[envName] ?? "";
+		if (lists.includes(name)) {
+			let joined = [inline, value].filter((v) => v.trim()).join("\n");
+			env[envName] = joined;
+			let before = joined.slice(0, joined.length - value.length);
+			value.trim() && origins.set(name, {
+				offset: before.split("\n").length - 1,
+				line
+			});
+		} else inline.trim() ? value.trim() && value.trim() !== inline.trim() && ignored.push(name) : (env[envName] = value, value.trim() && origins.set(name, {
+			offset: 0,
+			line
+		}));
+	}
+	return ignored.length ? {
+		path: full,
+		warning: `Ignored from config-file ${path}, set by the workflow: ${ignored.join(", ")}`,
+		origins
+	} : {
+		path: full,
+		origins
+	};
+}
 //#endregion
 //#region src/core/lib/actions/inputs.ts
 init_core();
@@ -63471,7 +63478,7 @@ async function runReportStep(env, overrides = {}) {
 		...realDeps,
 		...overrides
 	};
-	for (let ignored of normalizeInputNames(env, INPUT_NAMES)) warn(ignored);
+	for (let ignored of normalizeInputNames(env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists)) warn(ignored);
 	let { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
 	warning && warn(warning);
 	let builderName = readBuilderName();

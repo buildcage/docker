@@ -4973,17 +4973,26 @@ function inputEnvName(name) {
 function legacyInputName(name) {
 	return name.replaceAll("-", "_");
 }
-function normalizeInputNames(env, names) {
+function normalizeInputNames(env, names, lists = []) {
 	let warnings = [];
 	for (let name of names) {
 		let legacy = legacyInputName(name);
 		if (legacy === name) continue;
 		let legacyEnvName = inputEnvName(legacy), value = env[legacyEnvName] ?? "";
 		if (delete env[legacyEnvName], !value.trim()) continue;
-		let current = env[inputEnvName(name)] ?? "";
-		current.trim() ? current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}: ${name} is set.`) : env[inputEnvName(name)] = value;
+		let envName = inputEnvName(name), current = env[envName] ?? "";
+		current.trim() ? lists.includes(name) ? env[envName] = `${current}\n${value}` : current.trim() !== value.trim() && warnings.push(`Ignored ${legacy}, as ${name} is also set.`) : env[envName] = value;
 	}
 	return warnings;
+}
+function setOutputUnderBothNames(name, value, setOutput$1 = setOutput) {
+	let failures = [];
+	for (let output of [name, legacyInputName(name)]) try {
+		setOutput$1(output, value);
+	} catch (e) {
+		failures.push(e);
+	}
+	if (failures.length > 0) throw failures[0];
 }
 //#endregion
 //#region src/core/lib/actions/config-file.ts
@@ -5058,11 +5067,17 @@ function parseConfig(text, path, known) {
 		let node = resolved(nodes.get(key), doc), [start, end] = node.range, at = lineCounter.linePos(start).line;
 		if (node.type === import_dist$3.Scalar.BLOCK_LITERAL) return at + 1;
 		if (node.type !== import_dist$3.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
-	}, values = new Map();
-	for (let [key, value] of Object.entries(js)) {
+	}, own = new Set(doc.contents.items.filter(({ key }) => !isMergeKey(key, doc)).map(({ key }) => resolved(key, doc)).filter(import_dist$3.isScalar).map((key) => String(key.value))), keys = new Map();
+	for (let key of Object.keys(js)) {
 		let name = known.find((input) => key === input || key === legacyInputName(input));
 		if (!name) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
-		if (values.has(name)) throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
+		let other = keys.get(name);
+		if (other === void 0 || own.has(key) && !own.has(other)) keys.set(name, key);
+		else if (own.has(key) || !own.has(other)) throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
+	}
+	let values = new Map();
+	for (let [name, key] of keys) {
+		let value = js[key];
 		if (value == null) values.set(name, { text: "" });
 		else if ([
 			"string",
@@ -12936,11 +12951,11 @@ async function runSetupStep(env, overrides = {}) {
 		...realDeps,
 		...overrides
 	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
-	for (let ignored of normalizeInputNames(env, INPUT_NAMES)) warn(ignored);
+	for (let ignored of normalizeInputNames(env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists)) warn(ignored);
 	let { warning } = applyConfigFile(env, CONFIG_FILE_INPUTS) ?? {};
 	warning && warn(warning);
 	let { proxyEngine, builderName, proxyMode, failOnCaResidue, httpsRules, httpRules, ipRules, urlRules, tlsRules, knownBlockedRules } = readSetupInputs();
-	dropListInputs(env), log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutput("builder-name", builderName), setOutput("builder_name", builderName), checkUrlAndTlsRuleSupport({
+	dropListInputs(env), log(`Proxy engine: ${proxyEngine}`), env.GITHUB_STATE && saveState("builder_name", builderName), setOutputUnderBothNames("builder-name", builderName, setOutput), checkUrlAndTlsRuleSupport({
 		proxyEngine,
 		proxyMode,
 		urlRules,
