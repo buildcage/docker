@@ -22,28 +22,30 @@ and links here for the details.
 
 ## Setup action inputs
 
-`buildcage/docker` starts the builder. Every input is optional.
+`buildcage/docker` starts the builder. Every input is optional. Each one also takes its name spelled
+with underscores (`proxy_mode` for `proxy-mode`), as earlier versions named it. When a workflow sets
+both spellings, the hyphenated one wins and the step warns.
 
 | Input                | Default     | Description                                                                                                                                                                                 |
 | -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config_file`        | empty       | A YAML file, relative to the workspace, that sets the other inputs. See [Config file](#config-file).                                                                                        |
-| `builder_name`       | `buildcage` | Name of the builder container: at least two letters, digits, `_`, `.` or `-`, starting with a letter or digit. The Buildx `endpoint` has to match it; see [outputs](#setup-action-outputs). |
-| `proxy_mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                                                                             |
-| `proxy_engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                                                                              |
-| `fail_on_ca_residue` | `true`      | `inspect` only. `false` turns a copy of the CA or its NSS slot left in the image into a warning. See [CA residue](#ca-residue).                                                             |
+| `config-file`        | empty       | A YAML file, relative to the workspace, that sets the other inputs. See [Config file](#config-file).                                                                                        |
+| `builder-name`       | `buildcage` | Name of the builder container: at least two letters, digits, `_`, `.` or `-`, starting with a letter or digit. The Buildx `endpoint` has to match it; see [outputs](#setup-action-outputs). |
+| `proxy-mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                                                                             |
+| `proxy-engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                                                                              |
+| `fail-on-ca-residue` | `true`      | `inspect` only. `false` turns a copy of the CA or its NSS slot left in the image into a warning. See [CA residue](#ca-residue).                                                             |
 
-`fail_on_ca_residue` takes `true` or `false`. Any other value fails the step before the builder
+`fail-on-ca-residue` takes `true` or `false`. Any other value fails the step before the builder
 starts.
 
 ```yaml
 - uses: buildcage/docker@85cfae351eda1cb31743111246e5b291ed3556cb # v4.3.1
   with:
-    builder_name: buildcage
-    proxy_mode: restrict
-    proxy_engine: inspect
+    builder-name: buildcage
+    proxy-mode: restrict
+    proxy-engine: inspect
 ```
 
-On a self-hosted runner that runs several jobs at once, give each job its own `builder_name`. The
+On a self-hosted runner that runs several jobs at once, give each job its own `builder-name`. The
 name is what identifies the builder's containers, so two concurrent jobs sharing it tear down each
 other's builder. The report action needs the same name. A GitHub-hosted runner gets a VM per job, so
 the default is fine there.
@@ -55,15 +57,15 @@ rule in any input matches. Which ones apply depends on the engine.
 
 | Input                 | `inspect` | `universal` | What one rule matches                                                                                                      |
 | --------------------- | :-------: | :---------: | -------------------------------------------------------------------------------------------------------------------------- |
-| `allowed_url_rules`   |    ✅     |      -      | A method and a URL: `GET https://registry.npmjs.org/**`                                                                    |
-| `allowed_https_rules` |    ✅     |     ✅      | A host and port reached over HTTPS: `registry.npmjs.org:443`                                                               |
-| `allowed_http_rules`  |    ✅     |     ✅      | A host and port reached over plain HTTP: `deb.debian.org:80`                                                               |
-| `allowed_ip_rules`    |    ✅     |     ✅      | An address and port, for connections made without DNS: `192.168.1.1:443`                                                   |
-| `allowed_tls_rules`   |    ✅     |      -      | A TLS destination to pass through undecrypted, judged on SNI: `db.example.com:5432`                                        |
-| `known_blocked_rules` |    ✅     |     ✅      | A host, or (on `inspect`) a method and URL, expected to be blocked, so it doesn't fail the [report](#report-action-inputs) |
+| `allowed-url-rules`   |    ✅     |      -      | A method and a URL: `GET https://registry.npmjs.org/**`                                                                    |
+| `allowed-https-rules` |    ✅     |     ✅      | A host and port reached over HTTPS: `registry.npmjs.org:443`                                                               |
+| `allowed-http-rules`  |    ✅     |     ✅      | A host and port reached over plain HTTP: `deb.debian.org:80`                                                               |
+| `allowed-ip-rules`    |    ✅     |     ✅      | An address and port, for connections made without DNS: `192.168.1.1:443`                                                   |
+| `allowed-tls-rules`   |    ✅     |      -      | A TLS destination to pass through undecrypted, judged on SNI: `db.example.com:5432`                                        |
+| `known-blocked-rules` |    ✅     |     ✅      | A host, or (on `inspect`) a method and URL, expected to be blocked, so it doesn't fail the [report](#report-action-inputs) |
 
-Under `inspect`, `allowed_https_rules` and `allowed_http_rules` still work and are kept for
-compatibility, but `allowed_url_rules` covers them: a host rule is the same as a URL rule with any
+Under `inspect`, `allowed-https-rules` and `allowed-http-rules` still work and are kept for
+compatibility, but `allowed-url-rules` covers them: a host rule is the same as a URL rule with any
 method and any path.
 
 Setting a rule the engine can't act on is caught before the build starts: `restrict` fails, since a
@@ -71,7 +73,7 @@ rule that looks like it protects the build but cannot be enforced is worse than 
 warns and ignores it.
 
 Each of these inputs can hold about 128 KiB of rules, the most Linux passes in one environment
-variable, counted without comments and blank lines and with the `:*` a `known_blocked_rules` rule
+variable, counted without comments and blank lines and with the `:*` a `known-blocked-rules` rule
 without a port gets. A larger one fails setup before the builder starts; write fewer, broader
 rules, such as [wildcards](#wildcards).
 
@@ -79,33 +81,35 @@ rules, such as [wildcards](#wildcards).
 
 | Output         | Description                                                                              |
 | -------------- | ---------------------------------------------------------------------------------------- |
-| `builder_name` | Name of the builder container, whether the workflow, `config_file` or the default set it |
+| `builder-name` | Name of the builder container, whether the workflow, `config-file` or the default set it |
 
-A workflow shared across repositories cannot always know the name in advance, since `config_file`
+The same value is also set as `builder_name`.
+
+A workflow shared across repositories cannot always know the name in advance, since `config-file`
 may set it. Take the Buildx `endpoint` from the output instead:
 
 ```yaml
 - id: buildcage
   uses: buildcage/docker@<sha>
   with:
-    config_file: app/buildcage.yml
+    config-file: app/buildcage.yml
 - uses: docker/setup-buildx-action@<sha>
   with:
     driver: remote
-    endpoint: docker-container://${{ steps.buildcage.outputs.builder_name }}
+    endpoint: docker-container://${{ steps.buildcage.outputs.builder-name }}
 ```
 
 ## Config file
 
-`config_file` names a YAML file in the repository that sets the inputs of the setup and report
+`config-file` names a YAML file in the repository that sets the inputs of the setup and report
 actions, so the policy can sit beside the Dockerfile whose `RUN` steps it governs:
 
 ```yaml
 # app/buildcage.yml
-proxy_engine: inspect
-allowed_url_rules: |
+proxy-engine: inspect
+allowed-url-rules: |
   GET https://registry.npmjs.org/**
-known_blocked_rules: |
+known-blocked-rules: |
   telemetry.example.com
 ```
 
@@ -113,24 +117,25 @@ known_blocked_rules: |
 - uses: actions/checkout@<sha>
 - uses: buildcage/docker@<sha>
   with:
-    config_file: app/buildcage.yml
+    config-file: app/buildcage.yml
 # ... the build ...
 - uses: buildcage/docker/report@<sha>
   if: always()
   with:
-    config_file: app/buildcage.yml
+    config-file: app/buildcage.yml
 ```
 
-- Each key is an input name of either action and each value is written as it would be under
-  `with:`. A key that is neither action's input, a list or a nested mapping fails the step.
-- Give the same file to the report action, which reads `builder_name`, `fail_on_blocked` and the
+- Each key is an input name of either action, in either spelling, and each value is written as it
+  would be under `with:`. A key that is neither action's input, an input set under both spellings,
+  a list or a nested mapping fails the step.
+- Give the same file to the report action, which reads `builder-name`, `fail-on-blocked` and the
   traffic artifact inputs from it when it runs. Leave the file as it is until then, and keep it out
   of the way of a build's `--output type=local` export.
 - An input the workflow sets wins over the file. The rule inputs are the exception: the file's
   rules are added to the workflow's.
 - The path is relative to `$GITHUB_WORKSPACE` and must stay inside it, through symlinks too. The
   repository has to be checked out by an earlier step.
-- `config_file` fails the step on `pull_request_target`, and on `workflow_run` triggered by a pull
+- `config-file` fails the step on `pull_request_target`, and on `workflow_run` triggered by a pull
   request event: the workspace there can hold the pull request's own code, which could rewrite the
   file. Set the inputs in the workflow on those events.
 - On any other event the file is read as the workflow checked it out, so whoever can write that
@@ -138,11 +143,11 @@ known_blocked_rules: |
   example, takes the rules from the pull request.
 
 The rules belong to the builder, not to a Dockerfile: several builds on one builder share them. Give
-a Dockerfile that needs its own policy its own `builder_name` and file.
+a Dockerfile that needs its own policy its own `builder-name` and file.
 
 ## Operation modes
 
-| `proxy_mode` | What it does                                                      | When to use it                                             |
+| `proxy-mode` | What it does                                                      | When to use it                                             |
 | ------------ | ----------------------------------------------------------------- | ---------------------------------------------------------- |
 | `audit`      | Logs every destination the build reaches and blocks nothing       | First setup, adding a dependency, investigating a failure  |
 | `restrict`   | Allows only what the rules match, blocks and logs everything else | Everyday builds, CI/CD pipelines, security-critical builds |
@@ -151,7 +156,7 @@ a Dockerfile that needs its own policy its own `builder_name` and file.
 request carrying no `Host` header, is still blocked, on each engine's own terms.
 
 Because `audit` enforces nothing, the `allowed_*_rules` have no effect in it; you write them when
-you move to `restrict`. Any other `proxy_mode` value, a differently cased one included, fails the
+you move to `restrict`. Any other `proxy-mode` value, a differently cased one included, fails the
 setup.
 
 `audit` is not a passive observer under `inspect`: TLS is terminated in both modes, and what `audit`
@@ -163,10 +168,12 @@ destination named, which is why it is worth running `audit` first.
 
 ## Rule syntax
 
-`allowed_url_rules` and `allowed_tls_rules` need `proxy_engine: inspect`. The host rules work with
+`allowed-url-rules` and `allowed-tls-rules` need `proxy-engine: inspect`. The host rules work with
 every engine.
 
-### URL rules: `allowed_url_rules`
+<a id="url-rules-allowed_url_rules"></a>
+
+### URL rules: `allowed-url-rules`
 
 A rule is a method list, a space, then a URL pattern. Because a rule contains a space, this input is
 newline-separated. The method is required, so a rule always states what it permits. A `#` at the
@@ -176,7 +183,7 @@ comment: since `#` never legitimately appears in a rule (it is part of no host o
 fragment never travels with a request), it is reported as a mistake rather than silently trimmed.
 
 ```yaml
-allowed_url_rules: |
+allowed-url-rules: |
   # apt
   GET http://deb.debian.org/**
   GET http://security.debian.org/**
@@ -214,7 +221,7 @@ In a URL rule a wildcard may sit among literal text, inside a domain label or a 
 rules don't allow that:
 
 ```yaml
-allowed_url_rules: |
+allowed-url-rules: |
   GET https://abc*.amazonaws.com/**
   GET https://example.com/pkg-*/**
 ```
@@ -228,23 +235,25 @@ against the `Host` header and still decide, and an address reached this way stay
 method and path rules apply to it. Only plaintext `http` gets through, though. A client connecting
 to an address sends no SNI, so the proxy answers with a default certificate valid for no name, and
 the proxy's own check of the origin's certificate never accepts an IP SAN either. Pass TLS to an
-address through with `allowed_ip_rules` instead.
+address through with `allowed-ip-rules` instead.
 
-### Host rules: `allowed_https_rules`, `allowed_http_rules`, `allowed_ip_rules`, `known_blocked_rules`
+<a id="host-rules-allowed_https_rules-allowed_http_rules-allowed_ip_rules-known_blocked_rules"></a>
 
-`allowed_https_rules`, `allowed_http_rules` and `allowed_ip_rules` share one syntax; rules are
+### Host rules: `allowed-https-rules`, `allowed-http-rules`, `allowed-ip-rules`, `known-blocked-rules`
+
+`allowed-https-rules`, `allowed-http-rules` and `allowed-ip-rules` share one syntax; rules are
 separated by whitespace, so one per line reads best. A host rule is equivalent to a URL rule with any
-method and any path. `known_blocked_rules` extends this syntax and is newline-separated, since a line
-there can also be a URL rule; see [Blocked rules](#blocked-rules-known_blocked_rules).
+method and any path. `known-blocked-rules` extends this syntax and is newline-separated, since a line
+there can also be a URL rule; see [Blocked rules](#blocked-rules-known-blocked-rules).
 
 ```yaml
-allowed_https_rules: |
+allowed-https-rules: |
   registry.npmjs.org:443
   repo.maven.apache.org:443
   *.internal.example.com:443
   registry.internal.example.com:8443
 
-allowed_http_rules: |
+allowed-http-rules: |
   deb.debian.org:80
   security.debian.org:80
 ```
@@ -258,14 +267,14 @@ allowed_http_rules: |
 | `?`     | A single character excluding dots                           | `exampl?.com` matches `example.com`, `examplx.com`                       |
 
 A label that contains `*` has to be exactly `*` or `**`. `abc*.example.com` is rejected here; only
-[`allowed_url_rules`](#url-rules-allowed_url_rules) takes a wildcard in the middle of a label.
+[`allowed-url-rules`](#url-rules-allowed-url-rules) takes a wildcard in the middle of a label.
 
 Besides the wildcards, a label holds letters, digits, `-` and `_`, and nothing else. Write an
 internationalized name in its punycode form (`xn--mnchen-3ya.de`, not `münchen.de`), the form a
 connection carries. A leading, trailing or doubled dot is refused.
 
 A `Host` header ending in a dot (`example.com.`) matches as the name without it. An SNI may not end
-in one (RFC 6066), so where a rule is judged on the SNI (`allowed_tls_rules`, `allowed_https_rules`
+in one (RFC 6066), so where a rule is judged on the SNI (`allowed-tls-rules`, `allowed-https-rules`
 under `universal`, and [`sni-not-allowed`](#the-ones-buildcage-blocked)), only a rule whose `**` can
 take in the dot (`example.**` or `**`, not `example.com.**`), or a `~` rule written to allow the
 dot, matches such a name.
@@ -273,7 +282,7 @@ dot, matches such a name.
 `**` alone matches an address too: under `**:443`, a request that reaches the proxy through a name
 with `Host: 10.0.0.5` goes to that private address (see
 [A name may not resolve inward](./security.md#a-name-may-not-resolve-inward)). A connection straight
-to an address goes by `allowed_ip_rules` only.
+to an address goes by `allowed-ip-rules` only.
 
 #### Ports
 
@@ -287,14 +296,16 @@ it names one. A `~` rule's port is part of its regex and is not checked.
 | `*.example.com:8443` | Any single-level subdomain of `example.com` on port 8443 only |
 | `example.com:*`      | `example.com` on any port                                     |
 
-`known_blocked_rules` is the exception: a host rule there that names no port is read as `:*`. It is
+`known-blocked-rules` is the exception: a host rule there that names no port is read as `:*`. It is
 matched against rows of the report rather than against connections, and a row for a name the
 resolver blocked has no port at all, nothing having been connected to. `telemetry.example.com` and
 `telemetry.example.com:*` are the same rule.
 
-### Blocked rules: `known_blocked_rules`
+<a id="blocked-rules-known_blocked_rules"></a>
 
-`known_blocked_rules` lists traffic that is expected to be blocked, so a build isn't failed over a
+### Blocked rules: `known-blocked-rules`
+
+`known-blocked-rules` lists traffic that is expected to be blocked, so a build isn't failed over a
 block you already know about (see [Report action inputs](#report-action-inputs)). It does not
 allow anything: the traffic stays blocked. Use it for a telemetry endpoint you want blocked without
 failing the step, where allowing it would let the request through.
@@ -303,11 +314,11 @@ Unlike the allow inputs it is newline-separated, one rule per line, because a li
 form:
 
 - a **host rule** (`host:port`, the syntax above), which works on every engine; and
-- a **URL rule** (a method and a URL, the [`allowed_url_rules`](#url-rules-allowed_url_rules)
-  syntax), which needs `proxy_engine: inspect`, the only engine that sees a method or a path.
+- a **URL rule** (a method and a URL, the [`allowed-url-rules`](#url-rules-allowed-url-rules)
+  syntax), which needs `proxy-engine: inspect`, the only engine that sees a method or a path.
 
 ```yaml
-known_blocked_rules: |
+known-blocked-rules: |
   # host rules: acknowledge every port on a name, or a specific one
   telemetry.example.com
   *.metrics.example.com:443
@@ -325,13 +336,15 @@ follows each form: a host rule with no port reads as `:*`, a URL rule with no po
 default (`443`/`80`), exactly as in the allow inputs.
 
 Because a URL rule matches nothing on an engine that never sees a method or a path, a URL line under
-`proxy_engine: universal` is refused in `restrict` mode and warned about in `audit`, the same split
-`allowed_url_rules` gets. A host line works on every engine.
+`proxy-engine: universal` is refused in `restrict` mode and warned about in `audit`, the same split
+`allowed-url-rules` gets. A host line works on every engine.
 
-> **Migrating from v3.** `known_blocked_rules` was whitespace-separated, so several host rules could
+> **Migrating from v3.** `known-blocked-rules` was whitespace-separated, so several host rules could
 > share a line. It is now newline-separated: put each rule on its own line.
 
-### IP addresses: `allowed_ip_rules`
+<a id="ip-addresses-allowed_ip_rules"></a>
+
+### IP addresses: `allowed-ip-rules`
 
 Connections made straight to an address never go through DNS, so they are allowed separately from
 any domain. IPv4 only, in decimal without leading zeros (`10.0.0.1`, not `010.0.0.1`, which HAProxy
@@ -339,7 +352,7 @@ reads as octal) and with a prefix length of 0 to 32; setup refuses anything else
 address, a CIDR block, a wildcard or a `~` regex, the same on every engine:
 
 ```yaml
-allowed_ip_rules: |
+allowed-ip-rules: |
   192.168.1.10:443
   10.0.0.0/8:443
   192.168.1.*:443
@@ -354,28 +367,30 @@ through a name to the domain rules. A connection an IP rule allows is tunneled w
 once an `ip:port` pair is allowed, any TCP-based protocol can use that path. The proxy connects
 upstream as soon as the connection arrives, without waiting for the client to send anything, so a
 protocol where the server speaks first (SMTP, MySQL) works too. The connection goes to the address
-the client connected to, whatever name it carries (under `inspect`, even one an `allowed_tls_rules`
+the client connected to, whatever name it carries (under `inspect`, even one an `allowed-tls-rules`
 entry names), and the report lists it under the `IP` rule type. Prefer a domain rule where the
 destination has a stable name.
 
-A connection passed through this way or by `allowed_tls_rules`, any allowed HTTPS connection under
+A connection passed through this way or by `allowed-tls-rules`, any allowed HTTPS connection under
 `universal`, and an upgraded WebSocket are closed after an hour with nothing sent either way, so an
 idle ssh session or pooled database connection stays open until then.
 
-### TLS passthrough: `allowed_tls_rules`
+<a id="tls-passthrough-allowed_tls_rules"></a>
+
+### TLS passthrough: `allowed-tls-rules`
 
 Use this for TLS traffic that isn't HTTPS, and for HTTPS that must not be decrypted, such as gRPC:
 `inspect` answers no ALPN, so a client that requires HTTP/2 fails. The SNI and port are checked and
 the connection passes through undecrypted, so the build validates the origin's own certificate:
 
 ```yaml
-allowed_tls_rules: |
+allowed-tls-rules: |
   db.example.com:5432
   repo.maven.apache.org:443
 ```
 
 A host rule input is split on whitespace, so a rule per line and a group of rules on one line both
-work. Comments follow the same rule as [`allowed_url_rules`](#url-rules-allowed_url_rules): a `#` at
+work. Comments follow the same rule as [`allowed-url-rules`](#url-rules-allowed-url-rules): a `#` at
 the start of a line, or after whitespace, runs to the end of the line, and a `#` with no space
 before it is reported as a mistake rather than silently trimmed, since `#` is part of no host. The
 second rule above is the shape to use for a JVM build whose keystore Buildcage cannot inject into
@@ -386,7 +401,7 @@ trusts the injected CA without a passthrough.
 
 Prefix a rule with `~` to use a regular expression. A host rule's pattern is matched against
 `domain:port` as one expression, so the port is part of the pattern and can be a regex itself. It
-cannot be left out, except in `known_blocked_rules`, which reads a `~` rule with no port as any
+cannot be left out, except in `known-blocked-rules`, which reads a `~` rule with no port as any
 port: every other input refuses a `~` host rule with no `:` in it, since what the pattern is matched
 against always carries the port.
 
@@ -395,7 +410,7 @@ against always carries the port.
 | `~^example\.com:443$`             | Matches `example.com` on port 443 only                     |
 | `~^example\.com:\d+$`             | Matches `example.com` on any port                          |
 | `~^.*\.example\.com:(443\|8443)$` | Matches any subdomain of `example.com` on port 443 or 8443 |
-| `~^192\.168\.1\.\d+:80$`          | Matches a range of IP addresses (in `allowed_ip_rules`)    |
+| `~^192\.168\.1\.\d+:80$`          | Matches a range of IP addresses (in `allowed-ip-rules`)    |
 
 `^` and `$` are added where they are missing, so a pattern always covers the whole `domain:port`. An
 IPv6 address is refused here as everywhere else in the rule syntax. A host name matches in any case,
@@ -422,13 +437,13 @@ accepts: a flag modifier such as `(?i:`, and one group name used in two alternat
 both. A host needs no `(?i:`, since it matches in any case; in a path, spell each case as a class,
 as in `[Aa]`.
 
-In `allowed_url_rules` a `~` expression covers the URL, and is split at the first `/` after `://`:
+In `allowed-url-rules` a `~` expression covers the URL, and is split at the first `/` after `://`:
 everything before that `/` is matched against the host, everything from it onward against the path.
 The scheme before `://` must be written `https`, `http` or `https?`, the last covering both; any
 other spelling is refused, since the scheme decides which listener the rule is enforced on.
 
 ```yaml
-allowed_url_rules: |
+allowed-url-rules: |
   # host half: example\.com   path half: /pub/.*$
   GET ~^https://example\.com/pub/.*$
 
@@ -451,11 +466,11 @@ meaning. Keep the `|` inside a group, or write one rule per alternative:
 
 ```yaml
 # not supported
-allowed_url_rules: |
+allowed-url-rules: |
   GET ~^https://a\.example\.com/x$|^https://b\.example\.com/y$
 
 # supported
-allowed_url_rules: |
+allowed-url-rules: |
   GET ~^https://(a|b)\.example\.com/x$
   GET ~^https://a\.example\.com/x$
   GET ~^https://b\.example\.com/y$
@@ -467,25 +482,26 @@ refused with an error naming what to write instead.
 ## Report action inputs
 
 `buildcage/docker/report` reads the builder's communication log, writes the Job Summary, and
-optionally fails the job when blocked connections are found. Every input is optional.
+optionally fails the job when blocked connections are found. Every input is optional and, as the
+setup action's do, also takes its name spelled with underscores.
 
 | Input                             | Default     | Description                                                                                        |
 | --------------------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
-| `config_file`                     | empty       | The file given to the setup action. See [Config file](#config-file).                               |
-| `builder_name`                    | `buildcage` | Name of the builder container, as given to the setup action                                        |
-| `fail_on_blocked`                 | `true`      | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode)      |
-| `upload_traffic_artifact`         | `false`     | Upload the observed traffic as a JSON artifact named `buildcage-traffic`                           |
-| `traffic_artifact_retention_days` | empty       | How long to keep that artifact, as a whole number of days; empty uses the repository's own default |
+| `config-file`                     | empty       | The file given to the setup action. See [Config file](#config-file).                               |
+| `builder-name`                    | `buildcage` | Name of the builder container, as given to the setup action                                        |
+| `fail-on-blocked`                 | `true`      | Fail the step if blocked connections are detected (restrict mode only; ignored in audit mode)      |
+| `upload-traffic-artifact`         | `false`     | Upload the observed traffic as a JSON artifact named `buildcage-traffic`                           |
+| `traffic-artifact-retention-days` | empty       | How long to keep that artifact, as a whole number of days; empty uses the repository's own default |
 
-`fail_on_blocked` and `upload_traffic_artifact` take `true` or `false`. Any other value, or a
+`fail-on-blocked` and `upload-traffic-artifact` take `true` or `false`. Any other value, or a
 retention that is not a whole number above zero, fails the step before the report is written.
 
 In restrict mode the step fails when blocked connections are detected, and the workflow fails with
 it. In audit mode, blocked connections (protocol errors, for instance) are reported but never fail
 the step.
 
-When every blocked connection matches a `known_blocked_rules` rule, the step does not fail, even
-with `fail_on_blocked: true`, and a `::notice::` is emitted instead of `::error::`; any unmatched
+When every blocked connection matches a `known-blocked-rules` rule, the step does not fail, even
+with `fail-on-blocked: true`, and a `::notice::` is emitted instead of `::error::`; any unmatched
 blocked connection still fails the step. Matching is per request, so a row that counts several
 requests to one host counts as expected only when a rule accounts for every one of them: a URL rule
 that names one endpoint leaves the host's other blocked requests to fail the step. The matched rows
@@ -500,14 +516,14 @@ expected, there is no alert. Whatever was blocked unexpectedly is listed first w
 marked 🚫, in one table with any connection that failed, marked ⚠️, under **Blocked Hosts**,
 **Failed Hosts** or both, whichever it holds.
 
-The rows `known_blocked_rules` matched are folded into one row per rule, named after the rule and
+The rows `known-blocked-rules` matched are folded into one row per rule, named after the rule and
 counting the hosts behind it (`*.example.com:* (12 hosts)`). A rule covering noisy traffic then
 costs the table one line however many hosts it names, which matters most when the noise puts its
 payload in the name itself and every request brings a new long hostname. The individual hosts stay
 in **Communication details**.
 
 A name the build looked up and never connected to gets a row of its own, with `DNS` as the rule kind
-and no port (folded like any other row when a `known_blocked_rules` rule matches it). Under
+and no port (folded like any other row when a `known-blocked-rules` rule matches it). Under
 `inspect` that is the only trace of a name the build reached for and did not use, which is how a
 rule wider than the build needs shows up. A name that was connected to has no such row: the
 connection is already there. A name whose every connection ended before a request keeps that row,
@@ -524,7 +540,7 @@ what changes is only whether the row fails the step.
 1. **Allow the host the name belongs to** (`cluster0.x.mongodb.net`). The lookup is then reported as
    `discovery` instead and leaves the table, and the build may connect to that host. This is the
    useful one whenever the build was trying to reach the service.
-2. **List the service name in `known_blocked_rules`** (`_mongodb._tcp.cluster0.x.mongodb.net:*`).
+2. **List the service name in `known-blocked-rules`** (`_mongodb._tcp.cluster0.x.mongodb.net:*`).
    The row moves to Known Blocked Hosts, folded under that rule, and stops failing the step. Nothing
    else changes, and the host stays unreachable.
 
@@ -541,7 +557,7 @@ request are blocked like any other.
 Under `universal`, only a plaintext connection made through a name gets this far, and nothing names
 it before its request does, so its host reads `(unknown)`. Under `inspect`, the host is the name
 from the handshake's SNI. Without one, the address the connection was sent to stands in, and the
-row's rule type reads `IP`: an address the build wrote out itself is one only `allowed_ip_rules`
+row's rule type reads `IP`: an address the build wrote out itself is one only `allowed-ip-rules`
 could have passed through. The exception is Buildcage's own address, where every name-based
 connection lands because the resolver answers each name with it. That address names nothing, so the
 host reads `(unknown)`. The address is recorded either way, in the `destination` field of the
@@ -577,14 +593,14 @@ certificate the `inspect` engine signs with, so every HTTPS request to that host
 handshake, as `client-tls-failed`, or as `client-aborted` from a client that closes just after it.
 The build's own output says so first, as a certificate verification error; installing
 `ca-certificates`, or otherwise letting the client trust the CA, is what lets the requests through.
-An `allowed_https_rules` entry changes nothing: the host has already resolved and been dialed.
+An `allowed-https-rules` entry changes nothing: the host has already resolved and been dialed.
 
 A `client-aborted` or `client-timeout` is shown only where its host completed no other connection.
 Where the same host also completed one, the close is a keepalive pool cleaning up after its work
 rather than a failure, so it is left out of Communication details as noise. A `client-tls-failed` is
 always shown, since another client reaching the host says nothing of whether this one trusts the CA.
 The raw [traffic artifact](#traffic-artifact) keeps every one either way. None of them fails the
-step, not even with `fail_on_blocked: true`: no rule blocked them, so `known_blocked_rules` has
+step, not even with `fail-on-blocked: true`: no rule blocked them, so `known-blocked-rules` has
 nothing to match, and nothing reached an origin. A `::warning::` annotation gives the count of those
 shown.
 
@@ -592,13 +608,13 @@ A protocol where the server speaks first (SMTP, MySQL, FTP) ends here too once i
 plain-HTTP stage: the client waits for a greeting and the proxy waits for a request, so no rule is
 ever reached. Every such connection through a name gets there, and is ⚠️ rather than 🚫 even where
 nothing allows the destination, so it does not fail the step. With no TLS handshake it never matches
-`allowed_tls_rules`; connecting to the address under an `allowed_ip_rules` entry is what passes it
+`allowed-tls-rules`; connecting to the address under an `allowed-ip-rules` entry is what passes it
 through.
 
 ### The ones Buildcage blocked
 
 Buildcage blocked these: they are 🚫 rows in **Blocked Hosts**, counted in the blocked-connections
-annotation, and they fail the step under `fail_on_blocked: true` like any other blocked connection.
+annotation, and they fail the step under `fail-on-blocked: true` like any other blocked connection.
 
 ```
 🚫 00:14.002: GET http://10.0.0.9/pkg.tgz?token=*** -> missing-host-header
@@ -611,11 +627,11 @@ annotation, and they fail the step under `fail_on_blocked: true` like any other 
 | --------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `bad-request`         | the build sent bytes that could not be read as an HTTP request at all                                       |
 | `missing-host-header` | a request parsed, and carried no `Host` for a rule to match or resolve                                      |
-| `ip-not-allowed`      | a connection straight to an address no `allowed_ip_rules` entry covers ended before its request (`inspect`) |
+| `ip-not-allowed`      | a connection straight to an address no `allowed-ip-rules` entry covers ended before its request (`inspect`) |
 | `sni-not-allowed`     | the same, with an SNI naming a host no rule allows (`inspect`, `restrict` only)                             |
 
 `bad-request` is most often a protocol that is not HTTP at all and where the client speaks first,
-such as PostgreSQL or `git://`, on a port no `allowed_ip_rules` or `allowed_tls_rules` entry
+such as PostgreSQL or `git://`, on a port no `allowed-ip-rules` or `allowed-tls-rules` entry
 covers: anything that is not a TLS handshake is handed to the plain-HTTP stage, which reads it as a
 request and blocks it. `bad-request` and `missing-host-header` are blocked in `audit` mode too, as
 the same check is under `universal`, since a request naming no host has nothing to connect to,
@@ -631,31 +647,31 @@ exception: the log records where that request went, not the address, so its keep
 counted here.
 
 What clears one is a rule, though not a host rule. For traffic that is not HTTP, add the port to
-`allowed_ip_rules` or the name to `allowed_tls_rules`, and the connection is passed through
-undecrypted instead of being read as a request. `known_blocked_rules` can mark a row whose host is a
+`allowed-ip-rules` or the name to `allowed-tls-rules`, and the connection is passed through
+undecrypted instead of being read as a request. `known-blocked-rules` can mark a row whose host is a
 name from the SNI or an address; a row reading `(unknown)` names nothing a rule can be written
 against, so the passthrough rule is the only way to clear that one.
 
 `sni-not-allowed` is the same kind of connection carrying an SNI. The name is judged as the
-resolver judges one looked up through DNS, against the host of every rule but `allowed_ip_rules`,
+resolver judges one looked up through DNS, against the host of every rule but `allowed-ip-rules`,
 on any port; the one difference is that a trailing dot is kept. Through DNS, the same attempt is
 blocked as `dns-not-allowed`. A name the rules allow stays one nobody decided, as it does through
 DNS: usually a client that does not trust the CA, pointed at an address by `/etc/hosts` or
 `curl --resolve`. `audit` blocks no name, so it blocks no SNI. A rule allowing the host clears one,
-as does a `known_blocked_rules` entry.
+as does a `known-blocked-rules` entry.
 
 Under `universal`, a connection through a name that is not a TLS handshake is also read as HTTP. ssh
 or `git://` to a name is blocked as `bad-request`, in `audit` too, and a client waiting for the
 server to speak first (SMTP, FTP) ends as one nobody decided. No rule on the name clears either:
-`universal` has no `allowed_tls_rules`, so the build has to connect to the address, under an
-`allowed_ip_rules` entry.
+`universal` has no `allowed-tls-rules`, so the build has to connect to the address, under an
+`allowed-ip-rules` entry.
 
 ## Connections that failed
 
 A request no rule blocked can still come to nothing: the origin answers nothing usable, breaks off
 mid-transfer, or its name resolves nowhere. The report lists them as ⚠️ rows in the table of blocked
 hosts, headed **Blocked / Failed Hosts** when it holds both and **Failed Hosts** when it holds only
-them. They follow the blocked rows and stay in that table, as `known_blocked_rules` never matches
+them. They follow the blocked rows and stay in that table, as `known-blocked-rules` never matches
 a failure. **Communication details** shows each with ⚠️ too:
 
 ```
@@ -699,10 +715,10 @@ connection it never completed is one whose origin it never authenticated. See
 [Attempts to get around it](./security.md#attempts-to-get-around-it).
 
 A host that is flaky rather than hostile is cleared the way any expected block is, by listing it
-in `known_blocked_rules`.
+in `known-blocked-rules`.
 
-None of the four fails the step, not even with `fail_on_blocked: true`, and a `::notice::` gives the
-count. No rule blocked them, so no rule can clear them either: `known_blocked_rules` has nothing to
+None of the four fails the step, not even with `fail-on-blocked: true`, and a `::notice::` gives the
+count. No rule blocked them, so no rule can clear them either: `known-blocked-rules` has nothing to
 match, and an `allowed_*` entry changes nothing. What clears one is the origin coming back, or the
 build reaching for something that is up.
 
@@ -734,8 +750,8 @@ and what it still shows.
 
 ## Traffic artifact
 
-`upload_traffic_artifact: true` uploads the report's timeline as a `traffic.json` inside an artifact
-named `buildcage-traffic` (`buildcage-traffic-<builder_name>` when the builder is not the default
+`upload-traffic-artifact: true` uploads the report's timeline as a `traffic.json` inside an artifact
+named `buildcage-traffic` (`buildcage-traffic-<builder-name>` when the builder is not the default
 one). It carries every name lookup, including the ones the summary folds into the request that
 followed them, and service-discovery lookups with the record type that was asked for. `universal`
 sees neither the request nor where a name resolved, so under it `method`, `url`, `status` and
@@ -809,7 +825,7 @@ Job Summary is the exception: it replaces credential query parameters, see
 
 ## CA trust variables
 
-`proxy_engine: inspect` terminates TLS and re-signs it with a CA generated for each builder
+`proxy-engine: inspect` terminates TLS and re-signs it with a CA generated for each builder
 container, so the build has to trust that CA. The CA is valid for two days from when it is generated
 and carries a random `serialNumber` in its subject, so no two runs share one. The wrapper around
 runc sets these variables as each `RUN` step starts. If a variable is already set, by the base image
@@ -916,7 +932,7 @@ with, and takes the CA certificate, and the anchor, out of:
   certificate)
 - the EFI signature database RHEL's `update-ca-trust` writes
 
-Two things fail the build by default, pointing at `fail_on_ca_residue`:
+Two things fail the build by default, pointing at `fail-on-ca-residue`:
 
 - a copy of the CA the wrapper finds in the step's layer but cannot take out: one in a JKS keystore
   sealed with a password other than `changeit` or in a key's own chain, one inside any other binary
@@ -927,7 +943,7 @@ Two things fail the build by default, pointing at `fail_on_ca_residue`:
 - a `pkcs11.txt` in the step's layer that still names the CA's slot, or is too large to read (see
   [CA trust variables](#ca-trust-variables))
 
-With `fail_on_ca_residue: false` both only warn, and the copy or the slot stays in the image. Whatever
+With `fail-on-ca-residue: false` both only warn, and the copy or the slot stays in the image. Whatever
 the setting, a step whose layer the wrapper cannot read back does not run, nor does one where adding
 the CA to the wrapper's copy of a JVM keystore failed partway, and an error reading the layer back
 or restoring it fails the build.
