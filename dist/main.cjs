@@ -5014,16 +5014,16 @@ function isOutside(root, path) {
 	let inside = (0, node_path.relative)(root, path);
 	return inside === ".." || inside.startsWith(`..${node_path.sep}`);
 }
-function resolveConfigPath(path, env) {
+function resolveConfigPath(path, env, baseDir) {
 	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
-	if ((0, node_path.isAbsolute)(path)) throw pathError("must be relative to the workspace.");
-	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(workspace, path);
+	if ((0, node_path.isAbsolute)(path)) throw pathError("must be a relative path.");
+	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(baseDir ?? workspace, path);
 	if (isOutside(workspace, full)) throw pathError("leads outside the workspace.");
 	let real;
 	try {
 		real = (0, node_fs.realpathSync)(full);
 	} catch {
-		throw pathError("was not found in the workspace. Check out the repository in an earlier step.");
+		throw pathError("was not found. Check out the repository in an earlier step.");
 	}
 	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError("leads outside the workspace.");
 	return real;
@@ -5089,11 +5089,11 @@ function parseConfig(text, path, known) {
 	}
 	return values;
 }
-function applyConfigFile(env, { known, lists }) {
+function applyConfigFile(env, { known, lists }, baseDir) {
 	let path = env[inputEnvName("config-file")]?.trim() ?? "";
 	if (!path) return;
 	refuseUntrustedEvent(env);
-	let full = resolveConfigPath(path, env), text;
+	let full = resolveConfigPath(path, env, baseDir), text;
 	try {
 		text = (0, node_fs.readFileSync)(full, "utf8");
 	} catch (e) {
