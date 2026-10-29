@@ -97,19 +97,19 @@ function isOutside(root: string, path: string): boolean {
 }
 
 /** The file's real path, refusing one outside the workspace. */
-function resolveConfigPath(path: string, env: NodeJS.ProcessEnv): string {
+function resolveConfigPath(path: string, env: NodeJS.ProcessEnv, baseDir?: string): string {
   const pathError = (reason: string) =>
     new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
 
-  if (isAbsolute(path)) throw pathError("must be relative to the workspace.");
+  if (isAbsolute(path)) throw pathError("must be a relative path.");
   const workspace = resolve(env.GITHUB_WORKSPACE || process.cwd());
-  const full = resolve(workspace, path);
+  const full = resolve(baseDir ?? workspace, path);
   if (isOutside(workspace, full)) throw pathError("leads outside the workspace.");
   let real: string;
   try {
     real = realpathSync(full);
   } catch {
-    throw pathError("was not found in the workspace. Check out the repository in an earlier step.");
+    throw pathError(`(${full}) was not found. Check out the repository in an earlier step.`);
   }
   if (isOutside(realpathSync(workspace), real)) throw pathError("leads outside the workspace.");
   return real;
@@ -250,7 +250,10 @@ function parseConfig(
 /**
  * Merges `config-file` into `env`'s `INPUT_*` variables. A value the workflow
  * set wins; a list input gets both, the workflow's first. Undefined when no
- * config-file was given.
+ * config-file was given. The path resolves against `baseDir` (default: the
+ * workspace), which must be absolute and spelled as the workspace is, not
+ * resolved: `..` and the workspace check go by that spelling. The file must be
+ * in the workspace either way.
  *
  * @throws {ConfigFileError} on an untrusted event, a path outside the
  *   workspace or missing, or a file that is not a flat mapping of known
@@ -259,12 +262,13 @@ function parseConfig(
 export function applyConfigFile(
   env: NodeJS.ProcessEnv,
   { known, lists }: ConfigFileInputs,
+  baseDir?: string,
 ): AppliedConfigFile | undefined {
   const path = env[inputEnvName("config-file")]?.trim() ?? "";
   if (!path) return undefined;
 
   refuseUntrustedEvent(env);
-  const full = resolveConfigPath(path, env);
+  const full = resolveConfigPath(path, env, baseDir);
   let text: string;
   try {
     text = readFileSync(full, "utf8");

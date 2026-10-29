@@ -34,8 +34,13 @@ function envFor(path: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv 
   return { GITHUB_WORKSPACE: workspace, "INPUT_CONFIG-FILE": path, ...extra };
 }
 
-function expectError(env: NodeJS.ProcessEnv, code: string, message: string | RegExp): void {
-  expect(() => applyConfigFile(env, INPUTS)).toThrow(
+function expectError(
+  env: NodeJS.ProcessEnv,
+  code: string,
+  message: string | RegExp,
+  baseDir?: string,
+): void {
+  expect(() => applyConfigFile(env, INPUTS, baseDir)).toThrow(
     expect.objectContaining({
       name: ConfigFileError.name,
       code,
@@ -310,6 +315,23 @@ describe("applyConfigFile", () => {
     expect(env["INPUT_PROXY-MODE"]).toBe("audit");
   });
 
+  it("resolves against a base directory in the workspace", () => {
+    mkdirSync(join(workspace, "svc"));
+    writeConfig("proxy-mode: audit\n", "shared.yml");
+    const env = envFor("../shared.yml");
+    applyConfigFile(env, INPUTS, join(workspace, "svc"));
+    expect(env["INPUT_PROXY-MODE"]).toBe("audit");
+  });
+
+  it("climbs a symlinked base directory as it is spelled", () => {
+    mkdirSync(join(workspace, "releases/v2"), { recursive: true });
+    symlinkSync("releases/v2", join(workspace, "current"));
+    writeConfig("proxy-mode: audit\n", "shared.yml");
+    const env = envFor("../shared.yml");
+    applyConfigFile(env, INPUTS, join(workspace, "current"));
+    expect(env["INPUT_PROXY-MODE"]).toBe("audit");
+  });
+
   it("falls back to the working directory without GITHUB_WORKSPACE", () => {
     const cwd = process.cwd();
     process.chdir(workspace);
@@ -390,7 +412,7 @@ describe("applyConfigFile", () => {
       expectError(
         envFor(join(workspace, writeConfig("proxy-mode: audit\n"))),
         "CONFIG_FILE_PATH",
-        `config-file ${JSON.stringify(join(workspace, "buildcage.yml"))} must be relative to the workspace.`,
+        `config-file ${JSON.stringify(join(workspace, "buildcage.yml"))} must be a relative path.`,
       );
     });
 
@@ -398,7 +420,7 @@ describe("applyConfigFile", () => {
       expectError(
         envFor("missing.yml"),
         "CONFIG_FILE_PATH",
-        'config-file "missing.yml" was not found in the workspace. ' +
+        `config-file "missing.yml" (${join(workspace, "missing.yml")}) was not found. ` +
           "Check out the repository in an earlier step.",
       );
     });
@@ -409,6 +431,27 @@ describe("applyConfigFile", () => {
         envFor("../outside.yml"),
         "CONFIG_FILE_PATH",
         'config-file "../outside.yml" leads outside the workspace.',
+      );
+    });
+
+    it("that climbs out of the workspace from a base directory in it", () => {
+      mkdirSync(join(workspace, "svc"));
+      writeFileSync(join(root, "outside.yml"), "proxy-mode: audit\n");
+      expectError(
+        envFor("../../outside.yml"),
+        "CONFIG_FILE_PATH",
+        'config-file "../../outside.yml" leads outside the workspace.',
+        join(workspace, "svc"),
+      );
+    });
+
+    it("that leaves the workspace from a base directory outside it", () => {
+      writeFileSync(join(root, "outside.yml"), "proxy-mode: audit\n");
+      expectError(
+        envFor("outside.yml"),
+        "CONFIG_FILE_PATH",
+        'config-file "outside.yml" leads outside the workspace.',
+        root,
       );
     });
 
