@@ -337,7 +337,7 @@ jobs:
 
       # Audit mode's Job Summary carries the restrict-mode example a user
       # copies, which nothing else here renders through the real actions.
-      # These two steps keep the inputs' underscore spellings, still accepted.
+      # These two steps use the underscore spellings, to keep them tested.
       - name: Start the audit-mode builder
         if: matrix.proxy_engine == 'universal'
         uses: ./

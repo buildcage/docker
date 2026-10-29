@@ -1,7 +1,7 @@
 /**
- * Inputs are named with hyphens, and each still answers to the underscore
- * spelling it had first. Both are declared in action.yml, so neither draws the
- * runner's unexpected-input warning.
+ * Inputs are named with hyphens and still accept the underscore spelling they
+ * had first. action.yml declares both, so neither draws the runner's
+ * unexpected-input warning.
  */
 import * as core from "@actions/core";
 
@@ -16,10 +16,10 @@ export function legacyInputName(name: string): string {
 }
 
 /**
- * Moves each input's underscore spelling into its hyphenated one in `env` and
- * removes it, so the rest of the step, and any process it starts, reads one
- * name. Where both are set the hyphenated one wins, but a list input takes
- * both, the hyphenated one's lines first, as config-file's lists do.
+ * Moves each input's underscore spelling in `env` to its hyphenated name, so
+ * the step and any process it starts read only that one. Where both are set
+ * the hyphenated value wins, but a list input takes both, its hyphenated lines
+ * first, as config-file's lists do.
  *
  * @returns a warning for each underscore spelling ignored that way
  */
@@ -50,8 +50,7 @@ export function normalizeInputNames(
 
 /**
  * Sets an output under `name` and its underscore spelling. Both are tried
- * before a failure is thrown, so neither keeps a value something else wrote to
- * it.
+ * before a failure is thrown, so one failing still overwrites the other.
  */
 export function setOutputUnderBothNames(
   name: string,
