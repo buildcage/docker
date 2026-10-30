@@ -648,7 +648,7 @@ The following npm packages may be included in this product:
  - bare-events@2.9.2
  - bare-fs@4.8.4
  - bare-stream@2.13.4
- - bare-url@2.5.4
+ - bare-url@2.5.5
  - events-universal@1.0.1
  - text-decoder@1.2.7
 
