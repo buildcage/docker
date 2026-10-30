@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
-import { reportParams } from "#core/lib/test/report-data.node.ts";
+import { reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import type { ReportData, UniversalReportData } from "../types.ts";
 import { communicationTruncationNote } from "./communication-details.ts";
@@ -49,6 +49,7 @@ function report(overrides: Partial<UniversalReportData>): UniversalReportData {
     failed: [],
     blockedCount: 0,
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     timeline: [],
     startedAt: undefined,
     ...overrides,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
-import { reportParams } from "#core/lib/test/report-data.node.ts";
+import { reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import type { InspectReportData, UniversalReportData } from "../types.ts";
 import { joinSummaryBlocks } from "./fit-step-summary.ts";
@@ -33,6 +33,7 @@ const universal: UniversalReportData = {
   failed: [],
   blockedCount: 1,
   logLooksPlausible: true,
+  ...UNINTERRUPTED,
   timeline: [],
   startedAt: undefined,
 };
@@ -75,6 +76,26 @@ describe("trafficHeadingBlock", () => {
     expect(warning.replaceAll("\n> ", " ")).toMatch(
       /Either the logs don't begin where a real run does, one carries a line that cannot be read, or the proxy dropped lines it could not write/,
     );
+  });
+
+  it("names a proxy that stopped or restarted before the causes it can only list", () => {
+    const { text } = trafficHeadingBlock(
+      {
+        ...universal,
+        logLooksPlausible: false,
+        proxyAnswered: false,
+        restarts: { proxy: 1, resolver: 0 },
+      },
+      "T",
+    );
+    const [warning] = text.split("\n\n").filter((b) => b.includes("This report is incomplete"));
+    for (const line of warning.split("\n")) expect(line).toMatch(/^> /);
+    expect(warning.split("\n").slice(1, 5)).toStrictEqual([
+      "> The proxy did not answer the report, so it stopped or hung during the run. Requests made while it was down failed rather than going around it, and the step fails for this whatever the mode or fail-on-blocked.",
+      "> The proxy restarted 1 time(s) during the run.",
+      "> A restart loses the line of whatever was still in progress when the service stopped.",
+      "> Other causes may apply too: the logs don't begin where a real run does, one carries a line that cannot be",
+    ]);
   });
 
   it("has no warning when the log is a complete record", () => {
@@ -132,6 +153,7 @@ describe("communicationDetailsBlocks", () => {
     failed: [],
     blockedCount: 0,
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     timeline: [],
     startedAt: t,
   };

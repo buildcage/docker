@@ -57,7 +57,7 @@ describe("parseDroppedLogs", () => {
 describe("readProxyDroppedLogs", () => {
   it("asks the health socket inside the container", () => {
     const { docker, calls } = fakeDocker(() => METRICS);
-    expect(readProxyDroppedLogs(docker, "abc")).toBe(12);
+    expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({ answered: true, count: 12 });
     expect(calls).toStrictEqual([
       [
         "abc",
@@ -72,10 +72,17 @@ describe("readProxyDroppedLogs", () => {
     ]);
   });
 
-  it("returns undefined when the proxy does not answer", () => {
+  it("tells a proxy that answered without the counter from one that did not answer", () => {
+    expect(readProxyDroppedLogs(fakeDocker(() => "").docker, "abc")).toStrictEqual({
+      answered: true,
+      count: undefined,
+    });
     const { docker } = fakeDocker(() => {
       throw new Error("exit 7");
     });
-    expect(readProxyDroppedLogs(docker, "abc")).toBe(undefined);
+    expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({
+      answered: false,
+      count: undefined,
+    });
   });
 });

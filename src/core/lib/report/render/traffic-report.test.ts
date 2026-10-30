@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
-import { reportParams, expectedRows } from "#core/lib/test/report-data.node.ts";
+import { reportParams, expectedRows, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import { renderReportMarkdown } from "../../test/render-report-markdown.node.ts";
 import type { UniversalReportData, InspectReportData } from "../types.ts";
@@ -25,6 +25,7 @@ describe("renderReportMarkdown: universal", () => {
     failed: [],
     blockedCount: 0,
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     timeline: [],
     startedAt: undefined,
   };
@@ -240,6 +241,7 @@ describe("renderReportMarkdown: inspect", () => {
     failed: [],
     blockedCount: 0,
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     timeline: [],
     startedAt: t,
   };

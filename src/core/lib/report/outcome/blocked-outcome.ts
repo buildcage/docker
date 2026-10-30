@@ -1,4 +1,5 @@
 import type { ExpectedFlag } from "../build/aggregate.ts";
+import type { ReportDataCommon } from "../types.ts";
 
 export interface BlockedOutcome {
   level: "none" | "notice" | "error";
@@ -12,6 +13,8 @@ export interface DetermineBlockedOutcomeOptions {
   blockedRows: ExpectedFlag[];
   /** See ReportDataCommon.logLooksPlausible. */
   logLooksPlausible: boolean;
+  /** See ReportDataCommon.proxyAnswered. */
+  proxyAnswered: boolean;
 }
 
 /**
@@ -22,7 +25,9 @@ export interface DetermineBlockedOutcomeOptions {
  * (fail closed).
  *
  * An implausible log decides on its own: what survived says nothing about
- * what was dropped, so known-blocked-rules cannot clear the step.
+ * what was dropped, so known-blocked-rules cannot clear the step. A proxy that
+ * did not answer fails it in any mode: that is buildcage failing, not a rule
+ * the build broke.
  */
 export function determineBlockedOutcome({
   isAudit,
@@ -30,7 +35,9 @@ export function determineBlockedOutcome({
   blockedCount,
   blockedRows,
   logLooksPlausible,
+  proxyAnswered,
 }: DetermineBlockedOutcomeOptions): BlockedOutcome {
+  if (!proxyAnswered) return { level: "error", shouldFail: true };
   if (!logLooksPlausible) {
     if (isAudit) return { level: "notice", shouldFail: false };
     return failOnBlocked
@@ -79,6 +86,39 @@ export function buildBlockedMessage({
   return `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known-blocked-rules)`;
 }
 
+export type Interruptions = Pick<ReportDataCommon, "proxyAnswered" | "restarts">;
+
+/**
+ * What the report knows for certain cut its logs short, one sentence each, to
+ * be named before the causes it can only list as possible.
+ */
+export function describeInterruptions({ proxyAnswered, restarts }: Interruptions): string[] {
+  const facts: string[] = [];
+  if (!proxyAnswered) {
+    facts.push(
+      "The proxy did not answer the report, so it stopped or hung during the run. Requests made " +
+        "while it was down failed rather than going around it, and the step fails for this " +
+        "whatever the mode or fail-on-blocked.",
+    );
+  }
+  if (restarts.proxy) facts.push(`The proxy restarted ${restarts.proxy} time(s) during the run.`);
+  if (restarts.resolver) {
+    facts.push(`The DNS resolver restarted ${restarts.resolver} time(s) during the run.`);
+  }
+  if (restarts.proxy || restarts.resolver) {
+    facts.push(
+      "A restart loses the line of whatever was still in progress when the service stopped.",
+    );
+  }
+  return facts;
+}
+
+/** The words that open the causes logLooksPlausible cannot tell apart, which
+ *  stop being the only candidates once facts lead them. */
+export function possibleCauses(facts: string[]): string {
+  return facts.length === 0 ? "Either" : "Other causes may apply too:";
+}
+
 export interface DescribedBlockedOutcome extends BlockedOutcome {
   message: string;
 }
@@ -89,6 +129,8 @@ export interface DescribeBlockedOutcomeOptions {
   blockedCount: number;
   blockedRows: ExpectedFlag[];
   logLooksPlausible: boolean;
+  proxyAnswered: boolean;
+  restarts: Interruptions["restarts"];
   engineLabel: "sandbox" | "proxy";
 }
 
@@ -99,6 +141,8 @@ export function describeBlockedOutcome({
   blockedCount,
   blockedRows,
   logLooksPlausible,
+  proxyAnswered,
+  restarts,
   engineLabel,
 }: DescribeBlockedOutcomeOptions): DescribedBlockedOutcome {
   const outcome = determineBlockedOutcome({
@@ -107,16 +151,16 @@ export function describeBlockedOutcome({
     blockedCount,
     blockedRows,
     logLooksPlausible,
+    proxyAnswered,
   });
   const base = buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit });
   if (logLooksPlausible) return { ...outcome, message: base };
+  const facts = describeInterruptions({ proxyAnswered, restarts });
   // audit's notice keeps the fixed-format opening buildBlockedMessage
   // promises, so the warning is appended rather than replacing it.
-  if (isAudit) {
-    return {
-      ...outcome,
-      message: `${base}, but the logs are incomplete and this is not a full record`,
-    };
+  if (isAudit && proxyAnswered) {
+    const incomplete = `${base}, but the logs are incomplete and this is not a full record`;
+    return { ...outcome, message: facts.length ? `${incomplete}. ${facts.join(" ")}` : incomplete };
   }
   // Plural: the resolver keeps a log of its own, and either can be the truncated one.
   const incomplete = `buildcage ${engineLabel} logs are incomplete, so this report is not a full record of what ran`;
@@ -124,10 +168,12 @@ export function describeBlockedOutcome({
   const counted = blockedCount
     ? `${incomplete} (${blockedCount} blocked ${COUNT_NOUN} still recorded)`
     : incomplete;
-  // Enumerated, not attributed: logLooksPlausible collapses several conditions
-  // into one flag, and only the benign reading is the reader's to act on.
+  // Past the facts, enumerated, not attributed: logLooksPlausible collapses
+  // several conditions into one flag, and only the benign reading is the
+  // reader's to act on.
   const message =
-    `${counted}. Either the logs don't begin where a real run does, one carries a line the ` +
+    `${counted}. ${facts.map((fact) => `${fact} `).join("")}${possibleCauses(facts)} the logs ` +
+    "don't begin where a real run does, one carries a line the " +
     "report cannot read, or the proxy dropped lines it could not write (or could not say whether " +
     "it had). A missing beginning was either removed or rotated out by traffic heavy enough to " +
     "fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few " +

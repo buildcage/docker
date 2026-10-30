@@ -20,6 +20,9 @@ export interface HaproxyLogScan {
   /** Lines that open like a proxy line yet matched no format below. Each is a
    *  decision the report cannot account for. */
   unparsed: number;
+  /** Startup markers after the log's first line: each is the proxy starting
+   *  again after it stopped mid-run. */
+  restarts: number;
 }
 
 // The quoted target and the reason are restricted to the charset the config
@@ -79,6 +82,7 @@ export async function scanHaproxyLog(
   let startedAt: number | undefined;
   let headIntact: boolean | undefined;
   let unparsed = 0;
+  let restarts = 0;
 
   for await (const line of lines) {
     const m = DECISION.exec(line);
@@ -123,10 +127,11 @@ export async function scanHaproxyLog(
     const trimmed = line.trim();
     if (trimmed === "") continue;
     const start = START.exec(trimmed);
+    if (start && headIntact !== undefined) restarts++;
     headIntact ??= start !== null;
     if (start && startedAt === undefined) startedAt = Number(start[1]) / 1000;
     if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
   }
 
-  return { events, startedAt, headIntact: headIntact ?? false, unparsed };
+  return { events, startedAt, headIntact: headIntact ?? false, unparsed, restarts };
 }

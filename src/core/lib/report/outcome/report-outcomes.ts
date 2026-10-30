@@ -29,6 +29,8 @@ export function describeReportOutcomes(
       blockedCount: report.blockedCount,
       blockedRows: report.blocked,
       logLooksPlausible: report.logLooksPlausible,
+      proxyAnswered: report.proxyAnswered,
+      restarts: report.restarts,
       engineLabel,
     }),
   ];

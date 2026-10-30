@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 
+import { UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
+
 import {
   determineBlockedOutcome,
   buildBlockedMessage,
   describeBlockedOutcome,
+  describeInterruptions,
   type BuildBlockedMessageOptions,
   type DescribeBlockedOutcomeOptions,
   type DetermineBlockedOutcomeOptions,
@@ -17,6 +20,7 @@ const decide = (overrides: Partial<DetermineBlockedOutcomeOptions> = {}) =>
     blockedCount: 2,
     blockedRows: [{ expected: false }],
     logLooksPlausible: true,
+    proxyAnswered: true,
     ...overrides,
   });
 
@@ -36,6 +40,7 @@ const described = (overrides: Partial<DescribeBlockedOutcomeOptions> = {}) =>
     blockedCount: 1,
     blockedRows: [{ expected: false }],
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     engineLabel: "proxy",
     ...overrides,
   });
@@ -107,6 +112,45 @@ describe("determineBlockedOutcome", () => {
         });
       }
     });
+  });
+
+  it("fails whatever the mode or failOnBlocked when the proxy did not answer", () => {
+    for (const isAudit of [false, true]) {
+      for (const failOnBlocked of [false, true]) {
+        expect(
+          decide({
+            isAudit,
+            failOnBlocked,
+            blockedCount: 0,
+            blockedRows: [],
+            logLooksPlausible: false,
+            proxyAnswered: false,
+          }),
+        ).toStrictEqual({ level: "error", shouldFail: true });
+      }
+    }
+  });
+});
+
+describe("describeInterruptions", () => {
+  it("names nothing for a run nothing interrupted", () => {
+    expect(describeInterruptions(UNINTERRUPTED)).toStrictEqual([]);
+  });
+
+  it("names a proxy that did not answer", () => {
+    expect(describeInterruptions({ ...UNINTERRUPTED, proxyAnswered: false })).toStrictEqual([
+      "The proxy did not answer the report, so it stopped or hung during the run. Requests made while it was down failed rather than going around it, and the step fails for this whatever the mode or fail-on-blocked.",
+    ]);
+  });
+
+  it("counts each service's restarts and says what a restart loses", () => {
+    expect(
+      describeInterruptions({ proxyAnswered: true, restarts: { proxy: 2, resolver: 1 } }),
+    ).toStrictEqual([
+      "The proxy restarted 2 time(s) during the run.",
+      "The DNS resolver restarted 1 time(s) during the run.",
+      "A restart loses the line of whatever was still in progress when the service stopped.",
+    ]);
   });
 });
 
@@ -197,6 +241,40 @@ describe("describeBlockedOutcome", () => {
       ),
     ).toBe(true);
     expect(result.message).toContain("the logs are incomplete");
+  });
+
+  it("names a restart after audit's notice", () => {
+    expect(
+      described({
+        isAudit: true,
+        blockedCount: 2,
+        blockedRows: [{ expected: false }],
+        logLooksPlausible: false,
+        restarts: { proxy: 1, resolver: 0 },
+      }),
+    ).toStrictEqual({
+      level: "notice",
+      shouldFail: false,
+      message:
+        "2 blocked connection(s) and lookup(s) detected by buildcage proxy, but the logs are incomplete and this is not a full record. The proxy restarted 1 time(s) during the run. A restart loses the line of whatever was still in progress when the service stopped.",
+    });
+  });
+
+  it("fails audit for a proxy that did not answer, naming that before the other causes", () => {
+    expect(
+      described({
+        isAudit: true,
+        blockedCount: 0,
+        blockedRows: [],
+        logLooksPlausible: false,
+        proxyAnswered: false,
+      }),
+    ).toStrictEqual({
+      level: "error",
+      shouldFail: true,
+      message:
+        "buildcage proxy logs are incomplete, so this report is not a full record of what ran. The proxy did not answer the report, so it stopped or hung during the run. Requests made while it was down failed rather than going around it, and the step fails for this whatever the mode or fail-on-blocked. Other causes may apply too: the logs don't begin where a real run does, one carries a line the report cannot read, or the proxy dropped lines it could not write (or could not say whether it had). A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
+    });
   });
 
   it("names no count for an incomplete log that recorded none", () => {

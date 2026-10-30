@@ -3,6 +3,7 @@
  * traffic-report.ts stacks in print order.
  */
 
+import { describeInterruptions, possibleCauses } from "../outcome/blocked-outcome.ts";
 import type { ReportData } from "../types.ts";
 import {
   COMMUNICATION_DETAILS_CLOSE,
@@ -117,9 +118,11 @@ export function trafficHeadingBlock(
 
   // The tables would otherwise read as the whole story.
   if (!report.logLooksPlausible) {
+    const facts = describeInterruptions(report);
     top +=
       "> ❗ **This report is incomplete**, so the tables below are not a full record of this run.\n" +
-      "> Either the logs don't begin where a real run does, one carries a line that cannot be\n" +
+      facts.map((fact) => `> ${fact}\n`).join("") +
+      `> ${possibleCauses(facts)} the logs don't begin where a real run does, one carries a line that cannot be\n` +
       "> read, or the proxy dropped lines it could not write (or could not say whether it had).\n" +
       "> A missing beginning was either removed or rotated out by traffic heavy enough to fill the\n" +
       "> 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand\n" +

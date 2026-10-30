@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
-import { reportParams } from "#core/lib/test/report-data.node.ts";
+import { NONE_DROPPED, reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import { buildUniversalReportData } from "../build/universal.ts";
 import type { InspectReportData, UniversalReportData } from "../types.ts";
@@ -16,6 +16,7 @@ function universal(overrides: Partial<UniversalReportData> = {}): UniversalRepor
     failed: [],
     blockedCount: 0,
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     timeline: [],
     startedAt: undefined,
     ...overrides,
@@ -34,6 +35,7 @@ function inspect(
     failed: [],
     blockedCount: 0,
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     startedAt: 1787471970,
     timeline,
     ...overrides,
@@ -77,7 +79,7 @@ describe("describeReportOutcomes", () => {
         "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=evil.example.com.",
       ],
       reportParams(),
-      0,
+      NONE_DROPPED,
     );
     const [blocked] = describeReportOutcomes(report, options);
     expect(blocked.message).toBe(

@@ -4,6 +4,7 @@ import {
   convertRule,
   isKnownBlockedUrlRule,
 } from "#core/lib/acl/wildcard-rules.ts";
+import type { ProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import {
   aggregate,
   compareAggregated,
@@ -258,11 +259,11 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   proxyScan: Promise<InspectLogScan | HaproxyLogScan>,
   dnsScan: Promise<DnsLogScan>,
   parameters: GenReportParameters,
-  droppedLogs: number | undefined,
+  droppedLogs: ProxyDroppedLogs,
 ): Promise<Extract<ReportData, { engine: E }>> {
   const [
-    { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed },
-    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed },
+    { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed, restarts: proxy },
+    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed, restarts: resolver },
   ] = await Promise.all([proxyScan, dnsScan]);
 
   const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
@@ -276,7 +277,15 @@ export async function assembleReportData<E extends ReportData["engine"]>(
     // Either log losing its beginning loses evidence the other cannot vouch
     // for, and an unreadable or dropped line is the same gap mid-log.
     logLooksPlausible:
-      proxyHeadIntact && dnsHeadIntact && unparsed === 0 && dnsUnparsed === 0 && droppedLogs === 0,
+      proxyHeadIntact &&
+      dnsHeadIntact &&
+      unparsed === 0 &&
+      dnsUnparsed === 0 &&
+      droppedLogs.count === 0 &&
+      proxy === 0 &&
+      resolver === 0,
+    proxyAnswered: droppedLogs.answered,
+    restarts: { proxy, resolver },
     startedAt,
     timeline,
   } as Extract<ReportData, { engine: E }>;

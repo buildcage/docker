@@ -58,6 +58,11 @@ describe("scanDnsLog", () => {
     expect((await scanDnsLog([])).headIntact).toBe(false);
   });
 
+  it("counts a startup marker after the first line as a restart", async () => {
+    expect((await scanDnsLog(lines)).restarts).toBe(0);
+    expect((await scanDnsLog(["", ...lines, startMarker, startMarker])).restarts).toBe(2);
+  });
+
   it("reads a discovery lookup as its own kind of event, neither allowed nor blocked", async () => {
     const { events } = await scanDnsLog([
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns discovery name=_http._tcp.deb.debian.org. type=SRV",

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
-import { reportParams } from "#core/lib/test/report-data.node.ts";
+import { reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import type { UniversalReportData } from "../types.ts";
 import { renderVerdict } from "./verdict.ts";
@@ -32,6 +32,7 @@ const base: UniversalReportData = {
   failed: [],
   blockedCount: 0,
   logLooksPlausible: true,
+  ...UNINTERRUPTED,
   timeline: [],
   startedAt: undefined,
 };

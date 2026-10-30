@@ -332,6 +332,9 @@ export interface InspectLogScan {
   /** Lines that open as the proxy's own yet match no format above. Each is an
    *  event the report cannot account for. */
   unparsed: number;
+  /** Startup markers after the log's first line: each is the proxy starting
+   *  again after it stopped mid-run. */
+  restarts: number;
 }
 
 /**
@@ -352,6 +355,7 @@ export async function scanInspectLog(
   let startedAt: number | undefined;
   let headIntact: boolean | undefined;
   let unparsed = 0;
+  let restarts = 0;
   for await (const line of lines) {
     const event = parseProxyLine(line, isAudit);
     if (event) {
@@ -362,6 +366,7 @@ export async function scanInspectLog(
     const trimmed = line.trim();
     if (trimmed === "") continue;
     const match = START.exec(trimmed);
+    if (match && headIntact !== undefined) restarts++;
     headIntact ??= match !== null;
     if (match && startedAt === undefined) startedAt = Number(match[1]) / 1000;
     // Excluded by prefix rather than by `match`: a qjs that failed to print
@@ -370,7 +375,7 @@ export async function scanInspectLog(
   }
   blockUnpassedAddresses(events);
   if (allowsName) blockUnallowedNames(events, allowsName);
-  return { events, startedAt, headIntact: headIntact ?? false, unparsed };
+  return { events, startedAt, headIntact: headIntact ?? false, unparsed, restarts };
 }
 
 /**

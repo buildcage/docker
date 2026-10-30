@@ -11,7 +11,7 @@ import { describe, it } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
 import { expectMatchesGolden } from "#core/lib/test/golden.node.ts";
-import { expectedRows, reportParams } from "#core/lib/test/report-data.node.ts";
+import { expectedRows, reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import { renderReportMarkdown } from "../../test/render-report-markdown.node.ts";
 import type {
@@ -91,6 +91,7 @@ const universal: UniversalReportData = {
   failed,
   blockedCount: 2,
   logLooksPlausible: true,
+  ...UNINTERRUPTED,
   timeline: universalTimeline,
   startedAt: 1787471970,
 };
@@ -160,6 +161,7 @@ const inspect: InspectReportData = {
   ],
   blockedCount: 1,
   logLooksPlausible: true,
+  ...UNINTERRUPTED,
   timeline,
   startedAt: 1787471970,
 };
