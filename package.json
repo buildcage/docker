@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@sigstore/protobuf-specs": "^0.5.2",
-    "@types/node": "^24.13.3",
+    "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "5.0.5",
     "@vitest/expect": "5.0.5",
     "fast-check": "^4.9.0",
