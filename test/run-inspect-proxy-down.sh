@@ -3,7 +3,8 @@
 # A builder whose proxy stops mid-build: haproxy, then coredns, stopped while a
 # RUN step is still running. The step's traffic must then fail instead of
 # finding a way around the proxy, and the report must not pass a run the
-# stopped proxy can no longer vouch for.
+# stopped proxy can no longer vouch for, nor one with only the resolver still
+# stopped once haproxy is back.
 #
 # The step cannot reach the runner, and the runner cannot reach into the step
 # except through the builder, so the two take turns through marker files in
@@ -200,6 +201,59 @@ if [ "$REPORT_EXIT" = "1" ]; then
   pass "the report failed the step with fail-on-blocked: false too"
 else
   fail "the report exited $REPORT_EXIT with fail-on-blocked: false, expected 1"
+  echo "$REPORT_OUTPUT" | sed 's/^/    /'
+fi
+
+# start_service <service>: brings a stopped s6 service back and waits until it
+# reports ready.
+start_service() {
+  local svc="$1"
+  if docker exec "$BUILDER_NAME" s6-svc -wU -T 20000 -u "/run/service/$svc"; then
+    pass "$svc started again in the builder"
+  else
+    fail "could not start $svc again in the builder"
+  fi
+}
+
+echo ""
+echo "--- the report with only coredns stopped ---"
+# haproxy's restart alone fails no step with fail-on-blocked: false, so a
+# failure here is the stopped resolver's.
+start_service haproxy
+: >"$SUMMARY"
+REPORT_EXIT=0
+REPORT_OUTPUT=$(INPUT_FAIL_ON_BLOCKED=false GITHUB_STEP_SUMMARY="$SUMMARY" \
+  node report/src/main.ts 2>&1) || REPORT_EXIT=$?
+report_failed=0
+if [ "$REPORT_EXIT" = "1" ]; then
+  pass "the report failed the step with fail-on-blocked: false"
+else
+  fail "the report exited $REPORT_EXIT with fail-on-blocked: false, expected 1"
+  report_failed=1
+fi
+if grep -qF "The DNS resolver did not answer the report" <<<"$REPORT_OUTPUT"; then
+  pass "the report's error says the resolver did not answer"
+else
+  fail "the report's error does not say the resolver did not answer"
+  report_failed=1
+fi
+if [ "$report_failed" = "1" ]; then
+  echo "$REPORT_OUTPUT" | sed 's/^/    /'
+fi
+
+echo ""
+echo "--- the report with both running again ---"
+# Shows it was the stopped resolver: with it back, the restart alone leaves a
+# notice.
+start_service coredns
+: >"$SUMMARY"
+REPORT_EXIT=0
+REPORT_OUTPUT=$(INPUT_FAIL_ON_BLOCKED=false GITHUB_STEP_SUMMARY="$SUMMARY" \
+  node report/src/main.ts 2>&1) || REPORT_EXIT=$?
+if [ "$REPORT_EXIT" = "0" ] && ! grep -qF "did not answer the report" <<<"$REPORT_OUTPUT"; then
+  pass "the report passed the step with both running again"
+else
+  fail "the report exited $REPORT_EXIT with both running again, expected 0 and no service down"
   echo "$REPORT_OUTPUT" | sed 's/^/    /'
 fi
 

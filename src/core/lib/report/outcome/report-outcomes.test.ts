@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { TrafficEvent } from "#core/lib/log/traffic-event.ts";
-import { NONE_DROPPED, reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
+import { HEALTHY, reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import { buildUniversalReportData } from "../build/universal.ts";
 import type { InspectReportData, UniversalReportData } from "../types.ts";
@@ -79,7 +79,7 @@ describe("describeReportOutcomes", () => {
         "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=evil.example.com.",
       ],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     const [blocked] = describeReportOutcomes(report, options);
     expect(blocked.message).toBe(

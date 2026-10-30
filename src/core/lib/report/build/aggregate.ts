@@ -4,7 +4,6 @@ import {
   convertRule,
   isKnownBlockedUrlRule,
 } from "#core/lib/acl/wildcard-rules.ts";
-import type { ProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import {
   aggregate,
   compareAggregated,
@@ -17,7 +16,7 @@ import type { HaproxyLogScan } from "#core/lib/log/haproxy.ts";
 import type { InspectLogScan } from "#core/lib/log/inspect.ts";
 import { connectedHosts, isRedundantDns, type TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import type { GenReportParameters, ReportData } from "../types.ts";
+import type { GenReportParameters, ReportData, ServiceHealth } from "../types.ts";
 
 export interface AnnotatedBlockedRow extends AggregatedEntry {
   expected: boolean;
@@ -259,7 +258,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   proxyScan: Promise<InspectLogScan | HaproxyLogScan>,
   dnsScan: Promise<DnsLogScan>,
   parameters: GenReportParameters,
-  droppedLogs: ProxyDroppedLogs,
+  { droppedLogs, resolverAnswered }: ServiceHealth,
 ): Promise<Extract<ReportData, { engine: E }>> {
   const [
     { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed, restarts: proxy },
@@ -275,16 +274,19 @@ export async function assembleReportData<E extends ReportData["engine"]>(
     parameters,
     ...reduceTimeline(timeline, parameters.knownBlockedRules),
     // Either log losing its beginning loses evidence the other cannot vouch
-    // for, and an unreadable or dropped line is the same gap mid-log.
+    // for, and an unreadable or dropped line is the same gap mid-log. A
+    // resolver that stopped logs nothing of the lookups it then missed.
     logLooksPlausible:
       proxyHeadIntact &&
       dnsHeadIntact &&
       unparsed === 0 &&
       dnsUnparsed === 0 &&
       droppedLogs.count === 0 &&
+      resolverAnswered &&
       proxy === 0 &&
       resolver === 0,
     proxyAnswered: droppedLogs.answered,
+    resolverAnswered,
     restarts: { proxy, resolver },
     startedAt,
     timeline,

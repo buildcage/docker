@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { NONE_DROPPED, reportParams } from "#core/lib/test/report-data.node.ts";
+import { HEALTHY, reportParams } from "#core/lib/test/report-data.node.ts";
 
 import { buildInspectReportData } from "./inspect.ts";
 
@@ -36,19 +36,14 @@ describe("buildInspectReportData", () => {
       [START, BLOCKED, ALLOWED, TLS_PASS],
       dns,
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(r.timeline.length).toBe(4);
     expect(r.timeline.every((e, i) => i === 0 || r.timeline[i - 1].time <= e.time)).toBe(true);
   });
 
   it("tables a failure the origin caused apart from what the rules blocked", async () => {
-    const r = await buildInspectReportData(
-      [START, ORIGIN_FAILED],
-      [],
-      reportParams(),
-      NONE_DROPPED,
-    );
+    const r = await buildInspectReportData([START, ORIGIN_FAILED], [], reportParams(), HEALTHY);
     expect(r.failed.map((row) => `${row.host} ${row.reason}`)).toStrictEqual([
       "registry.npmjs.org origin-no-response",
     ]);
@@ -61,18 +56,13 @@ describe("buildInspectReportData", () => {
       [START, ORIGIN_FAILED, BLOCKED],
       [],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(r.blockedCount).toBe(1);
   });
 
   it("aggregates each side into host rows a rule could be written from", async () => {
-    const r = await buildInspectReportData(
-      [START, ALLOWED, BLOCKED],
-      [],
-      reportParams(),
-      NONE_DROPPED,
-    );
+    const r = await buildInspectReportData([START, ALLOWED, BLOCKED], [], reportParams(), HEALTHY);
     expect(r.passed[0].host).toBe("registry.npmjs.org");
     expect(r.passed[0].port).toBe("443");
     expect(r.passed[0].ruleType).toBe("HTTPS");
@@ -86,7 +76,7 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=evil.example.com.",
     ];
-    const r = await buildInspectReportData([START, BLOCKED], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, BLOCKED], dns, reportParams(), HEALTHY);
     expect(r.blocked.length).toBe(1);
     expect(r.blocked[0].ruleType).toBe("HTTPS");
     // The raw timeline is untouched: only the host tables collapse it.
@@ -97,13 +87,13 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=secret-in-a-name.attacker.example.",
     ];
-    const r = await buildInspectReportData([START], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START], dns, reportParams(), HEALTHY);
     expect(r.blocked.length).toBe(1);
     expect(r.blocked[0].ruleType).toBe("DNS");
   });
 
   it("gives a passthrough the rule kind that would permit it", async () => {
-    const r = await buildInspectReportData([START, TLS_PASS], [], reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, TLS_PASS], [], reportParams(), HEALTHY);
     expect(r.passed[0].ruleType).toBe("TLS");
     expect(r.passed[0].host).toBe("db.example.com");
     expect(r.passed[0].port).toBe("5432");
@@ -114,17 +104,12 @@ describe("buildInspectReportData", () => {
     // unauthenticated fetch would otherwise fail a build that was not blocked.
     const relayed =
       "buildcage 3 https GET 403 90 ts=-- reason=- tlserr=- dst=1.1.1.1:443 host=reg.example.com /pkg";
-    const r = await buildInspectReportData([START, relayed], [], reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, relayed], [], reportParams(), HEALTHY);
     expect(r.blockedCount).toBe(0);
   });
 
   it("counts every blocked event, not just the distinct hosts", async () => {
-    const r = await buildInspectReportData(
-      [START, BLOCKED, BLOCKED],
-      [],
-      reportParams(),
-      NONE_DROPPED,
-    );
+    const r = await buildInspectReportData([START, BLOCKED, BLOCKED], [], reportParams(), HEALTHY);
     expect(r.blocked.length).toBe(1);
     expect(r.blockedCount).toBe(2);
   });
@@ -133,7 +118,7 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=SECRET.att.example.",
     ];
-    const r = await buildInspectReportData([START], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START], dns, reportParams(), HEALTHY);
     expect(r.blocked[0].ruleType).toBe("DNS");
     expect(r.blocked[0].reason).toBe("dns-not-allowed");
     expect(r.blockedCount).toBe(1);
@@ -144,7 +129,7 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns allowed name=registry.npmjs.org.",
     ];
-    const r = await buildInspectReportData([START, ALLOWED], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, ALLOWED], dns, reportParams(), HEALTHY);
     expect(r.passed.length).toBe(1);
     // It is still in the timeline, which the job output is built from.
     expect(r.timeline.filter((e) => e.protocol === "dns").length).toBe(1);
@@ -157,7 +142,7 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns discovery name=_http._tcp.deb.debian.org. type=SRV",
     ];
-    const r = await buildInspectReportData([START], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START], dns, reportParams(), HEALTHY);
     expect(r.blocked.length).toBe(0);
     expect(r.blockedCount).toBe(0);
     expect(r.passed.length).toBe(0);
@@ -170,7 +155,7 @@ describe("buildInspectReportData", () => {
   it("keeps a connection dropped before its request out of both tables", async () => {
     // Nothing left the proxy, so no rule can permit or block it: naming the
     // host would not remove the row, and blocking it would fail the build.
-    const r = await buildInspectReportData([START, ABORTED], [], reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, ABORTED], [], reportParams(), HEALTHY);
     expect(r.blocked.length).toBe(0);
     expect(r.blockedCount).toBe(0);
     expect(r.passed.length).toBe(0);
@@ -188,7 +173,7 @@ describe("buildInspectReportData", () => {
       [START, BAD_REQUEST, NO_HOST],
       [],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(r.blockedCount).toBe(2);
     expect(r.blocked.map((row) => `${row.host}:${row.port} ${row.reason}`).sort()).toStrictEqual([
@@ -202,7 +187,7 @@ describe("buildInspectReportData", () => {
     // allowed-ip-rules is what would have passed it through, so that is the
     // rule kind the row names.
     const toResolver = BAD_REQUEST.replace("dst=198.19.255.1:8080", "dst=8.8.8.8:53");
-    const r = await buildInspectReportData([START, toResolver], [], reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, toResolver], [], reportParams(), HEALTHY);
     expect(
       r.blocked.map((row) => `${row.host}:${row.port} ${row.ruleType} ${row.reason}`),
     ).toStrictEqual(["8.8.8.8:53 IP bad-request"]);
@@ -213,7 +198,7 @@ describe("buildInspectReportData", () => {
     // address: fail-on-blocked has to see it, as it would under universal.
     const dropped =
       "buildcage 1787471976000 https <BADREQ> 0 0 ts=CR reason=- tlserr=- dst=203.0.113.9:8443 fcerr=ERESET sni=- host=- -";
-    const r = await buildInspectReportData([START, dropped], [], reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, dropped], [], reportParams(), HEALTHY);
     expect(r.blockedCount).toBe(1);
     expect(
       r.blocked.map((row) => `${row.host}:${row.port} ${row.ruleType} ${row.reason}`),
@@ -233,7 +218,7 @@ describe("buildInspectReportData", () => {
         [START, named("EXFIL.attacker.example")],
         [],
         params,
-        NONE_DROPPED,
+        HEALTHY,
       );
       expect(r.blockedCount).toBe(1);
       expect(
@@ -243,7 +228,7 @@ describe("buildInspectReportData", () => {
 
     it("is left undecided where a host or URL rule allows the name, as through DNS", async () => {
       for (const sni of ["registry.npmjs.org", "API.github.com"]) {
-        const r = await buildInspectReportData([START, named(sni)], [], params, NONE_DROPPED);
+        const r = await buildInspectReportData([START, named(sni)], [], params, HEALTHY);
         expect(r.blockedCount).toBe(0);
       }
     });
@@ -253,7 +238,7 @@ describe("buildInspectReportData", () => {
         [START, named("exfil.attacker.example")],
         [],
         reportParams({ mode: "audit" }),
-        NONE_DROPPED,
+        HEALTHY,
       );
       expect(r.blockedCount).toBe(0);
     });
@@ -262,7 +247,7 @@ describe("buildInspectReportData", () => {
   it("still blocks a request that did name a host", async () => {
     // Same termination state as BAD_REQUEST and NO_HOST, told apart by the
     // reason and by the method haproxy logs where a request never parsed.
-    const r = await buildInspectReportData([START, BLOCKED], [], reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, BLOCKED], [], reportParams(), HEALTHY);
     expect(r.blockedCount).toBe(1);
     expect(r.blocked[0].host).toBe("evil.example.com");
   });
@@ -271,7 +256,7 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=untrusted-ca.example.com.",
     ];
-    const r = await buildInspectReportData([START, ABORTED], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, ABORTED], dns, reportParams(), HEALTHY);
     expect(r.blocked[0].host).toBe("untrusted-ca.example.com");
     expect(r.blocked[0].reason).toBe("dns-not-allowed");
   });
@@ -281,7 +266,7 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns allowed name=unused.example.com.",
     ];
-    const r = await buildInspectReportData([START, ALLOWED], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START, ALLOWED], dns, reportParams(), HEALTHY);
     expect(r.passed.some((row) => row.host === "unused.example.com")).toBe(true);
     expect(r.blocked.length).toBe(0);
   });
@@ -290,12 +275,7 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns allowed name=looked-up.example.com.",
     ];
-    const r = await buildInspectReportData(
-      [START],
-      dns,
-      reportParams({ mode: "audit" }),
-      NONE_DROPPED,
-    );
+    const r = await buildInspectReportData([START], dns, reportParams({ mode: "audit" }), HEALTHY);
     expect(r.passed.length).toBe(1);
     expect(r.passed[0].host).toBe("looked-up.example.com");
     expect(r.passed[0].ruleType).toBe("DNS");
@@ -309,7 +289,7 @@ describe("buildInspectReportData", () => {
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns service-denied name=_mongodb._tcp.c0.example.net. type=SRV",
       "2026-08-23 16:45:01.000000000  [INFO] buildcage dns denied name=evil.example.com.",
     ];
-    const r = await buildInspectReportData([START], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START], dns, reportParams(), HEALTHY);
     const service = r.blocked.find((row) => row.host.startsWith("_mongodb"));
     const plain = r.blocked.find((row) => row.host === "evil.example.com");
     expect(service?.reason).toBe("dns-service-not-allowed");
@@ -326,7 +306,7 @@ describe("buildInspectReportData", () => {
       [START],
       dns,
       reportParams({ knownBlockedRules: ["_mongodb._tcp.c0.example.net:*"] }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(r.blocked[0].expected).toBe(true);
   });
@@ -341,7 +321,7 @@ describe("buildInspectReportData", () => {
       [START],
       dns,
       reportParams({ knownBlockedRules: ["telemetry.example.com:*"] }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(r.blocked[0].expected).toBe(true);
   });
@@ -354,7 +334,7 @@ describe("buildInspectReportData", () => {
       [START, blockedLine("blocked.com."), blockedLine("BLOCKED.COM"), blockedLine("blocked.com")],
       dns,
       reportParams({ knownBlockedRules: ["blocked.com"] }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(r.blocked.length).toBe(1);
     expect(r.blocked[0].host).toBe("blocked.com");
@@ -367,7 +347,7 @@ describe("buildInspectReportData", () => {
       [START, ALLOWED],
       [],
       reportParams({ mode: "audit" }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(r.timeline[0].action).toBe("audit");
   });
@@ -376,16 +356,11 @@ describe("buildInspectReportData", () => {
     // An empty log means either "saw nothing" or "never ran"; only the marker
     // tells them apart, and reporting "nothing was blocked" for a proxy that
     // never started would be the dangerous reading.
-    const missing = await buildInspectReportData([], [DNS_START], reportParams(), NONE_DROPPED);
+    const missing = await buildInspectReportData([], [DNS_START], reportParams(), HEALTHY);
     expect(missing.logLooksPlausible).toBe(false);
     expect(missing.startedAt === undefined).toBe(true);
 
-    const present = await buildInspectReportData(
-      [START],
-      [DNS_START],
-      reportParams(),
-      NONE_DROPPED,
-    );
+    const present = await buildInspectReportData([START], [DNS_START], reportParams(), HEALTHY);
     expect(present.logLooksPlausible).toBe(true);
     expect(present.startedAt).toBe(1787471970);
   });
@@ -393,12 +368,7 @@ describe("buildInspectReportData", () => {
   it("fails closed when a restart's marker is all that is left of the proxy log", async () => {
     // startedAt still reads from the second marker, so only the head check
     // notices the beginning is gone.
-    const r = await buildInspectReportData(
-      [ALLOWED, START],
-      [DNS_START],
-      reportParams(),
-      NONE_DROPPED,
-    );
+    const r = await buildInspectReportData([ALLOWED, START], [DNS_START], reportParams(), HEALTHY);
     expect(r.startedAt).toBe(1787471970);
     expect(r.logLooksPlausible).toBe(false);
   });
@@ -410,7 +380,7 @@ describe("buildInspectReportData", () => {
       [START, ALLOWED, unreadable],
       [DNS_START],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(r.logLooksPlausible).toBe(false);
     expect(r.passed.length).toBe(1);
@@ -426,13 +396,22 @@ describe("buildInspectReportData", () => {
   ])("fails closed when the proxy $what", async ({ droppedLogs }) => {
     // A dropped line leaves no gap either log shows, so only the count can
     // tell a whole log from one a flood thinned out.
-    const r = await buildInspectReportData(
-      [START, ALLOWED],
-      [DNS_START],
-      reportParams(),
+    const r = await buildInspectReportData([START, ALLOWED], [DNS_START], reportParams(), {
+      ...HEALTHY,
       droppedLogs,
-    );
+    });
     expect(r.logLooksPlausible).toBe(false);
+    expect(r.passed.length).toBe(1);
+  });
+
+  it("fails closed when the resolver did not answer", async () => {
+    // Lookups a stopped resolver never received leave no line in its log.
+    const r = await buildInspectReportData([START, ALLOWED], [DNS_START], reportParams(), {
+      ...HEALTHY,
+      resolverAnswered: false,
+    });
+    expect(r.logLooksPlausible).toBe(false);
+    expect(r.resolverAnswered).toBe(false);
     expect(r.passed.length).toBe(1);
   });
 
@@ -441,7 +420,7 @@ describe("buildInspectReportData", () => {
       DNS_START,
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns denied name=bad com.",
     ];
-    const r = await buildInspectReportData([START], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START], dns, reportParams(), HEALTHY);
     expect(r.logLooksPlausible).toBe(false);
   });
 
@@ -450,7 +429,7 @@ describe("buildInspectReportData", () => {
     const dns = [
       "2026-08-23 16:45:00.000000000  [INFO] buildcage dns allowed name=ok.example.com.",
     ];
-    const r = await buildInspectReportData([START], dns, reportParams(), NONE_DROPPED);
+    const r = await buildInspectReportData([START], dns, reportParams(), HEALTHY);
     expect(r.startedAt).toBe(1787471970);
     expect(r.logLooksPlausible).toBe(false);
   });

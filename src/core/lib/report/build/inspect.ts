@@ -1,10 +1,9 @@
 import { compileRuleSet } from "#core/lib/acl/haproxy-rules.ts";
 import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
-import type { ProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { scanDnsLog } from "#core/lib/log/dns.ts";
 import { scanInspectLog } from "#core/lib/log/inspect.ts";
 
-import type { GenReportParameters, InspectReportData } from "../types.ts";
+import type { GenReportParameters, InspectReportData, ServiceHealth } from "../types.ts";
 import { assembleReportData } from "./aggregate.ts";
 
 /** Whether the resolver allows a name, by the host regexes its Corefile is
@@ -22,7 +21,8 @@ function resolverAllows(parameters: GenReportParameters): (name: string) => bool
 
 /**
  * Build the report data from the proxy and resolver logs. Pure: the caller
- * fetches both logs, the parameters and the proxy's dropped-line count.
+ * fetches both logs, the parameters and what the running services say of
+ * themselves.
  *
  * The resolver log matters because a blocked name never reached the proxy, so
  * a DNS-only exfiltration attempt would otherwise leave no trace.
@@ -31,7 +31,7 @@ export async function buildInspectReportData(
   proxyLines: AsyncIterable<string> | Iterable<string>,
   dnsLines: AsyncIterable<string> | Iterable<string>,
   parameters: GenReportParameters,
-  droppedLogs: ProxyDroppedLogs,
+  health: ServiceHealth,
 ): Promise<InspectReportData> {
   const isAudit = parameters.mode === "audit";
   // Independent inputs (separate `docker exec` log streams, no data dependency
@@ -42,6 +42,6 @@ export async function buildInspectReportData(
     scanInspectLog(proxyLines, isAudit, isAudit ? undefined : resolverAllows(parameters)),
     scanDnsLog(dnsLines, isAudit),
     parameters,
-    droppedLogs,
+    health,
   );
 }

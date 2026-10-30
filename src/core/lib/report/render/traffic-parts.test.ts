@@ -90,8 +90,9 @@ describe("trafficHeadingBlock", () => {
     );
     const [warning] = text.split("\n\n").filter((b) => b.includes("This report is incomplete"));
     for (const line of warning.split("\n")) expect(line).toMatch(/^> /);
-    expect(warning.split("\n").slice(1, 5)).toStrictEqual([
-      "> The proxy did not answer the report, so it stopped or hung during the run. Requests made while it was down failed rather than going around it, and the step fails for this whatever the mode or fail-on-blocked.",
+    expect(warning.split("\n").slice(1, 6)).toStrictEqual([
+      "> The proxy did not answer the report, so it stopped or hung during the run. Requests made while it was down failed rather than going around it.",
+      "> The step fails for this whatever the mode or fail-on-blocked.",
       "> The proxy restarted 1 time(s) during the run.",
       "> A restart loses the line of whatever was still in progress when the service stopped.",
       "> Other causes may apply too: the logs don't begin where a real run does, one carries a line that cannot be",
