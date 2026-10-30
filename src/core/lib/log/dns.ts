@@ -55,6 +55,9 @@ export interface DnsLogScan {
   /** Lines written for one of our rules yet matching no format above. Each
    *  may be a block the report cannot account for. */
   unparsed: number;
+  /** Startup markers after the log's first line: each is the resolver starting
+   *  again after it stopped mid-run. */
+  restarts: number;
 }
 
 /**
@@ -86,9 +89,14 @@ export async function scanDnsLog(
   const service = new Map<string, { time: number; host: string; queryType: string }>();
   let headIntact: boolean | undefined;
   let unparsed = 0;
+  let restarts = 0;
   for await (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed !== "") headIntact ??= trimmed.endsWith(DNS_START_MARKER);
+    if (trimmed !== "") {
+      const start = trimmed.endsWith(DNS_START_MARKER);
+      if (start && headIntact !== undefined) restarts++;
+      headIntact ??= start;
+    }
     const match = DNS.exec(trimmed);
     if (match) {
       const time = timeOf(match[1]);
@@ -143,5 +151,5 @@ export async function scanDnsLog(
       reason: "dns-service-not-allowed",
     });
   }
-  return { events, headIntact: headIntact ?? false, unparsed };
+  return { events, headIntact: headIntact ?? false, unparsed, restarts };
 }

@@ -38,12 +38,22 @@ export interface ReportDataCommon {
 
   /** False iff the logs are not a complete record of the run: either log's
    *  beginning is gone or it is empty, a line of ours could not be read (each
-   *  scan's headIntact and unparsed), or the proxy dropped a line or could not
-   *  say whether it did (proxy-dropped-logs.ts). Anything written from this
-   *  flag has to name every one of them, since the flag itself does not say
-   *  which applied. The report fails closed rather than passing off what
-   *  survived as everything. */
+   *  scan's headIntact and unparsed), the proxy dropped a line or could not
+   *  say whether it did (proxy-dropped-logs.ts), or the proxy or the resolver
+   *  restarted. Anything written from this flag names what `proxyAnswered`
+   *  and `restarts` establish and has to list the rest as possibilities, since
+   *  the flag itself does not say which applied. The report fails closed
+   *  rather than passing off what survived as everything. */
   logLooksPlausible: boolean;
+
+  /** False when the proxy did not answer the report: it stopped during the run
+   *  and stayed down, or hung. */
+  proxyAnswered: boolean;
+
+  /** How many times each service started again after it stopped mid-run. A
+   *  connection still open when the proxy stopped never gets its line, and the
+   *  proxy's dropped-line count starts over, so a restart leaves the record short. */
+  restarts: { proxy: number; resolver: number };
 
   /** Every connection and blocked name, oldest first. Nothing is attributable
    *  to one RUN step or one command: the proxy log carries no identifier for

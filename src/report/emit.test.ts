@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { annotateKnownBlocked } from "#core/lib/report/build/aggregate.ts";
 import type { UniversalReportData } from "#core/lib/report/types.ts";
-import { reportParams } from "#core/lib/test/report-data.node.ts";
+import { reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import { emitReportOutcomes } from "./emit.ts";
 
@@ -26,6 +26,7 @@ function report(overrides: Partial<UniversalReportData> = {}): UniversalReportDa
     failed: [],
     blockedCount: 0,
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     timeline: [],
     startedAt: undefined,
     ...overrides,

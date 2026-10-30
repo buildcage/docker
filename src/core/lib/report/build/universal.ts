@@ -1,3 +1,4 @@
+import type { ProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { scanDnsLog } from "#core/lib/log/dns.ts";
 import { scanHaproxyLog } from "#core/lib/log/haproxy.ts";
 
@@ -6,8 +7,7 @@ import { assembleReportData } from "./aggregate.ts";
 
 /**
  * Build the report data from the proxy and resolver logs. Pure: the caller
- * fetches both logs, the parameters and the proxy's dropped-line count
- * (undefined where it could not be read).
+ * fetches both logs, the parameters and the proxy's dropped-line count.
  *
  * universal never terminates TLS, so its proxy events carry no method, URL or
  * status, only the host, port and bytes of each connection. The resolver log is
@@ -18,7 +18,7 @@ export async function buildUniversalReportData(
   proxyLines: AsyncIterable<string> | Iterable<string>,
   dnsLines: AsyncIterable<string> | Iterable<string>,
   parameters: GenReportParameters,
-  droppedLogs: number | undefined,
+  droppedLogs: ProxyDroppedLogs,
 ): Promise<UniversalReportData> {
   const isAudit = parameters.mode === "audit";
   // Independent inputs (separate log streams, no data dependency), so start

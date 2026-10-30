@@ -292,13 +292,21 @@ describe("scanInspectLog", () => {
     expect(startedAt === undefined).toBe(true);
   });
 
-  it("keeps the first startup marker if the line somehow repeats", async () => {
+  it("keeps the first startup marker and counts each later one as a restart", async () => {
     const lines = [
       "buildcage haproxy starting 1787471970000",
+      ALLOWED,
       "buildcage haproxy starting 1787471999000",
     ];
-    const { startedAt } = await scanInspectLog(lines);
+    const { startedAt, restarts } = await scanInspectLog(lines);
     expect(startedAt).toBe(1787471970);
+    expect(restarts).toBe(1);
+  });
+
+  it("counts no restart for a marker that opens a log whose head is gone", async () => {
+    const { restarts } = await scanInspectLog([ALLOWED]);
+    expect(restarts).toBe(0);
+    expect((await scanInspectLog(["buildcage haproxy starting 1787471999000"])).restarts).toBe(0);
   });
 });
 

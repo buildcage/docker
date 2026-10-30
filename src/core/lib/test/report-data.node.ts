@@ -1,10 +1,22 @@
 /**
  * Report-shaped test data more than one report test needs: the parameter
- * defaults a case starts from, and the blocked rows one known_blocked_rule
- * covers. Kept here so a new field on GenReportParameters is written once.
+ * defaults a case starts from, a run nothing interrupted, and the blocked rows
+ * one known_blocked_rule covers. Kept here so a new field on
+ * GenReportParameters is written once.
  */
+import type { ProxyDroppedLogs } from "../docker/proxy-dropped-logs.ts";
 import type { AnnotatedBlockedRow } from "../report/build/aggregate.ts";
+import type { Interruptions } from "../report/outcome/blocked-outcome.ts";
 import type { GenReportParameters } from "../report/types.ts";
+
+/** A proxy that answered and dropped nothing. */
+export const NONE_DROPPED: ProxyDroppedLogs = { answered: true, count: 0 };
+
+/** A run in which the proxy answered and nothing restarted. */
+export const UNINTERRUPTED: Interruptions = {
+  proxyAnswered: true,
+  restarts: { proxy: 0, resolver: 0 },
+};
 
 /** Restrict mode carrying only the rules a case names. */
 export function reportParams(overrides: Partial<GenReportParameters> = {}): GenReportParameters {

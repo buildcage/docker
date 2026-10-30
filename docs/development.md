@@ -266,7 +266,10 @@ archives kept. The report reads every archive, so `current` alone shows only wha
 last rotation.
 
 HAProxy drops a log line it cannot write at once rather than wait, and counts the lines it drops;
-the report reads that count and marks itself incomplete when it is not zero. To read it by hand:
+the report reads that count and marks itself incomplete when it is not zero. A proxy that does not
+answer that read fails the step in any mode. A second `buildcage haproxy starting` or `buildcage
+coredns starting` line also marks the report incomplete: a restart loses the line of whatever was
+still open and starts the count over. To read the count by hand:
 
 ```bash
 docker exec "$B" curl -s --unix-socket /var/run/haproxy-health.sock \

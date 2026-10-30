@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import type { Docker } from "#core/lib/docker/client.ts";
 import type { InspectReportData, UniversalReportData } from "#core/lib/report/types.ts";
-import { reportParams } from "#core/lib/test/report-data.node.ts";
+import { reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
 import { runReportAction, type ReportActionSpec } from "./action-main.ts";
 
@@ -32,6 +32,7 @@ const universal: UniversalReportData = {
   failed: [],
   blockedCount: 0,
   logLooksPlausible: true,
+  ...UNINTERRUPTED,
   timeline: [],
   startedAt: undefined,
 };
@@ -124,6 +125,7 @@ describe("runReportAction and the traffic file", () => {
     failed: [],
     blockedCount: 0,
     logLooksPlausible: true,
+    ...UNINTERRUPTED,
     timeline: [
       {
         time: 1787471975,

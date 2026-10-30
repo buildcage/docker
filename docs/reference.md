@@ -502,6 +502,15 @@ In restrict mode the step fails when blocked connections are detected, and the w
 it. In audit mode, blocked connections (protocol errors, for instance) are reported but never fail
 the step.
 
+A report that is not a full record of the build fails the step the same way, whatever survived: a
+log that doesn't begin where the build did, carries a line the report cannot read or lost lines the
+proxy could not write, or a proxy or resolver that restarted during the build, since a connection
+still open when the proxy stopped never gets its line. In audit mode, or with
+`fail-on-blocked: false`, it is a notice instead. A proxy that does not answer the report, because
+it stopped during the build and stayed down or hung, fails the step in both modes whatever
+`fail-on-blocked` says: requests made while it was down failed rather than going around it, but
+nothing recorded them.
+
 When every blocked connection matches a `known-blocked-rules` rule, the step does not fail, even
 with `fail-on-blocked: true`, and a `::notice::` is emitted instead of `::error::`; any unmatched
 blocked connection still fails the step. Matching is per request, so a row that counts several

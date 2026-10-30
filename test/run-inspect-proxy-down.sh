@@ -180,7 +180,26 @@ else
   fail "the report does not mark itself incomplete"
   report_failed=1
 fi
+if grep -qF "The proxy did not answer the report" <<<"$REPORT_OUTPUT"; then
+  pass "the report's error says the proxy did not answer"
+else
+  fail "the report's error does not say the proxy did not answer"
+  report_failed=1
+fi
 if [ "$report_failed" = "1" ]; then
+  echo "$REPORT_OUTPUT" | sed 's/^/    /'
+fi
+
+# A stopped proxy is not a rule the build broke, so turning the step's failure
+# off for blocks does not turn it off for this.
+: >"$SUMMARY"
+REPORT_EXIT=0
+REPORT_OUTPUT=$(INPUT_FAIL_ON_BLOCKED=false GITHUB_STEP_SUMMARY="$SUMMARY" \
+  node report/src/main.ts 2>&1) || REPORT_EXIT=$?
+if [ "$REPORT_EXIT" = "1" ]; then
+  pass "the report failed the step with fail-on-blocked: false too"
+else
+  fail "the report exited $REPORT_EXIT with fail-on-blocked: false, expected 1"
   echo "$REPORT_OUTPUT" | sed 's/^/    /'
 fi
 

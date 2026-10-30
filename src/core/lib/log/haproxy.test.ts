@@ -241,6 +241,13 @@ describe("scanHaproxyLog", () => {
     expect(headIntact).toBe(true);
   });
 
+  it("counts a startup marker after the first line as a restart", async () => {
+    const allowed = line("ALLOWED", "HTTPS", "a.com:443", "-");
+    expect((await scanHaproxyLog([MARKER, allowed, MARKER], false)).restarts).toBe(1);
+    expect((await scanHaproxyLog([allowed, MARKER], false)).restarts).toBe(1);
+    expect((await scanHaproxyLog([MARKER, allowed], false)).restarts).toBe(0);
+  });
+
   it("headIntact ignores blank lines when deciding", async () => {
     expect((await scanHaproxyLog("\n\n  \n".split("\n"), false)).headIntact).toBe(false);
   });
