@@ -303,7 +303,7 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 //#endregion
 //#region src/core/lib/acl/ipv4.ts
 const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[12]?[0-9])", IPV4 = `${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}`;
-RegExp(`^${OCTET}$`), RegExp(`^${IPV4}(?:/${PREFIX})?$`), RegExp(`^${IPV4}/${PREFIX}$`), `${IPV4}`;
+RegExp(`^${OCTET}$`), RegExp(`^${IPV4}(?:/${PREFIX})?$`), RegExp(`^${IPV4}/${PREFIX}$`);
 //#endregion
 //#region src/lib/inputs.ts
 function readBuilderName(getInput$3 = getInput) {

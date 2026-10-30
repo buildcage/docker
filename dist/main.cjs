@@ -1,5 +1,5 @@
 //#region \0rolldown/runtime.js
-var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDesc = Object.getOwnPropertyDescriptor, __getOwnPropNames = Object.getOwnPropertyNames, __getProtoOf = Object.getPrototypeOf, __hasOwnProp = Object.prototype.hasOwnProperty, __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports), __copyProps = (to, from, except, desc) => {
+var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDesc = Object.getOwnPropertyDescriptor, __getOwnPropNames = Object.getOwnPropertyNames, __getProtoOf = Object.getPrototypeOf, __hasOwnProp = Object.prototype.hasOwnProperty, __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod, mod.exports), cb = null), mod.exports), __copyProps = (to, from, except, desc) => {
 	if (from && typeof from == "object" || typeof from == "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) key = keys[i], !__hasOwnProp.call(to, key) && key !== except && __defProp(to, key, {
 		get: ((k) => from[k]).bind(null, key),
 		enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
@@ -1512,12 +1512,12 @@ var require_identity = __commonJSMin(((exports) => {
 	}
 	exports.stringifyPair = stringifyPair;
 })), require_log = __commonJSMin(((exports) => {
-	var node_process$2 = require("process");
+	var node_process = require("process");
 	function debug(logLevel, ...messages) {
 		logLevel === "debug" && console.log(...messages);
 	}
 	function warn(logLevel, warning) {
-		(logLevel === "debug" || logLevel === "warn") && (typeof node_process$2.emitWarning == "function" ? node_process$2.emitWarning(warning) : console.warn(warning));
+		(logLevel === "debug" || logLevel === "warn") && (typeof node_process.emitWarning == "function" ? node_process.emitWarning(warning) : console.warn(warning));
 	}
 	exports.debug = debug, exports.warn = warn;
 })), require_merge = __commonJSMin(((exports) => {
@@ -3434,7 +3434,7 @@ var require_identity = __commonJSMin(((exports) => {
 	}
 	exports.composeDoc = composeDoc;
 })), require_composer = __commonJSMin(((exports) => {
-	var node_process$1 = require("process"), directives = require_directives(), Document = require_Document(), errors = require_errors(), identity = require_identity(), composeDoc = require_compose_doc(), resolveEnd = require_resolve_end();
+	var node_process = require("process"), directives = require_directives(), Document = require_Document(), errors = require_errors(), identity = require_identity(), composeDoc = require_compose_doc(), resolveEnd = require_resolve_end();
 	function getErrorPos(src) {
 		if (typeof src == "number") return [src, src + 1];
 		if (Array.isArray(src)) return src.length === 2 ? src : [src[0], src[1]];
@@ -3502,7 +3502,7 @@ var require_identity = __commonJSMin(((exports) => {
 			yield* this.end(forceDoc, endOffset);
 		}
 		*next(token) {
-			switch (node_process$1.env.LOG_STREAM && console.dir(token, { depth: null }), token.type) {
+			switch (node_process.env.LOG_STREAM && console.dir(token, { depth: null }), token.type) {
 				case "directive":
 					this.directives.add(token.source, (offset, message, warning) => {
 						let pos = getErrorPos(token);
@@ -7008,8 +7008,8 @@ var require_envelope = __commonJSMin(((exports) => {
 	function isSet(value) {
 		return value != null;
 	}
-})), require_dist$6 = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_dist$6 = __commonJSMin(((exports, module, this$26) => {
+	var __createBinding = this$26 && this$26.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -7020,8 +7020,8 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __exportStar = exports && exports.__exportStar || function(m, exports$2) {
-		for (var p in m) p !== "default" && !Object.prototype.hasOwnProperty.call(exports$2, p) && __createBinding(exports$2, m, p);
+	})), __exportStar = this$26 && this$26.__exportStar || function(m, exports) {
+		for (var p in m) p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p) && __createBinding(exports, m, p);
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), __exportStar(require_envelope(), exports), __exportStar(require_sigstore_bundle(), exports), __exportStar(require_sigstore_common(), exports), __exportStar(require_sigstore_rekor(), exports), __exportStar(require_sigstore_trustroot(), exports), __exportStar(require_sigstore_verification(), exports);
 })), require_bundle$1 = __commonJSMin(((exports) => {
@@ -7302,26 +7302,26 @@ var require_envelope = __commonJSMin(((exports) => {
 			return validate_1.isBundleV01;
 		}
 	});
-})), require_appdata = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_appdata = __commonJSMin(((exports, module, this$25) => {
+	var __importDefault = this$25 && this$25.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.appDataPath = appDataPath;
-	let os_1$1 = __importDefault(require("os")), path_1$2 = __importDefault(require("path"));
+	let os_1 = __importDefault(require("os")), path_1 = __importDefault(require("path"));
 	function appDataPath(name) {
-		let homedir = os_1$1.default.homedir();
+		let homedir = os_1.default.homedir();
 		switch (process.platform) {
 			case "darwin": {
-				let appSupport = path_1$2.default.join(homedir, "Library", "Application Support");
-				return path_1$2.default.join(appSupport, name);
+				let appSupport = path_1.default.join(homedir, "Library", "Application Support");
+				return path_1.default.join(appSupport, name);
 			}
 			case "win32": {
-				let localAppData = process.env.LOCALAPPDATA || path_1$2.default.join(homedir, "AppData", "Local");
-				return path_1$2.default.join(localAppData, name, "Data");
+				let localAppData = process.env.LOCALAPPDATA || path_1.default.join(homedir, "AppData", "Local");
+				return path_1.default.join(localAppData, name, "Data");
 			}
 			default: {
-				let localData = process.env.XDG_DATA_HOME || path_1$2.default.join(homedir, ".local", "share");
-				return path_1$2.default.join(localData, name);
+				let localData = process.env.XDG_DATA_HOME || path_1.default.join(homedir, ".local", "share");
+				return path_1.default.join(localData, name);
 			}
 		}
 	}
@@ -7377,18 +7377,18 @@ var require_envelope = __commonJSMin(((exports) => {
 		return "\"" + string.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\"";
 	}
 	module.exports = { canonicalize };
-})), require_verify = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_verify = __commonJSMin(((exports, module, this$24) => {
+	var __importDefault = this$24 && this$24.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.verifySignature = void 0;
-	let canonical_json_1 = require_lib$1(), crypto_1$4 = __importDefault(require("crypto"));
+	let canonical_json_1 = require_lib$1(), crypto_1 = __importDefault(require("crypto"));
 	exports.verifySignature = (metaDataSignedData, key, signature) => {
 		let canonicalData = Buffer.from((0, canonical_json_1.canonicalize)(metaDataSignedData));
-		return crypto_1$4.default.verify(void 0, canonicalData, key, Buffer.from(signature, "hex"));
+		return crypto_1.default.verify(void 0, canonicalData, key, Buffer.from(signature, "hex"));
 	};
-})), require_utils = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_utils = __commonJSMin(((exports, module, this$23) => {
+	var __createBinding = this$23 && this$23.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -7399,14 +7399,14 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? (function(o, v) {
+	})), __setModuleDefault = this$23 && this$23.__setModuleDefault || (Object.create ? (function(o, v) {
 		Object.defineProperty(o, "default", {
 			enumerable: !0,
 			value: v
 		});
 	}) : function(o, v) {
 		o.default = v;
-	}), __importStar = exports && exports.__importStar || (function() {
+	}), __importStar = this$23 && this$23.__importStar || (function() {
 		var ownKeys = function(o) {
 			return ownKeys = Object.getOwnPropertyNames || function(o) {
 				var ar = [];
@@ -7422,12 +7422,12 @@ var require_envelope = __commonJSMin(((exports) => {
 		};
 	})();
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.crypto = exports.guard = void 0, exports.guard = __importStar(require_guard()), exports.crypto = __importStar(require_verify());
-})), require_base = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_base = __commonJSMin(((exports, module, this$22) => {
+	var __importDefault = this$22 && this$22.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Signed = exports.MetadataKind = void 0, exports.isMetadataKind = isMetadataKind;
-	let util_1$10 = __importDefault(require("util")), error_1 = require_error$5(), utils_1 = require_utils(), SPECIFICATION_VERSION = [
+	let util_1 = __importDefault(require("util")), error_1 = require_error$5(), utils_1 = require_utils(), SPECIFICATION_VERSION = [
 		"1",
 		"0",
 		"31"
@@ -7452,7 +7452,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			this.expires = options.expires, this.version = options.version, this.unrecognizedFields = options.unrecognizedFields || {};
 		}
 		equals(other) {
-			return other instanceof Signed && this.specVersion === other.specVersion && this.expires === other.expires && this.version === other.version && util_1$10.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
+			return other instanceof Signed && this.specVersion === other.specVersion && this.expires === other.expires && this.version === other.version && util_1.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
 		}
 		isExpired(referenceTime) {
 			return referenceTime ||= new Date(), referenceTime >= new Date(this.expires);
@@ -7476,12 +7476,12 @@ var require_envelope = __commonJSMin(((exports) => {
 	function isNumeric(str) {
 		return !isNaN(Number(str));
 	}
-})), require_file = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_file = __commonJSMin(((exports, module, this$21) => {
+	var __importDefault = this$21 && this$21.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.TargetFile = exports.MetaFile = void 0;
-	let crypto_1$3 = __importDefault(require("crypto")), util_1$9 = __importDefault(require("util")), error_1 = require_error$5(), utils_1 = require_utils();
+	let crypto_1 = __importDefault(require("crypto")), util_1 = __importDefault(require("util")), error_1 = require_error$5(), utils_1 = require_utils();
 	exports.MetaFile = class MetaFile {
 		version;
 		length;
@@ -7492,14 +7492,14 @@ var require_envelope = __commonJSMin(((exports) => {
 			opts.length !== void 0 && validateLength(opts.length), this.version = opts.version, this.length = opts.length, this.hashes = opts.hashes, this.unrecognizedFields = opts.unrecognizedFields || {};
 		}
 		equals(other) {
-			return other instanceof MetaFile && this.version === other.version && this.length === other.length && util_1$9.default.isDeepStrictEqual(this.hashes, other.hashes) && util_1$9.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
+			return other instanceof MetaFile && this.version === other.version && this.length === other.length && util_1.default.isDeepStrictEqual(this.hashes, other.hashes) && util_1.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
 		}
 		verify(data) {
 			if (this.length !== void 0 && data.length !== this.length) throw new error_1.LengthOrHashMismatchError(`Expected length ${this.length} but got ${data.length}`);
 			this.hashes && Object.entries(this.hashes).forEach(([key, value]) => {
 				let hash;
 				try {
-					hash = crypto_1$3.default.createHash(key);
+					hash = crypto_1.default.createHash(key);
 				} catch {
 					throw new error_1.LengthOrHashMismatchError(`Hash algorithm ${key} not supported`);
 				}
@@ -7539,12 +7539,12 @@ var require_envelope = __commonJSMin(((exports) => {
 			return !custom || Array.isArray(custom) || typeof custom != "object" ? {} : custom;
 		}
 		equals(other) {
-			return other instanceof TargetFile && this.length === other.length && this.path === other.path && util_1$9.default.isDeepStrictEqual(this.hashes, other.hashes) && util_1$9.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
+			return other instanceof TargetFile && this.length === other.length && this.path === other.path && util_1.default.isDeepStrictEqual(this.hashes, other.hashes) && util_1.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
 		}
 		async verify(stream) {
 			let observedLength = 0, digests = Object.keys(this.hashes).reduce((acc, key) => {
 				try {
-					acc[key] = crypto_1$3.default.createHash(key);
+					acc[key] = crypto_1.default.createHash(key);
 				} catch {
 					throw new error_1.LengthOrHashMismatchError(`Hash algorithm ${key} not supported`);
 				}
@@ -7601,12 +7601,12 @@ var require_envelope = __commonJSMin(((exports) => {
 		for (; value > 0;) bytes.unshift(value & 127 | mask), value >>= 7, mask = 128;
 		return bytes;
 	}
-})), require_key$2 = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_key$2 = __commonJSMin(((exports, module, this$20) => {
+	var __importDefault = this$20 && this$20.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.getPublicKey = getPublicKey;
-	let crypto_1$2 = __importDefault(require("crypto")), error_1 = require_error$5(), oid_1 = require_oid$1(), PEM_HEADER = "-----BEGIN PUBLIC KEY-----";
+	let crypto_1 = __importDefault(require("crypto")), error_1 = require_error$5(), oid_1 = require_oid$1(), PEM_HEADER = "-----BEGIN PUBLIC KEY-----";
 	function getPublicKey(keyInfo) {
 		switch (keyInfo.keyType) {
 			case "rsa": return getRSAPublicKey(keyInfo);
@@ -7619,21 +7619,21 @@ var require_envelope = __commonJSMin(((exports) => {
 	}
 	function getRSAPublicKey(keyInfo) {
 		if (!keyInfo.keyVal.startsWith(PEM_HEADER)) throw new error_1.CryptoError("Invalid key format");
-		let key = crypto_1$2.default.createPublicKey(keyInfo.keyVal);
+		let key = crypto_1.default.createPublicKey(keyInfo.keyVal);
 		switch (keyInfo.scheme) {
 			case "rsassa-pss-sha256": return {
 				key,
-				padding: crypto_1$2.default.constants.RSA_PKCS1_PSS_PADDING
+				padding: crypto_1.default.constants.RSA_PKCS1_PSS_PADDING
 			};
 			default: throw new error_1.UnsupportedAlgorithmError(`Unsupported RSA scheme: ${keyInfo.scheme}`);
 		}
 	}
 	function getED25519PublicKey(keyInfo) {
 		let key;
-		if (keyInfo.keyVal.startsWith(PEM_HEADER)) key = crypto_1$2.default.createPublicKey(keyInfo.keyVal);
+		if (keyInfo.keyVal.startsWith(PEM_HEADER)) key = crypto_1.default.createPublicKey(keyInfo.keyVal);
 		else {
 			if (!isHex(keyInfo.keyVal)) throw new error_1.CryptoError("Invalid key format");
-			key = crypto_1$2.default.createPublicKey({
+			key = crypto_1.default.createPublicKey({
 				key: ed25519.hexToDER(keyInfo.keyVal),
 				format: "der",
 				type: "spki"
@@ -7643,10 +7643,10 @@ var require_envelope = __commonJSMin(((exports) => {
 	}
 	function getECDCSAPublicKey(keyInfo) {
 		let key;
-		if (keyInfo.keyVal.startsWith(PEM_HEADER)) key = crypto_1$2.default.createPublicKey(keyInfo.keyVal);
+		if (keyInfo.keyVal.startsWith(PEM_HEADER)) key = crypto_1.default.createPublicKey(keyInfo.keyVal);
 		else {
 			if (!isHex(keyInfo.keyVal)) throw new error_1.CryptoError("Invalid key format");
-			key = crypto_1$2.default.createPublicKey({
+			key = crypto_1.default.createPublicKey({
 				key: ecdsa.hexToDER(keyInfo.keyVal),
 				format: "der",
 				type: "spki"
@@ -7688,12 +7688,12 @@ var require_envelope = __commonJSMin(((exports) => {
 			bitString
 		]);
 	} }, isHex = (key) => /^[0-9a-fA-F]+$/.test(key);
-})), require_key$1 = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_key$1 = __commonJSMin(((exports, module, this$19) => {
+	var __importDefault = this$19 && this$19.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Key = void 0;
-	let util_1$8 = __importDefault(require("util")), error_1 = require_error$5(), utils_1 = require_utils(), key_1 = require_key$2();
+	let util_1 = __importDefault(require("util")), error_1 = require_error$5(), utils_1 = require_utils(), key_1 = require_key$2();
 	exports.Key = class Key {
 		keyID;
 		keyType;
@@ -7720,7 +7720,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			}
 		}
 		equals(other) {
-			return other instanceof Key && this.keyID === other.keyID && this.keyType === other.keyType && this.scheme === other.scheme && util_1$8.default.isDeepStrictEqual(this.keyVal, other.keyVal) && util_1$8.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
+			return other instanceof Key && this.keyID === other.keyID && this.keyType === other.keyType && this.scheme === other.scheme && util_1.default.isDeepStrictEqual(this.keyVal, other.keyVal) && util_1.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
 		}
 		toJSON() {
 			return {
@@ -8723,12 +8723,12 @@ var require_envelope = __commonJSMin(((exports) => {
 			return unescape_js_2.unescape;
 		}
 	}), exports.minimatch.AST = ast_js_1.AST, exports.minimatch.Minimatch = Minimatch, exports.minimatch.escape = escape_js_1.escape, exports.minimatch.unescape = unescape_js_1.unescape;
-})), require_role = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_role = __commonJSMin(((exports, module, this$18) => {
+	var __importDefault = this$18 && this$18.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.SuccinctRoles = exports.DelegatedRole = exports.Role = exports.TOP_LEVEL_ROLE_NAMES = void 0;
-	let crypto_1$1 = __importDefault(require("crypto")), minimatch_1 = require_commonjs(), util_1$7 = __importDefault(require("util")), error_1 = require_error$5(), utils_1 = require_utils();
+	let crypto_1 = __importDefault(require("crypto")), minimatch_1 = require_commonjs(), util_1 = __importDefault(require("util")), error_1 = require_error$5(), utils_1 = require_utils();
 	exports.TOP_LEVEL_ROLE_NAMES = [
 		"root",
 		"targets",
@@ -8746,7 +8746,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			this.keyIDs = keyIDs, this.threshold = threshold, this.unrecognizedFields = unrecognizedFields || {};
 		}
 		equals(other) {
-			return other instanceof Role && this.threshold === other.threshold && util_1$7.default.isDeepStrictEqual(this.keyIDs, other.keyIDs) && util_1$7.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
+			return other instanceof Role && this.threshold === other.threshold && util_1.default.isDeepStrictEqual(this.keyIDs, other.keyIDs) && util_1.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
 		}
 		toJSON() {
 			return {
@@ -8782,12 +8782,12 @@ var require_envelope = __commonJSMin(((exports) => {
 			this.paths = paths, this.pathHashPrefixes = pathHashPrefixes;
 		}
 		equals(other) {
-			return other instanceof DelegatedRole && super.equals(other) && this.name === other.name && this.terminating === other.terminating && util_1$7.default.isDeepStrictEqual(this.paths, other.paths) && util_1$7.default.isDeepStrictEqual(this.pathHashPrefixes, other.pathHashPrefixes);
+			return other instanceof DelegatedRole && super.equals(other) && this.name === other.name && this.terminating === other.terminating && util_1.default.isDeepStrictEqual(this.paths, other.paths) && util_1.default.isDeepStrictEqual(this.pathHashPrefixes, other.pathHashPrefixes);
 		}
 		isDelegatedPath(targetFilepath) {
 			if (this.paths) return this.paths.some((pathPattern) => isTargetInPathPattern(targetFilepath, pathPattern));
 			if (this.pathHashPrefixes) {
-				let pathHash = crypto_1$1.default.createHash("sha256").update(targetFilepath).digest("hex");
+				let pathHash = crypto_1.default.createHash("sha256").update(targetFilepath).digest("hex");
 				return this.pathHashPrefixes.some((pathHashPrefix) => pathHash.startsWith(pathHashPrefix));
 			}
 			return !1;
@@ -8839,7 +8839,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			return other instanceof SuccinctRoles && super.equals(other) && this.bitLength === other.bitLength && this.namePrefix === other.namePrefix;
 		}
 		getRoleForTarget(targetFilepath) {
-			let hashBytes = crypto_1$1.default.createHash("sha256").update(targetFilepath).digest().subarray(0, 4), shiftValue = 32 - this.bitLength, suffix = (hashBytes.readUInt32BE() >>> shiftValue).toString(16).padStart(this.suffixLen, "0");
+			let hashBytes = crypto_1.default.createHash("sha256").update(targetFilepath).digest().subarray(0, 4), shiftValue = 32 - this.bitLength, suffix = (hashBytes.readUInt32BE() >>> shiftValue).toString(16).padStart(this.suffixLen, "0");
 			return `${this.namePrefix}-${suffix}`;
 		}
 		*getRoles() {
@@ -8878,12 +8878,12 @@ var require_envelope = __commonJSMin(((exports) => {
 			});
 		}
 	};
-})), require_root = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_root = __commonJSMin(((exports, module, this$17) => {
+	var __importDefault = this$17 && this$17.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Root = void 0;
-	let util_1$6 = __importDefault(require("util")), base_1 = require_base(), error_1 = require_error$5(), key_1 = require_key$1(), role_1 = require_role(), utils_1 = require_utils();
+	let util_1 = __importDefault(require("util")), base_1 = require_base(), error_1 = require_error$5(), key_1 = require_key$1(), role_1 = require_role(), utils_1 = require_utils();
 	exports.Root = class Root extends base_1.Signed {
 		type = base_1.MetadataKind.Root;
 		keys;
@@ -8908,7 +8908,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			this.roles[role].keyIDs.includes(key.keyID) || this.roles[role].keyIDs.push(key.keyID), this.keys[key.keyID] = key;
 		}
 		equals(other) {
-			return other instanceof Root && super.equals(other) && this.consistentSnapshot === other.consistentSnapshot && util_1$6.default.isDeepStrictEqual(this.keys, other.keys) && util_1$6.default.isDeepStrictEqual(this.roles, other.roles);
+			return other instanceof Root && super.equals(other) && this.consistentSnapshot === other.consistentSnapshot && util_1.default.isDeepStrictEqual(this.keys, other.keys) && util_1.default.isDeepStrictEqual(this.roles, other.roles);
 		}
 		toJSON() {
 			return {
@@ -8992,12 +8992,12 @@ var require_envelope = __commonJSMin(((exports) => {
 			});
 		}
 	};
-})), require_snapshot = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_snapshot = __commonJSMin(((exports, module, this$16) => {
+	var __importDefault = this$16 && this$16.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Snapshot = void 0;
-	let util_1$5 = __importDefault(require("util")), base_1 = require_base(), file_1 = require_file(), utils_1 = require_utils();
+	let util_1 = __importDefault(require("util")), base_1 = require_base(), file_1 = require_file(), utils_1 = require_utils();
 	exports.Snapshot = class Snapshot extends base_1.Signed {
 		type = base_1.MetadataKind.Snapshot;
 		meta;
@@ -9005,7 +9005,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			super(opts), this.meta = opts.meta || { "targets.json": new file_1.MetaFile({ version: 1 }) };
 		}
 		equals(other) {
-			return other instanceof Snapshot && super.equals(other) && util_1$5.default.isDeepStrictEqual(this.meta, other.meta);
+			return other instanceof Snapshot && super.equals(other) && util_1.default.isDeepStrictEqual(this.meta, other.meta);
 		}
 		toJSON() {
 			return {
@@ -9043,12 +9043,12 @@ var require_envelope = __commonJSMin(((exports) => {
 		}
 		return meta;
 	}
-})), require_delegations = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_delegations = __commonJSMin(((exports, module, this$15) => {
+	var __importDefault = this$15 && this$15.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Delegations = void 0;
-	let util_1$4 = __importDefault(require("util")), error_1 = require_error$5(), key_1 = require_key$1(), role_1 = require_role(), utils_1 = require_utils();
+	let util_1 = __importDefault(require("util")), error_1 = require_error$5(), key_1 = require_key$1(), role_1 = require_role(), utils_1 = require_utils();
 	exports.Delegations = class Delegations {
 		keys;
 		roles;
@@ -9059,7 +9059,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			this.succinctRoles = options.succinctRoles, this.roles = options.roles;
 		}
 		equals(other) {
-			return other instanceof Delegations && util_1$4.default.isDeepStrictEqual(this.keys, other.keys) && util_1$4.default.isDeepStrictEqual(this.roles, other.roles) && util_1$4.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields) && util_1$4.default.isDeepStrictEqual(this.succinctRoles, other.succinctRoles);
+			return other instanceof Delegations && util_1.default.isDeepStrictEqual(this.keys, other.keys) && util_1.default.isDeepStrictEqual(this.roles, other.roles) && util_1.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields) && util_1.default.isDeepStrictEqual(this.succinctRoles, other.succinctRoles);
 		}
 		*rolesForTarget(targetPath) {
 			if (this.roles) for (let role of Object.values(this.roles)) role.isDelegatedPath(targetPath) && (yield {
@@ -9118,12 +9118,12 @@ var require_envelope = __commonJSMin(((exports) => {
 		}
 		return roleMap;
 	}
-})), require_targets = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_targets = __commonJSMin(((exports, module, this$14) => {
+	var __importDefault = this$14 && this$14.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Targets = void 0;
-	let util_1$3 = __importDefault(require("util")), base_1 = require_base(), delegations_1 = require_delegations(), file_1 = require_file(), utils_1 = require_utils();
+	let util_1 = __importDefault(require("util")), base_1 = require_base(), delegations_1 = require_delegations(), file_1 = require_file(), utils_1 = require_utils();
 	exports.Targets = class Targets extends base_1.Signed {
 		type = base_1.MetadataKind.Targets;
 		targets;
@@ -9135,7 +9135,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			this.targets[target.path] = target;
 		}
 		equals(other) {
-			return other instanceof Targets && super.equals(other) && util_1$3.default.isDeepStrictEqual(this.targets, other.targets) && util_1$3.default.isDeepStrictEqual(this.delegations, other.delegations);
+			return other instanceof Targets && super.equals(other) && util_1.default.isDeepStrictEqual(this.targets, other.targets) && util_1.default.isDeepStrictEqual(this.delegations, other.delegations);
 		}
 		toJSON() {
 			let json = {
@@ -9223,12 +9223,12 @@ var require_envelope = __commonJSMin(((exports) => {
 		}
 		return snapshotMeta;
 	}
-})), require_metadata = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_metadata = __commonJSMin(((exports, module, this$13) => {
+	var __importDefault = this$13 && this$13.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Metadata = void 0;
-	let canonical_json_1 = require_lib$1(), util_1$2 = __importDefault(require("util")), base_1 = require_base(), error_1 = require_error$5(), root_1 = require_root(), signature_1 = require_signature(), snapshot_1 = require_snapshot(), targets_1 = require_targets(), timestamp_1 = require_timestamp$2(), utils_1 = require_utils();
+	let canonical_json_1 = require_lib$1(), util_1 = __importDefault(require("util")), base_1 = require_base(), error_1 = require_error$5(), root_1 = require_root(), signature_1 = require_signature(), snapshot_1 = require_snapshot(), targets_1 = require_targets(), timestamp_1 = require_timestamp$2(), utils_1 = require_utils();
 	exports.Metadata = class Metadata {
 		signed;
 		signatures;
@@ -9262,7 +9262,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			}), signingKeys.size < role.threshold) throw new error_1.UnsignedMetadataError(`${delegatedRole} was signed by ${signingKeys.size}/${role.threshold} keys`);
 		}
 		equals(other) {
-			return other instanceof Metadata && this.signed.equals(other.signed) && util_1$2.default.isDeepStrictEqual(this.signatures, other.signatures) && util_1$2.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
+			return other instanceof Metadata && this.signed.equals(other.signed) && util_1.default.isDeepStrictEqual(this.signatures, other.signatures) && util_1.default.isDeepStrictEqual(this.unrecognizedFields, other.unrecognizedFields);
 		}
 		toJSON() {
 			return {
@@ -9568,7 +9568,7 @@ var require_envelope = __commonJSMin(((exports) => {
 		return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
 	};
 })), require_supports_color = __commonJSMin(((exports, module) => {
-	let os$1 = require("os"), tty$1 = require("tty"), hasFlag = require_has_flag(), { env } = process, forceColor;
+	let os = require("os"), tty = require("tty"), hasFlag = require_has_flag(), { env } = process, forceColor;
 	hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never") ? forceColor = 0 : (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) && (forceColor = 1), "FORCE_COLOR" in env && (forceColor = env.FORCE_COLOR === "true" ? 1 : env.FORCE_COLOR === "false" ? 0 : env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3));
 	function translateLevel(level) {
 		return level !== 0 && {
@@ -9586,7 +9586,7 @@ var require_envelope = __commonJSMin(((exports) => {
 		let min = forceColor || 0;
 		if (env.TERM === "dumb") return min;
 		if (process.platform === "win32") {
-			let osRelease = os$1.release().split(".");
+			let osRelease = os.release().split(".");
 			return Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586 ? Number(osRelease[2]) >= 14931 ? 3 : 2 : 1;
 		}
 		if ("CI" in env) return [
@@ -9613,8 +9613,8 @@ var require_envelope = __commonJSMin(((exports) => {
 	}
 	module.exports = {
 		supportsColor: getSupportLevel,
-		stdout: translateLevel(supportsColor(!0, tty$1.isatty(1))),
-		stderr: translateLevel(supportsColor(!0, tty$1.isatty(2)))
+		stdout: translateLevel(supportsColor(!0, tty.isatty(1))),
+		stderr: translateLevel(supportsColor(!0, tty.isatty(2)))
 	};
 })), require_node = __commonJSMin(((exports, module) => {
 	let tty = require("tty"), util = require("util");
@@ -9760,15 +9760,15 @@ var require_envelope = __commonJSMin(((exports) => {
 			super(message), this.statusCode = statusCode;
 		}
 	};
-})), require_tmpfile = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_tmpfile = __commonJSMin(((exports, module, this$12) => {
+	var __importDefault = this$12 && this$12.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.withTempFile = void 0;
-	let promises_1 = __importDefault(require("fs/promises")), os_1 = __importDefault(require("os")), path_1$1 = __importDefault(require("path"));
-	exports.withTempFile = async (handler) => withTempDir(async (dir) => handler(path_1$1.default.join(dir, "tempfile")));
+	let promises_1 = __importDefault(require("fs/promises")), os_1 = __importDefault(require("os")), path_1 = __importDefault(require("path"));
+	exports.withTempFile = async (handler) => withTempDir(async (dir) => handler(path_1.default.join(dir, "tempfile")));
 	let withTempDir = async (handler) => {
-		let tmpDir = await promises_1.default.realpath(os_1.default.tmpdir()), dir = await promises_1.default.mkdtemp(tmpDir + path_1$1.default.sep);
+		let tmpDir = await promises_1.default.realpath(os_1.default.tmpdir()), dir = await promises_1.default.mkdtemp(tmpDir + path_1.default.sep);
 		try {
 			return await handler(dir);
 		} finally {
@@ -9877,16 +9877,16 @@ var require_envelope = __commonJSMin(((exports) => {
 			});
 		});
 	} };
-})), require_fetcher = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_fetcher = __commonJSMin(((exports, module, this$11) => {
+	var __importDefault = this$11 && this$11.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.DefaultFetcher = exports.BaseFetcher = void 0;
-	let debug_1 = __importDefault(require_src()), fs_1$2 = __importDefault(require("fs")), util_1$1 = __importDefault(require("util")), error_1 = require_error$4(), tmpfile_1 = require_tmpfile(), promise_retry_1 = require_lib(), log = (0, debug_1.default)("tuf:fetch");
+	let debug_1 = __importDefault(require_src()), fs_1 = __importDefault(require("fs")), util_1 = __importDefault(require("util")), error_1 = require_error$4(), tmpfile_1 = require_tmpfile(), promise_retry_1 = require_lib(), log = (0, debug_1.default)("tuf:fetch");
 	var BaseFetcher = class {
 		async downloadFile(url, maxLength, handler) {
 			return (0, tmpfile_1.withTempFile)(async (tmpFile) => {
-				let reader = await this.fetch(url), numberOfBytesReceived = 0, fileStream = fs_1$2.default.createWriteStream(tmpFile), streamReader = reader.getReader();
+				let reader = await this.fetch(url), numberOfBytesReceived = 0, fileStream = fs_1.default.createWriteStream(tmpFile), streamReader = reader.getReader();
 				try {
 					for (;;) {
 						let { done, value: chunk } = await streamReader.read();
@@ -9895,14 +9895,14 @@ var require_envelope = __commonJSMin(((exports) => {
 						await writeBufferToStream(fileStream, Buffer.from(chunk));
 					}
 				} finally {
-					streamReader.releaseLock(), await util_1$1.default.promisify(fileStream.close).bind(fileStream)();
+					streamReader.releaseLock(), await util_1.default.promisify(fileStream.close).bind(fileStream)();
 				}
 				return handler(tmpFile);
 			});
 		}
 		async downloadBytes(url, maxLength) {
 			return this.downloadFile(url, maxLength, async (file) => {
-				let stream = fs_1$2.default.createReadStream(file), chunks = [];
+				let stream = fs_1.default.createReadStream(file), chunks = [];
 				for await (let chunk of stream) chunks.push(chunk);
 				return Buffer.concat(chunks);
 			});
@@ -10104,8 +10104,8 @@ var require_envelope = __commonJSMin(((exports) => {
 	function removeLeadingSlash(path) {
 		return path.startsWith("/") ? path.slice(1) : path;
 	}
-})), require_updater = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_updater = __commonJSMin(((exports, module, this$10) => {
+	var __createBinding = this$10 && this$10.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -10116,14 +10116,14 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? (function(o, v) {
+	})), __setModuleDefault = this$10 && this$10.__setModuleDefault || (Object.create ? (function(o, v) {
 		Object.defineProperty(o, "default", {
 			enumerable: !0,
 			value: v
 		});
 	}) : function(o, v) {
 		o.default = v;
-	}), __importStar = exports && exports.__importStar || (function() {
+	}), __importStar = this$10 && this$10.__importStar || (function() {
 		var ownKeys = function(o) {
 			return ownKeys = Object.getOwnPropertyNames || function(o) {
 				var ar = [];
@@ -10137,11 +10137,11 @@ var require_envelope = __commonJSMin(((exports) => {
 			if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) k[i] !== "default" && __createBinding(result, mod, k[i]);
 			return __setModuleDefault(result, mod), result;
 		};
-	})(), __importDefault = exports && exports.__importDefault || function(mod) {
+	})(), __importDefault = this$10 && this$10.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Updater = void 0;
-	let models_1 = require_dist$4(), debug_1 = __importDefault(require_src()), fs$1 = __importStar(require("fs")), path$1 = __importStar(require("path")), package_json_1 = require_package$1(), config_1 = require_config(), error_1 = require_error$4(), fetcher_1 = require_fetcher(), store_1 = require_store(), url = __importStar(require_url()), log = (0, debug_1.default)("tuf:cache");
+	let models_1 = require_dist$4(), debug_1 = __importDefault(require_src()), fs = __importStar(require("fs")), path = __importStar(require("path")), package_json_1 = require_package$1(), config_1 = require_config(), error_1 = require_error$4(), fetcher_1 = require_fetcher(), store_1 = require_store(), url = __importStar(require_url()), log = (0, debug_1.default)("tuf:cache");
 	exports.Updater = class {
 		dir;
 		metadataBaseUrl;
@@ -10186,25 +10186,25 @@ var require_envelope = __commonJSMin(((exports) => {
 			}
 			let targetFilePath = targetInfo.path;
 			if (this.trustedSet.root.signed.consistentSnapshot && this.config.prefixTargetsWithHash) {
-				let hashes = Object.values(targetInfo.hashes), { dir, base } = path$1.parse(targetFilePath), filename = `${hashes[0]}.${base}`;
+				let hashes = Object.values(targetInfo.hashes), { dir, base } = path.parse(targetFilePath), filename = `${hashes[0]}.${base}`;
 				targetFilePath = dir ? `${dir}/${filename}` : filename;
 			}
 			let targetUrl = url.join(targetBaseUrl, targetFilePath);
 			return await this.fetcher.downloadFile(targetUrl, targetInfo.length, async (fileName) => {
-				await targetInfo.verify(fs$1.createReadStream(fileName)), log("WRITE %s", targetPath), fs$1.copyFileSync(fileName, targetPath);
+				await targetInfo.verify(fs.createReadStream(fileName)), log("WRITE %s", targetPath), fs.copyFileSync(fileName, targetPath);
 			}), targetPath;
 		}
 		async findCachedTarget(targetInfo, filePath) {
 			filePath ||= this.generateTargetPath(targetInfo);
 			try {
-				if (fs$1.existsSync(filePath)) return await targetInfo.verify(fs$1.createReadStream(filePath)), filePath;
+				if (fs.existsSync(filePath)) return await targetInfo.verify(fs.createReadStream(filePath)), filePath;
 			} catch {
 				return;
 			}
 		}
 		loadLocalMetadata(fileName) {
-			let filePath = path$1.join(this.dir, `${fileName}.json`);
-			return log("READ %s", filePath), fs$1.readFileSync(filePath);
+			let filePath = path.join(this.dir, `${fileName}.json`);
+			return log("READ %s", filePath), fs.readFileSync(filePath);
 		}
 		async loadRoot() {
 			let lowerBound = this.trustedSet.root.signed.version + 1, upperBound = lowerBound + this.config.maxRootRotations;
@@ -10293,13 +10293,13 @@ var require_envelope = __commonJSMin(((exports) => {
 		generateTargetPath(targetInfo) {
 			if (!this.targetDir) throw new error_1.ValueError("Target directory not set");
 			let filePath = encodeURIComponent(targetInfo.path);
-			return path$1.join(this.targetDir, filePath);
+			return path.join(this.targetDir, filePath);
 		}
 		persistMetadata(metaDataName, bytesData) {
 			let encodedName = encodeURIComponent(metaDataName);
 			try {
-				let filePath = path$1.join(this.dir, `${encodedName}.json`);
-				log("WRITE %s", filePath), fs$1.writeFileSync(filePath, bytesData.toString("utf8"));
+				let filePath = path.join(this.dir, `${encodedName}.json`);
+				log("WRITE %s", filePath), fs.writeFileSync(filePath, bytesData.toString("utf8"));
 			} catch (error) {
 				throw new error_1.PersistError(`Failed to persist metadata ${encodedName} error: ${error}`);
 			}
@@ -10369,16 +10369,16 @@ var require_envelope = __commonJSMin(((exports) => {
 			super(message), this.code = code, this.cause = cause, this.name = this.constructor.name;
 		}
 	};
-})), require_target = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_target = __commonJSMin(((exports, module, this$9) => {
+	var __importDefault = this$9 && this$9.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.readTarget = readTarget;
-	let fs_1$1 = __importDefault(require("fs")), error_1 = require_error$3();
+	let fs_1 = __importDefault(require("fs")), error_1 = require_error$3();
 	async function readTarget(tuf, targetPath) {
 		let path = await getTargetPath(tuf, targetPath);
 		return new Promise((resolve, reject) => {
-			fs_1$1.default.readFile(path, "utf-8", (err, data) => {
+			fs_1.default.readFile(path, "utf-8", (err, data) => {
 				err ? reject(new error_1.TUFError({
 					code: "TUF_READ_TARGET_ERROR",
 					message: `error reading target ${path}`,
@@ -10422,8 +10422,8 @@ var require_envelope = __commonJSMin(((exports) => {
 			"registry.npmjs.org%2Fkeys.json": "ewogICAgImtleXMiOiBbCiAgICAgICAgewogICAgICAgICAgICAia2V5SWQiOiAiU0hBMjU2OmpsM2J3c3d1ODBQampva0NnaDBvMnc1YzJVNExoUUFFNTdnajljejFrekEiLAogICAgICAgICAgICAia2V5VXNhZ2UiOiAibnBtOnNpZ25hdHVyZXMiLAogICAgICAgICAgICAicHVibGljS2V5IjogewogICAgICAgICAgICAgICAgInJhd0J5dGVzIjogIk1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRTFPbGIzek1BRkZ4WEtIaUlrUU81Y0ozWWhsNWk2VVBwK0lodXRlQkpidUhjQTVVb2dLbzBFV3RsV3dXNktTYUtvVE5FWUw3SmxDUWlWbmtoQmt0VWdnPT0iLAogICAgICAgICAgICAgICAgImtleURldGFpbHMiOiAiUEtJWF9FQ0RTQV9QMjU2X1NIQV8yNTYiLAogICAgICAgICAgICAgICAgInZhbGlkRm9yIjogewogICAgICAgICAgICAgICAgICAgICJzdGFydCI6ICIxOTk5LTAxLTAxVDAwOjAwOjAwLjAwMFoiLAogICAgICAgICAgICAgICAgICAgICJlbmQiOiAiMjAyNS0wMS0yOVQwMDowMDowMC4wMDBaIgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICB7CiAgICAgICAgICAgICJrZXlJZCI6ICJTSEEyNTY6amwzYndzd3U4MFBqam9rQ2doMG8ydzVjMlU0TGhRQUU1N2dqOWN6MWt6QSIsCiAgICAgICAgICAgICJrZXlVc2FnZSI6ICJucG06YXR0ZXN0YXRpb25zIiwKICAgICAgICAgICAgInB1YmxpY0tleSI6IHsKICAgICAgICAgICAgICAgICJyYXdCeXRlcyI6ICJNRmt3RXdZSEtvWkl6ajBDQVFZSUtvWkl6ajBEQVFjRFFnQUUxT2xiM3pNQUZGeFhLSGlJa1FPNWNKM1lobDVpNlVQcCtJaHV0ZUJKYnVIY0E1VW9nS28wRVd0bFd3VzZLU2FLb1RORVlMN0psQ1FpVm5raEJrdFVnZz09IiwKICAgICAgICAgICAgICAgICJrZXlEZXRhaWxzIjogIlBLSVhfRUNEU0FfUDI1Nl9TSEFfMjU2IiwKICAgICAgICAgICAgICAgICJ2YWxpZEZvciI6IHsKICAgICAgICAgICAgICAgICAgICAic3RhcnQiOiAiMjAyMi0xMi0wMVQwMDowMDowMC4wMDBaIiwKICAgICAgICAgICAgICAgICAgICAiZW5kIjogIjIwMjUtMDEtMjlUMDA6MDA6MDAuMDAwWiIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgIH0sCiAgICAgICAgewogICAgICAgICAgICAia2V5SWQiOiAiU0hBMjU2OkRoUTh3UjVBUEJ2RkhMRi8rVGMrQVl2UE9kVHBjSURxT2h4c0JIUndDN1UiLAogICAgICAgICAgICAia2V5VXNhZ2UiOiAibnBtOnNpZ25hdHVyZXMiLAogICAgICAgICAgICAicHVibGljS2V5IjogewogICAgICAgICAgICAgICAgInJhd0J5dGVzIjogIk1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVk2WWE3VysrN2FVUHp2TVRyZXpINlljeDNjK0hPS1lDY05HeWJKWlNDSnEvZmQ3UWE4dXVBS3RkSWtVUXRRaUVLRVJoQW1FNWxNTUpoUDhPa0RPYTJnPT0iLAogICAgICAgICAgICAgICAgImtleURldGFpbHMiOiAiUEtJWF9FQ0RTQV9QMjU2X1NIQV8yNTYiLAogICAgICAgICAgICAgICAgInZhbGlkRm9yIjogewogICAgICAgICAgICAgICAgICAgICJzdGFydCI6ICIyMDI1LTAxLTEzVDAwOjAwOjAwLjAwMFoiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgIHsKICAgICAgICAgICAgImtleUlkIjogIlNIQTI1NjpEaFE4d1I1QVBCdkZITEYvK1RjK0FZdlBPZFRwY0lEcU9oeHNCSFJ3QzdVIiwKICAgICAgICAgICAgImtleVVzYWdlIjogIm5wbTphdHRlc3RhdGlvbnMiLAogICAgICAgICAgICAicHVibGljS2V5IjogewogICAgICAgICAgICAgICAgInJhd0J5dGVzIjogIk1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVk2WWE3VysrN2FVUHp2TVRyZXpINlljeDNjK0hPS1lDY05HeWJKWlNDSnEvZmQ3UWE4dXVBS3RkSWtVUXRRaUVLRVJoQW1FNWxNTUpoUDhPa0RPYTJnPT0iLAogICAgICAgICAgICAgICAgImtleURldGFpbHMiOiAiUEtJWF9FQ0RTQV9QMjU2X1NIQV8yNTYiLAogICAgICAgICAgICAgICAgInZhbGlkRm9yIjogewogICAgICAgICAgICAgICAgICAgICJzdGFydCI6ICIyMDI1LTAxLTEzVDAwOjAwOjAwLjAwMFoiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICBdCn0K"
 		}
 	} };
-})), require_client = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_client = __commonJSMin(((exports, module, this$8) => {
+	var __importDefault = this$8 && this$8.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.TUFClient = void 0;
@@ -10791,8 +10791,8 @@ var require_envelope = __commonJSMin(((exports) => {
 			return obj_1.ASN1Obj;
 		}
 	});
-})), require_crypto = __commonJSMin(((exports) => {
-	var __importDefault = exports && exports.__importDefault || function(mod) {
+})), require_crypto = __commonJSMin(((exports, module, this$7) => {
+	var __importDefault = this$7 && this$7.__importDefault || function(mod) {
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.createPublicKey = createPublicKey, exports.digest = digest, exports.verify = verify, exports.bufferEqual = bufferEqual;
@@ -10902,8 +10902,8 @@ var require_envelope = __commonJSMin(((exports) => {
 	};
 })), require_error$1 = __commonJSMin(((exports) => {
 	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.RFC3161TimestampVerificationError = void 0, exports.RFC3161TimestampVerificationError = class extends Error {};
-})), require_tstinfo = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_tstinfo = __commonJSMin(((exports, module, this$6) => {
+	var __createBinding = this$6 && this$6.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -10914,14 +10914,14 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? (function(o, v) {
+	})), __setModuleDefault = this$6 && this$6.__setModuleDefault || (Object.create ? (function(o, v) {
 		Object.defineProperty(o, "default", {
 			enumerable: !0,
 			value: v
 		});
 	}) : function(o, v) {
 		o.default = v;
-	}), __importStar = exports && exports.__importStar || (function() {
+	}), __importStar = this$6 && this$6.__importStar || (function() {
 		var ownKeys = function(o) {
 			return ownKeys = Object.getOwnPropertyNames || function(o) {
 				var ar = [];
@@ -10967,8 +10967,8 @@ var require_envelope = __commonJSMin(((exports) => {
 			return this.root.subs[2];
 		}
 	};
-})), require_timestamp$1 = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_timestamp$1 = __commonJSMin(((exports, module, this$5) => {
+	var __createBinding = this$5 && this$5.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -10979,14 +10979,14 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? (function(o, v) {
+	})), __setModuleDefault = this$5 && this$5.__setModuleDefault || (Object.create ? (function(o, v) {
 		Object.defineProperty(o, "default", {
 			enumerable: !0,
 			value: v
 		});
 	}) : function(o, v) {
 		o.default = v;
-	}), __importStar = exports && exports.__importStar || (function() {
+	}), __importStar = this$5 && this$5.__importStar || (function() {
 		var ownKeys = function(o) {
 			return ownKeys = Object.getOwnPropertyNames || function(o) {
 				var ar = [];
@@ -11114,8 +11114,8 @@ var require_envelope = __commonJSMin(((exports) => {
 			return timestamp_1.RFC3161Timestamp;
 		}
 	});
-})), require_sct$1 = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_sct$1 = __commonJSMin(((exports, module, this$4) => {
+	var __createBinding = this$4 && this$4.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -11126,14 +11126,14 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? (function(o, v) {
+	})), __setModuleDefault = this$4 && this$4.__setModuleDefault || (Object.create ? (function(o, v) {
 		Object.defineProperty(o, "default", {
 			enumerable: !0,
 			value: v
 		});
 	}) : function(o, v) {
 		o.default = v;
-	}), __importStar = exports && exports.__importStar || (function() {
+	}), __importStar = this$4 && this$4.__importStar || (function() {
 		var ownKeys = function(o) {
 			return ownKeys = Object.getOwnPropertyNames || function(o) {
 				var ar = [];
@@ -11286,8 +11286,8 @@ var require_envelope = __commonJSMin(((exports) => {
 			return sctList;
 		}
 	};
-})), require_cert = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_cert = __commonJSMin(((exports, module, this$3) => {
+	var __createBinding = this$3 && this$3.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -11298,14 +11298,14 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? (function(o, v) {
+	})), __setModuleDefault = this$3 && this$3.__setModuleDefault || (Object.create ? (function(o, v) {
 		Object.defineProperty(o, "default", {
 			enumerable: !0,
 			value: v
 		});
 	}) : function(o, v) {
 		o.default = v;
-	}), __importStar = exports && exports.__importStar || (function() {
+	}), __importStar = this$3 && this$3.__importStar || (function() {
 		var ownKeys = function(o) {
 			return ownKeys = Object.getOwnPropertyNames || function(o) {
 				var ar = [];
@@ -11470,8 +11470,8 @@ var require_envelope = __commonJSMin(((exports) => {
 			return ext_1.X509SCTExtension;
 		}
 	});
-})), require_dist$1 = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_dist$1 = __commonJSMin(((exports, module, this$2) => {
+	var __createBinding = this$2 && this$2.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -11482,14 +11482,14 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? (function(o, v) {
+	})), __setModuleDefault = this$2 && this$2.__setModuleDefault || (Object.create ? (function(o, v) {
 		Object.defineProperty(o, "default", {
 			enumerable: !0,
 			value: v
 		});
 	}) : function(o, v) {
 		o.default = v;
-	}), __importStar = exports && exports.__importStar || (function() {
+	}), __importStar = this$2 && this$2.__importStar || (function() {
 		var ownKeys = function(o) {
 			return ownKeys = Object.getOwnPropertyNames || function(o) {
 				var ar = [];
@@ -12130,8 +12130,8 @@ var require_envelope = __commonJSMin(((exports) => {
 	function isSet(value) {
 		return value != null;
 	}
-})), require_v2 = __commonJSMin(((exports) => {
-	var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+})), require_v2 = __commonJSMin(((exports, module, this$1) => {
+	var __createBinding = this$1 && this$1.__createBinding || (Object.create ? (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k);
 		var desc = Object.getOwnPropertyDescriptor(m, k);
 		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
@@ -12142,8 +12142,8 @@ var require_envelope = __commonJSMin(((exports) => {
 		}), Object.defineProperty(o, k2, desc);
 	}) : (function(o, m, k, k2) {
 		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __exportStar = exports && exports.__exportStar || function(m, exports$1) {
-		for (var p in m) p !== "default" && !Object.prototype.hasOwnProperty.call(exports$1, p) && __createBinding(exports$1, m, p);
+	})), __exportStar = this$1 && this$1.__exportStar || function(m, exports) {
+		for (var p in m) p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p) && __createBinding(exports, m, p);
 	};
 	Object.defineProperty(exports, "__esModule", { value: !0 }), __exportStar(require_dsse$1(), exports), __exportStar(require_entry(), exports), __exportStar(require_hashedrekord$1(), exports), __exportStar(require_verifier$1(), exports);
 })), require_dsse = __commonJSMin(((exports) => {
