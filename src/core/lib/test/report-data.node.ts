@@ -7,14 +7,18 @@
 import type { ProxyDroppedLogs } from "../docker/proxy-dropped-logs.ts";
 import type { AnnotatedBlockedRow } from "../report/build/aggregate.ts";
 import type { Interruptions } from "../report/outcome/blocked-outcome.ts";
-import type { GenReportParameters } from "../report/types.ts";
+import type { GenReportParameters, ServiceHealth } from "../report/types.ts";
 
 /** A proxy that answered and dropped nothing. */
 export const NONE_DROPPED: ProxyDroppedLogs = { answered: true, count: 0 };
 
-/** A run in which the proxy answered and nothing restarted. */
+/** A proxy that answered and dropped nothing, and a resolver that answered. */
+export const HEALTHY: ServiceHealth = { droppedLogs: NONE_DROPPED, resolverAnswered: true };
+
+/** A run in which both services answered and nothing restarted. */
 export const UNINTERRUPTED: Interruptions = {
   proxyAnswered: true,
+  resolverAnswered: true,
   restarts: { proxy: 0, resolver: 0 },
 };
 

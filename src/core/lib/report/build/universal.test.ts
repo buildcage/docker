@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { NONE_DROPPED, reportParams } from "#core/lib/test/report-data.node.ts";
+import { HEALTHY, reportParams } from "#core/lib/test/report-data.node.ts";
 
 import { buildUniversalRestrictExample } from "../render/universal-example.ts";
 import { buildUniversalReportData } from "./universal.ts";
@@ -33,7 +33,7 @@ describe("buildUniversalReportData", () => {
       ],
       [DNS_START],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.engine).toBe("universal");
     expect(result.passed.map((r) => r.host)).toStrictEqual(["good.com"]);
@@ -49,7 +49,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, proxy("AUDIT", "HTTPS", "any.com:443", "-", 10)],
       [DNS_START],
       reportParams({ mode: "audit" }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.passed.map((r) => r.host)).toStrictEqual(["any.com"]);
   });
@@ -63,7 +63,7 @@ describe("buildUniversalReportData", () => {
       ],
       [DNS_START],
       reportParams({ mode: "audit" }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.passed.map((r) => [r.host, r.count])).toStrictEqual([["example.com", 2]]);
     expect(
@@ -76,7 +76,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, proxy("BLOCKED", "HTTPS", "absent.com:443", "dns-failed")],
       [DNS_START],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.failed.map((r) => r.host)).toStrictEqual(["absent.com"]);
     expect(result.blocked.length).toBe(0);
@@ -87,7 +87,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START],
       [DNS_START, dnsLine("denied", "exfil.attacker.example")],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.blocked[0].host).toBe("exfil.attacker.example");
     expect(result.blocked[0].ruleType).toBe("DNS");
@@ -100,7 +100,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START],
       [DNS_START, dnsLine("service-denied", "_mongodb._tcp.c0.example.net", "SRV")],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.blocked[0].host).toBe("_mongodb._tcp.c0.example.net");
     expect(result.blocked[0].ruleType).toBe("DNS");
@@ -111,7 +111,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START],
       [DNS_START, dnsLine("allowed", "looked-up.example.com")],
       reportParams({ mode: "audit" }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.passed[0].host).toBe("looked-up.example.com");
     expect(result.passed[0].ruleType).toBe("DNS");
@@ -122,7 +122,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START],
       [DNS_START, dnsLine("discovery", "_http._tcp.deb.debian.org", "SRV")],
       reportParams({ mode: "audit" }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.passed).toStrictEqual([]);
     expect(result.blocked).toStrictEqual([]);
@@ -134,7 +134,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 8)],
       [DNS_START, dnsLine("allowed", "good.com")],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.passed.length).toBe(1);
     expect(result.passed[0].ruleType).toBe("HTTPS");
@@ -145,7 +145,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START],
       [DNS_START, dnsLine("denied", "telemetry.example.com")],
       reportParams({ knownBlockedRules: ["telemetry.example.com:*"] }),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.blocked[0].expected).toBe(true);
   });
@@ -155,7 +155,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, proxy("ALLOWED", "HTTPS", "b.com:443", "-", 1, 1787471973000)],
       [DNS_START, dnsLine("denied", "a.example")],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     const times = result.timeline.map((e) => e.time);
     expect(times).toStrictEqual([...times].sort((x, y) => x - y));
@@ -166,7 +166,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
       [dnsLine("allowed", "good.com")],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.logLooksPlausible).toBe(false);
   });
@@ -177,7 +177,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START],
       [DNS_START, dnsLine("denied", "bad com")],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.logLooksPlausible).toBe(false);
   });
@@ -187,7 +187,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, `buildcage 1787471971000 [BLOCKED] (HTTPS) "bad.com:4`],
       [DNS_START],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.logLooksPlausible).toBe(false);
   });
@@ -206,11 +206,24 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
       [DNS_START],
       reportParams(),
-      droppedLogs,
+      { ...HEALTHY, droppedLogs },
     );
     expect(result.logLooksPlausible).toBe(false);
     expect(result.proxyAnswered).toBe(droppedLogs.answered);
     expect(result.passed.map((r) => r.host)).toStrictEqual(["good.com"]);
+  });
+
+  it("logLooksPlausible is false when the resolver did not answer", async () => {
+    // Lookups a stopped resolver never received leave no line in its log.
+    const result = await buildUniversalReportData(
+      [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
+      [DNS_START],
+      reportParams(),
+      { ...HEALTHY, resolverAnswered: false },
+    );
+    expect(result.logLooksPlausible).toBe(false);
+    expect(result.resolverAnswered).toBe(false);
+    expect(result.proxyAnswered).toBe(true);
   });
 
   it("logLooksPlausible is false when the proxy restarted", async () => {
@@ -219,14 +232,14 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, allowed, HAPROXY_START, allowed],
       [DNS_START],
       reportParams(),
-      NONE_DROPPED,
+      HEALTHY,
     );
     expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0 });
     expect(result.logLooksPlausible).toBe(false);
   });
 
   it("returns empty tables and an implausible log for empty input", async () => {
-    const result = await buildUniversalReportData([], [], reportParams(), NONE_DROPPED);
+    const result = await buildUniversalReportData([], [], reportParams(), HEALTHY);
     expect(result.passed).toStrictEqual([]);
     expect(result.blocked).toStrictEqual([]);
     expect(result.timeline).toStrictEqual([]);

@@ -30,6 +30,7 @@ export function describeReportOutcomes(
       blockedRows: report.blocked,
       logLooksPlausible: report.logLooksPlausible,
       proxyAnswered: report.proxyAnswered,
+      resolverAnswered: report.resolverAnswered,
       restarts: report.restarts,
       engineLabel,
     }),

@@ -15,6 +15,8 @@ export interface DetermineBlockedOutcomeOptions {
   logLooksPlausible: boolean;
   /** See ReportDataCommon.proxyAnswered. */
   proxyAnswered: boolean;
+  /** See ReportDataCommon.resolverAnswered. */
+  resolverAnswered: boolean;
 }
 
 /**
@@ -25,9 +27,9 @@ export interface DetermineBlockedOutcomeOptions {
  * (fail closed).
  *
  * An implausible log decides on its own: what survived says nothing about
- * what was dropped, so known-blocked-rules cannot clear the step. A proxy that
- * did not answer fails it in any mode: that is buildcage failing, not a rule
- * the build broke.
+ * what was dropped, so known-blocked-rules cannot clear the step. A proxy or
+ * resolver that did not answer fails it in any mode: that is buildcage
+ * failing, not a rule the build broke.
  */
 export function determineBlockedOutcome({
   isAudit,
@@ -36,8 +38,9 @@ export function determineBlockedOutcome({
   blockedRows,
   logLooksPlausible,
   proxyAnswered,
+  resolverAnswered,
 }: DetermineBlockedOutcomeOptions): BlockedOutcome {
-  if (!proxyAnswered) return { level: "error", shouldFail: true };
+  if (!proxyAnswered || !resolverAnswered) return { level: "error", shouldFail: true };
   if (!logLooksPlausible) {
     if (isAudit) return { level: "notice", shouldFail: false };
     return failOnBlocked
@@ -86,20 +89,35 @@ export function buildBlockedMessage({
   return `${base} (${unexpected} of ${blockedRows.length} distinct blocked host(s) unmatched by known-blocked-rules)`;
 }
 
-export type Interruptions = Pick<ReportDataCommon, "proxyAnswered" | "restarts">;
+export type Interruptions = Pick<
+  ReportDataCommon,
+  "proxyAnswered" | "resolverAnswered" | "restarts"
+>;
 
 /**
  * What the report knows for certain cut its logs short, one sentence each, to
  * be named before the causes it can only list as possible.
  */
-export function describeInterruptions({ proxyAnswered, restarts }: Interruptions): string[] {
+export function describeInterruptions({
+  proxyAnswered,
+  resolverAnswered,
+  restarts,
+}: Interruptions): string[] {
   const facts: string[] = [];
   if (!proxyAnswered) {
     facts.push(
       "The proxy did not answer the report, so it stopped or hung during the run. Requests made " +
-        "while it was down failed rather than going around it, and the step fails for this " +
-        "whatever the mode or fail-on-blocked.",
+        "while it was down failed rather than going around it.",
     );
+  }
+  if (!resolverAnswered) {
+    facts.push(
+      "The DNS resolver did not answer the report, so it stopped or hung during the run. " +
+        "Lookups made while it was down failed and left no line.",
+    );
+  }
+  if (!proxyAnswered || !resolverAnswered) {
+    facts.push("The step fails for this whatever the mode or fail-on-blocked.");
   }
   if (restarts.proxy) facts.push(`The proxy restarted ${restarts.proxy} time(s) during the run.`);
   if (restarts.resolver) {
@@ -130,6 +148,7 @@ export interface DescribeBlockedOutcomeOptions {
   blockedRows: ExpectedFlag[];
   logLooksPlausible: boolean;
   proxyAnswered: boolean;
+  resolverAnswered: boolean;
   restarts: Interruptions["restarts"];
   engineLabel: "sandbox" | "proxy";
 }
@@ -142,6 +161,7 @@ export function describeBlockedOutcome({
   blockedRows,
   logLooksPlausible,
   proxyAnswered,
+  resolverAnswered,
   restarts,
   engineLabel,
 }: DescribeBlockedOutcomeOptions): DescribedBlockedOutcome {
@@ -152,13 +172,14 @@ export function describeBlockedOutcome({
     blockedRows,
     logLooksPlausible,
     proxyAnswered,
+    resolverAnswered,
   });
   const base = buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit });
   if (logLooksPlausible) return { ...outcome, message: base };
-  const facts = describeInterruptions({ proxyAnswered, restarts });
+  const facts = describeInterruptions({ proxyAnswered, resolverAnswered, restarts });
   // audit's notice keeps the fixed-format opening buildBlockedMessage
   // promises, so the warning is appended rather than replacing it.
-  if (isAudit && proxyAnswered) {
+  if (isAudit && proxyAnswered && resolverAnswered) {
     const incomplete = `${base}, but the logs are incomplete and this is not a full record`;
     return { ...outcome, message: facts.length ? `${incomplete}. ${facts.join(" ")}` : incomplete };
   }
