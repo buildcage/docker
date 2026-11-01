@@ -8,7 +8,7 @@
  * orderings are only visible from here, so this is where they are tested.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 
 import * as core from "@actions/core";
 
@@ -25,11 +25,11 @@ import { logRules, withLogGroup } from "#core/lib/actions/log.ts";
 import { checkRuleListSizesOrThrow } from "#core/lib/actions/rule-inputs.ts";
 import { buildComposeUpArgs, buildComposeDownArgs } from "#core/lib/docker/args.ts";
 import { resolveProjectName } from "#core/lib/docker/compose-project-name.ts";
-import { resolveBuildcageImageRef } from "#core/lib/provenance/image-ref.ts";
+import { startImagePull, type ImagePull } from "#core/lib/docker/image-pull.ts";
 import {
   verifyImageDigestOrThrow,
+  verifyWhilePulling,
   type VerifyImageDigestOptions,
-  type ResolvedImage,
 } from "#core/lib/provenance/verify-image.ts";
 import { CONFIG_FILE_INPUTS, dropListInputs, INPUT_NAMES } from "#report/report-source.ts";
 
@@ -47,7 +47,7 @@ import { BUILDER_NAME_STATE } from "./post-cleanup.ts";
  * standing in for a dozen modules at once; each one is tested in its own file.
  *
  * Pure steps are left out on purpose and run for real (resolveProjectName,
- * buildComposeEnv, resolveBuildcageImageRef, describeDockerFailure, and the
+ * buildComposeEnv, verifyWhilePulling, describeDockerFailure, and the
  * argv builders): what a test wants to see of those is the value that reached
  * the next step, not the call.
  */
@@ -56,6 +56,7 @@ export interface SetupStepDeps {
   readSetupInputs: typeof readSetupInputs;
   readLocalImageOverride: typeof readLocalImageOverride;
   verifyImageDigestOrThrow: typeof verifyImageDigestOrThrow;
+  startImagePull: (imageRef: string) => ImagePull;
   checkUrlAndTlsRuleSupport: typeof checkUrlAndTlsRuleSupport;
   checkKnownBlockedUrlRuleSupport: typeof checkKnownBlockedUrlRuleSupport;
   logRules: typeof logRules;
@@ -78,6 +79,9 @@ export interface SetupStepDeps {
 const runDockerViaExec = (args: string[], env: NodeJS.ProcessEnv): void => {
   execFileSync("docker", args, { stdio: "inherit", env });
 };
+
+const startImagePullViaSpawn = (imageRef: string): ImagePull =>
+  startImagePull(imageRef, (args) => spawn("docker", args, { stdio: ["ignore", "pipe", "pipe"] }));
 /* v8 ignore stop */
 
 const realDeps: SetupStepDeps = {
@@ -85,6 +89,7 @@ const realDeps: SetupStepDeps = {
   readSetupInputs,
   readLocalImageOverride,
   verifyImageDigestOrThrow,
+  startImagePull: startImagePullViaSpawn,
   checkUrlAndTlsRuleSupport,
   checkKnownBlockedUrlRuleSupport,
   logRules,
@@ -98,20 +103,33 @@ const realDeps: SetupStepDeps = {
 };
 
 /**
- * Verifies image provenance and resolves the digest-pinned image ref.
+ * Verifies image provenance and waits for the digest-pinned image's pull,
+ * which runs alongside verification.
  * Throws ProvenanceError("UNVERIFIABLE_REF") if verification can't be
  * performed (branch ref, local ./), printed by the top-level catch.
  */
 async function resolveVerifiedImage(
   { actionRef, actionRepo, proxyEngine }: VerifyImageDigestOptions,
-  { verifyImageDigestOrThrow, log }: Pick<SetupStepDeps, "verifyImageDigestOrThrow" | "log">,
-): Promise<ResolvedImage> {
-  const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine });
+  {
+    verifyImageDigestOrThrow,
+    startImagePull,
+    log,
+  }: Pick<SetupStepDeps, "verifyImageDigestOrThrow" | "startImagePull" | "log">,
+): Promise<{ imageRef: string }> {
+  const { digest, imageRef, pull } = await verifyWhilePulling(
+    { actionRef, actionRepo, proxyEngine },
+    { verifyImageDigestOrThrow, startImagePull },
+  );
   log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
-  return {
-    imageRef: resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo }),
-    pullPolicy: "always",
-  };
+  try {
+    await pull.finished;
+  } catch (e) {
+    throw new SetupError(
+      describeDockerFailure(e, { operation: "docker pull" }),
+      "DOCKER_UNAVAILABLE",
+    );
+  }
+  return { imageRef };
 }
 
 /**
@@ -127,6 +145,7 @@ export async function runSetupStep(
     readSetupInputs,
     readLocalImageOverride,
     verifyImageDigestOrThrow,
+    startImagePull,
     checkUrlAndTlsRuleSupport,
     checkKnownBlockedUrlRuleSupport,
     logRules,
@@ -200,11 +219,11 @@ export async function runSetupStep(
   });
 
   const localOverride = await readLocalImageOverride(env, log);
-  const { imageRef, pullPolicy } =
+  const { imageRef } =
     localOverride ??
     (await resolveVerifiedImage(
       { actionRef, actionRepo, proxyEngine },
-      { verifyImageDigestOrThrow, log },
+      { verifyImageDigestOrThrow, startImagePull, log },
     ));
   log(`buildcage: image: ${imageRef}`);
 
@@ -247,7 +266,7 @@ export async function runSetupStep(
   }
 
   try {
-    runDocker(buildComposeUpArgs({ composeFiles, projectName, pullPolicy }), composeEnv);
+    runDocker(buildComposeUpArgs({ composeFiles, projectName }), composeEnv);
   } catch (e) {
     throw builderStartError(e, {
       composeFiles,

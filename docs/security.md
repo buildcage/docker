@@ -468,6 +468,10 @@ signing workflow and its ref or version, and the source commit SHA carried in Fu
 `1.3.6.1.4.1.57264.1.13`. That is the equivalent of cosign's `--certificate-oidc-issuer`,
 `--certificate-identity-regexp` and `--certificate-github-workflow-sha`.
 
+The image is pulled by that digest while the bundle is verified, and no container starts from it
+until verification passes. A failed verification stops a pull still under way; one that has already
+finished leaves the image in the runner's local image store, where the action never runs it.
+
 Two assertions then run against the verified bundle, both fail-closed:
 
 - **The signed digest must equal the digest the tag resolved to.** It is read from the verified

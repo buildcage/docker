@@ -24,7 +24,6 @@ describe("buildComposeUpArgs", () => {
     const args = buildComposeUpArgs({
       composeFiles: ["/path/to/compose.yaml"],
       projectName: "buildcage-proxy-abcd1234",
-      pullPolicy: "always",
     });
     expect(args).toStrictEqual([
       "compose",
@@ -35,12 +34,11 @@ describe("buildComposeUpArgs", () => {
       "up",
       "-d",
       "--pull",
-      "always",
+      "never",
       "--no-build",
       "--wait",
       "--wait-timeout",
       "180",
-      "--quiet-pull",
     ]);
   });
 });

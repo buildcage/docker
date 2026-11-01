@@ -12,6 +12,7 @@ const mocks = {
   readSetupInputs: vi.fn(),
   readLocalImageOverride: vi.fn(),
   verifyImageDigestOrThrow: vi.fn(),
+  startImagePull: vi.fn(),
   checkUrlAndTlsRuleSupport: vi.fn(),
   checkKnownBlockedUrlRuleSupport: vi.fn(),
   logRules: vi.fn(),
@@ -48,6 +49,7 @@ beforeEach(() => {
   mocks.readSetupInputs.mockReturnValue(inputsWith());
   mocks.readLocalImageOverride.mockResolvedValue(null);
   mocks.verifyImageDigestOrThrow.mockResolvedValue(DIGEST);
+  mocks.startImagePull.mockReturnValue({ finished: Promise.resolve(), cancel: vi.fn() });
   // The real one runs the callback; a test that cares asserts on logRules.
   mocks.withLogGroup.mockImplementation((_title: string, fn: () => void) => fn());
   mocks.builderStartError.mockReturnValue(
@@ -175,11 +177,13 @@ describe("runSetupStep", () => {
 
     expect(orderOf(mocks.readSetupInputs)).toBeLessThan(orderOf(mocks.readLocalImageOverride));
     expect(orderOf(mocks.readSetupInputs)).toBeLessThan(orderOf(mocks.verifyImageDigestOrThrow));
-    expect(mocks.verifyImageDigestOrThrow).toHaveBeenCalledWith({
-      actionRef: "v3.2.1",
-      actionRepo: "buildcage/docker",
-      proxyEngine: "universal",
-    });
+    expect(mocks.verifyImageDigestOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionRef: "v3.2.1",
+        actionRepo: "buildcage/docker",
+        proxyEngine: "universal",
+      }),
+    );
   });
 
   // A local-path `uses: ./` invocation sets neither, and an empty ref is
@@ -258,24 +262,58 @@ describe("runSetupStep", () => {
   it("pulls the image by verified digest, under the action's own repository", async () => {
     await runSetupStep(ENV, deps);
 
+    expect(mocks.startImagePull).toHaveBeenCalledExactlyOnceWith(
+      `ghcr.io/buildcage/docker@${DIGEST}`,
+    );
     expect(dockerArgs(1)).toStrictEqual(
-      expect.arrayContaining(["up", "-d", "--pull", "always", "--no-build"]),
+      expect.arrayContaining(["up", "-d", "--pull", "never", "--no-build"]),
     );
     expect(mocks.runDocker.mock.calls[1]![1]).toMatchObject({
       BUILDCAGE_IMAGE_REF: `ghcr.io/buildcage/docker@${DIGEST}`,
     });
   });
 
+  it("starts the builder only once the image pull has finished", async () => {
+    let finishPull!: () => void;
+    mocks.startImagePull.mockReturnValue({
+      finished: new Promise<void>((resolve) => (finishPull = resolve)),
+      cancel: vi.fn(),
+    });
+
+    const step = runSetupStep(ENV, deps);
+    await vi.waitFor(() => expect(mocks.startImagePull).toHaveBeenCalled());
+    expect(mocks.runDocker).not.toHaveBeenCalled();
+    finishPull();
+    await step;
+
+    expect(dockerArgs(1)).toStrictEqual(expect.arrayContaining(["up"]));
+  });
+
+  it("fails with the pull's own error, and starts no builder, when the image pull fails", async () => {
+    const finished = Promise.reject(
+      Object.assign(new Error("pull failed"), { status: 1, stderr: "manifest unknown\n" }),
+    );
+    // As the real one does, so the rejection is not reported before the step awaits it.
+    finished.catch(() => {});
+    mocks.startImagePull.mockReturnValue({ finished, cancel: vi.fn() });
+
+    await expect(runSetupStep(ENV, deps)).rejects.toMatchObject({
+      code: "DOCKER_UNAVAILABLE",
+      message: expect.stringMatching(/^docker pull failed: manifest unknown\./),
+    });
+    expect(mocks.runDocker).not.toHaveBeenCalled();
+  });
+
   it("skips provenance verification when a local override names an image", async () => {
     mocks.readLocalImageOverride.mockResolvedValue({
       imageRef: "local:dev",
-      pullPolicy: "never",
       composeOverlay: undefined,
     });
 
     await runSetupStep(ENV, deps);
 
     expect(mocks.verifyImageDigestOrThrow).not.toHaveBeenCalled();
+    expect(mocks.startImagePull).not.toHaveBeenCalled();
     expect(dockerArgs(1)).toStrictEqual(expect.arrayContaining(["--pull", "never"]));
     expect(dockerArgs(1).slice(0, 3)).toStrictEqual(["compose", "-f", COMPOSE_FILE]);
     expect(mocks.runDocker.mock.calls[1]![1]).toMatchObject({ BUILDCAGE_IMAGE_REF: "local:dev" });
@@ -285,7 +323,6 @@ describe("runSetupStep", () => {
   it("layers a local override's compose overlay on the shipped compose file", async () => {
     mocks.readLocalImageOverride.mockResolvedValue({
       imageRef: "local:dev",
-      pullPolicy: "never",
       composeOverlay: "/repo/docker/compose.action.test-inspect.yaml",
     });
 

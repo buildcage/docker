@@ -7,10 +7,12 @@
  *   - an unverifiable ref (branch, local ./setup) returns null
  */
 
+import type { ImagePull } from "../docker/image-pull.ts";
 import { errorMessage } from "../errors.ts";
 import { readGhcrBasicAuth } from "./docker-credentials.ts";
 import { checkImageEngine } from "./engine-label.ts";
 import { ProvenanceError, VerifyImageError } from "./errors.ts";
+import { resolveBuildcageImageRef } from "./image-ref.ts";
 import { imageTagFromRef } from "./image-tag.ts";
 import { fetchBundle } from "./oci-bundle.ts";
 import { fetchManifestDigest, fetchRegistryToken, fetchImageConfigLabels } from "./oci-registry.ts";
@@ -21,12 +23,9 @@ const REGISTRY = "ghcr.io";
 
 export interface VerifyImageDigestOptions extends VerifyImageIdentity {
   proxyEngine?: string;
-}
-
-/** The verified, digest-pinned image ref an action is about to pull. */
-export interface ResolvedImage {
-  imageRef: string;
-  pullPolicy: "always";
+  /** Called with the digest under verification as soon as it is known,
+   *  before the bundle is fetched and checked. */
+  onDigest?: (digest: string) => void;
 }
 
 /**
@@ -40,6 +39,7 @@ export async function verifyImageDigest({
   actionRef,
   actionRepo,
   proxyEngine = "inspect",
+  onDigest,
 }: VerifyImageDigestOptions): Promise<string | null> {
   const repoPath = actionRepo.toLowerCase();
 
@@ -49,6 +49,7 @@ export async function verifyImageDigest({
   const tag = imageTagFromRef(actionRef, proxyEngine);
   const regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth());
   const digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
+  onDigest?.(digest);
   const bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken);
   // Read before verifyBundle, whose TUF refresh can outlast the registry token.
   const labels = await fetchImageConfigLabels(REGISTRY, repoPath, digest, regToken);
@@ -94,13 +95,57 @@ export async function verifyImageDigestOrThrow({
   actionRef,
   actionRepo,
   proxyEngine,
+  onDigest,
 }: VerifyImageDigestOptions): Promise<string> {
   let digest;
   try {
-    digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine });
+    digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine, onDigest });
   } catch (e) {
     throw toProvenanceError(e);
   }
   return requireDigest(digest, actionRef);
 }
 /* v8 ignore stop */
+
+/** The verified, digest-pinned image ref, with its pull already under way. */
+export interface VerifiedImage {
+  digest: string;
+  imageRef: string;
+  pull: ImagePull;
+}
+
+export interface VerifyWhilePullingDeps {
+  verifyImageDigestOrThrow: typeof verifyImageDigestOrThrow;
+  startImagePull: (imageRef: string) => ImagePull;
+}
+
+/**
+ * verifyImageDigestOrThrow, pulling the image by the digest under
+ * verification in the meantime. The pull is by digest, so it fetches exactly
+ * what gets verified, and the caller starts nothing from it until this
+ * resolves. A failed verification stops the pull.
+ */
+export async function verifyWhilePulling(
+  { actionRef, actionRepo, proxyEngine }: Omit<VerifyImageDigestOptions, "onDigest">,
+  { verifyImageDigestOrThrow, startImagePull }: VerifyWhilePullingDeps,
+): Promise<VerifiedImage> {
+  const imageRefFor = (digest: string) =>
+    resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo });
+  let pull: ImagePull | undefined;
+  let digest;
+  try {
+    digest = await verifyImageDigestOrThrow({
+      actionRef,
+      actionRepo,
+      proxyEngine,
+      onDigest: (early) => {
+        pull = startImagePull(imageRefFor(early));
+      },
+    });
+  } catch (e) {
+    pull?.cancel();
+    throw e;
+  }
+  const imageRef = imageRefFor(digest);
+  return { digest, imageRef, pull: pull ?? startImagePull(imageRef) };
+}

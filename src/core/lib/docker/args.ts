@@ -22,13 +22,8 @@ function fileArgs(composeFiles: readonly string[]): string[] {
   return composeFiles.flatMap((file) => ["-f", file]);
 }
 
-export interface BuildComposeUpArgsOptions extends ComposeArgsOptions {
-  pullPolicy: string;
-}
-
-/** Bounds the `--wait` phase, image pull excluded. Compose gives up on its own
- *  once a container reports unhealthy, so this only catches one that stays
- *  "starting" forever. */
+/** Bounds the `--wait` phase. Compose gives up on its own once a container
+ *  reports unhealthy, so this only catches one that stays "starting" forever. */
 const WAIT_TIMEOUT_SECONDS = 180;
 
 /**
@@ -39,11 +34,7 @@ const WAIT_TIMEOUT_SECONDS = 180;
  * step keywords) never share Compose's implicit, directory-derived project
  * name; see compose-project-name.ts's deriveProjectName for why that matters.
  */
-export function buildComposeUpArgs({
-  composeFiles,
-  projectName,
-  pullPolicy,
-}: BuildComposeUpArgsOptions): string[] {
+export function buildComposeUpArgs({ composeFiles, projectName }: ComposeArgsOptions): string[] {
   return [
     "compose",
     ...fileArgs(composeFiles),
@@ -51,13 +42,13 @@ export function buildComposeUpArgs({
     projectName,
     "up",
     "-d",
+    // The image is already local: pulled alongside verification, or built for a test.
     "--pull",
-    pullPolicy,
+    "never",
     "--no-build",
     "--wait",
     "--wait-timeout",
     String(WAIT_TIMEOUT_SECONDS),
-    "--quiet-pull",
   ];
 }
 

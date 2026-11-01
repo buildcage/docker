@@ -6014,7 +6014,7 @@ function checkRuleListSizesOrThrow(rules, names) {
 function fileArgs(composeFiles) {
 	return composeFiles.flatMap((file) => ["-f", file]);
 }
-function buildComposeUpArgs({ composeFiles, projectName, pullPolicy }) {
+function buildComposeUpArgs({ composeFiles, projectName }) {
 	return [
 		"compose",
 		...fileArgs(composeFiles),
@@ -6023,12 +6023,11 @@ function buildComposeUpArgs({ composeFiles, projectName, pullPolicy }) {
 		"up",
 		"-d",
 		"--pull",
-		pullPolicy,
+		"never",
 		"--no-build",
 		"--wait",
 		"--wait-timeout",
-		"180",
-		"--quiet-pull"
+		"180"
 	];
 }
 function buildComposeLogsArgs({ composeFiles, projectName, tail }) {
@@ -6062,9 +6061,30 @@ function resolveProjectName(builderName, composeProjectNameOverride) {
 	return composeProjectNameOverride || deriveProjectName(builderName);
 }
 //#endregion
-//#region src/core/lib/provenance/image-ref.ts
-function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
-	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
+//#region src/core/lib/docker/image-pull.ts
+function startImagePull(imageRef, spawnDocker) {
+	let child = spawnDocker([
+		"pull",
+		"--quiet",
+		imageRef
+	]), stderr = "";
+	child.stderr?.setEncoding("utf8"), child.stderr?.on("data", (chunk) => {
+		stderr += chunk;
+	}), child.stdout?.resume();
+	let finished = new Promise((resolve, reject) => {
+		child.on("error", reject), child.on("close", (code, signal) => {
+			code === 0 ? resolve() : reject(Object.assign(Error(`docker pull exited with code ${code}${signal ? ` (signal ${signal})` : ""}: ${stderr.trim()}`), {
+				status: code ?? void 0,
+				stderr
+			}));
+		});
+	});
+	return finished.catch(() => {}), {
+		finished,
+		cancel: () => {
+			child.exitCode === null && child.signalCode === null && child.kill();
+		}
+	};
 }
 //#endregion
 //#region src/core/lib/provenance/docker-credentials.ts
@@ -6096,6 +6116,11 @@ function checkImageEngine({ labels, proxyEngine, imageTag }) {
 	if (!label) throw new VerifyImageError(`Image ${imageTag} carries no ${IMAGE_VERSION_LABEL} label, so the proxy engine it was published for cannot be confirmed.`, "VERIFY_FAILED");
 	let suffix = engineTagSuffix(proxyEngine);
 	if (!(label.endsWith(suffix) && RELEASE_VERSION.test(label.slice(0, label.length - suffix.length)))) throw new VerifyImageError(`Image ${imageTag} was not published for proxy engine ${proxyEngine} (${IMAGE_VERSION_LABEL}: ${label}), so the rules this run was given would not be enforced.`, "VERIFY_FAILED");
+}
+//#endregion
+//#region src/core/lib/provenance/image-ref.ts
+function resolveBuildcageImageRef({ imageDigest, actionRepository }) {
+	return `${`ghcr.io/${actionRepository}`.toLowerCase()}@${imageDigest}`;
 }
 //#endregion
 //#region src/core/lib/provenance/oci-registry.ts
@@ -12688,13 +12713,15 @@ function buildVerifyOptions({ actionRef, actionRepo }) {
 //#endregion
 //#region src/core/lib/provenance/verify-image.ts
 const REGISTRY = "ghcr.io";
-async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "inspect" }) {
+async function verifyImageDigest({ actionRef, actionRepo, proxyEngine = "inspect", onDigest }) {
 	let repoPath = actionRepo.toLowerCase(), verifyOptions = buildVerifyOptions({
 		actionRef,
 		actionRepo
 	});
 	if (!verifyOptions) return null;
-	let tag = imageTagFromRef(actionRef, proxyEngine), regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth()), digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken), bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken), labels = await fetchImageConfigLabels(REGISTRY, repoPath, digest, regToken);
+	let tag = imageTagFromRef(actionRef, proxyEngine), regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth()), digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
+	onDigest?.(digest);
+	let bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken), labels = await fetchImageConfigLabels(REGISTRY, repoPath, digest, regToken);
 	return await verifyBundle(bundle, verifyOptions, digest), checkImageEngine({
 		labels,
 		proxyEngine,
@@ -12708,18 +12735,43 @@ function requireDigest(digest, actionRef) {
 	if (digest === null) throw new ProvenanceError(`Cannot verify image provenance for ref: ${JSON.stringify(actionRef)}. Pin the action to a version tag (e.g. @v2.1.0) or a commit SHA.`, "UNVERIFIABLE_REF");
 	return digest;
 }
-async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine }) {
+async function verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine, onDigest }) {
 	let digest;
 	try {
 		digest = await verifyImageDigest({
 			actionRef,
 			actionRepo,
-			proxyEngine
+			proxyEngine,
+			onDigest
 		});
 	} catch (e) {
 		throw toProvenanceError(e);
 	}
 	return requireDigest(digest, actionRef);
+}
+async function verifyWhilePulling({ actionRef, actionRepo, proxyEngine }, { verifyImageDigestOrThrow, startImagePull }) {
+	let imageRefFor = (digest) => resolveBuildcageImageRef({
+		imageDigest: digest,
+		actionRepository: actionRepo
+	}), pull, digest;
+	try {
+		digest = await verifyImageDigestOrThrow({
+			actionRef,
+			actionRepo,
+			proxyEngine,
+			onDigest: (early) => {
+				pull = startImagePull(imageRefFor(early));
+			}
+		});
+	} catch (e) {
+		throw pull?.cancel(), e;
+	}
+	let imageRef = imageRefFor(digest);
+	return {
+		digest,
+		imageRef,
+		pull: pull ?? startImagePull(imageRef)
+	};
 }
 //#endregion
 //#region src/report/report-source.ts
@@ -12912,6 +12964,11 @@ const realDeps = {
 	readSetupInputs,
 	readLocalImageOverride,
 	verifyImageDigestOrThrow,
+	startImagePull: (imageRef) => startImagePull(imageRef, (args) => (0, node_child_process.spawn)("docker", args, { stdio: [
+		"ignore",
+		"pipe",
+		"pipe"
+	] })),
 	checkUrlAndTlsRuleSupport,
 	checkKnownBlockedUrlRuleSupport,
 	logRules,
@@ -12928,22 +12985,25 @@ const realDeps = {
 	log: console.log,
 	warn: annotate.warning
 };
-async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }, { verifyImageDigestOrThrow, log }) {
-	let digest = await verifyImageDigestOrThrow({
+async function resolveVerifiedImage({ actionRef, actionRepo, proxyEngine }, { verifyImageDigestOrThrow, startImagePull, log }) {
+	let { digest, imageRef, pull } = await verifyWhilePulling({
 		actionRef,
 		actionRepo,
 		proxyEngine
+	}, {
+		verifyImageDigestOrThrow,
+		startImagePull
 	});
-	return log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`), {
-		imageRef: resolveBuildcageImageRef({
-			imageDigest: digest,
-			actionRepository: actionRepo
-		}),
-		pullPolicy: "always"
-	};
+	log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
+	try {
+		await pull.finished;
+	} catch (e) {
+		throw new SetupError(describeDockerFailure(e, { operation: "docker pull" }), "DOCKER_UNAVAILABLE");
+	}
+	return { imageRef };
 }
 async function runSetupStep(env, overrides = {}) {
-	let { applyConfigFile, readSetupInputs, readLocalImageOverride, verifyImageDigestOrThrow, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, saveState, setOutput, log, warn } = {
+	let { applyConfigFile, readSetupInputs, readLocalImageOverride, verifyImageDigestOrThrow, startImagePull, checkUrlAndTlsRuleSupport, checkKnownBlockedUrlRuleSupport, logRules, withLogGroup, builderStartError, runDocker, saveState, setOutput, log, warn } = {
 		...realDeps,
 		...overrides
 	}, actionRef = env.GITHUB_ACTION_REF ?? "", actionRepo = env.GITHUB_ACTION_REPOSITORY ?? "";
@@ -12970,12 +13030,13 @@ async function runSetupStep(env, overrides = {}) {
 	}, BUILDER_RULE_INPUTS), withLogGroup("buildcage: Configured ACL Rules", () => {
 		logRules("HTTPS", httpsRules), logRules("HTTP", httpRules), logRules("IP", ipRules), logRules("URL", urlRules), logRules("TLS", tlsRules), logRules("Known blocked", knownBlockedRules);
 	});
-	let localOverride = await readLocalImageOverride(env, log), { imageRef, pullPolicy } = localOverride ?? await resolveVerifiedImage({
+	let localOverride = await readLocalImageOverride(env, log), { imageRef } = localOverride ?? await resolveVerifiedImage({
 		actionRef,
 		actionRepo,
 		proxyEngine
 	}, {
 		verifyImageDigestOrThrow,
+		startImagePull,
 		log
 	});
 	log(`buildcage: image: ${imageRef}`);
@@ -13003,8 +13064,7 @@ async function runSetupStep(env, overrides = {}) {
 	try {
 		runDocker(buildComposeUpArgs({
 			composeFiles,
-			projectName,
-			pullPolicy
+			projectName
 		}), composeEnv);
 	} catch (e) {
 		throw builderStartError(e, {
