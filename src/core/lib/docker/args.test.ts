@@ -77,7 +77,7 @@ describe("buildComposeDownArgs", () => {
     ).toStrictEqual(["compose", "-f", "/path/to/compose.yaml", "-f", "/path/to/overlay.yaml"]);
   });
 
-  it("includes -p <projectName> alongside -f <composeFile>, and removes volumes", () => {
+  it("includes -p <projectName> alongside -f <composeFile>, kills without waiting, and removes volumes", () => {
     const args = buildComposeDownArgs({
       composeFiles: ["/path/to/compose.yaml"],
       projectName: "buildcage-proxy-abcd1234",
@@ -89,6 +89,8 @@ describe("buildComposeDownArgs", () => {
       "-p",
       "buildcage-proxy-abcd1234",
       "down",
+      "-t",
+      "0",
       "-v",
     ]);
   });

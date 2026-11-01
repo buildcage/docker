@@ -88,7 +88,9 @@ export function buildComposeLogsArgs({
  * Build the `docker compose ... down` argv; see buildComposeUpArgs above.
  * `-v` removes the anonymous volume an image's VOLUME gets on each `up`
  * (moby/buildkit's /var/lib/buildkit), which would otherwise pile up.
+ * `-t 0` kills the container instead of waiting for its services to stop:
+ * every caller is throwing it away, and nothing reads from it any more.
  */
 export function buildComposeDownArgs({ composeFiles, projectName }: ComposeArgsOptions): string[] {
-  return ["compose", ...fileArgs(composeFiles), "-p", projectName, "down", "-v"];
+  return ["compose", ...fileArgs(composeFiles), "-p", projectName, "down", "-t", "0", "-v"];
 }
