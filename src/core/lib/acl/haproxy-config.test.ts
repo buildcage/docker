@@ -43,6 +43,14 @@ describe("the global section", () => {
     expect(resolves.length).toBeGreaterThan(0);
     for (const line of resolves) expect(line).toContain(",ipv4)");
   });
+
+  it("logs the longest request head it accepts with 1024 bytes left for the other fields", () => {
+    const global = section(FULL_CONFIG, "global");
+    const value = (pattern: RegExp): number => Number(pattern.exec(global)?.[1]);
+    const head = value(/\n {4}tune\.bufsize (\d+)\n/) - value(/\n {4}tune\.maxrewrite (\d+)\n/);
+    expect(head).toBe(16384);
+    expect(value(/\n {4}log stdout len (\d+) /)).toBe(head + 1024);
+  });
 });
 
 describe("where a connection is sent", () => {

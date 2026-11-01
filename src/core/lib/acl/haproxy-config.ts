@@ -92,6 +92,10 @@ export function generateHaproxyConfig(options: HaproxyConfigOptions): string {
         "    # normalize-uri is still marked experimental upstream.",
         "    expose-experimental-directives",
         "    tune.ssl.default-dh-param 2048",
+        "    # Fewer syscalls per byte relayed, which speeds up parallel downloads.",
+        "    # The request head limit (bufsize - maxrewrite) is 16384.",
+        "    tune.bufsize 32768",
+        "    tune.maxrewrite 16384",
         ...(opts.extension?.global ?? []),
       ],
       defaults: [

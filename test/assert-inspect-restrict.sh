@@ -107,7 +107,7 @@ else
   grep -c "end=TAIL-MARKER" <<< "$LOGS" || true
 fi
 # Independent of the pattern above: without the raised `len` (haproxy-sections.ts's
-# `log stdout len 16384`), no line could pass 1024 bytes at all.
+# `log stdout len 17408`), no line could pass 1024 bytes at all.
 LONGEST=$(grep -E "^buildcage [0-9]+ https? " <<< "$LOGS" | awk '{print length($0)}' | sort -n | tail -1)
 if [ "${LONGEST:-0}" -gt 1024 ]; then
   pass "the log carries a line past haproxy's 1024-byte default ($LONGEST bytes)"

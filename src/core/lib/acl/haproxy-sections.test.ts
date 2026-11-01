@@ -31,7 +31,7 @@ describe("the preamble", () => {
   it("sizes a log line for the longest request it accepts", () => {
     // A cut line matches nothing, so the event it carried leaves no trace. The
     // token order is load-bearing: the other one is rejected outright.
-    expect(lines).toContain("    log stdout len 16384 format raw local0");
+    expect(lines).toContain("    log stdout len 17408 format raw local0");
   });
 
   it("writes every line from one thread", () => {
