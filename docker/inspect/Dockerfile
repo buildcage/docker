@@ -25,7 +25,7 @@ ARG CNI_SHA256_ARM64
 ARG COREDNS_VERSION
 ARG COREDNS_SHA256_AMD64
 ARG COREDNS_SHA256_ARM64
-RUN apk add --no-cache curl && \
+RUN apk add --no-cache curl libcap-utils && \
     ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') && \
     mkdir -p /opt/cni/bin && \
     CNI_SHA=$([ "$ARCH" = "amd64" ] && echo "$CNI_SHA256_AMD64" || echo "$CNI_SHA256_ARM64") && \
@@ -37,7 +37,8 @@ RUN apk add --no-cache curl && \
     curl -fsSL "https://github.com/coredns/coredns/releases/download/${COREDNS_VERSION}/coredns_${COREDNS_VERSION#v}_linux_${ARCH}.tgz" \
       -o /tmp/coredns.tgz && \
     echo "${COREDNS_SHA}  /tmp/coredns.tgz" | sha256sum -c && \
-    tar -C /usr/local/bin -xz -f /tmp/coredns.tgz coredns
+    tar -C /usr/local/bin -xz -f /tmp/coredns.tgz coredns && \
+    setcap cap_net_bind_service=+ep /usr/local/bin/coredns
 
 # Build the runc wrapper (statically linked). --platform=$BUILDPLATFORM keeps
 # the Go toolchain on the build host's own architecture; GOOS/GOARCH then
@@ -123,11 +124,9 @@ COPY --from=deps /opt/cni/bin /opt/cni/bin
 COPY --from=deps /usr/local/bin/coredns /usr/local/bin/coredns
 
 # CoreDNS answers queries the build controls, so it must not run as root.
-# setcap keeps :53 bindable once it has dropped.
-RUN apk add --no-cache --virtual .setcap libcap-utils && \
-    addgroup -S coredns && adduser -S -D -H -G coredns coredns && \
-    setcap cap_net_bind_service=+ep /usr/local/bin/coredns && \
-    apk del .setcap
+# deps sets cap_net_bind_service to keep :53 bindable; a setcap here would
+# copy the whole binary into another layer.
+RUN addgroup -S coredns && adduser -S -D -H -G coredns coredns
 
 COPY --from=runc-wrapper-build /out/buildcage-runc /opt/buildcage/bin/buildcage-runc
 
