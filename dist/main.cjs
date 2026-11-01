@@ -6050,6 +6050,8 @@ function buildComposeDownArgs({ composeFiles, projectName }) {
 		"-p",
 		projectName,
 		"down",
+		"-t",
+		"0",
 		"-v"
 	];
 }

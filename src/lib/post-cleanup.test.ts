@@ -32,6 +32,8 @@ describe("planPostCleanup", () => {
       "-p",
       "buildcage-16367aacb67a",
       "down",
+      "-t",
+      "0",
       "-v",
     ]);
     expect(env).toStrictEqual({ PATH: "/usr/bin", BUILDER_NAME: "second" });
@@ -135,6 +137,8 @@ describe("planPostCleanup", () => {
       "-p",
       "buildcage-e2e",
       "down",
+      "-t",
+      "0",
       "-v",
     ]);
   });
