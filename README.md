@@ -289,9 +289,9 @@ are made up is in [Report details](./docs/reference.md#report-details).
 
 In `restrict` mode the step fails when a blocked connection is found, and with it the workflow. Pass
 `fail-on-blocked: false` to report without failing, or list what you expect to stay blocked in the
-setup action's `known-blocked-rules`. In `audit` mode nothing fails the step, except a proxy or
-resolver that stopped during the build and stayed down, or hung: that fails it in either mode,
-whatever `fail-on-blocked` says. The action's inputs are in
+setup action's `known-blocked-rules`. In `audit` mode neither a blocked connection nor an
+incomplete report fails the step. A proxy or resolver that stopped and stayed down, or hung, fails
+it in either mode, whatever `fail-on-blocked` says. The action's inputs are in
 [Reference](./docs/reference.md#report-action-inputs).
 
 ### Traffic artifact

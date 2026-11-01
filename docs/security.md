@@ -38,10 +38,10 @@ Four things sit outside that model by design.
   reach the proxy container through `docker exec` or `docker cp`, or the host filesystem directly on
   a passwordless-sudo runner, and rewrite the traffic log. `report` marks a log that doesn't start
   where a real proxy run would as incomplete, and fails the step for it under `restrict` with
-  `fail-on-blocked`, which catches wholesale erasure but not a format-aware forgery. Stopping the
-  proxy or the resolver fails the step whatever the mode, and restarting either marks the report
-  incomplete. The defense here is procedural: don't place an untrusted step between `setup` and
-  `report`.
+  `fail-on-blocked`, which catches wholesale erasure but not a format-aware forgery. A proxy or
+  resolver kept down, or hung, fails the step whatever the mode, and one that restarts, as after a
+  plain kill, marks the report incomplete. The defense here is procedural: don't place an untrusted
+  step between `setup` and `report`.
 
 One gap does sit inside the model. The report action reads `config-file` again after the build, so
 when a build's `--output type=local` export lands on the file, a `RUN` step decides what the report
