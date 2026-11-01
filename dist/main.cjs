@@ -5680,7 +5680,7 @@ function generateHaproxyConfig(options) {
 				"    expose-experimental-directives",
 				"    tune.ssl.default-dh-param 2048",
 				"    # Fewer syscalls per byte relayed, which speeds up parallel downloads.",
-				"    # The request head limit (bufsize - maxrewrite) is 16384.",
+				"    # A request head may take bufsize - maxrewrite, 16384 bytes.",
 				"    tune.bufsize 32768",
 				"    tune.maxrewrite 16384",
 				...opts.extension?.global ?? []
