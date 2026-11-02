@@ -36,7 +36,7 @@ iptables
 util-linux (util-linux-misc, setarch and the libraries, from the base image)
   Website : https://github.com/util-linux/util-linux
   License : GPL-2.0-or-later by default, with parts under other GPL, LGPL,
-            BSD, MIT and ISC terms (see licenses/alpine-packages.txt)
+            BSD, MIT, ISC and EUPL terms (see licenses/alpine-packages.txt)
   Source  : https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git or
             via Alpine Linux source packages
   Note    : The notices of its files under BSD, MIT, ISC and EUPL terms are
