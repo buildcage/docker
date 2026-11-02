@@ -507,9 +507,9 @@ log that doesn't begin where the build did, carries a line the report cannot rea
 proxy could not write, or a proxy or resolver that restarted during the build, since a connection
 still open when the proxy stopped never gets its line. In audit mode, or with
 `fail-on-blocked: false`, it is a notice instead. A proxy or resolver that does not answer the
-report, because it stopped during the build and stayed down or hung, fails the step in both modes
-whatever `fail-on-blocked` says: requests and lookups made while it was down failed rather than
-going around it, but nothing recorded them.
+report, because it stopped and stayed down or hung, fails the step in both modes whatever
+`fail-on-blocked` says: requests and lookups made while it was down failed rather than going around
+it, but nothing recorded them.
 
 When every blocked connection matches a `known-blocked-rules` rule, the step does not fail, even
 with `fail-on-blocked: true`, and a `::notice::` is emitted instead of `::error::`; any unmatched
