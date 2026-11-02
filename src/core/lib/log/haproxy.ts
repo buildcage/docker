@@ -1,31 +1,15 @@
 /** Log parsing library for HAProxy's buildcage decision log. */
 import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
-import { PROXY_LOG_BARRIER, ringDropped } from "./proxy-notices.ts";
-import { PROXY_START_MARKER } from "./start-marker.ts";
+import { createProxyLogTally, type ProxyLogTally } from "./proxy-log-tally.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
 import type { TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
 
-export interface HaproxyLogScan {
+export interface HaproxyLogScan extends ProxyLogTally {
   /** Every connection, oldest first: one the proxy allowed, audited or blocked,
    *  one that failed after it was allowed, or one that ended before a whole
    *  request arrived. */
   events: TrafficEvent[];
-  /** Seconds since the epoch the proxy started, from the startup marker, so the
-   *  report can time each event relative to it. Undefined when the marker
-   *  carried no stamp or was rotated away. */
-  startedAt: number | undefined;
-  /** True iff the log opens with the startup marker. Anything else means its
-   *  beginning is gone, rotated away or erased. */
-  headIntact: boolean;
-  /** Lines that open like a proxy line yet matched no format below. Each is a
-   *  decision the report cannot account for. */
-  unparsed: number;
-  /** Startup markers after the log's first line: each is the proxy starting
-   *  again after it stopped mid-run. */
-  restarts: number;
-  /** Lines the proxy said it dropped because its log ring was full. */
-  dropped: number;
 }
 
 // The quoted target and the reason are restricted to the charset the config
@@ -39,12 +23,6 @@ const DECISION =
 /** http_in's line where no request parsed, so no rule set a field. */
 const NO_REQUEST =
   /^buildcage (\d+) \[-\] \(HTTP\) "-" - (?:\d+|-) ts=([A-Za-z-]{2}) dst=([0-9.]+):(\d+)$/;
-
-/** Every line the proxy writes opens with this; used to count unparsed ones. */
-const LINE_PREFIX = "buildcage ";
-
-/** The startup marker with its millisecond epoch (see s6-rc.d/haproxy/data/start-marker.lua). */
-const START = new RegExp(`^${PROXY_START_MARKER} (\\d+)$`);
 
 /** The proxy's rule kinds mapped to the protocol the timeline records. universal
  *  never terminates TLS, so an HTTPS connection is a passthrough it sees only
@@ -82,16 +60,12 @@ export async function scanHaproxyLog(
 ): Promise<HaproxyLogScan> {
   const events: TrafficEvent[] = [];
   const passedDecision = isAudit ? "AUDIT" : "ALLOWED";
-  let startedAt: number | undefined;
-  let headIntact: boolean | undefined;
-  let unparsed = 0;
-  let restarts = 0;
-  let dropped = 0;
+  const tally = createProxyLogTally();
 
   for await (const line of lines) {
     const m = DECISION.exec(line);
     if (m) {
-      headIntact ??= false;
+      tally.event();
       const [, ms, decision, ruleType, target, reason, bytes] = m;
       if (decision !== passedDecision && decision !== "BLOCKED") continue;
       const { host: address, port } = splitHostPort(target);
@@ -114,7 +88,7 @@ export async function scanHaproxyLog(
     }
     const none = NO_REQUEST.exec(line);
     if (none) {
-      headIntact ??= false;
+      tally.event();
       const [, ms, terminationState, address, port] = none;
       const ended = incompleteReason(terminationState, BAD_REQUEST_METHOD);
       events.push({
@@ -128,25 +102,8 @@ export async function scanHaproxyLog(
       });
       continue;
     }
-    const trimmed = line.trim();
-    if (trimmed === "") continue;
-    const lost = ringDropped(trimmed);
-    if (lost !== undefined) {
-      dropped += lost;
-      continue;
-    }
-    const start = START.exec(trimmed);
-    if (start && headIntact !== undefined) restarts++;
-    headIntact ??= start !== null;
-    if (start && startedAt === undefined) startedAt = Number(start[1]) / 1000;
-    if (
-      trimmed.startsWith(LINE_PREFIX) &&
-      !trimmed.startsWith(PROXY_START_MARKER) &&
-      !trimmed.startsWith(PROXY_LOG_BARRIER)
-    ) {
-      unparsed++;
-    }
+    tally.other(line);
   }
 
-  return { events, startedAt, headIntact: headIntact ?? false, unparsed, restarts, dropped };
+  return { events, ...tally.result() };
 }

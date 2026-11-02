@@ -5,7 +5,7 @@
  * haproxy writes each line without blocking, and a line it cannot write at
  * once is dropped. Its own counter covers a line that never reached the log
  * ring. One the full ring dropped is counted only by a notice in the log
- * itself (proxy-notices.ts), written on the next line that fits, so the
+ * itself (proxy-log-tally.ts), written on the next line that fits, so the
  * report first logs one more line and waits for it: that flushes the notice
  * and everything ahead of it into the log the report then reads.
  */

@@ -16,7 +16,7 @@ import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
 
 import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
-import { PROXY_LOG_BARRIER, ringDropped } from "./proxy-notices.ts";
+import { createProxyLogTally, type ProxyLogTally } from "./proxy-log-tally.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
 import { actionFor, CLIENT_ENDED_REASONS, type TrafficEvent } from "./traffic-event.ts";
@@ -62,15 +62,6 @@ interface RequestFields {
 }
 const PASSTHROUGH =
   /^buildcage (\d+) pass (tls|tcp) (\d+) ts=(\S*) reason=(\S+) dst=(\S+):(\d+) sni=(\S+)$/;
-/** What every line the proxy writes for us opens with. HAProxy's own
- *  [NOTICE]/[WARNING] output never does. */
-const LINE_PREFIX = "buildcage ";
-
-/** The startup marker, capturing the millisecond epoch it was printed with.
- *  start-marker.lua stamps it with core.now(); every other line's <ms> comes
- *  from HAProxy's date(0,ms). */
-const START = new RegExp(`^${PROXY_START_MARKER} (\\d+)$`);
-
 /**
  * Whether the response the build saw was buildcage's own, not an origin's.
  *
@@ -320,24 +311,8 @@ function parseProxyLine(line: string, isAudit: boolean): TrafficEvent | null {
 }
 
 /** What one pass over the proxy log yields. */
-export interface InspectLogScan {
+export interface InspectLogScan extends ProxyLogTally {
   events: TrafficEvent[];
-  /** Seconds since the epoch at which the proxy itself started, matching
-   *  TrafficEvent.time's unit. Undefined when no marker line carried a
-   *  stamp. */
-  startedAt: number | undefined;
-  /** True iff the log opens with the startup marker. Stricter than
-   *  `startedAt`: a restart writes a second marker, which would otherwise
-   *  vouch for a beginning that had already rotated away. */
-  headIntact: boolean;
-  /** Lines that open as the proxy's own yet match no format above. Each is an
-   *  event the report cannot account for. */
-  unparsed: number;
-  /** Startup markers after the log's first line: each is the proxy starting
-   *  again after it stopped mid-run. */
-  restarts: number;
-  /** Lines the proxy said it dropped because its log ring was full. */
-  dropped: number;
 }
 
 /**
@@ -355,40 +330,19 @@ export async function scanInspectLog(
   allowsName?: (name: string) => boolean,
 ): Promise<InspectLogScan> {
   const events: TrafficEvent[] = [];
-  let startedAt: number | undefined;
-  let headIntact: boolean | undefined;
-  let unparsed = 0;
-  let restarts = 0;
-  let dropped = 0;
+  const tally = createProxyLogTally();
   for await (const line of lines) {
     const event = parseProxyLine(line, isAudit);
     if (event) {
-      headIntact ??= false;
+      tally.event();
       events.push(event);
       continue;
     }
-    const trimmed = line.trim();
-    if (trimmed === "") continue;
-    const lost = ringDropped(trimmed);
-    if (lost !== undefined) {
-      dropped += lost;
-      continue;
-    }
-    const match = START.exec(trimmed);
-    if (match && headIntact !== undefined) restarts++;
-    headIntact ??= match !== null;
-    if (match && startedAt === undefined) startedAt = Number(match[1]) / 1000;
-    if (
-      trimmed.startsWith(LINE_PREFIX) &&
-      !trimmed.startsWith(PROXY_START_MARKER) &&
-      !trimmed.startsWith(PROXY_LOG_BARRIER)
-    ) {
-      unparsed++;
-    }
+    tally.other(line);
   }
   blockUnpassedAddresses(events);
   if (allowsName) blockUnallowedNames(events, allowsName);
-  return { events, startedAt, headIntact: headIntact ?? false, unparsed, restarts, dropped };
+  return { events, ...tally.result() };
 }
 
 /**
