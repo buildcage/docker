@@ -4,6 +4,7 @@ import { describe, it, expect } from "vitest";
 import { generateUniversalHaproxyConfig } from "../acl/haproxy-universal-config.ts";
 import { scanHaproxyLog } from "./haproxy.ts";
 import { PROXY_ADDRESS } from "./proxy-address.ts";
+import { PROXY_LOG_BARRIER } from "./proxy-notices.ts";
 
 const CONFIG = generateUniversalHaproxyConfig({
   proxyAddress: PROXY_ADDRESS,
@@ -28,7 +29,7 @@ const TOKEN = /%(?:\[[^\]]*\]|[A-Za-z]+)/g;
 
 /** The log-format strings in the config, unquoted, in config order. */
 const FORMATS = CONFIG.split("\n")
-  .filter((l) => l.trim().startsWith('log-format "'))
+  .filter((l) => l.trim().startsWith('log-format "') && !l.includes(PROXY_LOG_BARRIER))
   .map((l) => l.slice(l.indexOf('"') + 1, l.lastIndexOf('"')).replaceAll('\\"', '"'));
 const [OUTBOUND, HTTP_IN] = FORMATS;
 

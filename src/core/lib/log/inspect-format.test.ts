@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 
 import { generateHaproxyConfig } from "../acl/haproxy-config.ts";
 import { scanInspectLog } from "./inspect.ts";
+import { PROXY_LOG_BARRIER } from "./proxy-notices.ts";
 
 const OPTIONS = {
   httpsRules: ["registry.npmjs.org:443"],
@@ -48,7 +49,10 @@ const TOKEN = /%(?:\[(?:[^[\]]|\[[^[\]]*\])*\]|[A-Za-z]+)/g;
 function logFormats(config: string, directive = "log-format"): string[] {
   return config
     .split("\n")
-    .filter((line) => line.trim().startsWith(`${directive} "buildcage`))
+    .filter(
+      (line) =>
+        line.trim().startsWith(`${directive} "buildcage`) && !line.includes(PROXY_LOG_BARRIER),
+    )
     .map((line) => line.slice(line.indexOf('"') + 1, line.lastIndexOf('"')));
 }
 

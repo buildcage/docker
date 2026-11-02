@@ -404,6 +404,18 @@ describe("buildInspectReportData", () => {
     expect(r.passed.length).toBe(1);
   });
 
+  it("fails closed when the proxy's log ring dropped lines", async () => {
+    // haproxy's own counter stays at zero for these; only the notice says so.
+    const r = await buildInspectReportData(
+      [START, "3 events dropped", ALLOWED],
+      [DNS_START],
+      reportParams(),
+      HEALTHY,
+    );
+    expect(r.logLooksPlausible).toBe(false);
+    expect(r.passed.length).toBe(1);
+  });
+
   it("fails closed when the resolver did not answer", async () => {
     // Lookups a stopped resolver never received leave no line in its log.
     const r = await buildInspectReportData([START, ALLOWED], [DNS_START], reportParams(), {

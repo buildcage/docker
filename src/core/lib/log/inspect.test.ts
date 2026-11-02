@@ -275,7 +275,7 @@ describe("scanInspectLog", () => {
     const lines = [
       "[NOTICE] (1) : haproxy version is 3.4.3",
       "buildcage haproxy starting 1787471970000",
-      // The marker without its stamp, if qjs failed to print one.
+      // The marker without its stamp.
       "buildcage haproxy starting",
       ALLOWED,
     ];
@@ -307,6 +307,43 @@ describe("scanInspectLog", () => {
     const { restarts } = await scanInspectLog([ALLOWED]);
     expect(restarts).toBe(0);
     expect((await scanInspectLog(["buildcage haproxy starting 1787471999000"])).restarts).toBe(0);
+  });
+
+  it("adds up the lines a full log ring dropped", async () => {
+    const lines = [
+      "buildcage haproxy starting 1787471970000",
+      "1 event dropped",
+      "2 events dropped",
+    ];
+    const { dropped, unparsed, headIntact } = await scanInspectLog(lines);
+    expect(dropped).toBe(3);
+    expect(unparsed).toBe(0);
+    expect(headIntact).toBe(true);
+  });
+
+  it("reads a log that opens with a drop notice as having lost its head", async () => {
+    const { headIntact, restarts } = await scanInspectLog([
+      "3 events dropped",
+      "buildcage haproxy starting 1787471970000",
+    ]);
+    expect(headIntact).toBe(false);
+    expect(restarts).toBe(1);
+  });
+
+  it("reads a drop notice that kept haproxy's trailing NUL", async () => {
+    expect((await scanInspectLog(["7 events dropped\0"])).dropped).toBe(7);
+  });
+
+  it("does not take a decision line's text for a drop notice", async () => {
+    expect((await scanInspectLog([`${ALLOWED} 5 events dropped`])).dropped).toBe(0);
+  });
+
+  it("reads the report's barrier line as neither an event nor a gap", async () => {
+    const lines = ["buildcage haproxy starting 1787471970000", "buildcage log barrier ?0123abcd"];
+    const { events, unparsed, dropped } = await scanInspectLog(lines);
+    expect(events).toStrictEqual([]);
+    expect(unparsed).toBe(0);
+    expect(dropped).toBe(0);
   });
 });
 

@@ -31,13 +31,26 @@ describe("the preamble", () => {
   it("sizes a log line for the longest request it accepts", () => {
     // A cut line matches nothing, so the event it carried leaves no trace. The
     // token order is load-bearing: the other one is rejected outright.
-    expect(lines).toContain("    log stdout len 16384 format raw local0");
+    expect(lines).toContain("    log ring@buildcage len 16384 format raw local0");
+    expect(lines).toContain("    maxlen 16384");
   });
 
-  it("writes every line from one thread", () => {
-    // Threads sharing the stdout fd drop lines, and one dropped line marks the
-    // report incomplete.
-    expect(lines.filter((l) => l.trim().startsWith("nbthread"))).toStrictEqual(["    nbthread 1"]);
+  it("logs through a ring, which lets haproxy run a thread per CPU", () => {
+    // Threads sharing the stdout fd drop lines, so stdout would need nbthread 1.
+    expect(lines.join("\n")).not.toContain("log stdout");
+    expect(lines.some((l) => l.trim().startsWith("nbthread"))).toBe(false);
+    expect(lines).toContain("ring buildcage");
+    expect(lines).toContain("    server log unix@/var/run/haproxy-log/socket");
+  });
+
+  it("loads the script that logs the startup marker", () => {
+    expect(lines).toContain("    lua-load /etc/s6-overlay/s6-rc.d/haproxy/data/start-marker.lua");
+  });
+
+  it("logs the barrier the report waits for, on a socket of its own", () => {
+    expect(lines).toContain("frontend log_barrier");
+    expect(lines).toContain("    bind /var/run/haproxy-barrier.sock mode 600");
+    expect(lines).toContain('    log-format "buildcage log barrier %HQ"');
   });
 
   it("exposes readiness on a unix socket, out of reach of the firewall", () => {

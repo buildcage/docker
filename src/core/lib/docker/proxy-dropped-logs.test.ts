@@ -54,22 +54,58 @@ describe("parseDroppedLogs", () => {
   });
 });
 
+/** Answers the barrier with `barrier` and the metrics request with `metrics`. */
+function byCommand(barrier: () => string, metrics: () => string): Docker["exec"] {
+  return (_id, args) => (args[0] === "sh" ? barrier() : metrics());
+}
+
+function fail(): string {
+  throw new Error("exit 1");
+}
+
 describe("readProxyDroppedLogs", () => {
-  it("asks the health socket inside the container", () => {
+  it("waits for its barrier line in the log, then asks the health socket", () => {
     const { docker, calls } = fakeDocker(() => METRICS);
-    expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({ answered: true, count: 12 });
-    expect(calls).toStrictEqual([
-      [
-        "abc",
-        "curl",
-        "-sf",
-        "--max-time",
-        "10",
-        "--unix-socket",
-        "/var/run/haproxy-health.sock",
-        "http://localhost/metrics?scope=global",
-      ],
+    expect(readProxyDroppedLogs(docker, "abc", "f00d")).toStrictEqual({
+      answered: true,
+      count: 12,
+    });
+    expect(calls.length).toBe(2);
+    const [id, sh, flag, script, name, token, line] = calls[0];
+    expect([id, sh, flag, name, token, line]).toStrictEqual([
+      "abc",
+      "sh",
+      "-c",
+      "sh",
+      "f00d",
+      "buildcage log barrier ?f00d",
     ]);
+    expect(script).toContain("--unix-socket /var/run/haproxy-barrier.sock");
+    expect(script).toContain("/var/log/haproxy/current");
+    expect(calls[1]).toStrictEqual([
+      "abc",
+      "curl",
+      "-sf",
+      "--max-time",
+      "10",
+      "--unix-socket",
+      "/var/run/haproxy-health.sock",
+      "http://localhost/metrics?scope=global",
+    ]);
+  });
+
+  it("makes up a fresh barrier each time it is not given one", () => {
+    const { docker, calls } = fakeDocker(() => METRICS);
+    readProxyDroppedLogs(docker, "abc");
+    readProxyDroppedLogs(docker, "abc");
+    const [first, second] = [calls[0][5], calls[2][5]];
+    expect(first).toMatch(/^[0-9a-f]{32}$/);
+    expect(second === first).toBe(false);
+  });
+
+  it("leaves the count unknown when the log never caught up with the barrier", () => {
+    const { docker } = fakeDocker(byCommand(fail, () => "haproxy_process_dropped_logs_total 0"));
+    expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({ answered: true, count: undefined });
   });
 
   it("tells a proxy that answered without the counter from one that did not answer", () => {
