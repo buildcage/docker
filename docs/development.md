@@ -269,14 +269,13 @@ last rotation.
 HAProxy writes each line into an in-memory ring without waiting, and the `haproxy-log` service
 reads the ring through `/var/run/haproxy-log/socket` into s6-log. A line the full ring cannot take
 is dropped, and the next one that fits is preceded by an `N events dropped` line. Before reading
-the log, the report asks HAProxy to log one more line (`buildcage log barrier ?<token>`) and waits
-for it to arrive, which also brings in any such notice. It asks again every second, since a ring
-that is still full drops that line too. The report then marks itself incomplete for
-a notice, for a barrier that never arrives, and for a non-zero count from HAProxy's own counter of
-dropped lines. A proxy that does not answer that read fails the step in any mode. A second
-`buildcage haproxy starting` or `buildcage coredns starting` line also marks the report incomplete:
-a restart loses the line of whatever was still open and starts the count over. To read the count
-by hand:
+the log, the report waits for it to stop growing, so the ring has room again, then asks HAProxy to
+log one more line (`buildcage log barrier ?<token>`) and waits for it to arrive, which also brings
+in any such notice. The report then marks itself incomplete for a notice, for a barrier that never
+arrives, and for a non-zero count from HAProxy's own counter of dropped lines. A proxy that does
+not answer that read fails the step in any mode. A second `buildcage haproxy starting` or
+`buildcage coredns starting` line also marks the report incomplete: a restart loses the line of
+whatever was still open and starts the count over. To read the count by hand:
 
 ```bash
 docker exec "$B" curl -s --unix-socket /var/run/haproxy-health.sock \

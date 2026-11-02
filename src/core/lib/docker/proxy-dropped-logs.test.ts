@@ -127,28 +127,38 @@ describe("readProxyDroppedLogs", () => {
     });
   });
 
-  it("asks again for a barrier line the full ring dropped", () => {
+  it("logs its barrier only once the log has stopped growing", () => {
     const dir = mkdtempSync(join(tmpdir(), "barrier-"));
+    const fake = (name: string, body: string[]): void => {
+      writeFileSync(join(dir, name), ["#!/bin/sh", ...body].join("\n"));
+      chmodSync(join(dir, name), 0o755);
+    };
     try {
-      // Only the second request's line reaches the log.
-      writeFileSync(
-        join(dir, "curl"),
-        [
-          "#!/bin/sh",
-          `echo >> ${dir}/calls`,
-          `[ "$(wc -l < ${dir}/calls)" -eq 2 ] && echo "buildcage log barrier ?f00d" >> ${dir}/log/current`,
-          "exit 0",
-        ].join("\n"),
-      );
-      chmodSync(join(dir, "curl"), 0o755);
       mkdirSync(join(dir, "log"));
+      // The log grows for the first five looks, then stays at the fifth size.
+      fake("stat", [
+        'echo stat >> "$CALLS"',
+        'n=$(grep -c stat "$CALLS")',
+        '[ "$n" -gt 5 ] && n=5',
+        'echo "$n"',
+      ]);
+      fake("curl", ['echo "curl $*" >> "$CALLS"', 'echo "$BARRIER" >> "$LOG/current"']);
       const { docker, calls } = fakeDocker(() => METRICS);
       readProxyDroppedLogs(docker, "abc", "f00d");
       const [, , , script, ...args] = calls[0];
-      execFileSync("sh", ["-c", script.replaceAll("/var/log/haproxy", join(dir, "log")), ...args], {
-        env: { PATH: `${dir}:${process.env.PATH}` },
+      execFileSync("sh", ["-c", script.replaceAll("/var/log/haproxy", "$LOG"), ...args], {
+        env: {
+          PATH: `${dir}:${process.env.PATH}`,
+          CALLS: join(dir, "calls"),
+          LOG: join(dir, "log"),
+          BARRIER: "buildcage log barrier ?f00d",
+        },
       });
-      expect(readFileSync(join(dir, "calls"), "utf8")).toBe("\n\n");
+      expect(readFileSync(join(dir, "calls"), "utf8").split("\n")).toStrictEqual([
+        ...Array<string>(10).fill("stat"),
+        "curl -sf --max-time 10 --unix-socket /var/run/haproxy-barrier.sock http://localhost/?f00d",
+        "",
+      ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
