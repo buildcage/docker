@@ -40,7 +40,7 @@ describe("the preamble", () => {
     expect(lines.join("\n")).not.toContain("log stdout");
     expect(lines.some((l) => l.trim().startsWith("nbthread"))).toBe(false);
     expect(lines).toContain("ring buildcage");
-    expect(lines).toContain("    server log unix@/var/run/haproxy-log.sock");
+    expect(lines).toContain("    server log unix@/var/run/haproxy-log/socket");
   });
 
   it("loads the script that logs the startup marker", () => {

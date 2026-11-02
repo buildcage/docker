@@ -67,8 +67,8 @@ const PASSTHROUGH =
 const LINE_PREFIX = "buildcage ";
 
 /** The startup marker, capturing the millisecond epoch it was printed with.
- *  qjs's Date.now() prints it, before HAProxy itself is even running; every
- *  other line's <ms> comes from HAProxy's date(0,ms). */
+ *  start-marker.lua stamps it with core.now(); every other line's <ms> comes
+ *  from HAProxy's date(0,ms). */
 const START = new RegExp(`^${PROXY_START_MARKER} (\\d+)$`);
 
 /**
@@ -324,7 +324,7 @@ export interface InspectLogScan {
   events: TrafficEvent[];
   /** Seconds since the epoch at which the proxy itself started, matching
    *  TrafficEvent.time's unit. Undefined when no marker line carried a
-   *  stamp, which includes the bare marker a failed qjs leaves behind. */
+   *  stamp. */
   startedAt: number | undefined;
   /** True iff the log opens with the startup marker. Stricter than
    *  `startedAt`: a restart writes a second marker, which would otherwise
@@ -378,8 +378,6 @@ export async function scanInspectLog(
     if (match && headIntact !== undefined) restarts++;
     headIntact ??= match !== null;
     if (match && startedAt === undefined) startedAt = Number(match[1]) / 1000;
-    // Excluded by prefix rather than by `match`: a qjs that failed to print
-    // the stamp would leave the marker bare, which is not a missing event.
     if (
       trimmed.startsWith(LINE_PREFIX) &&
       !trimmed.startsWith(PROXY_START_MARKER) &&

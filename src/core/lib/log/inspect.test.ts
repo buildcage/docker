@@ -321,6 +321,10 @@ describe("scanInspectLog", () => {
     expect(headIntact).toBe(true);
   });
 
+  it("reads a drop notice that kept haproxy's trailing NUL", async () => {
+    expect((await scanInspectLog(["7 events dropped\0"])).dropped).toBe(7);
+  });
+
   it("does not take a decision line's text for a drop notice", async () => {
     expect((await scanInspectLog([`${ALLOWED} 5 events dropped`])).dropped).toBe(0);
   });

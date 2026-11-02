@@ -69,15 +69,14 @@ export function preamble(spec: PreambleSpec): string[] {
     "    http-request return status 204",
     "",
     // A full ring drops the line and says so on the next one that fits
-    // (proxy-notices.ts). 1MB rode out every burst measured with s6-log
-    // keeping up. maxlen matches the log's len, or a long line is cut.
+    // (proxy-notices.ts). maxlen matches the log's len, or a long line is cut.
     `ring ${LOG_RING}`,
     "    format raw",
     "    size 1048576",
     "    maxlen 16384",
     "    timeout connect 5s",
     "    timeout server 1h",
-    "    server log unix@/var/run/haproxy-log.sock",
+    "    server log unix@/var/run/haproxy-log/socket",
     "",
   ];
 }

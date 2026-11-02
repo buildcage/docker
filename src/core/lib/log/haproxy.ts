@@ -13,7 +13,7 @@ export interface HaproxyLogScan {
   events: TrafficEvent[];
   /** Seconds since the epoch the proxy started, from the startup marker, so the
    *  report can time each event relative to it. Undefined when the marker
-   *  carried no stamp (qjs failed) or was rotated away. */
+   *  carried no stamp or was rotated away. */
   startedAt: number | undefined;
   /** True iff the log opens with the startup marker. Anything else means its
    *  beginning is gone, rotated away or erased. */

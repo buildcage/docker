@@ -1,8 +1,9 @@
 #!/usr/bin/execlineb -P
 # haproxy's threads write each line into its ring without waiting, and the
-# ring's forwarder streams them here. -1 tells s6-rc the socket is listening,
-# so haproxy starts after it; haproxy drops root before it connects, hence
-# -a 0666. One connection at a time, as two s6-log cannot share a directory.
+# ring's forwarder streams them here. Only root and the haproxy group may enter
+# the socket's directory, so no other process in the container can write a line
+# into the log. -1 tells s6-rc the socket is listening, so haproxy starts after
+# it. One connection at a time, as two s6-log cannot share a directory.
 #
 # s: rotate current at 1MB rather than s6-log's own default of ~100KB, so a
 # run with a lot of traffic doesn't rotate mid-run. n: keep 100 rotated
@@ -12,6 +13,7 @@
 # only past 32768 rather than s6-log's own default of 8192, which sits under
 # the length haproxy is configured to write and would cut a long URL in half
 # here instead.
+if { install -d -m 0750 -g haproxy /var/run/haproxy-log }
 fdmove 1 3
-s6-ipcserver -1 -c 1 -a 0666 /var/run/haproxy-log.sock
+s6-ipcserver -1 -c 1 /var/run/haproxy-log/socket
 s6-log -l 32768 s1000000 n100 /var/log/haproxy

@@ -5637,7 +5637,7 @@ function preamble(spec) {
 		"    maxlen 16384",
 		"    timeout connect 5s",
 		"    timeout server 1h",
-		"    server log unix@/var/run/haproxy-log.sock",
+		"    server log unix@/var/run/haproxy-log/socket",
 		""
 	];
 }
