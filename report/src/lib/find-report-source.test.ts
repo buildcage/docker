@@ -29,13 +29,13 @@ function fakeDocker(...results: (string[] | Error)[]): {
   };
 }
 
-function thrown(run: () => unknown): ReportError {
+function caught(call: () => unknown): ReportError {
   try {
-    run();
+    call();
   } catch (e) {
     return e as ReportError;
   }
-  throw new Error("did not throw");
+  throw new Error("expected findReportSourceContainer to throw");
 }
 
 describe("findReportSourceContainer", () => {
@@ -49,19 +49,14 @@ describe("findReportSourceContainer", () => {
   });
 
   it("refuses to guess when the setup step left no container behind", () => {
-    const { docker } = fakeDocker([]);
+    const { docker, filters } = fakeDocker([]);
 
-    const error = (() => {
-      try {
-        findReportSourceContainer(docker, PROJECT, BUILDER);
-      } catch (e) {
-        return e as ReportError;
-      }
-    })();
+    const error = caught(() => findReportSourceContainer(docker, PROJECT, BUILDER));
 
     expect(error).toBeInstanceOf(ReportError);
-    expect(error!.code).toBe("CONTAINER_NOT_FOUND");
-    expect(error!.message).toContain("found 0");
+    expect(error.code).toBe("CONTAINER_NOT_FOUND");
+    expect(error.message).toContain("found 0");
+    expect(filters.length).toBe(2);
   });
 
   // Reporting on the wrong container would report on the wrong build.
@@ -76,41 +71,40 @@ describe("findReportSourceContainer", () => {
       Object.assign(new Error("exit 1"), { status: 1, stderr: "Cannot connect to the daemon" }),
     );
 
-    const error = (() => {
-      try {
-        findReportSourceContainer(docker, PROJECT, BUILDER);
-      } catch (e) {
-        return e as ReportError;
-      }
-    })();
+    const error = caught(() => findReportSourceContainer(docker, PROJECT, BUILDER));
 
-    expect(error!.code).toBe("DOCKER_UNAVAILABLE");
-    expect(error!.message).toContain("docker ps");
+    expect(error.code).toBe("DOCKER_UNAVAILABLE");
+    expect(error.message).toContain("docker ps");
   });
 
-  it("says the container stopped when only a stopped one matches", () => {
+  it("says the container is not running when the only match has stopped or never started", () => {
     const { docker, filters } = fakeDocker([], ["abc123"]);
 
-    const error = thrown(() => findReportSourceContainer(docker, PROJECT, BUILDER));
+    const error = caught(() => findReportSourceContainer(docker, PROJECT, BUILDER));
 
     expect(error).toBeInstanceOf(ReportError);
     expect(error.code).toBe("CONTAINER_STOPPED");
-    expect(error.message).toContain('builder-name "buildcage" has stopped');
-    expect(filters[1]).toStrictEqual([...filters[0], "status=exited", "status=dead"]);
+    expect(error.message).toContain('builder-name "buildcage" exists but is not running');
+    expect(filters[1]).toStrictEqual([
+      ...filters[0],
+      "status=created",
+      "status=exited",
+      "status=dead",
+    ]);
   });
 
-  it("blames Docker when the lookup for a stopped container fails", () => {
+  it("blames Docker when the lookup for a container that is not running fails", () => {
     const { docker } = fakeDocker(
       [],
       Object.assign(new Error("exit 1"), { status: 1, stderr: "Cannot connect to the daemon" }),
     );
 
-    expect(thrown(() => findReportSourceContainer(docker, PROJECT, BUILDER)).code).toBe(
+    expect(caught(() => findReportSourceContainer(docker, PROJECT, BUILDER)).code).toBe(
       "DOCKER_UNAVAILABLE",
     );
   });
 
-  it("looks for a stopped container only when no running one matches", () => {
+  it("looks for a container that is not running only when no running one matches", () => {
     const { docker, filters } = fakeDocker(["abc123", "def456"]);
 
     expect(() => findReportSourceContainer(docker, PROJECT, BUILDER)).toThrow(/found 2/);

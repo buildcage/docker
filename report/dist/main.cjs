@@ -15430,14 +15430,15 @@ function step(operation, call) {
 }
 //#endregion
 //#region report/src/lib/find-report-source.ts
+const NOT_RUNNING = [
+	"status=created",
+	"status=exited",
+	"status=dead"
+];
 function findReportSourceContainer(docker, projectName, builderName) {
 	let filters = [`label=com.docker.compose.project=${projectName}`, "label=io.github.buildcage.report-source=true"], ids = find(docker, filters);
 	if (ids.length === 1) return ids[0];
-	throw ids.length === 0 && find(docker, [
-		...filters,
-		"status=exited",
-		"status=dead"
-	]).length > 0 ? new ReportError(`The buildcage container for builder-name ${JSON.stringify(builderName)} has stopped, and its proxy with it. The report cannot read the proxy log, and nothing recorded what the build reached after the proxy stopped.`, "CONTAINER_STOPPED") : new ReportError(`Expected exactly one buildcage container for builder-name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder-name?`, "CONTAINER_NOT_FOUND");
+	throw ids.length === 0 && find(docker, [...filters, ...NOT_RUNNING]).length > 0 ? new ReportError(`The buildcage container for builder-name ${JSON.stringify(builderName)} exists but is not running. Its proxy runs inside it and is down too, and the report reads the proxy log only from a running container.`, "CONTAINER_STOPPED") : new ReportError(`Expected exactly one buildcage container for builder-name ${JSON.stringify(builderName)}, found ${ids.length}. Did the setup step run first, with the same builder-name?`, "CONTAINER_NOT_FOUND");
 }
 function find(docker, filters) {
 	try {

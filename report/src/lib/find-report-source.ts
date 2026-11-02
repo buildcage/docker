@@ -10,6 +10,8 @@ import { ReportError } from "./errors.ts";
  * Anything other than exactly one match is an error rather than a guess:
  * reporting on the wrong container would report on the wrong build.
  */
+const NOT_RUNNING = ["status=created", "status=exited", "status=dead"];
+
 export function findReportSourceContainer(
   docker: Docker,
   projectName: string,
@@ -21,11 +23,11 @@ export function findReportSourceContainer(
   ];
   const ids = find(docker, filters);
   if (ids.length === 1) return ids[0];
-  // A status filter lists stopped containers too, which plain `docker ps` leaves out.
-  if (ids.length === 0 && find(docker, [...filters, "status=exited", "status=dead"]).length > 0) {
+  // A status filter lists containers that are not running, which plain `docker ps` leaves out.
+  if (ids.length === 0 && find(docker, [...filters, ...NOT_RUNNING]).length > 0) {
     throw new ReportError(
-      `The buildcage container for builder-name ${JSON.stringify(builderName)} has stopped, and its proxy with it. ` +
-        "The report cannot read the proxy log, and nothing recorded what the build reached after the proxy stopped.",
+      `The buildcage container for builder-name ${JSON.stringify(builderName)} exists but is not running. ` +
+        "Its proxy runs inside it and is down too, and the report reads the proxy log only from a running container.",
       "CONTAINER_STOPPED",
     );
   }

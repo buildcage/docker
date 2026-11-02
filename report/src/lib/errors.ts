@@ -11,7 +11,7 @@ import { ActionError } from "#core/lib/errors.ts";
  *                         (`ps`, `inspect`, `create`, `cp`) failed
  *   CONTAINER_NOT_FOUND:  `docker ps --filter` didn't find exactly one
  *                         report-source container for this builder-name
- *   CONTAINER_STOPPED:    that container exists but has stopped
+ *   CONTAINER_STOPPED:    that container exists but is not running
  *   REPORT_SCRIPT_FAILED: report-action.js couldn't even be launched (a
  *                         report-action.js that ran and exited nonzero is
  *                         reproduced via this action's exit code instead)
