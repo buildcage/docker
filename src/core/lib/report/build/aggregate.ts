@@ -267,7 +267,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       headIntact: proxyHeadIntact,
       unparsed,
       restarts: proxy,
-      dropped: ringDropped,
+      dropped: ringDroppedLines,
     },
     { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed, restarts: resolver },
   ] = await Promise.all([proxyScan, dnsScan]);
@@ -289,7 +289,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       unparsed === 0 &&
       dnsUnparsed === 0 &&
       droppedLogs.count === 0 &&
-      ringDropped === 0 &&
+      ringDroppedLines === 0 &&
       resolverAnswered &&
       proxy === 0 &&
       resolver === 0,

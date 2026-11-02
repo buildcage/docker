@@ -275,7 +275,7 @@ describe("scanInspectLog", () => {
     const lines = [
       "[NOTICE] (1) : haproxy version is 3.4.3",
       "buildcage haproxy starting 1787471970000",
-      // The marker without its stamp, if qjs failed to print one.
+      // The marker without its stamp.
       "buildcage haproxy starting",
       ALLOWED,
     ];
@@ -319,6 +319,15 @@ describe("scanInspectLog", () => {
     expect(dropped).toBe(3);
     expect(unparsed).toBe(0);
     expect(headIntact).toBe(true);
+  });
+
+  it("reads a log that opens with a drop notice as having lost its head", async () => {
+    const { headIntact, restarts } = await scanInspectLog([
+      "3 events dropped",
+      "buildcage haproxy starting 1787471970000",
+    ]);
+    expect(headIntact).toBe(false);
+    expect(restarts).toBe(1);
   });
 
   it("reads a drop notice that kept haproxy's trailing NUL", async () => {

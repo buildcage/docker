@@ -54,7 +54,7 @@ export function parseDroppedLogs(metrics: string): number | undefined {
 }
 
 /** True once a line the proxy logs on request has reached its log. */
-export function awaitProxyLog(docker: Docker, containerId: string, token: string): boolean {
+function awaitProxyLog(docker: Docker, containerId: string, token: string): boolean {
   try {
     docker.exec(containerId, [
       "sh",

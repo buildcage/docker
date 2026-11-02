@@ -56,8 +56,8 @@ export function preamble(spec: PreambleSpec): string[] {
     "    mode http",
     "    no log",
     "    monitor-uri /health",
-    // A line HAProxy cannot write at once is dropped without a trace in the log
-    // itself; only this counter says one went missing.
+    // Counts lines that never reached the log ring; one the ring itself
+    // dropped is announced in the log instead.
     "    http-request use-service prometheus-exporter if { path /metrics }",
     "",
     "# Logs the query of each request, which the report waits to see in the log",

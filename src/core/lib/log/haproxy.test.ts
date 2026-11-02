@@ -209,6 +209,12 @@ describe("scanHaproxyLog", () => {
     expect(unparsed).toBe(0);
   });
 
+  it("reads a log that opens with a drop notice as having lost its head", async () => {
+    const { headIntact, restarts } = await scanHaproxyLog(["3 events dropped", MARKER], false);
+    expect(headIntact).toBe(false);
+    expect(restarts).toBe(1);
+  });
+
   it("reads the report's barrier line as neither an event nor a gap", async () => {
     const { events, unparsed, dropped } = await scanHaproxyLog(
       [MARKER, "buildcage log barrier ?0123abcd"],

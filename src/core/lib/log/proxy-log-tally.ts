@@ -50,6 +50,8 @@ export function createProxyLogTally(): {
       if (trimmed === "") return;
       const lost = ringDropped(trimmed);
       if (lost !== undefined) {
+        // Lines lost before anything else arrived include the log's opening.
+        headIntact ??= false;
         dropped += lost;
         return;
       }
