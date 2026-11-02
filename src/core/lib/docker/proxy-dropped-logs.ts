@@ -25,7 +25,8 @@ const MAX_TIME_SECONDS = "10";
 const BARRIER_SOCKET = "/var/run/haproxy-barrier.sock";
 const LOG_DIR = "/var/log/haproxy";
 /** Polls `current` for up to 10s, then searches every segment once, in case
- *  the line arrived just before a rotation. */
+ *  the line arrived just before a rotation. Asks again every second, as a
+ *  ring still full drops the line; any copy of it ends the wait. */
 const BARRIER_SCRIPT = [
   `curl -sf --max-time ${MAX_TIME_SECONDS} --unix-socket ${BARRIER_SOCKET} "http://localhost/?$1" >/dev/null || exit 1`,
   "i=0",
@@ -33,6 +34,9 @@ const BARRIER_SCRIPT = [
   `  grep -qsF "$2" ${LOG_DIR}/current && exit 0`,
   "  sleep 0.1",
   "  i=$((i + 1))",
+  "  if [ $((i % 10)) -eq 0 ]; then",
+  `    curl -sf --max-time 1 --unix-socket ${BARRIER_SOCKET} "http://localhost/?$1" >/dev/null`,
+  "  fi",
   "done",
   `grep -rqsF "$2" ${LOG_DIR}`,
 ].join("\n");

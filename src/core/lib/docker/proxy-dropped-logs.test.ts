@@ -1,3 +1,8 @@
+import { execFileSync } from "node:child_process";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, it, expect } from "vitest";
 
 import type { Docker } from "./client.ts";
@@ -120,5 +125,32 @@ describe("readProxyDroppedLogs", () => {
       answered: false,
       count: undefined,
     });
+  });
+
+  it("asks again for a barrier line the full ring dropped", () => {
+    const dir = mkdtempSync(join(tmpdir(), "barrier-"));
+    try {
+      // Only the second request's line reaches the log.
+      writeFileSync(
+        join(dir, "curl"),
+        [
+          "#!/bin/sh",
+          `echo >> ${dir}/calls`,
+          `[ "$(wc -l < ${dir}/calls)" -eq 2 ] && echo "buildcage log barrier ?f00d" >> ${dir}/log/current`,
+          "exit 0",
+        ].join("\n"),
+      );
+      chmodSync(join(dir, "curl"), 0o755);
+      mkdirSync(join(dir, "log"));
+      const { docker, calls } = fakeDocker(() => METRICS);
+      readProxyDroppedLogs(docker, "abc", "f00d");
+      const [, , , script, ...args] = calls[0];
+      execFileSync("sh", ["-c", script.replaceAll("/var/log/haproxy", join(dir, "log")), ...args], {
+        env: { PATH: `${dir}:${process.env.PATH}` },
+      });
+      expect(readFileSync(join(dir, "calls"), "utf8")).toBe("\n\n");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
