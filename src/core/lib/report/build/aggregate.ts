@@ -261,7 +261,14 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   { droppedLogs, resolverAnswered }: ServiceHealth,
 ): Promise<Extract<ReportData, { engine: E }>> {
   const [
-    { events: proxyEvents, startedAt, headIntact: proxyHeadIntact, unparsed, restarts: proxy },
+    {
+      events: proxyEvents,
+      startedAt,
+      headIntact: proxyHeadIntact,
+      unparsed,
+      restarts: proxy,
+      dropped: ringDropped,
+    },
     { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed, restarts: resolver },
   ] = await Promise.all([proxyScan, dnsScan]);
 
@@ -282,6 +289,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       unparsed === 0 &&
       dnsUnparsed === 0 &&
       droppedLogs.count === 0 &&
+      ringDropped === 0 &&
       resolverAnswered &&
       proxy === 0 &&
       resolver === 0,

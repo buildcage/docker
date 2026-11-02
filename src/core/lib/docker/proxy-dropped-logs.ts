@@ -1,12 +1,17 @@
 /**
- * How many lines the proxy failed to write to its own log, read from its own
- * counter when the report runs.
+ * Whether the proxy lost any line of its log, asked when the report runs and
+ * before it reads the log.
  *
- * haproxy writes each line to a pipe without blocking, and a line it cannot
- * write at once is dropped with nothing left in the log to mark where. Neither
- * the startup marker nor an unreadable line can reveal that, so a build that
- * floods the pipe could otherwise hide a connection among the lines it lost.
+ * haproxy writes each line without blocking, and a line it cannot write at
+ * once is dropped. Its own counter covers a line that never reached the log
+ * ring. One the full ring dropped is counted only by a notice in the log
+ * itself (proxy-notices.ts), written on the next line that fits, so the
+ * report first logs one more line and waits for it: that flushes the notice
+ * and everything ahead of it into the log the report then reads.
  */
+import { randomBytes } from "node:crypto";
+
+import { PROXY_LOG_BARRIER } from "../log/proxy-notices.ts";
 import type { Docker } from "./client.ts";
 
 /** Served by the proxy's `health` frontend; see haproxy-sections.ts. */
@@ -16,12 +21,29 @@ const COUNTER = /^haproxy_process_dropped_logs_total (\d+)$/m;
 /** A wedged proxy can accept the connection and never answer. */
 const MAX_TIME_SECONDS = "10";
 
+/** Served by the proxy's `log_barrier` frontend; see haproxy-sections.ts. */
+const BARRIER_SOCKET = "/var/run/haproxy-barrier.sock";
+const LOG_DIR = "/var/log/haproxy";
+/** Polls `current` for up to 10s, then searches every segment once, in case
+ *  the line arrived just before a rotation. */
+const BARRIER_SCRIPT = [
+  `curl -sf --max-time ${MAX_TIME_SECONDS} --unix-socket ${BARRIER_SOCKET} "http://localhost/?$1" >/dev/null || exit 1`,
+  "i=0",
+  "while [ $i -lt 100 ]; do",
+  `  grep -qsF "$2" ${LOG_DIR}/current && exit 0`,
+  "  sleep 0.1",
+  "  i=$((i + 1))",
+  "done",
+  `grep -rqsF "$2" ${LOG_DIR}`,
+].join("\n");
+
 /** What the report learned from asking the proxy for its dropped-line count. */
 export interface ProxyDroppedLogs {
   /** False when the proxy did not answer at all: it stopped during the run and
    *  stayed down, or hung. */
   answered: boolean;
-  /** The count, or undefined where it could not be read. */
+  /** The count, or undefined where it could not be read or the log did not
+   *  catch up. */
   count: number | undefined;
 }
 
@@ -31,8 +53,30 @@ export function parseDroppedLogs(metrics: string): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
+/** True once a line the proxy logs on request has reached its log. */
+export function awaitProxyLog(docker: Docker, containerId: string, token: string): boolean {
+  try {
+    docker.exec(containerId, [
+      "sh",
+      "-c",
+      BARRIER_SCRIPT,
+      "sh",
+      token,
+      `${PROXY_LOG_BARRIER} ?${token}`,
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The proxy's dropped-line count, and whether it answered at all. */
-export function readProxyDroppedLogs(docker: Docker, containerId: string): ProxyDroppedLogs {
+export function readProxyDroppedLogs(
+  docker: Docker,
+  containerId: string,
+  token = randomBytes(16).toString("hex"),
+): ProxyDroppedLogs {
+  const caughtUp = awaitProxyLog(docker, containerId, token);
   let metrics: string;
   try {
     metrics = docker.exec(containerId, [
@@ -47,5 +91,5 @@ export function readProxyDroppedLogs(docker: Docker, containerId: string): Proxy
   } catch {
     return { answered: false, count: undefined };
   }
-  return { answered: true, count: parseDroppedLogs(metrics) };
+  return { answered: true, count: caughtUp ? parseDroppedLogs(metrics) : undefined };
 }

@@ -202,6 +202,23 @@ describe("scanHaproxyLog", () => {
     expect(unparsed).toBe(1);
   });
 
+  it("adds up the lines a full log ring dropped", async () => {
+    const log = [MARKER, "1 event dropped", "", "20138 events dropped"];
+    const { dropped, unparsed } = await scanHaproxyLog(log, false);
+    expect(dropped).toBe(20139);
+    expect(unparsed).toBe(0);
+  });
+
+  it("reads the report's barrier line as neither an event nor a gap", async () => {
+    const { events, unparsed, dropped } = await scanHaproxyLog(
+      [MARKER, "buildcage log barrier ?0123abcd"],
+      false,
+    );
+    expect(events).toStrictEqual([]);
+    expect(unparsed).toBe(0);
+    expect(dropped).toBe(0);
+  });
+
   it("reads startedAt from the startup marker's millisecond epoch", async () => {
     const { startedAt } = await scanHaproxyLog([MARKER], false);
     expect(startedAt).toBe(1787471970);

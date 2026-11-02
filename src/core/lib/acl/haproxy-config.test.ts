@@ -1,4 +1,5 @@
 import { PROXY_ADDRESS, PROXY_SUBNET } from "../log/proxy-address.ts";
+import { PROXY_LOG_BARRIER } from "../log/proxy-notices.ts";
 import { FULL_RULES, section, seconds, timeout } from "../test/config-text.ts";
 import { describe, it, expect, reportResults } from "../test/test-shim.ts";
 import { generateHaproxyConfig, type HaproxyConfigOptions } from "./haproxy-config.ts";
@@ -121,8 +122,8 @@ describe("plaintext request timeout", () => {
 describe("log lines", () => {
   it("puts the one field the build sizes at the end of every line it logs", () => {
     // Whatever cuts a line then costs the target's tail, not the decision.
-    const formats = FULL_CONFIG.split("\n").filter((line) =>
-      line.includes('log-format "buildcage'),
+    const formats = FULL_CONFIG.split("\n").filter(
+      (line) => line.includes('log-format "buildcage') && !line.includes(PROXY_LOG_BARRIER),
     );
     // error-log-format included.
     expect(formats.length).toBe(4);

@@ -213,6 +213,18 @@ describe("buildUniversalReportData", () => {
     expect(result.passed.map((r) => r.host)).toStrictEqual(["good.com"]);
   });
 
+  it("logLooksPlausible is false when the proxy's log ring dropped lines", async () => {
+    // haproxy's own counter stays at zero for these; only the notice says so.
+    const result = await buildUniversalReportData(
+      [HAPROXY_START, "1 event dropped", proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
+      [DNS_START],
+      reportParams(),
+      HEALTHY,
+    );
+    expect(result.logLooksPlausible).toBe(false);
+    expect(result.passed.map((r) => r.host)).toStrictEqual(["good.com"]);
+  });
+
   it("logLooksPlausible is false when the resolver did not answer", async () => {
     // Lookups a stopped resolver never received leave no line in its log.
     const result = await buildUniversalReportData(

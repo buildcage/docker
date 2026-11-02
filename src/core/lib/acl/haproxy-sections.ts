@@ -1,3 +1,9 @@
+import { PROXY_LOG_BARRIER } from "../log/proxy-notices.ts";
+
+const LOG_RING = "buildcage";
+/** Copied into the image from docker/common/files/s6-rc.d/haproxy/data. */
+const START_MARKER_SCRIPT = "/etc/s6-overlay/s6-rc.d/haproxy/data/start-marker.lua";
+
 /** What one engine adds to the `global` and `defaults` sections. */
 export interface PreambleSpec {
   global: string[];
@@ -16,11 +22,13 @@ export function preamble(spec: PreambleSpec): string[] {
     // 16384 covers the longest request head haproxy accepts (tune.bufsize -
     // tune.maxrewrite). At the default of 1024 a long URL cuts the line, and a
     // cut line matches nothing at all, taking its event out of the report.
-    // `len` must precede `format`, or the config is rejected.
-    "    log stdout len 16384 format raw local0",
-    // Threads sharing the stdout fd contend for its lock, and the loser drops
-    // its line (fd_write_frag_line).
-    "    nbthread 1",
+    // `len` must precede `format`, or the config is rejected. A ring rather
+    // than stdout: threads sharing the stdout fd contend for its lock and the
+    // loser drops its line, so stdout held haproxy to one thread.
+    `    log ring@${LOG_RING} len 16384 format raw local0`,
+    // Must come before lua-load; left unset, haproxy warns on every start.
+    "    tune.lua.bool-sample-conversion normal",
+    `    lua-load ${START_MARKER_SCRIPT}`,
     // This process parses traffic the workload controls, so it must not be root.
     "    user haproxy",
     "    group haproxy",
@@ -51,6 +59,25 @@ export function preamble(spec: PreambleSpec): string[] {
     // A line HAProxy cannot write at once is dropped without a trace in the log
     // itself; only this counter says one went missing.
     "    http-request use-service prometheus-exporter if { path /metrics }",
+    "",
+    "# Logs the query of each request, which the report waits to see in the log",
+    "# before reading it. Not reachable from the network.",
+    "frontend log_barrier",
+    "    bind /var/run/haproxy-barrier.sock mode 600",
+    "    mode http",
+    `    log-format "${PROXY_LOG_BARRIER} %HQ"`,
+    "    http-request return status 204",
+    "",
+    // A full ring drops the line and says so on the next one that fits
+    // (proxy-notices.ts). 1MB rode out every burst measured with s6-log
+    // keeping up. maxlen matches the log's len, or a long line is cut.
+    `ring ${LOG_RING}`,
+    "    format raw",
+    "    size 1048576",
+    "    maxlen 16384",
+    "    timeout connect 5s",
+    "    timeout server 1h",
+    "    server log unix@/var/run/haproxy-log.sock",
     "",
   ];
 }

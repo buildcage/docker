@@ -16,6 +16,7 @@ import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
 
 import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
+import { PROXY_LOG_BARRIER, ringDropped } from "./proxy-notices.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
 import { actionFor, CLIENT_ENDED_REASONS, type TrafficEvent } from "./traffic-event.ts";
@@ -335,6 +336,8 @@ export interface InspectLogScan {
   /** Startup markers after the log's first line: each is the proxy starting
    *  again after it stopped mid-run. */
   restarts: number;
+  /** Lines the proxy said it dropped because its log ring was full. */
+  dropped: number;
 }
 
 /**
@@ -356,6 +359,7 @@ export async function scanInspectLog(
   let headIntact: boolean | undefined;
   let unparsed = 0;
   let restarts = 0;
+  let dropped = 0;
   for await (const line of lines) {
     const event = parseProxyLine(line, isAudit);
     if (event) {
@@ -365,17 +369,28 @@ export async function scanInspectLog(
     }
     const trimmed = line.trim();
     if (trimmed === "") continue;
+    const lost = ringDropped(trimmed);
+    if (lost !== undefined) {
+      dropped += lost;
+      continue;
+    }
     const match = START.exec(trimmed);
     if (match && headIntact !== undefined) restarts++;
     headIntact ??= match !== null;
     if (match && startedAt === undefined) startedAt = Number(match[1]) / 1000;
     // Excluded by prefix rather than by `match`: a qjs that failed to print
     // the stamp would leave the marker bare, which is not a missing event.
-    if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
+    if (
+      trimmed.startsWith(LINE_PREFIX) &&
+      !trimmed.startsWith(PROXY_START_MARKER) &&
+      !trimmed.startsWith(PROXY_LOG_BARRIER)
+    ) {
+      unparsed++;
+    }
   }
   blockUnpassedAddresses(events);
   if (allowsName) blockUnallowedNames(events, allowsName);
-  return { events, startedAt, headIntact: headIntact ?? false, unparsed, restarts };
+  return { events, startedAt, headIntact: headIntact ?? false, unparsed, restarts, dropped };
 }
 
 /**

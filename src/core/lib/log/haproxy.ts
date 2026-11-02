@@ -1,6 +1,7 @@
 /** Log parsing library for HAProxy's buildcage decision log. */
 import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
+import { PROXY_LOG_BARRIER, ringDropped } from "./proxy-notices.ts";
 import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
 import type { TrafficEvent, TrafficProtocol } from "./traffic-event.ts";
@@ -23,6 +24,8 @@ export interface HaproxyLogScan {
   /** Startup markers after the log's first line: each is the proxy starting
    *  again after it stopped mid-run. */
   restarts: number;
+  /** Lines the proxy said it dropped because its log ring was full. */
+  dropped: number;
 }
 
 // The quoted target and the reason are restricted to the charset the config
@@ -40,7 +43,7 @@ const NO_REQUEST =
 /** Every line the proxy writes opens with this; used to count unparsed ones. */
 const LINE_PREFIX = "buildcage ";
 
-/** The startup marker with its millisecond epoch (see s6-rc.d/haproxy/run). */
+/** The startup marker with its millisecond epoch (see s6-rc.d/haproxy/data/start-marker.lua). */
 const START = new RegExp(`^${PROXY_START_MARKER} (\\d+)$`);
 
 /** The proxy's rule kinds mapped to the protocol the timeline records. universal
@@ -83,6 +86,7 @@ export async function scanHaproxyLog(
   let headIntact: boolean | undefined;
   let unparsed = 0;
   let restarts = 0;
+  let dropped = 0;
 
   for await (const line of lines) {
     const m = DECISION.exec(line);
@@ -126,12 +130,23 @@ export async function scanHaproxyLog(
     }
     const trimmed = line.trim();
     if (trimmed === "") continue;
+    const lost = ringDropped(trimmed);
+    if (lost !== undefined) {
+      dropped += lost;
+      continue;
+    }
     const start = START.exec(trimmed);
     if (start && headIntact !== undefined) restarts++;
     headIntact ??= start !== null;
     if (start && startedAt === undefined) startedAt = Number(start[1]) / 1000;
-    if (trimmed.startsWith(LINE_PREFIX) && !trimmed.startsWith(PROXY_START_MARKER)) unparsed++;
+    if (
+      trimmed.startsWith(LINE_PREFIX) &&
+      !trimmed.startsWith(PROXY_START_MARKER) &&
+      !trimmed.startsWith(PROXY_LOG_BARRIER)
+    ) {
+      unparsed++;
+    }
   }
 
-  return { events, startedAt, headIntact: headIntact ?? false, unparsed, restarts };
+  return { events, startedAt, headIntact: headIntact ?? false, unparsed, restarts, dropped };
 }

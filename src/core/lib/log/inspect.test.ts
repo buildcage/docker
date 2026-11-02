@@ -308,6 +308,30 @@ describe("scanInspectLog", () => {
     expect(restarts).toBe(0);
     expect((await scanInspectLog(["buildcage haproxy starting 1787471999000"])).restarts).toBe(0);
   });
+
+  it("adds up the lines a full log ring dropped", async () => {
+    const lines = [
+      "buildcage haproxy starting 1787471970000",
+      "1 event dropped",
+      "2 events dropped",
+    ];
+    const { dropped, unparsed, headIntact } = await scanInspectLog(lines);
+    expect(dropped).toBe(3);
+    expect(unparsed).toBe(0);
+    expect(headIntact).toBe(true);
+  });
+
+  it("does not take a decision line's text for a drop notice", async () => {
+    expect((await scanInspectLog([`${ALLOWED} 5 events dropped`])).dropped).toBe(0);
+  });
+
+  it("reads the report's barrier line as neither an event nor a gap", async () => {
+    const lines = ["buildcage haproxy starting 1787471970000", "buildcage log barrier ?0123abcd"];
+    const { events, unparsed, dropped } = await scanInspectLog(lines);
+    expect(events).toStrictEqual([]);
+    expect(unparsed).toBe(0);
+    expect(dropped).toBe(0);
+  });
 });
 
 describe("a connection sent straight to an address that ended before its request", () => {

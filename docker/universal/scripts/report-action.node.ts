@@ -21,16 +21,16 @@ const RESOLVER_LOG_DIR = "/var/log/coredns";
 
 runReportAction({
   proxyEngine: "universal",
-  build: (docker, containerId, parameters) =>
-    buildUniversalReportData(
+  build: (docker, containerId, parameters) => {
+    // First: it waits for the proxy's log to catch up before anything reads it.
+    const droppedLogs = readProxyDroppedLogs(docker, containerId);
+    return buildUniversalReportData(
       readRotatedLog(docker, containerId, PROXY_LOG_DIR),
       readRotatedLog(docker, containerId, RESOLVER_LOG_DIR),
       parameters,
-      {
-        droppedLogs: readProxyDroppedLogs(docker, containerId),
-        resolverAnswered: readResolverAnswered(docker, containerId),
-      },
-    ),
+      { droppedLogs, resolverAnswered: readResolverAnswered(docker, containerId) },
+    );
+  },
 }).catch((e) => {
   console.log(`::error::Unexpected error in report-action: ${errorMessage(e)}`);
   process.exit(1);
