@@ -15,24 +15,34 @@ export function findReportSourceContainer(
   projectName: string,
   builderName: string,
 ): string {
-  let ids: string[];
+  const filters = [
+    `label=com.docker.compose.project=${projectName}`,
+    `label=${REPORT_SOURCE_LABEL}=true`,
+  ];
+  const ids = find(docker, filters);
+  if (ids.length === 1) return ids[0];
+  // A status filter lists stopped containers too, which plain `docker ps` leaves out.
+  if (ids.length === 0 && find(docker, [...filters, "status=exited", "status=dead"]).length > 0) {
+    throw new ReportError(
+      `The buildcage container for builder-name ${JSON.stringify(builderName)} has stopped, and its proxy with it. ` +
+        "The report cannot read the proxy log, and nothing recorded what the build reached after the proxy stopped.",
+      "CONTAINER_STOPPED",
+    );
+  }
+  throw new ReportError(
+    `Expected exactly one buildcage container for builder-name ${JSON.stringify(builderName)}, found ${ids.length}. ` +
+      "Did the setup step run first, with the same builder-name?",
+    "CONTAINER_NOT_FOUND",
+  );
+}
+
+function find(docker: Docker, filters: string[]): string[] {
   try {
-    ids = docker.findContainers([
-      `label=com.docker.compose.project=${projectName}`,
-      `label=${REPORT_SOURCE_LABEL}=true`,
-    ]);
+    return docker.findContainers(filters);
   } catch (e) {
     throw new ReportError(
       describeDockerFailure(e, { operation: "docker ps" }),
       "DOCKER_UNAVAILABLE",
     );
   }
-  if (ids.length !== 1) {
-    throw new ReportError(
-      `Expected exactly one buildcage container for builder-name ${JSON.stringify(builderName)}, found ${ids.length}. ` +
-        "Did the setup step run first, with the same builder-name?",
-      "CONTAINER_NOT_FOUND",
-    );
-  }
-  return ids[0];
 }
