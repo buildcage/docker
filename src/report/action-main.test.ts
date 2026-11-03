@@ -12,6 +12,7 @@ import { reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts"
 import {
   BuilderStoppedError,
   LogsUnreadableError,
+  readLog,
   reportActionError,
   runReportAction,
   type ReportActionSpec,
@@ -156,16 +157,38 @@ describe("runReportAction when the logs cannot be read", () => {
   );
 
   it("names the unreadable logs while both services answer", async () => {
-    const result = runReportAction(unreadable, {
+    const readsLog = spec({
+      build: async (docker, containerId) => {
+        for await (const _ of readLog(docker, containerId, "/var/log/coredns"));
+        return universal;
+      },
+    });
+    const result = runReportAction(readsLog, {
       containerId: "abc123",
-      docker: answering(true, true),
+      docker: {
+        ...answering(true, true),
+        // eslint-disable-next-line require-yield
+        execLines: async function* () {
+          throw new Error("exit 1");
+        },
+      },
       env: {},
     });
     await expect(result).rejects.toThrow(LogsUnreadableError);
     await expect(result).rejects.not.toThrow(BuilderStoppedError);
     await expect(result).rejects.toThrow(
-      "The proxy and the DNS resolver answered but the logs could not be read: container is not running",
+      "The proxy and the DNS resolver answered but the logs could not be read: exit 1",
     );
+  });
+
+  it("passes any other error on as it is while both services answer", async () => {
+    const result = runReportAction(unreadable, {
+      containerId: "abc123",
+      docker: answering(true, true),
+      env: {},
+    });
+    await expect(result).rejects.toThrow("container is not running");
+    await expect(result).rejects.not.toThrow(LogsUnreadableError);
   });
 });
 

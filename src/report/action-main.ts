@@ -20,6 +20,7 @@ import type { Docker } from "#core/lib/docker/client.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
 import { readProxyAnswered } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { readResolverAnswered } from "#core/lib/docker/resolver-health.ts";
+import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
@@ -97,6 +98,22 @@ export class LogsUnreadableError extends Error {}
  */
 export class BuilderStoppedError extends LogsUnreadableError {}
 
+/** A failed log read, told apart from a fault in building the report. */
+class LogReadError extends Error {}
+
+/** readRotatedLog for a spec's build, so that a failed read fails the step whatever the mode. */
+export async function* readLog(
+  docker: Docker,
+  containerId: string,
+  dir: string,
+): AsyncIterable<string> {
+  try {
+    yield* readRotatedLog(docker, containerId, dir);
+  } catch (e) {
+    throw new LogReadError(errorMessage(e));
+  }
+}
+
 /** The annotation an engine's report-action.node.ts prints for a failed run. */
 export function reportActionError(e: unknown): string {
   return e instanceof LogsUnreadableError
@@ -128,15 +145,18 @@ export async function runReportAction(
   } catch (e) {
     // Asked again without a barrier, as the container can stop after the
     // first answer.
-    if (readProxyAnswered(docker, containerId) && readResolverAnswered(docker, containerId)) {
-      throw new LogsUnreadableError(
-        `The proxy and the DNS resolver answered but the logs could not be read: ${errorMessage(e)}`,
+    if (!readProxyAnswered(docker, containerId) || !readResolverAnswered(docker, containerId)) {
+      throw new BuilderStoppedError(
+        "The buildcage container stopped or hung: the proxy or the DNS resolver did not answer " +
+          `and the logs could not be read: ${errorMessage(e)}`,
       );
     }
-    throw new BuilderStoppedError(
-      "The buildcage container stopped or hung: the proxy or the DNS resolver did not answer " +
-        `and the logs could not be read: ${errorMessage(e)}`,
-    );
+    if (e instanceof LogReadError) {
+      throw new LogsUnreadableError(
+        `The proxy and the DNS resolver answered but the logs could not be read: ${e.message}`,
+      );
+    }
+    throw e;
   }
 
   for (const line of spec.logSections?.(report) ?? []) {

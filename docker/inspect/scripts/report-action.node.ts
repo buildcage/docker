@@ -11,9 +11,8 @@
  */
 import { readProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { readResolverAnswered } from "#core/lib/docker/resolver-health.ts";
-import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
 import { buildInspectReportData } from "#core/lib/report/build/inspect.ts";
-import { reportActionError, runReportAction } from "#report/action-main.ts";
+import { readLog, reportActionError, runReportAction } from "#report/action-main.ts";
 
 const PROXY_LOG_DIR = "/var/log/haproxy";
 const RESOLVER_LOG_DIR = "/var/log/coredns";
@@ -24,8 +23,8 @@ runReportAction({
     // First: it waits for the proxy's log to catch up before anything reads it.
     const droppedLogs = readProxyDroppedLogs(docker, containerId);
     return buildInspectReportData(
-      readRotatedLog(docker, containerId, PROXY_LOG_DIR),
-      readRotatedLog(docker, containerId, RESOLVER_LOG_DIR),
+      readLog(docker, containerId, PROXY_LOG_DIR),
+      readLog(docker, containerId, RESOLVER_LOG_DIR),
       parameters,
       { droppedLogs, resolverAnswered: readResolverAnswered(docker, containerId) },
     );
