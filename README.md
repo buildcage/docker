@@ -404,6 +404,8 @@ data, or source you do not publish. For the full threat model, see
 - Under `inspect`, the generated allowlist writes URL rules only from the requests the proxy read.
   `allowed-tls-rules` and `allowed-ip-rules` are copied over unchanged from the audit run's own
   inputs, since the traffic they pass through is never decrypted.
+- Under `universal`, the generated allowlist writes a host rule for the SNI or `Host` of each
+  connection made through a name, and an IP rule for each address reached directly.
 - Buildcage produces no SLSA provenance. The traffic artifact is an observation record with no
   content digest.
 
