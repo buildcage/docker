@@ -15,7 +15,7 @@ function fakeDocker(overrides: Partial<Docker> = {}): Docker {
   return {
     findContainers: () => [],
     copyFromContainer: () => {},
-    readFileLines: () => (async function* () {})(),
+    execLines: () => (async function* () {})(),
     readEnv: () => ({ PROXY_MODE: "restrict" }),
     readLabels: () => ({ "org.opencontainers.image.version": "2.1.0" }),
     exec: () => "",

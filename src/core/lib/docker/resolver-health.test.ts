@@ -14,7 +14,7 @@ function fakeDocker(exec: Docker["exec"]): { docker: Docker; calls: string[][] }
       calls.push([id, ...args]);
       return exec(id, args);
     },
-    async *readFileLines() {
+    async *execLines() {
       yield* [];
     },
   };

@@ -1,71 +1,29 @@
-import { describe, it, expect } from "vitest";
+import { spawn } from "node:child_process";
+import { linkSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createInterface } from "node:readline";
+
+import { afterEach, describe, it, expect } from "vitest";
 
 import type { Docker } from "./client.ts";
-import { parseLogSegments, readRotatedLog } from "./rotated-log.ts";
+import { readRotatedLog } from "./rotated-log.ts";
 
-describe("parseLogSegments", () => {
-  it("keeps only s6-log segment names, archives before current", () => {
-    const ls = [
-      "state",
-      "lock",
-      "@400000006a94d9dc0621143f.s",
-      "current",
-      "@400000006a94d9dc09e929d9.s",
-    ].join("\n");
-    expect(parseLogSegments(ls)).toStrictEqual([
-      "@400000006a94d9dc0621143f.s",
-      "@400000006a94d9dc09e929d9.s",
-      "current",
-    ]);
-  });
-
-  it("sorts archives chronologically by their TAI64N name", () => {
-    const ls = ["@400000006a94d9dc09e929d9.s", "@400000006a94d9dc0621143f.s"].join("\n");
-    expect(parseLogSegments(ls)).toStrictEqual([
-      "@400000006a94d9dc0621143f.s",
-      "@400000006a94d9dc09e929d9.s",
-    ]);
-  });
-
-  it("returns just current when nothing has rotated yet", () => {
-    expect(parseLogSegments("current\nlock\nstate\n")).toStrictEqual(["current"]);
-  });
-
-  it("returns an empty array when current itself is absent", () => {
-    expect(parseLogSegments("lock\nstate\n")).toStrictEqual([]);
-  });
-
-  // n100 (see the haproxy-log/coredns-log run scripts) means a build or step
-  // can genuinely produce more than 10 archives, so the fixed-width TAI64N sort is
-  // exercised past double digits rather than just at 2.
-  it("keeps chronological order past double-digit archive counts", () => {
-    const inOrder = Array.from({ length: 15 }, (_, i) => `@${i.toString(16).padStart(24, "0")}.s`);
-    const shuffled = [...inOrder].reverse();
-    expect(parseLogSegments(shuffled.join("\n"))).toStrictEqual(inOrder);
-  });
-});
-
-/** Minimal stand-in for Docker, just enough surface for readRotatedLog. */
-function fakeDocker(
-  lsOutput: string,
-  files: Record<string, string[]>,
-): { docker: Docker; reads: string[] } {
-  const reads: string[] = [];
-  const docker: Docker = {
+/** A Docker whose execLines runs the command on this machine instead. */
+function localDocker(): Docker {
+  return {
     findContainers: () => [],
     copyFromContainer: () => {},
     readEnv: () => ({}),
     readLabels: () => ({}),
-    exec: (_id, args) => {
-      if (args[0] === "ls") return lsOutput;
-      throw new Error(`unexpected exec: ${args.join(" ")}`);
-    },
-    async *readFileLines(_id, path) {
-      reads.push(path);
-      for (const line of files[path] ?? []) yield line;
+    exec: () => "",
+    async *execLines(_id, [command, ...args]) {
+      const child = spawn(command, args, { stdio: ["ignore", "pipe", "ignore"] });
+      const closed = new Promise<number | null>((resolve) => child.on("close", resolve));
+      yield* createInterface({ input: child.stdout });
+      if ((await closed) !== 0) throw new Error(`${command} failed`);
     },
   };
-  return { docker, reads };
 }
 
 async function drain(iterable: AsyncIterable<string>): Promise<string[]> {
@@ -74,45 +32,96 @@ async function drain(iterable: AsyncIterable<string>): Promise<string[]> {
   return lines;
 }
 
+const OLD = "@400000006a94d9dc0621143f.s";
+const MIDDLE = "@400000006a94d9dc09e929d9.s";
+const NEWER = "@400000006a94d9dc0aaaaaaa.s";
+const NEWEST = "@400000006a94d9dc0bbbbbbb.u";
+
 describe("readRotatedLog", () => {
-  it("reads archives oldest-first, then current, all concatenated", async () => {
-    const ls = ["current", "@400000006a94d9dc09e929d9.s", "@400000006a94d9dc0621143f.s"].join("\n");
-    const { docker, reads } = fakeDocker(ls, {
-      "/var/log/haproxy/@400000006a94d9dc0621143f.s": ["old line"],
-      "/var/log/haproxy/@400000006a94d9dc09e929d9.s": ["middle line"],
-      "/var/log/haproxy/current": ["newest line"],
-    });
-    const lines = await drain(readRotatedLog(docker, "abc123", "/var/log/haproxy"));
-    expect(lines).toStrictEqual(["old line", "middle line", "newest line"]);
-    expect(reads).toStrictEqual([
-      "/var/log/haproxy/@400000006a94d9dc0621143f.s",
-      "/var/log/haproxy/@400000006a94d9dc09e929d9.s",
-      "/var/log/haproxy/current",
+  it("runs its script in the container with the directory as its argument", async () => {
+    let seen: string[] = [];
+    const docker: Docker = {
+      ...localDocker(),
+      async *execLines(id, args) {
+        seen = [id, ...args];
+        yield "line";
+      },
+    };
+    expect(await drain(readRotatedLog(docker, "abc123", "/var/log/haproxy"))).toStrictEqual([
+      "line",
+    ]);
+    expect(seen).toStrictEqual([
+      "abc123",
+      "sh",
+      "-c",
+      expect.any(String),
+      "sh",
+      "/var/log/haproxy",
     ]);
   });
+});
 
-  it("reads just current when nothing has rotated", async () => {
-    const { docker } = fakeDocker("current\nlock\nstate\n", {
-      "/var/log/coredns/current": ["a", "b"],
-    });
-    const lines = await drain(readRotatedLog(docker, "abc123", "/var/log/coredns"));
-    expect(lines).toStrictEqual(["a", "b"]);
+// The script needs /proc and GNU or busybox stat, as in the proxy image.
+describe.runIf(process.platform === "linux")("readRotatedLog's script", () => {
+  let dir: string;
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  function logDir(files: Record<string, string>): string {
+    dir = mkdtempSync(join(tmpdir(), "rotated-log-"));
+    for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
+    return dir;
+  }
+  const read = (path: string) => drain(readRotatedLog(localDocker(), "id", path));
+
+  it("reads the archives oldest first, then current", async () => {
+    const path = logDir({ current: "c\n", [MIDDLE]: "m\n", [OLD]: "o\n", lock: "", state: "" });
+    expect(await read(path)).toStrictEqual(["o", "m", "c"]);
   });
 
-  it("lists the directory via docker exec ls -1", async () => {
-    let seenArgs: string[] = [];
-    const docker: Docker = {
-      findContainers: () => [],
-      copyFromContainer: () => {},
-      readEnv: () => ({}),
-      readLabels: () => ({}),
-      exec: (_id, args) => {
-        seenArgs = args;
-        return "current\n";
-      },
-      async *readFileLines() {},
-    };
-    await drain(readRotatedLog(docker, "abc123", "/var/log/haproxy"));
-    expect(seenArgs).toStrictEqual(["ls", "-1", "/var/log/haproxy"]);
+  it("orders archives by name past ten of them", async () => {
+    const names = Array.from({ length: 15 }, (_, i) => `@${i.toString(16).padStart(24, "0")}.s`);
+    const path = logDir(Object.fromEntries([...names].reverse().map((n) => [n, `${n}\n`])));
+    writeFileSync(join(path, "current"), "c\n");
+    expect(await read(path)).toStrictEqual([...names, "c"]);
+  });
+
+  it("reads previous after the archives, once while it also has its archive name", async () => {
+    const path = logDir({ current: "c\n", [OLD]: "o\n", previous: "p\n" });
+    linkSync(join(path, "previous"), join(path, NEWER));
+    expect(await read(path)).toStrictEqual(["o", "p", "c"]);
+  });
+
+  it("stops at the file it opened as current once that has rotated", async () => {
+    const path = logDir({ current: "c\n", [OLD]: "o\n" });
+    linkSync(join(path, "current"), join(path, "previous"));
+    linkSync(join(path, "current"), join(path, NEWER));
+    writeFileSync(join(path, NEWEST), "after\n");
+    expect(await read(path)).toStrictEqual(["o", "c"]);
+  });
+
+  it("ends an archive's cut-short last line before the next segment", async () => {
+    const path = logDir({ current: "c\n", [OLD]: "o\ncut", [MIDDLE]: "m\n" });
+    expect(await read(path)).toStrictEqual(["o", "cut", "m", "c"]);
+  });
+
+  it("reads every archive when there is no current", async () => {
+    expect(await read(logDir({ [OLD]: "o\n", [MIDDLE]: "m\n" }))).toStrictEqual(["o", "m"]);
+  });
+
+  it("reads current written while it waits for one", async () => {
+    const path = logDir({ [OLD]: "o\n" });
+    setTimeout(() => writeFileSync(join(path, "current"), "c\n"), 300);
+    expect(await read(path)).toStrictEqual(["o", "c"]);
+  });
+
+  it("fails on a directory that is not there", async () => {
+    dir = mkdtempSync(join(tmpdir(), "rotated-log-"));
+    await expect(read(join(dir, "missing"))).rejects.toThrow();
+  });
+
+  it("reads nothing from an empty directory", async () => {
+    dir = mkdtempSync(join(tmpdir(), "rotated-log-"));
+    mkdirSync(join(dir, "log"));
+    expect(await read(join(dir, "log"))).toStrictEqual([]);
   });
 });

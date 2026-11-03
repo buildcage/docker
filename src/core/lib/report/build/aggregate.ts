@@ -273,6 +273,12 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   ] = await Promise.all([proxyScan, dnsScan]);
 
   const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
+  // The proxy connects once per start, so a connection past those is its log
+  // writer having died.
+  const proxyLog =
+    droppedLogs.logConnections === undefined
+      ? undefined
+      : Math.max(0, droppedLogs.logConnections - 1 - proxy);
 
   // engine is the discriminant and the rest is the shared ReportDataCommon, so
   // the assertion only restates the variant E already fixes.
@@ -292,10 +298,11 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       ringDroppedLines === 0 &&
       resolverAnswered &&
       proxy === 0 &&
-      resolver === 0,
+      resolver === 0 &&
+      proxyLog === 0,
     proxyAnswered: droppedLogs.answered,
     resolverAnswered,
-    restarts: { proxy, resolver },
+    restarts: { proxy, resolver, proxyLog: proxyLog ?? 0 },
     startedAt,
     timeline,
   } as Extract<ReportData, { engine: E }>;

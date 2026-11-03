@@ -5,6 +5,11 @@
 # into the log. -1 tells s6-rc the socket is listening, so haproxy starts after
 # it. One connection at a time, as two s6-log cannot share a directory.
 #
+# Each connection first appends a line to connections. haproxy keeps one
+# connection for as long as it runs, so a second one from the same haproxy
+# means the s6-log before it died with the lines still in the socket, and the
+# report marks itself incomplete for it (aggregate.ts).
+#
 # s: rotate current at 1MB rather than s6-log's own default of ~100KB, so a
 # run with a lot of traffic doesn't rotate mid-run. n: keep 100 rotated
 # segments (100MB) rather than the default 10, for the same reason. report
@@ -16,4 +21,5 @@
 if { install -d -m 0750 -g haproxy /var/run/haproxy-log }
 fdmove 1 3
 s6-ipcserver -1 -c 1 /var/run/haproxy-log/socket
+if { redirfd -a 1 /var/run/haproxy-log/connections echo }
 s6-log -l 32768 s1000000 n100 /var/log/haproxy
