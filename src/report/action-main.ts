@@ -129,8 +129,8 @@ export async function runReportAction(
       throw e;
     }
     throw new BuilderStoppedError(
-      "The buildcage container stopped or hung while the report read it: the proxy or the " +
-        `DNS resolver did not answer and the logs could not be read: ${errorMessage(e)}`,
+      "The buildcage container stopped or hung: the proxy or the DNS resolver did not answer " +
+        `and the logs could not be read: ${errorMessage(e)}`,
     );
   }
 

@@ -149,7 +149,7 @@ describe("runReportAction when the logs cannot be read", () => {
       });
       await expect(result).rejects.toThrow(BuilderStoppedError);
       await expect(result).rejects.toThrow(
-        "The buildcage container stopped or hung while the report read it: the proxy or the DNS resolver did not answer and the logs could not be read: container is not running",
+        "The buildcage container stopped or hung: the proxy or the DNS resolver did not answer and the logs could not be read: container is not running",
       );
     },
   );
