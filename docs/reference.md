@@ -29,7 +29,7 @@ value, warning when the two differ.
 
 | Input                | Default     | Description                                                                                                                                                                                 |
 | -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config-file`        | empty       | A YAML file, relative to the workspace, that sets the other inputs. See [Config file](#config-file).                                                                                        |
+| `config-file`        | empty       | A YAML file in the workspace, relative to it or absolute, that sets the other inputs. See [Config file](#config-file).                                                                      |
 | `builder-name`       | `buildcage` | Name of the builder container: at least two letters, digits, `_`, `.` or `-`, starting with a letter or digit. The Buildx `endpoint` has to match it; see [outputs](#setup-action-outputs). |
 | `proxy-mode`         | `restrict`  | `audit` or `restrict`. See [Operation modes](#operation-modes).                                                                                                                             |
 | `proxy-engine`       | `inspect`   | `inspect` or `universal`. See [Engines](../README.md#engines).                                                                                                                              |
@@ -137,8 +137,10 @@ known-blocked-rules: |
   build's `--output type=local` export.
 - An input the workflow sets wins over the file. The rule inputs are the exception: the file's
   rules are added to the workflow's.
-- The path is relative to `$GITHUB_WORKSPACE` and must stay inside it, through symlinks too. The
-  repository has to be checked out by an earlier step.
+- A relative path is relative to `$GITHUB_WORKSPACE`. An absolute path, such as
+  `${{ github.workspace }}/buildcage.yml`, is taken as it is. Either way the file, with its
+  symlinks resolved, must be inside `$GITHUB_WORKSPACE`, and a `..` may only start a relative
+  path. The repository has to be checked out by an earlier step.
 - `config-file` fails the step on `pull_request_target`, and on `workflow_run` triggered by a pull
   request event: the workspace there can hold the pull request's own code, which could rewrite the
   file. Set the inputs in the workflow on those events.

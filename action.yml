@@ -6,7 +6,7 @@ branding:
 
 inputs:
   config-file:
-    description: "YAML file, relative to the workspace, setting any input of this action or report. An input the workflow sets wins; rule lists are combined. Pass the same file to report. See docs/reference.md#config-file."
+    description: "YAML file in the workspace, relative to it or absolute, setting any input of this action or report. An input the workflow sets wins; rule lists are combined. Pass the same file to report. See docs/reference.md#config-file."
     required: false
     default: ""
   builder-name:
