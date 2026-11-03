@@ -65,7 +65,7 @@ FROM moby/buildkit:v0.34.0@sha256:b059f8d7226d0b326bc871af489a5dddf65e36af4d20d1
 
 LABEL org.opencontainers.image.title="buildcage" \
       org.opencontainers.image.description="Secure Docker build environment with network access control" \
-      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-1.0-only AND GPL-1.0-or-later AND GPL-2.0-only AND GPL-2.0-or-later AND (GPL-2.0-or-later WITH OpenSSL-Exception) AND GPL-3.0-or-later AND LGPL-2.1-only AND LGPL-2.1-or-later AND MPL-2.0 AND curl AND ISC AND BSD-1-Clause AND BSD-2-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND 0BSD AND Zlib AND X11 AND SSH-OpenSSH AND blessing AND EUPL-1.2" \
+      org.opencontainers.image.licenses="MIT AND Apache-2.0 AND GPL-1.0-only AND GPL-2.0-only AND GPL-2.0-or-later AND (GPL-2.0-or-later WITH OpenSSL-Exception) AND GPL-3.0-or-later AND LGPL-2.1-only AND LGPL-2.1-or-later AND MPL-2.0 AND curl AND ISC AND BSD-1-Clause AND BSD-2-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND 0BSD AND Zlib AND X11 AND SSH-OpenSSH AND EUPL-1.2" \
       org.opencontainers.image.source="https://github.com/buildcage/docker" \
       io.github.buildcage.report-source="true"
 # report finds this container by this label; must match src/report/report-source.ts.
@@ -99,8 +99,8 @@ ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 # that never reports ready.
 ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=90000
 # Shutdown sleeps this long unconditionally between its SIGTERM and SIGKILL.
-# Teardown kills the container outright, so only a `docker stop` or the
-# container ending on its own waits. The services stop in under 1s.
+# The action's teardown kills the container outright, so only a `docker stop`
+# or the container ending on its own waits. The services stop in under 1s.
 ENV S6_KILL_GRACETIME=500
 
 COPY --from=deps /opt/cni/bin /opt/cni/bin

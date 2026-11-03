@@ -161,7 +161,9 @@ the image lists them.
 
 The full texts of the GPL-1.0, GPL-2.0, GPL-3.0, LGPL-2.1, MPL-2.0 and
 Apache-2.0 licenses are in licenses/ in this repository, and each image
-carries those its own components need in /opt/buildcage/licenses/.
+carries those its own components need in /opt/buildcage/licenses/. The
+EUPL-1.2 text is in alpine/util-linux.txt there, with util-linux's other
+license copies.
 
 The license files of curl and QuickJS-ng, copyright notices included, are in
 licenses/ and in each image's /opt/buildcage/licenses/ as curl.txt and
