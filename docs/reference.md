@@ -504,8 +504,9 @@ the step.
 
 A report that is not a full record of the build fails the step the same way, whatever survived: a
 log that doesn't begin where the build did, carries a line the report cannot read or lost lines the
-proxy could not write, or a proxy or resolver that restarted during the build, since a connection
-still open when the proxy stopped never gets its line. In audit mode, or with
+proxy could not write, or a proxy, proxy log writer or resolver that restarted during the build,
+since a connection still open when the proxy stopped never gets its line and a log writer loses the
+lines it had not yet written. In audit mode, or with
 `fail-on-blocked: false`, it is a notice instead. A proxy or resolver that does not answer the
 report, because it stopped and stayed down or hung, fails the step in both modes whatever
 `fail-on-blocked` says: requests and lookups made while it was down failed rather than going around

@@ -8,7 +8,8 @@
  * itself (proxy-log-tally.ts), written on the next line that fits, so the
  * report logs one more line once the log goes quiet and waits for it: that
  * flushes the notice and everything ahead of it into the log the report then
- * reads.
+ * reads. Lines the log writer took and then died with are counted by its
+ * connections, read once that barrier is in.
  */
 import { randomBytes } from "node:crypto";
 
@@ -25,6 +26,8 @@ const MAX_TIME_SECONDS = "10";
 /** Served by the proxy's `log_barrier` frontend; see haproxy-sections.ts. */
 const BARRIER_SOCKET = "/var/run/haproxy-barrier.sock";
 const LOG_DIR = "/var/log/haproxy";
+/** One line per connection to the log writer; see haproxy-log/run. */
+const CONNECTIONS = "/var/run/haproxy-log/connections";
 /**
  * Waits up to 10s for `current` to stop growing for half a second, as a ring
  * still full would drop the barrier line too. Then polls `current` for up to
@@ -59,6 +62,9 @@ export interface ProxyDroppedLogs {
   /** The count, or undefined where it could not be read or the log did not
    *  catch up. */
   count: number | undefined;
+  /** How many times the proxy connected to its log writer, or undefined
+   *  where that could not be read. */
+  logConnections: number | undefined;
 }
 
 /** The counter's value in Prometheus text output, or undefined without one. */
@@ -103,7 +109,19 @@ export function readProxyDroppedLogs(
       URL,
     ]);
   } catch {
-    return { answered: false, count: undefined };
+    return { answered: false, count: undefined, logConnections: undefined };
   }
-  return { answered: true, count: caughtUp ? parseDroppedLogs(metrics) : undefined };
+  return {
+    answered: true,
+    count: caughtUp ? parseDroppedLogs(metrics) : undefined,
+    logConnections: readLogConnections(docker, containerId),
+  };
+}
+
+function readLogConnections(docker: Docker, containerId: string): number | undefined {
+  try {
+    return docker.exec(containerId, ["cat", CONNECTIONS]).split("\n").length - 1;
+  } catch {
+    return undefined;
+  }
 }

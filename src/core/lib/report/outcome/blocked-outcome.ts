@@ -128,6 +128,12 @@ export function describeInterruptions({
       "A restart loses the line of whatever was still in progress when the service stopped.",
     );
   }
+  if (restarts.proxyLog) {
+    facts.push(
+      `The proxy's log writer restarted ${restarts.proxyLog} time(s) during the run, losing ` +
+        "the lines it had been sent but not yet written.",
+    );
+  }
   return facts;
 }
 

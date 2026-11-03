@@ -137,17 +137,17 @@ async function drain(iterable: AsyncIterable<string>): Promise<string[]> {
   return lines;
 }
 
-describe("createDocker readFileLines", () => {
+describe("createDocker execLines", () => {
   it("is lazy: nothing spawns until iteration actually starts", () => {
     const { spawnDocker, calls } = fakeSpawn();
-    createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current");
+    createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/var/log/haproxy/current"]);
     expect(calls).toStrictEqual([]);
   });
 
-  it("streams docker exec cat's stdout as lines, in argv order", async () => {
+  it("streams docker exec's stdout as lines, in argv order", async () => {
     const { spawnDocker, calls, children } = fakeSpawn();
     const iterablePromise = drain(
-      createDocker(undefined, spawnDocker).readFileLines("abc123", "/var/log/haproxy/current"),
+      createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/var/log/haproxy/current"]),
     );
     // drain()'s first pull has already triggered the spawn synchronously.
     expect(calls).toStrictEqual([["exec", "abc123", "cat", "/var/log/haproxy/current"]]);
@@ -158,7 +158,9 @@ describe("createDocker readFileLines", () => {
 
   it("throws {status, stderr} on a non-zero exit", async () => {
     const { spawnDocker, children } = fakeSpawn();
-    const drained = drain(createDocker(undefined, spawnDocker).readFileLines("abc123", "/missing"));
+    const drained = drain(
+      createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/missing"]),
+    );
     await Promise.resolve();
     children[0].stderr.write("cat: /missing: No such file or directory\n");
     children[0].finish(1);
@@ -171,7 +173,9 @@ describe("createDocker readFileLines", () => {
 
   it("surfaces a spawn-level ENOENT as-is", async () => {
     const { spawnDocker, children } = fakeSpawn();
-    const drained = drain(createDocker(undefined, spawnDocker).readFileLines("abc123", "/path"));
+    const drained = drain(
+      createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/path"]),
+    );
     await Promise.resolve();
     children[0].failToSpawn(Object.assign(new Error("spawn docker ENOENT"), { code: "ENOENT" }));
     await expect(drained).rejects.toSatisfy((e) => (e as NodeJS.ErrnoException).code === "ENOENT");
@@ -179,10 +183,10 @@ describe("createDocker readFileLines", () => {
 
   it("kills the child if the consumer stops iterating early", async () => {
     const { spawnDocker, children } = fakeSpawn();
-    const iterable = createDocker(undefined, spawnDocker).readFileLines(
-      "abc123",
+    const iterable = createDocker(undefined, spawnDocker).execLines("abc123", [
+      "cat",
       "/var/log/haproxy/current",
-    );
+    ]);
     const iterator = iterable[Symbol.asyncIterator]();
     // .next() runs synchronously through spawnDocker(args), so the child
     // already exists once this returns.
@@ -197,7 +201,7 @@ describe("createDocker readFileLines", () => {
   // then finds no exit code at all, only the signal that ended it.
   it("names the signal, and carries no status, when the child was killed", async () => {
     const { spawnDocker, children } = fakeSpawn();
-    const drained = drain(createDocker(undefined, spawnDocker).readFileLines("abc123", "/x"));
+    const drained = drain(createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/x"]));
     await Promise.resolve();
     children[0].stderr.write("terminated\n");
     children[0].kill();

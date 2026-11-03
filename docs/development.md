@@ -264,7 +264,8 @@ buildcage 1787471975123 https GET 200 708 ts=-- reason=- tlserr=- dst=104.16.1.3
 
 Each log is an s6-log directory: `current` rotates into a timestamped archive at 1MB, up to 100
 archives kept. The report reads every archive, so `current` alone shows only what came after the
-last rotation.
+last rotation. It opens `current` before the archives, so a rotation while it reads moves nothing
+past it (see `src/core/lib/docker/rotated-log.ts`).
 
 HAProxy writes each line into an in-memory ring without waiting, and the `haproxy-log` service
 reads the ring through `/var/run/haproxy-log/socket` into s6-log. A line the full ring cannot take
@@ -275,7 +276,9 @@ in any such notice. The report then marks itself incomplete for a notice, for a 
 arrives, and for a non-zero count from HAProxy's own counter of dropped lines. A proxy that does
 not answer that read fails the step in any mode. A second `buildcage haproxy starting` or
 `buildcage coredns starting` line also marks the report incomplete: a restart loses the line of
-whatever was still open and starts the count over. To read the count by hand:
+whatever was still open and starts the count over. So does a connection to `haproxy-log` beyond
+one per HAProxy start, each listed in `/var/run/haproxy-log/connections`: the s6-log before it
+died with the lines it had not written. To read the count by hand:
 
 ```bash
 docker exec "$B" curl -s --unix-socket /var/run/haproxy-health.sock \

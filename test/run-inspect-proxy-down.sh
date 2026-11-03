@@ -257,4 +257,25 @@ else
   echo "$REPORT_OUTPUT" | sed 's/^/    /'
 fi
 
+echo ""
+echo "--- the report after the proxy's log writer was killed ---"
+# haproxy hands its next line to a new s6-log, and nothing in the log itself
+# shows the lines the killed one had not written.
+if docker exec "$BUILDER_NAME" pkill -KILL -f "s6-log .*/var/log/haproxy"; then
+  pass "the proxy's s6-log killed in the builder"
+else
+  fail "could not kill the proxy's s6-log in the builder"
+fi
+: >"$SUMMARY"
+REPORT_EXIT=0
+REPORT_OUTPUT=$(INPUT_FAIL_ON_BLOCKED=false GITHUB_STEP_SUMMARY="$SUMMARY" \
+  node report/src/main.ts 2>&1) || REPORT_EXIT=$?
+if [ "$REPORT_EXIT" = "0" ] &&
+  grep -qF "The proxy's log writer restarted 1 time(s) during the run" <<<"$REPORT_OUTPUT"; then
+  pass "the report counts the log writer's restart"
+else
+  fail "the report exited $REPORT_EXIT and did not count the log writer's restart"
+  echo "$REPORT_OUTPUT" | sed 's/^/    /'
+fi
+
 assert_results

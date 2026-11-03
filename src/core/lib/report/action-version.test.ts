@@ -8,7 +8,7 @@ function dockerReturning(labels: Record<string, string> | Error): Docker {
   return {
     findContainers: () => [],
     copyFromContainer: () => {},
-    readFileLines: () => (async function* () {})(),
+    execLines: () => (async function* () {})(),
     readEnv: () => ({}),
     readLabels: () => {
       if (labels instanceof Error) throw labels;

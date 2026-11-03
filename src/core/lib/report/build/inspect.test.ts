@@ -387,12 +387,15 @@ describe("buildInspectReportData", () => {
   });
 
   it.each([
-    { droppedLogs: { answered: true, count: 1 }, what: "dropped a line" },
+    { droppedLogs: { answered: true, count: 1, logConnections: 1 }, what: "dropped a line" },
     {
-      droppedLogs: { answered: true, count: undefined },
+      droppedLogs: { answered: true, count: undefined, logConnections: 1 },
       what: "could not say whether it dropped one",
     },
-    { droppedLogs: { answered: false, count: undefined }, what: "did not answer" },
+    {
+      droppedLogs: { answered: false, count: undefined, logConnections: undefined },
+      what: "did not answer",
+    },
   ])("fails closed when the proxy $what", async ({ droppedLogs }) => {
     // A dropped line leaves no gap either log shows, so only the count can
     // tell a whole log from one a flood thinned out.

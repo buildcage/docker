@@ -48,7 +48,7 @@ export interface ReportDataCommon {
    *  beginning is gone or it is empty, a line of ours could not be read (each
    *  scan's headIntact and unparsed), the proxy dropped a line or could not
    *  say whether it did (proxy-dropped-logs.ts), the resolver did not answer,
-   *  or the proxy or the resolver restarted. Anything written from this flag
+   *  or a service restarted. Anything written from this flag
    *  names what `proxyAnswered`, `resolverAnswered` and `restarts` establish
    *  and has to list the rest as possibilities, since the flag itself does
    *  not say which applied. The report fails closed rather than passing off
@@ -65,8 +65,10 @@ export interface ReportDataCommon {
 
   /** How many times each service started again after it stopped mid-run. A
    *  connection still open when the proxy stopped never gets its line, and the
-   *  proxy's dropped-line count starts over, so a restart leaves the record short. */
-  restarts: { proxy: number; resolver: number };
+   *  proxy's dropped-line count starts over, so a restart leaves the record
+   *  short. `proxyLog` is the proxy's log writer, which loses the lines it was
+   *  sent and had not yet written. */
+  restarts: { proxy: number; resolver: number; proxyLog: number };
 
   /** Every connection and blocked name, oldest first. Nothing is attributable
    *  to one RUN step or one command: the proxy log carries no identifier for

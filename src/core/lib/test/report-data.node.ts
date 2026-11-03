@@ -10,7 +10,7 @@ import type { Interruptions } from "../report/outcome/blocked-outcome.ts";
 import type { GenReportParameters, ServiceHealth } from "../report/types.ts";
 
 /** A proxy that answered and dropped nothing. */
-export const NONE_DROPPED: ProxyDroppedLogs = { answered: true, count: 0 };
+export const NONE_DROPPED: ProxyDroppedLogs = { answered: true, count: 0, logConnections: 1 };
 
 /** A proxy that answered and dropped nothing, and a resolver that answered. */
 export const HEALTHY: ServiceHealth = { droppedLogs: NONE_DROPPED, resolverAnswered: true };
@@ -19,7 +19,7 @@ export const HEALTHY: ServiceHealth = { droppedLogs: NONE_DROPPED, resolverAnswe
 export const UNINTERRUPTED: Interruptions = {
   proxyAnswered: true,
   resolverAnswered: true,
-  restarts: { proxy: 0, resolver: 0 },
+  restarts: { proxy: 0, resolver: 0, proxyLog: 0 },
 };
 
 /** Restrict mode carrying only the rules a case names. */

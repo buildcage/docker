@@ -32,7 +32,7 @@ function fakeDocker(exec: Docker["exec"]): { docker: Docker; calls: string[][] }
       calls.push([id, ...args]);
       return exec(id, args);
     },
-    async *readFileLines() {
+    async *execLines() {
       yield* [];
     },
   };
@@ -59,9 +59,15 @@ describe("parseDroppedLogs", () => {
   });
 });
 
-/** Answers the barrier with `barrier` and the metrics request with `metrics`. */
-function byCommand(barrier: () => string, metrics: () => string): Docker["exec"] {
-  return (_id, args) => (args[0] === "sh" ? barrier() : metrics());
+/** Answers the barrier with `barrier`, the metrics request with `metrics` and
+ *  the read of the log writer's connections with `connections`. */
+function byCommand(
+  barrier: () => string,
+  metrics: () => string,
+  connections: () => string = () => "\n",
+): Docker["exec"] {
+  return (_id, args) =>
+    args[0] === "sh" ? barrier() : args[0] === "cat" ? connections() : metrics();
 }
 
 function fail(): string {
@@ -69,13 +75,19 @@ function fail(): string {
 }
 
 describe("readProxyDroppedLogs", () => {
-  it("waits for its barrier line in the log, then asks the health socket", () => {
-    const { docker, calls } = fakeDocker(() => METRICS);
+  it("waits for its barrier line in the log, asks the health socket, then counts log connections", () => {
+    const { docker, calls } = fakeDocker(
+      byCommand(
+        () => "",
+        () => METRICS,
+      ),
+    );
     expect(readProxyDroppedLogs(docker, "abc", "f00d")).toStrictEqual({
       answered: true,
       count: 12,
+      logConnections: 1,
     });
-    expect(calls.length).toBe(2);
+    expect(calls.length).toBe(3);
     const [id, sh, flag, script, name, token, line] = calls[0];
     expect([id, sh, flag, name, token, line]).toStrictEqual([
       "abc",
@@ -97,26 +109,55 @@ describe("readProxyDroppedLogs", () => {
       "/var/run/haproxy-health.sock",
       "http://localhost/metrics?scope=global",
     ]);
+    expect(calls[2]).toStrictEqual(["abc", "cat", "/var/run/haproxy-log/connections"]);
   });
 
   it("makes up a fresh barrier each time it is not given one", () => {
     const { docker, calls } = fakeDocker(() => METRICS);
     readProxyDroppedLogs(docker, "abc");
     readProxyDroppedLogs(docker, "abc");
-    const [first, second] = [calls[0][5], calls[2][5]];
+    const [first, second] = [calls[0][5], calls[3][5]];
     expect(first).toMatch(/^[0-9a-f]{32}$/);
     expect(second === first).toBe(false);
   });
 
   it("leaves the count unknown when the log never caught up with the barrier", () => {
     const { docker } = fakeDocker(byCommand(fail, () => "haproxy_process_dropped_logs_total 0"));
-    expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({ answered: true, count: undefined });
+    expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({
+      answered: true,
+      count: undefined,
+      logConnections: 1,
+    });
+  });
+
+  it("counts one log connection per line, and none it cannot read", () => {
+    const count = (connections: () => string) =>
+      readProxyDroppedLogs(
+        fakeDocker(
+          byCommand(
+            () => "",
+            () => METRICS,
+            connections,
+          ),
+        ).docker,
+        "abc",
+      ).logConnections;
+    expect(count(() => "\n\n\n")).toBe(3);
+    expect(count(() => "")).toBe(0);
+    expect(count(fail)).toBe(undefined);
   });
 
   it("tells a proxy that answered without the counter from one that did not answer", () => {
-    expect(readProxyDroppedLogs(fakeDocker(() => "").docker, "abc")).toStrictEqual({
+    const silent = fakeDocker(
+      byCommand(
+        () => "",
+        () => "",
+      ),
+    );
+    expect(readProxyDroppedLogs(silent.docker, "abc")).toStrictEqual({
       answered: true,
       count: undefined,
+      logConnections: 1,
     });
     const { docker } = fakeDocker(() => {
       throw new Error("exit 7");
@@ -124,6 +165,7 @@ describe("readProxyDroppedLogs", () => {
     expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({
       answered: false,
       count: undefined,
+      logConnections: undefined,
     });
   });
 

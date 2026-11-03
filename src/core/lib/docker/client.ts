@@ -117,9 +117,9 @@ export interface Docker {
   findContainers(filters: string[]): string[];
   /** `docker cp <containerId>:<containerPath> <hostPath>`. */
   copyFromContainer(containerId: string, containerPath: string, hostPath: string): void;
-  /** `docker exec <containerId> cat <path>`, streamed one line at a time;
-   *  see streamDockerLines() for the error-shape/cleanup contract. */
-  readFileLines(containerId: string, path: string): AsyncIterable<string>;
+  /** `docker exec <containerId> <...args>`'s stdout, streamed one line at a
+   *  time; see streamDockerLines() for the error-shape/cleanup contract. */
+  execLines(containerId: string, args: string[]): AsyncIterable<string>;
   /** `docker inspect <containerId>`'s own env, as a lookup map. */
   readEnv(containerId: string): Record<string, string>;
   /** `docker inspect <containerId>`'s own labels, as a lookup map. */
@@ -145,11 +145,11 @@ export function createDocker(
     copyFromContainer(containerId, containerPath, hostPath) {
       run(buildDockerCpArgs({ containerName: containerId, containerPath, hostPath }));
     },
-    readFileLines(containerId, path) {
+    execLines(containerId, args) {
       return streamDockerLines(
         spawnDocker,
-        ["exec", containerId, "cat", path],
-        `docker exec cat ${path}`,
+        ["exec", containerId, ...args],
+        `docker exec ${args[0]}`,
       );
     },
     readEnv(containerId) {

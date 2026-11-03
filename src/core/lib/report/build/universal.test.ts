@@ -193,12 +193,15 @@ describe("buildUniversalReportData", () => {
   });
 
   it.each([
-    { droppedLogs: { answered: true, count: 1 }, what: "dropped a line" },
+    { droppedLogs: { answered: true, count: 1, logConnections: 1 }, what: "dropped a line" },
     {
-      droppedLogs: { answered: true, count: undefined },
+      droppedLogs: { answered: true, count: undefined, logConnections: 1 },
       what: "could not say whether it dropped one",
     },
-    { droppedLogs: { answered: false, count: undefined }, what: "did not answer" },
+    {
+      droppedLogs: { answered: false, count: undefined, logConnections: undefined },
+      what: "did not answer",
+    },
   ])("logLooksPlausible is false when the proxy $what", async ({ droppedLogs }) => {
     // A dropped line leaves no gap either log shows, so only the count can
     // tell a whole log from one a flood thinned out.
@@ -246,9 +249,41 @@ describe("buildUniversalReportData", () => {
       reportParams(),
       HEALTHY,
     );
-    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0 });
+    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 0 });
     expect(result.logLooksPlausible).toBe(false);
   });
+
+  it("counts a proxy's own restart as one of its log connections", async () => {
+    const allowed = proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1);
+    const result = await buildUniversalReportData(
+      [HAPROXY_START, allowed, HAPROXY_START, allowed],
+      [DNS_START],
+      reportParams(),
+      { ...HEALTHY, droppedLogs: { ...HEALTHY.droppedLogs, logConnections: 3 } },
+    );
+    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 1 });
+  });
+
+  it.each([
+    { logConnections: 2, proxyLog: 1 },
+    { logConnections: undefined, proxyLog: 0 },
+  ])(
+    "logLooksPlausible is false with $logConnections log connections from one proxy start",
+    async ({ logConnections, proxyLog }) => {
+      const allowed = proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1);
+      const result = await buildUniversalReportData(
+        [HAPROXY_START, allowed],
+        [DNS_START],
+        reportParams(),
+        {
+          ...HEALTHY,
+          droppedLogs: { ...HEALTHY.droppedLogs, logConnections },
+        },
+      );
+      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog });
+      expect(result.logLooksPlausible).toBe(false);
+    },
+  );
 
   it("returns empty tables and an implausible log for empty input", async () => {
     const result = await buildUniversalReportData([], [], reportParams(), HEALTHY);
