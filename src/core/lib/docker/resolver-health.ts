@@ -3,7 +3,8 @@
  *
  * A lookup the resolver never received leaves no line in its log, and its log
  * is the only trace of a name looked up but never connected to. A resolver
- * that stopped mid-run would otherwise leave a log that reads as whole.
+ * that stopped mid-run would otherwise leave a log that reads as whole. So
+ * would a log writer that died with lines it had not written.
  */
 import type { Docker } from "./client.ts";
 
@@ -11,6 +12,19 @@ import type { Docker } from "./client.ts";
 const URL = "http://127.0.0.1:8080/health";
 /** A wedged resolver can accept the connection and never answer. */
 const MAX_TIME_SECONDS = "10";
+
+/** One line per start of the resolver's log writer; see coredns-log/run. */
+const LOG_STARTS = "/var/run/coredns-log/starts";
+
+/** How many times the resolver's log writer started, or undefined where that
+ *  could not be read. */
+export function readResolverLogStarts(docker: Docker, containerId: string): number | undefined {
+  try {
+    return docker.exec(containerId, ["cat", LOG_STARTS]).split("\n").length - 1;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Whether the resolver answered its health check. */
 export function readResolverAnswered(docker: Docker, containerId: string): boolean {

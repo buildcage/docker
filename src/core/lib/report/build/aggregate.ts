@@ -258,7 +258,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   proxyScan: Promise<InspectLogScan | HaproxyLogScan>,
   dnsScan: Promise<DnsLogScan>,
   parameters: GenReportParameters,
-  { droppedLogs, resolverAnswered }: ServiceHealth,
+  { droppedLogs, resolverAnswered, resolverLogStarts }: ServiceHealth,
 ): Promise<Extract<ReportData, { engine: E }>> {
   const [
     {
@@ -279,6 +279,9 @@ export async function assembleReportData<E extends ReportData["engine"]>(
     droppedLogs.logConnections === undefined
       ? undefined
       : Math.max(0, droppedLogs.logConnections - 1 - proxy);
+  // The resolver's log writer outlives a resolver restart, so any start past
+  // the first is it having died. None at all cannot vouch for anything.
+  const resolverLog = resolverLogStarts ? resolverLogStarts - 1 : undefined;
 
   // engine is the discriminant and the rest is the shared ReportDataCommon, so
   // the assertion only restates the variant E already fixes.
@@ -299,10 +302,11 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       resolverAnswered &&
       proxy === 0 &&
       resolver === 0 &&
-      proxyLog === 0,
+      proxyLog === 0 &&
+      resolverLog === 0,
     proxyAnswered: droppedLogs.answered,
     resolverAnswered,
-    restarts: { proxy, resolver, proxyLog: proxyLog ?? 0 },
+    restarts: { proxy, resolver, proxyLog: proxyLog ?? 0, resolverLog: resolverLog ?? 0 },
     startedAt,
     timeline,
   } as Extract<ReportData, { engine: E }>;

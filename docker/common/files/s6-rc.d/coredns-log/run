@@ -10,4 +10,11 @@
 # of DNS traffic doesn't lose the earliest blocked names before report reads them.
 # report reads every segment, oldest first, so this is a safety margin, not
 # the only thing standing between a busy run and a truncated report.
+#
+# Each start first appends a line to starts. CoreDNS restarting leaves this
+# service running, so a second line means the s6-log before it died with the
+# lines it had read from the pipe but not written, and the report marks itself
+# incomplete for it (aggregate.ts).
+if { install -d -m 0755 /var/run/coredns-log }
+if { redirfd -a 1 /var/run/coredns-log/starts echo }
 s6-log s1000000 n100 T /var/log/coredns

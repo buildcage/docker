@@ -170,7 +170,10 @@ describe("describeInterruptions", () => {
 
   it("counts each service's restarts and says what a restart loses", () => {
     expect(
-      describeInterruptions({ ...UNINTERRUPTED, restarts: { proxy: 2, resolver: 1, proxyLog: 0 } }),
+      describeInterruptions({
+        ...UNINTERRUPTED,
+        restarts: { proxy: 2, resolver: 1, proxyLog: 0, resolverLog: 0 },
+      }),
     ).toStrictEqual([
       "The proxy restarted 2 time(s) during the run.",
       "The DNS resolver restarted 1 time(s) during the run.",
@@ -178,11 +181,15 @@ describe("describeInterruptions", () => {
     ]);
   });
 
-  it("says what the log writer's restart loses on its own", () => {
+  it("says what each log writer's restart loses on its own", () => {
     expect(
-      describeInterruptions({ ...UNINTERRUPTED, restarts: { proxy: 0, resolver: 0, proxyLog: 2 } }),
+      describeInterruptions({
+        ...UNINTERRUPTED,
+        restarts: { proxy: 0, resolver: 0, proxyLog: 2, resolverLog: 1 },
+      }),
     ).toStrictEqual([
       "The proxy's log writer restarted 2 time(s) during the run, losing the lines it had been sent but not yet written.",
+      "The DNS resolver's log writer restarted 1 time(s) during the run, losing the lines it had been sent but not yet written.",
     ]);
   });
 });
@@ -283,7 +290,7 @@ describe("describeBlockedOutcome", () => {
         blockedCount: 2,
         blockedRows: [{ expected: false }],
         logLooksPlausible: false,
-        restarts: { proxy: 1, resolver: 0, proxyLog: 0 },
+        restarts: { proxy: 1, resolver: 0, proxyLog: 0, resolverLog: 0 },
       }),
     ).toStrictEqual({
       level: "notice",

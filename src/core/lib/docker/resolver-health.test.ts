@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { Docker } from "./client.ts";
-import { readResolverAnswered } from "./resolver-health.ts";
+import { readResolverAnswered, readResolverLogStarts } from "./resolver-health.ts";
 
 function fakeDocker(exec: Docker["exec"]): { docker: Docker; calls: string[][] } {
   const calls: string[][] = [];
@@ -35,5 +35,20 @@ describe("readResolverAnswered", () => {
       throw new Error("exit 7");
     });
     expect(readResolverAnswered(docker, "abc")).toBe(false);
+  });
+});
+
+describe("readResolverLogStarts", () => {
+  it("counts the lines of the log writer's starts file", () => {
+    const { docker, calls } = fakeDocker(() => "\n\n");
+    expect(readResolverLogStarts(docker, "abc")).toBe(2);
+    expect(calls).toStrictEqual([["abc", "cat", "/var/run/coredns-log/starts"]]);
+  });
+
+  it("returns undefined when the file cannot be read", () => {
+    const { docker } = fakeDocker(() => {
+      throw new Error("exit 1");
+    });
+    expect(readResolverLogStarts(docker, "abc")).toBeUndefined();
   });
 });

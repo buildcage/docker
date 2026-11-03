@@ -278,7 +278,9 @@ not answer that read fails the step in any mode. A second `buildcage haproxy sta
 `buildcage coredns starting` line also marks the report incomplete: a restart loses the line of
 whatever was still open and starts the count over. So does a connection to `haproxy-log` beyond
 one per HAProxy start, each listed in `/var/run/haproxy-log/connections`: the s6-log before it
-died with the lines it had not written. To read the count by hand:
+died with the lines it had not written. The same goes for a second start of `coredns-log`, each
+listed in `/var/run/coredns-log/starts`; a CoreDNS restart leaves that service running. To read the
+count by hand:
 
 ```bash
 docker exec "$B" curl -s --unix-socket /var/run/haproxy-health.sock \

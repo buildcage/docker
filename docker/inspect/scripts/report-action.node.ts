@@ -10,7 +10,7 @@
  * Everything but those two log paths is src/report/action-main.ts.
  */
 import { readProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
-import { readResolverAnswered } from "#core/lib/docker/resolver-health.ts";
+import { readResolverAnswered, readResolverLogStarts } from "#core/lib/docker/resolver-health.ts";
 import { buildInspectReportData } from "#core/lib/report/build/inspect.ts";
 import { readLog, reportActionError, runReportAction } from "#report/action-main.ts";
 
@@ -26,7 +26,11 @@ runReportAction({
       readLog(docker, containerId, PROXY_LOG_DIR),
       readLog(docker, containerId, RESOLVER_LOG_DIR),
       parameters,
-      { droppedLogs, resolverAnswered: readResolverAnswered(docker, containerId) },
+      {
+        droppedLogs,
+        resolverAnswered: readResolverAnswered(docker, containerId),
+        resolverLogStarts: readResolverLogStarts(docker, containerId),
+      },
     );
   },
 }).catch((e) => {

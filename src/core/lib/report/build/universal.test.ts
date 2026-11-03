@@ -249,7 +249,7 @@ describe("buildUniversalReportData", () => {
       reportParams(),
       HEALTHY,
     );
-    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 0 });
+    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 0, resolverLog: 0 });
     expect(result.logLooksPlausible).toBe(false);
   });
 
@@ -261,7 +261,7 @@ describe("buildUniversalReportData", () => {
       reportParams(),
       { ...HEALTHY, droppedLogs: { ...HEALTHY.droppedLogs, logConnections: 3 } },
     );
-    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 1 });
+    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 1, resolverLog: 0 });
   });
 
   it.each([
@@ -280,10 +280,38 @@ describe("buildUniversalReportData", () => {
           droppedLogs: { ...HEALTHY.droppedLogs, logConnections },
         },
       );
-      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog });
+      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog, resolverLog: 0 });
       expect(result.logLooksPlausible).toBe(false);
     },
   );
+
+  it.each([
+    { resolverLogStarts: 2, resolverLog: 1 },
+    { resolverLogStarts: 0, resolverLog: 0 },
+    { resolverLogStarts: undefined, resolverLog: 0 },
+  ])(
+    "logLooksPlausible is false with $resolverLogStarts starts of the resolver's log writer",
+    async ({ resolverLogStarts, resolverLog }) => {
+      const result = await buildUniversalReportData(
+        [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
+        [DNS_START],
+        reportParams(),
+        { ...HEALTHY, resolverLogStarts },
+      );
+      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog: 0, resolverLog });
+      expect(result.logLooksPlausible).toBe(false);
+    },
+  );
+
+  it("does not count a resolver's own restart against its log writer", async () => {
+    const result = await buildUniversalReportData(
+      [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
+      [DNS_START, DNS_START],
+      reportParams(),
+      HEALTHY,
+    );
+    expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 1, proxyLog: 0, resolverLog: 0 });
+  });
 
   it("returns empty tables and an implausible log for empty input", async () => {
     const result = await buildUniversalReportData([], [], reportParams(), HEALTHY);

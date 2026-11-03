@@ -134,6 +134,12 @@ export function describeInterruptions({
         "the lines it had been sent but not yet written.",
     );
   }
+  if (restarts.resolverLog) {
+    facts.push(
+      `The DNS resolver's log writer restarted ${restarts.resolverLog} time(s) during the run, ` +
+        "losing the lines it had been sent but not yet written.",
+    );
+  }
   return facts;
 }
 
