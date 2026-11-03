@@ -51,8 +51,8 @@ export interface ReportDataCommon {
    *  beginning is gone or it is empty, a line of ours could not be read (each
    *  scan's headIntact and unparsed), the proxy dropped a line or could not
    *  say whether it did (proxy-dropped-logs.ts), the resolver did not answer,
-   *  or a service or its log writer restarted or could not say whether it
-   *  had. Anything written from this flag
+   *  a service or its log writer restarted, or a log writer's restarts could
+   *  not be read. Anything written from this flag
    *  names what `proxyAnswered`, `resolverAnswered` and `restarts` establish
    *  and has to list the rest as possibilities, since the flag itself does
    *  not say which applied. The report fails closed rather than passing off

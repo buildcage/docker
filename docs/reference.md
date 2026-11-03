@@ -526,7 +526,7 @@ been blocked. The report is not a full record when:
   proxy stopped never gets its line
 - the proxy's or the resolver's log writer restarted during the build, losing the lines it had not
   yet written
-- the report could not confirm that the proxy lost no lines, or that neither log writer restarted
+- the report could not confirm that the proxy lost no lines, or that no log writer restarted
 
 In audit mode, or with `fail-on-blocked: false`, an incomplete report is a notice instead.
 

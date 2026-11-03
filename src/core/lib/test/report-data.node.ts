@@ -12,7 +12,8 @@ import type { GenReportParameters, ServiceHealth } from "../report/types.ts";
 /** A proxy that answered and dropped nothing. */
 export const NONE_DROPPED: ProxyDroppedLogs = { answered: true, count: 0, logConnections: 1 };
 
-/** A proxy that answered and dropped nothing, and a resolver that answered. */
+/** A proxy that answered and dropped nothing, and a resolver that answered and
+ *  whose log writer started once. */
 export const HEALTHY: ServiceHealth = {
   droppedLogs: NONE_DROPPED,
   resolverAnswered: true,

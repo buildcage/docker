@@ -280,8 +280,9 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       ? undefined
       : Math.max(0, droppedLogs.logConnections - 1 - proxy);
   // The resolver's log writer outlives a resolver restart, so any start past
-  // the first is it having died. None at all cannot vouch for anything.
-  const resolverLog = resolverLogStarts ? resolverLogStarts - 1 : undefined;
+  // the first is it having died.
+  const resolverLog =
+    resolverLogStarts === undefined ? undefined : Math.max(0, resolverLogStarts - 1);
 
   // engine is the discriminant and the rest is the shared ReportDataCommon, so
   // the assertion only restates the variant E already fixes.

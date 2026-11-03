@@ -286,12 +286,12 @@ describe("buildUniversalReportData", () => {
   );
 
   it.each([
-    { resolverLogStarts: 2, resolverLog: 1 },
-    { resolverLogStarts: 0, resolverLog: 0 },
-    { resolverLogStarts: undefined, resolverLog: 0 },
+    { resolverLogStarts: 1, resolverLog: 0, plausible: true },
+    { resolverLogStarts: 2, resolverLog: 1, plausible: false },
+    { resolverLogStarts: undefined, resolverLog: 0, plausible: false },
   ])(
-    "logLooksPlausible is false with $resolverLogStarts starts of the resolver's log writer",
-    async ({ resolverLogStarts, resolverLog }) => {
+    "logLooksPlausible is $plausible with $resolverLogStarts starts of the resolver's log writer",
+    async ({ resolverLogStarts, resolverLog, plausible }) => {
       const result = await buildUniversalReportData(
         [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
         [DNS_START],
@@ -299,7 +299,7 @@ describe("buildUniversalReportData", () => {
         { ...HEALTHY, resolverLogStarts },
       );
       expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog: 0, resolverLog });
-      expect(result.logLooksPlausible).toBe(false);
+      expect(result.logLooksPlausible).toBe(plausible);
     },
   );
 
