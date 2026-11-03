@@ -7,6 +7,7 @@
  * would a log writer that died with lines it had not written.
  */
 import type { Docker } from "./client.ts";
+import { readStartLedger } from "./start-ledger.ts";
 
 /** CoreDNS's health plugin; see coredns-config.ts. */
 const URL = "http://127.0.0.1:8080/health";
@@ -17,13 +18,9 @@ const MAX_TIME_SECONDS = "10";
 const LOG_STARTS = "/var/run/coredns-log/starts";
 
 /** How many times the resolver's log writer started, or undefined where that
- *  could not be read. */
+ *  could not be read (start-ledger.ts). */
 export function readResolverLogStarts(docker: Docker, containerId: string): number | undefined {
-  try {
-    return docker.exec(containerId, ["cat", LOG_STARTS]).split("\n").length - 1;
-  } catch {
-    return undefined;
-  }
+  return readStartLedger(docker, containerId, LOG_STARTS);
 }
 
 /** Whether the resolver answered its health check. */

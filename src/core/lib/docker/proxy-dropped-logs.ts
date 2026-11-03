@@ -15,6 +15,7 @@ import { randomBytes } from "node:crypto";
 
 import { PROXY_LOG_BARRIER } from "../log/proxy-notices.ts";
 import type { Docker } from "./client.ts";
+import { readStartLedger } from "./start-ledger.ts";
 
 /** Served by the proxy's `health` frontend; see haproxy-sections.ts. */
 const SOCKET = "/var/run/haproxy-health.sock";
@@ -63,7 +64,7 @@ export interface ProxyDroppedLogs {
    *  catch up. */
   count: number | undefined;
   /** How many times the proxy connected to its log writer, or undefined
-   *  where that could not be read. */
+   *  where that could not be read (start-ledger.ts). */
   logConnections: number | undefined;
 }
 
@@ -104,7 +105,7 @@ export function readProxyDroppedLogs(
   return {
     answered: true,
     count: caughtUp ? parseDroppedLogs(metrics) : undefined,
-    logConnections: readLogConnections(docker, containerId),
+    logConnections: readStartLedger(docker, containerId, CONNECTIONS),
   };
 }
 
@@ -124,14 +125,6 @@ function readMetrics(docker: Docker, containerId: string): string | undefined {
       SOCKET,
       URL,
     ]);
-  } catch {
-    return undefined;
-  }
-}
-
-function readLogConnections(docker: Docker, containerId: string): number | undefined {
-  try {
-    return docker.exec(containerId, ["cat", CONNECTIONS]).split("\n").length - 1;
   } catch {
     return undefined;
   }

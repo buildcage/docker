@@ -278,4 +278,31 @@ else
   echo "$REPORT_OUTPUT" | sed 's/^/    /'
 fi
 
+echo ""
+echo "--- the report after the resolver's log writer was killed ---"
+# CoreDNS keeps writing into the pipe the new s6-log reads, and nothing in the
+# log itself shows the lines the killed one had not written.
+if docker exec "$BUILDER_NAME" pkill -KILL -f "s6-log .*/var/log/coredns"; then
+  pass "the resolver's s6-log killed in the builder"
+else
+  fail "could not kill the resolver's s6-log in the builder"
+fi
+# s6-supervise holds off a restart for up to a second.
+for _ in $(seq 1 20); do
+  starts=$(docker exec "$BUILDER_NAME" sh -c 'wc -l < /var/run/coredns-log/starts')
+  [ "${starts// /}" = "2" ] && break
+  sleep 0.5
+done
+: >"$SUMMARY"
+REPORT_EXIT=0
+REPORT_OUTPUT=$(INPUT_FAIL_ON_BLOCKED=false GITHUB_STEP_SUMMARY="$SUMMARY" \
+  node report/src/main.ts 2>&1) || REPORT_EXIT=$?
+if [ "$REPORT_EXIT" = "0" ] &&
+  grep -qF "The DNS resolver's log writer restarted 1 time(s) during the run" <<<"$REPORT_OUTPUT"; then
+  pass "the report counts the resolver's log writer's restart"
+else
+  fail "the report exited $REPORT_EXIT and did not count the resolver's log writer's restart"
+  echo "$REPORT_OUTPUT" | sed 's/^/    /'
+fi
+
 assert_results
