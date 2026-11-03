@@ -106,20 +106,29 @@ function resolveConfigPath(path: string, env: NodeJS.ProcessEnv, baseDir?: strin
     throw pathError('has a ".." after its start; only a leading "../" may climb.');
   }
   const workspace = resolve(env.GITHUB_WORKSPACE || process.cwd());
+  const notFound = (at: string) =>
+    pathError(
+      `(${at}) was not found. Check the path, and that an earlier step checked out the repository.`,
+    );
+  let realWorkspace: string;
+  try {
+    realWorkspace = realpathSync(workspace);
+  } catch {
+    throw notFound(workspace);
+  }
+  const outside = (to: string) => pathError(`(${to}) leads outside the workspace (${workspace}).`);
   // The base has no symlinks, so a leading `..` climbs by spelling to where
   // the kernel would.
-  const full = resolve(baseDir ?? realpathSync(workspace), path);
+  const full = resolve(baseDir ?? realWorkspace, path);
   let real: string;
   try {
     real = realpathSync(full);
   } catch {
-    throw pathError(
-      `(${full}) was not found. Check the path, and that an earlier step checked out the repository.`,
-    );
+    throw isOutside(workspace, full) && isOutside(realWorkspace, full)
+      ? outside(full)
+      : notFound(full);
   }
-  if (isOutside(realpathSync(workspace), real)) {
-    throw pathError(`(${real}) leads outside the workspace (${workspace}).`);
-  }
+  if (isOutside(realWorkspace, real)) throw outside(real);
   return real;
 }
 
@@ -258,9 +267,9 @@ function parseConfig(
 /**
  * Merges `config-file` into `env`'s `INPUT_*` variables. A value the workflow
  * set wins; a list input gets both, the workflow's first. Undefined when no
- * config-file was given. A relative path resolves against `baseDir`, an
- * absolute path with its symlinks resolved (default: the workspace's real
- * path). The file's real path must be in the workspace's.
+ * config-file was given. A relative path resolves against `baseDir`, which
+ * must already be a real path (default: the workspace's real path). The
+ * file's real path must be in the workspace's.
  *
  * @throws {ConfigFileError} on an untrusted event, a path outside the
  *   workspace or missing, or a file that is not a flat mapping of known

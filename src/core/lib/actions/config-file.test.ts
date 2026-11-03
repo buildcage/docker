@@ -415,6 +415,25 @@ describe("applyConfigFile", () => {
       );
     });
 
+    it("that is absolute, outside the workspace and missing", () => {
+      expectError(
+        envFor(join(root, "missing.yml")),
+        "CONFIG_FILE_PATH",
+        `config-file ${JSON.stringify(join(root, "missing.yml"))} (${join(root, "missing.yml")}) leads outside the workspace (${workspace}).`,
+      );
+    });
+
+    it("in a workspace that does not exist", () => {
+      writeConfig("proxy-mode: audit\n");
+      const missing = join(root, "no-workspace");
+      expectError(
+        { GITHUB_WORKSPACE: missing, "INPUT_CONFIG-FILE": "buildcage.yml" },
+        "CONFIG_FILE_PATH",
+        `config-file "buildcage.yml" (${missing}) was not found. ` +
+          "Check the path, and that an earlier step checked out the repository.",
+      );
+    });
+
     it.each(["svc/../buildcage.yml", "../workspace/buildcage.yml/..", "/x/../buildcage.yml"])(
       "with a .. after its start: %j",
       (path) => {
@@ -486,6 +505,17 @@ describe("applyConfigFile", () => {
       const env = {
         GITHUB_WORKSPACE: join(root, "linked-workspace"),
         "INPUT_CONFIG-FILE": "buildcage.yml",
+      };
+      expect(applyConfigFile(env, INPUTS)?.path).toBe(join(workspace, "buildcage.yml"));
+    });
+
+    it("climbs a leading .. from where a symlinked workspace leads", () => {
+      writeConfig("proxy-mode: audit\n");
+      mkdirSync(join(root, "a"));
+      symlinkSync("../workspace", join(root, "a", "ws"));
+      const env = {
+        GITHUB_WORKSPACE: join(root, "a", "ws"),
+        "INPUT_CONFIG-FILE": "../workspace/buildcage.yml",
       };
       expect(applyConfigFile(env, INPUTS)?.path).toBe(join(workspace, "buildcage.yml"));
     });

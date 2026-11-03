@@ -5024,13 +5024,19 @@ function isOutside(root, path) {
 function resolveConfigPath(path, env, baseDir) {
 	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
 	if (hasDotDotAfterStart(path)) throw pathError("has a \"..\" after its start; only a leading \"../\" may climb.");
-	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(baseDir ?? (0, node_fs.realpathSync)(workspace), path), real;
+	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), notFound = (at) => pathError(`(${at}) was not found. Check the path, and that an earlier step checked out the repository.`), realWorkspace;
+	try {
+		realWorkspace = (0, node_fs.realpathSync)(workspace);
+	} catch {
+		throw notFound(workspace);
+	}
+	let outside = (to) => pathError(`(${to}) leads outside the workspace (${workspace}).`), full = (0, node_path.resolve)(baseDir ?? realWorkspace, path), real;
 	try {
 		real = (0, node_fs.realpathSync)(full);
 	} catch {
-		throw pathError(`(${full}) was not found. Check the path, and that an earlier step checked out the repository.`);
+		throw isOutside(workspace, full) && isOutside(realWorkspace, full) ? outside(full) : notFound(full);
 	}
-	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError(`(${real}) leads outside the workspace (${workspace}).`);
+	if (isOutside(realWorkspace, real)) throw outside(real);
 	return real;
 }
 const resolved = (node, doc) => (0, import_dist$3.isAlias)(node) ? node.resolve(doc) : node;
