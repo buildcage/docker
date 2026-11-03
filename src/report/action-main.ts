@@ -18,6 +18,8 @@ import { readBooleanInput } from "#core/lib/actions/inputs.ts";
 import { writeStepSummary } from "#core/lib/actions/write-step-summary.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
+import { readProxyAnswered } from "#core/lib/docker/proxy-dropped-logs.ts";
+import { readResolverAnswered } from "#core/lib/docker/resolver-health.ts";
 import { errorMessage } from "#core/lib/errors.ts";
 import { readActionVersion } from "#core/lib/report/action-version.ts";
 import { buildTrafficRecords, writeTrafficFile } from "#core/lib/report/outcome/traffic-output.ts";
@@ -86,6 +88,19 @@ function readFailOnBlocked(): boolean {
   }
 }
 
+/**
+ * The logs could not be read and the proxy or the resolver did not answer
+ * either, as when the container stopped during the report.
+ */
+export class BuilderStoppedError extends Error {}
+
+/** The annotation an engine's report-action.node.ts prints for a failed run. */
+export function reportActionError(e: unknown): string {
+  return e instanceof BuilderStoppedError
+    ? `::error::${e.message}`
+    : `::error::Unexpected error in report-action: ${errorMessage(e)}`;
+}
+
 export async function runReportAction(
   spec: ReportActionSpec,
   deps: ReportActionDeps = {},
@@ -104,7 +119,20 @@ export async function runReportAction(
   }
 
   const parameters = buildReportParameters(docker.readEnv(containerId));
-  const report = await spec.build(docker, containerId, parameters);
+  let report: ReportData;
+  try {
+    report = await spec.build(docker, containerId, parameters);
+  } catch (e) {
+    // Asked again without a barrier, as the container can stop after the
+    // first answer.
+    if (readProxyAnswered(docker, containerId) && readResolverAnswered(docker, containerId)) {
+      throw e;
+    }
+    throw new BuilderStoppedError(
+      "The buildcage container stopped or hung: the proxy or the DNS resolver did not answer " +
+        `and the logs could not be read: ${errorMessage(e)}`,
+    );
+  }
 
   for (const line of spec.logSections?.(report) ?? []) {
     console.log(line);

@@ -9,7 +9,12 @@ import type { Docker } from "#core/lib/docker/client.ts";
 import type { InspectReportData, UniversalReportData } from "#core/lib/report/types.ts";
 import { reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts";
 
-import { runReportAction, type ReportActionSpec } from "./action-main.ts";
+import {
+  BuilderStoppedError,
+  reportActionError,
+  runReportAction,
+  type ReportActionSpec,
+} from "./action-main.ts";
 
 function fakeDocker(overrides: Partial<Docker> = {}): Docker {
   return {
@@ -113,6 +118,64 @@ describe("runReportAction", () => {
   it("prints nothing extra for an engine with no log sections", async () => {
     const lines = await run(spec());
     expect(lines[0]).toMatch(/^## Outbound Traffic Report/);
+  });
+});
+
+describe("runReportAction when the logs cannot be read", () => {
+  const unreadable = spec({
+    build: () => {
+      throw new Error("container is not running");
+    },
+  });
+  const answering = (proxy: boolean, resolver: boolean) =>
+    fakeDocker({
+      exec: (_id, args) => {
+        const answers = args.includes("--unix-socket") ? proxy : resolver;
+        if (!answers) throw new Error("exit 7");
+        return "";
+      },
+    });
+
+  it.each([
+    { proxy: false, resolver: true },
+    { proxy: true, resolver: false },
+  ])(
+    "names a stopped container when proxy=$proxy and resolver=$resolver answer",
+    async ({ proxy, resolver }) => {
+      const result = runReportAction(unreadable, {
+        containerId: "abc123",
+        docker: answering(proxy, resolver),
+        env: {},
+      });
+      await expect(result).rejects.toThrow(BuilderStoppedError);
+      await expect(result).rejects.toThrow(
+        "The buildcage container stopped or hung: the proxy or the DNS resolver did not answer and the logs could not be read: container is not running",
+      );
+    },
+  );
+
+  it("passes the read error on as it is while both services answer", async () => {
+    const result = runReportAction(unreadable, {
+      containerId: "abc123",
+      docker: answering(true, true),
+      env: {},
+    });
+    await expect(result).rejects.toThrow("container is not running");
+    await expect(result).rejects.not.toThrow(BuilderStoppedError);
+  });
+});
+
+describe("reportActionError", () => {
+  it("prints a stopped container's message as it is", () => {
+    expect(reportActionError(new BuilderStoppedError("The buildcage container stopped"))).toBe(
+      "::error::The buildcage container stopped",
+    );
+  });
+
+  it("calls anything else unexpected", () => {
+    expect(reportActionError(new Error("boom"))).toBe(
+      "::error::Unexpected error in report-action: boom",
+    );
   });
 });
 

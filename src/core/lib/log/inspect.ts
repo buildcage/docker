@@ -17,7 +17,6 @@ import { DEFAULT_PORT } from "#core/lib/acl/url-rules.ts";
 import { ruleHost, sniHost, splitHostPort } from "./authority.ts";
 import { PROXY_ADDRESS, UNKNOWN_HOST } from "./proxy-address.ts";
 import { createProxyLogTally, type ProxyLogTally } from "./proxy-log-tally.ts";
-import { PROXY_START_MARKER } from "./start-marker.ts";
 import { BAD_REQUEST_METHOD, incompleteReason } from "./termination.ts";
 import { actionFor, CLIENT_ENDED_REASONS, type TrafficEvent } from "./traffic-event.ts";
 
@@ -394,18 +393,4 @@ function blockUnallowedNames(events: TrafficEvent[], allowsName: (name: string) 
     event.action = "block";
     event.reason = "sni-not-allowed";
   }
-}
-
-/**
- * True when the log carries the marker the proxy prints once at startup.
- *
- * An empty log is ambiguous: the proxy may have started and seen nothing, or it
- * may never have started at all. The caller fails closed rather than reporting
- * "nothing was blocked" for a proxy that never ran.
- */
-export function hasProxyStarted(lines: Iterable<string>): boolean {
-  for (const line of lines) {
-    if (line.includes(PROXY_START_MARKER)) return true;
-  }
-  return false;
 }

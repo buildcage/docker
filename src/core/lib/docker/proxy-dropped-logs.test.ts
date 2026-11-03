@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
 import type { Docker } from "./client.ts";
-import { parseDroppedLogs, readProxyDroppedLogs } from "./proxy-dropped-logs.ts";
+import { parseDroppedLogs, readProxyAnswered, readProxyDroppedLogs } from "./proxy-dropped-logs.ts";
 
 /** What haproxy 3.4's exporter serves for `?scope=global`, trimmed to the
  *  counter and its neighbours. */
@@ -167,6 +167,13 @@ describe("readProxyDroppedLogs", () => {
       count: undefined,
       logConnections: undefined,
     });
+  });
+
+  it("asks only the health socket when it needs to know whether the proxy answers", () => {
+    const { docker, calls } = fakeDocker(() => METRICS);
+    expect(readProxyAnswered(docker, "abc")).toBe(true);
+    expect(calls.map((call) => call[1])).toStrictEqual(["curl"]);
+    expect(readProxyAnswered(fakeDocker(fail).docker, "abc")).toBe(false);
   });
 
   it("logs its barrier only once the log has stopped growing", () => {
