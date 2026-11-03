@@ -104,14 +104,15 @@ function resolveConfigPath(path: string, env: NodeJS.ProcessEnv, baseDir?: strin
   if (isAbsolute(path)) throw pathError("must be a relative path.");
   const workspace = resolve(env.GITHUB_WORKSPACE || process.cwd());
   const full = resolve(baseDir ?? workspace, path);
-  if (isOutside(workspace, full)) throw pathError("leads outside the workspace.");
+  const outside = (to: string) => pathError(`(${to}) leads outside the workspace (${workspace}).`);
+  if (isOutside(workspace, full)) throw outside(full);
   let real: string;
   try {
     real = realpathSync(full);
   } catch {
     throw pathError(`(${full}) was not found. Check out the repository in an earlier step.`);
   }
-  if (isOutside(realpathSync(workspace), real)) throw pathError("leads outside the workspace.");
+  if (isOutside(realpathSync(workspace), real)) throw outside(real);
   return real;
 }
 

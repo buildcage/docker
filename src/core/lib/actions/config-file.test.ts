@@ -430,7 +430,7 @@ describe("applyConfigFile", () => {
       expectError(
         envFor("../outside.yml"),
         "CONFIG_FILE_PATH",
-        'config-file "../outside.yml" leads outside the workspace.',
+        `config-file "../outside.yml" (${join(root, "outside.yml")}) leads outside the workspace (${workspace}).`,
       );
     });
 
@@ -440,7 +440,7 @@ describe("applyConfigFile", () => {
       expectError(
         envFor("../../outside.yml"),
         "CONFIG_FILE_PATH",
-        'config-file "../../outside.yml" leads outside the workspace.',
+        `config-file "../../outside.yml" (${join(root, "outside.yml")}) leads outside the workspace (${workspace}).`,
         join(workspace, "svc"),
       );
     });
@@ -450,7 +450,7 @@ describe("applyConfigFile", () => {
       expectError(
         envFor("outside.yml"),
         "CONFIG_FILE_PATH",
-        'config-file "outside.yml" leads outside the workspace.',
+        `config-file "outside.yml" (${join(root, "outside.yml")}) leads outside the workspace (${workspace}).`,
         root,
       );
     });
@@ -485,7 +485,7 @@ describe("applyConfigFile", () => {
       expectError(
         envFor("link.yml"),
         "CONFIG_FILE_PATH",
-        'config-file "link.yml" leads outside the workspace.',
+        `config-file "link.yml" (${join(root, "outside.yml")}) leads outside the workspace (${workspace}).`,
       );
     });
   });
