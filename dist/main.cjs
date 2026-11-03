@@ -4967,6 +4967,13 @@ var require_identity = __commonJSMin(((exports) => {
 	var lexer = require_lexer(), lineCounter = require_line_counter(), parser = require_parser(), publicApi = require_public_api(), visit = require_visit();
 	exports.Composer = composer.Composer, exports.Document = Document.Document, exports.Schema = Schema.Schema, exports.YAMLError = errors.YAMLError, exports.YAMLParseError = errors.YAMLParseError, exports.YAMLWarning = errors.YAMLWarning, exports.Alias = Alias.Alias, exports.isAlias = identity.isAlias, exports.isCollection = identity.isCollection, exports.isDocument = identity.isDocument, exports.isMap = identity.isMap, exports.isNode = identity.isNode, exports.isPair = identity.isPair, exports.isScalar = identity.isScalar, exports.isSeq = identity.isSeq, exports.Pair = Pair.Pair, exports.Scalar = Scalar.Scalar, exports.YAMLMap = YAMLMap.YAMLMap, exports.YAMLSeq = YAMLSeq.YAMLSeq, exports.Lexer = lexer.Lexer, exports.LineCounter = lineCounter.LineCounter, exports.Parser = parser.Parser, exports.parse = publicApi.parse, exports.parseAllDocuments = publicApi.parseAllDocuments, exports.parseDocument = publicApi.parseDocument, exports.stringify = publicApi.stringify, exports.visit = visit.visit, exports.visitAsync = visit.visitAsync;
 }))();
+function hasDotDotAfterStart(path) {
+	let parts = path.split("/"), start = 0;
+	for (; parts[start] === ".." || parts[start] === ".";) start++;
+	return parts.slice(start).includes("..");
+}
+//#endregion
+//#region src/core/lib/actions/input-names.ts
 function inputEnvName(name) {
 	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
 }
@@ -5016,16 +5023,14 @@ function isOutside(root, path) {
 }
 function resolveConfigPath(path, env, baseDir) {
 	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
-	if ((0, node_path.isAbsolute)(path)) throw pathError("must be a relative path.");
-	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(baseDir ?? workspace, path), outside = (to) => pathError(`(${to}) leads outside the workspace (${workspace}).`);
-	if (isOutside(workspace, full)) throw outside(full);
-	let real;
+	if (hasDotDotAfterStart(path)) throw pathError("has a \"..\" after its start; only a leading \"../\" may climb.");
+	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(baseDir ?? (0, node_fs.realpathSync)(workspace), path), real;
 	try {
 		real = (0, node_fs.realpathSync)(full);
 	} catch {
-		throw pathError(`(${full}) was not found. Check out the repository in an earlier step.`);
+		throw pathError(`(${full}) was not found. Check the path, and that an earlier step checked out the repository.`);
 	}
-	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw outside(real);
+	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError(`(${real}) leads outside the workspace (${workspace}).`);
 	return real;
 }
 const resolved = (node, doc) => (0, import_dist$3.isAlias)(node) ? node.resolve(doc) : node;

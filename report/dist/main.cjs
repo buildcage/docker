@@ -4427,12 +4427,17 @@ var require_identity$1 = __commonJSMin(((exports) => {
 		return identity.isDocument(value) && !_replacer ? value.toString(options) : new Document.Document(value, _replacer, options).toString(options);
 	}
 	exports.parse = parse, exports.parseAllDocuments = parseAllDocuments, exports.parseDocument = parseDocument, exports.stringify = stringify;
-})), require_dist$4 = __commonJSMin(((exports) => {
+})), import_dist$2 = __commonJSMin(((exports) => {
 	var composer = require_composer(), Document = require_Document(), Schema = require_Schema(), errors = require_errors$3(), Alias = require_Alias(), identity = require_identity$1(), Pair = require_Pair(), Scalar = require_Scalar(), YAMLMap = require_YAMLMap(), YAMLSeq = require_YAMLSeq();
 	require_cst();
 	var lexer = require_lexer(), lineCounter = require_line_counter(), parser = require_parser(), publicApi = require_public_api(), visit = require_visit();
 	exports.Composer = composer.Composer, exports.Document = Document.Document, exports.Schema = Schema.Schema, exports.YAMLError = errors.YAMLError, exports.YAMLParseError = errors.YAMLParseError, exports.YAMLWarning = errors.YAMLWarning, exports.Alias = Alias.Alias, exports.isAlias = identity.isAlias, exports.isCollection = identity.isCollection, exports.isDocument = identity.isDocument, exports.isMap = identity.isMap, exports.isNode = identity.isNode, exports.isPair = identity.isPair, exports.isScalar = identity.isScalar, exports.isSeq = identity.isSeq, exports.Pair = Pair.Pair, exports.Scalar = Scalar.Scalar, exports.YAMLMap = YAMLMap.YAMLMap, exports.YAMLSeq = YAMLSeq.YAMLSeq, exports.Lexer = lexer.Lexer, exports.LineCounter = lineCounter.LineCounter, exports.Parser = parser.Parser, exports.parse = publicApi.parse, exports.parseAllDocuments = publicApi.parseAllDocuments, exports.parseDocument = publicApi.parseDocument, exports.stringify = publicApi.stringify, exports.visit = visit.visit, exports.visitAsync = visit.visitAsync;
-}));
+}))();
+function hasDotDotAfterStart(path) {
+	let parts = path.split("/"), start = 0;
+	for (; parts[start] === ".." || parts[start] === ".";) start++;
+	return parts.slice(start).includes("..");
+}
 //#endregion
 //#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/utils.js
 function toCommandValue(input) {
@@ -15018,7 +15023,9 @@ var ExitCode, init_core = __esmMin((() => {
 	init_command(), init_utils$4(), init_oidc_utils(), init_summary(), init_platform(), (function(ExitCode) {
 		ExitCode[ExitCode.Success = 0] = "Success", ExitCode[ExitCode.Failure = 1] = "Failure";
 	})(ExitCode ||= {});
-})), import_dist$2 = require_dist$4();
+}));
+//#endregion
+//#region src/core/lib/actions/input-names.ts
 init_core();
 function inputEnvName(name) {
 	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
@@ -15060,16 +15067,14 @@ function isOutside(root, path) {
 }
 function resolveConfigPath(path, env, baseDir) {
 	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
-	if ((0, node_path.isAbsolute)(path)) throw pathError("must be a relative path.");
-	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(baseDir ?? workspace, path), outside = (to) => pathError(`(${to}) leads outside the workspace (${workspace}).`);
-	if (isOutside(workspace, full)) throw outside(full);
-	let real;
+	if (hasDotDotAfterStart(path)) throw pathError("has a \"..\" after its start; only a leading \"../\" may climb.");
+	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(baseDir ?? (0, node_fs.realpathSync)(workspace), path), real;
 	try {
 		real = (0, node_fs.realpathSync)(full);
 	} catch {
-		throw pathError(`(${full}) was not found. Check out the repository in an earlier step.`);
+		throw pathError(`(${full}) was not found. Check the path, and that an earlier step checked out the repository.`);
 	}
-	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw outside(real);
+	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError(`(${real}) leads outside the workspace (${workspace}).`);
 	return real;
 }
 const resolved = (node, doc) => (0, import_dist$2.isAlias)(node) ? node.resolve(doc) : node;

@@ -323,12 +323,10 @@ describe("applyConfigFile", () => {
     expect(env["INPUT_PROXY-MODE"]).toBe("audit");
   });
 
-  it("climbs a symlinked base directory as it is spelled", () => {
-    mkdirSync(join(workspace, "releases/v2"), { recursive: true });
-    symlinkSync("releases/v2", join(workspace, "current"));
-    writeConfig("proxy-mode: audit\n", "shared.yml");
-    const env = envFor("../shared.yml");
-    applyConfigFile(env, INPUTS, join(workspace, "current"));
+  it("reads an absolute path in the workspace", () => {
+    const path = join(workspace, writeConfig("proxy-mode: audit\n"));
+    const env = envFor(path);
+    expect(applyConfigFile(env, INPUTS, join(workspace, "svc"))?.path).toBe(path);
     expect(env["INPUT_PROXY-MODE"]).toBe("audit");
   });
 
@@ -408,20 +406,33 @@ describe("applyConfigFile", () => {
   });
 
   describe("refuses a path", () => {
-    it("that is absolute", () => {
+    it("that is absolute and outside the workspace", () => {
+      writeFileSync(join(root, "outside.yml"), "proxy-mode: audit\n");
       expectError(
-        envFor(join(workspace, writeConfig("proxy-mode: audit\n"))),
+        envFor(join(root, "outside.yml")),
         "CONFIG_FILE_PATH",
-        `config-file ${JSON.stringify(join(workspace, "buildcage.yml"))} must be a relative path.`,
+        `config-file ${JSON.stringify(join(root, "outside.yml"))} (${join(root, "outside.yml")}) leads outside the workspace (${workspace}).`,
       );
     });
+
+    it.each(["svc/../buildcage.yml", "../workspace/buildcage.yml/..", "/x/../buildcage.yml"])(
+      "with a .. after its start: %j",
+      (path) => {
+        writeConfig("proxy-mode: audit\n");
+        expectError(
+          envFor(path),
+          "CONFIG_FILE_PATH",
+          `config-file ${JSON.stringify(path)} has a ".." after its start; only a leading "../" may climb.`,
+        );
+      },
+    );
 
     it("that does not exist", () => {
       expectError(
         envFor("missing.yml"),
         "CONFIG_FILE_PATH",
         `config-file "missing.yml" (${join(workspace, "missing.yml")}) was not found. ` +
-          "Check out the repository in an earlier step.",
+          "Check the path, and that an earlier step checked out the repository.",
       );
     });
 

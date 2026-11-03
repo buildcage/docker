@@ -5,7 +5,7 @@
  * every reader, a child process included, sees the merged value.
  */
 import { readFileSync, realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { relative, resolve, sep } from "node:path";
 
 import {
   isAlias,
@@ -20,6 +20,7 @@ import {
 
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
 
+import { hasDotDotAfterStart } from "./dot-dot.ts";
 import { inputEnvName, legacyInputName } from "./input-names.ts";
 
 export class ConfigFileError extends ActionError<
@@ -101,18 +102,24 @@ function resolveConfigPath(path: string, env: NodeJS.ProcessEnv, baseDir?: strin
   const pathError = (reason: string) =>
     new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
 
-  if (isAbsolute(path)) throw pathError("must be a relative path.");
+  if (hasDotDotAfterStart(path)) {
+    throw pathError('has a ".." after its start; only a leading "../" may climb.');
+  }
   const workspace = resolve(env.GITHUB_WORKSPACE || process.cwd());
-  const full = resolve(baseDir ?? workspace, path);
-  const outside = (to: string) => pathError(`(${to}) leads outside the workspace (${workspace}).`);
-  if (isOutside(workspace, full)) throw outside(full);
+  // The base has no symlinks, so a leading `..` climbs by spelling to where
+  // the kernel would.
+  const full = resolve(baseDir ?? realpathSync(workspace), path);
   let real: string;
   try {
     real = realpathSync(full);
   } catch {
-    throw pathError(`(${full}) was not found. Check out the repository in an earlier step.`);
+    throw pathError(
+      `(${full}) was not found. Check the path, and that an earlier step checked out the repository.`,
+    );
   }
-  if (isOutside(realpathSync(workspace), real)) throw outside(real);
+  if (isOutside(realpathSync(workspace), real)) {
+    throw pathError(`(${real}) leads outside the workspace (${workspace}).`);
+  }
   return real;
 }
 
@@ -251,10 +258,9 @@ function parseConfig(
 /**
  * Merges `config-file` into `env`'s `INPUT_*` variables. A value the workflow
  * set wins; a list input gets both, the workflow's first. Undefined when no
- * config-file was given. The path resolves against `baseDir` (default: the
- * workspace), which must be absolute and spelled as the workspace is, not
- * resolved: `..` and the workspace check go by that spelling. The file must be
- * in the workspace either way.
+ * config-file was given. A relative path resolves against `baseDir`, an
+ * absolute path with its symlinks resolved (default: the workspace's real
+ * path). The file's real path must be in the workspace's.
  *
  * @throws {ConfigFileError} on an untrusted event, a path outside the
  *   workspace or missing, or a file that is not a flat mapping of known
