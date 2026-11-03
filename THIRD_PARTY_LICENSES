@@ -20,7 +20,8 @@ BuildKit (base image: moby/buildkit)
 
 HAProxy
   Website : https://www.haproxy.org/
-  License : GNU General Public License v2.0 or later (GPL-2.0-or-later)
+  License : GNU General Public License v2.0 or later, with the OpenSSL
+            exception (GPL-2.0-or-later WITH OpenSSL-Exception)
   Source  : https://git.haproxy.org/ or via Alpine Linux source packages
 
 ------------------------------------------------------------------------------
@@ -158,9 +159,9 @@ the image lists them.
 
 ------------------------------------------------------------------------------
 
-The full texts of the GPL-2.0, GPL-3.0, MPL-2.0 and Apache-2.0 licenses named
-above are in licenses/ in this repository, and each image carries those its
-own components need in /opt/buildcage/licenses/.
+The full texts of the GPL-1.0, GPL-2.0, GPL-3.0, LGPL-2.1, MPL-2.0 and
+Apache-2.0 licenses are in licenses/ in this repository, and each image
+carries those its own components need in /opt/buildcage/licenses/.
 
 The license files of curl and QuickJS-ng, copyright notices included, are in
 licenses/ and in each image's /opt/buildcage/licenses/ as curl.txt and
