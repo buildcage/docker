@@ -8,8 +8,8 @@
  * itself (proxy-log-tally.ts), written on the next line that fits, so the
  * report logs one more line once the log goes quiet and waits for it: that
  * flushes the notice and everything ahead of it into the log the report then
- * reads. Lines the log writer took and then died with are counted by its
- * connections, read once that barrier is in.
+ * reads. A log writer that died with lines it had not written leaves an extra
+ * connection in haproxy-log's list, read after the barrier.
  */
 import { randomBytes } from "node:crypto";
 

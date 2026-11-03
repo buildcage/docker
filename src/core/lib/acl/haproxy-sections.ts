@@ -70,8 +70,8 @@ export function preamble(spec: PreambleSpec): string[] {
     "",
     // A full ring drops the line and says so on the next one that fits
     // (proxy-notices.ts). maxlen matches the log's len, or a long line is cut.
-    // No timeout server: one that expires reconnects, which the report counts
-    // as the log writer dying (haproxy-log/run).
+    // No timeout server: an idle forwarder would reconnect once it expired,
+    // and the report counts a reconnect as the log writer dying (haproxy-log/run).
     `ring ${LOG_RING}`,
     "    format raw",
     "    size 1048576",

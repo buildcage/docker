@@ -5,10 +5,10 @@
 # into the log. -1 tells s6-rc the socket is listening, so haproxy starts after
 # it. One connection at a time, as two s6-log cannot share a directory.
 #
-# Each connection appends a line to connections first: haproxy holds one
-# connection for as long as it runs, so another one means the s6-log before it
-# died, taking the lines still in the socket with it, and the report counts
-# those (proxy-dropped-logs.ts).
+# Each connection first appends a line to connections. haproxy keeps one
+# connection for as long as it runs, so a second one from the same haproxy
+# means the s6-log before it died with the lines still in the socket, and the
+# report marks itself incomplete for it (aggregate.ts).
 #
 # s: rotate current at 1MB rather than s6-log's own default of ~100KB, so a
 # run with a lot of traffic doesn't rotate mid-run. n: keep 100 rotated

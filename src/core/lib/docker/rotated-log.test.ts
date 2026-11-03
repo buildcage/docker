@@ -99,6 +99,11 @@ describe.runIf(process.platform === "linux")("readRotatedLog's script", () => {
     expect(await read(path)).toStrictEqual(["o", "c"]);
   });
 
+  it("ends an archive's cut-short last line before the next segment", async () => {
+    const path = logDir({ current: "c\n", [OLD]: "o\ncut", [MIDDLE]: "m\n" });
+    expect(await read(path)).toStrictEqual(["o", "cut", "m", "c"]);
+  });
+
   it("reads every archive when there is no current", async () => {
     expect(await read(logDir({ [OLD]: "o\n", [MIDDLE]: "m\n" }))).toStrictEqual(["o", "m"]);
   });
