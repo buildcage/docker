@@ -13,13 +13,15 @@ A `docker build` runs your `RUN` steps, and every dependency they fetch, with un
 access. Buildcage puts that behind an allowlist: each `RUN` step can reach only the destinations you
 name, and anything else is blocked and reported.
 
-- Your Dockerfile doesn't change, BuildKit isn't patched, and nothing Buildcage does is left in the
-  image layers.
+- Your Dockerfile doesn't change, BuildKit isn't patched, and the CA and variables Buildcage adds to
+  a step are taken back out before its layer is committed
+  ([details](#ca-trust-and-compatibility)).
 - Run once in [`audit`](#operation-modes) mode and the report writes the allowlist for you, ready to
-  paste back into the workflow.
+  review and paste back into the workflow.
 - A rule can name an HTTP method and a URL, inside TLS as well, so a build can fetch a package from
   a registry without being able to publish one to it.
-- It all runs inside your GitHub Actions job, with no agent and no external service.
+- It all runs inside your GitHub Actions job, with no agent to install and no hosted service in the
+  build's traffic path.
 
 See [buildcage.github.io](https://buildcage.github.io/) for what it does and why. To isolate a
 workflow `run:` step rather than a Docker build, use
@@ -71,7 +73,7 @@ covers the choice of engine.
 - name: Start Buildcage in audit mode
   uses: buildcage/docker@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
   with:
-    proxy-mode: audit # Log every destination, block nothing
+    proxy-mode: audit # Log every destination, enforce no rules
 
 - name: Set up Docker Buildx
   uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -169,10 +171,11 @@ heading or a rule can carry its reason. It works the same in every rule input.
 
 ### Operation modes
 
-`proxy-mode: audit` logs every destination the build reaches and blocks nothing. `restrict`, the
-default, allows only what the rules match and blocks and logs everything else. Start with `audit`
-when you first adopt Buildcage or when a dependency changes, and keep `restrict` for everyday
-builds.
+`proxy-mode: audit` logs every destination the build reaches and enforces none of the rules. It
+still blocks a malformed request and a name that resolves to cloud metadata or the runner itself.
+`restrict`, the default, allows only what the rules match and blocks and logs everything else. Start
+with `audit` when you first adopt Buildcage or when a dependency changes, and keep `restrict` for
+everyday builds.
 
 If you forget a domain the build needs, `restrict` blocks it and the report step fails with the
 destination named, which is why it is worth running `audit` first.
@@ -355,7 +358,9 @@ does stop is traffic to a destination that is not on the list, and infrastructur
 up is normally not on it, because the build has no reason to reach it. That is also the hardest kind
 of leak to find afterwards.
 
-An allowlist generated from an audit run already blocks every destination the audit did not record.
+An allowlist generated from an audit run already blocks every host the audit did not record, apart
+from what the `allowed-tls-rules` and `allowed-ip-rules` it carries over from the audit run's own
+inputs admit.
 Whether to go further depends on what the build has access to:
 [Hardening](./docs/security.md#hardening) is what to look at when it holds credentials, personal
 data, or source you do not publish. For the full threat model, see
@@ -369,12 +374,12 @@ data, or source you do not publish. For the full threat model, see
   frontend image a `# syntax=` directive names are fetched by buildkitd itself rather than by a
   `RUN` step, and no rule applies to them.
   See [What buildkitd fetches itself](./docs/security.md#what-buildkitd-fetches-itself).
-- `allowed-tls-rules` is not decrypted. The SNI and the port are checked, and the proxy resolves
-  that name itself, so the connection reaches the host the rule named, but nothing inside the TLS
-  session is seen.
-- `allowed-ip-rules` is not inspected at all, and doesn't require TLS either: once an `ip:port` pair
-  is allowed, any TCP-based protocol can use that path. Prefer a domain rule wherever the
-  destination has a stable name.
+- Traffic an `allowed-tls-rules` entry passes is not decrypted. The SNI and the port are checked,
+  and the proxy resolves that name itself, so the connection reaches the host the rule named, but
+  nothing inside the TLS session is seen.
+- Traffic an `allowed-ip-rules` entry passes is not inspected at all, and doesn't require TLS
+  either: once an `ip:port` pair is allowed, any TCP-based protocol can use that path. Prefer a
+  domain rule wherever the destination has a stable name.
 - `universal` never sees the method or the path. They travel inside TLS, so neither is enforced and
   neither reaches the report or the traffic artifact. A request fronted behind an allowed SNI is
   invisible to it as well, while `inspect` matches on the real `Host` and blocks it. See
@@ -402,8 +407,8 @@ data, or source you do not publish. For the full threat model, see
 
 The resolver has no upstream, so it returns nothing for a discovery record: `SRV`, `TXT`, `TLSA` and
 `URI` queries come back empty, and the build connects to the name a rule allowed rather than to one
-a nameserver picked for it. Clients that treat `SRV` as a discovery layer fall back to the host name
-itself, so the host a rule names is the host the build reaches.
+a nameserver picked for it. A client that treats `SRV` as an optional discovery layer falls back to
+the host name itself, so the host a rule names is the host the build reaches.
 
 What this breaks is a client with no fallback, where the record is the only way it can find the
 service at all. A `mongodb+srv://` connection string is the one to expect: use `mongodb://` with the

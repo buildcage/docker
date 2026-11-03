@@ -20,7 +20,7 @@ allowlist, and where it stops short. For how to configure the action, see the
 ## Threat model
 
 Buildcage governs the code that runs inside a `RUN` step: a dependency's `postinstall`, a build
-script, a compiler plugin, none of which the Dockerfile author reviewed. It decides which
+script, a compiler plugin, which the Dockerfile author usually has not reviewed. It decides which
 destinations that code can reach, and records what it tried.
 
 Four things sit outside that model by design.
@@ -112,8 +112,9 @@ reaches a rule, in `audit` too: `universal` blocks such an SNI (`invalid-sni`) o
 (`invalid-host`), and `inspect` never passes one through and blocks such a `Host` (`invalid-host`).
 Otherwise a `:` in the name could let a `~` rule's port pattern match a name the proxy resolves.
 
-That order is an invariant. Reversed, resolution would become the exfiltration channel the resolver
-below exists to prevent, so a name a request would be blocked for never triggers a real DNS query.
+The rules decide before anything is resolved, so a request no rule allows never triggers a real
+DNS query. Resolving first would turn resolution into the exfiltration channel that the resolver
+below exists to prevent.
 
 Where the proxy resolves is the container's own `/etc/resolv.conf`. On a runner that is Docker's
 embedded DNS forwarding to the runner's own resolvers, so a name only an internal resolver knows
@@ -176,9 +177,9 @@ is a literal address, such as `169.254.169.254:80`, exempts the requests it matc
 in `audit` too. A wildcard or regex that merely admits the address, `**:80` or `~^.*:80$`, does not.
 The exemption never covers the proxy's own network (`198.19.255.0/24`) or port `10024` of any
 internal address, since a rule naming the proxy's listener would loop it into itself. Under
-`universal`, no rule exempts a request. Reaching a cloud metadata endpoint directly, the way any AWS
-or GCP SDK does, is not what this is meant to stop, and `allowed-ip-rules` is the intended path for
-it. That path skips this guard except for the listener: a connection to port `10024` of an internal
+`universal`, no rule exempts a request. Reaching a cloud metadata endpoint directly, the way AWS and
+GCP SDKs do, is not what this is meant to stop, and `allowed-ip-rules` is the intended path for it.
+That path skips this guard except for the listener: a connection to port `10024` of an internal
 address is blocked there too, whatever the IP rules say and in `audit` as well.
 
 ### Only TCP gets out
@@ -334,10 +335,10 @@ trips `fail-on-blocked`:
   buildkitd to fetch through the gateway API. This is the broadest of the four: a frontend produces
   the LLB the daemon runs, so it can read a step's output back and fetch on the daemon's behalf.
 
-This is a scope decision rather than a gap left open. All four are destinations a developer writes
-into the Dockerfile, so they are reviewable source, and they are resolved before any step runs. What
-covers them is ordinary supply chain practice: reviewing the Dockerfile, and pinning base images and
-the `# syntax=` frontend by digest rather than by a floating tag.
+This is a scope decision. Each of the four starts from something written into the Dockerfile, so it
+is reviewable source, and buildkitd fetches it outside any `RUN` step. What covers them is ordinary
+supply chain practice: reviewing the Dockerfile, and pinning base images and the `# syntax=`
+frontend by digest rather than by a floating tag.
 
 ### Domain fronting
 
@@ -408,9 +409,11 @@ follows against what the build has access to.
 
 ### Keep each rule as narrow as it can be
 
-An audit run only ever emits the exact `host:port` pairs it observed. Wildcards and `:*` ports come
-from broadening a rule by hand, and each one covers destinations the build never asked for. Where a
-broad rule exists, it is worth checking whether the build can be changed instead.
+Apart from the `allowed-tls-rules` and `allowed-ip-rules` it carries over from its own inputs, an
+audit run writes rules only for hosts and ports it observed, never a wildcard host or a `:*` port.
+Under `inspect`, the part of a path that varied becomes `**`. Wildcards and `:*` ports come from
+broadening a rule by hand, and each one covers destinations the build never asked for. Where a broad
+rule exists, it is worth checking whether the build can be changed instead.
 
 Pay particular attention to general-purpose destinations: a gist host, object storage, or an API
 that can create repositories. They accept uploads as readily as they serve downloads, which is what
@@ -437,11 +440,10 @@ and replaces none of them.
 
 ## Image provenance verification
 
-Buildcage relies on being verifiable rather than on being trusted. Its source is open to read at any
-time, and what runs is verified to have been built from it. Releases are immutable, and each image
-is built from the release commit by the release workflow and signed by that run, with no step where
-anyone, the maintainers included, can slip in something else. The action verifies that signature
-against the pinned commit before it runs, so changing what Buildcage does means changing its public
+Buildcage's source is open to read at any time. Releases are immutable, and each image is built
+from the release commit by the release workflow and signed by that run, so an image built anywhere
+else fails verification. Before it runs, the action verifies that signature against the commit or
+tag the workflow pins, so changing what Buildcage does means publishing a release from its public
 source first.
 
 Buildcage decides what the build can reach, so the action has to establish that the image it runs

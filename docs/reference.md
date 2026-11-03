@@ -151,7 +151,7 @@ a Dockerfile that needs its own policy its own `builder-name` and file.
 
 | `proxy-mode` | What it does                                                      | When to use it                                             |
 | ------------ | ----------------------------------------------------------------- | ---------------------------------------------------------- |
-| `audit`      | Logs every destination the build reaches and blocks nothing       | First setup, adding a dependency, investigating a failure  |
+| `audit`      | Logs every destination the build reaches and enforces no rules    | First setup, adding a dependency, investigating a failure  |
 | `restrict`   | Allows only what the rules match, blocks and logs everything else | Everyday builds, CI/CD pipelines, security-critical builds |
 
 `audit` allows what the active engine can classify. A connection it cannot classify, such as an HTTP
@@ -161,9 +161,8 @@ Because `audit` enforces nothing, the `allowed-*-rules` have no effect in it; yo
 you move to `restrict`. Any other `proxy-mode` value, a differently cased one included, fails the
 setup.
 
-`audit` is not a passive observer under `inspect`: TLS is terminated in both modes, and what `audit`
-drops is the rule ACLs, not the interception. A tool that cannot accept the injected CA fails under
-`audit` exactly as it would under `restrict`.
+Under `inspect`, `audit` still terminates TLS and only stops enforcing the rules. A tool that
+cannot accept the injected CA fails under `audit` as it would under `restrict`.
 
 If you forget a domain the build needs, `restrict` blocks it and the report step fails with the
 destination named, which is why it is worth running `audit` first.
@@ -499,7 +498,7 @@ action's inputs, each also takes its name spelled with underscores.
 retention that is not a whole number above zero, fails the step before the report is written.
 
 In restrict mode the step fails when blocked connections are detected, and the workflow fails with
-it. In audit mode, blocked connections (protocol errors, for instance) are reported but never fail
+it. In audit mode, blocked connections (protocol errors, for instance) are reported and do not fail
 the step.
 
 A report that is not a full record of the build fails the step the same way, whatever survived: a
@@ -718,11 +717,11 @@ it does fail the step:
 | `origin-connect-failed` | the connection never completed, so no certificate was ever accepted      |
 
 `origin-untrusted` is the plain case: a forged certificate, an expired one, or an origin speaking no
-TLS at all. `origin-connect-failed` is the one that looks like an outage and cannot be shown to be
-one. HAProxy retries a failed connection, and the TLS error it reports belongs to the last attempt
-alone, so an impostor blocked for its certificate on one attempt leaves no trace once a later
-attempt fails at TCP. The report does not claim to tell that from an origin that is simply down: a
-connection it never completed is one whose origin it never authenticated. See
+TLS at all. `origin-connect-failed` can look like an outage, and the report cannot tell it apart
+from one. HAProxy retries a failed connection, and the TLS error it reports belongs to the last
+attempt alone, so an impostor blocked for its certificate on one attempt leaves no trace once a
+later attempt fails at TCP. The report therefore counts it as blocked: a connection it never
+completed is one whose origin it never authenticated. See
 [Attempts to get around it](./security.md#attempts-to-get-around-it).
 
 A host that is flaky rather than hostile is cleared the way any expected block is, by listing it
