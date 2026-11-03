@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { Docker } from "./client.ts";
-import { readResolverAnswered, readResolverLogStarts } from "./resolver-health.ts";
+import { readResolverAnswered, readResolverLogDeaths } from "./resolver-health.ts";
 
 function fakeDocker(exec: Docker["exec"]): { docker: Docker; calls: string[][] } {
   const calls: string[][] = [];
@@ -38,17 +38,24 @@ describe("readResolverAnswered", () => {
   });
 });
 
-describe("readResolverLogStarts", () => {
-  it("counts the lines of the log writer's starts file", () => {
-    const { docker, calls } = fakeDocker(() => "\n\n");
-    expect(readResolverLogStarts(docker, "abc")).toBe(2);
-    expect(calls).toStrictEqual([["abc", "cat", "/var/run/coredns-log/starts"]]);
+describe("readResolverLogDeaths", () => {
+  it("counts one death per line of the log writer's death tally", () => {
+    const { docker, calls } = fakeDocker(
+      () => "@400000006aea742d18027a67 signal SIGKILL\n@400000006aea74333aafec3b signal SIGKILL\n",
+    );
+    expect(readResolverLogDeaths(docker, "abc")).toBe(2);
+    expect(calls).toStrictEqual([["abc", "s6-svdt", "/run/service/coredns-log"]]);
   });
 
-  it("returns undefined when the file cannot be read", () => {
+  it("reads an empty tally as no death", () => {
+    const { docker } = fakeDocker(() => "");
+    expect(readResolverLogDeaths(docker, "abc")).toBe(0);
+  });
+
+  it("returns undefined when the tally cannot be read", () => {
     const { docker } = fakeDocker(() => {
-      throw new Error("exit 1");
+      throw new Error("exit 111");
     });
-    expect(readResolverLogStarts(docker, "abc")).toBeUndefined();
+    expect(readResolverLogDeaths(docker, "abc")).toBeUndefined();
   });
 });

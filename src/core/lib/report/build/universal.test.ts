@@ -286,32 +286,22 @@ describe("buildUniversalReportData", () => {
   );
 
   it.each([
-    { resolverLogStarts: 1, resolverLog: 0, plausible: true },
-    { resolverLogStarts: 2, resolverLog: 1, plausible: false },
-    { resolverLogStarts: undefined, resolverLog: 0, plausible: false },
+    { resolverLogDeaths: 0, resolverLog: 0, plausible: true },
+    { resolverLogDeaths: 1, resolverLog: 1, plausible: false },
+    { resolverLogDeaths: undefined, resolverLog: 0, plausible: false },
   ])(
-    "logLooksPlausible is $plausible with $resolverLogStarts starts of the resolver's log writer",
-    async ({ resolverLogStarts, resolverLog, plausible }) => {
+    "logLooksPlausible is $plausible with $resolverLogDeaths deaths of the resolver's log writer",
+    async ({ resolverLogDeaths, resolverLog, plausible }) => {
       const result = await buildUniversalReportData(
         [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
         [DNS_START],
         reportParams(),
-        { ...HEALTHY, resolverLogStarts },
+        { ...HEALTHY, resolverLogDeaths },
       );
       expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog: 0, resolverLog });
       expect(result.logLooksPlausible).toBe(plausible);
     },
   );
-
-  it("does not count a resolver's own restart against its log writer", async () => {
-    const result = await buildUniversalReportData(
-      [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
-      [DNS_START, DNS_START],
-      reportParams(),
-      HEALTHY,
-    );
-    expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 1, proxyLog: 0, resolverLog: 0 });
-  });
 
   it("returns empty tables and an implausible log for empty input", async () => {
     const result = await buildUniversalReportData([], [], reportParams(), HEALTHY);

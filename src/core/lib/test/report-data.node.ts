@@ -13,11 +13,11 @@ import type { GenReportParameters, ServiceHealth } from "../report/types.ts";
 export const NONE_DROPPED: ProxyDroppedLogs = { answered: true, count: 0, logConnections: 1 };
 
 /** A proxy that answered and dropped nothing, and a resolver that answered and
- *  whose log writer started once. */
+ *  whose log writer never died. */
 export const HEALTHY: ServiceHealth = {
   droppedLogs: NONE_DROPPED,
   resolverAnswered: true,
-  resolverLogStarts: 1,
+  resolverLogDeaths: 0,
 };
 
 /** A run in which both services answered and nothing restarted. */

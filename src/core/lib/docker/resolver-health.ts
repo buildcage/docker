@@ -7,20 +7,25 @@
  * would a log writer that died with lines it had not written.
  */
 import type { Docker } from "./client.ts";
-import { readStartLedger } from "./start-ledger.ts";
 
 /** CoreDNS's health plugin; see coredns-config.ts. */
 const URL = "http://127.0.0.1:8080/health";
 /** A wedged resolver can accept the connection and never answer. */
 const MAX_TIME_SECONDS = "10";
 
-/** One line per start of the resolver's log writer; see coredns-log/run. */
-const LOG_STARTS = "/var/run/coredns-log/starts";
+/** s6-supervise's directory for the resolver's log writer. A CoreDNS restart
+ *  leaves that service running, so each death it records is the writer's. */
+const LOG_SERVICE = "/run/service/coredns-log";
 
-/** How many times the resolver's log writer started, or undefined where that
- *  could not be read (start-ledger.ts). */
-export function readResolverLogStarts(docker: Docker, containerId: string): number | undefined {
-  return readStartLedger(docker, containerId, LOG_STARTS);
+/** How many times the resolver's log writer died, or undefined where that
+ *  could not be read. s6-supervise records a death as it happens, so one the
+ *  writer has not yet come back from counts too. */
+export function readResolverLogDeaths(docker: Docker, containerId: string): number | undefined {
+  try {
+    return docker.exec(containerId, ["s6-svdt", LOG_SERVICE]).split("\n").length - 1;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Whether the resolver answered its health check. */

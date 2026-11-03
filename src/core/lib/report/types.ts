@@ -21,9 +21,9 @@ export interface ServiceHealth {
   droppedLogs: ProxyDroppedLogs;
   /** Whether the resolver answered its health check (resolver-health.ts). */
   resolverAnswered: boolean;
-  /** How many times the resolver's log writer started, or undefined where that
+  /** How many times the resolver's log writer died, or undefined where that
    *  could not be read (resolver-health.ts). */
-  resolverLogStarts: number | undefined;
+  resolverLogDeaths: number | undefined;
 }
 
 export interface ReportDataCommon {
