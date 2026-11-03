@@ -96,8 +96,9 @@ The [report action](#report-action) writes every destination the build contacted
 <img src="assets/report-inspect-audit-mode.png" alt="Outbound Traffic Report (audit mode)" width="557">
 
 Its **Switch to restrict mode** section holds the allowlist, already written out from what the build
-actually did. A request whose method, host or path a rule would read as a wildcard is listed under
-it rather than written in, since copying it would permit more than was sent.
+actually did. A request whose method, host or path contains rule syntax, such as `*`, is listed
+below the allowlist instead of being added to it, since a rule copied from it would permit more
+than was sent.
 
 ### 2. Enforce the allowlist
 
@@ -124,16 +125,18 @@ doesn't pass unnoticed.
 
 ### Example workflows
 
-Each pair runs a build in audit, then in restrict with the rules audit reported and one request they
-block: `inspect` on an apt and npm build ([audit](.github/workflows/example-inspect-audit.yml) ·
-[restrict](.github/workflows/example-inspect-restrict.yml)), `universal` on a Maven build
-([audit](.github/workflows/example-universal-audit.yml) ·
-[restrict](.github/workflows/example-universal-restrict.yml)).
+Each pair runs a build in audit, then in restrict with the rules the audit reported, plus one
+request those rules block so the report shows a block:
+
+- `inspect` on an apt and npm build: [audit](.github/workflows/example-inspect-audit.yml) ·
+  [restrict](.github/workflows/example-inspect-restrict.yml)
+- `universal` on a Maven build: [audit](.github/workflows/example-universal-audit.yml) ·
+  [restrict](.github/workflows/example-universal-restrict.yml)
 
 ## Engines
 
-`proxy-engine` sets how closely a build's traffic is read. `inspect` is the default; `universal` has
-to be set explicitly.
+`proxy-engine` sets how much of each connection Buildcage reads, and so what a rule can match.
+`inspect` is the default; `universal` has to be set explicitly.
 
 `inspect` terminates TLS and re-signs it with a CA generated for each builder container. Rules
 match on method and URL, so `GET|HEAD https://registry.npmjs.org/**` allows a fetch while blocking a
@@ -142,21 +145,21 @@ that CA: Buildcage adds it to the system store, to the CA-trust variables, to a 
 base image, and to Chromium's NSS database, so most toolchains need nothing extra (see [CA trust and
 compatibility](#ca-trust-and-compatibility)).
 
-`universal` reads only the SNI. Rules match on host and port, so `registry.npmjs.org:443` is the
-most one can say, the report shows host and port, and the build's own TLS is left untouched.
+`universal` reads only the SNI. Rules match on host and port only, such as `registry.npmjs.org:443`.
+The report shows host and port, and the build's own TLS is left untouched.
 
 Start with `inspect`. When a tool pins a certificate or ships a trust store Buildcage cannot inject
 into, its host cannot be re-signed: switch the whole build to `universal`, or pass that host alone
 through with `allowed-tls-rules`.
 
-Every engine intercepts at the network level, so a tool that ignores `HTTP_PROXY` is covered too,
-and only `RUN` steps go through it. What buildkitd fetches for itself stays outside: see
+Every engine intercepts at the network level, so a tool that ignores `HTTP_PROXY` is covered too.
+Only traffic from `RUN` steps is intercepted. What buildkitd fetches for itself is not: see
 [Limitations](#limitations).
 
 ## Inputs
 
-Every input is optional, and the ones below are the rules you write by hand. The full list, with
-defaults and the engines each input applies to, is in
+Every input is optional. The sections below cover the rule inputs you write by hand. The full list,
+with defaults and the engines each input applies to, is in
 [Reference](./docs/reference.md#setup-action-inputs), and the grammar those rules are written in is
 in [Rule syntax](./docs/reference.md#rule-syntax).
 
@@ -210,7 +213,8 @@ allowed-url-rules: |
 ```
 
 `allowed-tls-rules` passes a TLS destination through undecrypted, judged on its SNI and port. It is
-for TLS that isn't HTTPS, and for the hosts an `inspect` build must not decrypt:
+for TLS that isn't HTTPS, and for hosts whose clients cannot accept the `inspect` CA, such as a tool
+that pins its certificate:
 
 ```yaml
 allowed-tls-rules: |
@@ -257,7 +261,7 @@ known-blocked-rules: |
   telemetry.example.com
 ```
 
-A name blocked at resolution, before any connection, has no port. A bare `telemetry.example.com`
+A name that was only looked up, never connected to, has no port. A bare `telemetry.example.com`
 (or `telemetry.example.com:*`) covers it; `telemetry.example.com:443` does not, since no port was
 involved.
 
@@ -284,13 +288,18 @@ with `if: always()` so a failing build still reports:
   uses: buildcage/docker/report@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
 ```
 
-An alert under the report's title counts what needs a look. Whatever was blocked unexpectedly is
-listed first with the reason, together with any connection that failed, then the allowed hosts, then
-what `known-blocked-rules` matched, collapsed under **Known Blocked Hosts**. Under `inspect`,
-**Communication details** names the URL of every request, allowed or blocked, with credential query
-parameters replaced (see [Credentials in a URL](docs/security.md#credentials-in-a-url)). In `audit`
-mode the summary also holds the **Switch to restrict mode** allowlist. How the alert and the tables
-are made up is in [Report details](./docs/reference.md#report-details).
+When anything needs attention, an alert under the report's title gives the counts, such as how many
+connections were blocked or failed. The report then lists, in this order:
+
+- what was blocked unexpectedly, and any connection that failed, each with its reason
+- the allowed hosts
+- what `known-blocked-rules` matched, collapsed under **Known Blocked Hosts**
+- in `audit` mode, the **Switch to restrict mode** allowlist
+- under `inspect`, **Communication details**: the URL of every request, allowed or blocked, with
+  credential query parameters replaced (see
+  [Credentials in a URL](docs/security.md#credentials-in-a-url))
+
+How the alert and the tables are made up is in [Report details](./docs/reference.md#report-details).
 
 In `restrict` mode the step fails when a blocked connection is found, and with it the workflow. Pass
 `fail-on-blocked: false` to report without failing, or list what you expect to stay blocked in the
@@ -317,9 +326,9 @@ builder container, at the network level, so a tool that ignores the proxy enviro
 covered as well. The figure is the `inspect` engine; `universal` follows the same path without
 terminating TLS, and so needs no CA.
 
-Buildx needs `driver: remote` because the builder is a second BuildKit, but multi-stage builds,
-caching and the image that comes out are unaffected, and nothing Buildcage does reaches the LLB or a
-cache key.
+Buildx needs `driver: remote` because the builder is a second BuildKit. Multi-stage builds, caching
+and the image that comes out are unaffected, and nothing Buildcage does changes the build definition
+BuildKit runs (its LLB) or a cache key.
 
 [Security Details](./docs/security.md) has the architecture of each engine, with a diagram of what
 runs where and what it decides.
@@ -335,17 +344,19 @@ container, whose private key never leaves that container
   `ca-certificates` partway through keeps trusting it.
 - The variables Node, Deno, OpenSSL, Python `requests` and pip read: `NODE_EXTRA_CA_CERTS`,
   `DENO_CERT`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `PIP_CERT`, and `CURL_CA_BUNDLE` in a step
-  with no system CA store. A variable the base image or the Dockerfile already set is appended to
-  rather than redirected, and so are `GIT_SSL_CAINFO`, `npm_config_cafile`, `AWS_CA_BUNDLE`,
-  `CARGO_HTTP_CAINFO` and `BUNDLE_SSL_CA_CERT`, which are otherwise left unset.
+  with no system CA store. If the base image or the Dockerfile already sets one of them, the CA is
+  appended to the file it names instead of the variable being pointed elsewhere. `GIT_SSL_CAINFO`,
+  `npm_config_cafile`, `AWS_CA_BUNDLE`, `CARGO_HTTP_CAINFO` and `BUNDLE_SSL_CA_CERT` are handled
+  only that way: appended to when already set, and otherwise left unset.
 - The keystore of a JVM already in the base image, at `$JAVA_HOME` and behind the first `java` on
   `PATH`, so `mvn`, `gradle` and `java` reach the proxy without `proxy-engine: universal`.
 - The NSS database in `$HOME` that Chromium reads, including the `chrome-headless-shell` that
   Puppeteer, Playwright and Remotion download.
 
 All of it is taken back out before the layer is committed, so neither the CA nor the variables are
-left in the image, except a copy a step hides where it cannot be read, or one it cannot take out
-under `fail-on-ca-residue: false`. How each one is done is in
+left in the image. Two kinds of copy are the exception: one inside something Buildcage cannot read,
+such as a compressed archive, and one it found but could not remove, which
+`fail-on-ca-residue: false` lets through with a warning. How each one is done is in
 [CA trust variables](./docs/reference.md#ca-trust-variables), and what this cannot cover is in
 [Limitations](#under-the-inspect-engine), below.
 
@@ -355,10 +366,9 @@ Buildcage controls _where_ your build can connect, not _what code_ it runs. A ma
 delivered through an allowed domain still runs. Treat it as one layer among your other measures: if
 something gets past them, it still cannot reach a destination outside the allowlist.
 
-An allowlist also cannot stop anything leaving through a service you had to allow anyway. What it
-does stop is traffic to a destination that is not on the list, and infrastructure an attacker set
-up is normally not on it, because the build has no reason to reach it. That is also the hardest kind
-of leak to find afterwards.
+An allowlist also cannot stop anything leaving through a service you had to allow anyway. It stops
+traffic to destinations that are not on the list, such as infrastructure an attacker set up; see
+[Threat model](./docs/security.md#threat-model).
 
 An allowlist generated from an audit run already blocks every host the audit did not record, apart
 from what the `allowed-tls-rules` and `allowed-ip-rules` it carries over from the audit run's own
@@ -391,16 +401,17 @@ data, or source you do not publish. For the full threat model, see
   runner. A mirror or registry running on the runner is therefore not reachable by name: allow it
   with `allowed-ip-rules`, which skips that guard except for the proxy's own port. See
   [A name may not resolve inward](./docs/security.md#a-name-may-not-resolve-inward).
-- The generated allowlist covers only what the engine classified. `allowed-tls-rules` and
-  `allowed-ip-rules` come back exactly as the audit run was configured with them, since nothing
-  behind a passthrough was ever decrypted.
+- Under `inspect`, the generated allowlist writes URL rules only from the requests the proxy read.
+  `allowed-tls-rules` and `allowed-ip-rules` are copied over unchanged from the audit run's own
+  inputs, since the traffic they pass through is never decrypted.
 - Buildcage produces no SLSA provenance. The traffic artifact is an observation record with no
   content digest.
 
 ### Protocols
 
-- UDP is dropped, so QUIC and HTTP/3 either fall back to TCP or fail. Port 53 to the proxy, which is
-  the resolver, is the one exception. ICMP is dropped too.
+- UDP is dropped, so QUIC and HTTP/3 either fall back to TCP or fail. The one exception is port 53
+  on the gateway, which is the proxy's own address and where the resolver listens. ICMP is dropped
+  too.
 - IPv6 is not used anywhere. The rule syntax refuses an IPv6 address, forwarded IPv6 is dropped, and
   the proxy reaches allowed names over IPv4 only, so an allowed name with AAAA records and no A
   record never resolves and no rule can clear it.
@@ -430,12 +441,13 @@ reported as blocked; see
 - A client that insists on HTTP/2 through ALPN, as gRPC clients do (grpc-go since 1.67, for one),
   fails to connect: `inspect` answers no ALPN. Pass its host through with `allowed-tls-rules`,
   which judges the SNI and port only. A client that falls back to HTTP/1.1, such as curl, works.
-- Only the JDK at `$JAVA_HOME` and the one behind the first `java` on `PATH` get the CA in their
-  keystore. A keystore sealed with a password other than the JDK default is left alone, so that JDK
-  needs `proxy-engine: universal` or an `allowed-tls-rules` passthrough. Any other JDK does not
-  trust the CA: one further along `PATH`, a Gradle toolchain under `~/.gradle/jdks`, or one the step
-  itself downloads (an `sdk install`, an unpacked tarball). Fetch it in an earlier `RUN` step and
-  put it first on `PATH` or on `JAVA_HOME` with `ENV`:
+- Only two JDKs get the CA in their keystore: the one at `$JAVA_HOME` and the one behind the first
+  `java` on `PATH`. Even those are left alone when the keystore is sealed with a password other
+  than the JDK default; such a JDK needs `proxy-engine: universal` or an `allowed-tls-rules`
+  passthrough. These JDKs do not trust the CA: one further along `PATH`, a Gradle toolchain under
+  `~/.gradle/jdks`, or one the step itself downloads (an `sdk install`, an unpacked tarball). Fetch
+  such a JDK in an earlier `RUN` step, then use `ENV` to put its `bin` first on `PATH` or point
+  `JAVA_HOME` at it:
 
   ```dockerfile
   RUN tar xzf jdk-21.tar.gz -C /opt/java && /opt/java/jdk-21/bin/java -jar fetch.jar   # fails
@@ -447,8 +459,10 @@ reported as blocked; see
 - Chromium trusts the CA only through the NSS database under the `HOME` the step starts with.
   Chromium started with another `HOME` (`HOME=/tmp chromium`) or as another user (`su`, `gosu`,
   `sudo -u`) does not trust it: switch users with `USER` and leave `HOME` alone within the step. A
-  Chromium before M146 reads only `~/.pki/nssdb`. A database the step's user cannot write takes no
-  slot, and the step warns; use `proxy-engine: universal` for Chromium there. See
+  Chromium before M146 reads only `~/.pki/nssdb`. Buildcage adds the CA by giving a copy of the
+  database's `pkcs11.txt` an extra entry that points at a store holding only the CA. A database the
+  step's user cannot write gets no such entry, and the step warns; use `proxy-engine: universal`
+  for Chromium there. See
   [Chromium](./docs/reference.md#chromium).
 - A Firefox carrying Mozilla's own root list, such as Playwright's or the one Selenium drives, reads
   a per-profile database and does not trust the CA; use `proxy-engine: universal` or an
@@ -471,7 +485,7 @@ reported as blocked; see
   it a warning). One that cannot be read, such as in a compressed archive, is not found and stays in
   the image. See [CA residue](./docs/reference.md#ca-residue).
 - `audit` terminates TLS as well. It drops the rules, not the interception, so a tool that cannot
-  accept the CA fails in `audit` exactly as it would in `restrict`.
+  accept the CA fails in `audit` just as it would in `restrict`.
 - An image with no system CA store (`scratch`, distroless, or `debian:*-slim` before
   `ca-certificates` is installed) still gets every variable set, but pointed at a file trusting only
   the proxy's own CA. That is enough for ordinary HTTPS, since `inspect` re-signs all of it with
@@ -538,15 +552,14 @@ enforcement mechanism. Its source policy matches a request's host, port and URL 
 notion of an HTTP method, so it cannot allow a fetch from a registry while blocking a publish to the
 same host, which `inspect` does by terminating TLS. And because it is an explicit proxy, what it
 enforces and records reaches only tools that honor the proxy variables; a tool that ignores them is
-not covered. Buildcage enforces at the network level instead, so it also covers those tools and can
-act on the method and URL.
+not covered. Buildcage enforces at the network level instead, so it also covers those tools.
 
 **Can I trust the action itself?**
 
-Buildcage relies on being verifiable rather than on being trusted. The source is open for anyone to
-read at any time, and the action runs only what was built from it: each release is immutable, its
-image is built from the release commit and signed, and the action verifies that before it runs.
-Changing what Buildcage does means changing its public source first. See
+You can check what it runs instead of taking it on trust. The source is public, and the action runs
+only what was built from it: each release is immutable, its image is built from the release commit
+and signed, and the action verifies that signature before it runs. Changing what Buildcage does
+means changing its public source first. See
 [Image provenance verification](./docs/security.md#image-provenance-verification).
 
 ## GitHub's native egress firewall
@@ -562,7 +575,8 @@ One policy for the whole run is one allowlist for every step in it: the destinat
 `actions/checkout`, the caches and the setup actions need stay open to the build as well. Buildcage
 writes a separate allowlist for the build you don't trust, so a `docker build` gets the hosts that
 build needs and nothing else, and a rule there can name a method and a URL rather than only a host.
-The two compose: a perimeter the job can't switch off, and a tighter policy inside it.
+The two can be used together: GitHub's firewall as an outer limit the job cannot turn off, and
+Buildcage as a narrower allowlist for the build.
 
 Buildcage also runs on any Linux runner with Docker, self-hosted included, rather than on a
 firewall-enabled runner image.
@@ -577,12 +591,12 @@ firewall-enabled runner image.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests at [github.com/buildcage/docker](https://github.com/buildcage/docker).
+Issues and pull requests are welcome at [github.com/buildcage/docker](https://github.com/buildcage/docker).
 
 ## Show Your Support
 
 Knowing that this project is useful to others gives me the motivation to keep working on it.
-If you find Buildcage helpful, please consider giving it a star ⭐ on GitHub!
+If you find Buildcage useful, please consider giving it a star on GitHub.
 
 ## Disclaimer
 
