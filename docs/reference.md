@@ -733,6 +733,14 @@ no rule allowed anything there either: the table says only that the rules did no
 rules `audit` suggests for `restrict` include these hosts too, since the next run will ask for them
 again.
 
+None of the four fails the step, not even with `fail-on-blocked: true`, and a `::notice::` gives the
+count. No rule blocked them, so no rule can clear them either. `known-blocked-rules` has nothing to
+match, and an `allowed-*` entry changes nothing. What clears one is the origin coming back, or the
+build reaching for something that is up.
+
+A blocked `DNS` row for the same name is different. That one is Buildcage's own resolver saying no
+rule allows the name, and it does fail the step.
+
 A connection Buildcage never completed is not one of these. It is blocked, listed in Blocked Hosts,
 and fails the step:
 
@@ -751,14 +759,6 @@ completed is one whose origin it never authenticated. See
 
 An `origin-connect-failed` row from a host you know to be flaky rather than hostile is cleared the
 way any expected block is, by listing the host in `known-blocked-rules`.
-
-None of the four fails the step, not even with `fail-on-blocked: true`, and a `::notice::` gives the
-count. No rule blocked them, so no rule can clear them either. `known-blocked-rules` has nothing to
-match, and an `allowed-*` entry changes nothing. What clears one is the origin coming back, or the
-build reaching for something that is up.
-
-A blocked `DNS` row for the same name is different. That one is Buildcage's own resolver saying no
-rule allows the name, and it does fail the step.
 
 ## Hidden query parameters
 
