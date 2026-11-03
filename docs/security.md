@@ -403,9 +403,10 @@ the path, and a recorded query is as likely to hold a one-off token as anything 
 ## Hardening
 
 Buildcage runs against your Dockerfile as it is, and an allowlist generated from an audit run
-already blocks every destination the audit did not record. Going further is about shrinking the set
-of services that stay reachable, which is the [structural limit](#threat-model) above. Weigh what
-follows against what the build has access to.
+already blocks every host the audit did not record, apart from what the `allowed-tls-rules` and
+`allowed-ip-rules` it carries over from the audit run's own inputs admit. Going further is about
+shrinking the set of services that stay reachable, which is the [structural limit](#threat-model)
+above. Weigh what follows against what the build has access to.
 
 ### Keep each rule as narrow as it can be
 

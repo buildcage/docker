@@ -14,8 +14,8 @@ access. Buildcage puts that behind an allowlist: each `RUN` step can reach only 
 name, and anything else is blocked and reported.
 
 - Your Dockerfile doesn't change, BuildKit isn't patched, and the CA and variables Buildcage adds to
-  a step are taken back out before its layer is committed
-  ([details](#ca-trust-and-compatibility)).
+  a step are taken back out before its layer is committed, apart from the exceptions in
+  [CA trust and compatibility](#ca-trust-and-compatibility).
 - Run once in [`audit`](#operation-modes) mode and the report writes the allowlist for you, ready to
   review and paste back into the workflow.
 - A rule can name an HTTP method and a URL, inside TLS as well, so a build can fetch a package from
@@ -172,7 +172,9 @@ heading or a rule can carry its reason. It works the same in every rule input.
 ### Operation modes
 
 `proxy-mode: audit` logs every destination the build reaches and enforces none of the rules. It
-still blocks a malformed request and a name that resolves to cloud metadata or the runner itself.
+still blocks what no rule could allow, such as a malformed request or a name that resolves to an
+internal address like cloud metadata or the runner itself, and under `inspect` an origin whose
+certificate fails verification.
 `restrict`, the default, allows only what the rules match and blocks and logs everything else. Start
 with `audit` when you first adopt Buildcage or when a dependency changes, and keep `restrict` for
 everyday builds.
