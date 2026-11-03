@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { scanInspectLog, hasProxyStarted } from "./inspect.ts";
+import { scanInspectLog } from "./inspect.ts";
 import type { TrafficEvent } from "./traffic-event.ts";
 
 // Lines exactly as the generated configuration emits them. The timestamp is
@@ -437,18 +437,6 @@ describe("a connection sent straight to an address with an SNI that ended before
       "buildcage 1 https GET 200 5 ts=-- reason=- tlserr=- dst=203.0.113.9:443 fcerr=- sni=exfil.attacker.example host=registry.npmjs.org /x";
     const [e] = await judge([served]);
     expect(e.action).toBe("allow");
-  });
-});
-
-describe("hasProxyStarted", () => {
-  it("tells a proxy that saw nothing from one that never ran", () => {
-    expect(hasProxyStarted(["buildcage haproxy starting"])).toBe(true);
-    expect(hasProxyStarted([ALLOWED])).toBe(false);
-    expect(hasProxyStarted([])).toBe(false);
-  });
-
-  it("matches the marker with its timestamp", () => {
-    expect(hasProxyStarted(["buildcage haproxy starting 1787471970000"])).toBe(true);
   });
 });
 

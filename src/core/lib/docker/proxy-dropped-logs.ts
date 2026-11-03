@@ -97,9 +97,25 @@ export function readProxyDroppedLogs(
   token = randomBytes(16).toString("hex"),
 ): ProxyDroppedLogs {
   const caughtUp = awaitProxyLog(docker, containerId, token);
-  let metrics: string;
+  const metrics = readMetrics(docker, containerId);
+  if (metrics === undefined) {
+    return { answered: false, count: undefined, logConnections: undefined };
+  }
+  return {
+    answered: true,
+    count: caughtUp ? parseDroppedLogs(metrics) : undefined,
+    logConnections: readLogConnections(docker, containerId),
+  };
+}
+
+/** Whether the proxy answers at all, without logging a barrier first. */
+export function readProxyAnswered(docker: Docker, containerId: string): boolean {
+  return readMetrics(docker, containerId) !== undefined;
+}
+
+function readMetrics(docker: Docker, containerId: string): string | undefined {
   try {
-    metrics = docker.exec(containerId, [
+    return docker.exec(containerId, [
       "curl",
       "-sf",
       "--max-time",
@@ -109,13 +125,8 @@ export function readProxyDroppedLogs(
       URL,
     ]);
   } catch {
-    return { answered: false, count: undefined, logConnections: undefined };
+    return undefined;
   }
-  return {
-    answered: true,
-    count: caughtUp ? parseDroppedLogs(metrics) : undefined,
-    logConnections: readLogConnections(docker, containerId),
-  };
 }
 
 function readLogConnections(docker: Docker, containerId: string): number | undefined {

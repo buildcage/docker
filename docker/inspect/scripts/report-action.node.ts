@@ -12,9 +12,8 @@
 import { readProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
 import { readResolverAnswered } from "#core/lib/docker/resolver-health.ts";
 import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
-import { errorMessage } from "#core/lib/errors.ts";
 import { buildInspectReportData } from "#core/lib/report/build/inspect.ts";
-import { runReportAction } from "#report/action-main.ts";
+import { reportActionError, runReportAction } from "#report/action-main.ts";
 
 const PROXY_LOG_DIR = "/var/log/haproxy";
 const RESOLVER_LOG_DIR = "/var/log/coredns";
@@ -32,6 +31,6 @@ runReportAction({
     );
   },
 }).catch((e) => {
-  console.log(`::error::Unexpected error in report-action: ${errorMessage(e)}`);
+  console.log(reportActionError(e));
   process.exit(1);
 });

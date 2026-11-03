@@ -304,7 +304,8 @@ How the alert and the tables are made up is in [Report details](./docs/reference
 In `restrict` mode the step fails when a blocked connection is found, and with it the workflow. Pass
 `fail-on-blocked: false` to report without failing, or list what you expect to stay blocked in the
 setup action's `known-blocked-rules`. In `audit` mode a blocked connection or an incomplete report
-does not fail the step. The action's inputs are in
+does not fail the step, but a proxy or resolver that stopped answering does, in any mode. The
+action's inputs are in
 [Reference](./docs/reference.md#report-action-inputs).
 
 ### Traffic artifact
