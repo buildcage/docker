@@ -15061,15 +15061,16 @@ function isOutside(root, path) {
 function resolveConfigPath(path, env, baseDir) {
 	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
 	if ((0, node_path.isAbsolute)(path)) throw pathError("must be a relative path.");
-	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(baseDir ?? workspace, path);
-	if (isOutside(workspace, full)) throw pathError("leads outside the workspace.");
+	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), full = (0, node_path.resolve)(baseDir ?? workspace, path), outside = (to, root) => pathError(`(${to}) leads outside the workspace (${root}).`);
+	if (isOutside(workspace, full)) throw outside(full, workspace);
 	let real;
 	try {
 		real = (0, node_fs.realpathSync)(full);
 	} catch {
 		throw pathError(`(${full}) was not found. Check out the repository in an earlier step.`);
 	}
-	if (isOutside((0, node_fs.realpathSync)(workspace), real)) throw pathError("leads outside the workspace.");
+	let realWorkspace = (0, node_fs.realpathSync)(workspace);
+	if (isOutside(realWorkspace, real)) throw outside(real, realWorkspace);
 	return real;
 }
 const resolved = (node, doc) => (0, import_dist$2.isAlias)(node) ? node.resolve(doc) : node;
