@@ -20,7 +20,7 @@ import {
 
 import { ActionError, errorMessage } from "#core/lib/errors.ts";
 
-import { hasDotDotAfterStart } from "./dot-dot.ts";
+import { DOT_DOT_AFTER_START, hasDotDotAfterStart } from "./dot-dot.ts";
 import { inputEnvName, legacyInputName } from "./input-names.ts";
 
 export class ConfigFileError extends ActionError<
@@ -102,21 +102,22 @@ function resolveConfigPath(path: string, env: NodeJS.ProcessEnv, baseDir?: strin
   const pathError = (reason: string) =>
     new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
 
-  if (hasDotDotAfterStart(path)) {
-    throw pathError('has a ".." after its start; only a leading "../" may climb.');
-  }
+  if (hasDotDotAfterStart(path)) throw pathError(DOT_DOT_AFTER_START);
   const workspace = resolve(env.GITHUB_WORKSPACE || process.cwd());
+  let realWorkspace: string;
+  try {
+    realWorkspace = realpathSync(workspace);
+  } catch (e) {
+    throw pathError(`cannot be read: the workspace (${workspace}) is missing: ${errorMessage(e)}`);
+  }
   const notFound = (at: string) =>
     pathError(
       `(${at}) was not found. Check the path, and that an earlier step checked out the repository.`,
     );
-  let realWorkspace: string;
-  try {
-    realWorkspace = realpathSync(workspace);
-  } catch {
-    throw notFound(workspace);
-  }
-  const outside = (to: string) => pathError(`(${to}) leads outside the workspace (${workspace}).`);
+  // The workspace as the check sees it, with its real path where that differs.
+  const named = realWorkspace === workspace ? workspace : `${workspace}, at ${realWorkspace}`;
+  const outside = (to: string) =>
+    pathError(`${to === path ? "" : `(${to}) `}leads outside the workspace (${named}).`);
   // The base has no symlinks, so a leading `..` climbs by spelling to where
   // the kernel would.
   const full = resolve(baseDir ?? realWorkspace, path);

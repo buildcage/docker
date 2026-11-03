@@ -411,7 +411,7 @@ describe("applyConfigFile", () => {
       expectError(
         envFor(join(root, "outside.yml")),
         "CONFIG_FILE_PATH",
-        `config-file ${JSON.stringify(join(root, "outside.yml"))} (${join(root, "outside.yml")}) leads outside the workspace (${workspace}).`,
+        `config-file ${JSON.stringify(join(root, "outside.yml"))} leads outside the workspace (${workspace}).`,
       );
     });
 
@@ -419,7 +419,7 @@ describe("applyConfigFile", () => {
       expectError(
         envFor(join(root, "missing.yml")),
         "CONFIG_FILE_PATH",
-        `config-file ${JSON.stringify(join(root, "missing.yml"))} (${join(root, "missing.yml")}) leads outside the workspace (${workspace}).`,
+        `config-file ${JSON.stringify(join(root, "missing.yml"))} leads outside the workspace (${workspace}).`,
       );
     });
 
@@ -429,8 +429,9 @@ describe("applyConfigFile", () => {
       expectError(
         { GITHUB_WORKSPACE: missing, "INPUT_CONFIG-FILE": "buildcage.yml" },
         "CONFIG_FILE_PATH",
-        `config-file "buildcage.yml" (${missing}) was not found. ` +
-          "Check the path, and that an earlier step checked out the repository.",
+        new RegExp(
+          `^config-file "buildcage\\.yml" cannot be read: the workspace \\(${missing}\\) is missing: ENOENT`,
+        ),
       );
     });
 
@@ -441,7 +442,8 @@ describe("applyConfigFile", () => {
         expectError(
           envFor(path),
           "CONFIG_FILE_PATH",
-          `config-file ${JSON.stringify(path)} has a ".." after its start; only a leading "../" may climb.`,
+          `config-file ${JSON.stringify(path)} has a ".." after its start. Name the path without it; ` +
+            'only a relative path may climb, with a leading "../".',
         );
       },
     );
@@ -518,6 +520,17 @@ describe("applyConfigFile", () => {
         "INPUT_CONFIG-FILE": "../workspace/buildcage.yml",
       };
       expect(applyConfigFile(env, INPUTS)?.path).toBe(join(workspace, "buildcage.yml"));
+    });
+
+    it("names the real path of a symlinked workspace it leads out of", () => {
+      writeFileSync(join(root, "outside.yml"), "proxy-mode: audit\n");
+      symlinkSync(workspace, join(root, "linked-workspace"));
+      expectError(
+        { GITHUB_WORKSPACE: join(root, "linked-workspace"), "INPUT_CONFIG-FILE": "../outside.yml" },
+        "CONFIG_FILE_PATH",
+        `config-file "../outside.yml" (${join(root, "outside.yml")}) leads outside the workspace ` +
+          `(${join(root, "linked-workspace")}, at ${workspace}).`,
+      );
     });
 
     it("refuses a symlink out of the workspace", () => {

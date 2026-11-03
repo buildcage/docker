@@ -4969,7 +4969,7 @@ var require_identity = __commonJSMin(((exports) => {
 }))();
 function hasDotDotAfterStart(path) {
 	let parts = path.split("/"), start = 0;
-	for (; parts[start] === ".." || parts[start] === ".";) start++;
+	for (; ["..", "."].includes(parts[start]) || start > 0 && parts[start] === "";) start++;
 	return parts.slice(start).includes("..");
 }
 //#endregion
@@ -5023,14 +5023,14 @@ function isOutside(root, path) {
 }
 function resolveConfigPath(path, env, baseDir) {
 	let pathError = (reason) => new ConfigFileError(`config-file ${JSON.stringify(path)} ${reason}`, "CONFIG_FILE_PATH");
-	if (hasDotDotAfterStart(path)) throw pathError("has a \"..\" after its start; only a leading \"../\" may climb.");
-	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), notFound = (at) => pathError(`(${at}) was not found. Check the path, and that an earlier step checked out the repository.`), realWorkspace;
+	if (hasDotDotAfterStart(path)) throw pathError("has a \"..\" after its start. Name the path without it; only a relative path may climb, with a leading \"../\".");
+	let workspace = (0, node_path.resolve)(env.GITHUB_WORKSPACE || process.cwd()), realWorkspace;
 	try {
 		realWorkspace = (0, node_fs.realpathSync)(workspace);
-	} catch {
-		throw notFound(workspace);
+	} catch (e) {
+		throw pathError(`cannot be read: the workspace (${workspace}) is missing: ${errorMessage(e)}`);
 	}
-	let outside = (to) => pathError(`(${to}) leads outside the workspace (${workspace}).`), full = (0, node_path.resolve)(baseDir ?? realWorkspace, path), real;
+	let notFound = (at) => pathError(`(${at}) was not found. Check the path, and that an earlier step checked out the repository.`), named = realWorkspace === workspace ? workspace : `${workspace}, at ${realWorkspace}`, outside = (to) => pathError(`${to === path ? "" : `(${to}) `}leads outside the workspace (${named}).`), full = (0, node_path.resolve)(baseDir ?? realWorkspace, path), real;
 	try {
 		real = (0, node_fs.realpathSync)(full);
 	} catch {
