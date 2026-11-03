@@ -88,15 +88,18 @@ function readFailOnBlocked(): boolean {
   }
 }
 
+/** The logs could not be read, so the step fails whatever the mode. */
+export class LogsUnreadableError extends Error {}
+
 /**
  * The logs could not be read and the proxy or the resolver did not answer
  * either, as when the container stopped during the report.
  */
-export class BuilderStoppedError extends Error {}
+export class BuilderStoppedError extends LogsUnreadableError {}
 
 /** The annotation an engine's report-action.node.ts prints for a failed run. */
 export function reportActionError(e: unknown): string {
-  return e instanceof BuilderStoppedError
+  return e instanceof LogsUnreadableError
     ? `::error::${e.message}`
     : `::error::Unexpected error in report-action: ${errorMessage(e)}`;
 }
@@ -126,7 +129,9 @@ export async function runReportAction(
     // Asked again without a barrier, as the container can stop after the
     // first answer.
     if (readProxyAnswered(docker, containerId) && readResolverAnswered(docker, containerId)) {
-      throw e;
+      throw new LogsUnreadableError(
+        `The proxy and the DNS resolver answered but the logs could not be read: ${errorMessage(e)}`,
+      );
     }
     throw new BuilderStoppedError(
       "The buildcage container stopped or hung: the proxy or the DNS resolver did not answer " +

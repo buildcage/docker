@@ -4,14 +4,14 @@ import { REPORT_SOURCE_LABEL } from "#report/report-source.ts";
 
 import { ReportError } from "./errors.ts";
 
+const NOT_RUNNING = ["status=created", "status=exited", "status=dead"];
+
 /**
  * Locates the report-source container purely via Docker metadata: the
  * Compose project this builder-name derives to, plus buildcage's own label.
  * Anything other than exactly one match is an error rather than a guess:
  * reporting on the wrong container would report on the wrong build.
  */
-const NOT_RUNNING = ["status=created", "status=exited", "status=dead"];
-
 export function findReportSourceContainer(
   docker: Docker,
   projectName: string,

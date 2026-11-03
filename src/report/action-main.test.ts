@@ -11,6 +11,7 @@ import { reportParams, UNINTERRUPTED } from "#core/lib/test/report-data.node.ts"
 
 import {
   BuilderStoppedError,
+  LogsUnreadableError,
   reportActionError,
   runReportAction,
   type ReportActionSpec,
@@ -154,14 +155,17 @@ describe("runReportAction when the logs cannot be read", () => {
     },
   );
 
-  it("passes the read error on as it is while both services answer", async () => {
+  it("names the unreadable logs while both services answer", async () => {
     const result = runReportAction(unreadable, {
       containerId: "abc123",
       docker: answering(true, true),
       env: {},
     });
-    await expect(result).rejects.toThrow("container is not running");
+    await expect(result).rejects.toThrow(LogsUnreadableError);
     await expect(result).rejects.not.toThrow(BuilderStoppedError);
+    await expect(result).rejects.toThrow(
+      "The proxy and the DNS resolver answered but the logs could not be read: container is not running",
+    );
   });
 });
 
@@ -169,6 +173,12 @@ describe("reportActionError", () => {
   it("prints a stopped container's message as it is", () => {
     expect(reportActionError(new BuilderStoppedError("The buildcage container stopped"))).toBe(
       "::error::The buildcage container stopped",
+    );
+  });
+
+  it("prints unreadable logs' message as it is", () => {
+    expect(reportActionError(new LogsUnreadableError("The logs could not be read"))).toBe(
+      "::error::The logs could not be read",
     );
   });
 
