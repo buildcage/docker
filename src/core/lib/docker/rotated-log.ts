@@ -60,5 +60,9 @@ export function readRotatedLog(
   containerId: string,
   dir: string,
 ): AsyncIterable<string> {
-  return docker.execLines(containerId, ["sh", "-c", READ_SCRIPT, "sh", dir], `reading ${dir}`);
+  return docker.execLines(
+    containerId,
+    ["sh", "-c", READ_SCRIPT, "sh", dir],
+    `docker exec reading ${dir}`,
+  );
 }

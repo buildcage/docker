@@ -60,7 +60,8 @@ export interface ReportDataCommon {
   logLooksPlausible: boolean;
 
   /** How many lines the proxy said it dropped, by its own counter and by the
-   *  notices in its log. Zero where it could not say. */
+   *  notices in its log. At least that many: the counter starts over when the
+   *  proxy restarts, and adds nothing where it could not be read. */
   droppedLines: number;
 
   /** False when the proxy did not answer the report: it stopped during the run

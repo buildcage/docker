@@ -143,7 +143,7 @@ export function describeInterruptions({
   }
   if (droppedLines) {
     facts.push(
-      `The proxy dropped ${droppedLines} log line(s) during the run because it could not write them.`,
+      `The proxy dropped at least ${droppedLines} log line(s) during the run because it could not write them.`,
     );
   }
   return facts;

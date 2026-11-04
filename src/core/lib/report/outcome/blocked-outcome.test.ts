@@ -195,7 +195,7 @@ describe("describeInterruptions", () => {
 
   it("counts the lines the proxy dropped", () => {
     expect(describeInterruptions({ ...UNINTERRUPTED, droppedLines: 3 })).toStrictEqual([
-      "The proxy dropped 3 log line(s) during the run because it could not write them.",
+      "The proxy dropped at least 3 log line(s) during the run because it could not write them.",
     ]);
   });
 });
@@ -316,7 +316,7 @@ describe("describeBlockedOutcome", () => {
         droppedLines: 4,
       }).message,
     ).toBe(
-      "2 blocked connection(s) and lookup(s) detected by buildcage proxy, but the logs are incomplete and this is not a full record. The proxy dropped 4 log line(s) during the run because it could not write them.",
+      "2 blocked connection(s) and lookup(s) detected by buildcage proxy, but the logs are incomplete and this is not a full record. The proxy dropped at least 4 log line(s) during the run because it could not write them.",
     );
   });
 

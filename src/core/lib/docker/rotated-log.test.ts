@@ -57,7 +57,7 @@ describe("readRotatedLog", () => {
       expect.any(String),
       "sh",
       "/var/log/haproxy",
-      "reading /var/log/haproxy",
+      "docker exec reading /var/log/haproxy",
     ]);
   });
 });
