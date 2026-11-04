@@ -239,10 +239,11 @@ function parseConfig(
   // Each input's key; one in its underscore spelling is read as that input.
   const keys = new Map<string, string>();
   for (const key of Object.keys(js)) {
-    const name = known.find((input) => key === input || key === legacyInputName(input));
+    const spells = (input: string) => key === input || key === legacyInputName(input);
+    const name = known.find(spells);
     if (!name) {
-      const reason = stepOnly.some((input) => key === input || key === legacyInputName(input))
-        ? `${JSON.stringify(key)} can be set only on the step, not in a config-file`
+      const reason = stepOnly.some(spells)
+        ? `${JSON.stringify(key)} can be set only on the step`
         : `unknown key ${JSON.stringify(key)}`;
       throw invalid(`${reason}. Allowed keys: ${known.join(", ")}.`);
     }

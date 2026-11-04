@@ -19,15 +19,13 @@ function inputsOf(path: string): string[] {
 }
 
 describe("CONFIG_FILE_INPUTS", () => {
-  it("names every input of setup and report but config-file itself", () => {
-    const inputs = new Set([...inputsOf("action.yml"), ...inputsOf("report/action.yml")]);
-    inputs.delete("config-file");
-    const hyphenated = [...inputs].filter((name) => !name.includes("_"));
-    expect([...CONFIG_FILE_INPUTS.known].sort()).toEqual(hyphenated.sort());
-  });
-
-  it("names config-file itself as the step's own", () => {
+  it("names every input of setup and report, config-file itself as the step's own", () => {
+    const inputs = [...new Set([...inputsOf("action.yml"), ...inputsOf("report/action.yml")])];
+    const hyphenated = inputs.filter((name) => !name.includes("_"));
     expect(CONFIG_FILE_INPUTS.stepOnly).toEqual(["config-file"]);
+    expect([...CONFIG_FILE_INPUTS.known, ...CONFIG_FILE_INPUTS.stepOnly!].sort()).toEqual(
+      hyphenated.sort(),
+    );
   });
 
   it("declares each input's underscore spelling too, and INPUT_NAMES names them all", () => {

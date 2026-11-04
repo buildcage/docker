@@ -127,8 +127,8 @@ known-blocked-rules: |
     config-file: app/buildcage.yml
 ```
 
-- Each key is an input name of either action, in either spelling, and each value is written as it
-  would be under `with:`. The step fails on a key that is neither action's input, on a value that is
+- Each key is an input name of either action but `config-file`, in either spelling, and each value
+  is written as it would be under `with:`. The step fails on any other key, on a value that is
   a list or a nested mapping, and on an input set under both spellings. The exception is an input
   whose other spelling comes in through a merge key (`<<`): the file's own key then wins.
 - Give the same file to the report action. The report reads `builder-name`, `fail-on-blocked` and

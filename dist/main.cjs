@@ -5080,8 +5080,8 @@ function parseConfig(text, path, { known, stepOnly = [] }) {
 		if (node.type !== import_dist$3.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
 	}, own = new Set(doc.contents.items.filter(({ key }) => !isMergeKey(key, doc)).map(({ key }) => resolved(key, doc)).filter(import_dist$3.isScalar).map((key) => String(key.value))), keys = new Map();
 	for (let key of Object.keys(js)) {
-		let name = known.find((input) => key === input || key === legacyInputName(input));
-		if (!name) throw invalid(`${stepOnly.some((input) => key === input || key === legacyInputName(input)) ? `${JSON.stringify(key)} can be set only on the step, not in a config-file` : `unknown key ${JSON.stringify(key)}`}. Allowed keys: ${known.join(", ")}.`);
+		let spells = (input) => key === input || key === legacyInputName(input), name = known.find(spells);
+		if (!name) throw invalid(`${stepOnly.some(spells) ? `${JSON.stringify(key)} can be set only on the step` : `unknown key ${JSON.stringify(key)}`}. Allowed keys: ${known.join(", ")}.`);
 		let other = keys.get(name);
 		if (other === void 0 || own.has(key) && !own.has(other)) keys.set(name, key);
 		else if (own.has(key) || !own.has(other)) throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);

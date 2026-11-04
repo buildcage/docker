@@ -614,8 +614,8 @@ describe("applyConfigFile", () => {
           name: ConfigFileError.name,
           code: "CONFIG_FILE_INVALID",
           message:
-            `Invalid config-file "buildcage.yml": "${key}" can be set only on the step, not in a ` +
-            "config-file. Allowed keys: proxy-mode, proxy-engine, allowed-https-rules, known-blocked-rules.",
+            `Invalid config-file "buildcage.yml": "${key}" can be set only on the step. Allowed ` +
+            "keys: proxy-mode, proxy-engine, allowed-https-rules, known-blocked-rules.",
         }),
       );
     });
