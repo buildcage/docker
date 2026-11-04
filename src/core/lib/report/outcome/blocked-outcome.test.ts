@@ -189,7 +189,7 @@ describe("describeInterruptions", () => {
       }),
     ).toStrictEqual([
       "The proxy's log writer restarted 2 time(s) during the run, losing the lines it had been sent but not yet written.",
-      "The DNS resolver's log writer restarted 1 time(s) during the run, losing the lines it had been sent but not yet written.",
+      "The DNS resolver's log writer died 1 time(s) during the run, losing the lines it had been sent but not yet written.",
     ]);
   });
 });
@@ -262,7 +262,7 @@ describe("describeBlockedOutcome", () => {
       level: "error",
       shouldFail: true,
       message:
-        "buildcage proxy logs are incomplete, so this report is not a full record of what ran (3 blocked connection(s) and lookup(s) still recorded). Either the logs don't begin where a real run does, one carries a line the report cannot read, or the proxy dropped lines it could not write (or the report could not tell whether the proxy or a log writer lost any). A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
+        "buildcage proxy logs are incomplete, so this report is not a full record of what ran (3 blocked connection(s) and lookup(s) still recorded). Either the logs don't begin where a real run does, one carries a line the report cannot read, the proxy dropped lines it could not write, or the report could not tell whether the proxy or a log writer lost any. A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
     });
   });
 
@@ -313,7 +313,7 @@ describe("describeBlockedOutcome", () => {
       level: "error",
       shouldFail: true,
       message:
-        "buildcage proxy logs are incomplete, so this report is not a full record of what ran. The proxy did not answer the report, so it stopped or hung during the run. Requests made while it was down failed rather than going around it. The step fails for this whatever the mode or fail-on-blocked. Other causes may apply too: the logs don't begin where a real run does, one carries a line the report cannot read, or the proxy dropped lines it could not write (or the report could not tell whether the proxy or a log writer lost any). A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
+        "buildcage proxy logs are incomplete, so this report is not a full record of what ran. The proxy did not answer the report, so it stopped or hung during the run. Requests made while it was down failed rather than going around it. The step fails for this whatever the mode or fail-on-blocked. Other causes may apply too: the logs don't begin where a real run does, one carries a line the report cannot read, the proxy dropped lines it could not write, or the report could not tell whether the proxy or a log writer lost any. A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
     });
   });
 
@@ -330,7 +330,7 @@ describe("describeBlockedOutcome", () => {
       level: "error",
       shouldFail: true,
       message:
-        "buildcage proxy logs are incomplete, so this report is not a full record of what ran. The DNS resolver did not answer the report, so it stopped or hung during the run. Lookups made while it was down failed and left no line. The step fails for this whatever the mode or fail-on-blocked. Other causes may apply too: the logs don't begin where a real run does, one carries a line the report cannot read, or the proxy dropped lines it could not write (or the report could not tell whether the proxy or a log writer lost any). A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
+        "buildcage proxy logs are incomplete, so this report is not a full record of what ran. The DNS resolver did not answer the report, so it stopped or hung during the run. Lookups made while it was down failed and left no line. The step fails for this whatever the mode or fail-on-blocked. Other causes may apply too: the logs don't begin where a real run does, one carries a line the report cannot read, the proxy dropped lines it could not write, or the report could not tell whether the proxy or a log writer lost any. A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
     });
   });
 
@@ -343,7 +343,7 @@ describe("describeBlockedOutcome", () => {
         engineLabel: "sandbox",
       }).message,
     ).toBe(
-      "buildcage sandbox logs are incomplete, so this report is not a full record of what ran. Either the logs don't begin where a real run does, one carries a line the report cannot read, or the proxy dropped lines it could not write (or the report could not tell whether the proxy or a log writer lost any). A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
+      "buildcage sandbox logs are incomplete, so this report is not a full record of what ran. Either the logs don't begin where a real run does, one carries a line the report cannot read, the proxy dropped lines it could not write, or the report could not tell whether the proxy or a log writer lost any. A missing beginning was either removed or rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand made as long as a request can be: the report's own tables still count what survived, per host.",
     );
   });
 });

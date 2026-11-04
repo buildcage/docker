@@ -74,7 +74,7 @@ describe("trafficHeadingBlock", () => {
     // as body text.
     for (const line of warning.split("\n")) expect(line).toMatch(/^> /);
     expect(warning.replaceAll("\n> ", " ")).toMatch(
-      /Either the logs don't begin where a real run does, one carries a line that cannot be read, or the proxy dropped lines it could not write/,
+      /Either the logs don't begin where a real run does, one carries a line that cannot be read, the proxy dropped lines it could not write, or the report could not tell whether the proxy or a log writer lost any/,
     );
   });
 

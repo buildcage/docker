@@ -5,8 +5,8 @@
 
 > ❗ **This report is incomplete**, so the tables below are not a full record of this run.
 > Either the logs don't begin where a real run does, one carries a line that cannot be
-> read, or the proxy dropped lines it could not write (or the report could not tell whether
-> the proxy or a log writer lost any).
+> read, the proxy dropped lines it could not write, or the report could not tell whether the
+> proxy or a log writer lost any.
 > A missing beginning was either removed or rotated out by traffic heavy enough to fill the
 > 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand
 > made as long as a request can be.
