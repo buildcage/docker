@@ -123,7 +123,8 @@ export function trafficHeadingBlock(
       "> ❗ **This report is incomplete**, so the tables below are not a full record of this run.\n" +
       facts.map((fact) => `> ${fact}\n`).join("") +
       `> ${possibleCauses(facts)} the logs don't begin where a real run does, one carries a line that cannot be\n` +
-      "> read, or the proxy dropped lines it could not write (or could not say whether it had).\n" +
+      "> read, the proxy dropped lines it could not write, or the report could not tell whether the\n" +
+      "> proxy or a log writer lost any.\n" +
       "> A missing beginning was either removed or rotated out by traffic heavy enough to fill the\n" +
       "> 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few thousand\n" +
       "> made as long as a request can be.\n\n";

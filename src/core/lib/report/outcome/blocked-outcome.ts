@@ -134,6 +134,12 @@ export function describeInterruptions({
         "the lines it had been sent but not yet written.",
     );
   }
+  if (restarts.resolverLog) {
+    facts.push(
+      `The DNS resolver's log writer died ${restarts.resolverLog} time(s) during the run, ` +
+        "losing the lines it had been sent but not yet written.",
+    );
+  }
   return facts;
 }
 
@@ -201,10 +207,10 @@ export function describeBlockedOutcome({
   const message =
     `${counted}. ${facts.map((fact) => `${fact} `).join("")}${possibleCauses(facts)} the logs ` +
     "don't begin where a real run does, one carries a line the " +
-    "report cannot read, or the proxy dropped lines it could not write (or could not say whether " +
-    "it had). A missing beginning was either removed or rotated out by traffic heavy enough to " +
-    "fill the 100 MB of log kept, which takes a few hundred thousand ordinary requests or a few " +
-    "thousand made as long as a request can be: the report's own tables still count what " +
-    "survived, per host.";
+    "report cannot read, the proxy dropped lines it could not write, or the report could not " +
+    "tell whether the proxy or a log writer lost any. A missing beginning was either removed or " +
+    "rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few " +
+    "hundred thousand ordinary requests or a few thousand made as long as a request can be: the " +
+    "report's own tables still count what survived, per host.";
   return { ...outcome, message };
 }

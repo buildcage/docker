@@ -249,7 +249,7 @@ describe("buildUniversalReportData", () => {
       reportParams(),
       HEALTHY,
     );
-    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 0 });
+    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 0, resolverLog: 0 });
     expect(result.logLooksPlausible).toBe(false);
   });
 
@@ -261,7 +261,7 @@ describe("buildUniversalReportData", () => {
       reportParams(),
       { ...HEALTHY, droppedLogs: { ...HEALTHY.droppedLogs, logConnections: 3 } },
     );
-    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 1 });
+    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 1, resolverLog: 0 });
   });
 
   it.each([
@@ -280,8 +280,26 @@ describe("buildUniversalReportData", () => {
           droppedLogs: { ...HEALTHY.droppedLogs, logConnections },
         },
       );
-      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog });
+      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog, resolverLog: 0 });
       expect(result.logLooksPlausible).toBe(false);
+    },
+  );
+
+  it.each([
+    { resolverLogDeaths: 0, resolverLog: 0, plausible: true },
+    { resolverLogDeaths: 1, resolverLog: 1, plausible: false },
+    { resolverLogDeaths: undefined, resolverLog: 0, plausible: false },
+  ])(
+    "logLooksPlausible is $plausible with $resolverLogDeaths deaths of the resolver's log writer",
+    async ({ resolverLogDeaths, resolverLog, plausible }) => {
+      const result = await buildUniversalReportData(
+        [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
+        [DNS_START],
+        reportParams(),
+        { ...HEALTHY, resolverLogDeaths },
+      );
+      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog: 0, resolverLog });
+      expect(result.logLooksPlausible).toBe(plausible);
     },
   );
 

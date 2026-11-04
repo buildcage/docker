@@ -258,7 +258,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   proxyScan: Promise<InspectLogScan | HaproxyLogScan>,
   dnsScan: Promise<DnsLogScan>,
   parameters: GenReportParameters,
-  { droppedLogs, resolverAnswered }: ServiceHealth,
+  { droppedLogs, resolverAnswered, resolverLogDeaths: resolverLog }: ServiceHealth,
 ): Promise<Extract<ReportData, { engine: E }>> {
   const [
     {
@@ -299,10 +299,11 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       resolverAnswered &&
       proxy === 0 &&
       resolver === 0 &&
-      proxyLog === 0,
+      proxyLog === 0 &&
+      resolverLog === 0,
     proxyAnswered: droppedLogs.answered,
     resolverAnswered,
-    restarts: { proxy, resolver, proxyLog: proxyLog ?? 0 },
+    restarts: { proxy, resolver, proxyLog: proxyLog ?? 0, resolverLog: resolverLog ?? 0 },
     startedAt,
     timeline,
   } as Extract<ReportData, { engine: E }>;

@@ -129,9 +129,11 @@ function readMetrics(docker: Docker, containerId: string): string | undefined {
   }
 }
 
+/** haproxy-log adds a line before it takes any log, so an empty file cannot
+ *  vouch for the log either. */
 function readLogConnections(docker: Docker, containerId: string): number | undefined {
   try {
-    return docker.exec(containerId, ["cat", CONNECTIONS]).split("\n").length - 1;
+    return docker.exec(containerId, ["cat", CONNECTIONS]).split("\n").length - 1 || undefined;
   } catch {
     return undefined;
   }

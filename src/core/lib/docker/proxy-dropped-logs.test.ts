@@ -130,7 +130,7 @@ describe("readProxyDroppedLogs", () => {
     });
   });
 
-  it("counts one log connection per line, and none it cannot read", () => {
+  it("counts one log connection per line, and leaves an empty or unreadable file unknown", () => {
     const count = (connections: () => string) =>
       readProxyDroppedLogs(
         fakeDocker(
@@ -143,7 +143,7 @@ describe("readProxyDroppedLogs", () => {
         "abc",
       ).logConnections;
     expect(count(() => "\n\n\n")).toBe(3);
-    expect(count(() => "")).toBe(0);
+    expect(count(() => "")).toBe(undefined);
     expect(count(fail)).toBe(undefined);
   });
 
