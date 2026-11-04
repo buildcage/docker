@@ -51,13 +51,18 @@ export interface ReportDataCommon {
    *  beginning is gone or it is empty, a line of ours could not be read (each
    *  scan's headIntact and unparsed), the proxy dropped a line or could not
    *  say whether it did (proxy-dropped-logs.ts), the resolver did not answer,
-   *  a service or its log writer restarted, or a log writer's restarts could
-   *  not be read. Anything written from this flag
-   *  names what `proxyAnswered`, `resolverAnswered` and `restarts` establish
-   *  and has to list the rest as possibilities, since the flag itself does
-   *  not say which applied. The report fails closed rather than passing off
-   *  what survived as everything. */
+   *  a service restarted, a log writer died, or how often one did could not
+   *  be read. Anything written from this flag names what `proxyAnswered`,
+   *  `resolverAnswered`, `droppedLines` and `restarts` establish and has to
+   *  list the rest as possibilities, since the flag itself does not say which
+   *  applied. The report fails closed rather than passing off what survived
+   *  as everything. */
   logLooksPlausible: boolean;
+
+  /** How many lines the proxy said it dropped, by its own counter and by the
+   *  notices in its log. At least that many: the counter starts over when the
+   *  proxy restarts, and adds nothing where it could not be read. */
+  droppedLines: number;
 
   /** False when the proxy did not answer the report: it stopped during the run
    *  and stayed down, or hung. */

@@ -24,6 +24,7 @@ export const HEALTHY: ServiceHealth = {
 export const UNINTERRUPTED: Interruptions = {
   proxyAnswered: true,
   resolverAnswered: true,
+  droppedLines: 0,
   restarts: { proxy: 0, resolver: 0, proxyLog: 0, resolverLog: 0 },
 };
 

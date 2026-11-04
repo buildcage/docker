@@ -301,6 +301,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       resolver === 0 &&
       proxyLog === 0 &&
       resolverLog === 0,
+    droppedLines: (droppedLogs.count ?? 0) + ringDroppedLines,
     proxyAnswered: droppedLogs.answered,
     resolverAnswered,
     restarts: { proxy, resolver, proxyLog: proxyLog ?? 0, resolverLog: resolverLog ?? 0 },

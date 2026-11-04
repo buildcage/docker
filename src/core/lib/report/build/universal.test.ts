@@ -193,16 +193,22 @@ describe("buildUniversalReportData", () => {
   });
 
   it.each([
-    { droppedLogs: { answered: true, count: 1, logConnections: 1 }, what: "dropped a line" },
+    {
+      droppedLogs: { answered: true, count: 1, logConnections: 1 },
+      what: "dropped a line",
+      droppedLines: 1,
+    },
     {
       droppedLogs: { answered: true, count: undefined, logConnections: 1 },
       what: "could not say whether it dropped one",
+      droppedLines: 0,
     },
     {
       droppedLogs: { answered: false, count: undefined, logConnections: undefined },
       what: "did not answer",
+      droppedLines: 0,
     },
-  ])("logLooksPlausible is false when the proxy $what", async ({ droppedLogs }) => {
+  ])("logLooksPlausible is false when the proxy $what", async ({ droppedLogs, droppedLines }) => {
     // A dropped line leaves no gap either log shows, so only the count can
     // tell a whole log from one a flood thinned out.
     const result = await buildUniversalReportData(
@@ -213,6 +219,7 @@ describe("buildUniversalReportData", () => {
     );
     expect(result.logLooksPlausible).toBe(false);
     expect(result.proxyAnswered).toBe(droppedLogs.answered);
+    expect(result.droppedLines).toBe(droppedLines);
     expect(result.passed.map((r) => r.host)).toStrictEqual(["good.com"]);
   });
 
@@ -225,7 +232,18 @@ describe("buildUniversalReportData", () => {
       HEALTHY,
     );
     expect(result.logLooksPlausible).toBe(false);
+    expect(result.droppedLines).toBe(1);
     expect(result.passed.map((r) => r.host)).toStrictEqual(["good.com"]);
+  });
+
+  it("adds the lines the proxy's counter and its log ring dropped", async () => {
+    const result = await buildUniversalReportData(
+      [HAPROXY_START, "3 events dropped", proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
+      [DNS_START],
+      reportParams(),
+      { ...HEALTHY, droppedLogs: { answered: true, count: 2, logConnections: 1 } },
+    );
+    expect(result.droppedLines).toBe(5);
   });
 
   it("logLooksPlausible is false when the resolver did not answer", async () => {

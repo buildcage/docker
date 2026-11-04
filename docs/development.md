@@ -274,13 +274,14 @@ the log, the report waits for it to stop growing, so the ring has room again, th
 log one more line (`buildcage log barrier ?<token>`) and waits for it to arrive, which also brings
 in any such notice. The report then marks itself incomplete for a notice, for a barrier that never
 arrives, and for a non-zero count from HAProxy's own counter of dropped lines. A proxy that does
-not answer that read fails the step in any mode. A second `buildcage haproxy starting` or
-`buildcage coredns starting` line also marks the report incomplete: a restart loses the line of
-whatever was still open and starts the count over. So does a connection to `haproxy-log` beyond
-one per HAProxy start, each listed in `/var/run/haproxy-log/connections`: the s6-log before it
-died with the lines it had not written. So does any death of `coredns-log`'s s6-log, which
-s6-supervise records as it happens (`s6-svdt /run/service/coredns-log`); a CoreDNS restart leaves
-that service running. To read HAProxy's count of dropped lines by hand:
+not answer that read, or a DNS resolver that does not answer its health check, fails the step in
+any mode. A second `buildcage haproxy starting` or `buildcage coredns starting` line also marks
+the report incomplete: a restart loses the line of whatever was still open and starts the count
+over. So does a connection to `haproxy-log` beyond one per HAProxy start, each listed in
+`/var/run/haproxy-log/connections`: the s6-log before it died with the lines it had not written.
+So does any death of `coredns-log`'s s6-log, which s6-supervise records as it happens
+(`s6-svdt /run/service/coredns-log`); a CoreDNS restart leaves that service running. To read
+HAProxy's count of dropped lines by hand:
 
 ```bash
 docker exec "$B" curl -s --unix-socket /var/run/haproxy-health.sock \
