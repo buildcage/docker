@@ -38,12 +38,12 @@ const NEWER = "@400000006a94d9dc0aaaaaaa.s";
 const NEWEST = "@400000006a94d9dc0bbbbbbb.u";
 
 describe("readRotatedLog", () => {
-  it("runs its script in the container with the directory as its argument", async () => {
+  it("runs its script in the container with the directory as its argument and in its name", async () => {
     let seen: string[] = [];
     const docker: Docker = {
       ...localDocker(),
-      async *execLines(id, args) {
-        seen = [id, ...args];
+      async *execLines(id, args, operation) {
+        seen = [id, ...args, operation];
         yield "line";
       },
     };
@@ -57,6 +57,7 @@ describe("readRotatedLog", () => {
       expect.any(String),
       "sh",
       "/var/log/haproxy",
+      "reading /var/log/haproxy",
     ]);
   });
 });

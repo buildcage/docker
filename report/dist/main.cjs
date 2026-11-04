@@ -15306,12 +15306,12 @@ function createDocker(run = defaultRunCommand, spawnDocker = defaultSpawnCommand
 				hostPath
 			}));
 		},
-		execLines(containerId, args) {
+		execLines(containerId, args, operation) {
 			return streamDockerLines(spawnDocker, [
 				"exec",
 				containerId,
 				...args
-			], `docker exec ${args[0]}`);
+			], operation);
 		},
 		readEnv(containerId) {
 			return parseDockerInspectEnv(run([

@@ -140,14 +140,22 @@ async function drain(iterable: AsyncIterable<string>): Promise<string[]> {
 describe("createDocker execLines", () => {
   it("is lazy: nothing spawns until iteration actually starts", () => {
     const { spawnDocker, calls } = fakeSpawn();
-    createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/var/log/haproxy/current"]);
+    createDocker(undefined, spawnDocker).execLines(
+      "abc123",
+      ["cat", "/var/log/haproxy/current"],
+      "reading /var/log/haproxy/current",
+    );
     expect(calls).toStrictEqual([]);
   });
 
   it("streams docker exec's stdout as lines, in argv order", async () => {
     const { spawnDocker, calls, children } = fakeSpawn();
     const iterablePromise = drain(
-      createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/var/log/haproxy/current"]),
+      createDocker(undefined, spawnDocker).execLines(
+        "abc123",
+        ["cat", "/var/log/haproxy/current"],
+        "reading /var/log/haproxy/current",
+      ),
     );
     // drain()'s first pull has already triggered the spawn synchronously.
     expect(calls).toStrictEqual([["exec", "abc123", "cat", "/var/log/haproxy/current"]]);
@@ -156,10 +164,14 @@ describe("createDocker execLines", () => {
     expect(await iterablePromise).toStrictEqual(["line one", "line two"]);
   });
 
-  it("throws {status, stderr} on a non-zero exit", async () => {
+  it("throws {status, stderr} on a non-zero exit, named by the operation", async () => {
     const { spawnDocker, children } = fakeSpawn();
     const drained = drain(
-      createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/missing"]),
+      createDocker(undefined, spawnDocker).execLines(
+        "abc123",
+        ["cat", "/missing"],
+        "reading /missing",
+      ),
     );
     await Promise.resolve();
     children[0].stderr.write("cat: /missing: No such file or directory\n");
@@ -167,6 +179,7 @@ describe("createDocker execLines", () => {
     await expect(drained).rejects.toSatisfy(
       (e) =>
         (e as { status?: number; stderr?: string }).status === 1 &&
+        (e as Error).message.startsWith("reading /missing exited with code 1: ") &&
         Boolean((e as { stderr?: string }).stderr?.includes("No such file or directory")),
     );
   });
@@ -174,7 +187,7 @@ describe("createDocker execLines", () => {
   it("surfaces a spawn-level ENOENT as-is", async () => {
     const { spawnDocker, children } = fakeSpawn();
     const drained = drain(
-      createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/path"]),
+      createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/path"], "reading /path"),
     );
     await Promise.resolve();
     children[0].failToSpawn(Object.assign(new Error("spawn docker ENOENT"), { code: "ENOENT" }));
@@ -183,10 +196,11 @@ describe("createDocker execLines", () => {
 
   it("kills the child if the consumer stops iterating early", async () => {
     const { spawnDocker, children } = fakeSpawn();
-    const iterable = createDocker(undefined, spawnDocker).execLines("abc123", [
-      "cat",
-      "/var/log/haproxy/current",
-    ]);
+    const iterable = createDocker(undefined, spawnDocker).execLines(
+      "abc123",
+      ["cat", "/var/log/haproxy/current"],
+      "reading /var/log/haproxy/current",
+    );
     const iterator = iterable[Symbol.asyncIterator]();
     // .next() runs synchronously through spawnDocker(args), so the child
     // already exists once this returns.
@@ -201,7 +215,9 @@ describe("createDocker execLines", () => {
   // then finds no exit code at all, only the signal that ended it.
   it("names the signal, and carries no status, when the child was killed", async () => {
     const { spawnDocker, children } = fakeSpawn();
-    const drained = drain(createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/x"]));
+    const drained = drain(
+      createDocker(undefined, spawnDocker).execLines("abc123", ["cat", "/x"], "reading /x"),
+    );
     await Promise.resolve();
     children[0].stderr.write("terminated\n");
     children[0].kill();

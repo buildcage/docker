@@ -91,7 +91,7 @@ export function buildBlockedMessage({
 
 export type Interruptions = Pick<
   ReportDataCommon,
-  "proxyAnswered" | "resolverAnswered" | "restarts"
+  "proxyAnswered" | "resolverAnswered" | "droppedLines" | "restarts"
 >;
 
 /**
@@ -101,6 +101,7 @@ export type Interruptions = Pick<
 export function describeInterruptions({
   proxyAnswered,
   resolverAnswered,
+  droppedLines,
   restarts,
 }: Interruptions): string[] {
   const facts: string[] = [];
@@ -140,6 +141,11 @@ export function describeInterruptions({
         "losing the lines it had been sent but not yet written.",
     );
   }
+  if (droppedLines) {
+    facts.push(
+      `The proxy dropped ${droppedLines} log line(s) during the run because it could not write them.`,
+    );
+  }
   return facts;
 }
 
@@ -161,6 +167,7 @@ export interface DescribeBlockedOutcomeOptions {
   logLooksPlausible: boolean;
   proxyAnswered: boolean;
   resolverAnswered: boolean;
+  droppedLines: number;
   restarts: Interruptions["restarts"];
   engineLabel: "sandbox" | "proxy";
 }
@@ -174,6 +181,7 @@ export function describeBlockedOutcome({
   logLooksPlausible,
   proxyAnswered,
   resolverAnswered,
+  droppedLines,
   restarts,
   engineLabel,
 }: DescribeBlockedOutcomeOptions): DescribedBlockedOutcome {
@@ -188,7 +196,7 @@ export function describeBlockedOutcome({
   });
   const base = buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit });
   if (logLooksPlausible) return { ...outcome, message: base };
-  const facts = describeInterruptions({ proxyAnswered, resolverAnswered, restarts });
+  const facts = describeInterruptions({ proxyAnswered, resolverAnswered, droppedLines, restarts });
   // audit's notice keeps the fixed-format opening buildBlockedMessage
   // promises, so the warning is appended rather than replacing it.
   if (isAudit && proxyAnswered && resolverAnswered) {
@@ -207,7 +215,7 @@ export function describeBlockedOutcome({
   const message =
     `${counted}. ${facts.map((fact) => `${fact} `).join("")}${possibleCauses(facts)} the logs ` +
     "don't begin where a real run does, one carries a line the " +
-    "report cannot read, the proxy dropped lines it could not write, or the report could not " +
+    "report cannot read, or the report could not " +
     "tell whether the proxy or a log writer lost any. A missing beginning was either removed or " +
     "rotated out by traffic heavy enough to fill the 100 MB of log kept, which takes a few " +
     "hundred thousand ordinary requests or a few thousand made as long as a request can be: the " +

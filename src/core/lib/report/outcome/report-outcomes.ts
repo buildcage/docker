@@ -31,6 +31,7 @@ export function describeReportOutcomes(
       logLooksPlausible: report.logLooksPlausible,
       proxyAnswered: report.proxyAnswered,
       resolverAnswered: report.resolverAnswered,
+      droppedLines: report.droppedLines,
       restarts: report.restarts,
       engineLabel,
     }),
