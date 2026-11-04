@@ -33,6 +33,9 @@ export interface ConfigFileInputs {
   /** Inputs whose file value is appended to the workflow's rather than
    *  replaced by it. */
   lists: readonly string[];
+  /** Inputs of the action the file may not set, refused as such rather than
+   *  as unknown keys. */
+  stepOnly?: readonly string[];
 }
 
 /** Where the file's part of an input's value is. */
@@ -188,7 +191,7 @@ function valueNodes(doc: Document): Map<string, unknown> {
 function parseConfig(
   text: string,
   path: string,
-  known: readonly string[],
+  { known, stepOnly = [] }: ConfigFileInputs,
 ): Map<string, ParsedValue> {
   const invalid = (reason: string) =>
     new ConfigFileError(
@@ -238,7 +241,10 @@ function parseConfig(
   for (const key of Object.keys(js)) {
     const name = known.find((input) => key === input || key === legacyInputName(input));
     if (!name) {
-      throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
+      const reason = stepOnly.some((input) => key === input || key === legacyInputName(input))
+        ? `${JSON.stringify(key)} can be set only on the step, not in a config-file`
+        : `unknown key ${JSON.stringify(key)}`;
+      throw invalid(`${reason}. Allowed keys: ${known.join(", ")}.`);
     }
     const other = keys.get(name);
     if (other === undefined || (own.has(key) && !own.has(other))) keys.set(name, key);
@@ -278,9 +284,10 @@ function parseConfig(
  */
 export function applyConfigFile(
   env: NodeJS.ProcessEnv,
-  { known, lists }: ConfigFileInputs,
+  inputs: ConfigFileInputs,
   baseDir?: string,
 ): AppliedConfigFile | undefined {
+  const { lists } = inputs;
   const path = env[inputEnvName("config-file")]?.trim() ?? "";
   if (!path) return undefined;
 
@@ -295,7 +302,7 @@ export function applyConfigFile(
       "CONFIG_FILE_PATH",
     );
   }
-  const values = parseConfig(text, path, known);
+  const values = parseConfig(text, path, inputs);
 
   const ignored: string[] = [];
   const origins = new Map<string, ConfigValueOrigin>();

@@ -26,6 +26,10 @@ describe("CONFIG_FILE_INPUTS", () => {
     expect([...CONFIG_FILE_INPUTS.known].sort()).toEqual(hyphenated.sort());
   });
 
+  it("names config-file itself as the step's own", () => {
+    expect(CONFIG_FILE_INPUTS.stepOnly).toEqual(["config-file"]);
+  });
+
   it("declares each input's underscore spelling too, and INPUT_NAMES names them all", () => {
     for (const path of ["action.yml", "report/action.yml"]) {
       const declared = inputsOf(path);
