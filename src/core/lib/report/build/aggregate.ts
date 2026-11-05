@@ -14,9 +14,10 @@ import {
 import type { DnsLogScan } from "#core/lib/log/dns.ts";
 import type { HaproxyLogScan } from "#core/lib/log/haproxy.ts";
 import type { InspectLogScan } from "#core/lib/log/inspect.ts";
+import type { ServiceHealth } from "#core/lib/log/service-health.ts";
 import { connectedHosts, isRedundantDns, type TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import type { GenReportParameters, ReportData, ServiceHealth } from "../types.ts";
+import type { GenReportParameters, ReportData } from "../types.ts";
 
 export interface AnnotatedBlockedRow extends AggregatedEntry {
   expected: boolean;

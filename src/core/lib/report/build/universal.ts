@@ -1,7 +1,8 @@
 import { scanDnsLog } from "#core/lib/log/dns.ts";
 import { scanHaproxyLog } from "#core/lib/log/haproxy.ts";
+import type { ServiceHealth } from "#core/lib/log/service-health.ts";
 
-import type { GenReportParameters, UniversalReportData, ServiceHealth } from "../types.ts";
+import type { GenReportParameters, UniversalReportData } from "../types.ts";
 import { assembleReportData } from "./aggregate.ts";
 
 /**

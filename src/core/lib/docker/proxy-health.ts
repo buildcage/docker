@@ -14,7 +14,7 @@
 import { randomBytes } from "node:crypto";
 
 import { PROXY_LOG_BARRIER } from "../log/proxy-notices.ts";
-import type { ProxyHealth } from "../report/types.ts";
+import type { ProxyHealth } from "../log/service-health.ts";
 import type { Docker } from "./client.ts";
 
 /** Served by the proxy's `health` frontend; see haproxy-sections.ts. */

@@ -1,3 +1,4 @@
+import type { ServiceHealth } from "../log/service-health.ts";
 /**
  * Report-shaped test data more than one report test needs: the parameter
  * defaults a case starts from, a run nothing interrupted, and the blocked rows
@@ -6,7 +7,7 @@
  */
 import type { AnnotatedBlockedRow } from "../report/build/aggregate.ts";
 import type { Interruptions } from "../report/outcome/blocked-outcome.ts";
-import type { GenReportParameters, ServiceHealth } from "../report/types.ts";
+import type { GenReportParameters } from "../report/types.ts";
 
 /** A proxy that answered, dropped nothing and connected to its log writer once,
  *  and a resolver that answered and whose log writer never died. */
