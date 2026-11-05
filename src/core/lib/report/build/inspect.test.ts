@@ -387,21 +387,21 @@ describe("buildInspectReportData", () => {
   });
 
   it.each([
-    { droppedLogs: { answered: true, count: 1, logConnections: 1 }, what: "dropped a line" },
+    { proxy: { answered: true, droppedLines: 1, logConnections: 1 }, what: "dropped a line" },
     {
-      droppedLogs: { answered: true, count: undefined, logConnections: 1 },
+      proxy: { answered: true, droppedLines: undefined, logConnections: 1 },
       what: "could not say whether it dropped one",
     },
     {
-      droppedLogs: { answered: false, count: undefined, logConnections: undefined },
+      proxy: { answered: false, droppedLines: undefined, logConnections: undefined },
       what: "did not answer",
     },
-  ])("fails closed when the proxy $what", async ({ droppedLogs }) => {
+  ])("fails closed when the proxy $what", async ({ proxy }) => {
     // A dropped line leaves no gap either log shows, so only the count can
     // tell a whole log from one a flood thinned out.
     const r = await buildInspectReportData([START, ALLOWED], [DNS_START], reportParams(), {
       ...HEALTHY,
-      droppedLogs,
+      proxy,
     });
     expect(r.logLooksPlausible).toBe(false);
     expect(r.passed.length).toBe(1);

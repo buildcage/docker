@@ -2,8 +2,9 @@ import { compileRuleSet } from "#core/lib/acl/haproxy-rules.ts";
 import { buildUrlRules } from "#core/lib/acl/url-rules.ts";
 import { scanDnsLog } from "#core/lib/log/dns.ts";
 import { scanInspectLog } from "#core/lib/log/inspect.ts";
+import type { ServiceHealth } from "#core/lib/log/service-health.ts";
 
-import type { GenReportParameters, InspectReportData, ServiceHealth } from "../types.ts";
+import type { GenReportParameters, InspectReportData } from "../types.ts";
 import { assembleReportData } from "./aggregate.ts";
 
 /** Whether the resolver allows a name, by the host regexes its Corefile is

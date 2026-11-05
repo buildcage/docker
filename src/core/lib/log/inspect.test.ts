@@ -275,11 +275,18 @@ describe("scanInspectLog", () => {
     const lines = [
       "[NOTICE] (1) : haproxy version is 3.4.3",
       "buildcage haproxy starting 1787471970000",
-      // The marker without its stamp.
-      "buildcage haproxy starting",
       ALLOWED,
     ];
     expect((await scanInspectLog(lines)).unparsed).toBe(0);
+  });
+
+  it("counts a startup marker without its stamp as unparsed", async () => {
+    const lines = [
+      "buildcage haproxy starting 1787471970000",
+      "buildcage haproxy starting",
+      ALLOWED,
+    ];
+    expect((await scanInspectLog(lines)).unparsed).toBe(1);
   });
 
   it("reads the startup marker's own millisecond epoch", async () => {

@@ -1,6 +1,6 @@
 /**
- * Whether the proxy lost any line of its log, asked when the report runs and
- * before it reads the log.
+ * Whether the proxy still answers and whether it lost any line of its log,
+ * asked when the report runs and before it reads the log.
  *
  * haproxy writes each line without blocking, and a line it cannot write at
  * once is dropped. Its own counter covers a line that never reached the log
@@ -14,6 +14,7 @@
 import { randomBytes } from "node:crypto";
 
 import { PROXY_LOG_BARRIER } from "../log/proxy-notices.ts";
+import type { ProxyHealth } from "../log/service-health.ts";
 import type { Docker } from "./client.ts";
 
 /** Served by the proxy's `health` frontend; see haproxy-sections.ts. */
@@ -54,21 +55,8 @@ const BARRIER_SCRIPT = [
   `grep -rqsF "$2" ${LOG_DIR}`,
 ].join("\n");
 
-/** What the report learned from asking the proxy for its dropped-line count. */
-export interface ProxyDroppedLogs {
-  /** False when the proxy did not answer at all: it stopped during the run and
-   *  stayed down, or hung. */
-  answered: boolean;
-  /** The count, or undefined where it could not be read or the log did not
-   *  catch up. */
-  count: number | undefined;
-  /** How many times the proxy connected to its log writer, or undefined
-   *  where that could not be read. */
-  logConnections: number | undefined;
-}
-
 /** The counter's value in Prometheus text output, or undefined without one. */
-export function parseDroppedLogs(metrics: string): number | undefined {
+export function parseDroppedLines(metrics: string): number | undefined {
   const match = COUNTER.exec(metrics);
   return match ? Number(match[1]) : undefined;
 }
@@ -90,20 +78,21 @@ function awaitProxyLog(docker: Docker, containerId: string, token: string): bool
   }
 }
 
-/** The proxy's dropped-line count, and whether it answered at all. */
-export function readProxyDroppedLogs(
+/** Whether the proxy answered, its dropped-line count once the log caught up,
+ *  and its connections to the log writer. */
+export function readProxyHealth(
   docker: Docker,
   containerId: string,
   token = randomBytes(16).toString("hex"),
-): ProxyDroppedLogs {
+): ProxyHealth {
   const caughtUp = awaitProxyLog(docker, containerId, token);
   const metrics = readMetrics(docker, containerId);
   if (metrics === undefined) {
-    return { answered: false, count: undefined, logConnections: undefined };
+    return { answered: false, droppedLines: undefined, logConnections: undefined };
   }
   return {
     answered: true,
-    count: caughtUp ? parseDroppedLogs(metrics) : undefined,
+    droppedLines: caughtUp ? parseDroppedLines(metrics) : undefined,
     logConnections: readLogConnections(docker, containerId),
   };
 }

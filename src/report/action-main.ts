@@ -18,7 +18,7 @@ import { readBooleanInput } from "#core/lib/actions/inputs.ts";
 import { writeStepSummary } from "#core/lib/actions/write-step-summary.ts";
 import type { Docker } from "#core/lib/docker/client.ts";
 import { createDocker } from "#core/lib/docker/client.ts";
-import { readProxyAnswered } from "#core/lib/docker/proxy-dropped-logs.ts";
+import { readProxyAnswered } from "#core/lib/docker/proxy-health.ts";
 import { readResolverAnswered } from "#core/lib/docker/resolver-health.ts";
 import { readRotatedLog } from "#core/lib/docker/rotated-log.ts";
 import { errorMessage } from "#core/lib/errors.ts";

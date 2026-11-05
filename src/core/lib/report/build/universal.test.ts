@@ -194,31 +194,31 @@ describe("buildUniversalReportData", () => {
 
   it.each([
     {
-      droppedLogs: { answered: true, count: 1, logConnections: 1 },
+      health: { answered: true, droppedLines: 1, logConnections: 1 },
       what: "dropped a line",
       droppedLines: 1,
     },
     {
-      droppedLogs: { answered: true, count: undefined, logConnections: 1 },
+      health: { answered: true, droppedLines: undefined, logConnections: 1 },
       what: "could not say whether it dropped one",
       droppedLines: 0,
     },
     {
-      droppedLogs: { answered: false, count: undefined, logConnections: undefined },
+      health: { answered: false, droppedLines: undefined, logConnections: undefined },
       what: "did not answer",
       droppedLines: 0,
     },
-  ])("logLooksPlausible is false when the proxy $what", async ({ droppedLogs, droppedLines }) => {
+  ])("logLooksPlausible is false when the proxy $what", async ({ health, droppedLines }) => {
     // A dropped line leaves no gap either log shows, so only the count can
     // tell a whole log from one a flood thinned out.
     const result = await buildUniversalReportData(
       [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
       [DNS_START],
       reportParams(),
-      { ...HEALTHY, droppedLogs },
+      { ...HEALTHY, proxy: health },
     );
     expect(result.logLooksPlausible).toBe(false);
-    expect(result.proxyAnswered).toBe(droppedLogs.answered);
+    expect(result.proxyAnswered).toBe(health.answered);
     expect(result.droppedLines).toBe(droppedLines);
     expect(result.passed.map((r) => r.host)).toStrictEqual(["good.com"]);
   });
@@ -241,7 +241,7 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, "3 events dropped", proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
       [DNS_START],
       reportParams(),
-      { ...HEALTHY, droppedLogs: { answered: true, count: 2, logConnections: 1 } },
+      { ...HEALTHY, proxy: { answered: true, droppedLines: 2, logConnections: 1 } },
     );
     expect(result.droppedLines).toBe(5);
   });
@@ -267,7 +267,8 @@ describe("buildUniversalReportData", () => {
       reportParams(),
       HEALTHY,
     );
-    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 0, resolverLog: 0 });
+    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0 });
+    expect(result.logWriterDeaths).toStrictEqual({ proxy: 0, resolver: 0 });
     expect(result.logLooksPlausible).toBe(false);
   });
 
@@ -277,17 +278,18 @@ describe("buildUniversalReportData", () => {
       [HAPROXY_START, allowed, HAPROXY_START, allowed],
       [DNS_START],
       reportParams(),
-      { ...HEALTHY, droppedLogs: { ...HEALTHY.droppedLogs, logConnections: 3 } },
+      { ...HEALTHY, proxy: { ...HEALTHY.proxy, logConnections: 3 } },
     );
-    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0, proxyLog: 1, resolverLog: 0 });
+    expect(result.restarts).toStrictEqual({ proxy: 1, resolver: 0 });
+    expect(result.logWriterDeaths).toStrictEqual({ proxy: 1, resolver: 0 });
   });
 
   it.each([
-    { logConnections: 2, proxyLog: 1 },
-    { logConnections: undefined, proxyLog: 0 },
+    { logConnections: 2, deaths: 1 },
+    { logConnections: undefined, deaths: 0 },
   ])(
     "logLooksPlausible is false with $logConnections log connections from one proxy start",
-    async ({ logConnections, proxyLog }) => {
+    async ({ logConnections, deaths }) => {
       const allowed = proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1);
       const result = await buildUniversalReportData(
         [HAPROXY_START, allowed],
@@ -295,28 +297,30 @@ describe("buildUniversalReportData", () => {
         reportParams(),
         {
           ...HEALTHY,
-          droppedLogs: { ...HEALTHY.droppedLogs, logConnections },
+          proxy: { ...HEALTHY.proxy, logConnections },
         },
       );
-      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog, resolverLog: 0 });
+      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0 });
+      expect(result.logWriterDeaths).toStrictEqual({ proxy: deaths, resolver: 0 });
       expect(result.logLooksPlausible).toBe(false);
     },
   );
 
   it.each([
-    { resolverLogDeaths: 0, resolverLog: 0, plausible: true },
-    { resolverLogDeaths: 1, resolverLog: 1, plausible: false },
-    { resolverLogDeaths: undefined, resolverLog: 0, plausible: false },
+    { resolverLogDeaths: 0, deaths: 0, plausible: true },
+    { resolverLogDeaths: 1, deaths: 1, plausible: false },
+    { resolverLogDeaths: undefined, deaths: 0, plausible: false },
   ])(
     "logLooksPlausible is $plausible with $resolverLogDeaths deaths of the resolver's log writer",
-    async ({ resolverLogDeaths, resolverLog, plausible }) => {
+    async ({ resolverLogDeaths, deaths, plausible }) => {
       const result = await buildUniversalReportData(
         [HAPROXY_START, proxy("ALLOWED", "HTTPS", "good.com:443", "-", 1)],
         [DNS_START],
         reportParams(),
         { ...HEALTHY, resolverLogDeaths },
       );
-      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0, proxyLog: 0, resolverLog });
+      expect(result.restarts).toStrictEqual({ proxy: 0, resolver: 0 });
+      expect(result.logWriterDeaths).toStrictEqual({ proxy: 0, resolver: deaths });
       expect(result.logLooksPlausible).toBe(plausible);
     },
   );

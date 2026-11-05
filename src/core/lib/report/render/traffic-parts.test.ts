@@ -84,7 +84,8 @@ describe("trafficHeadingBlock", () => {
         ...universal,
         logLooksPlausible: false,
         proxyAnswered: false,
-        restarts: { proxy: 1, resolver: 0, proxyLog: 0, resolverLog: 0 },
+        restarts: { proxy: 1, resolver: 0 },
+        logWriterDeaths: { proxy: 0, resolver: 0 },
       },
       "T",
     );

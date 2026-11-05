@@ -230,10 +230,14 @@ describe("scanHaproxyLog", () => {
     expect(startedAt).toBe(1787471970);
   });
 
-  it("leaves startedAt undefined when the marker carries no stamp", async () => {
-    const { startedAt, headIntact } = await scanHaproxyLog(["buildcage haproxy starting"], false);
+  it("takes a marker without its stamp for an unreadable line, not the log's start", async () => {
+    const { startedAt, headIntact, unparsed } = await scanHaproxyLog(
+      ["buildcage haproxy starting"],
+      false,
+    );
     expect(startedAt).toBeUndefined();
     expect(headIntact).toBe(false);
+    expect(unparsed).toBe(1);
   });
 
   it("accepts a real AsyncIterable, not just an array", async () => {

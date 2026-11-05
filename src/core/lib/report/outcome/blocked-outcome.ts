@@ -91,7 +91,7 @@ export function buildBlockedMessage({
 
 export type Interruptions = Pick<
   ReportDataCommon,
-  "proxyAnswered" | "resolverAnswered" | "droppedLines" | "restarts"
+  "proxyAnswered" | "resolverAnswered" | "droppedLines" | "restarts" | "logWriterDeaths"
 >;
 
 /**
@@ -103,6 +103,7 @@ export function describeInterruptions({
   resolverAnswered,
   droppedLines,
   restarts,
+  logWriterDeaths,
 }: Interruptions): string[] {
   const facts: string[] = [];
   if (!proxyAnswered) {
@@ -129,15 +130,15 @@ export function describeInterruptions({
       "A restart loses the line of whatever was still in progress when the service stopped.",
     );
   }
-  if (restarts.proxyLog) {
+  if (logWriterDeaths.proxy) {
     facts.push(
-      `The proxy's log writer restarted ${restarts.proxyLog} time(s) during the run, losing ` +
+      `The proxy's log writer died ${logWriterDeaths.proxy} time(s) during the run, losing ` +
         "the lines it had been sent but not yet written.",
     );
   }
-  if (restarts.resolverLog) {
+  if (logWriterDeaths.resolver) {
     facts.push(
-      `The DNS resolver's log writer died ${restarts.resolverLog} time(s) during the run, ` +
+      `The DNS resolver's log writer died ${logWriterDeaths.resolver} time(s) during the run, ` +
         "losing the lines it had been sent but not yet written.",
     );
   }
@@ -169,6 +170,7 @@ export interface DescribeBlockedOutcomeOptions {
   resolverAnswered: boolean;
   droppedLines: number;
   restarts: Interruptions["restarts"];
+  logWriterDeaths: Interruptions["logWriterDeaths"];
   engineLabel: "sandbox" | "proxy";
 }
 
@@ -183,6 +185,7 @@ export function describeBlockedOutcome({
   resolverAnswered,
   droppedLines,
   restarts,
+  logWriterDeaths,
   engineLabel,
 }: DescribeBlockedOutcomeOptions): DescribedBlockedOutcome {
   const outcome = determineBlockedOutcome({
@@ -196,7 +199,13 @@ export function describeBlockedOutcome({
   });
   const base = buildBlockedMessage({ blockedCount, blockedRows, engineLabel, isAudit });
   if (logLooksPlausible) return { ...outcome, message: base };
-  const facts = describeInterruptions({ proxyAnswered, resolverAnswered, droppedLines, restarts });
+  const facts = describeInterruptions({
+    proxyAnswered,
+    resolverAnswered,
+    droppedLines,
+    restarts,
+    logWriterDeaths,
+  });
   // audit's notice keeps the fixed-format opening buildBlockedMessage
   // promises, so the warning is appended rather than replacing it.
   if (isAudit && proxyAnswered && resolverAnswered) {

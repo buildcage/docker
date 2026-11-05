@@ -14,9 +14,10 @@ import {
 import type { DnsLogScan } from "#core/lib/log/dns.ts";
 import type { HaproxyLogScan } from "#core/lib/log/haproxy.ts";
 import type { InspectLogScan } from "#core/lib/log/inspect.ts";
+import type { ServiceHealth } from "#core/lib/log/service-health.ts";
 import { connectedHosts, isRedundantDns, type TrafficEvent } from "#core/lib/log/traffic-event.ts";
 
-import type { GenReportParameters, ReportData, ServiceHealth } from "../types.ts";
+import type { GenReportParameters, ReportData } from "../types.ts";
 
 export interface AnnotatedBlockedRow extends AggregatedEntry {
   expected: boolean;
@@ -258,7 +259,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   proxyScan: Promise<InspectLogScan | HaproxyLogScan>,
   dnsScan: Promise<DnsLogScan>,
   parameters: GenReportParameters,
-  { droppedLogs, resolverAnswered, resolverLogDeaths: resolverLog }: ServiceHealth,
+  { proxy: proxyHealth, resolverAnswered, resolverLogDeaths }: ServiceHealth,
 ): Promise<Extract<ReportData, { engine: E }>> {
   const [
     {
@@ -266,19 +267,24 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       startedAt,
       headIntact: proxyHeadIntact,
       unparsed,
-      restarts: proxy,
+      restarts: proxyRestarts,
       dropped: ringDroppedLines,
     },
-    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed, restarts: resolver },
+    {
+      events: dnsEvents,
+      headIntact: dnsHeadIntact,
+      unparsed: dnsUnparsed,
+      restarts: resolverRestarts,
+    },
   ] = await Promise.all([proxyScan, dnsScan]);
 
   const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
   // The proxy connects once per start, so a connection past those is its log
   // writer having died.
-  const proxyLog =
-    droppedLogs.logConnections === undefined
+  const proxyLogDeaths =
+    proxyHealth.logConnections === undefined
       ? undefined
-      : Math.max(0, droppedLogs.logConnections - 1 - proxy);
+      : Math.max(0, proxyHealth.logConnections - 1 - proxyRestarts);
 
   // engine is the discriminant and the rest is the shared ReportDataCommon, so
   // the assertion only restates the variant E already fixes.
@@ -294,17 +300,18 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       dnsHeadIntact &&
       unparsed === 0 &&
       dnsUnparsed === 0 &&
-      droppedLogs.count === 0 &&
+      proxyHealth.droppedLines === 0 &&
       ringDroppedLines === 0 &&
       resolverAnswered &&
-      proxy === 0 &&
-      resolver === 0 &&
-      proxyLog === 0 &&
-      resolverLog === 0,
-    droppedLines: (droppedLogs.count ?? 0) + ringDroppedLines,
-    proxyAnswered: droppedLogs.answered,
+      proxyRestarts === 0 &&
+      resolverRestarts === 0 &&
+      proxyLogDeaths === 0 &&
+      resolverLogDeaths === 0,
+    droppedLines: (proxyHealth.droppedLines ?? 0) + ringDroppedLines,
+    proxyAnswered: proxyHealth.answered,
     resolverAnswered,
-    restarts: { proxy, resolver, proxyLog: proxyLog ?? 0, resolverLog: resolverLog ?? 0 },
+    restarts: { proxy: proxyRestarts, resolver: resolverRestarts },
+    logWriterDeaths: { proxy: proxyLogDeaths ?? 0, resolver: resolverLogDeaths ?? 0 },
     startedAt,
     timeline,
   } as Extract<ReportData, { engine: E }>;
