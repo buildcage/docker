@@ -182,7 +182,7 @@ describe("describeInterruptions", () => {
     ]);
   });
 
-  it("says what each log writer's restart loses on its own", () => {
+  it("says what each log writer's death loses on its own", () => {
     expect(
       describeInterruptions({
         ...UNINTERRUPTED,

@@ -1,6 +1,6 @@
 /**
- * Whether the proxy answers and lost any line of its log, asked when the
- * report runs and before it reads the log.
+ * Whether the proxy still answers and whether it lost any line of its log,
+ * asked when the report runs and before it reads the log.
  *
  * haproxy writes each line without blocking, and a line it cannot write at
  * once is dropped. Its own counter covers a line that never reached the log
@@ -56,7 +56,7 @@ const BARRIER_SCRIPT = [
 ].join("\n");
 
 /** The counter's value in Prometheus text output, or undefined without one. */
-export function parseDroppedLogs(metrics: string): number | undefined {
+export function parseDroppedLines(metrics: string): number | undefined {
   const match = COUNTER.exec(metrics);
   return match ? Number(match[1]) : undefined;
 }
@@ -92,7 +92,7 @@ export function readProxyHealth(
   }
   return {
     answered: true,
-    droppedLines: caughtUp ? parseDroppedLogs(metrics) : undefined,
+    droppedLines: caughtUp ? parseDroppedLines(metrics) : undefined,
     logConnections: readLogConnections(docker, containerId),
   };
 }

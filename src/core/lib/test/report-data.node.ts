@@ -6,15 +6,12 @@
  */
 import type { AnnotatedBlockedRow } from "../report/build/aggregate.ts";
 import type { Interruptions } from "../report/outcome/blocked-outcome.ts";
-import type { GenReportParameters, ProxyHealth, ServiceHealth } from "../report/types.ts";
+import type { GenReportParameters, ServiceHealth } from "../report/types.ts";
 
-/** A proxy that answered and dropped nothing. */
-export const NONE_DROPPED: ProxyHealth = { answered: true, droppedLines: 0, logConnections: 1 };
-
-/** A proxy that answered and dropped nothing, and a resolver that answered and
- *  whose log writer never died. */
+/** A proxy that answered, dropped nothing and connected to its log writer once,
+ *  and a resolver that answered and whose log writer never died. */
 export const HEALTHY: ServiceHealth = {
-  proxy: NONE_DROPPED,
+  proxy: { answered: true, droppedLines: 0, logConnections: 1 },
   resolverAnswered: true,
   resolverLogDeaths: 0,
 };

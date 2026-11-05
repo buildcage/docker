@@ -12,7 +12,7 @@ const START = new RegExp(`^${PROXY_START_MARKER} (\\d+)$`);
 
 export interface ProxyLogTally {
   /** Seconds since the epoch at which the proxy itself started, matching
-   *  TrafficEvent.time's unit. Undefined when the log holds no marker. */
+   *  TrafficEvent.time's unit. Undefined when the log holds no readable marker. */
   startedAt: number | undefined;
   /** True iff the log opens with the startup marker. Stricter than
    *  `startedAt`: a restart writes a second marker, which would otherwise

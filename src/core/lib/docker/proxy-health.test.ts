@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
 import type { Docker } from "./client.ts";
-import { parseDroppedLogs, readProxyAnswered, readProxyHealth } from "./proxy-health.ts";
+import { parseDroppedLines, readProxyAnswered, readProxyHealth } from "./proxy-health.ts";
 
 /** What haproxy 3.4's exporter serves for `?scope=global`, trimmed to the
  *  counter and its neighbours. */
@@ -39,23 +39,23 @@ function fakeDocker(exec: Docker["exec"]): { docker: Docker; calls: string[][] }
   return { docker, calls };
 }
 
-describe("parseDroppedLogs", () => {
+describe("parseDroppedLines", () => {
   it("reads the counter out of the exporter's text", () => {
-    expect(parseDroppedLogs(METRICS)).toBe(12);
+    expect(parseDroppedLines(METRICS)).toBe(12);
   });
 
   it("reads a zero as zero, not as missing", () => {
-    expect(parseDroppedLogs("haproxy_process_dropped_logs_total 0\n")).toBe(0);
+    expect(parseDroppedLines("haproxy_process_dropped_logs_total 0\n")).toBe(0);
   });
 
   it("finds no counter in its HELP line alone", () => {
     expect(
-      parseDroppedLogs("# HELP haproxy_process_dropped_logs_total Total number of dropped logs"),
+      parseDroppedLines("# HELP haproxy_process_dropped_logs_total Total number of dropped logs"),
     ).toBe(undefined);
   });
 
   it("returns undefined for output that carries no counter", () => {
-    expect(parseDroppedLogs("")).toBe(undefined);
+    expect(parseDroppedLines("")).toBe(undefined);
   });
 });
 

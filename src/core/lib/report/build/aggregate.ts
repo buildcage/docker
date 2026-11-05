@@ -266,10 +266,15 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       startedAt,
       headIntact: proxyHeadIntact,
       unparsed,
-      restarts: proxy,
+      restarts: proxyRestarts,
       dropped: ringDroppedLines,
     },
-    { events: dnsEvents, headIntact: dnsHeadIntact, unparsed: dnsUnparsed, restarts: resolver },
+    {
+      events: dnsEvents,
+      headIntact: dnsHeadIntact,
+      unparsed: dnsUnparsed,
+      restarts: resolverRestarts,
+    },
   ] = await Promise.all([proxyScan, dnsScan]);
 
   const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
@@ -278,7 +283,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   const proxyLogDeaths =
     proxyHealth.logConnections === undefined
       ? undefined
-      : Math.max(0, proxyHealth.logConnections - 1 - proxy);
+      : Math.max(0, proxyHealth.logConnections - 1 - proxyRestarts);
 
   // engine is the discriminant and the rest is the shared ReportDataCommon, so
   // the assertion only restates the variant E already fixes.
@@ -297,14 +302,14 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       proxyHealth.droppedLines === 0 &&
       ringDroppedLines === 0 &&
       resolverAnswered &&
-      proxy === 0 &&
-      resolver === 0 &&
+      proxyRestarts === 0 &&
+      resolverRestarts === 0 &&
       proxyLogDeaths === 0 &&
       resolverLogDeaths === 0,
     droppedLines: (proxyHealth.droppedLines ?? 0) + ringDroppedLines,
     proxyAnswered: proxyHealth.answered,
     resolverAnswered,
-    restarts: { proxy, resolver },
+    restarts: { proxy: proxyRestarts, resolver: resolverRestarts },
     logWriterDeaths: { proxy: proxyLogDeaths ?? 0, resolver: resolverLogDeaths ?? 0 },
     startedAt,
     timeline,

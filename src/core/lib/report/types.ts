@@ -66,10 +66,10 @@ export interface ReportDataCommon {
    *  say whether it did (proxy-health.ts), the resolver did not answer,
    *  a service restarted, a log writer died, or how often one did could not
    *  be read. Anything written from this flag names what `proxyAnswered`,
-   *  `resolverAnswered`, `droppedLines` and `restarts` establish and has to
-   *  list the rest as possibilities, since the flag itself does not say which
-   *  applied. The report fails closed rather than passing off what survived
-   *  as everything. */
+   *  `resolverAnswered`, `droppedLines`, `restarts` and `logWriterDeaths`
+   *  establish and has to list the rest as possibilities, since the flag
+   *  itself does not say which applied. The report fails closed rather than
+   *  passing off what survived as everything. */
   logLooksPlausible: boolean;
 
   /** How many lines the proxy said it dropped, by its own counter and by the
