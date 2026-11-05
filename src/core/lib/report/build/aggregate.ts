@@ -258,7 +258,7 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   proxyScan: Promise<InspectLogScan | HaproxyLogScan>,
   dnsScan: Promise<DnsLogScan>,
   parameters: GenReportParameters,
-  { droppedLogs, resolverAnswered, resolverLogDeaths: resolverLog }: ServiceHealth,
+  { proxy: proxyHealth, resolverAnswered, resolverLogDeaths }: ServiceHealth,
 ): Promise<Extract<ReportData, { engine: E }>> {
   const [
     {
@@ -275,10 +275,10 @@ export async function assembleReportData<E extends ReportData["engine"]>(
   const timeline = [...proxyEvents, ...dnsEvents].sort((a, b) => a.time - b.time);
   // The proxy connects once per start, so a connection past those is its log
   // writer having died.
-  const proxyLog =
-    droppedLogs.logConnections === undefined
+  const proxyLogDeaths =
+    proxyHealth.logConnections === undefined
       ? undefined
-      : Math.max(0, droppedLogs.logConnections - 1 - proxy);
+      : Math.max(0, proxyHealth.logConnections - 1 - proxy);
 
   // engine is the discriminant and the rest is the shared ReportDataCommon, so
   // the assertion only restates the variant E already fixes.
@@ -294,17 +294,18 @@ export async function assembleReportData<E extends ReportData["engine"]>(
       dnsHeadIntact &&
       unparsed === 0 &&
       dnsUnparsed === 0 &&
-      droppedLogs.count === 0 &&
+      proxyHealth.droppedLines === 0 &&
       ringDroppedLines === 0 &&
       resolverAnswered &&
       proxy === 0 &&
       resolver === 0 &&
-      proxyLog === 0 &&
-      resolverLog === 0,
-    droppedLines: (droppedLogs.count ?? 0) + ringDroppedLines,
-    proxyAnswered: droppedLogs.answered,
+      proxyLogDeaths === 0 &&
+      resolverLogDeaths === 0,
+    droppedLines: (proxyHealth.droppedLines ?? 0) + ringDroppedLines,
+    proxyAnswered: proxyHealth.answered,
     resolverAnswered,
-    restarts: { proxy, resolver, proxyLog: proxyLog ?? 0, resolverLog: resolverLog ?? 0 },
+    restarts: { proxy, resolver },
+    logWriterDeaths: { proxy: proxyLogDeaths ?? 0, resolver: resolverLogDeaths ?? 0 },
     startedAt,
     timeline,
   } as Extract<ReportData, { engine: E }>;

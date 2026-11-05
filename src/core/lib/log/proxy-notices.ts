@@ -5,7 +5,7 @@
  */
 
 /** Opens the line the report has the proxy log and then waits for; see
- *  proxy-dropped-logs.ts. */
+ *  proxy-health.ts. */
 export const PROXY_LOG_BARRIER = "buildcage log barrier";
 
 /** What haproxy writes into its ring after it had to drop lines there, on the

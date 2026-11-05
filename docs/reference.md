@@ -137,7 +137,8 @@ known-blocked-rules: |
   build's `--output type=local` export.
 - An input the workflow sets wins over the file. The rule inputs are the exception: the file's
   rules are added to the workflow's.
-- A relative path is relative to `$GITHUB_WORKSPACE`. An absolute path, such as
+- A relative path is relative to `$GITHUB_WORKSPACE`'s real path, so where the workspace is a
+  symlink, a leading `..` climbs from where it leads, as after `cd -P`. An absolute path, such as
   `${{ github.workspace }}/buildcage.yml`, is taken as it is. Either way the file, with its
   symlinks resolved, must be inside `$GITHUB_WORKSPACE`, and a `..` may only start a relative
   path. The repository has to be checked out by an earlier step.

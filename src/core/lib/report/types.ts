@@ -1,4 +1,3 @@
-import type { ProxyDroppedLogs } from "../docker/proxy-dropped-logs.ts";
 import type { AggregatedEntry } from "../log/aggregate.ts";
 import type { TrafficEvent } from "../log/traffic-event.ts";
 import type { AnnotatedBlockedRow } from "./build/aggregate.ts";
@@ -16,9 +15,23 @@ export interface GenReportParameters {
   knownBlockedRules: string[];
 }
 
+/** What the report learned from asking the proxy before it read the log
+ *  (proxy-health.ts). */
+export interface ProxyHealth {
+  /** False when the proxy did not answer at all: it stopped during the run and
+   *  stayed down, or hung. */
+  answered: boolean;
+  /** The proxy's own dropped-line count, or undefined where it could not be
+   *  read or the log did not catch up. */
+  droppedLines: number | undefined;
+  /** How many times the proxy connected to its log writer, or undefined
+   *  where that could not be read. */
+  logConnections: number | undefined;
+}
+
 /** What the report asks the running proxy container, alongside its logs. */
 export interface ServiceHealth {
-  droppedLogs: ProxyDroppedLogs;
+  proxy: ProxyHealth;
   /** Whether the resolver answered its health check (resolver-health.ts). */
   resolverAnswered: boolean;
   /** How many times the resolver's log writer died, or undefined where that
@@ -50,7 +63,7 @@ export interface ReportDataCommon {
   /** False iff the logs are not a complete record of the run: either log's
    *  beginning is gone or it is empty, a line of ours could not be read (each
    *  scan's headIntact and unparsed), the proxy dropped a line or could not
-   *  say whether it did (proxy-dropped-logs.ts), the resolver did not answer,
+   *  say whether it did (proxy-health.ts), the resolver did not answer,
    *  a service restarted, a log writer died, or how often one did could not
    *  be read. Anything written from this flag names what `proxyAnswered`,
    *  `resolverAnswered`, `droppedLines` and `restarts` establish and has to
@@ -75,9 +88,12 @@ export interface ReportDataCommon {
   /** How many times each service started again after it stopped mid-run. A
    *  connection still open when the proxy stopped never gets its line, and the
    *  proxy's dropped-line count starts over, so a restart leaves the record
-   *  short. `proxyLog` and `resolverLog` are each service's log writer, which
-   *  loses the lines it was sent and had not yet written. */
-  restarts: { proxy: number; resolver: number; proxyLog: number; resolverLog: number };
+   *  short. */
+  restarts: { proxy: number; resolver: number };
+
+  /** How many times each service's log writer died mid-run, losing the lines
+   *  it was sent and had not yet written. */
+  logWriterDeaths: { proxy: number; resolver: number };
 
   /** Every connection and blocked name, oldest first. Nothing is attributable
    *  to one RUN step or one command: the proxy log carries no identifier for

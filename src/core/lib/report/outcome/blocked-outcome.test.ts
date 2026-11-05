@@ -172,7 +172,8 @@ describe("describeInterruptions", () => {
     expect(
       describeInterruptions({
         ...UNINTERRUPTED,
-        restarts: { proxy: 2, resolver: 1, proxyLog: 0, resolverLog: 0 },
+        restarts: { proxy: 2, resolver: 1 },
+        logWriterDeaths: { proxy: 0, resolver: 0 },
       }),
     ).toStrictEqual([
       "The proxy restarted 2 time(s) during the run.",
@@ -185,10 +186,11 @@ describe("describeInterruptions", () => {
     expect(
       describeInterruptions({
         ...UNINTERRUPTED,
-        restarts: { proxy: 0, resolver: 0, proxyLog: 2, resolverLog: 1 },
+        restarts: { proxy: 0, resolver: 0 },
+        logWriterDeaths: { proxy: 2, resolver: 1 },
       }),
     ).toStrictEqual([
-      "The proxy's log writer restarted 2 time(s) during the run, losing the lines it had been sent but not yet written.",
+      "The proxy's log writer died 2 time(s) during the run, losing the lines it had been sent but not yet written.",
       "The DNS resolver's log writer died 1 time(s) during the run, losing the lines it had been sent but not yet written.",
     ]);
   });
@@ -296,7 +298,8 @@ describe("describeBlockedOutcome", () => {
         blockedCount: 2,
         blockedRows: [{ expected: false }],
         logLooksPlausible: false,
-        restarts: { proxy: 1, resolver: 0, proxyLog: 0, resolverLog: 0 },
+        restarts: { proxy: 1, resolver: 0 },
+        logWriterDeaths: { proxy: 0, resolver: 0 },
       }),
     ).toStrictEqual({
       level: "notice",

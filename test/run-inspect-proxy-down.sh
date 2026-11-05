@@ -271,7 +271,7 @@ REPORT_EXIT=0
 REPORT_OUTPUT=$(INPUT_FAIL_ON_BLOCKED=false GITHUB_STEP_SUMMARY="$SUMMARY" \
   node report/src/main.ts 2>&1) || REPORT_EXIT=$?
 if [ "$REPORT_EXIT" = "0" ] &&
-  grep -qF "The proxy's log writer restarted 1 time(s) during the run" <<<"$REPORT_OUTPUT"; then
+  grep -qF "The proxy's log writer died 1 time(s) during the run" <<<"$REPORT_OUTPUT"; then
   pass "the report counts the log writer's restart"
 else
   fail "the report exited $REPORT_EXIT and did not count the log writer's restart"

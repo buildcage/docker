@@ -9,7 +9,7 @@
  *
  * Everything but those two log paths is src/report/action-main.ts.
  */
-import { readProxyDroppedLogs } from "#core/lib/docker/proxy-dropped-logs.ts";
+import { readProxyHealth } from "#core/lib/docker/proxy-health.ts";
 import { readResolverAnswered, readResolverLogDeaths } from "#core/lib/docker/resolver-health.ts";
 import { buildUniversalReportData } from "#core/lib/report/build/universal.ts";
 import { readLog, reportActionError, runReportAction } from "#report/action-main.ts";
@@ -21,13 +21,13 @@ runReportAction({
   proxyEngine: "universal",
   build: (docker, containerId, parameters) => {
     // First: it waits for the proxy's log to catch up before anything reads it.
-    const droppedLogs = readProxyDroppedLogs(docker, containerId);
+    const proxy = readProxyHealth(docker, containerId);
     return buildUniversalReportData(
       readLog(docker, containerId, PROXY_LOG_DIR),
       readLog(docker, containerId, RESOLVER_LOG_DIR),
       parameters,
       {
-        droppedLogs,
+        proxy,
         resolverAnswered: readResolverAnswered(docker, containerId),
         resolverLogDeaths: readResolverLogDeaths(docker, containerId),
       },

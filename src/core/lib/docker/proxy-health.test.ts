@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
 import type { Docker } from "./client.ts";
-import { parseDroppedLogs, readProxyAnswered, readProxyDroppedLogs } from "./proxy-dropped-logs.ts";
+import { parseDroppedLogs, readProxyAnswered, readProxyHealth } from "./proxy-health.ts";
 
 /** What haproxy 3.4's exporter serves for `?scope=global`, trimmed to the
  *  counter and its neighbours. */
@@ -74,7 +74,7 @@ function fail(): string {
   throw new Error("exit 1");
 }
 
-describe("readProxyDroppedLogs", () => {
+describe("readProxyHealth", () => {
   it("waits for its barrier line in the log, asks the health socket, then counts log connections", () => {
     const { docker, calls } = fakeDocker(
       byCommand(
@@ -82,9 +82,9 @@ describe("readProxyDroppedLogs", () => {
         () => METRICS,
       ),
     );
-    expect(readProxyDroppedLogs(docker, "abc", "f00d")).toStrictEqual({
+    expect(readProxyHealth(docker, "abc", "f00d")).toStrictEqual({
       answered: true,
-      count: 12,
+      droppedLines: 12,
       logConnections: 1,
     });
     expect(calls.length).toBe(3);
@@ -114,8 +114,8 @@ describe("readProxyDroppedLogs", () => {
 
   it("makes up a fresh barrier each time it is not given one", () => {
     const { docker, calls } = fakeDocker(() => METRICS);
-    readProxyDroppedLogs(docker, "abc");
-    readProxyDroppedLogs(docker, "abc");
+    readProxyHealth(docker, "abc");
+    readProxyHealth(docker, "abc");
     const [first, second] = [calls[0][5], calls[3][5]];
     expect(first).toMatch(/^[0-9a-f]{32}$/);
     expect(second === first).toBe(false);
@@ -123,16 +123,16 @@ describe("readProxyDroppedLogs", () => {
 
   it("leaves the count unknown when the log never caught up with the barrier", () => {
     const { docker } = fakeDocker(byCommand(fail, () => "haproxy_process_dropped_logs_total 0"));
-    expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({
+    expect(readProxyHealth(docker, "abc")).toStrictEqual({
       answered: true,
-      count: undefined,
+      droppedLines: undefined,
       logConnections: 1,
     });
   });
 
   it("counts one log connection per line, and leaves an empty or unreadable file unknown", () => {
     const count = (connections: () => string) =>
-      readProxyDroppedLogs(
+      readProxyHealth(
         fakeDocker(
           byCommand(
             () => "",
@@ -154,17 +154,17 @@ describe("readProxyDroppedLogs", () => {
         () => "",
       ),
     );
-    expect(readProxyDroppedLogs(silent.docker, "abc")).toStrictEqual({
+    expect(readProxyHealth(silent.docker, "abc")).toStrictEqual({
       answered: true,
-      count: undefined,
+      droppedLines: undefined,
       logConnections: 1,
     });
     const { docker } = fakeDocker(() => {
       throw new Error("exit 7");
     });
-    expect(readProxyDroppedLogs(docker, "abc")).toStrictEqual({
+    expect(readProxyHealth(docker, "abc")).toStrictEqual({
       answered: false,
-      count: undefined,
+      droppedLines: undefined,
       logConnections: undefined,
     });
   });
@@ -193,7 +193,7 @@ describe("readProxyDroppedLogs", () => {
       ]);
       fake("curl", ['echo "curl $*" >> "$CALLS"', 'echo "$BARRIER" >> "$LOG/current"']);
       const { docker, calls } = fakeDocker(() => METRICS);
-      readProxyDroppedLogs(docker, "abc", "f00d");
+      readProxyHealth(docker, "abc", "f00d");
       const [, , , script, ...args] = calls[0];
       execFileSync("sh", ["-c", script.replaceAll("/var/log/haproxy", "$LOG"), ...args], {
         env: {

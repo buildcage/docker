@@ -33,6 +33,7 @@ export function describeReportOutcomes(
       resolverAnswered: report.resolverAnswered,
       droppedLines: report.droppedLines,
       restarts: report.restarts,
+      logWriterDeaths: report.logWriterDeaths,
       engineLabel,
     }),
   ];

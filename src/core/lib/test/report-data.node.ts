@@ -4,18 +4,17 @@
  * one known_blocked_rule covers. Kept here so a new field on
  * GenReportParameters is written once.
  */
-import type { ProxyDroppedLogs } from "../docker/proxy-dropped-logs.ts";
 import type { AnnotatedBlockedRow } from "../report/build/aggregate.ts";
 import type { Interruptions } from "../report/outcome/blocked-outcome.ts";
-import type { GenReportParameters, ServiceHealth } from "../report/types.ts";
+import type { GenReportParameters, ProxyHealth, ServiceHealth } from "../report/types.ts";
 
 /** A proxy that answered and dropped nothing. */
-export const NONE_DROPPED: ProxyDroppedLogs = { answered: true, count: 0, logConnections: 1 };
+export const NONE_DROPPED: ProxyHealth = { answered: true, droppedLines: 0, logConnections: 1 };
 
 /** A proxy that answered and dropped nothing, and a resolver that answered and
  *  whose log writer never died. */
 export const HEALTHY: ServiceHealth = {
-  droppedLogs: NONE_DROPPED,
+  proxy: NONE_DROPPED,
   resolverAnswered: true,
   resolverLogDeaths: 0,
 };
@@ -25,7 +24,8 @@ export const UNINTERRUPTED: Interruptions = {
   proxyAnswered: true,
   resolverAnswered: true,
   droppedLines: 0,
-  restarts: { proxy: 0, resolver: 0, proxyLog: 0, resolverLog: 0 },
+  restarts: { proxy: 0, resolver: 0 },
+  logWriterDeaths: { proxy: 0, resolver: 0 },
 };
 
 /** Restrict mode carrying only the rules a case names. */
