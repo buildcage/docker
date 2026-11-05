@@ -305,4 +305,38 @@ else
   echo "$REPORT_OUTPUT" | sed 's/^/    /'
 fi
 
+echo ""
+echo "--- the report after the proxy's log ring overflowed ---"
+# Only haproxy's own notice in the log tells of lines a full ring dropped, so
+# this checks the report still reads the notice haproxy actually writes. The
+# stopped s6-log leaves the ring full, and each barrier request logs a line of
+# about 1KB, where haproxy cuts the URI, 3MB in all against the 1MB ring.
+# shellcheck disable=SC2016 # expanded inside the builder
+if docker exec "$BUILDER_NAME" sh -c '
+  pkill -STOP -f "^s6-log .*/var/log/haproxy" || exit 1
+  pad=$(head -c 1000 /dev/zero | tr "\0" x)
+  i=0
+  status=0
+  while [ $i -lt 3000 ]; do
+    curl -sf --unix-socket /var/run/haproxy-barrier.sock "http://localhost/?$i-$pad" >/dev/null || status=1
+    i=$((i + 1))
+  done
+  pkill -CONT -f "^s6-log .*/var/log/haproxy"
+  exit $status'; then
+  pass "the proxy's log ring overflowed in the builder"
+else
+  fail "could not overflow the proxy's log ring in the builder"
+fi
+: >"$SUMMARY"
+REPORT_EXIT=0
+REPORT_OUTPUT=$(INPUT_FAIL_ON_BLOCKED=false GITHUB_STEP_SUMMARY="$SUMMARY" \
+  node report/src/main.ts 2>&1) || REPORT_EXIT=$?
+if [ "$REPORT_EXIT" = "0" ] &&
+  grep -qE "The proxy dropped at least [1-9][0-9]* log line\(s\) during the run" <<<"$REPORT_OUTPUT"; then
+  pass "the report counts the lines the ring dropped"
+else
+  fail "the report exited $REPORT_EXIT and did not count the lines the ring dropped"
+  echo "$REPORT_OUTPUT" | sed 's/^/    /'
+fi
+
 assert_results
