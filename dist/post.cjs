@@ -267,7 +267,8 @@ const LIST_INPUTS = [
 		"upload-traffic-artifact",
 		"traffic-artifact-retention-days"
 	],
-	lists: LIST_INPUTS
+	lists: LIST_INPUTS,
+	stepOnly: ["config-file"]
 }, INPUT_NAMES = ["config-file", ...CONFIG_FILE_INPUTS.known], __dirname$1 = (0, node_path.dirname)((0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href)), COMPOSE_FILE = (0, node_path.join)(__dirname$1, "../docker/compose.action.yaml");
 function withComposeOverlay(composeFile, overlay) {
 	return overlay ? [composeFile, overlay] : [composeFile];

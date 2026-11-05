@@ -606,6 +606,19 @@ describe("applyConfigFile", () => {
     ])("%s", (_, text, message) => {
       expectError(envFor(writeConfig(text)), "CONFIG_FILE_INVALID", message);
     });
+
+    it.each(["config-file", "config_file"])("setting %s, an input only the step takes", (key) => {
+      const env = envFor(writeConfig(`${key}: other.yml\n`));
+      expect(() => applyConfigFile(env, { ...INPUTS, stepOnly: ["config-file"] })).toThrow(
+        expect.objectContaining({
+          name: ConfigFileError.name,
+          code: "CONFIG_FILE_INVALID",
+          message:
+            `Invalid config-file "buildcage.yml": "${key}" can be set only on the step. Allowed ` +
+            "keys: proxy-mode, proxy-engine, allowed-https-rules, known-blocked-rules.",
+        }),
+      );
+    });
   });
 
   it("refuses a file whose aliases expand too far", () => {

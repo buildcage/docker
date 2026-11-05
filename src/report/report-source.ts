@@ -68,6 +68,7 @@ export const CONFIG_FILE_INPUTS: ConfigFileInputs = {
     "traffic-artifact-retention-days",
   ],
   lists: LIST_INPUTS,
+  stepOnly: ["config-file"],
 };
 
 /** Every input of setup and report, for normalizeInputNames. */

@@ -5062,7 +5062,7 @@ function valueNodes(doc) {
 	};
 	return nodesOf(doc.contents);
 }
-function parseConfig(text, path, known) {
+function parseConfig(text, path, { known, stepOnly = [] }) {
 	let invalid = (reason) => new ConfigFileError(`Invalid config-file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$3.LineCounter(), doc = (0, import_dist$3.parseDocument)(text, { lineCounter });
 	for (let warning of doc.warnings) process.emitWarning(warning);
 	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
@@ -5080,8 +5080,8 @@ function parseConfig(text, path, known) {
 		if (node.type !== import_dist$3.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
 	}, own = new Set(doc.contents.items.filter(({ key }) => !isMergeKey(key, doc)).map(({ key }) => resolved(key, doc)).filter(import_dist$3.isScalar).map((key) => String(key.value))), keys = new Map();
 	for (let key of Object.keys(js)) {
-		let name = known.find((input) => key === input || key === legacyInputName(input));
-		if (!name) throw invalid(`unknown key ${JSON.stringify(key)}. Allowed keys: ${known.join(", ")}.`);
+		let spells = (input) => key === input || key === legacyInputName(input), name = known.find(spells);
+		if (!name) throw invalid(`${stepOnly.some(spells) ? `${JSON.stringify(key)} can be set only on the step` : `unknown key ${JSON.stringify(key)}`}. Allowed keys: ${known.join(", ")}.`);
 		let other = keys.get(name);
 		if (other === void 0 || own.has(key) && !own.has(other)) keys.set(name, key);
 		else if (own.has(key) || !own.has(other)) throw invalid(`${name} is set twice, also as ${legacyInputName(name)}.`);
@@ -5100,8 +5100,8 @@ function parseConfig(text, path, known) {
 	}
 	return values;
 }
-function applyConfigFile(env, { known, lists }, baseDir) {
-	let path = env[inputEnvName("config-file")]?.trim() ?? "";
+function applyConfigFile(env, inputs, baseDir) {
+	let { lists } = inputs, path = env[inputEnvName("config-file")]?.trim() ?? "";
 	if (!path) return;
 	refuseUntrustedEvent(env);
 	let full = resolveConfigPath(path, env, baseDir), text;
@@ -5110,7 +5110,7 @@ function applyConfigFile(env, { known, lists }, baseDir) {
 	} catch (e) {
 		throw new ConfigFileError(`config-file ${JSON.stringify(path)} could not be read: ${errorMessage(e)}`, "CONFIG_FILE_PATH");
 	}
-	let values = parseConfig(text, path, known), ignored = [], origins = new Map();
+	let values = parseConfig(text, path, inputs), ignored = [], origins = new Map();
 	for (let [name, { text: value, line }] of values) {
 		let envName = inputEnvName(name), inline = env[envName] ?? "";
 		if (lists.includes(name)) {
@@ -12777,7 +12777,8 @@ const LIST_INPUTS = [
 		"upload-traffic-artifact",
 		"traffic-artifact-retention-days"
 	],
-	lists: LIST_INPUTS
+	lists: LIST_INPUTS,
+	stepOnly: ["config-file"]
 }, INPUT_NAMES = ["config-file", ...CONFIG_FILE_INPUTS.known];
 function dropListInputs(env) {
 	for (let name of LIST_INPUTS) delete env[inputEnvName(name)];
