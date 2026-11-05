@@ -174,7 +174,7 @@ RUN if [ -n "$BUILDCAGE_TEST_HOOKS" ]; then touch /opt/buildcage/.test-hooks; fi
 # A .apk-new is a new version apk left beside a file it found changed, so the
 # image would ship the old one.
 RUN if find /etc -name '*.apk-new' | grep .; then \
-      echo "apk left the files above uninstalled" >&2; exit 1; \
+      echo "apk did not install the new versions listed above" >&2; exit 1; \
     fi
 
 # Last, so that it sees every package the image ends up with.
