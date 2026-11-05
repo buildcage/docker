@@ -43,7 +43,7 @@ RUN apk add --no-cache curl libcap-utils && \
 # Build the runc wrapper (statically linked). --platform=$BUILDPLATFORM keeps
 # the Go toolchain on the build host's own architecture; GOOS/GOARCH then
 # cross-compile for the target.
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS runc-wrapper-build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS runc-wrapper-build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
