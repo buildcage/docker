@@ -39,7 +39,7 @@ value, warning when the two differ.
 starts.
 
 ```yaml
-- uses: buildcage/docker@ef2b79a3baaddc6a69c1b10a2c473a134ece2eca # v4.4.0
+- uses: buildcage/docker@575ea4709782ddfbeda3231b41e14a054f473a42 # v4.4.1
   with:
     builder-name: buildcage
     proxy-mode: restrict
