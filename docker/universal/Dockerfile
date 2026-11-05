@@ -6,11 +6,11 @@ ARG CNI_SHA256_AMD64=b98f74a0f8522f0a83867178729c1aa70f2158f90c45a2ca8fa791db1c7
 ARG CNI_SHA256_ARM64=56171987d3947707c3563db2f4001bccaf50fd63468611b9f3cbecb1375ee7ec
 
 # renovate: datasource=github-release-attachments depName=coredns/coredns
-ARG COREDNS_VERSION=v1.14.7
-# renovate: datasource=github-release-attachments depName=coredns/coredns digestVersion=v1.14.7
-ARG COREDNS_SHA256_AMD64=9a09356438c6d9591cb80011a2a7a52f87fc3a113f6690e41f243f98b98faac9
-# renovate: datasource=github-release-attachments depName=coredns/coredns digestVersion=v1.14.7
-ARG COREDNS_SHA256_ARM64=bf26782d19b5340e3e6cb50f1ed6df72f58e4a30932c79d167f0f0a8b1e92e16
+ARG COREDNS_VERSION=v1.15.0
+# renovate: datasource=github-release-attachments depName=coredns/coredns digestVersion=v1.15.0
+ARG COREDNS_SHA256_AMD64=2495c5b8f3fab6d0a336c397f1227b75406d86e6ec7125744a29df9e936ab8cd
+# renovate: datasource=github-release-attachments depName=coredns/coredns digestVersion=v1.15.0
+ARG COREDNS_SHA256_ARM64=73a5bf107c9791d57741ccd59ad138ab00bcd5bb3f62e2e28c999f5c047334a4
 
 # The BuildKit base is a release behind and carries HAProxy 3.2, whose resolver
 # defaults are not the ones the generated config is written against.
