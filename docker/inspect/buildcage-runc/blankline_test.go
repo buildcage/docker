@@ -26,6 +26,7 @@ func TestRemoveCAKeepsOneBlankLineBetweenSeparatedCertificates(t *testing.T) {
 		{"no blank line before", other + string(testCA) + "\n" + other, other + "\n" + other},
 		{"first", string(testCA) + "\n" + other, other},
 		{"after a single byte", "\n" + string(testCA) + "\n" + other, "\n\n" + other},
+		{"only", string(testCA) + "\n", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "bundle.pem")

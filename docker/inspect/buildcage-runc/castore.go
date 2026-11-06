@@ -296,8 +296,9 @@ func holdsAnyDER(b []byte, ders [][]byte) bool {
 type span struct{ start, end int64 }
 
 // removeCA deletes every copy of the certificate, leaving anything else in
-// place, and reports whether one came with p11-kit's label line, which makes
-// the file a bundle p11-kit wrote rather than a copy of the CA alone.
+// place, and reports whether one came with a bundle's separator (p11-kit's
+// label line or a blank line after it), which makes the file a bundle a tool
+// wrote rather than a copy of the CA alone.
 //
 // Returns without error when there is none, since the step may have rewritten
 // the file itself, or when the file is binary. The find and the strip share one
@@ -327,7 +328,7 @@ func removeCA(path string, marks caMarks) (bool, error) {
 
 	size := info.Size()
 	w := newFileWindow(f, size)
-	cuts, labelled, err := findCertificates(w, marks)
+	cuts, inBundle, err := findCertificates(w, marks)
 	if err != nil || len(cuts) == 0 {
 		return false, err
 	}
@@ -342,23 +343,23 @@ func removeCA(path string, marks caMarks) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return labelled, f.Truncate(kept)
+	return inBundle, f.Truncate(kept)
 }
 
 // findCertificates returns, in order, the range each armoured copy of the
 // certificate occupies, including the line break that closes it and, in a
-// bundle p11-kit wrote, the label line and blank line that go with it. It
-// also reports whether any copy had a label line.
+// bundle, the label line or blank line that goes with it. It also reports
+// whether any copy came with one.
 func findCertificates(w *fileWindow, marks caMarks) ([]span, bool, error) {
 	var cuts []span
-	labelled := false
+	inBundle := false
 	for off := int64(0); off < w.size; {
 		begin, err := findInFile(w, beginPEM, off)
 		if err != nil {
 			return nil, false, err
 		}
 		if begin == -1 {
-			return cuts, labelled, nil
+			return cuts, inBundle, nil
 		}
 		block, end, err := readPEMBlock(w, begin)
 		if err != nil {
@@ -386,14 +387,15 @@ func findCertificates(w *fileWindow, marks caMarks) ([]span, bool, error) {
 		if err != nil {
 			return nil, false, err
 		}
-		if cut.start < begin {
-			labelled = true
-		} else if cut.end, err = withBlankLineAfter(w, begin, end); err != nil {
-			return nil, false, err
+		if cut.start == begin {
+			if cut.end, err = withBlankLineAfter(w, begin, end); err != nil {
+				return nil, false, err
+			}
 		}
+		inBundle = inBundle || cut.start < begin || cut.end > end
 		cuts = append(cuts, cut)
 	}
-	return cuts, labelled, nil
+	return cuts, inBundle, nil
 }
 
 // withLabelLine widens a cut to the label line right above it and to one of
