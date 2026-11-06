@@ -260,8 +260,9 @@ fi
 echo ""
 echo "--- the report after the proxy's log writer was killed ---"
 # haproxy hands its next line to a new s6-log, and nothing in the log itself
-# shows the lines the killed one had not written.
-if docker exec "$BUILDER_NAME" pkill -KILL -f "s6-log .*/var/log/haproxy"; then
+# shows the lines the killed one had not written. Anchored, as the listener
+# that starts each s6-log carries its command line too.
+if docker exec "$BUILDER_NAME" pkill -KILL -f "^s6-log .*/var/log/haproxy"; then
   pass "the proxy's s6-log killed in the builder"
 else
   fail "could not kill the proxy's s6-log in the builder"
@@ -282,7 +283,8 @@ echo ""
 echo "--- the report after the resolver's log writer was killed ---"
 # CoreDNS keeps writing into the pipe the new s6-log reads, and nothing in the
 # log itself shows the lines the killed one had not written.
-if docker exec "$BUILDER_NAME" pkill -KILL -f "s6-log .*/var/log/coredns"; then
+# Anchored like the proxy's, though no listener starts this one.
+if docker exec "$BUILDER_NAME" pkill -KILL -f "^s6-log .*/var/log/coredns"; then
   pass "the resolver's s6-log killed in the builder"
 else
   fail "could not kill the resolver's s6-log in the builder"
