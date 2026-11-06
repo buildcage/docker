@@ -100,7 +100,7 @@ func TestUndoAnchorsTakesBackWhatIsNotAdopted(t *testing.T) {
 		_ = os.Remove(resolvedAnchor(rootfs, anchor.dir))
 	}
 
-	undoAnchors(rootfs, created, nil)
+	undoAnchors(rootfs, created, anchorsAtStart{})
 
 	adopted := filepath.Join(rootfs, "usr", "local", "share", "ca-certificates")
 	if _, err := os.Stat(adopted); err != nil {
@@ -132,7 +132,7 @@ func TestUndoAnchorsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testing.T) {
 		_ = os.Remove(resolvedAnchor(rootfs, anchor.dir))
 	}
 
-	undoAnchors(rootfs, created, nil)
+	undoAnchors(rootfs, created, anchorsAtStart{})
 
 	if _, err := os.Stat(filepath.Join(rootfs, "etc", "ca-certificates", "trust-source", "anchors")); err != nil {
 		t.Fatalf("removed Arch's adopted anchor directory: %v", err)
@@ -155,7 +155,7 @@ func TestUndoAnchorsLeavesOneTheStepFilled(t *testing.T) {
 	_ = os.Remove(filepath.Join(dir, anchorName))
 	mustWriteFile(t, filepath.Join(dir, "theirs.crt"), "THEIRS\n")
 
-	undoAnchors(rootfs, created, nil)
+	undoAnchors(rootfs, created, anchorsAtStart{})
 
 	if _, err := os.Stat(filepath.Join(dir, "theirs.crt")); err != nil {
 		t.Fatalf("took away a directory the step had filled: %v", err)
@@ -183,7 +183,7 @@ func TestUndoAnchorsRefusesAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	}
 	mustSymlink(t, outside, source)
 
-	undoAnchors(rootfs, created, nil)
+	undoAnchors(rootfs, created, anchorsAtStart{})
 
 	if _, err := os.Stat(filepath.Join(outside, "anchors")); err != nil {
 		t.Fatalf("the undo followed a symlink out of the rootfs: %v", err)
@@ -261,7 +261,7 @@ func TestUndoAnchorsReportsAFailureOfItsOwn(t *testing.T) {
 	parent := filepath.Join(rootfs, "usr", "local", "share")
 	mustMakeReadOnly(t, parent)
 
-	undoAnchors(rootfs, created, nil) // must neither panic nor fail the process
+	undoAnchors(rootfs, created, anchorsAtStart{}) // must neither panic nor fail the process
 
 	if _, err := os.Stat(filepath.Join(parent, "ca-certificates")); err != nil {
 		t.Fatalf("the read-only case did not leave the directory: %v", err)
