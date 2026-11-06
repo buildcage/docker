@@ -89,8 +89,15 @@ func apkChecksumOfFile(path string, truncatedSHA256 bool) (string, error) {
 }
 
 // openGuarded opens path read-only without following a symlink or blocking on
-// a FIFO.
+// a FIFO. Anything but a regular file is refused before the open, since the
+// wrapper runs as root on the host and opening a device node reaches the
+// host's device.
 func openGuarded(path string) (bundleFile, os.FileInfo, error) {
+	if info, err := os.Lstat(path); err != nil {
+		return nil, nil, err
+	} else if !info.Mode().IsRegular() {
+		return nil, nil, fmt.Errorf("%s: %w", path, errNotRegular)
+	}
 	f, err := openBundle(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, nil, asNotRegular(path, err)
@@ -328,8 +335,9 @@ func (s *apkState) inRootfs(rel string) (string, bool) {
 
 // apkSees is where a file the database names is as the step left it: in this
 // bind's mirror when it is under the mirrored directory, else in the rootfs.
+// Cleaning first keeps a ".." in the database from leading out of the mirror.
 func (b *dirBind) apkSees(rel string) (string, bool) {
-	if inside, ok := strings.CutPrefix("/"+rel, b.containerDir+"/"); ok {
+	if inside, ok := strings.CutPrefix(filepath.Clean("/"+rel), b.containerDir+"/"); ok {
 		return filepath.Join(b.scratchDir, inside), true
 	}
 	return b.apk.inRootfs(rel)

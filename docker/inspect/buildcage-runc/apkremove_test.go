@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -152,6 +153,14 @@ func TestInjectKeepsTheBundleWhereApkWouldHaveKeptIt(t *testing.T) {
 				t.Fatal(err)
 			}
 			mustMkdirAll(t, dbPath(rootfs))
+		}},
+		{"a database that is not a file", true, func(t *testing.T, rootfs, mirror string) {
+			if err := os.Remove(dbPath(rootfs)); err != nil {
+				t.Fatal(err)
+			}
+			if err := syscall.Mkfifo(dbPath(rootfs), 0o644); err != nil {
+				t.Skipf("mkfifo unavailable: %v", err)
+			}
 		}},
 		{"a file whose place cannot be told", true, func(t *testing.T, rootfs, mirror string) {
 			removeAPKDatabase(t, rootfs)

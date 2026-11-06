@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -128,6 +129,14 @@ func TestAPKChecksumOfFileRefusesWhatIsNotAFile(t *testing.T) {
 	if _, err := apkChecksumOfFile(link, false); !errors.Is(err, errNotRegular) {
 		t.Errorf("symlink: got %v", err)
 	}
+	t.Run("swapped for a symlink after the check", func(t *testing.T) {
+		old := openBundle
+		openBundle = func(string, int, os.FileMode) (bundleFile, error) { return nil, syscall.ELOOP }
+		t.Cleanup(func() { openBundle = old })
+		if _, err := apkChecksumOfFile(path, false); !errors.Is(err, errNotRegular) {
+			t.Fatalf("got %v", err)
+		}
+	})
 	for _, tc := range []struct {
 		name   string
 		broken brokenFile
@@ -151,6 +160,74 @@ func TestReadDatabaseRefusesOneTooLargeToHold(t *testing.T) {
 	mustSparseFile(t, path, maxCustomDirBytes+1)
 	if _, _, err := readDatabase(path); !errors.Is(err, errDatabaseTooLarge) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// The image or the step can leave a device node at the database's path, which
+// the wrapper must not open as root on the host.
+func TestReadDatabaseRefusesWhatIsNotAFileBeforeOpeningIt(t *testing.T) {
+	opened := 0
+	old := openBundle
+	openBundle = func(path string, flag int, perm os.FileMode) (bundleFile, error) {
+		opened++
+		return old(path, flag, perm)
+	}
+	t.Cleanup(func() { openBundle = old })
+
+	for _, tc := range []struct {
+		name    string
+		arrange func(t *testing.T, path string)
+	}{
+		{"device", func(t *testing.T, path string) {
+			var null syscall.Stat_t
+			if err := syscall.Stat("/dev/null", &null); err != nil {
+				t.Skipf("no /dev/null: %v", err)
+			}
+			if err := syscall.Mknod(path, syscall.S_IFCHR|0o644, int(null.Rdev)); err != nil {
+				t.Skipf("mknod unavailable: %v", err)
+			}
+		}},
+		{"FIFO", func(t *testing.T, path string) {
+			if err := syscall.Mkfifo(path, 0o644); err != nil {
+				t.Skipf("mkfifo unavailable: %v", err)
+			}
+		}},
+		{"directory", func(t *testing.T, path string) { mustMkdirAll(t, path) }},
+		{"symlink", func(t *testing.T, path string) {
+			target := filepath.Join(t.TempDir(), "installed")
+			mustWriteFile(t, target, "P:musl\n")
+			mustSymlink(t, target, path)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "installed")
+			tc.arrange(t, path)
+			opened = 0
+			if _, _, err := readDatabase(path); !errors.Is(err, errNotRegular) {
+				t.Errorf("got %v", err)
+			}
+			if opened != 0 {
+				t.Errorf("opened it %d times", opened)
+			}
+		})
+	}
+}
+
+// A database naming a file with ".." under the mirrored directory points into
+// the rootfs, never past the mirror into the host.
+func TestAPKSeesCleansThePathBeforeMatchingTheMirror(t *testing.T) {
+	rootfs, scratch := t.TempDir(), t.TempDir()
+	b := &dirBind{containerDir: "/etc/ssl/certs", scratchDir: scratch, apk: &apkState{rootfs: rootfs}}
+	for rel, want := range map[string]string{
+		"etc/ssl/certs/ca-certificates.crt":               filepath.Join(scratch, "ca-certificates.crt"),
+		"etc/ssl/certs/sub/../ca-certificates.crt":        filepath.Join(scratch, "ca-certificates.crt"),
+		"etc/ssl/certs/../../../../../../../../etc/hosts": filepath.Join(rootfs, "etc", "hosts"),
+		"etc/ssl/certs/../cert.pem":                       filepath.Join(rootfs, "etc", "ssl", "cert.pem"),
+	} {
+		got, ok := b.apkSees(rel)
+		if !ok || got != want {
+			t.Errorf("%s: got %s, %v, want %s", rel, got, ok, want)
+		}
 	}
 }
 
