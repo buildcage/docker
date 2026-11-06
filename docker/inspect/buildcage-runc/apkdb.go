@@ -412,8 +412,11 @@ var renameFile = os.Rename
 // bundle, and on a reinstall of the same version, the package's file, which is
 // what the .apk-new holds. So the .apk-new goes into place when the bundle,
 // with the CA out, is as it was before the step and either matched apk's
-// record or holds what the .apk-new holds. A bundle the image or the step
-// changed stays, as apk keeps it under any engine.
+// record or holds what the .apk-new holds. It also goes when the bundle now
+// holds what the .apk-new holds, as when the step rebuilt the bundle after the
+// upgrade, since apk writes no .apk-new for a file that already matches the
+// package's. A bundle the image or the step changed stays, as apk keeps it
+// under any engine.
 func (b *dirBind) promoteAPKNew() error {
 	for _, name := range b.bundleFiles {
 		apkNew := name + ".apk-new"
@@ -424,24 +427,29 @@ func (b *dirBind) promoteAPKNew() error {
 		if !existed || !before.mode.IsRegular() {
 			continue
 		}
-		bundleSum, ok, err := regularFileSum(filepath.Join(b.scratchDir, name))
+		bundleSum, bundleOK, err := regularFileSum(filepath.Join(b.scratchDir, name))
 		if err != nil {
 			return err
 		}
-		if !ok || bundleSum != before.sha256 {
+		apkNewSum, apkNewOK, err := regularFileSum(filepath.Join(b.scratchDir, apkNew))
+		if err != nil {
+			return err
+		}
+		if !bundleOK || !apkNewOK {
 			continue
 		}
-		apkNewSum, ok, err := regularFileSum(filepath.Join(b.scratchDir, apkNew))
-		if err != nil {
-			return err
-		}
-		if !ok || !b.apkRecorded[name] && apkNewSum != before.sha256 {
+		unchanged := bundleSum == before.sha256 && (b.apkRecorded[name] || apkNewSum == before.sha256)
+		if !unchanged && bundleSum != apkNewSum {
 			continue
 		}
 		if err := renameFile(filepath.Join(b.scratchDir, apkNew), filepath.Join(b.scratchDir, name)); err != nil {
 			return err
 		}
 		logf("moved %s over %s, as apk would have without the CA", filepath.Join(b.containerDir, apkNew), filepath.Join(b.containerDir, name))
+		if b.apkReplaced == nil {
+			b.apkReplaced = map[string]bool{}
+		}
+		b.apkReplaced[name] = true
 	}
 	return nil
 }

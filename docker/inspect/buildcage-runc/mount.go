@@ -99,6 +99,9 @@ type dirBind struct {
 	// them, and apk's database, for a bundle bind (apkdb.go).
 	apkRecorded map[string]bool
 	apk         *apkState
+	// The bundles an .apk-new was moved over: written as apk writes them, so
+	// they keep the mtime it left even when the content is the same.
+	apkReplaced map[string]bool
 }
 
 // groupTargetsByBind groups the CA targets by the directory whose mirror carries
@@ -461,6 +464,7 @@ func (b *dirBind) finish() error {
 	if err != nil {
 		return err
 	}
+	stripped = slices.DeleteFunc(stripped, func(e fileEntry) bool { return b.apkReplaced[e.path] })
 	if err := restoreUnchangedMtimes(b.original, stripped, b.scratchDir); err != nil {
 		return err
 	}

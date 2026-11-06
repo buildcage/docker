@@ -912,8 +912,10 @@ that differs from what it compares it with and writes the package's version besi
 reinstall. After the step the `.apk-new` is moved over the bundle where apk would have replaced the
 bundle without the CA: the bundle, once the CA is out, is as it was before the step, and either
 matched apk's record in `/lib/apk/db/installed` (an upgrade compares with the record) or holds what
-the `.apk-new` holds (a reinstall compares with the package). A bundle the image or the step changed
-itself is kept with its `.apk-new` beside it, as apk keeps it under any engine.
+the `.apk-new` holds (a reinstall compares with the package). It is also moved when the bundle
+already holds what the `.apk-new` holds, as after the `ca-certificates` package's trigger rebuilt
+it, since apk writes no `.apk-new` for a file that matches the package's. A bundle the image or the
+step changed itself is kept with its `.apk-new` beside it, as apk keeps it under any engine.
 
 Removing the bundle's package likewise leaves the bundle, since apk removes a file under `/etc` only
 where it matches its record. After the step the bundle is removed where apk would have removed it:
