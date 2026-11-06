@@ -1007,7 +1007,8 @@ anchor directory:
 
 Where p11-kit rebuilt a bundle from the anchors, as `update-ca-trust` does on RHEL, Fedora and
 Arch, the label line it wrote above the CA goes with the CA. So do the links left pointing at the
-CA's own copy, such as the hash links in `/etc/pki/tls/certs`.
+CA's own copy, such as the hash links in `/etc/pki/tls/certs` on Fedora and `/etc/ssl/certs` on
+Arch.
 
 Two things fail the build by default, pointing at `fail-on-ca-residue`:
 

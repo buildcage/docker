@@ -105,17 +105,17 @@ func TestRemoveCAKeepsLinesThatAreNotItsLabel(t *testing.T) {
 	}
 }
 
-// A certificate with no common name gets no label to look for.
-func TestLabelLinesOfSkipsACertificateWithoutACommonName(t *testing.T) {
-	if lines := labelLinesOf([][]byte{testDER, labelledCADER(t, "")}); len(lines) != 0 {
-		t.Fatalf("got %q, want none", lines)
+// A certificate with no common name, or one that does not parse, gets no
+// label to look for.
+func TestCAMarksHaveNoLabelWithoutACommonName(t *testing.T) {
+	for name, ca := range map[string][]byte{
+		"no common name":    labelledCA(t, ""),
+		"not a certificate": testCA,
+	} {
+		if labels := caMarksOf(ca).labels; len(labels) != 0 {
+			t.Errorf("%s: got %q, want none", name, labels)
+		}
 	}
-}
-
-func labelledCADER(t *testing.T, name string) []byte {
-	t.Helper()
-	cert, _ := selfSignedCA(t, 1, pkix.Name{CommonName: name})
-	return cert.Raw
 }
 
 // The label is read back from before the block, which can be past what the

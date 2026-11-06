@@ -263,11 +263,15 @@ const base64PrefixLength = 48
 
 func caMarksOf(ca []byte) caMarks {
 	marks := caMarks{ders: certificateDERs(ca)}
-	marks.labels = labelLinesOf(marks.ders)
 	marks.needles = slices.Clone(marks.ders)
 	for _, der := range marks.ders {
 		if cert, err := x509.ParseCertificate(der); err == nil {
 			marks.needles = append(marks.needles, cert.RawSubject)
+			// p11-kit's trust extract names a certificate from an anchor by its
+			// common name, in a comment line above it.
+			if cert.Subject.CommonName != "" {
+				marks.labels = append(marks.labels, []byte("# "+cert.Subject.CommonName+"\n"))
+			}
 		}
 		line := base64.StdEncoding.EncodeToString(der)
 		marks.needles = append(marks.needles, []byte(line[:min(len(line), base64PrefixLength)]))
@@ -390,18 +394,6 @@ func findCertificates(w *fileWindow, marks caMarks) ([]span, bool, error) {
 		cuts = append(cuts, cut)
 	}
 	return cuts, labelled, nil
-}
-
-// labelLinesOf returns the comment line p11-kit's trust extract writes above
-// each certificate taken from an anchor, naming it by its common name.
-func labelLinesOf(ders [][]byte) [][]byte {
-	var lines [][]byte
-	for _, der := range ders {
-		if cert, err := x509.ParseCertificate(der); err == nil && cert.Subject.CommonName != "" {
-			lines = append(lines, []byte("# "+cert.Subject.CommonName+"\n"))
-		}
-	}
-	return lines
 }
 
 // withLabelLine widens a cut to the label line right above it and to one of
