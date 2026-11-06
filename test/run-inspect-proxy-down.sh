@@ -283,7 +283,8 @@ echo ""
 echo "--- the report after the resolver's log writer was killed ---"
 # CoreDNS keeps writing into the pipe the new s6-log reads, and nothing in the
 # log itself shows the lines the killed one had not written.
-if docker exec "$BUILDER_NAME" pkill -KILL -f "s6-log .*/var/log/coredns"; then
+# Anchored the same way.
+if docker exec "$BUILDER_NAME" pkill -KILL -f "^s6-log .*/var/log/coredns"; then
   pass "the resolver's s6-log killed in the builder"
 else
   fail "could not kill the resolver's s6-log in the builder"
