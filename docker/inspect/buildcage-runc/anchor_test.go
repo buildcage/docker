@@ -86,7 +86,7 @@ func TestRemovalOrderIsDeepestFirst(t *testing.T) {
 
 // The directories go once the step has ended, unless the step installed the
 // package that owns one, which would have created it anyway.
-func TestRemoveCreatedDirsTakesBackWhatIsNotAdopted(t *testing.T) {
+func TestUndoAnchorsTakesBackWhatIsNotAdopted(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
@@ -122,7 +122,7 @@ func TestRemoveCreatedDirsTakesBackWhatIsNotAdopted(t *testing.T) {
 // Arch's anchor directory sits beside blocklist/ under trust-source/, so a step
 // that installs its package keeps the directory and the parents the injection
 // made for the other anchors still go.
-func TestRemoveCreatedDirsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testing.T) {
+func TestUndoAnchorsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
@@ -144,7 +144,7 @@ func TestRemoveCreatedDirsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testin
 
 // A directory the step put something else in is not the injection's to take,
 // so a non-empty one is left rather than reported as a failure.
-func TestRemoveCreatedDirsLeavesOneTheStepFilled(t *testing.T) {
+func TestUndoAnchorsLeavesOneTheStepFilled(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
@@ -166,7 +166,7 @@ func TestRemoveCreatedDirsLeavesOneTheStepFilled(t *testing.T) {
 // to an absolute path of its own must not have the undo follow it: os.Remove on
 // the inject-time path would otherwise reach out of the rootfs. Re-resolving the
 // path disagrees with where the injection put it, so the directory is left.
-func TestRemoveCreatedDirsRefusesAPathASymlinkNowLeadsOutOf(t *testing.T) {
+func TestUndoAnchorsRefusesAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
@@ -248,7 +248,7 @@ func TestCreateCAReportsAPathItCannotBuild(t *testing.T) {
 
 // A created directory the undo cannot take away for a reason of its own is
 // logged, not swallowed and not fatal.
-func TestRemoveCreatedDirsReportsAFailureOfItsOwn(t *testing.T) {
+func TestUndoAnchorsReportsAFailureOfItsOwn(t *testing.T) {
 	skipIfRoot(t)
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))

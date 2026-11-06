@@ -53,8 +53,8 @@ var anchorDirs = []struct {
 	}},
 	// SUSE, where p11-kit ships the anchor directory
 	{"/etc/pki/trust/anchors", []string{"/var/lib/ca-certificates"}, nil},
-	// Arch
-	{"/etc/ca-certificates/trust-source/anchors", []string{"/etc/ca-certificates/trust-source/blocklist"}, []string{
+	// Arch; blacklist before 2021
+	{"/etc/ca-certificates/trust-source/anchors", []string{"/etc/ca-certificates/trust-source/blocklist", "/etc/ca-certificates/trust-source/blacklist"}, []string{
 		"/etc/ca-certificates/trust-source/anchors",
 		"/etc/ca-certificates/trust-source",
 	}},
@@ -145,6 +145,7 @@ func installedAnchorPackages(rootfs string) []bool {
 			resolved, _ := resolveInRoot(rootfs, owner)
 			if _, err := os.Stat(resolved); err == nil {
 				installed[i] = true
+				break
 			}
 		}
 	}
@@ -168,18 +169,26 @@ func undoAnchors(rootfs string, created createdDirs, installedBefore []bool) {
 			adopted[dir] = true
 		}
 	}
-	for _, dir := range created.removalOrder() {
+	var dirs createdDirs
+	for _, dir := range created.dirs {
 		if !adopted[dir] {
-			removeEmptyDir(rootfs, dir)
+			dirs.add([]string{dir})
 		}
 	}
-	// Then what removing a package the step removed would have taken.
+	// And what removing a package the step removed would have taken, in the
+	// same order, so a parent another anchor's list names goes after its
+	// children.
 	for i := range anchorDirs {
 		if i < len(installedBefore) && installedBefore[i] && !installed[i] {
 			for _, dir := range anchorDirs[i].removal {
-				removeEmptyDir(rootfs, filepath.Join(rootfs, dir))
+				if resolved, err := resolveInRoot(rootfs, dir); err == nil {
+					dirs.add([]string{resolved})
+				}
 			}
 		}
+	}
+	for _, dir := range dirs.removalOrder() {
+		removeEmptyDir(rootfs, dir)
 	}
 }
 

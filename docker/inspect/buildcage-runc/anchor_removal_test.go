@@ -85,23 +85,62 @@ func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
 			}
 		})
 	}
-	t.Run("Arch", func(t *testing.T) {
+	for _, owner := range []string{"blocklist", "blacklist"} {
+		t.Run("Arch with "+owner, func(t *testing.T) {
+			rootfs := t.TempDir()
+			for _, dir := range []string{"trust-source/anchors", "trust-source/" + owner, "extracted"} {
+				mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", dir))
+			}
+			before := installedAnchorPackages(rootfs)
+			created := placeAnchors(rootfs, testCA)
+			removeAll(t, rootfs, "etc/ca-certificates/trust-source/"+owner)
+			emptyAnchors(rootfs)
+
+			undoAnchors(rootfs, created, before)
+
+			if exists(filepath.Join(rootfs, "etc", "ca-certificates", "trust-source")) {
+				t.Error("/etc/ca-certificates/trust-source was left behind")
+			}
+			if !exists(filepath.Join(rootfs, "etc", "ca-certificates", "extracted")) {
+				t.Error("/etc/ca-certificates/extracted, which the removal keeps, was taken away")
+			}
+		})
+	}
+	// Debian's list names /etc/ca-certificates and Arch's names trust-source
+	// under it: with both packages gone, the parent goes once its child has.
+	t.Run("Debian and Arch", func(t *testing.T) {
 		rootfs := t.TempDir()
-		for _, dir := range []string{"trust-source/anchors", "trust-source/blocklist", "extracted"} {
+		mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
+		for _, dir := range []string{"update.d", "trust-source/anchors", "trust-source/blocklist"} {
 			mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", dir))
 		}
 		before := installedAnchorPackages(rootfs)
 		created := placeAnchors(rootfs, testCA)
-		removeAll(t, rootfs, "etc/ca-certificates/trust-source/blocklist")
+		removeAll(t, rootfs, "usr/share/ca-certificates", "etc/ca-certificates/update.d", "etc/ca-certificates/trust-source/blocklist")
 		emptyAnchors(rootfs)
 
 		undoAnchors(rootfs, created, before)
 
-		if exists(filepath.Join(rootfs, "etc", "ca-certificates", "trust-source")) {
-			t.Error("/etc/ca-certificates/trust-source was left behind")
+		if exists(filepath.Join(rootfs, "etc", "ca-certificates")) {
+			t.Error("/etc/ca-certificates was left behind")
 		}
-		if !exists(filepath.Join(rootfs, "etc", "ca-certificates", "extracted")) {
-			t.Error("/etc/ca-certificates/extracted, which the removal keeps, was taken away")
+	})
+	// A symlink the image ships in the path, as an ostree-style /usr/local,
+	// is followed to where the directory really is.
+	t.Run("through a symlinked parent", func(t *testing.T) {
+		rootfs := t.TempDir()
+		mustMkdirAll(t, filepath.Join(rootfs, "var", "usrlocal", "share", "ca-certificates"))
+		mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
+		mustSymlink(t, "../var/usrlocal", filepath.Join(rootfs, "usr", "local"))
+		before := installedAnchorPackages(rootfs)
+		created := placeAnchors(rootfs, testCA)
+		removeAll(t, rootfs, "usr/share/ca-certificates")
+		emptyAnchors(rootfs)
+
+		undoAnchors(rootfs, created, before)
+
+		if exists(filepath.Join(rootfs, "var", "usrlocal", "share", "ca-certificates")) {
+			t.Error("/usr/local/share/ca-certificates was left behind")
 		}
 	})
 }
