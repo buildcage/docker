@@ -256,3 +256,7 @@ CVE-2026-61801
 # CoreDNS contains it, and no code path reaches it (govulncheck); buildkitd,
 # buildctl and buildcage-runc carry the module without the package.
 GO-2026-5932
+
+# golang.org/x/sys/windows: integer overflow in NewNTUnicodeString, Windows only.
+# This product runs exclusively in Linux containers; the Windows package is never executed.
+CVE-2026-39824
