@@ -450,7 +450,7 @@ func (b *dirBind) finish() error {
 			return err
 		}
 	}
-	dropped := false
+	var dropped []string
 	if b.apk != nil {
 		if dropped, err = b.dropRemovedBundles(); err != nil {
 			return err
@@ -482,8 +482,8 @@ func (b *dirBind) finish() error {
 	if err := writeBack(b.scratchDir, b.hostDir); err != nil {
 		return err
 	}
-	if dropped {
-		return b.apk.removeEmptiedDirs(b.containerDir)
+	for _, dir := range dropped {
+		b.apk.removeEmptiedDirs(dir)
 	}
 	return nil
 }

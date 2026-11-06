@@ -242,55 +242,110 @@ func TestInjectKeepsADirectoryApkWouldHaveKept(t *testing.T) {
 	}
 }
 
-func TestInjectFailsWhenItCannotRemoveWhatApkWouldHave(t *testing.T) {
-	for _, target := range []string{"ca-certificates.crt", "certs"} {
-		t.Run(target, func(t *testing.T) {
+func TestInjectFailsWhenItCannotRemoveTheBundle(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newAPKBundleWithLink(t)
+	old := removeFile
+	removeFile = func(path string) error {
+		if filepath.Base(path) == "ca-certificates.crt" {
+			return errBrokenFile
+		}
+		return old(path)
+	}
+	t.Cleanup(func() { removeFile = old })
+
+	if err := removalStep(t, bundle, func(string) { apkRemovesTheBundlePackage(t, rootfs) }); !errors.Is(err, errBrokenFile) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+// A directory it cannot remove is left, as apk leaves one.
+func TestInjectLeavesADirectoryItCannotRemove(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newAPKBundleWithLink(t)
+	old := removeFile
+	removeFile = func(path string) error {
+		if filepath.Base(path) == "certs" {
+			return errBrokenFile
+		}
+		return old(path)
+	}
+	t.Cleanup(func() { removeFile = old })
+
+	if err := removalStep(t, bundle, func(string) { apkRemovesTheBundlePackage(t, rootfs) }); err != nil {
+		t.Fatal(err)
+	}
+	if !exists(certsOf(rootfs)) {
+		t.Error("/etc/ssl/certs went")
+	}
+	if want := "cannot remove the emptied /etc/ssl/certs"; !strings.Contains(ownLogText(), want) {
+		t.Errorf("%q is not in the log:\n%s", want, ownLogText())
+	}
+}
+
+// A bundle another package records once the step is done, as after an
+// upgrade that moved it, is one apk kept; so is a directory a package the
+// step installed lists, and anything when the database lists no package.
+func TestInjectKeepsWhatAPackageStillInstalledRecords(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		after  string
+		bundle bool
+		certs  bool
+	}{
+		{"the bundle moved to another package", "P:ca-certificates-new\nF:etc/ssl/certs\nR:ca-certificates.crt\nZ:Q1MOVED\n\n", true, true},
+		{"the directory listed by a new package", "P:certs-dir\nF:etc/ssl/certs\n\n", false, true},
+		{"a database listing no package", "", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			useFakeRsync(t)
 			bundle, rootfs := newAPKBundleWithLink(t)
-			old := removeFile
-			removeFile = func(path string) error {
-				if filepath.Base(path) == target {
-					return errBrokenFile
+			err := removalStep(t, bundle, func(string) {
+				apkRemovesTheBundlePackage(t, rootfs)
+				if tc.after == "" {
+					mustWriteFile(t, dbPath(rootfs), "")
+				} else {
+					mustAppendFile(t, dbPath(rootfs), tc.after)
 				}
-				return old(path)
+			})
+			if err != nil {
+				t.Fatal(err)
 			}
-			t.Cleanup(func() { removeFile = old })
-
-			if err := removalStep(t, bundle, func(string) { apkRemovesTheBundlePackage(t, rootfs) }); !errors.Is(err, errBrokenFile) {
-				t.Fatalf("got %v", err)
+			if got := exists(filepath.Join(certsOf(rootfs), "ca-certificates.crt")); got != tc.bundle {
+				t.Errorf("bundle there: %v", got)
+			}
+			if got := exists(certsOf(rootfs)); got != tc.certs {
+				t.Errorf("/etc/ssl/certs there: %v", got)
 			}
 		})
 	}
 }
 
-func TestDropRemovedBundlesReportsABundleItCannotRead(t *testing.T) {
-	scratch := t.TempDir()
-	mustWriteFile(t, filepath.Join(scratch, "sub"), "")
-	b := &dirBind{scratchDir: scratch, bundleFiles: []string{"sub/bundle.pem"}, apkRecorded: map[string]bool{"sub/bundle.pem": true}}
-	if _, err := b.dropRemovedBundles(); err == nil {
-		t.Fatal("succeeded")
-	}
-}
-
-// The walk stops at a directory it cannot resolve, and otherwise goes on as
-// far up as the removed packages listed.
-func TestRemoveEmptiedDirsWalksUpWhileTheRemovedPackagesListedTheDirectory(t *testing.T) {
-	rootfs := t.TempDir()
-	removed := &apkState{rootfs: rootfs, afterRead: true, after: &apkDatabase{packages: map[string][]string{}},
-		before: &apkDatabase{dirOwners: map[string][]string{"a": {"p"}, "loop/b": {"p"}}}}
-	mustMkdirAll(t, filepath.Join(rootfs, "a"))
-	if err := removed.removeEmptiedDirs("/a"); err != nil {
+// A bundle folded into a bind of its parent directory has its own directory
+// emptied and removed first.
+func TestInjectRemovesTheDirectoryOfANestedBundle(t *testing.T) {
+	useFakeRsync(t)
+	_, rootfs := newAPKBundleWithLink(t)
+	s, err := loadSpec(filepath.Dir(rootfs))
+	if err != nil {
 		t.Fatal(err)
 	}
-	if exists(filepath.Join(rootfs, "a")) {
-		t.Error("/a is still there")
+	b := prepareBind(s, filepath.Dir(rootfs), filepath.Join(rootfs, "etc", "ssl"), []string{"certs/ca-certificates.crt"}, testCA, mirrorLimit{}, false)
+	if b == nil {
+		t.Fatal("not bound")
 	}
-
-	mustSymlink(t, "loop", filepath.Join(rootfs, "loop"))
-	if err := removed.removeEmptiedDirs("/loop/b"); err != nil {
+	t.Cleanup(b.cleanup)
+	noteAPKRecords(rootfs, []*dirBind{b})
+	apkRemovesTheBundlePackage(t, rootfs)
+	if err := os.Remove(filepath.Join(b.scratchDir, "cert.pem")); err != nil {
 		t.Fatal(err)
 	}
-	if !exists(filepath.Join(rootfs, "loop")) {
-		t.Error("the link went")
+
+	if err := b.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if exists(filepath.Join(rootfs, "etc", "ssl")) {
+		t.Error("/etc/ssl is still there")
 	}
 }

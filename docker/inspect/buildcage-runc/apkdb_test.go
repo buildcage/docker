@@ -149,7 +149,7 @@ func TestAPKChecksumOfFileRefusesWhatIsNotAFile(t *testing.T) {
 func TestReadDatabaseRefusesOneTooLargeToHold(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "installed")
 	mustSparseFile(t, path, maxCustomDirBytes+1)
-	if _, err := readDatabase(path); !errors.Is(err, errDatabaseTooLarge) {
+	if _, _, err := readDatabase(path); !errors.Is(err, errDatabaseTooLarge) {
 		t.Fatalf("got %v", err)
 	}
 }

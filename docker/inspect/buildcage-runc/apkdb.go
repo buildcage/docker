@@ -110,16 +110,24 @@ func openGuarded(path string) (bundleFile, os.FileInfo, error) {
 // from being read into memory whole.
 var errDatabaseTooLarge = errors.New("larger than " + fmt.Sprint(maxCustomDirBytes>>20) + " MiB")
 
-func readDatabase(path string) ([]byte, error) {
+func readDatabase(path string) ([]byte, os.FileInfo, error) {
 	f, info, err := openGuarded(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer f.Close()
 	if info.Size() > maxCustomDirBytes {
-		return nil, fmt.Errorf("%s: %w", path, errDatabaseTooLarge)
+		return nil, nil, fmt.Errorf("%s: %w", path, errDatabaseTooLarge)
 	}
-	return io.ReadAll(io.NewSectionReader(f, 0, info.Size()))
+	db, err := io.ReadAll(io.NewSectionReader(f, 0, info.Size()))
+	return db, info, err
+}
+
+// sameFileAndVersion reports whether a and b are the same file with the same
+// size and mtime: apk replaces its database by renaming a new file over it,
+// so one it rewrote is a different file.
+func sameFileAndVersion(a, b os.FileInfo) bool {
+	return os.SameFile(a, b) && a.Size() == b.Size() && a.ModTime().Equal(b.ModTime())
 }
 
 // apkState is apk's database as it was before the step, shared by the bundle
@@ -128,9 +136,12 @@ type apkState struct {
 	rootfs  string
 	before  *apkDatabase
 	bundles map[string]bool // every CA bundle, relative to the root
-	// For each package a removal may need judging, the files it listed that
-	// were there before the step, apart from the CA bundles.
+	// For each bundle's package, the files it listed that were there before
+	// the step, apart from the CA bundles.
 	presentBefore map[string][]string
+	// The database file as it was before the step, so one the step left alone
+	// is not read again.
+	beforeInfo os.FileInfo
 
 	afterRead bool
 	after     *apkDatabase // nil when the step removed the database or it could not be read
@@ -147,14 +158,14 @@ func noteAPKRecords(rootfs string, binds []*dirBind) {
 		logf("cannot resolve %s: %v; leaving any .apk-new beside a CA bundle", apkDBPath, err)
 		return
 	}
-	db, err := readDatabase(path)
+	db, info, err := readDatabase(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			logf("cannot read apk's database: %v; leaving any .apk-new beside a CA bundle", err)
 		}
 		return
 	}
-	state := &apkState{rootfs: rootfs, before: parseAPKDatabase(db), bundles: map[string]bool{}, presentBefore: map[string][]string{}}
+	state := &apkState{rootfs: rootfs, before: parseAPKDatabase(db), bundles: map[string]bool{}, presentBefore: map[string][]string{}, beforeInfo: info}
 	for _, b := range binds {
 		if b.keystore || b.nssBase != "" {
 			continue
@@ -182,20 +193,22 @@ func noteAPKRecords(rootfs string, binds []*dirBind) {
 			}
 		}
 	}
-	// The bundles' packages, and those listing a directory a removal may empty.
 	for _, b := range binds {
 		for name := range b.apkRecorded {
-			state.notePresent(state.before.records[strings.TrimPrefix(filepath.Join(b.containerDir, name), "/")].pkg)
-		}
-		if len(b.apkRecorded) == 0 {
-			continue
-		}
-		for rel := strings.TrimPrefix(b.containerDir, "/"); rel != "." && rel != ""; rel = filepath.Dir(rel) {
-			for _, pkg := range state.before.dirOwners[rel] {
-				state.notePresent(pkg)
-			}
+			state.notePresent(b.bundlePackage(name))
 		}
 	}
+}
+
+// bundleRel is a bundle's path as apk's database names it.
+func (b *dirBind) bundleRel(name string) string {
+	return strings.TrimPrefix(filepath.Join(b.containerDir, name), "/")
+}
+
+// bundlePackage is the package apk's database said owned a bundle before the
+// step.
+func (b *dirBind) bundlePackage(name string) string {
+	return b.apk.before.records[b.bundleRel(name)].pkg
 }
 
 // notePresent keeps the files pkg listed that are there before the step,
@@ -218,7 +231,9 @@ func (s *apkState) notePresent(pkg string) {
 	s.presentBefore[pkg] = present
 }
 
-// readAfter reads apk's database as the step left it.
+// readAfter reads apk's database as the step left it. A file still the one
+// read before the step is not read again, and one listing no package at all
+// is not taken to say every package went.
 func (s *apkState) readAfter() {
 	if s.afterRead {
 		return
@@ -226,9 +241,17 @@ func (s *apkState) readAfter() {
 	s.afterRead = true
 	path, err := resolveInRoot(s.rootfs, apkDBPath)
 	if err == nil {
+		if info, statErr := os.Lstat(path); statErr == nil && sameFileAndVersion(info, s.beforeInfo) {
+			s.after = s.before
+			return
+		}
 		var db []byte
-		if db, err = readDatabase(path); err == nil {
-			s.after = parseAPKDatabase(db)
+		if db, _, err = readDatabase(path); err == nil {
+			if after := parseAPKDatabase(db); len(after.packages) > 0 {
+				s.after = after
+			} else {
+				logf("apk's database lists no package after the step; leaving the CA bundles apk may have removed")
+			}
 			return
 		}
 	}
@@ -254,7 +277,16 @@ func (s *apkState) packageRemoved(pkg string, at func(rel string) (string, bool)
 	if !s.removed {
 		return false
 	}
-	present := s.presentBefore[pkg]
+	present, noted := s.presentBefore[pkg]
+	if !noted {
+		// A directory's owner: the directory being empty already says its
+		// files went, so what it listed is taken as there before.
+		for _, rel := range s.before.packages[pkg] {
+			if !s.bundles[rel] {
+				present = append(present, rel)
+			}
+		}
+	}
 	for _, rel := range present {
 		path, ok := at(rel)
 		if !ok {
@@ -282,12 +314,24 @@ func (b *dirBind) apkSees(rel string) (string, bool) {
 	return b.apk.inRootfs(rel)
 }
 
+// bundleRemoved reports whether the step removed a bundle's package and no
+// package the step left installed records the bundle in its place.
+func (b *dirBind) bundleRemoved(name string) bool {
+	if !b.apk.packageRemoved(b.bundlePackage(name), b.apkSees) {
+		return false
+	}
+	if b.apk.after != nil {
+		_, recorded := b.apk.after.records[b.bundleRel(name)]
+		return !recorded
+	}
+	return true
+}
+
 // bundlePackageRemoved reports whether the step removed the package of a
 // bundle that matched apk's record before the step.
 func (b *dirBind) bundlePackageRemoved() bool {
 	for name := range b.apkRecorded {
-		rel := strings.TrimPrefix(filepath.Join(b.containerDir, name), "/")
-		if b.apk.packageRemoved(b.apk.before.records[rel].pkg, b.apkSees) {
+		if b.bundleRemoved(name) {
 			return true
 		}
 	}
@@ -297,9 +341,10 @@ func (b *dirBind) bundlePackageRemoved() bool {
 // dropRemovedBundles takes out of the mirror each bundle whose package the
 // step removed, where apk would have removed the bundle without the CA: apk
 // removes a file under /etc only when it matches its record, which the CA
-// kept it from doing. It reports whether it took any out.
-func (b *dirBind) dropRemovedBundles() (bool, error) {
-	dropped := false
+// kept it from doing. It returns the directories that held the bundles it
+// took out.
+func (b *dirBind) dropRemovedBundles() ([]string, error) {
+	var dropped []string
 	for _, name := range b.bundleFiles {
 		if !b.apkRecorded[name] {
 			continue
@@ -312,15 +357,14 @@ func (b *dirBind) dropRemovedBundles() (bool, error) {
 		if !ok || sum != before.sha256 {
 			continue
 		}
-		rel := strings.TrimPrefix(filepath.Join(b.containerDir, name), "/")
-		if !b.apk.packageRemoved(b.apk.before.records[rel].pkg, b.apkSees) {
+		if !b.bundleRemoved(name) {
 			continue
 		}
 		if err := removeFile(filepath.Join(b.scratchDir, name)); err != nil {
 			return dropped, err
 		}
-		logf("removed %s, as apk would have without the CA when it removed %s", "/"+rel, b.apk.before.records[rel].pkg)
-		dropped = true
+		logf("removed /%s, as apk would have without the CA when it removed %s", b.bundleRel(name), b.bundlePackage(name))
+		dropped = append(dropped, filepath.Dir(filepath.Join(b.containerDir, name)))
 	}
 	return dropped, nil
 }
@@ -328,32 +372,32 @@ func (b *dirBind) dropRemovedBundles() (bool, error) {
 // removeEmptiedDirs removes dir and then each parent that is empty and that
 // only packages the step removed listed, as apk removes a directory no
 // installed package lists once it is empty. Run after the write-back, on the
-// rootfs.
-func (s *apkState) removeEmptiedDirs(dir string) error {
+// rootfs. A directory it cannot remove is left, as apk leaves one.
+func (s *apkState) removeEmptiedDirs(dir string) {
 	for rel := strings.TrimPrefix(dir, "/"); rel != "." && rel != ""; rel = filepath.Dir(rel) {
 		owners := s.before.dirOwners[rel]
-		if len(owners) == 0 {
-			return nil
+		if len(owners) == 0 || s.after != nil && len(s.after.dirOwners[rel]) > 0 {
+			return
 		}
 		for _, pkg := range owners {
 			if !s.packageRemoved(pkg, s.inRootfs) {
-				return nil
+				return
 			}
 		}
 		path, ok := s.inRootfs(rel)
 		if !ok {
-			return nil
+			return
 		}
 		entries, err := os.ReadDir(path)
 		if err != nil || len(entries) > 0 {
-			return nil
+			return
 		}
 		if err := removeFile(path); err != nil {
-			return err
+			logf("cannot remove the emptied /%s: %v", rel, err)
+			return
 		}
 		logf("removed /%s, which apk would have removed once it was empty", rel)
 	}
-	return nil
 }
 
 // removeFile is a var so a test can fail a removal a real filesystem allows.

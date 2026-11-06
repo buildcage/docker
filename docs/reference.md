@@ -918,7 +918,7 @@ itself is kept with its `.apk-new` beside it, as apk keeps it under any engine.
 Removing the bundle's package likewise leaves the bundle, since apk removes a file under `/etc` only
 where it matches its record. After the step the bundle is removed where apk would have removed it:
 it matched its record before the step, is as it was with the CA out, and its package is gone from
-apk's database. When the step removed the database too (`rm -rf /lib/apk`), the package counts as
+apk's database with no other package recording the bundle. When the step removed the database too (`rm -rf /lib/apk`), the package counts as
 removed when every other file it listed, such as `/etc/ssl/cert.pem`, is gone as well. The
 directories this leaves empty are removed as apk removes them, when no package still installed
 lists them.
