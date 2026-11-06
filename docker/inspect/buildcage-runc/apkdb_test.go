@@ -231,6 +231,25 @@ func TestAPKSeesCleansThePathBeforeMatchingTheMirror(t *testing.T) {
 	}
 }
 
+// A symlink the step left in the mirror resolves inside the mirror, as
+// resolveInRoot resolves one in the rootfs, never on the host.
+func TestAPKSeesKeepsASymlinkInTheMirrorInsideIt(t *testing.T) {
+	rootfs, scratch, host := t.TempDir(), t.TempDir(), t.TempDir()
+	mustWriteFile(t, filepath.Join(host, "x"), "")
+	mustSymlink(t, host, filepath.Join(scratch, "sub"))
+	mustSymlink(t, "loop-b", filepath.Join(scratch, "loop-a"))
+	mustSymlink(t, "loop-a", filepath.Join(scratch, "loop-b"))
+	b := &dirBind{containerDir: "/etc/ssl/certs", scratchDir: scratch, apk: &apkState{rootfs: rootfs}}
+
+	got, ok := b.apkSees("etc/ssl/certs/sub/x")
+	if want := filepath.Join(scratch, host, "x"); !ok || got != want {
+		t.Errorf("got %s, %v, want %s", got, ok, want)
+	}
+	if got, ok := b.apkSees("etc/ssl/certs/loop-a/x"); ok {
+		t.Errorf("a symlink loop resolved to %s", got)
+	}
+}
+
 // stepLeaves runs inject, lets the step leave content at each name in the
 // store's mirror, and finishes.
 func stepLeaves(t *testing.T, bundle string, files map[string]string) error {

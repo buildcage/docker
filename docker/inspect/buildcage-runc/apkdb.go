@@ -335,10 +335,12 @@ func (s *apkState) inRootfs(rel string) (string, bool) {
 
 // apkSees is where a file the database names is as the step left it: in this
 // bind's mirror when it is under the mirrored directory, else in the rootfs.
-// Cleaning first keeps a ".." in the database from leading out of the mirror.
+// Neither a ".." in the database nor a symlink the step left in the mirror
+// leads out of it.
 func (b *dirBind) apkSees(rel string) (string, bool) {
 	if inside, ok := strings.CutPrefix(filepath.Clean("/"+rel), b.containerDir+"/"); ok {
-		return filepath.Join(b.scratchDir, inside), true
+		path, err := resolveInRoot(b.scratchDir, "/"+inside)
+		return path, err == nil
 	}
 	return b.apk.inRootfs(rel)
 }

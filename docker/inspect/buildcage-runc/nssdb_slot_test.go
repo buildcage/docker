@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -429,6 +430,45 @@ func TestRemoveNSSSlotLeavesSomethingNotRegular(t *testing.T) {
 	}
 	if got := mustRead(t, path); got != string(nssSlot) {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// The step can leave a device node in place of pkcs11.txt, which the wrapper
+// must not open as root on the host.
+func TestRemoveNSSSlotDoesNotOpenWhatIsNotAFile(t *testing.T) {
+	opened := 0
+	old := openBundle
+	openBundle = func(path string, flag int, perm os.FileMode) (bundleFile, error) {
+		opened++
+		return old(path, flag, perm)
+	}
+	t.Cleanup(func() { openBundle = old })
+
+	for name, arrange := range map[string]func(t *testing.T, path string){
+		"missing": func(t *testing.T, path string) {},
+		"FIFO": func(t *testing.T, path string) {
+			if err := syscall.Mkfifo(path, 0o644); err != nil {
+				t.Skipf("mkfifo unavailable: %v", err)
+			}
+		},
+		"directory": func(t *testing.T, path string) { mustMkdirAll(t, path) },
+		"symlink": func(t *testing.T, path string) {
+			target := filepath.Join(t.TempDir(), "pkcs11.txt")
+			mustWriteFile(t, target, string(nssSlot))
+			mustSymlink(t, target, path)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "pkcs11.txt")
+			arrange(t, path)
+			opened = 0
+			if err := removeNSSSlot(path, nssSlot, true); err != nil {
+				t.Fatal(err)
+			}
+			if opened != 0 {
+				t.Errorf("opened it %d times", opened)
+			}
+		})
 	}
 }
 
