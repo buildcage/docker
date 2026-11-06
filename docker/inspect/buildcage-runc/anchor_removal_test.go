@@ -16,51 +16,104 @@ func fedoraTrust(t *testing.T, rootfs string) {
 	}
 }
 
-// Removing a package takes its empty directories with it, but under inspect
-// the anchor directory held the CA and extracted/pem was a mount point, so the
-// removal could not. Once the package is gone and they are empty, they go.
-func TestRemoveWhatPackageRemovalLeftTakesTheDirectoriesTheRemovalWould(t *testing.T) {
-	rootfs := t.TempDir()
-	fedoraTrust(t, rootfs)
-	mustMkdirAll(t, filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
-	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "update.d"))
-	before := installedAnchorPackages(rootfs)
+// emptyAnchors stands in for the layer sweep, which takes the anchor files out.
+func emptyAnchors(rootfs string) {
+	for _, anchor := range anchorDirs {
+		_ = os.Remove(resolvedAnchor(rootfs, anchor.dir))
+	}
+}
 
-	// rpm -e and apt-get remove, as far as each got with the CA in place.
-	for _, dir := range []string{"pki/ca-trust/source/blocklist", "ca-certificates"} {
-		if err := os.RemoveAll(filepath.Join(rootfs, "etc", dir)); err != nil {
+// removeAll stands in for a package removal: rm -rf of each path, which under
+// inspect gets only as far as the anchors allow, so it is done after them.
+func removeAll(t *testing.T, rootfs string, paths ...string) {
+	t.Helper()
+	for _, path := range paths {
+		if err := os.RemoveAll(filepath.Join(rootfs, path)); err != nil {
 			t.Fatal(err)
 		}
 	}
+}
 
-	removeWhatPackageRemovalLeft(rootfs, before)
+// Removing a package takes its empty directories with it, but under inspect
+// the anchor directories held the CA and extracted/pem was a mount point, so
+// the removal could not. Once the package is gone and they are empty, they go.
+func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
+	t.Run("Debian", func(t *testing.T) {
+		rootfs := t.TempDir()
+		mustMkdirAll(t, filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
+		mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
+		mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "update.d"))
+		before := installedAnchorPackages(rootfs)
+		// The Arch anchor lands in /etc/ca-certificates, which keeps dpkg from
+		// removing that directory too.
+		created := placeAnchors(rootfs, testCA)
+		removeAll(t, rootfs, "usr/share/ca-certificates", "etc/ca-certificates/update.d")
+		emptyAnchors(rootfs)
 
-	for _, dir := range []string{
-		"usr/local/share/ca-certificates",
-		"etc/pki/ca-trust/source",
-		"etc/pki/ca-trust/extracted/pem",
-	} {
-		if exists(filepath.Join(rootfs, dir)) {
-			t.Errorf("/%s was left behind", dir)
+		undoAnchors(rootfs, created, before)
+
+		for _, dir := range []string{"usr/local/share/ca-certificates", "etc/ca-certificates"} {
+			if exists(filepath.Join(rootfs, dir)) {
+				t.Errorf("/%s was left behind", dir)
+			}
 		}
-	}
-	// What the removal leaves too: another package's directory and the parents
-	// it keeps.
-	for _, dir := range []string{"etc/pki/ca-trust/extracted/edk2", "usr/local/share"} {
-		if !exists(filepath.Join(rootfs, dir)) {
-			t.Errorf("/%s was taken away", dir)
+		if !exists(filepath.Join(rootfs, "usr", "local", "share")) {
+			t.Error("/usr/local/share, which the removal keeps, was taken away")
 		}
+	})
+	for _, owner := range []string{"blocklist", "blacklist"} {
+		t.Run("RHEL with "+owner, func(t *testing.T) {
+			rootfs := t.TempDir()
+			for _, dir := range []string{"source/anchors", "source/" + owner, "extracted/pem", "extracted/java", "extracted/edk2"} {
+				mustMkdirAll(t, filepath.Join(rootfs, "etc", "pki", "ca-trust", dir))
+			}
+			before := installedAnchorPackages(rootfs)
+			created := placeAnchors(rootfs, testCA)
+			removeAll(t, rootfs, "etc/pki/ca-trust/source/"+owner)
+			emptyAnchors(rootfs)
+
+			undoAnchors(rootfs, created, before)
+
+			for _, dir := range []string{"source", "extracted/pem", "extracted/java"} {
+				if exists(filepath.Join(rootfs, "etc", "pki", "ca-trust", dir)) {
+					t.Errorf("/etc/pki/ca-trust/%s was left behind", dir)
+				}
+			}
+			// Another package's directory, and the parents it keeps.
+			if !exists(filepath.Join(rootfs, "etc", "pki", "ca-trust", "extracted", "edk2")) {
+				t.Error("/etc/pki/ca-trust/extracted/edk2 was taken away")
+			}
+		})
 	}
+	t.Run("Arch", func(t *testing.T) {
+		rootfs := t.TempDir()
+		for _, dir := range []string{"trust-source/anchors", "trust-source/blocklist", "extracted"} {
+			mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", dir))
+		}
+		before := installedAnchorPackages(rootfs)
+		created := placeAnchors(rootfs, testCA)
+		removeAll(t, rootfs, "etc/ca-certificates/trust-source/blocklist")
+		emptyAnchors(rootfs)
+
+		undoAnchors(rootfs, created, before)
+
+		if exists(filepath.Join(rootfs, "etc", "ca-certificates", "trust-source")) {
+			t.Error("/etc/ca-certificates/trust-source was left behind")
+		}
+		if !exists(filepath.Join(rootfs, "etc", "ca-certificates", "extracted")) {
+			t.Error("/etc/ca-certificates/extracted, which the removal keeps, was taken away")
+		}
+	})
 }
 
 // Only a removal the step made counts: a package still installed, or one that
 // was not installed as the step started, leaves every directory alone, as does
 // one the step put something in.
-func TestRemoveWhatPackageRemovalLeftLeavesWhatTheStepDidNotEmpty(t *testing.T) {
+func TestUndoAnchorsLeavesWhatTheStepDidNotEmpty(t *testing.T) {
 	t.Run("still installed", func(t *testing.T) {
 		rootfs := t.TempDir()
 		fedoraTrust(t, rootfs)
-		removeWhatPackageRemovalLeft(rootfs, installedAnchorPackages(rootfs))
+		undoAnchors(rootfs, createdDirs{}, installedAnchorPackages(rootfs))
 		if !exists(filepath.Join(rootfs, "etc/pki/ca-trust/source/anchors")) {
 			t.Fatal("removed the anchor directory of an installed package")
 		}
@@ -68,7 +121,7 @@ func TestRemoveWhatPackageRemovalLeftLeavesWhatTheStepDidNotEmpty(t *testing.T) 
 	t.Run("never installed", func(t *testing.T) {
 		rootfs := t.TempDir()
 		mustMkdirAll(t, filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
-		removeWhatPackageRemovalLeft(rootfs, installedAnchorPackages(rootfs))
+		undoAnchors(rootfs, createdDirs{}, installedAnchorPackages(rootfs))
 		if !exists(filepath.Join(rootfs, "usr/local/share/ca-certificates")) {
 			t.Fatal("removed a directory no package removal touched")
 		}
@@ -81,7 +134,7 @@ func TestRemoveWhatPackageRemovalLeftLeavesWhatTheStepDidNotEmpty(t *testing.T) 
 		if err := os.Remove(filepath.Join(rootfs, "etc/pki/ca-trust/source/blocklist")); err != nil {
 			t.Fatal(err)
 		}
-		removeWhatPackageRemovalLeft(rootfs, before)
+		undoAnchors(rootfs, createdDirs{}, before)
 		if !exists(filepath.Join(rootfs, "etc/pki/ca-trust/source/anchors/company.crt")) {
 			t.Fatal("removed a directory the step put a file in")
 		}
@@ -102,8 +155,8 @@ func TestRemoveEmptyDirLeavesWhatIsNotAPlainDirectory(t *testing.T) {
 	mustWriteFile(t, filepath.Join(rootfs, "a", "file"), "")
 	mustSymlink(t, "loop", filepath.Join(rootfs, "a", "loop"))
 
-	for _, dir := range []string{"/a/through/empty", "/a/link", "/a/file", "/a/loop/x"} {
-		removeEmptyDir(rootfs, dir)
+	for _, dir := range []string{"a/through/empty", "a/link", "a/file", "a/loop/x", "a/missing"} {
+		removeEmptyDir(rootfs, filepath.Join(rootfs, dir))
 	}
 	for _, path := range []string{"elsewhere/empty", "a/link", "a/file", "a/loop"} {
 		if !exists(filepath.Join(rootfs, path)) {
@@ -121,12 +174,12 @@ func TestRemoveEmptyDirReportsAFailureOfItsOwn(t *testing.T) {
 	mustMkdirAll(t, filepath.Join(rootfs, "a", "b"))
 	mustMakeReadOnly(t, filepath.Join(rootfs, "a"))
 
-	removeEmptyDir(rootfs, "/a/b")
+	removeEmptyDir(rootfs, filepath.Join(rootfs, "a", "b"))
 
 	if !exists(filepath.Join(rootfs, "a", "b")) {
 		t.Fatal("the read-only case removed the directory")
 	}
-	if got := ownLog.String(); !strings.Contains(got, "cannot remove /a/b") {
+	if got := ownLog.String(); !strings.Contains(got, "cannot remove "+filepath.Join(rootfs, "a", "b")) {
 		t.Fatalf("log = %q, want the failure named", got)
 	}
 }

@@ -904,7 +904,7 @@ For the step, the CA is also placed in the distribution's anchor directory, the 
 `/etc/ca-certificates/trust-source/anchors` on Arch). A step that installs
 `ca-certificates` partway through therefore keeps trusting the CA once the bundle has been rebuilt
 from scratch. A step that removes `ca-certificates` cannot remove the anchor directory while the CA
-is in it, nor, on RHEL and Fedora, the mounted `/etc/pki/ca-trust/extracted/pem`. After the step,
+is in it, nor, on RHEL and Fedora, the mounted directories under `/etc/pki/ca-trust/extracted`. After the step,
 those directories are removed once empty, as the removal would have done. On SUSE, GnuTLS reads the certificate directory
 `/var/lib/ca-certificates/pem` instead of the bundle. When the image has it, the CA is added there
 for the step and taken back out before the layer is committed.

@@ -226,8 +226,7 @@ func (in *injection) finish() error {
 	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssAppended, gone))
 	// After the sweep, which has by now emptied and removed the anchor files,
 	// so a directory the injection created is empty and can go.
-	removeCreatedDirs(in.rootfs, in.created)
-	removeWhatPackageRemovalLeft(in.rootfs, in.anchorPackages)
+	undoAnchors(in.rootfs, in.created, in.anchorPackages)
 	if firstErr != nil {
 		if sweepErr != nil {
 			logf("%v", sweepErr)
