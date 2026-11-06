@@ -213,3 +213,46 @@ CVE-2026-78410
 # from a RUN step. Fixed in pcre2 10.49, but moby/buildkit v0.33.1 still ships
 # 10.48, so no base bump is available yet.
 CVE-2026-103111
+
+# Go stdlib: a CA denylist in crypto/x509, HTTP/1 CONNECT handling, Range and
+# multipart parsing, html/template escaping, a TLS server's ECH parsing, and a
+# Windows-only os.Root bug. Flagged only in the CNI plugins, which contain none
+# of the affected functions (govulncheck): each one sets up a build container's
+# network from the config buildkitd hands it and makes no HTTP or TLS connection.
+CVE-2026-111943
+CVE-2026-56857
+CVE-2026-56866
+CVE-2026-78667
+CVE-2026-94439
+CVE-2026-94440
+CVE-2026-94448
+CVE-2026-97030
+CVE-2026-97031
+
+# HTTP/2 bugs in net/http and golang.org/x/net/http2, mostly a malicious client
+# exhausting a server. The CNI plugins and buildkit-runc contain none of the
+# affected functions. buildkitd and buildctl serve HTTP/2 only as gRPC on Unix
+# sockets, which the runner's buildx and the health check reach and a RUN step
+# never does. As clients they talk only to destinations the build definition
+# names, fetched outside the proxy by design (docs/security.md, "What buildkitd
+# fetches itself"). CVE-2026-78660 needs a reverse proxy, which none of them runs.
+CVE-2026-78659
+CVE-2026-78660
+CVE-2026-78663
+CVE-2026-78669
+CVE-2026-97032
+
+# golang.org/x/net/html: parser bugs on crafted HTML. buildkitd, buildctl and
+# buildkit-runc don't contain the parser. CoreDNS links it, but no code path
+# reaches it (govulncheck), and it serves only DNS.
+CVE-2026-78661
+CVE-2026-97045
+
+# github.com/moby/sys/user: unbounded entries when parsing /etc/passwd- or
+# /etc/group-style files. buildkit-runc doesn't contain the affected functions.
+CVE-2026-61801
+
+# golang.org/x/crypto/openpgp: deprecated package with known flaws. Only
+# CoreDNS contains it, and no code path reaches it (govulncheck); buildkitd,
+# buildctl and buildcage-runc carry the module without the package.
+GO-2026-5932
