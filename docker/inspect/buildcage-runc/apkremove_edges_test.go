@@ -6,14 +6,42 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDropRemovedBundlesReportsABundleItCannotRead(t *testing.T) {
 	scratch := t.TempDir()
 	mustWriteFile(t, filepath.Join(scratch, "sub"), "")
-	b := &dirBind{scratchDir: scratch, bundleFiles: []string{"sub/bundle.pem"}, apkRecorded: map[string]bool{"sub/bundle.pem": true}}
-	if _, err := b.dropRemovedBundles(); err == nil {
+	untouched := []fileEntry{{path: "sub/bundle.pem"}}
+	b := &dirBind{scratchDir: scratch, bundleFiles: []string{"sub/bundle.pem"}, apkRecorded: map[string]bool{"sub/bundle.pem": true}, baseline: untouched}
+	if _, err := b.dropRemovedBundles(untouched); err == nil {
 		t.Fatal("succeeded")
+	}
+}
+
+// A bundle the step wrote back after removing its package, even with the
+// same content, is the step's, not one apk left.
+func TestInjectKeepsABundleTheStepWroteBack(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newAPKBundleWithLink(t)
+	err := removalStep(t, bundle, func(mirror string) {
+		apkRemovesTheBundlePackage(t, rootfs)
+		path := filepath.Join(mirror, "ca-certificates.crt")
+		content := mustRead(t, path)
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+		mustWriteFile(t, path, content)
+		later := time.Now().Add(time.Hour)
+		if err := os.Chtimes(path, later, later); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists(filepath.Join(certsOf(rootfs), "ca-certificates.crt")) {
+		t.Error("the bundle the step wrote back was removed")
 	}
 }
 
@@ -21,7 +49,7 @@ func TestDropRemovedBundlesReportsABundleItCannotRead(t *testing.T) {
 // far up as the removed packages listed.
 func TestRemoveEmptiedDirsWalksUpWhileTheRemovedPackagesListedTheDirectory(t *testing.T) {
 	rootfs := t.TempDir()
-	removed := &apkState{rootfs: rootfs, afterRead: true, after: &apkDatabase{packages: map[string][]string{}},
+	removed := &apkState{rootfs: rootfs, afterRead: true, present: true, after: &apkDatabase{packages: map[string][]string{}},
 		before: &apkDatabase{dirOwners: map[string][]string{"a": {"p"}, "loop/b": {"p"}}}}
 	mustMkdirAll(t, filepath.Join(rootfs, "a"))
 	removed.removeEmptiedDirs("/a")

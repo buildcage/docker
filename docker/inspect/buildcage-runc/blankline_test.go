@@ -24,7 +24,8 @@ func TestRemoveCAKeepsOneBlankLineBetweenSeparatedCertificates(t *testing.T) {
 		{"appended after a blank line", other + "\n" + string(testCA), other + "\n"},
 		{"no blank line after", other + "\n" + string(testCA) + other, other + "\n" + other},
 		{"no blank line before", other + string(testCA) + "\n" + other, other + "\n" + other},
-		{"first", string(testCA) + "\n" + other, "\n" + other},
+		{"first", string(testCA) + "\n" + other, other},
+		{"after a single byte", "\n" + string(testCA) + "\n" + other, "\n\n" + other},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "bundle.pem")
@@ -70,6 +71,37 @@ func TestPromoteAPKNewGoesOnPastABundleWithoutOne(t *testing.T) {
 	}
 	if exists(filepath.Join(scratch, "second.pem.apk-new")) {
 		t.Error("the .apk-new the bundle matches is still there")
+	}
+}
+
+// A rebuilt bundle that matches its .apk-new stays as the step left it, mtime
+// and all, and the .apk-new goes, as apk writes none then. Failing to remove
+// it fails the step.
+func TestPromoteAPKNewKeepsARebuiltBundleThatMatches(t *testing.T) {
+	scratch := t.TempDir()
+	mustWriteFile(t, filepath.Join(scratch, "bundle.pem"), "NEW\n")
+	mustWriteFile(t, filepath.Join(scratch, "bundle.pem.apk-new"), "NEW\n")
+	rebuilt := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(filepath.Join(scratch, "bundle.pem"), rebuilt, rebuilt); err != nil {
+		t.Fatal(err)
+	}
+	b := &dirBind{scratchDir: scratch, bundleFiles: []string{"bundle.pem"}, original: []fileEntry{{path: "bundle.pem"}}}
+
+	old := removeFile
+	removeFile = func(string) error { return errBrokenFile }
+	if err := b.promoteAPKNew(); !errors.Is(err, errBrokenFile) {
+		t.Errorf("a failed removal: got %v", err)
+	}
+	removeFile = old
+
+	if err := b.promoteAPKNew(); err != nil {
+		t.Fatal(err)
+	}
+	if exists(filepath.Join(scratch, "bundle.pem.apk-new")) {
+		t.Error("the .apk-new is still there")
+	}
+	if got := mustStatMtime(t, filepath.Join(scratch, "bundle.pem")); !got.Equal(rebuilt) || b.apkReplaced["bundle.pem"] {
+		t.Errorf("the bundle was replaced: mtime %v, replaced %v", got, b.apkReplaced)
 	}
 }
 

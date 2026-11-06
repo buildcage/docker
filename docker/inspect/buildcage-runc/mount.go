@@ -455,7 +455,7 @@ func (b *dirBind) finish() error {
 	}
 	var dropped []string
 	if b.apk != nil {
-		if dropped, err = b.dropRemovedBundles(); err != nil {
+		if dropped, err = b.dropRemovedBundles(current); err != nil {
 			return err
 		}
 	}

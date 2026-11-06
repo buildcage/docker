@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
@@ -144,7 +145,9 @@ type apkState struct {
 	beforeInfo os.FileInfo
 
 	afterRead bool
-	after     *apkDatabase // nil when the step removed the database or it could not be read
+	present   bool         // the step left a database listing packages
+	afterRaw  []byte       // that database, until something needs it parsed
+	after     *apkDatabase // that database parsed, by afterDB
 	removed   bool         // the step removed the database
 }
 
@@ -172,7 +175,7 @@ func noteAPKRecords(rootfs string, binds []*dirBind) {
 		}
 		b.apk = state
 		for _, name := range b.bundleFiles {
-			rel := strings.TrimPrefix(filepath.Join(b.containerDir, name), "/")
+			rel := b.bundleRel(name)
 			state.bundles[rel] = true
 			record, ok := state.before.records[rel]
 			if !ok {
@@ -242,13 +245,13 @@ func (s *apkState) readAfter() {
 	path, err := resolveInRoot(s.rootfs, apkDBPath)
 	if err == nil {
 		if info, statErr := os.Lstat(path); statErr == nil && sameFileAndVersion(info, s.beforeInfo) {
-			s.after = s.before
+			s.present, s.after = true, s.before
 			return
 		}
 		var db []byte
 		if db, _, err = readDatabase(path); err == nil {
-			if after := parseAPKDatabase(db); len(after.packages) > 0 {
-				s.after = after
+			if bytes.HasPrefix(db, []byte("P:")) || bytes.Contains(db, []byte("\nP:")) {
+				s.present, s.afterRaw = true, db
 			} else {
 				logf("apk's database lists no package after the step; leaving the CA bundles apk may have removed")
 			}
@@ -262,6 +265,25 @@ func (s *apkState) readAfter() {
 	logf("cannot read apk's database after the step: %v; leaving the CA bundles apk may have removed", err)
 }
 
+// afterDB is the database the step left, parsed the first time it is needed:
+// most steps only need to know whether a package is still listed.
+func (s *apkState) afterDB() *apkDatabase {
+	if s.after == nil {
+		s.after, s.afterRaw = parseAPKDatabase(s.afterRaw), nil
+	}
+	return s.after
+}
+
+// listedAfter reports whether the database the step left lists pkg.
+func (s *apkState) listedAfter(pkg string) bool {
+	if s.after != nil {
+		_, listed := s.after.packages[pkg]
+		return listed
+	}
+	line := []byte("P:" + pkg + "\n")
+	return bytes.HasPrefix(s.afterRaw, line) || bytes.Contains(s.afterRaw, append([]byte("\n"), line...))
+}
+
 // packageRemoved reports whether the step removed pkg: it is gone from the
 // database, or, when the step removed the database too, every file the
 // package listed that was there before the step, apart from the CA bundles,
@@ -270,9 +292,8 @@ func (s *apkState) readAfter() {
 // is now, or false when that cannot be told.
 func (s *apkState) packageRemoved(pkg string, at func(rel string) (string, bool)) bool {
 	s.readAfter()
-	if s.after != nil {
-		_, installed := s.after.packages[pkg]
-		return !installed
+	if s.present {
+		return !s.listedAfter(pkg)
 	}
 	if !s.removed {
 		return false
@@ -320,8 +341,8 @@ func (b *dirBind) bundleRemoved(name string) bool {
 	if !b.apk.packageRemoved(b.bundlePackage(name), b.apkSees) {
 		return false
 	}
-	if b.apk.after != nil {
-		_, recorded := b.apk.after.records[b.bundleRel(name)]
+	if b.apk.present {
+		_, recorded := b.apk.afterDB().records[b.bundleRel(name)]
 		return !recorded
 	}
 	return true
@@ -341,12 +362,18 @@ func (b *dirBind) bundlePackageRemoved() bool {
 // dropRemovedBundles takes out of the mirror each bundle whose package the
 // step removed, where apk would have removed the bundle without the CA: apk
 // removes a file under /etc only when it matches its record, which the CA
-// kept it from doing. It returns the directories that held the bundles it
-// took out.
-func (b *dirBind) dropRemovedBundles() ([]string, error) {
+// kept it from doing. A bundle the step wrote, even with the same content, is
+// not one apk left. current is the mirror as the step left it. It returns the
+// directories that held the bundles it took out.
+func (b *dirBind) dropRemovedBundles(current []fileEntry) ([]string, error) {
 	var dropped []string
 	for _, name := range b.bundleFiles {
 		if !b.apkRecorded[name] {
+			continue
+		}
+		now, _ := entryFor(current, name)
+		injected, _ := entryFor(b.baseline, name)
+		if !now.sameExceptMtime(injected) || !now.mtime.Equal(injected.mtime) {
 			continue
 		}
 		before, _ := entryFor(b.original, name)
@@ -376,7 +403,7 @@ func (b *dirBind) dropRemovedBundles() ([]string, error) {
 func (s *apkState) removeEmptiedDirs(dir string) {
 	for rel := strings.TrimPrefix(dir, "/"); rel != "." && rel != ""; rel = filepath.Dir(rel) {
 		owners := s.before.dirOwners[rel]
-		if len(owners) == 0 || s.after != nil && len(s.after.dirOwners[rel]) > 0 {
+		if len(owners) == 0 || s.present && len(s.afterDB().dirOwners[rel]) > 0 {
 			return
 		}
 		for _, pkg := range owners {
@@ -412,11 +439,11 @@ var renameFile = os.Rename
 // bundle, and on a reinstall of the same version, the package's file, which is
 // what the .apk-new holds. So the .apk-new goes into place when the bundle,
 // with the CA out, is as it was before the step and either matched apk's
-// record or holds what the .apk-new holds. It also goes when the bundle now
-// holds what the .apk-new holds, as when the step rebuilt the bundle after the
-// upgrade, since apk writes no .apk-new for a file that already matches the
-// package's. A bundle the image or the step changed stays, as apk keeps it
-// under any engine.
+// record or holds what the .apk-new holds. When the bundle already holds what
+// the .apk-new holds, as when the step rebuilt the bundle after the upgrade,
+// the .apk-new goes and the bundle stays, since apk writes no .apk-new for a
+// file that matches the package's. A bundle the image or the step changed
+// otherwise stays, as apk keeps it under any engine.
 func (b *dirBind) promoteAPKNew() error {
 	for _, name := range b.bundleFiles {
 		apkNew := name + ".apk-new"
@@ -439,7 +466,13 @@ func (b *dirBind) promoteAPKNew() error {
 			continue
 		}
 		unchanged := bundleSum == before.sha256 && (b.apkRecorded[name] || apkNewSum == before.sha256)
-		if !unchanged && bundleSum != apkNewSum {
+		if !unchanged {
+			if bundleSum == apkNewSum {
+				if err := removeFile(filepath.Join(b.scratchDir, apkNew)); err != nil {
+					return err
+				}
+				logf("removed %s, which holds what %s does, as apk writes none then", filepath.Join(b.containerDir, apkNew), filepath.Join(b.containerDir, name))
+			}
 			continue
 		}
 		if err := renameFile(filepath.Join(b.scratchDir, apkNew), filepath.Join(b.scratchDir, name)); err != nil {
