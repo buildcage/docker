@@ -321,6 +321,24 @@ func TestSweepDirKeepsABundleP11KitWroteOnlyTheCAInto(t *testing.T) {
 	}
 }
 
+// Alpine's update-ca-certificates writes an empty bundle when it has no
+// certificate, so one it wrote holding only the CA stays empty too.
+func TestSweepDirKeepsABundleUpdateCACertificatesWroteOnlyTheCAInto(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "ca-certificates.crt"), string(testCA)+"\n")
+	mustWriteFile(t, filepath.Join(dir, "buildcage.pem"), string(testCA))
+
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustReadFile(t, filepath.Join(dir, "ca-certificates.crt")); got != "" {
+		t.Fatalf("the bundle holds %q, want it empty", got)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "buildcage.pem")); !os.IsNotExist(err) {
+		t.Fatal("the copy of the CA alone was left behind")
+	}
+}
+
 // A rebuild links to its copy from outside the mirror too, as Arch does from
 // /etc/ssl/certs into /etc/ca-certificates/extracted/cadir. The mirror's
 // write-back removed that copy, so the sweep is handed it and drops the links.

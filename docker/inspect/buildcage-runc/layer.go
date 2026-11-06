@@ -210,7 +210,7 @@ func sweepDir(listing, root string, marks caMarks, gone map[string]bool) (int, m
 		if err != nil {
 			return err
 		}
-		left, labelled, err := stripCA(target, marks)
+		left, inBundle, err := stripCA(target, marks)
 		if err != nil {
 			return err
 		}
@@ -221,8 +221,9 @@ func sweepDir(listing, root string, marks caMarks, gone map[string]bool) (int, m
 		// A file the strip emptied held nothing but the certificate, which is
 		// generated per build, so the file is one the injection put there: it
 		// goes, rather than staying behind as an empty trace. A file that held
-		// the CA under p11-kit's label is a bundle, and stays empty.
-		if info, err := os.Stat(target); err == nil && info.Size() == 0 && !labelled {
+		// the CA with a label line or a blank line between entries is a bundle,
+		// and stays empty as its tool leaves it with no certificate.
+		if info, err := os.Stat(target); err == nil && info.Size() == 0 && !inBundle {
 			if err := os.Remove(target); err != nil {
 				return err
 			}
@@ -312,7 +313,7 @@ func dropRemovedLinks(listing, root string, removed, gone map[string]bool) error
 
 // stripCA takes the certificate out of one file, in whichever shape it is in
 // there, and reports whether a copy is still in it afterwards and whether one
-// it took out came with p11-kit's label line (see removeCA).
+// it took out came with a bundle's label line or blank line (see removeCA).
 func stripCA(path string, marks caMarks) (bool, bool, error) {
 	// Read-only first, even though the listing already said this file carries
 	// the certificate: the listing named it under a different directory, and on
@@ -322,13 +323,13 @@ func stripCA(path string, marks caMarks) (bool, bool, error) {
 	if err != nil || !carries {
 		return false, false, err
 	}
-	labelled, err := removeCA(path, marks)
+	inBundle, err := removeCA(path, marks)
 	if err != nil {
 		return false, false, err
 	}
 	left, err := fileHoldsCA(path, marks.needles)
 	if err != nil || !left {
-		return false, labelled, err
+		return false, inBundle, err
 	}
 	// What is left is a binary holding the certificate as DER or as PEM that
 	// removeCA would not cut, or a trace nothing removes. Only a Java keystore
