@@ -86,7 +86,7 @@ func TestRemovalOrderIsDeepestFirst(t *testing.T) {
 
 // The directories go once the step has ended, unless the step installed the
 // package that owns one, which would have created it anyway.
-func TestRemoveCreatedDirsTakesBackWhatIsNotAdopted(t *testing.T) {
+func TestUndoAnchorsTakesBackWhatIsNotAdopted(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
@@ -95,12 +95,12 @@ func TestRemoveCreatedDirsTakesBackWhatIsNotAdopted(t *testing.T) {
 	// exists, so that anchor directory is adopted and stays. The others are
 	// the injection's and go. The sweep would have emptied the anchor files
 	// first; here they are removed by hand to stand in for it.
-	mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates"))
+	mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
 	for _, anchor := range anchorDirs {
 		_ = os.Remove(resolvedAnchor(rootfs, anchor.dir))
 	}
 
-	removeCreatedDirs(rootfs, created)
+	undoAnchors(rootfs, created, nil)
 
 	adopted := filepath.Join(rootfs, "usr", "local", "share", "ca-certificates")
 	if _, err := os.Stat(adopted); err != nil {
@@ -119,20 +119,20 @@ func TestRemoveCreatedDirsTakesBackWhatIsNotAdopted(t *testing.T) {
 	}
 }
 
-// Arch's anchor directory sits beside extracted/ under /etc/ca-certificates, so
-// a step that installs its package keeps the directory and the parents the
-// injection made for the other anchors still go.
-func TestRemoveCreatedDirsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testing.T) {
+// Arch's anchor directory sits beside blocklist/ under trust-source/, so a step
+// that installs its package keeps the directory and the parents the injection
+// made for the other anchors still go.
+func TestUndoAnchorsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
 
-	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "extracted"))
+	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "trust-source", "blocklist"))
 	for _, anchor := range anchorDirs {
 		_ = os.Remove(resolvedAnchor(rootfs, anchor.dir))
 	}
 
-	removeCreatedDirs(rootfs, created)
+	undoAnchors(rootfs, created, nil)
 
 	if _, err := os.Stat(filepath.Join(rootfs, "etc", "ca-certificates", "trust-source", "anchors")); err != nil {
 		t.Fatalf("removed Arch's adopted anchor directory: %v", err)
@@ -144,7 +144,7 @@ func TestRemoveCreatedDirsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testin
 
 // A directory the step put something else in is not the injection's to take,
 // so a non-empty one is left rather than reported as a failure.
-func TestRemoveCreatedDirsLeavesOneTheStepFilled(t *testing.T) {
+func TestUndoAnchorsLeavesOneTheStepFilled(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
@@ -155,7 +155,7 @@ func TestRemoveCreatedDirsLeavesOneTheStepFilled(t *testing.T) {
 	_ = os.Remove(filepath.Join(dir, anchorName))
 	mustWriteFile(t, filepath.Join(dir, "theirs.crt"), "THEIRS\n")
 
-	removeCreatedDirs(rootfs, created)
+	undoAnchors(rootfs, created, nil)
 
 	if _, err := os.Stat(filepath.Join(dir, "theirs.crt")); err != nil {
 		t.Fatalf("took away a directory the step had filled: %v", err)
@@ -166,7 +166,7 @@ func TestRemoveCreatedDirsLeavesOneTheStepFilled(t *testing.T) {
 // to an absolute path of its own must not have the undo follow it: os.Remove on
 // the inject-time path would otherwise reach out of the rootfs. Re-resolving the
 // path disagrees with where the injection put it, so the directory is left.
-func TestRemoveCreatedDirsRefusesAPathASymlinkNowLeadsOutOf(t *testing.T) {
+func TestUndoAnchorsRefusesAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
@@ -183,7 +183,7 @@ func TestRemoveCreatedDirsRefusesAPathASymlinkNowLeadsOutOf(t *testing.T) {
 	}
 	mustSymlink(t, outside, source)
 
-	removeCreatedDirs(rootfs, created)
+	undoAnchors(rootfs, created, nil)
 
 	if _, err := os.Stat(filepath.Join(outside, "anchors")); err != nil {
 		t.Fatalf("the undo followed a symlink out of the rootfs: %v", err)
@@ -248,7 +248,7 @@ func TestCreateCAReportsAPathItCannotBuild(t *testing.T) {
 
 // A created directory the undo cannot take away for a reason of its own is
 // logged, not swallowed and not fatal.
-func TestRemoveCreatedDirsReportsAFailureOfItsOwn(t *testing.T) {
+func TestUndoAnchorsReportsAFailureOfItsOwn(t *testing.T) {
 	skipIfRoot(t)
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
@@ -261,7 +261,7 @@ func TestRemoveCreatedDirsReportsAFailureOfItsOwn(t *testing.T) {
 	parent := filepath.Join(rootfs, "usr", "local", "share")
 	mustMakeReadOnly(t, parent)
 
-	removeCreatedDirs(rootfs, created) // must neither panic nor fail the process
+	undoAnchors(rootfs, created, nil) // must neither panic nor fail the process
 
 	if _, err := os.Stat(filepath.Join(parent, "ca-certificates")); err != nil {
 		t.Fatalf("the read-only case did not leave the directory: %v", err)

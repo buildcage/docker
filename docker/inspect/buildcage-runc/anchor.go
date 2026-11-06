@@ -23,18 +23,41 @@ import (
 
 // Where each distribution's ca-certificates tooling reads extra trusted
 // certificates from. A directory is created here only because the package that
-// ships it is not installed; owner is another directory that same package
-// ships and nothing else does, so its presence at the end says the anchor
-// directory now belongs to the package rather than to this wrapper.
-var anchorDirs = []struct{ dir, owner string }{
+// ships it is not installed; owners are other directories that same package
+// ships and nothing else does, one per release that renamed it, so finding one
+// at the end says the anchor directory now belongs to the package rather than
+// to this wrapper.
+//
+// removal lists, deepest first, what removing that package takes away but the
+// injection can keep from going: the CA, and the other anchor directories it
+// creates, keep the anchor directory and its parents from being empty, and a
+// mirrored directory is a mount point.
+var anchorDirs = []struct {
+	dir     string
+	owners  []string
+	removal []string
+}{
 	// Debian, Ubuntu, Alpine
-	{"/usr/local/share/ca-certificates", "/usr/share/ca-certificates"},
-	// RHEL, Fedora
-	{"/etc/pki/ca-trust/source/anchors", "/etc/pki/ca-trust/extracted"},
-	// SUSE
-	{"/etc/pki/trust/anchors", "/var/lib/ca-certificates"},
-	// Arch
-	{"/etc/ca-certificates/trust-source/anchors", "/etc/ca-certificates/extracted"},
+	{"/usr/local/share/ca-certificates", []string{"/usr/share/ca-certificates/mozilla"}, []string{
+		"/usr/local/share/ca-certificates",
+		"/etc/ca-certificates",
+	}},
+	// RHEL, Fedora; blacklist up to RHEL 8
+	{"/etc/pki/ca-trust/source/anchors", []string{"/etc/pki/ca-trust/source/blocklist", "/etc/pki/ca-trust/source/blacklist"}, []string{
+		"/etc/pki/ca-trust/source/anchors",
+		"/etc/pki/ca-trust/source",
+		"/etc/pki/ca-trust/extracted/pem",
+		"/etc/pki/ca-trust/extracted/java",
+		"/etc/pki/ca-trust/extracted",
+		"/etc/pki/ca-trust",
+	}},
+	// SUSE, where p11-kit ships the anchor directory
+	{"/etc/pki/trust/anchors", []string{"/var/lib/ca-certificates"}, nil},
+	// Arch; blacklist before 2021
+	{"/etc/ca-certificates/trust-source/anchors", []string{"/etc/ca-certificates/trust-source/blocklist", "/etc/ca-certificates/trust-source/blacklist"}, []string{
+		"/etc/ca-certificates/trust-source/anchors",
+		"/etc/ca-certificates/trust-source",
+	}},
 }
 
 // What the certificate is called in each of them. Debian's
@@ -111,51 +134,80 @@ func mkdirAllTracking(dir string) ([]string, error) {
 	return created, os.MkdirAll(dir, 0o755)
 }
 
-// adoptedAnchorDirs is the anchor directories whose own package is installed by
-// the time the step ends. The undo leaves those: taking one away would leave
-// the image short a directory an unproxied build of the same Dockerfile has.
-func adoptedAnchorDirs(rootfs string) map[string]bool {
-	adopted := map[string]bool{}
-	for _, anchor := range anchorDirs {
-		// A path that will not resolve inside the rootfs is not there, the same
-		// answer as not finding it.
-		owner, _ := resolveInRoot(rootfs, anchor.owner)
-		if _, err := os.Stat(owner); err != nil {
-			continue
+// installedAnchorPackages reports, for each of anchorDirs, whether its package
+// is installed.
+func installedAnchorPackages(rootfs string) []bool {
+	installed := make([]bool, len(anchorDirs))
+	for i, anchor := range anchorDirs {
+		for _, owner := range anchor.owners {
+			// A path that will not resolve inside the rootfs is not there, the
+			// same answer as not finding it.
+			resolved, _ := resolveInRoot(rootfs, owner)
+			if _, err := os.Stat(resolved); err == nil {
+				installed[i] = true
+				break
+			}
 		}
-		dir, _ := resolveInRoot(rootfs, anchor.dir)
-		adopted[dir] = true
 	}
-	return adopted
+	return installed
 }
 
-// removeCreatedDirs takes back the directories placeAnchors and placeNSSDB
-// made, deepest first, leaving one the step has since put something in. It
-// runs after the layer sweep, so an anchor file is already gone and the
-// directory that held it is empty.
-func removeCreatedDirs(rootfs string, created createdDirs) {
-	adopted := adoptedAnchorDirs(rootfs)
-	for _, dir := range created.removalOrder() {
-		if adopted[dir] {
-			continue
+// undoAnchors takes back what the anchors left once the step has ended.
+// installedBefore is installedAnchorPackages as the step started. It runs
+// after the layer sweep, so an anchor file is already gone and the directory
+// that held it is empty unless the step put something there.
+func undoAnchors(rootfs string, created createdDirs, installedBefore []bool) {
+	installed := installedAnchorPackages(rootfs)
+	// The directories placeAnchors and placeNSSDB made, deepest first, except
+	// an anchor directory whose package is now installed: taking one away
+	// would leave the image short a directory an unproxied build of the same
+	// Dockerfile has.
+	adopted := map[string]bool{}
+	for i := range anchorDirs {
+		if installed[i] {
+			dir, _ := resolveInRoot(rootfs, anchorDirs[i].dir)
+			adopted[dir] = true
 		}
-		// Re-resolve the container path and remove only what still lands where
-		// the injection created it. Otherwise a step that swapped an ancestor for
-		// an absolute symlink would have os.Remove follow it out of the rootfs;
-		// resolveInRoot confines the target, and a mismatch reveals the swap.
-		resolved, err := resolveInRoot(rootfs, containerPathOf(rootfs, dir))
-		if err != nil || resolved != dir {
-			logf("not taking the created directory %s back out: it no longer resolves there (%v)", dir, err)
-			continue
+	}
+	var dirs createdDirs
+	for _, dir := range created.dirs {
+		if !adopted[dir] {
+			dirs.add([]string{dir})
 		}
-		err = os.Remove(resolved)
-		// Gone, or holding something the step put there: either way the
-		// injection has nothing left of its own here.
-		if os.IsNotExist(err) || errors.Is(err, syscall.ENOTEMPTY) {
-			continue
+	}
+	// And what removing a package the step removed would have taken, in the
+	// same order, so a parent another anchor's list names goes after its
+	// children.
+	for i := range anchorDirs {
+		if i < len(installedBefore) && installedBefore[i] && !installed[i] {
+			for _, dir := range anchorDirs[i].removal {
+				if resolved, err := resolveInRoot(rootfs, dir); err == nil {
+					dirs.add([]string{resolved})
+				}
+			}
 		}
-		if err != nil {
-			logf("cannot take the created directory %s back out: %v", dir, err)
-		}
+	}
+	for _, dir := range dirs.removalOrder() {
+		removeEmptyDir(rootfs, dir)
+	}
+}
+
+// removeEmptyDir removes the directory at dir, a path under rootfs, when it is
+// empty. The container path is re-resolved and only what still lands there is
+// removed: a step that swapped an ancestor for an absolute symlink would
+// otherwise have os.Remove follow it out of the rootfs, and resolveInRoot
+// confines the target, so a mismatch reveals the swap. Whatever the step put
+// in its place, or in it, is left.
+func removeEmptyDir(rootfs, dir string) {
+	resolved, err := resolveInRoot(rootfs, containerPathOf(rootfs, dir))
+	if err != nil || resolved != dir {
+		logf("not removing %s: it no longer resolves there (%v)", dir, err)
+		return
+	}
+	if info, err := os.Lstat(dir); err != nil || !info.IsDir() {
+		return
+	}
+	if err := os.Remove(dir); err != nil && !errors.Is(err, syscall.ENOTEMPTY) {
+		logf("cannot remove %s: %v", dir, err)
 	}
 }
