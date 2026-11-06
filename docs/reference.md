@@ -915,6 +915,14 @@ matched apk's record in `/lib/apk/db/installed` (an upgrade compares with the re
 the `.apk-new` holds (a reinstall compares with the package). A bundle the image or the step changed
 itself is kept with its `.apk-new` beside it, as apk keeps it under any engine.
 
+Removing the bundle's package likewise leaves the bundle, since apk removes a file under `/etc` only
+where it matches its record. After the step the bundle is removed where apk would have removed it:
+it matched its record before the step, is as it was with the CA out, and its package is gone from
+apk's database. When the step removed the database too (`rm -rf /lib/apk`), the package counts as
+removed when every other file it listed, such as `/etc/ssl/cert.pem`, is gone as well. The
+directories this leaves empty are removed as apk removes them, when no package still installed
+lists them.
+
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
 reach.

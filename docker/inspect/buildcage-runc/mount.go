@@ -96,8 +96,9 @@ type dirBind struct {
 	nssBase     string
 
 	// The bundles whose content before the CA went in matched apk's record of
-	// them (apkdb.go).
+	// them, and apk's database, for a bundle bind (apkdb.go).
 	apkRecorded map[string]bool
+	apk         *apkState
 }
 
 // groupTargetsByBind groups the CA targets by the directory whose mirror carries
@@ -416,7 +417,9 @@ func (b *dirBind) finish() error {
 	if err != nil {
 		return err
 	}
-	if manifestsEqual(current, b.baseline) {
+	// Removing the bundle's package leaves the mirror as it was, since apk
+	// keeps the bundle the CA changed.
+	if manifestsEqual(current, b.baseline) && !b.bundlePackageRemoved() {
 		return nil
 	}
 
@@ -447,6 +450,12 @@ func (b *dirBind) finish() error {
 			return err
 		}
 	}
+	dropped := false
+	if b.apk != nil {
+		if dropped, err = b.dropRemovedBundles(); err != nil {
+			return err
+		}
+	}
 
 	stripped, err := captureManifest(b.scratchDir)
 	if err != nil {
@@ -470,7 +479,13 @@ func (b *dirBind) finish() error {
 		return fmt.Errorf("the step changed the CA store in %s and moved that directory away, leaving nowhere to write it back: %w", b.containerDir, err)
 	}
 
-	return writeBack(b.scratchDir, b.hostDir)
+	if err := writeBack(b.scratchDir, b.hostDir); err != nil {
+		return err
+	}
+	if dropped {
+		return b.apk.removeEmptiedDirs(b.containerDir)
+	}
+	return nil
 }
 
 // coverKeystore adds the CA to a keystore at rel inside this bind's already-
