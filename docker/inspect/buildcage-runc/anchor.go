@@ -21,29 +21,50 @@ import (
 	"syscall"
 )
 
+// Each package is told by paths only it ships, one per release that renamed
+// the path: finding any says it is installed.
+var (
+	debianCACertificates = []string{"/usr/share/ca-certificates/mozilla"} // and Ubuntu's, Alpine's
+	rhelCACertificates   = []string{"/etc/pki/ca-trust/source/blocklist", "/etc/pki/ca-trust/source/blacklist"}
+	suseCACertificates   = []string{"/usr/lib/ca-certificates/update.d"}
+	archCACertificates   = []string{"/etc/ca-certificates/trust-source/blocklist", "/etc/ca-certificates/trust-source/blacklist"}
+	openssl              = []string{"/usr/bin/openssl"}
+)
+
 // Where each distribution's ca-certificates tooling reads extra trusted
 // certificates from. A directory is created here only because the package that
-// ships it is not installed; owners are other directories that same package
-// ships and nothing else does, one per release that renamed it, so finding one
-// at the end says the anchor directory now belongs to the package rather than
-// to this wrapper.
-//
-// removal lists, deepest first, what removing that package takes away but the
-// injection can keep from going: the CA, and the other anchor directories it
-// creates, keep the anchor directory and its parents from being empty, and a
-// mirrored directory is a mount point.
+// ships it is not installed, so finding owners at the end says the anchor
+// directory now belongs to the package rather than to this wrapper.
 var anchorDirs = []struct {
-	dir     string
-	owners  []string
-	removal []string
+	dir    string
+	owners []string
 }{
-	// Debian, Ubuntu, Alpine
-	{"/usr/local/share/ca-certificates", []string{"/usr/share/ca-certificates/mozilla"}, []string{
+	{"/usr/local/share/ca-certificates", debianCACertificates},
+	{"/etc/pki/ca-trust/source/anchors", rhelCACertificates},
+	// p11-kit ships it too
+	{"/etc/pki/trust/anchors", suseCACertificates},
+	{"/etc/ca-certificates/trust-source/anchors", archCACertificates},
+}
+
+// packageRemovals lists, deepest first, what removing packages takes away but
+// the injection can keep from going: the CA, and the other anchor directories
+// it creates, keep an anchor directory and its parents from being empty, and a
+// mirrored directory is a mount point. The directories go once a step has
+// removed every one of the packages, all installed as it started.
+var packageRemovals = []struct {
+	packages [][]string
+	dirs     []string
+}{
+	{[][]string{debianCACertificates}, []string{
 		"/usr/local/share/ca-certificates",
 		"/etc/ca-certificates",
 	}},
-	// RHEL, Fedora; blacklist up to RHEL 8
-	{"/etc/pki/ca-trust/source/anchors", []string{"/etc/pki/ca-trust/source/blocklist", "/etc/pki/ca-trust/source/blacklist"}, []string{
+	// The CA store's directory, which openssl ships too
+	{[][]string{debianCACertificates, openssl}, []string{
+		"/etc/ssl/certs",
+		"/etc/ssl",
+	}},
+	{[][]string{rhelCACertificates}, []string{
 		"/etc/pki/ca-trust/source/anchors",
 		"/etc/pki/ca-trust/source",
 		"/etc/pki/ca-trust/extracted/pem",
@@ -51,30 +72,12 @@ var anchorDirs = []struct {
 		"/etc/pki/ca-trust/extracted",
 		"/etc/pki/ca-trust",
 	}},
-	// SUSE, where p11-kit ships the anchor directory too
-	{"/etc/pki/trust/anchors", []string{"/usr/lib/ca-certificates/update.d"}, []string{
+	{[][]string{suseCACertificates}, []string{
 		"/etc/ca-certificates",
 	}},
-	// Arch; blacklist before 2021
-	{"/etc/ca-certificates/trust-source/anchors", []string{"/etc/ca-certificates/trust-source/blocklist", "/etc/ca-certificates/trust-source/blacklist"}, []string{
+	{[][]string{archCACertificates}, []string{
 		"/etc/ca-certificates/trust-source/anchors",
 		"/etc/ca-certificates/trust-source",
-	}},
-}
-
-// sharedRemovals lists, deepest first, directories several packages ship that
-// the injection can keep from going, as removal does for one: they go once
-// every one of those packages is gone. Each package is the paths only it
-// ships, as for anchorDirs.
-var sharedRemovals = []struct {
-	packages [][]string
-	dirs     []string
-}{
-	// Debian, Ubuntu: the CA store's directory is mirrored, and both
-	// ca-certificates and openssl ship it.
-	{[][]string{{"/usr/share/ca-certificates/mozilla"}, {"/usr/bin/openssl"}}, []string{
-		"/etc/ssl/certs",
-		"/etc/ssl",
 	}},
 }
 
@@ -166,45 +169,37 @@ func installed(rootfs string, owners []string) bool {
 	return false
 }
 
-// installedAnchorPackages reports, for each of anchorDirs, whether its package
-// is installed.
-func installedAnchorPackages(rootfs string) []bool {
-	result := make([]bool, len(anchorDirs))
-	for i, anchor := range anchorDirs {
-		result[i] = installed(rootfs, anchor.owners)
-	}
-	return result
-}
-
-// installedSharedPackages reports, for each of sharedRemovals, whether any of
-// its packages is installed.
-func installedSharedPackages(rootfs string) []bool {
-	result := make([]bool, len(sharedRemovals))
-	for i, shared := range sharedRemovals {
-		for _, owners := range shared.packages {
-			result[i] = result[i] || installed(rootfs, owners)
+// packagesInstalled reports whether every one of packages is installed, and
+// whether any is.
+func packagesInstalled(rootfs string, packages [][]string) (all, any bool) {
+	all = true
+	for _, owners := range packages {
+		if installed(rootfs, owners) {
+			any = true
+		} else {
+			all = false
 		}
 	}
-	return result
+	return all, any
 }
 
 // anchorsAtStart is the state of the anchors' packages as the step started,
 // for undoAnchors to compare the end of the step with.
 type anchorsAtStart struct {
-	installed, shared []bool
-	// Each removal list with its parents resolved, so the links the image
+	// For each of packageRemovals, whether all its packages were installed,
+	// and its directories with their parents resolved, so the links the image
 	// ships are followed and a link the step puts in a path later shows as a
 	// mismatch: a removal does not reach through one.
-	removal, sharedRemoval [][]string
+	installed []bool
+	removal   [][]string
 }
 
 func recordAnchors(rootfs string) anchorsAtStart {
-	at := anchorsAtStart{installed: installedAnchorPackages(rootfs), shared: installedSharedPackages(rootfs)}
-	for _, anchor := range anchorDirs {
-		at.removal = append(at.removal, resolveRemoval(rootfs, anchor.removal))
-	}
-	for _, shared := range sharedRemovals {
-		at.sharedRemoval = append(at.sharedRemoval, resolveRemoval(rootfs, shared.dirs))
+	var at anchorsAtStart
+	for _, removal := range packageRemovals {
+		all, _ := packagesInstalled(rootfs, removal.packages)
+		at.installed = append(at.installed, all)
+		at.removal = append(at.removal, resolveRemoval(rootfs, removal.dirs))
 	}
 	return at
 }
@@ -228,15 +223,14 @@ func resolveRemoval(rootfs string, dirs []string) []string {
 // runs after the layer sweep, so an anchor file is already gone and the
 // directory that held it is empty unless the step put something there.
 func undoAnchors(rootfs string, created createdDirs, before anchorsAtStart) {
-	installed := installedAnchorPackages(rootfs)
 	// The directories placeAnchors and placeNSSDB made, deepest first, except
 	// an anchor directory whose package is now installed: taking one away
 	// would leave the image short a directory an unproxied build of the same
 	// Dockerfile has.
 	adopted := map[string]bool{}
-	for i := range anchorDirs {
-		if installed[i] {
-			dir, _ := resolveInRoot(rootfs, anchorDirs[i].dir)
+	for _, anchor := range anchorDirs {
+		if installed(rootfs, anchor.owners) {
+			dir, _ := resolveInRoot(rootfs, anchor.dir)
 			adopted[dir] = true
 		}
 	}
@@ -246,17 +240,12 @@ func undoAnchors(rootfs string, created createdDirs, before anchorsAtStart) {
 			dirs.add([]string{dir})
 		}
 	}
-	// And what removing a package the step removed would have taken, in the
-	// same order, so a parent another anchor's list names goes after its
-	// children.
-	for i := range anchorDirs {
-		if i < len(before.installed) && before.installed[i] && !installed[i] {
+	// And what removing packages the step removed would have taken, in the
+	// same order, so a parent another list names goes after its children.
+	for i, removal := range packageRemovals {
+		_, any := packagesInstalled(rootfs, removal.packages)
+		if i < len(before.installed) && before.installed[i] && !any {
 			dirs.add(before.removal[i])
-		}
-	}
-	for i, still := range installedSharedPackages(rootfs) {
-		if i < len(before.shared) && before.shared[i] && !still {
-			dirs.add(before.sharedRemoval[i])
 		}
 	}
 	for _, dir := range dirs.removalOrder() {

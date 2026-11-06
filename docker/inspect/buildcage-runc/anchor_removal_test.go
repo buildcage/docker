@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -209,7 +210,7 @@ func TestRecordAnchorsReportsAPathThatDoesNotResolve(t *testing.T) {
 
 	at := recordAnchors(rootfs)
 
-	for _, dir := range at.removal[1] {
+	for _, dir := range slices.Concat(at.removal...) {
 		if strings.HasPrefix(dir, filepath.Join(rootfs, "etc", "pki", "ca-trust")+"/") {
 			t.Errorf("recorded %s, under a loop", dir)
 		}
@@ -272,6 +273,25 @@ func TestUndoAnchorsTakesASharedDirectoryOnceEveryPackageIsGone(t *testing.T) {
 
 		if !exists(filepath.Join(rootfs, "etc", "ssl", "certs")) {
 			t.Error("/etc/ssl/certs, which openssl still ships, was taken away")
+		}
+	})
+	// Elsewhere openssl alone going is not Debian's pair: Fedora's
+	// /etc/ssl/certs, a link, is not looked at.
+	t.Run("not Debian", func(t *testing.T) {
+		useTempLog(t)
+		rootfs := t.TempDir()
+		mustMkdirAll(t, filepath.Join(rootfs, "usr", "bin"))
+		mustWriteFile(t, filepath.Join(rootfs, "usr", "bin", "openssl"), "")
+		mustMkdirAll(t, filepath.Join(rootfs, "etc", "pki", "tls", "certs"))
+		mustMkdirAll(t, filepath.Join(rootfs, "etc", "ssl"))
+		mustSymlink(t, "../pki/tls/certs", filepath.Join(rootfs, "etc", "ssl", "certs"))
+		before := recordAnchors(rootfs)
+		removeAll(t, rootfs, "usr/bin/openssl")
+
+		undoAnchors(rootfs, createdDirs{}, before)
+
+		if got := ownLog.String(); strings.Contains(got, "/etc/ssl") {
+			t.Errorf("log = %q, want /etc/ssl left alone", got)
 		}
 	})
 }
