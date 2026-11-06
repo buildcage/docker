@@ -181,8 +181,11 @@ func undoAnchors(rootfs string, created createdDirs, installedBefore []bool) {
 	for i := range anchorDirs {
 		if i < len(installedBefore) && installedBefore[i] && !installed[i] {
 			for _, dir := range anchorDirs[i].removal {
-				if resolved, err := resolveInRoot(rootfs, dir); err == nil {
-					dirs.add([]string{resolved})
+				// The image's links are followed down to the directory, as the
+				// removal reaches it, but not the directory itself: rmdir on a
+				// link fails and removes nothing.
+				if parent, err := resolveInRoot(rootfs, filepath.Dir(dir)); err == nil {
+					dirs.add([]string{filepath.Join(parent, filepath.Base(dir))})
 				}
 			}
 		}
@@ -193,14 +196,14 @@ func undoAnchors(rootfs string, created createdDirs, installedBefore []bool) {
 }
 
 // removeEmptyDir removes the directory at dir, a path under rootfs, when it is
-// empty. The container path is re-resolved and only what still lands there is
-// removed: a step that swapped an ancestor for an absolute symlink would
-// otherwise have os.Remove follow it out of the rootfs, and resolveInRoot
+// empty. The parent's container path is re-resolved and only what still lands
+// there is removed: a step that swapped an ancestor for an absolute symlink
+// would otherwise have os.Remove follow it out of the rootfs, and resolveInRoot
 // confines the target, so a mismatch reveals the swap. Whatever the step put
-// in its place, or in it, is left.
+// in its place, a link included, or in it, is left.
 func removeEmptyDir(rootfs, dir string) {
-	resolved, err := resolveInRoot(rootfs, containerPathOf(rootfs, dir))
-	if err != nil || resolved != dir {
+	parent, err := resolveInRoot(rootfs, containerPathOf(rootfs, filepath.Dir(dir)))
+	if err != nil || parent != filepath.Dir(dir) {
 		logf("not removing %s: it no longer resolves there (%v)", dir, err)
 		return
 	}

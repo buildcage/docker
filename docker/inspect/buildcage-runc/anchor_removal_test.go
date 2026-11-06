@@ -145,6 +145,31 @@ func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
 	})
 }
 
+// A link the step put where a listed directory was is not followed: rmdir on
+// it fails, so without the CA the removal leaves the link and what it points
+// at.
+func TestUndoAnchorsLeavesWhatALinkInAListedPlacePointsAt(t *testing.T) {
+	rootfs := t.TempDir()
+	mustMkdirAll(t, filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
+	mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
+	mustMkdirAll(t, filepath.Join(rootfs, "data", "certs"))
+	before := installedAnchorPackages(rootfs)
+	created := placeAnchors(rootfs, testCA)
+	// apt-get purge, then the step links the anchor directory elsewhere.
+	emptyAnchors(rootfs)
+	removeAll(t, rootfs, "usr/share/ca-certificates", "usr/local/share/ca-certificates")
+	mustSymlink(t, "/data/certs", filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
+
+	undoAnchors(rootfs, created, before)
+
+	if !exists(filepath.Join(rootfs, "data", "certs")) {
+		t.Error("/data/certs, which the link points at, was removed")
+	}
+	if !exists(filepath.Join(rootfs, "usr", "local", "share", "ca-certificates")) {
+		t.Error("the link the step put there was removed")
+	}
+}
+
 // Only a removal the step made counts: a package still installed, or one that
 // was not installed as the step started, leaves every directory alone, as does
 // one the step put something in.
