@@ -152,11 +152,35 @@ func installedAnchorPackages(rootfs string) []bool {
 	return installed
 }
 
-// undoAnchors takes back what the anchors left once the step has ended.
-// installedBefore is installedAnchorPackages as the step started. It runs
-// after the layer sweep, so an anchor file is already gone and the directory
-// that held it is empty unless the step put something there.
-func undoAnchors(rootfs string, created createdDirs, installedBefore []bool) {
+// anchorsAtStart is the state of the anchors' packages as the step started,
+// for undoAnchors to compare the end of the step with.
+type anchorsAtStart struct {
+	installed []bool
+	// Each anchor's removal list with its parents resolved, so the links the
+	// image ships are followed and a link the step puts in a path later shows
+	// as a mismatch: a removal does not reach through one.
+	removal [][]string
+}
+
+func recordAnchors(rootfs string) anchorsAtStart {
+	at := anchorsAtStart{installed: installedAnchorPackages(rootfs), removal: make([][]string, len(anchorDirs))}
+	for i, anchor := range anchorDirs {
+		for _, dir := range anchor.removal {
+			parent, err := resolveInRoot(rootfs, filepath.Dir(dir))
+			if err != nil {
+				logf("not removing %s after the step: %v", dir, err)
+				continue
+			}
+			at.removal[i] = append(at.removal[i], filepath.Join(parent, filepath.Base(dir)))
+		}
+	}
+	return at
+}
+
+// undoAnchors takes back what the anchors left once the step has ended. It
+// runs after the layer sweep, so an anchor file is already gone and the
+// directory that held it is empty unless the step put something there.
+func undoAnchors(rootfs string, created createdDirs, before anchorsAtStart) {
 	installed := installedAnchorPackages(rootfs)
 	// The directories placeAnchors and placeNSSDB made, deepest first, except
 	// an anchor directory whose package is now installed: taking one away
@@ -179,12 +203,8 @@ func undoAnchors(rootfs string, created createdDirs, installedBefore []bool) {
 	// same order, so a parent another anchor's list names goes after its
 	// children.
 	for i := range anchorDirs {
-		if i < len(installedBefore) && installedBefore[i] && !installed[i] {
-			for _, dir := range anchorDirs[i].removal {
-				if resolved, err := resolveInRoot(rootfs, dir); err == nil {
-					dirs.add([]string{resolved})
-				}
-			}
+		if i < len(before.installed) && before.installed[i] && !installed[i] {
+			dirs.add(before.removal[i])
 		}
 	}
 	for _, dir := range dirs.removalOrder() {
@@ -193,18 +213,26 @@ func undoAnchors(rootfs string, created createdDirs, installedBefore []bool) {
 }
 
 // removeEmptyDir removes the directory at dir, a path under rootfs, when it is
-// empty. The container path is re-resolved and only what still lands there is
-// removed: a step that swapped an ancestor for an absolute symlink would
-// otherwise have os.Remove follow it out of the rootfs, and resolveInRoot
-// confines the target, so a mismatch reveals the swap. Whatever the step put
-// in its place, or in it, is left.
+// empty. The parent's container path is re-resolved and only what still lands
+// there is removed: a step that swapped an ancestor for an absolute symlink
+// would otherwise have os.Remove follow it out of the rootfs, and resolveInRoot
+// confines the target, so a mismatch reveals the swap. The directory itself is
+// not followed either: rmdir on a link fails. Whatever the step put in its
+// place, or in it, is left.
 func removeEmptyDir(rootfs, dir string) {
-	resolved, err := resolveInRoot(rootfs, containerPathOf(rootfs, dir))
-	if err != nil || resolved != dir {
-		logf("not removing %s: it no longer resolves there (%v)", dir, err)
+	parent, err := resolveInRoot(rootfs, containerPathOf(rootfs, filepath.Dir(dir)))
+	if err != nil {
+		logf("not removing %s: %v", dir, err)
+		return
+	}
+	if parent != filepath.Dir(dir) {
+		logf("not removing %s: its parent now leads to %s", dir, parent)
 		return
 	}
 	if info, err := os.Lstat(dir); err != nil || !info.IsDir() {
+		if !os.IsNotExist(err) {
+			logf("not removing %s: it is no longer a directory", dir)
+		}
 		return
 	}
 	if err := os.Remove(dir); err != nil && !errors.Is(err, syscall.ENOTEMPTY) {

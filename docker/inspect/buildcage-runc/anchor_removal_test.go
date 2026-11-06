@@ -43,7 +43,7 @@ func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
 		mustMkdirAll(t, filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
 		mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
 		mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "update.d"))
-		before := installedAnchorPackages(rootfs)
+		before := recordAnchors(rootfs)
 		// The Arch anchor lands in /etc/ca-certificates, which keeps dpkg from
 		// removing that directory too.
 		created := placeAnchors(rootfs, testCA)
@@ -67,7 +67,7 @@ func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
 			for _, dir := range []string{"source/anchors", "source/" + owner, "extracted/pem", "extracted/java", "extracted/edk2"} {
 				mustMkdirAll(t, filepath.Join(rootfs, "etc", "pki", "ca-trust", dir))
 			}
-			before := installedAnchorPackages(rootfs)
+			before := recordAnchors(rootfs)
 			created := placeAnchors(rootfs, testCA)
 			removeAll(t, rootfs, "etc/pki/ca-trust/source/"+owner)
 			emptyAnchors(rootfs)
@@ -91,7 +91,7 @@ func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
 			for _, dir := range []string{"trust-source/anchors", "trust-source/" + owner, "extracted"} {
 				mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", dir))
 			}
-			before := installedAnchorPackages(rootfs)
+			before := recordAnchors(rootfs)
 			created := placeAnchors(rootfs, testCA)
 			removeAll(t, rootfs, "etc/ca-certificates/trust-source/"+owner)
 			emptyAnchors(rootfs)
@@ -114,7 +114,7 @@ func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
 		for _, dir := range []string{"update.d", "trust-source/anchors", "trust-source/blocklist"} {
 			mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", dir))
 		}
-		before := installedAnchorPackages(rootfs)
+		before := recordAnchors(rootfs)
 		created := placeAnchors(rootfs, testCA)
 		removeAll(t, rootfs, "usr/share/ca-certificates", "etc/ca-certificates/update.d", "etc/ca-certificates/trust-source/blocklist")
 		emptyAnchors(rootfs)
@@ -132,7 +132,7 @@ func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
 		mustMkdirAll(t, filepath.Join(rootfs, "var", "usrlocal", "share", "ca-certificates"))
 		mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
 		mustSymlink(t, "../var/usrlocal", filepath.Join(rootfs, "usr", "local"))
-		before := installedAnchorPackages(rootfs)
+		before := recordAnchors(rootfs)
 		created := placeAnchors(rootfs, testCA)
 		removeAll(t, rootfs, "usr/share/ca-certificates")
 		emptyAnchors(rootfs)
@@ -145,6 +145,80 @@ func TestUndoAnchorsTakesWhatAPackageRemovalWould(t *testing.T) {
 	})
 }
 
+// A link the step put where a listed directory was is not followed: rmdir on
+// it fails, so without the CA the removal leaves the link and what it points
+// at.
+func TestUndoAnchorsLeavesWhatALinkInAListedPlacePointsAt(t *testing.T) {
+	rootfs := t.TempDir()
+	mustMkdirAll(t, filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
+	mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
+	mustMkdirAll(t, filepath.Join(rootfs, "data", "certs"))
+	before := recordAnchors(rootfs)
+	created := placeAnchors(rootfs, testCA)
+	// apt-get purge, then the step links the anchor directory elsewhere.
+	emptyAnchors(rootfs)
+	removeAll(t, rootfs, "usr/share/ca-certificates", "usr/local/share/ca-certificates")
+	mustSymlink(t, "/data/certs", filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
+
+	undoAnchors(rootfs, created, before)
+
+	if !exists(filepath.Join(rootfs, "data", "certs")) {
+		t.Error("/data/certs, which the link points at, was removed")
+	}
+	if !exists(filepath.Join(rootfs, "usr", "local", "share", "ca-certificates")) {
+		t.Error("the link the step put there was removed")
+	}
+}
+
+// The same holds for a link the step puts higher up the path, after the
+// paths were resolved as the step started.
+func TestUndoAnchorsLeavesWhatALinkTheStepPutAboveAListedPlacePointsAt(t *testing.T) {
+	useTempLog(t)
+	rootfs := t.TempDir()
+	for _, dir := range []string{"source/anchors", "source/blocklist", "extracted/pem"} {
+		mustMkdirAll(t, filepath.Join(rootfs, "etc", "pki", "ca-trust", dir))
+	}
+	for _, dir := range []string{"source/anchors", "extracted/pem"} {
+		mustMkdirAll(t, filepath.Join(rootfs, "data", "trust", dir))
+	}
+	before := recordAnchors(rootfs)
+	created := placeAnchors(rootfs, testCA)
+	// rpm -e, then the step links /etc/pki/ca-trust elsewhere.
+	emptyAnchors(rootfs)
+	removeAll(t, rootfs, "etc/pki/ca-trust")
+	mustSymlink(t, "/data/trust", filepath.Join(rootfs, "etc", "pki", "ca-trust"))
+
+	undoAnchors(rootfs, created, before)
+
+	for _, dir := range []string{"source/anchors", "extracted/pem"} {
+		if !exists(filepath.Join(rootfs, "data", "trust", dir)) {
+			t.Errorf("/data/trust/%s, reached through the step's link, was removed", dir)
+		}
+	}
+	if got := ownLog.String(); !strings.Contains(got, "its parent now leads to") {
+		t.Errorf("log = %q, want the link named", got)
+	}
+}
+
+// A listed path the image itself has made unresolvable is left, and said so.
+func TestRecordAnchorsReportsAPathThatDoesNotResolve(t *testing.T) {
+	useTempLog(t)
+	rootfs := t.TempDir()
+	mustMkdirAll(t, filepath.Join(rootfs, "etc", "pki"))
+	mustSymlink(t, "ca-trust", filepath.Join(rootfs, "etc", "pki", "ca-trust"))
+
+	at := recordAnchors(rootfs)
+
+	for _, dir := range at.removal[1] {
+		if strings.HasPrefix(dir, filepath.Join(rootfs, "etc", "pki", "ca-trust")+"/") {
+			t.Errorf("recorded %s, under a loop", dir)
+		}
+	}
+	if got := ownLog.String(); !strings.Contains(got, "not removing /etc/pki/ca-trust/source/anchors after the step") {
+		t.Errorf("log = %q, want the path named", got)
+	}
+}
+
 // Only a removal the step made counts: a package still installed, or one that
 // was not installed as the step started, leaves every directory alone, as does
 // one the step put something in.
@@ -152,7 +226,7 @@ func TestUndoAnchorsLeavesWhatTheStepDidNotEmpty(t *testing.T) {
 	t.Run("still installed", func(t *testing.T) {
 		rootfs := t.TempDir()
 		fedoraTrust(t, rootfs)
-		undoAnchors(rootfs, createdDirs{}, installedAnchorPackages(rootfs))
+		undoAnchors(rootfs, createdDirs{}, recordAnchors(rootfs))
 		if !exists(filepath.Join(rootfs, "etc/pki/ca-trust/source/anchors")) {
 			t.Fatal("removed the anchor directory of an installed package")
 		}
@@ -160,7 +234,7 @@ func TestUndoAnchorsLeavesWhatTheStepDidNotEmpty(t *testing.T) {
 	t.Run("never installed", func(t *testing.T) {
 		rootfs := t.TempDir()
 		mustMkdirAll(t, filepath.Join(rootfs, "usr", "local", "share", "ca-certificates"))
-		undoAnchors(rootfs, createdDirs{}, installedAnchorPackages(rootfs))
+		undoAnchors(rootfs, createdDirs{}, recordAnchors(rootfs))
 		if !exists(filepath.Join(rootfs, "usr/local/share/ca-certificates")) {
 			t.Fatal("removed a directory no package removal touched")
 		}
@@ -168,7 +242,7 @@ func TestUndoAnchorsLeavesWhatTheStepDidNotEmpty(t *testing.T) {
 	t.Run("not empty", func(t *testing.T) {
 		rootfs := t.TempDir()
 		fedoraTrust(t, rootfs)
-		before := installedAnchorPackages(rootfs)
+		before := recordAnchors(rootfs)
 		mustWriteFile(t, filepath.Join(rootfs, "etc/pki/ca-trust/source/anchors/company.crt"), "COMPANY\n")
 		if err := os.Remove(filepath.Join(rootfs, "etc/pki/ca-trust/source/blocklist")); err != nil {
 			t.Fatal(err)
