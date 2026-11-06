@@ -54,7 +54,7 @@ jobs:
       # request they block. The rules name methods too, so an npm publish (a
       # PUT) would be blocked as well.
       - name: Start Buildcage builder
-        uses: buildcage/docker@575ea4709782ddfbeda3231b41e14a054f473a42 # v4.4.1
+        uses: buildcage/docker@83263b33b35553f644c01b5419923a88bb1085d0 # v4.4.2
         with:
           proxy-mode: restrict
           proxy-engine: inspect
@@ -99,6 +99,6 @@ jobs:
       # leave it at its default so a real workflow fails on a disallowed request.
       - name: Show proxy report
         if: always()
-        uses: buildcage/docker/report@575ea4709782ddfbeda3231b41e14a054f473a42 # v4.4.1
+        uses: buildcage/docker/report@83263b33b35553f644c01b5419923a88bb1085d0 # v4.4.2
         with:
           fail-on-blocked: false

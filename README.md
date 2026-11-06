@@ -71,7 +71,7 @@ covers the choice of engine.
 
 ```yaml
 - name: Start Buildcage in audit mode
-  uses: buildcage/docker@575ea4709782ddfbeda3231b41e14a054f473a42 # v4.4.1
+  uses: buildcage/docker@83263b33b35553f644c01b5419923a88bb1085d0 # v4.4.2
   with:
     proxy-mode: audit # Log every destination, enforce no rules
 
@@ -88,7 +88,7 @@ covers the choice of engine.
 
 - name: Show Buildcage report
   if: always()
-  uses: buildcage/docker/report@575ea4709782ddfbeda3231b41e14a054f473a42 # v4.4.1
+  uses: buildcage/docker/report@83263b33b35553f644c01b5419923a88bb1085d0 # v4.4.2
 ```
 
 The [report action](#report-action) writes every destination the build contacted to the Job Summary:
@@ -106,7 +106,7 @@ Paste that allowlist into the setup step and switch the mode:
 
 ```yaml
 - name: Start Buildcage in restrict mode
-  uses: buildcage/docker@575ea4709782ddfbeda3231b41e14a054f473a42 # v4.4.1
+  uses: buildcage/docker@83263b33b35553f644c01b5419923a88bb1085d0 # v4.4.2
   with:
     proxy-mode: restrict
     allowed-url-rules: |
@@ -285,7 +285,7 @@ with `if: always()` so a failing build still reports:
 ```yaml
 - name: Show Buildcage report
   if: always()
-  uses: buildcage/docker/report@575ea4709782ddfbeda3231b41e14a054f473a42 # v4.4.1
+  uses: buildcage/docker/report@83263b33b35553f644c01b5419923a88bb1085d0 # v4.4.2
 ```
 
 When anything needs attention, an alert under the report's title gives the counts, such as how many
