@@ -1,6 +1,15 @@
-# http-cache-semantics has no fixed release yet. It is reached only through the
-# generate-license-file devDependency and never ships in dist/.
+# minimatch: DoS through brace-expanded patterns at optimizationLevel 2 or
+# higher, when an attacker supplies the pattern. In the bundles, minimatch runs
+# only in TUF's target path matching, at the default level on patterns from
+# signed metadata. The copies under archiver's directory() and glob() are never
+# called: the artifact upload adds each file by name. The rest is dev-only.
 [[IgnoredVulns]]
-id = "GHSA-ch52-4w7c-c8xp"
-ignoreUntil = 2027-01-05
-reason = "Dev-only through generate-license-file; not bundled into dist/."
+id = "GHSA-g3hv-75wg-m249"
+reason = "Only TUF calls it, at the default optimizationLevel on signed patterns."
+
+# glob: traversal keeps running after its AbortSignal fires. The bundled copy
+# comes with archiver and is never called, and nothing passes it an AbortSignal.
+# glob@13 is dev-only, through generate-license-file.
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+reason = "The bundled copy is never called; glob@13 is dev-only."
