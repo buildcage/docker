@@ -95,7 +95,7 @@ func TestRemoveCreatedDirsTakesBackWhatIsNotAdopted(t *testing.T) {
 	// exists, so that anchor directory is adopted and stays. The others are
 	// the injection's and go. The sweep would have emptied the anchor files
 	// first; here they are removed by hand to stand in for it.
-	mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates"))
+	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "update.d"))
 	for _, anchor := range anchorDirs {
 		_ = os.Remove(resolvedAnchor(rootfs, anchor.dir))
 	}
@@ -112,22 +112,22 @@ func TestRemoveCreatedDirsTakesBackWhatIsNotAdopted(t *testing.T) {
 		}
 	}
 	// The intermediate directories the injection made go with them.
-	for _, dir := range []string{"pki", "ca-certificates"} {
+	for _, dir := range []string{"pki", "ca-certificates/trust-source"} {
 		if _, err := os.Stat(filepath.Join(rootfs, "etc", dir)); !os.IsNotExist(err) {
 			t.Fatalf("/etc/%s was left behind", dir)
 		}
 	}
 }
 
-// Arch's anchor directory sits beside extracted/ under /etc/ca-certificates, so
-// a step that installs its package keeps the directory and the parents the
-// injection made for the other anchors still go.
+// Arch's anchor directory sits beside blocklist/ under trust-source/, so a step
+// that installs its package keeps the directory and the parents the injection
+// made for the other anchors still go.
 func TestRemoveCreatedDirsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testing.T) {
 	rootfs := t.TempDir()
 	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
 	created := placeAnchors(rootfs, testCA)
 
-	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "extracted"))
+	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "trust-source", "blocklist"))
 	for _, anchor := range anchorDirs {
 		_ = os.Remove(resolvedAnchor(rootfs, anchor.dir))
 	}

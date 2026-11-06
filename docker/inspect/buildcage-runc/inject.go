@@ -186,6 +186,8 @@ type injection struct {
 	binds    []*dirBind
 	ownCADir string
 	created  createdDirs
+	// installedAnchorPackages as the step started.
+	anchorPackages []bool
 	// What the NSS mirror's pkcs11.txt gained, if there is one.
 	nssAppended []byte
 	// The step's layer as found when the injection began, kept rather than
@@ -225,6 +227,7 @@ func (in *injection) finish() error {
 	// After the sweep, which has by now emptied and removed the anchor files,
 	// so a directory the injection created is empty and can go.
 	removeCreatedDirs(in.rootfs, in.created)
+	removeWhatPackageRemovalLeft(in.rootfs, in.anchorPackages)
 	if firstErr != nil {
 		if sweepErr != nil {
 			logf("%v", sweepErr)
@@ -257,6 +260,7 @@ func inject(bundle string, ca []byte) (*injection, error) {
 		logf("no system CA store in %s (%v); falling back to proxy-CA-only trust", s.rootfs, storeErr)
 	}
 
+	anchorPackages := installedAnchorPackages(s.rootfs)
 	created := placeAnchors(s.rootfs, ca)
 
 	plan := planCATrust(s, bundle, ca, store)
@@ -300,7 +304,8 @@ keystores:
 
 	in := &injection{
 		rootfs: s.rootfs, ca: ca, binds: binds, ownCADir: plan.ownCADir, created: created,
-		upper: upper,
+		anchorPackages: anchorPackages,
+		upper:          upper,
 	}
 	// Before the spec is saved, so a step that will not run leaves it as it was.
 	if halfWritten != nil {

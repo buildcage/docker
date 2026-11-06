@@ -26,15 +26,31 @@ import (
 // ships it is not installed; owner is another directory that same package
 // ships and nothing else does, so its presence at the end says the anchor
 // directory now belongs to the package rather than to this wrapper.
-var anchorDirs = []struct{ dir, owner string }{
+//
+// removal is what removing that package takes away but the injection can keep
+// in place, deepest first: the anchor directory holds the CA, so it and its
+// parents are not empty, and a mirrored directory is a mount point.
+var anchorDirs = []struct {
+	dir, owner string
+	removal    []string
+}{
 	// Debian, Ubuntu, Alpine
-	{"/usr/local/share/ca-certificates", "/usr/share/ca-certificates"},
+	{"/usr/local/share/ca-certificates", "/etc/ca-certificates/update.d", []string{
+		"/usr/local/share/ca-certificates",
+	}},
 	// RHEL, Fedora
-	{"/etc/pki/ca-trust/source/anchors", "/etc/pki/ca-trust/extracted"},
-	// SUSE
-	{"/etc/pki/trust/anchors", "/var/lib/ca-certificates"},
+	{"/etc/pki/ca-trust/source/anchors", "/etc/pki/ca-trust/source/blocklist", []string{
+		"/etc/pki/ca-trust/source/anchors",
+		"/etc/pki/ca-trust/source",
+		"/etc/pki/ca-trust/extracted/pem",
+	}},
+	// SUSE, where p11-kit ships the anchor directory
+	{"/etc/pki/trust/anchors", "/var/lib/ca-certificates", nil},
 	// Arch
-	{"/etc/ca-certificates/trust-source/anchors", "/etc/ca-certificates/extracted"},
+	{"/etc/ca-certificates/trust-source/anchors", "/etc/ca-certificates/trust-source/blocklist", []string{
+		"/etc/ca-certificates/trust-source/anchors",
+		"/etc/ca-certificates/trust-source",
+	}},
 }
 
 // What the certificate is called in each of them. Debian's
@@ -111,22 +127,63 @@ func mkdirAllTracking(dir string) ([]string, error) {
 	return created, os.MkdirAll(dir, 0o755)
 }
 
+// installedAnchorPackages reports, for each of anchorDirs, whether its package
+// is installed.
+func installedAnchorPackages(rootfs string) []bool {
+	installed := make([]bool, len(anchorDirs))
+	for i, anchor := range anchorDirs {
+		// A path that will not resolve inside the rootfs is not there, the same
+		// answer as not finding it.
+		owner, _ := resolveInRoot(rootfs, anchor.owner)
+		_, err := os.Stat(owner)
+		installed[i] = err == nil
+	}
+	return installed
+}
+
 // adoptedAnchorDirs is the anchor directories whose own package is installed by
 // the time the step ends. The undo leaves those: taking one away would leave
 // the image short a directory an unproxied build of the same Dockerfile has.
 func adoptedAnchorDirs(rootfs string) map[string]bool {
 	adopted := map[string]bool{}
-	for _, anchor := range anchorDirs {
-		// A path that will not resolve inside the rootfs is not there, the same
-		// answer as not finding it.
-		owner, _ := resolveInRoot(rootfs, anchor.owner)
-		if _, err := os.Stat(owner); err != nil {
-			continue
+	for i, installed := range installedAnchorPackages(rootfs) {
+		if installed {
+			dir, _ := resolveInRoot(rootfs, anchorDirs[i].dir)
+			adopted[dir] = true
 		}
-		dir, _ := resolveInRoot(rootfs, anchor.dir)
-		adopted[dir] = true
 	}
 	return adopted
+}
+
+// removeWhatPackageRemovalLeft takes away the directories of each anchor's
+// removal list once the step has removed that package, as the removal would
+// have without the CA. installedBefore is installedAnchorPackages as the step
+// started. A directory that is not empty is something the step left there.
+func removeWhatPackageRemovalLeft(rootfs string, installedBefore []bool) {
+	for i, installed := range installedAnchorPackages(rootfs) {
+		if !installedBefore[i] || installed {
+			continue
+		}
+		for _, dir := range anchorDirs[i].removal {
+			removeEmptyDir(rootfs, dir)
+		}
+	}
+}
+
+// removeEmptyDir removes the directory at the container path dir when it is
+// one, it is empty, and no symlink leads to it, so nothing the step swapped in
+// is followed. Anything else is left as it is.
+func removeEmptyDir(rootfs, dir string) {
+	resolved, err := resolveInRoot(rootfs, dir)
+	if err != nil || resolved != filepath.Join(rootfs, dir) {
+		return
+	}
+	if info, err := os.Lstat(resolved); err != nil || !info.IsDir() {
+		return
+	}
+	if err := os.Remove(resolved); err != nil && !errors.Is(err, syscall.ENOTEMPTY) {
+		logf("cannot remove %s, which removing its package leaves: %v", dir, err)
+	}
 }
 
 // removeCreatedDirs takes back the directories placeAnchors and placeNSSDB
