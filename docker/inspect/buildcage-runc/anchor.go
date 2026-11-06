@@ -51,12 +51,30 @@ var anchorDirs = []struct {
 		"/etc/pki/ca-trust/extracted",
 		"/etc/pki/ca-trust",
 	}},
-	// SUSE, where p11-kit ships the anchor directory
-	{"/etc/pki/trust/anchors", []string{"/var/lib/ca-certificates"}, nil},
+	// SUSE, where p11-kit ships the anchor directory too
+	{"/etc/pki/trust/anchors", []string{"/usr/lib/ca-certificates/update.d"}, []string{
+		"/etc/ca-certificates",
+	}},
 	// Arch; blacklist before 2021
 	{"/etc/ca-certificates/trust-source/anchors", []string{"/etc/ca-certificates/trust-source/blocklist", "/etc/ca-certificates/trust-source/blacklist"}, []string{
 		"/etc/ca-certificates/trust-source/anchors",
 		"/etc/ca-certificates/trust-source",
+	}},
+}
+
+// sharedRemovals lists, deepest first, directories several packages ship that
+// the injection can keep from going, as removal does for one: they go once
+// every one of those packages is gone. Each package is the paths only it
+// ships, as for anchorDirs.
+var sharedRemovals = []struct {
+	packages [][]string
+	dirs     []string
+}{
+	// Debian, Ubuntu: the CA store's directory is mirrored, and both
+	// ca-certificates and openssl ship it.
+	{[][]string{{"/usr/share/ca-certificates/mozilla"}, {"/usr/bin/openssl"}}, []string{
+		"/etc/ssl/certs",
+		"/etc/ssl",
 	}},
 }
 
@@ -134,47 +152,76 @@ func mkdirAllTracking(dir string) ([]string, error) {
 	return created, os.MkdirAll(dir, 0o755)
 }
 
+// installed reports whether a package is installed, by any of the paths only
+// it ships.
+func installed(rootfs string, owners []string) bool {
+	for _, owner := range owners {
+		// A path that will not resolve inside the rootfs is not there, the same
+		// answer as not finding it.
+		resolved, _ := resolveInRoot(rootfs, owner)
+		if _, err := os.Stat(resolved); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // installedAnchorPackages reports, for each of anchorDirs, whether its package
 // is installed.
 func installedAnchorPackages(rootfs string) []bool {
-	installed := make([]bool, len(anchorDirs))
+	result := make([]bool, len(anchorDirs))
 	for i, anchor := range anchorDirs {
-		for _, owner := range anchor.owners {
-			// A path that will not resolve inside the rootfs is not there, the
-			// same answer as not finding it.
-			resolved, _ := resolveInRoot(rootfs, owner)
-			if _, err := os.Stat(resolved); err == nil {
-				installed[i] = true
-				break
-			}
+		result[i] = installed(rootfs, anchor.owners)
+	}
+	return result
+}
+
+// installedSharedPackages reports, for each of sharedRemovals, whether any of
+// its packages is installed.
+func installedSharedPackages(rootfs string) []bool {
+	result := make([]bool, len(sharedRemovals))
+	for i, shared := range sharedRemovals {
+		for _, owners := range shared.packages {
+			result[i] = result[i] || installed(rootfs, owners)
 		}
 	}
-	return installed
+	return result
 }
 
 // anchorsAtStart is the state of the anchors' packages as the step started,
 // for undoAnchors to compare the end of the step with.
 type anchorsAtStart struct {
-	installed []bool
-	// Each anchor's removal list with its parents resolved, so the links the
-	// image ships are followed and a link the step puts in a path later shows
-	// as a mismatch: a removal does not reach through one.
-	removal [][]string
+	installed, shared []bool
+	// Each removal list with its parents resolved, so the links the image
+	// ships are followed and a link the step puts in a path later shows as a
+	// mismatch: a removal does not reach through one.
+	removal, sharedRemoval [][]string
 }
 
 func recordAnchors(rootfs string) anchorsAtStart {
-	at := anchorsAtStart{installed: installedAnchorPackages(rootfs), removal: make([][]string, len(anchorDirs))}
-	for i, anchor := range anchorDirs {
-		for _, dir := range anchor.removal {
-			parent, err := resolveInRoot(rootfs, filepath.Dir(dir))
-			if err != nil {
-				logf("not removing %s after the step: %v", dir, err)
-				continue
-			}
-			at.removal[i] = append(at.removal[i], filepath.Join(parent, filepath.Base(dir)))
-		}
+	at := anchorsAtStart{installed: installedAnchorPackages(rootfs), shared: installedSharedPackages(rootfs)}
+	for _, anchor := range anchorDirs {
+		at.removal = append(at.removal, resolveRemoval(rootfs, anchor.removal))
+	}
+	for _, shared := range sharedRemovals {
+		at.sharedRemoval = append(at.sharedRemoval, resolveRemoval(rootfs, shared.dirs))
 	}
 	return at
+}
+
+// resolveRemoval resolves the parent of each directory, leaving out one whose
+// parent will not resolve.
+func resolveRemoval(rootfs string, dirs []string) []string {
+	var resolved []string
+	for _, dir := range dirs {
+		parent, err := resolveInRoot(rootfs, filepath.Dir(dir))
+		if err != nil {
+			logf("not removing %s after the step: %v", dir, err)
+			continue
+		}
+		resolved = append(resolved, filepath.Join(parent, filepath.Base(dir)))
+	}
+	return resolved
 }
 
 // undoAnchors takes back what the anchors left once the step has ended. It
@@ -205,6 +252,11 @@ func undoAnchors(rootfs string, created createdDirs, before anchorsAtStart) {
 	for i := range anchorDirs {
 		if i < len(before.installed) && before.installed[i] && !installed[i] {
 			dirs.add(before.removal[i])
+		}
+	}
+	for i, still := range installedSharedPackages(rootfs) {
+		if i < len(before.shared) && before.shared[i] && !still {
+			dirs.add(before.sharedRemoval[i])
 		}
 	}
 	for _, dir := range dirs.removalOrder() {
