@@ -30,7 +30,7 @@ func TestRemoveCAKeepsOneBlankLineBetweenSeparatedCertificates(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "bundle.pem")
 			mustWriteFile(t, path, tc.bundle)
-			if err := removeCA(path, testCA); err != nil {
+			if _, err := removeCA(path, testCA); err != nil {
 				t.Fatal(err)
 			}
 			if got := mustRead(t, path); got != tc.wants {
@@ -147,7 +147,7 @@ func TestFindCertificatesReportsAFailedReadAroundTheCut(t *testing.T) {
 	begin := int64(strings.Index(data, "-----BEGIN"))
 	passed := false
 	w := newFileWindow(readerFailingBack{data: data, at: begin, passed: &passed}, int64(len(data)))
-	if _, err := findCertificates(w, certificateDERs(testCA)); !errors.Is(err, errBrokenFile) {
+	if _, _, err := findCertificates(w, certificateDERs(testCA)); !errors.Is(err, errBrokenFile) {
 		t.Fatalf("got %v", err)
 	}
 }

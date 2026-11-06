@@ -82,7 +82,7 @@ func TestSweepDirRemovesAMonoBareDERFile(t *testing.T) {
 	cer := filepath.Join(dir, "ski-DEADBEEF.cer")
 	mustWriteFile(t, cer, string(ca.Raw))
 
-	if _, err := sweepDir(dir, dir, caPEM, caMarksOf(caPEM)); err != nil {
+	if _, err := sweepDir(dir, dir, caPEM, caMarksOf(caPEM), nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(cer); !os.IsNotExist(err) {

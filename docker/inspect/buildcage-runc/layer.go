@@ -195,22 +195,25 @@ func fileHoldsCA(path string, needles [][]byte) (bool, error) {
 }
 
 // sweepDir takes the certificate out of every file under listing that holds
-// one, and returns how many files it read.
+// one, and returns how many files it read. removed is the paths already taken
+// away elsewhere, so a link here left pointing at one goes too; the sweep adds
+// what it takes away to it. A nil one starts empty.
 //
 // The two directories differ for the layer: what to look at comes from the
 // overlay's upper directory, but each removal goes through the rootfs, because
 // writing into the upper directory would step around the whiteouts overlay
 // keeps there. For a mirror they are the same directory.
-func sweepDir(listing, root string, ca []byte, marks caMarks) (int, error) {
+func sweepDir(listing, root string, ca []byte, marks caMarks, removed map[string]bool) (int, error) {
 	var unstrippable []string
-	// The paths the sweep took away, so a link left pointing at one can go too.
-	removed := map[string]bool{}
+	if removed == nil {
+		removed = map[string]bool{}
+	}
 	files, err := eachFileHoldingCA(listing, marks.needles, func(rel string) error {
 		target, err := resolveInRoot(root, rel)
 		if err != nil {
 			return err
 		}
-		left, err := stripCA(target, ca, marks)
+		left, labelled, err := stripCA(target, ca, marks)
 		if err != nil {
 			return err
 		}
@@ -220,8 +223,9 @@ func sweepDir(listing, root string, ca []byte, marks caMarks) (int, error) {
 		}
 		// A file the strip emptied held nothing but the certificate, which is
 		// generated per build, so the file is one the injection put there: it
-		// goes, rather than staying behind as an empty trace.
-		if info, err := os.Stat(target); err == nil && info.Size() == 0 {
+		// goes, rather than staying behind as an empty trace. One p11-kit wrote
+		// the CA into under its label is a bundle that is empty without it.
+		if info, err := os.Stat(target); err == nil && info.Size() == 0 && !labelled {
 			if err := os.Remove(target); err != nil {
 				return err
 			}
@@ -310,44 +314,49 @@ func dropRemovedLinks(listing, root string, removed map[string]bool) error {
 }
 
 // stripCA takes the certificate out of one file, in whichever shape it is in
-// there, and reports whether a copy is still in it afterwards.
-func stripCA(path string, ca []byte, marks caMarks) (bool, error) {
+// there, and reports whether a copy is still in it afterwards and whether one
+// it took out came with p11-kit's label line (see removeCA).
+func stripCA(path string, ca []byte, marks caMarks) (bool, bool, error) {
 	// Read-only first, even though the listing already said this file carries
 	// the certificate: the listing named it under a different directory, and on
 	// an overlay, opening a file for writing copies it up into the layer. Only
 	// a file that carries the certificate is ever opened for writing.
 	carries, err := fileHoldsCA(path, marks.needles)
 	if err != nil || !carries {
-		return false, err
+		return false, false, err
 	}
-	if err := removeCA(path, ca); err != nil {
-		return false, err
+	labelled, err := removeCA(path, ca)
+	if err != nil {
+		return false, false, err
 	}
 	left, err := fileHoldsCA(path, marks.needles)
 	if err != nil || !left {
-		return false, err
+		return false, labelled, err
 	}
 	// What is left is a binary holding the certificate as DER or as PEM that
 	// removeCA would not cut, or a trace nothing removes. Only a Java keystore
 	// or an EFI signature database can be rewritten; anything else is reported.
 	rewritten, err := removeFromBinaryStore(path, marks.ders)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	if !rewritten {
-		return true, nil
+		return true, false, nil
 	}
-	return fileHoldsCA(path, marks.needles)
+	left, err = fileHoldsCA(path, marks.needles)
+	return left, false, err
 }
 
 // stripLayer takes the certificate out of the step's own layer, then reads the
-// layer back to say whether any of it is left.
+// layer back to say whether any of it is left. removed is what the mirrors'
+// write-backs took away, as rootfs paths, for the links in the layer that
+// point at it.
 //
 // Reading it back is the check that matters: the guarantee is about what
 // BuildKit commits, not about what the removals above believed they did.
 //
 // upper is the layer found when the injection began (see injection.upper).
-func stripLayer(rootfs, upper string, ca, nssAppended []byte) error {
+func stripLayer(rootfs, upper string, ca, nssAppended []byte, removed map[string]bool) error {
 	if upper == "" {
 		return errLayerUnread
 	}
@@ -356,7 +365,7 @@ func stripLayer(rootfs, upper string, ca, nssAppended []byte) error {
 	started := time.Now()
 	var errs []error
 	reported := map[string]bool{}
-	files, err := sweepDir(upper, rootfs, ca, marks)
+	files, err := sweepDir(upper, rootfs, ca, marks, removed)
 	// A copy it cannot strip does not stop the slots being cut and the layer
 	// read back, which a build going on past it still needs.
 	var unstrippable *unstrippableError

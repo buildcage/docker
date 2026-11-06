@@ -900,7 +900,8 @@ that path gets none of the variables that would point there.
 
 For the step, the CA is also placed in the distribution's anchor directory, the directory its
 `update-ca-certificates` or `update-ca-trust` rebuilds the bundle from
-(`/usr/local/share/ca-certificates` on Debian, Ubuntu and Alpine). A step that installs
+(`/usr/local/share/ca-certificates` on Debian, Ubuntu and Alpine,
+`/etc/ca-certificates/trust-source/anchors` on Arch). A step that installs
 `ca-certificates` partway through therefore keeps trusting the CA once the bundle has been rebuilt
 from scratch. On SUSE, GnuTLS reads the certificate directory
 `/var/lib/ca-certificates/pem` instead of the bundle. When the image has it, the CA is added there
@@ -1003,6 +1004,10 @@ anchor directory:
 - each bare DER file a trust store splits the bundle into (Mono's `cert-sync` writes one per
   certificate)
 - the EFI signature database RHEL's `update-ca-trust` writes
+
+A bundle p11-kit rebuilt from the anchors, as `update-ca-trust` does on RHEL, Fedora and Arch,
+loses the label line written above the CA along with it, and the links left pointing at the
+removed copy of the CA, such as the hash links in `/etc/pki/tls/certs`, are removed too.
 
 Two things fail the build by default, pointing at `fail-on-ca-residue`:
 

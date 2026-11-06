@@ -144,7 +144,7 @@ func TestRemoveCALeavesLaterAdditionsIntact(t *testing.T) {
 	}
 	mustAppendFile(t, path, string(otherCA))
 
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -164,7 +164,7 @@ func TestRemoveCARestoresTheFileExactly(t *testing.T) {
 	if err := appendCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(path)
@@ -180,7 +180,7 @@ func TestRemoveCAStripsEveryCopy(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bundle.pem")
 	mustWriteFile(t, path, string(testCA)+string(otherCA)+string(testCA))
 
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -200,7 +200,7 @@ func TestRemoveCAMatchesAReEncodedCertificate(t *testing.T) {
 		"-----BEGIN CERTIFICATE-----\nQlVJ\nTERD\nQUdF\nLUNB\n-----END CERTIFICATE-----\n"
 	mustWriteFile(t, path, string(otherCA)+rewrapped)
 
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -222,7 +222,7 @@ func TestRemoveCAStripsACertificateBehindAnUnterminatedBlock(t *testing.T) {
 	truncated := beginTestBlock + "\nVFJVTkNBVEVE\n"
 	mustWriteFile(t, path, truncated+string(testCA))
 
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -241,7 +241,7 @@ func TestRemoveCALeavesAnOversizedBlockAlone(t *testing.T) {
 	oversized := string(caOfSize(t, maxCertificateBytes+2))
 	mustWriteFile(t, path, oversized+string(testCA))
 
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -264,7 +264,7 @@ func TestRemoveCAIsANoOpWithoutACertificateToMatch(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "bundle.pem")
 			mustWriteFile(t, path, string(testCA))
 
-			if err := removeCA(path, []byte(ca)); err != nil {
+			if _, err := removeCA(path, []byte(ca)); err != nil {
 				t.Fatal(err)
 			}
 			got, _ := os.ReadFile(path)
@@ -280,7 +280,7 @@ func TestRemoveCAIsANoOpWhenTheCertificateIsGone(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bundle.pem")
 	mustWriteFile(t, path, "REWRITTEN\n")
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(path)
@@ -325,7 +325,7 @@ func TestRemoveCAStripsACertificateAcrossWindowBoundaries(t *testing.T) {
 			before, after := filler(c.beginAt), filler(c.after)
 			mustWriteFile(t, path, before+string(ca)+after)
 
-			if err := removeCA(path, ca); err != nil {
+			if _, err := removeCA(path, ca); err != nil {
 				t.Fatal(err)
 			}
 			got, err := os.ReadFile(path)
@@ -352,7 +352,7 @@ func TestRemoveCAStripsACertificateWithoutItsClosingNewline(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "bundle.pem")
 			mustWriteFile(t, path, c.content)
-			if err := removeCA(path, testCA); err != nil {
+			if _, err := removeCA(path, testCA); err != nil {
 				t.Fatal(err)
 			}
 			got, err := os.ReadFile(path)
@@ -373,7 +373,10 @@ func TestBundleEditsRefuseANonRegularFile(t *testing.T) {
 	for _, edit := range []struct {
 		name string
 		fn   func(path string, ca []byte) error
-	}{{"appendCA", appendCA}, {"removeCA", removeCA}} {
+	}{{"appendCA", appendCA}, {"removeCA", func(path string, ca []byte) error {
+		_, err := removeCA(path, ca)
+		return err
+	}}} {
 		for name, tc := range map[string]struct {
 			arrange func(t *testing.T, path string) (check func(t *testing.T))
 			want    error
@@ -511,7 +514,7 @@ func TestAppendCARefusesSomethingThatIsNotACertificate(t *testing.T) {
 // A step is free to delete the bundle outright. There is then no block to
 // strip, and no reason to fail the build over it.
 func TestRemoveCAIsANoOpWhenTheFileIsGone(t *testing.T) {
-	if err := removeCA(filepath.Join(t.TempDir(), "gone.pem"), testCA); err != nil {
+	if _, err := removeCA(filepath.Join(t.TempDir(), "gone.pem"), testCA); err != nil {
 		t.Fatalf("got %v, want nil", err)
 	}
 }
@@ -522,7 +525,7 @@ func TestRemoveCALeavesABinaryUntouched(t *testing.T) {
 	content := "\x7fELF\x02\x01\x01\x00" + string(testCA) + "\x00TRAILER"
 	mustWriteFile(t, path, content)
 
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -540,7 +543,7 @@ func TestRemoveCAIsANoOpOnAnEmptyFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bundle.pem")
 	mustWriteFile(t, path, "")
 
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -560,7 +563,7 @@ func TestRemoveCALeavesAnUnterminatedBlockAlone(t *testing.T) {
 	content := "ORIGINAL\n" + beginTestBlock + "\nQlVJTERDQUdFLUNB\n"
 	mustWriteFile(t, path, content)
 
-	if err := removeCA(path, testCA); err != nil {
+	if _, err := removeCA(path, testCA); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -605,7 +608,7 @@ func TestRemoveCAReportsAFailurePartwayThrough(t *testing.T) {
 			}
 			useBrokenBundleFile(t, broken)
 
-			if err := removeCA(path, testCA); !errors.Is(err, errBrokenFile) {
+			if _, err := removeCA(path, testCA); !errors.Is(err, errBrokenFile) {
 				t.Fatalf("got %v, want it to name the I/O failure", err)
 			}
 			after, err := os.ReadFile(path)
@@ -655,7 +658,7 @@ func TestAppendAndRemoveCARefuseSomethingThatIsNotARegularFile(t *testing.T) {
 	t.Run("removeCA cannot stat it", func(t *testing.T) {
 		path := withCA(t)
 		useBrokenBundleFile(t, &brokenFile{failStat: true})
-		if err := removeCA(path, testCA); !errors.Is(err, errBrokenFile) {
+		if _, err := removeCA(path, testCA); !errors.Is(err, errBrokenFile) {
 			t.Fatalf("got %v, want it to name the I/O failure", err)
 		}
 	})
@@ -747,7 +750,7 @@ func TestRemoveCALeavesAnUnfinishedOpeningLineAlone(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "bundle.pem")
 			mustWriteFile(t, path, c.content)
 
-			if err := removeCA(path, testCA); err != nil {
+			if _, err := removeCA(path, testCA); err != nil {
 				t.Fatal(err)
 			}
 			got, err := os.ReadFile(path)
@@ -890,7 +893,7 @@ func TestBlockReadPastTheWindowReportsAFailedRead(t *testing.T) {
 	})
 	t.Run("findCertificates", func(t *testing.T) {
 		path, size := lateOpeningLines(t, [][]byte{beginPEM})
-		if _, err := findCertificates(newFileWindow(open(t, path), size), marks.ders); !errors.Is(err, errBrokenFile) {
+		if _, _, err := findCertificates(newFileWindow(open(t, path), size), marks.ders); !errors.Is(err, errBrokenFile) {
 			t.Fatalf("got %v, want it to name the I/O failure", err)
 		}
 	})
@@ -920,7 +923,7 @@ func TestUnterminatedOpeningLinesAreReadOnce(t *testing.T) {
 	}
 
 	counted = &brokenFile{bundleFile: f}
-	cuts, err := findCertificates(newFileWindow(counted, size), caMarksOf(testCA).ders)
+	cuts, _, err := findCertificates(newFileWindow(counted, size), caMarksOf(testCA).ders)
 	if err != nil {
 		t.Fatal(err)
 	}
