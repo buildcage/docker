@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -209,7 +210,7 @@ func TestRecordAnchorsReportsAPathThatDoesNotResolve(t *testing.T) {
 
 	at := recordAnchors(rootfs)
 
-	for _, dir := range at.removal[1] {
+	for _, dir := range slices.Concat(at.removal...) {
 		if strings.HasPrefix(dir, filepath.Join(rootfs, "etc", "pki", "ca-trust")+"/") {
 			t.Errorf("recorded %s, under a loop", dir)
 		}
@@ -217,6 +218,82 @@ func TestRecordAnchorsReportsAPathThatDoesNotResolve(t *testing.T) {
 	if got := ownLog.String(); !strings.Contains(got, "not removing /etc/pki/ca-trust/source/anchors after the step") {
 		t.Errorf("log = %q, want the path named", got)
 	}
+}
+
+// On SUSE, too, the Arch anchor keeps rpm from removing /etc/ca-certificates.
+func TestUndoAnchorsTakesSUSEsEtcCACertificates(t *testing.T) {
+	rootfs := t.TempDir()
+	mustMkdirAll(t, filepath.Join(rootfs, "usr", "lib", "ca-certificates", "update.d"))
+	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "update.d"))
+	mustMkdirAll(t, filepath.Join(rootfs, "etc", "pki", "trust", "anchors"))
+	before := recordAnchors(rootfs)
+	created := placeAnchors(rootfs, testCA)
+	removeAll(t, rootfs, "usr/lib/ca-certificates", "etc/ca-certificates/update.d")
+	emptyAnchors(rootfs)
+
+	undoAnchors(rootfs, created, before)
+
+	if exists(filepath.Join(rootfs, "etc", "ca-certificates")) {
+		t.Error("/etc/ca-certificates was left behind")
+	}
+	// p11-kit ships the anchor directory too, so it stays.
+	if !exists(filepath.Join(rootfs, "etc", "pki", "trust", "anchors")) {
+		t.Error("/etc/pki/trust/anchors was taken away")
+	}
+}
+
+// /etc/ssl/certs, which the CA store is mirrored from, goes once both
+// ca-certificates and openssl have, as apt-get purge --auto-remove takes them.
+func TestUndoAnchorsTakesASharedDirectoryOnceEveryPackageIsGone(t *testing.T) {
+	debian := func(t *testing.T) string {
+		rootfs := t.TempDir()
+		mustMkdirAll(t, filepath.Join(rootfs, "usr", "share", "ca-certificates", "mozilla"))
+		mustMkdirAll(t, filepath.Join(rootfs, "usr", "bin"))
+		mustWriteFile(t, filepath.Join(rootfs, "usr", "bin", "openssl"), "")
+		mustMkdirAll(t, filepath.Join(rootfs, "etc", "ssl", "certs"))
+		return rootfs
+	}
+	t.Run("both removed", func(t *testing.T) {
+		rootfs := debian(t)
+		before := recordAnchors(rootfs)
+		removeAll(t, rootfs, "usr/share/ca-certificates", "usr/bin/openssl")
+
+		undoAnchors(rootfs, createdDirs{}, before)
+
+		if exists(filepath.Join(rootfs, "etc", "ssl")) {
+			t.Error("/etc/ssl was left behind")
+		}
+	})
+	t.Run("openssl kept", func(t *testing.T) {
+		rootfs := debian(t)
+		before := recordAnchors(rootfs)
+		removeAll(t, rootfs, "usr/share/ca-certificates")
+
+		undoAnchors(rootfs, createdDirs{}, before)
+
+		if !exists(filepath.Join(rootfs, "etc", "ssl", "certs")) {
+			t.Error("/etc/ssl/certs, which openssl still ships, was taken away")
+		}
+	})
+	// Elsewhere openssl alone going is not Debian's pair: Fedora's
+	// /etc/ssl/certs, a link, is not looked at.
+	t.Run("not Debian", func(t *testing.T) {
+		useTempLog(t)
+		rootfs := t.TempDir()
+		mustMkdirAll(t, filepath.Join(rootfs, "usr", "bin"))
+		mustWriteFile(t, filepath.Join(rootfs, "usr", "bin", "openssl"), "")
+		mustMkdirAll(t, filepath.Join(rootfs, "etc", "pki", "tls", "certs"))
+		mustMkdirAll(t, filepath.Join(rootfs, "etc", "ssl"))
+		mustSymlink(t, "../pki/tls/certs", filepath.Join(rootfs, "etc", "ssl", "certs"))
+		before := recordAnchors(rootfs)
+		removeAll(t, rootfs, "usr/bin/openssl")
+
+		undoAnchors(rootfs, createdDirs{}, before)
+
+		if got := ownLog.String(); strings.Contains(got, "/etc/ssl") {
+			t.Errorf("log = %q, want /etc/ssl left alone", got)
+		}
+	})
 }
 
 // Only a removal the step made counts: a package still installed, or one that
