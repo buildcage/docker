@@ -82,12 +82,7 @@ LABEL org.opencontainers.image.title="buildcage (inspect proxy engine)" \
 
 # apk add leaves an installed package alone, so without this the CA bundle
 # stays as old as the base image and keeps trusting roots since withdrawn.
-# A builder that adds its own CA to the bundle during the step makes apk keep
-# the old file and install the new one as .apk-new, so move it into place.
-RUN apk add --no-cache --upgrade ca-certificates-bundle && \
-    if [ -e /etc/ssl/certs/ca-certificates.crt.apk-new ]; then \
-      mv /etc/ssl/certs/ca-certificates.crt.apk-new /etc/ssl/certs/ca-certificates.crt; \
-    fi
+RUN apk add --no-cache --upgrade ca-certificates-bundle
 
 # nss-tools provides certutil for init-cfg's NSS database.
 RUN apk add --no-cache \
