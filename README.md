@@ -474,6 +474,10 @@ reported as blocked; see
 - Every `RUN` step has the NSS database's directory as a mount point, created if the home has none,
   so `rm -rf ~/.pki`, `git clone <url> .` into the home and `rm -rf ~/.[!.]*` fail; use a `WORKDIR`
   outside the home. A step that changes the CA's own trust with `certutil -M` fails the build.
+- On an apk-based image (Alpine, Wolfi), a `RUN` step that upgrades `ca-certificates-bundle` no
+  longer trusts the CA for the rest of that step, since apk replaces the bundle the CA was added
+  to. Run what needs HTTPS after the upgrade in a later `RUN` step. See
+  [CA trust variables](./docs/reference.md#ca-trust-variables).
 - A `RUN` step that copies the system CA bundle into a binary or an uncompressed archive
   (`go:embed`, `include_str!`, `tar cf`) fails: the copy carries the build's CA, which cannot be cut
   out of a binary without corrupting it. Copy the bundle in an earlier `RUN` step instead:

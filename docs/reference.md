@@ -906,6 +906,17 @@ from scratch. On SUSE, GnuTLS reads the certificate directory
 `/var/lib/ca-certificates/pem` instead of the bundle. When the image has it, the CA is added there
 for the step and taken back out before the layer is committed.
 
+On Alpine, Wolfi and other images that install packages with apk, apk keeps a file under `/etc`
+that differs from its record of it and writes the package's version beside it as `.apk-new`. The
+bundle carries the CA while the step runs, so for the step its record in
+`/lib/apk/db/installed` is set to the bundle with the CA in it, when the image's bundle matched
+the record. The file is changed in place, not mounted over, so removing apk's files works as
+usual. An upgrade then replaces the bundle as it would under any engine, and the rest of that
+step no longer trusts the CA. A reinstall of the same version (`apk fix`) compares the bundle with
+the package instead and still writes `.apk-new`, which is removed after the step when it holds what
+the bundle holds without the CA. A bundle the image changed itself is kept, `.apk-new` and all, as
+apk keeps it anyway. After the step, each record apk did not replace is set back.
+
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't
 reach.

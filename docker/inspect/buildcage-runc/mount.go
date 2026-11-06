@@ -438,6 +438,12 @@ func (b *dirBind) finish() error {
 		return err
 	}
 
+	if !b.keystore && b.nssBase == "" {
+		if err := b.dropRedundantAPKNew(); err != nil {
+			return err
+		}
+	}
+
 	stripped, err := captureManifest(b.scratchDir)
 	if err != nil {
 		return err

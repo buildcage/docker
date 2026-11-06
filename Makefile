@@ -23,6 +23,7 @@ BUILDER_IMAGE := buildcage-builder$(BUILDCAGE_WORKTREE_SUFFIX)
 QJS_TEST_IMAGE ?= buildcage-qjs-test$(BUILDCAGE_WORKTREE_SUFFIX)
 BYTE_EXACT_INSPECT := buildcage-byte-exact-inspect$(BUILDCAGE_WORKTREE_SUFFIX)
 BYTE_EXACT_UNIVERSAL := buildcage-byte-exact-universal$(BUILDCAGE_WORKTREE_SUFFIX)
+BYTE_EXACT_FIXTURES := test/Dockerfile.inspect-byte-exact test/Dockerfile.inspect-byte-exact-apk
 SCRATCH_PREFIX ?= /tmp/buildcage$(BUILDCAGE_WORKTREE_SUFFIX)
 # Read by test/assert-listener-scope.sh, which names a Compose project of its own.
 export BUILDCAGE_WORKTREE_SUFFIX
@@ -337,30 +338,37 @@ test_integration_buildkit_inspect_hidden_ca: ## Check inspect fails a build that
 .PHONY: test_integration_buildkit_inspect_byte_exact
 test_integration_buildkit_inspect_byte_exact: ## Compare inspect vs universal layer-for-layer, byte for byte
 	@echo "Running inspect-engine byte-exact layer comparison..."
-	@rm -f $(SCRATCH_PREFIX)-byte-exact-inspect.tar $(SCRATCH_PREFIX)-byte-exact-universal.tar
+	@rm -f $(SCRATCH_PREFIX)-byte-exact-inspect-*.tar $(SCRATCH_PREFIX)-byte-exact-universal-*.tar
 	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(INSPECT_OVERLAY) \
 	  $(MAKE) setup_buildkit_inspect_audit
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --build-arg SOURCE_DATE_EPOCH=1700000000 \
-	  --output type=docker,name=$(BYTE_EXACT_INSPECT),rewrite-timestamp=true,unpack=false,dest=$(SCRATCH_PREFIX)-byte-exact-inspect.tar \
-	  --progress=plain -f test/Dockerfile.inspect-byte-exact test/
+	@for f in $(BYTE_EXACT_FIXTURES); do \
+	  docker buildx build --no-cache \
+	    --builder $(BUILDER_NAME) \
+	    --platform $(TEST_PLATFORM) \
+	    --build-arg SOURCE_DATE_EPOCH=1700000000 \
+	    --output type=docker,name=$(BYTE_EXACT_INSPECT):$${f##*/},rewrite-timestamp=true,unpack=false,dest=$(SCRATCH_PREFIX)-byte-exact-inspect-$${f##*/}.tar \
+	    --progress=plain -f $$f test/ || exit 1; \
+	done
 	@TEST_COMPOSE_FILE=$(INSPECT_OVERLAY) $(MAKE) clean_buildkit
 	@BUILDCAGE_TEST_COMPOSE_OVERLAY=$(UNIVERSAL_OVERLAY) \
 	  $(MAKE) setup_buildkit_universal_audit
-	@docker buildx build --no-cache \
-	  --builder $(BUILDER_NAME) \
-	  --platform $(TEST_PLATFORM) \
-	  --build-arg SOURCE_DATE_EPOCH=1700000000 \
-	  --output type=docker,name=$(BYTE_EXACT_UNIVERSAL),rewrite-timestamp=true,unpack=false,dest=$(SCRATCH_PREFIX)-byte-exact-universal.tar \
-	  --progress=plain -f test/Dockerfile.inspect-byte-exact test/
+	@for f in $(BYTE_EXACT_FIXTURES); do \
+	  docker buildx build --no-cache \
+	    --builder $(BUILDER_NAME) \
+	    --platform $(TEST_PLATFORM) \
+	    --build-arg SOURCE_DATE_EPOCH=1700000000 \
+	    --output type=docker,name=$(BYTE_EXACT_UNIVERSAL):$${f##*/},rewrite-timestamp=true,unpack=false,dest=$(SCRATCH_PREFIX)-byte-exact-universal-$${f##*/}.tar \
+	    --progress=plain -f $$f test/ || exit 1; \
+	done
 	@TEST_COMPOSE_FILE=$(UNIVERSAL_OVERLAY) $(MAKE) clean_buildkit
-	@docker load -i $(SCRATCH_PREFIX)-byte-exact-inspect.tar
-	@docker load -i $(SCRATCH_PREFIX)-byte-exact-universal.tar
-	@./test/assert-inspect-byte-exact.sh $(BYTE_EXACT_UNIVERSAL) $(BYTE_EXACT_INSPECT)
-	@docker rmi $(BYTE_EXACT_INSPECT) $(BYTE_EXACT_UNIVERSAL)
-	@rm -f $(SCRATCH_PREFIX)-byte-exact-inspect.tar $(SCRATCH_PREFIX)-byte-exact-universal.tar
+	@for f in $(BYTE_EXACT_FIXTURES); do \
+	  n=$${f##*/}; \
+	  docker load -i $(SCRATCH_PREFIX)-byte-exact-inspect-$$n.tar && \
+	  docker load -i $(SCRATCH_PREFIX)-byte-exact-universal-$$n.tar && \
+	  ./test/assert-inspect-byte-exact.sh $(BYTE_EXACT_UNIVERSAL):$$n $(BYTE_EXACT_INSPECT):$$n && \
+	  docker rmi $(BYTE_EXACT_INSPECT):$$n $(BYTE_EXACT_UNIVERSAL):$$n || exit 1; \
+	done
+	@rm -f $(SCRATCH_PREFIX)-byte-exact-inspect-*.tar $(SCRATCH_PREFIX)-byte-exact-universal-*.tar
 
 .PHONY: test_integration_buildkit_inspect_roundtrip
 test_integration_buildkit_inspect_roundtrip: ## Check an inspect audit run, then enforce the rules it generated
