@@ -247,6 +247,8 @@ func certificateDERs(armoured []byte) [][]byte {
 type caMarks struct {
 	// What removal takes out.
 	ders [][]byte
+	// The label lines p11-kit writes above them, which removal takes too.
+	labels [][]byte
 	// What detection searches for: ders, plus traces removal cannot take out,
 	// which fail the build. The subject is the issuer of every certificate
 	// the proxy forged. The base64 prefix includes the random serial and
@@ -261,6 +263,7 @@ const base64PrefixLength = 48
 
 func caMarksOf(ca []byte) caMarks {
 	marks := caMarks{ders: certificateDERs(ca)}
+	marks.labels = labelLinesOf(marks.ders)
 	marks.needles = slices.Clone(marks.ders)
 	for _, der := range marks.ders {
 		if cert, err := x509.ParseCertificate(der); err == nil {
@@ -296,9 +299,8 @@ type span struct{ start, end int64 }
 // the file itself, or when the file is binary. The find and the strip share one
 // handle, opened the same guarded way as appendCA, so they can't land on
 // different files.
-func removeCA(path string, ca []byte) (bool, error) {
-	ders := certificateDERs(ca)
-	if len(ders) == 0 {
+func removeCA(path string, marks caMarks) (bool, error) {
+	if len(marks.ders) == 0 {
 		return false, nil
 	}
 
@@ -321,7 +323,7 @@ func removeCA(path string, ca []byte) (bool, error) {
 
 	size := info.Size()
 	w := newFileWindow(f, size)
-	cuts, labelled, err := findCertificates(w, ders)
+	cuts, labelled, err := findCertificates(w, marks)
 	if err != nil || len(cuts) == 0 {
 		return false, err
 	}
@@ -343,8 +345,7 @@ func removeCA(path string, ca []byte) (bool, error) {
 // certificate occupies, including the line break that closes it and, in a
 // bundle p11-kit wrote, the label line and blank line that go with it. It
 // also reports whether any copy had a label line.
-func findCertificates(w *fileWindow, ders [][]byte) ([]span, bool, error) {
-	labels := labelLinesOf(ders)
+func findCertificates(w *fileWindow, marks caMarks) ([]span, bool, error) {
 	var cuts []span
 	labelled := false
 	for off := int64(0); off < w.size; {
@@ -370,14 +371,14 @@ func findCertificates(w *fileWindow, ders [][]byte) ([]span, bool, error) {
 		// A block that was read has no opening line inside it, so resuming at
 		// its end skips nothing and saves reading it all again.
 		off = end
-		if !holdsAnyDER(block.Bytes, ders) {
+		if !holdsAnyDER(block.Bytes, marks.ders) {
 			continue
 		}
 		floor := int64(0)
 		if len(cuts) > 0 {
 			floor = cuts[len(cuts)-1].end
 		}
-		cut, err := withLabelLine(w, span{begin, end}, labels, floor)
+		cut, err := withLabelLine(w, span{begin, end}, marks.labels, floor)
 		if err != nil {
 			return nil, false, err
 		}

@@ -49,7 +49,7 @@ func TestRemoveCATakesP11KitsLabelLineWithIt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "tls-ca-bundle.pem")
 			mustWriteFile(t, path, tc.with)
-			if _, err := removeCA(path, ca); err != nil {
+			if _, err := removeCA(path, caMarksOf(ca)); err != nil {
 				t.Fatal(err)
 			}
 			if got := mustReadFile(t, path); got != tc.out {
@@ -72,7 +72,7 @@ func TestRemoveCATakesTheLabelOfEachAdjacentCopy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "tls-ca-bundle.pem")
 			mustWriteFile(t, path, with)
-			if _, err := removeCA(path, ca); err != nil {
+			if _, err := removeCA(path, caMarksOf(ca)); err != nil {
 				t.Fatal(err)
 			}
 			if got := mustReadFile(t, path); got != first {
@@ -95,7 +95,7 @@ func TestRemoveCAKeepsLinesThatAreNotItsLabel(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "bundle.pem")
 			mustWriteFile(t, path, string(otherCA)+tc.before+string(ca))
-			if _, err := removeCA(path, ca); err != nil {
+			if _, err := removeCA(path, caMarksOf(ca)); err != nil {
 				t.Fatal(err)
 			}
 			if got, want := mustReadFile(t, path), string(otherCA)+tc.before; got != want {
@@ -154,11 +154,11 @@ func TestFindCertificatesReportsAFailedLabelRead(t *testing.T) {
 	mustWriteFile(t, path, content)
 
 	counted := &brokenFile{bundleFile: openForRead(t, path)}
-	if _, _, err := findCertificates(newFileWindow(counted, int64(len(content))), certificateDERs(ca)); err != nil {
+	if _, _, err := findCertificates(newFileWindow(counted, int64(len(content))), caMarksOf(ca)); err != nil {
 		t.Fatal(err)
 	}
 	f := &brokenFile{bundleFile: openForRead(t, path), failReadAt: counted.reads}
-	if _, _, err := findCertificates(newFileWindow(f, int64(len(content))), certificateDERs(ca)); !errors.Is(err, errBrokenFile) {
+	if _, _, err := findCertificates(newFileWindow(f, int64(len(content))), caMarksOf(ca)); !errors.Is(err, errBrokenFile) {
 		t.Fatalf("got %v, want the I/O failure", err)
 	}
 }

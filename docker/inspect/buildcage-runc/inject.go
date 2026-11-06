@@ -205,10 +205,10 @@ type injection struct {
 // code it leaves is not in ValidExitCodes, which a Dockerfile cannot set.
 func (in *injection) finish() error {
 	var firstErr error
-	removed := map[string]bool{}
+	gone := map[string]bool{}
 	for _, b := range in.binds {
 		err := b.finish()
-		maps.Copy(removed, b.removed)
+		maps.Copy(gone, b.removed)
 		if err != nil {
 			logf("CA write-back failed for %s: %v", b.containerDir, err)
 			if firstErr == nil {
@@ -221,7 +221,7 @@ func (in *injection) finish() error {
 		removeScratchDir(in.ownCADir)
 	}
 	// After the write-back, whose own result lands in the layer.
-	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssAppended, removed))
+	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssAppended, gone))
 	// After the sweep, which has by now emptied and removed the anchor files,
 	// so a directory the injection created is empty and can go.
 	removeCreatedDirs(in.rootfs, in.created)

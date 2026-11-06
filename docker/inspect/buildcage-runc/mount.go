@@ -449,8 +449,8 @@ func (b *dirBind) finish() error {
 	// for stripLayer to find: it only gets there when the write-back below
 	// copies it up. A copy it cannot strip goes back with the rest, for
 	// stripLayer to report once.
-	removed := map[string]bool{}
-	if _, err := sweepDir(b.scratchDir, b.scratchDir, b.ca, caMarksOf(b.ca), removed); err != nil && !errors.Is(err, errUnstrippableCA) {
+	_, removed, err := sweepDir(b.scratchDir, b.scratchDir, caMarksOf(b.ca), nil)
+	if err != nil && !errors.Is(err, errUnstrippableCA) {
 		return err
 	}
 
