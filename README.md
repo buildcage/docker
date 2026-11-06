@@ -1,4 +1,4 @@
-# Buildcage for Docker
+# buildcage/docker
 
 ![Buildcage](./assets/banner.png)
 
@@ -25,7 +25,7 @@ name, and anything else is blocked and reported.
 
 See [buildcage.github.io](https://buildcage.github.io/) for what it does and why. To isolate a
 workflow `run:` step rather than a Docker build, use
-[Buildcage for `run:` Steps](https://github.com/buildcage/isolated-run).
+[buildcage/isolated-run](https://github.com/buildcage/isolated-run).
 
 ## Contents
 
