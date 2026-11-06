@@ -81,11 +81,13 @@ func appendNSSSlot(path string, uid, gid int) ([]byte, error) {
 // A pkcs11.txt the step replaced with something other than a file carries no
 // slot. One the injection created is removed once it holds nothing else.
 func removeNSSSlot(path string, appended []byte, created bool) error {
+	// Checked before the open: the wrapper is root on the host, where opening a
+	// device node the step left reaches the host's device.
+	if info, err := os.Lstat(path); os.IsNotExist(err) || err == nil && !info.Mode().IsRegular() {
+		return nil
+	}
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) || errors.Is(asNotRegular(path, err), errNotRegular) {
-			return nil
-		}
 		return err
 	}
 	defer f.Close()
