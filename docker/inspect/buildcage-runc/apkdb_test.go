@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -57,40 +58,50 @@ func ownLogText() string {
 	return out.String()
 }
 
-func TestParseAPKRecordsReadsEachFilesChecksum(t *testing.T) {
+func TestParseAPKDatabaseReadsRecordsPackagesAndDirectories(t *testing.T) {
 	db := apkDB("Q1BUNDLE") +
 		"P:new\nf:S\nF:etc\nR:a\nZ:Q1NEW\n\n" +
-		"P:old\nF:etc\nR:b\nZ:Q1OLD\n"
-	got := parseAPKRecords([]byte(db))
+		"P:old\nF:etc\nR:b\nZ:Q1OLD\n\n" +
+		"P:empty\nV:1\n"
+	got := parseAPKDatabase([]byte(db))
 	want := map[string]apkRecord{
-		"lib/ld-musl.so.1":                  {value: "Q1AAAA"},
-		"etc/ssl/cert.pem":                  {value: "Q1LINK"},
-		"etc/ssl/certs/ca-certificates.crt": {value: "Q1BUNDLE"},
-		"etc/a":                             {value: "Q1NEW", truncatedSHA256: true},
-		"etc/b":                             {value: "Q1OLD"},
+		"lib/ld-musl.so.1":                  {value: "Q1AAAA", pkg: "musl"},
+		"etc/ssl/cert.pem":                  {value: "Q1LINK", pkg: "ca-certificates-bundle"},
+		"etc/ssl/certs/ca-certificates.crt": {value: "Q1BUNDLE", pkg: "ca-certificates-bundle"},
+		"etc/a":                             {value: "Q1NEW", truncatedSHA256: true, pkg: "new"},
+		"etc/b":                             {value: "Q1OLD", pkg: "old"},
 	}
-	if len(got) != len(want) {
-		t.Fatalf("got %v", got)
+	if len(got.records) != len(want) {
+		t.Fatalf("got %v", got.records)
 	}
 	for path, record := range want {
-		if got[path] != record {
-			t.Errorf("%s: got %+v, want %+v", path, got[path], record)
+		if got.records[path] != record {
+			t.Errorf("%s: got %+v, want %+v", path, got.records[path], record)
 		}
+	}
+	if files := got.packages["ca-certificates-bundle"]; !slices.Equal(files, []string{"etc/ssl/cert.pem", "etc/ssl/certs/ca-certificates.crt"}) {
+		t.Errorf("files: %v", files)
+	}
+	if files, ok := got.packages["empty"]; !ok || len(files) != 0 {
+		t.Errorf("a package with no files: %v, %v", files, ok)
+	}
+	if owners := got.dirOwners["etc"]; !slices.Equal(owners, []string{"new", "old"}) {
+		t.Errorf("owners of etc: %v", owners)
 	}
 }
 
 // A Z: line belongs to the R: line above it only until the record or the
 // directory ends.
-func TestParseAPKRecordsReadsZOnlyAfterItsFile(t *testing.T) {
+func TestParseAPKDatabaseReadsZOnlyAfterItsFile(t *testing.T) {
 	for _, db := range []string{
 		"F:etc\nR:a\n\nZ:Q1OLD\n",
 		"F:etc\nR:a\nF:usr\nZ:Q1OLD\n",
 	} {
-		if got := parseAPKRecords([]byte(db)); len(got) != 0 {
+		if got := parseAPKDatabase([]byte(db)).records; len(got) != 0 {
 			t.Errorf("%q gave %v", db, got)
 		}
 	}
-	if got := parseAPKRecords([]byte("F:etc\nR:a\nZ:Q1KEPT\nZ:Q1OLD\n")); got["etc/a"].value != "Q1KEPT" {
+	if got := parseAPKDatabase([]byte("F:etc\nR:a\nZ:Q1KEPT\nZ:Q1OLD\n")).records; got["etc/a"].value != "Q1KEPT" {
 		t.Errorf("got %v", got)
 	}
 }
@@ -138,7 +149,7 @@ func TestAPKChecksumOfFileRefusesWhatIsNotAFile(t *testing.T) {
 func TestReadDatabaseRefusesOneTooLargeToHold(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "installed")
 	mustSparseFile(t, path, maxCustomDirBytes+1)
-	if _, err := readDatabase(path); !errors.Is(err, errDatabaseTooLarge) {
+	if _, _, err := readDatabase(path); !errors.Is(err, errDatabaseTooLarge) {
 		t.Fatalf("got %v", err)
 	}
 }

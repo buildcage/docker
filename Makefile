@@ -23,7 +23,8 @@ BUILDER_IMAGE := buildcage-builder$(BUILDCAGE_WORKTREE_SUFFIX)
 QJS_TEST_IMAGE ?= buildcage-qjs-test$(BUILDCAGE_WORKTREE_SUFFIX)
 BYTE_EXACT_INSPECT := buildcage-byte-exact-inspect$(BUILDCAGE_WORKTREE_SUFFIX)
 BYTE_EXACT_UNIVERSAL := buildcage-byte-exact-universal$(BUILDCAGE_WORKTREE_SUFFIX)
-BYTE_EXACT_FIXTURES := test/Dockerfile.inspect-byte-exact test/Dockerfile.inspect-byte-exact-apk
+BYTE_EXACT_FIXTURES := test/Dockerfile.inspect-byte-exact test/Dockerfile.inspect-byte-exact-apk \
+  test/Dockerfile.inspect-byte-exact-apk-del test/Dockerfile.inspect-byte-exact-apk-rebuild
 SCRATCH_PREFIX ?= /tmp/buildcage$(BUILDCAGE_WORKTREE_SUFFIX)
 # Read by test/assert-listener-scope.sh, which names a Compose project of its own.
 export BUILDCAGE_WORKTREE_SUFFIX

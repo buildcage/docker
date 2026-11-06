@@ -96,8 +96,12 @@ type dirBind struct {
 	nssBase     string
 
 	// The bundles whose content before the CA went in matched apk's record of
-	// them (apkdb.go).
+	// them, and apk's database, for a bundle bind (apkdb.go).
 	apkRecorded map[string]bool
+	apk         *apkState
+	// The bundles an .apk-new was moved over: written as apk writes them, so
+	// they keep the mtime it left even when the content is the same.
+	apkReplaced map[string]bool
 }
 
 // groupTargetsByBind groups the CA targets by the directory whose mirror carries
@@ -416,7 +420,9 @@ func (b *dirBind) finish() error {
 	if err != nil {
 		return err
 	}
-	if manifestsEqual(current, b.baseline) {
+	// Removing the bundle's package leaves the mirror as it was, since apk
+	// keeps the bundle the CA changed.
+	if manifestsEqual(current, b.baseline) && !b.bundlePackageRemoved() {
 		return nil
 	}
 
@@ -447,11 +453,18 @@ func (b *dirBind) finish() error {
 			return err
 		}
 	}
+	var dropped []string
+	if b.apk != nil {
+		if dropped, err = b.dropRemovedBundles(current); err != nil {
+			return err
+		}
+	}
 
 	stripped, err := captureManifest(b.scratchDir)
 	if err != nil {
 		return err
 	}
+	stripped = slices.DeleteFunc(stripped, func(e fileEntry) bool { return b.apkReplaced[e.path] })
 	if err := restoreUnchangedMtimes(b.original, stripped, b.scratchDir); err != nil {
 		return err
 	}
@@ -470,7 +483,13 @@ func (b *dirBind) finish() error {
 		return fmt.Errorf("the step changed the CA store in %s and moved that directory away, leaving nowhere to write it back: %w", b.containerDir, err)
 	}
 
-	return writeBack(b.scratchDir, b.hostDir)
+	if err := writeBack(b.scratchDir, b.hostDir); err != nil {
+		return err
+	}
+	for _, dir := range dropped {
+		b.apk.removeEmptiedDirs(dir)
+	}
+	return nil
 }
 
 // coverKeystore adds the CA to a keystore at rel inside this bind's already-

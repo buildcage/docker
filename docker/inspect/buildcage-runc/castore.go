@@ -368,9 +368,30 @@ func findCertificates(w *fileWindow, ders [][]byte) ([]span, error) {
 		if !holdsAnyDER(block.Bytes, ders) {
 			continue
 		}
+		if end, err = withBlankLineAfter(w, begin, end); err != nil {
+			return nil, err
+		}
 		cuts = append(cuts, span{begin, end})
 	}
 	return cuts, nil
+}
+
+// withBlankLineAfter extends a cut to the blank line after it when a blank
+// line comes before it too, or when it starts the file. A bundle that
+// separates its certificates with blank lines, as Alpine's
+// update-ca-certificates writes one, then keeps one between the certificates
+// either side rather than gaining a second, and does not start with one.
+func withBlankLineAfter(w *fileWindow, begin, end int64) (int64, error) {
+	start := max(begin-2, 0)
+	// The bytes before the cut, the cut and the byte after it, in one read.
+	around, err := w.at(start, int(end-start)+1)
+	if err != nil || len(around) < int(end-start)+1 {
+		return end, err
+	}
+	if begin != 0 && string(around[:begin-start]) != "\n\n" || around[len(around)-1] != '\n' {
+		return end, nil
+	}
+	return end + 1, nil
 }
 
 // readPEMBlock decodes the block beginning at begin and returns it with the

@@ -1,0 +1,8 @@
+# Fixture for assert-inspect-byte-exact.sh, run beside Dockerfile.inspect-byte-exact.
+# apk removes a file under /etc on removal only where it matches its record,
+# and inspect adds its CA to the bundle for each step, so removing the bundle
+# package must still remove the bundle and the directories it leaves empty, here
+# with the database removed in the same step.
+FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+RUN apk del --no-cache apk-tools && rm -rf /lib/apk /etc/apk /var/log/apk.log
