@@ -907,15 +907,13 @@ from scratch. On SUSE, GnuTLS reads the certificate directory
 for the step and taken back out before the layer is committed.
 
 On Alpine, Wolfi and other images that install packages with apk, apk keeps a file under `/etc`
-that differs from its record of it and writes the package's version beside it as `.apk-new`. The
-bundle carries the CA while the step runs, so for the step its record in
-`/lib/apk/db/installed` is set to the bundle with the CA in it, when the image's bundle matched
-the record. The file is changed in place, not mounted over, so removing apk's files works as
-usual. An upgrade then replaces the bundle as it would under any engine, and the rest of that
-step no longer trusts the CA. A reinstall of the same version (`apk fix`) compares the bundle with
-the package instead and still writes `.apk-new`, which is removed after the step when it holds what
-the bundle holds without the CA. A bundle the image changed itself is kept, `.apk-new` and all, as
-apk keeps it anyway. After the step, each record apk did not replace is set back.
+that differs from what it compares it with and writes the package's version beside it as
+`.apk-new`. While the step runs the bundle carries the CA, so apk keeps it on an upgrade or a
+reinstall. After the step the `.apk-new` is moved over the bundle where apk would have replaced the
+bundle without the CA: the bundle, once the CA is out, is as it was before the step, and either
+matched apk's record in `/lib/apk/db/installed` (an upgrade compares with the record) or holds what
+the `.apk-new` holds (a reinstall compares with the package). A bundle the image or the step changed
+itself is kept with its `.apk-new` beside it, as apk keeps it under any engine.
 
 Neither the CA nor these variables are left in the image layers, and injection happens at exec time,
 so it cannot affect a cache key. [Limitations](../README.md#limitations) covers what this can't

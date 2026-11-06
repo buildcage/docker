@@ -8,8 +8,6 @@ FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4c
 # repository holds by the time this runs.
 RUN sed -i '/^P:ca-certificates-bundle$/,/^$/ s/^V:.*/V:0-r0/' /lib/apk/db/installed
 
-RUN apk upgrade --no-cache ca-certificates-bundle
-
-# Leaves apk's database alone, so its record, set for the step and set back
-# after, must not put a copy of it in this layer.
-RUN echo "no apk use here"
+# apk's log carries the time, and under inspect also the .apk-new the wrapper
+# moves into place after the step.
+RUN apk upgrade --no-cache ca-certificates-bundle && rm /var/log/apk.log

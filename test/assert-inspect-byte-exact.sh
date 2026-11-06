@@ -42,9 +42,9 @@ listing_of() {
   tar -tvf "$1" 2>/dev/null | sort
 }
 
-# apt/dpkg/apk/ldconfig write real wall-clock content into these regardless of
+# apt/dpkg/ldconfig write real wall-clock content into these regardless of
 # SOURCE_DATE_EPOCH, which only pins layer timestamps, not file content.
-NONDETERMINISTIC_PATHS='^(var/log/apt/[^ ]*|var/log/dpkg\.log|var/log/apk\.log|var/cache/ldconfig/aux-cache) '
+NONDETERMINISTIC_PATHS='^(var/log/apt/[^ ]*|var/log/dpkg\.log|var/cache/ldconfig/aux-cache) '
 
 # tar -tv has no content hash, only size, so regular files are separately
 # extracted and hashed.

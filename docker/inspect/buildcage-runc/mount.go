@@ -94,6 +94,10 @@ type dirBind struct {
 	nssAppended []byte
 	nssHadTxt   bool
 	nssBase     string
+
+	// The bundles whose content before the CA went in matched apk's record of
+	// them (apkdb.go).
+	apkRecorded map[string]bool
 }
 
 // groupTargetsByBind groups the CA targets by the directory whose mirror carries
@@ -439,7 +443,7 @@ func (b *dirBind) finish() error {
 	}
 
 	if !b.keystore && b.nssBase == "" {
-		if err := b.dropRedundantAPKNew(); err != nil {
+		if err := b.promoteAPKNew(); err != nil {
 			return err
 		}
 	}

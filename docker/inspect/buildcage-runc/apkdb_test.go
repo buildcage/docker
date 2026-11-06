@@ -1,12 +1,13 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 // apkDB is the shape of /lib/apk/db/installed: one record per package, each
@@ -17,15 +18,32 @@ func apkDB(bundleSum string) string {
 		"F:etc/ssl/certs\nR:ca-certificates.crt\nZ:" + bundleSum + "\n\n"
 }
 
+func sha1Record(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "f")
+	mustWriteFile(t, path, content)
+	sum, err := apkChecksumOfFile(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sum
+}
+
 // newAPKBundle is newBundle in an apk-based image whose database records the
 // store as the image ships it.
 func newAPKBundle(t *testing.T) (bundle, rootfs string) {
 	t.Helper()
 	bundle, rootfs = newBundle(t, []string{"PATH=/usr/bin"})
 	mustMkdirAll(t, filepath.Join(rootfs, "lib", "apk", "db"))
-	mustWriteFile(t, filepath.Join(rootfs, "lib", "apk", "db", "installed"), apkDB(apkChecksumOf([]byte("ORIGINAL-ROOTS\n"))))
+	mustWriteFile(t, dbPath(rootfs), apkDB(sha1Record(t, "ORIGINAL-ROOTS\n")))
 	return bundle, rootfs
 }
+
+func dbPath(rootfs string) string {
+	return filepath.Join(rootfs, "lib", "apk", "db", "installed")
+}
+
+func certsOf(rootfs string) string { return filepath.Join(rootfs, "etc", "ssl", "certs") }
 
 func mountSource(t *testing.T, bundle, dest string) string {
 	t.Helper()
@@ -33,500 +51,87 @@ func mountSource(t *testing.T, bundle, dest string) string {
 	return source
 }
 
-func TestAPKChecksumIsTheBase64SHA1ApkWrites(t *testing.T) {
-	// SHA-1("abc") is a9993e36...d0d89d.
-	sum := apkChecksumOf([]byte("abc"))
-	if sum != "Q1qZk+NkcGgWq6PiVxeFDCbJzQ2J0=" {
-		t.Fatalf("got %s", sum)
-	}
+func ownLogText() string {
+	var out strings.Builder
+	dumpOwnLog(&out)
+	return out.String()
 }
 
-func TestRewriteAPKChecksumsSwapsOnlyTheNamedFileWithTheGivenValue(t *testing.T) {
-	db := apkDB("Q1OLD")
-	swap := map[string]map[string]string{"etc/ssl/certs/ca-certificates.crt": {"Q1OLD": "Q1NEW"}}
-
-	got, changed := rewriteAPKChecksums([]byte(db), swap)
-	if !changed || string(got) != apkDB("Q1NEW") {
-		t.Fatalf("changed=%v\n%s", changed, got)
+func TestParseAPKRecordsReadsEachFilesChecksum(t *testing.T) {
+	db := apkDB("Q1BUNDLE") +
+		"P:new\nf:S\nF:etc\nR:a\nZ:Q1NEW\n\n" +
+		"P:old\nF:etc\nR:b\nZ:Q1OLD\n"
+	got := parseAPKRecords([]byte(db))
+	want := map[string]apkRecord{
+		"lib/ld-musl.so.1":                  {value: "Q1AAAA"},
+		"etc/ssl/cert.pem":                  {value: "Q1LINK"},
+		"etc/ssl/certs/ca-certificates.crt": {value: "Q1BUNDLE"},
+		"etc/a":                             {value: "Q1NEW", truncatedSHA256: true},
+		"etc/b":                             {value: "Q1OLD"},
 	}
-
-	// A file whose record holds another value, and the same name in another
-	// directory, are left alone.
-	for _, other := range []map[string]map[string]string{
-		{"etc/ssl/certs/ca-certificates.crt": {"Q1OTHER": "Q1NEW"}},
-		{"etc/ca-certificates.crt": {"Q1OLD": "Q1NEW"}},
-		{"etc/ssl/cert.pem": {"Q1OLD": "Q1NEW"}},
-	} {
-		if got, changed := rewriteAPKChecksums([]byte(db), other); changed || string(got) != db {
-			t.Errorf("%v changed the database:\n%s", other, got)
+	if len(got) != len(want) {
+		t.Fatalf("got %v", got)
+	}
+	for path, record := range want {
+		if got[path] != record {
+			t.Errorf("%s: got %+v, want %+v", path, got[path], record)
 		}
 	}
 }
 
 // A Z: line belongs to the R: line above it only until the record or the
-// directory ends, and a file without a trailing newline keeps that shape.
-func TestRewriteAPKChecksumsReadsZOnlyAfterItsFile(t *testing.T) {
-	swap := map[string]map[string]string{"etc/a": {"Q1OLD": "Q1NEW"}}
+// directory ends.
+func TestParseAPKRecordsReadsZOnlyAfterItsFile(t *testing.T) {
 	for _, db := range []string{
 		"F:etc\nR:a\n\nZ:Q1OLD\n",
 		"F:etc\nR:a\nF:usr\nZ:Q1OLD\n",
-		"F:etc\nR:a\nZ:Q1KEPT\nZ:Q1OLD\n",
 	} {
-		if _, changed := rewriteAPKChecksums([]byte(db), swap); changed {
-			t.Errorf("%q swapped a Z: line that is not the file's", db)
+		if got := parseAPKRecords([]byte(db)); len(got) != 0 {
+			t.Errorf("%q gave %v", db, got)
 		}
 	}
-	got, _ := rewriteAPKChecksums([]byte("F:etc\nR:a\nZ:Q1OLD"), swap)
-	if string(got) != "F:etc\nR:a\nZ:Q1NEW" {
-		t.Errorf("got %q", got)
+	if got := parseAPKRecords([]byte("F:etc\nR:a\nZ:Q1KEPT\nZ:Q1OLD\n")); got["etc/a"].value != "Q1KEPT" {
+		t.Errorf("got %v", got)
 	}
 }
 
-func dbPath(rootfs string) string {
-	return filepath.Join(rootfs, "lib", "apk", "db", "installed")
-}
-
-func TestInjectRecordsTheStoreWithTheCAForApk(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-	then := time.Date(2001, 2, 3, 4, 5, 6, 7, time.UTC)
-	if err := os.Chtimes(dbPath(rootfs), then, then); err != nil {
-		t.Fatal(err)
+func TestAPKChecksumOfFileIsWhatApkRecords(t *testing.T) {
+	// SHA-1("abc") is a9993e36...d0d89d.
+	if got := sha1Record(t, "abc"); got != "Q1qZk+NkcGgWq6PiVxeFDCbJzQ2J0=" {
+		t.Errorf("SHA-1: got %s", got)
 	}
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer restore.finish()
-
-	injected := mustRead(t, filepath.Join(mountSource(t, bundle, "/etc/ssl/certs"), "ca-certificates.crt"))
-	if !strings.Contains(injected, string(testCA)) {
-		t.Fatalf("the store mirror carries no CA: %q", injected)
-	}
-	if got, want := mustRead(t, dbPath(rootfs)), apkDB(apkChecksumOf([]byte(injected))); got != want {
-		t.Fatalf("the database does not record the store with the CA:\n%s", got)
-	}
-	if got := mustStatMtime(t, dbPath(rootfs)); !got.Equal(then) {
-		t.Errorf("the database's mtime moved to %v", got)
-	}
-	for _, m := range loadMounts(t, bundle) {
-		if dest, _ := m["destination"].(string); strings.HasPrefix(dest, "/lib") {
-			t.Errorf("mounted %s", dest)
-		}
+	path := filepath.Join(t.TempDir(), "f")
+	mustWriteFile(t, path, "abc")
+	full := sha256.Sum256([]byte("abc"))
+	got, err := apkChecksumOfFile(path, true)
+	if err != nil || got != "Q1"+base64.StdEncoding.EncodeToString(full[:20]) {
+		t.Errorf("truncated SHA-256: got %s, %v", got, err)
 	}
 }
 
-// What apk does on an upgrade once the record matches: replace the bundle and
-// the database, each by renaming a new file over it.
-func TestInjectKeepsTheBundleAndRecordApkReplaced(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	storeMirror := mountSource(t, bundle, "/etc/ssl/certs")
-	mustWriteFile(t, filepath.Join(storeMirror, ".apk.tmp"), "NEW-ROOTS\n")
-	if err := os.Rename(filepath.Join(storeMirror, ".apk.tmp"), filepath.Join(storeMirror, "ca-certificates.crt")); err != nil {
-		t.Fatal(err)
-	}
-	upgraded := apkDB(apkChecksumOf([]byte("NEW-ROOTS\n")))
-	mustWriteFile(t, dbPath(rootfs)+".new", upgraded)
-	if err := os.Rename(dbPath(rootfs)+".new", dbPath(rootfs)); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := restore.finish(); err != nil {
-		t.Fatal(err)
-	}
-
-	if got := mustRead(t, filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt")); got != "NEW-ROOTS\n" {
-		t.Errorf("store: %q", got)
-	}
-	if got := mustRead(t, dbPath(rootfs)); got != upgraded {
-		t.Errorf("database:\n%s", got)
-	}
-}
-
-// apk rewrites the whole database for any package it adds, carrying the
-// bundle's record over as it read it; that record goes back to the one
-// without the CA, and the mtime apk left stays.
-func TestInjectGivesBackTheRecordOfABundleApkLeftAlone(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustAppendFile(t, dbPath(rootfs), "P:jq\nV:1.8-r0\n\n")
-	rewritten := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
-	if err := os.Chtimes(dbPath(rootfs), rewritten, rewritten); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := restore.finish(); err != nil {
-		t.Fatal(err)
-	}
-
-	want := apkDB(apkChecksumOf([]byte("ORIGINAL-ROOTS\n"))) + "P:jq\nV:1.8-r0\n\n"
-	if got := mustRead(t, dbPath(rootfs)); got != want {
-		t.Errorf("database:\n%s", got)
-	}
-	if got := mustStatMtime(t, dbPath(rootfs)); !got.Equal(rewritten) {
-		t.Errorf("mtime %v, want the %v apk left", got, rewritten)
-	}
-}
-
-// A database the step never touched goes back to its content and mtime, so a
-// layer differ that compares them commits no copy of it.
-func TestInjectLeavesAnUntouchedDatabaseAsItWas(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-	then := time.Date(2001, 2, 3, 4, 5, 6, 7, time.UTC)
-	if err := os.Chtimes(dbPath(rootfs), then, then); err != nil {
-		t.Fatal(err)
-	}
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := restore.finish(); err != nil {
-		t.Fatal(err)
-	}
-
-	if got := mustRead(t, dbPath(rootfs)); got != apkDB(apkChecksumOf([]byte("ORIGINAL-ROOTS\n"))) {
-		t.Errorf("database:\n%s", got)
-	}
-	if got := mustStatMtime(t, dbPath(rootfs)); !got.Equal(then) {
-		t.Errorf("mtime %v, want %v", got, then)
-	}
-}
-
-// A database the step removed has no record left to give back.
-func TestInjectLeavesADatabaseTheStepRemovedRemoved(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.RemoveAll(filepath.Join(rootfs, "lib", "apk")); err != nil {
-		t.Fatal(err)
-	}
-	if err := restore.finish(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(dbPath(rootfs)); !os.IsNotExist(err) {
-		t.Errorf("the database is back: %v", err)
-	}
-}
-
-// The wrapper runs as root on the host, so a symlink the step left on the way
-// to the database is followed only inside the rootfs: one leading out finds no
-// database there, and a loop fails the step.
-func TestInjectRefusesADatabaseTheStepSwappedForASymlink(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		swap func(t *testing.T, rootfs, outside string)
-		want error
-	}{
-		{"the file", func(t *testing.T, rootfs, outside string) {
-			mustSymlink(t, outside, dbPath(rootfs))
-		}, nil},
-		{"a directory above it", func(t *testing.T, rootfs, _ string) {
-			if err := os.RemoveAll(filepath.Join(rootfs, "lib")); err != nil {
-				t.Fatal(err)
-			}
-			mustSymlink(t, "lib-loop", filepath.Join(rootfs, "lib"))
-			mustSymlink(t, "lib", filepath.Join(rootfs, "lib-loop"))
-		}, errTooManySymlinks},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			useTempLog(t)
-			useFakeRsync(t)
-			bundle, rootfs := newAPKBundle(t)
-			outside := filepath.Join(t.TempDir(), "host-file")
-			mustWriteFile(t, outside, apkDB("Q1ANY"))
-
-			restore, err := inject(bundle, testCA)
-			if err != nil {
-				t.Fatal(err)
-			}
-			tc.swap(t, rootfs, outside)
-
-			if err := restore.finish(); !errors.Is(err, tc.want) {
-				t.Fatalf("got %v", err)
-			}
-			if got := mustRead(t, outside); got != apkDB("Q1ANY") {
-				t.Errorf("the file the symlink names was written: %q", got)
-			}
-		})
-	}
-}
-
-// A bundle the image changed itself is one apk keeps on an upgrade, CA or no
-// CA, so its record is left as it is.
-func TestInjectLeavesTheRecordOfABundleTheImageChanged(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-	mustAppendFile(t, filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt"), "COMPANY-CA\n")
-	before := mustRead(t, dbPath(rootfs))
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer restore.finish()
-
-	if got := mustRead(t, dbPath(rootfs)); got != before {
-		t.Fatalf("the database was changed:\n%s", got)
-	}
-}
-
-// A bundle a variable names but the image does not ship has no record to
-// match; the store beside it still gets its own.
-func TestInjectSkipsABundleThatWasNotThereBefore(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-	mustMkdirAll(t, filepath.Join(rootfs, "opt"))
-	s, err := loadSpec(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.raw["process"] = map[string]any{"env": toAny([]string{"GIT_SSL_CAINFO=/opt/git-ca.pem"})}
-	if err := s.save(); err != nil {
-		t.Fatal(err)
-	}
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer restore.finish()
-
-	injected := mustRead(t, filepath.Join(mountSource(t, bundle, "/etc/ssl/certs"), "ca-certificates.crt"))
-	if got := mustRead(t, dbPath(rootfs)); got != apkDB(apkChecksumOf([]byte(injected))) {
-		t.Fatalf("database:\n%s", got)
-	}
-}
-
-// A database that cannot be written fails the step before it runs: the write
-// may have stopped partway.
-func TestInjectRefusesAStepWhoseDatabaseItCannotWrite(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-	old := changeTimes
-	changeTimes = func(path string, a, m time.Time) error {
-		if path == dbPath(rootfs) {
-			return errBrokenFile
-		}
-		return old(path, a, m)
-	}
-	t.Cleanup(func() { changeTimes = old })
-
-	if _, err := inject(bundle, testCA); !errors.Is(err, errBrokenFile) {
-		t.Fatalf("got %v", err)
-	}
-	if mounts := loadMounts(t, bundle); len(mounts) != 0 {
-		t.Errorf("the spec was saved with %v", mounts)
-	}
-}
-
-func TestPlaceAPKRecordsLeavesTheRecordsAloneWhenItCannotSetThem(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		arrange func(t *testing.T, bundle, rootfs string)
-		want    string
-	}{
-		{"unresolvable path", func(t *testing.T, _, rootfs string) {
-			if err := os.RemoveAll(filepath.Join(rootfs, "lib")); err != nil {
-				t.Fatal(err)
-			}
-			mustSymlink(t, "lib-loop", filepath.Join(rootfs, "lib"))
-			mustSymlink(t, "lib", filepath.Join(rootfs, "lib-loop"))
-		}, "cannot resolve " + apkDBPath},
-		{"unreadable database", func(t *testing.T, _, rootfs string) {
-			if err := os.Remove(dbPath(rootfs)); err != nil {
-				t.Fatal(err)
-			}
-			mustMkdirAll(t, dbPath(rootfs))
-		}, "cannot read apk's database"},
-		{"a mount over it", func(t *testing.T, bundle, _ string) {
-			s, err := loadSpec(bundle)
-			if err != nil {
-				t.Fatal(err)
-			}
-			s.addBindMount("/lib/apk", "/cache")
-			if err := s.save(); err != nil {
-				t.Fatal(err)
-			}
-		}, "a mount already covers /lib/apk/db/installed"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			useTempLog(t)
-			useFakeRsync(t)
-			bundle, rootfs := newAPKBundle(t)
-			b := storeBind(t, bundle, rootfs)
-			tc.arrange(t, bundle, rootfs)
-			s, err := loadSpec(bundle)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if got, err := placeAPKRecords(s, []*dirBind{b}); got != nil || err != nil {
-				t.Fatalf("got %v, %v", got, err)
-			}
-			var out strings.Builder
-			dumpOwnLog(&out)
-			if !strings.Contains(out.String(), tc.want) {
-				t.Errorf("%q is not in the log:\n%s", tc.want, out.String())
-			}
-		})
-	}
-}
-
-// storeBind is the store's bind as inject leaves it, mirrored with the CA in.
-func storeBind(t *testing.T, bundle, rootfs string) *dirBind {
-	t.Helper()
-	s, err := loadSpec(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b := prepareBind(s, bundle, filepath.Join(rootfs, "etc", "ssl", "certs"), []string{"ca-certificates.crt"}, testCA, mirrorLimit{}, false)
-	if b == nil {
-		t.Fatal("the store could not be bound")
-	}
-	t.Cleanup(b.cleanup)
-	return b
-}
-
-func TestPlaceAPKRecordsLeavesTheRecordsAloneWhenABundleCannotBeRead(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		arrange func(t *testing.T, b *dirBind)
-	}{
-		{"before the CA", func(t *testing.T, b *dirBind) {
-			path := filepath.Join(b.hostDir, "ca-certificates.crt")
-			if err := os.Remove(path); err != nil {
-				t.Fatal(err)
-			}
-			mustSymlink(t, "elsewhere", path)
-		}},
-		{"with the CA", func(t *testing.T, b *dirBind) {
-			if err := os.Remove(filepath.Join(b.scratchDir, "ca-certificates.crt")); err != nil {
-				t.Fatal(err)
-			}
-		}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			useTempLog(t)
-			useFakeRsync(t)
-			bundle, rootfs := newAPKBundle(t)
-			b := storeBind(t, bundle, rootfs)
-			tc.arrange(t, b)
-			s, err := loadSpec(bundle)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if got, err := placeAPKRecords(s, []*dirBind{b}); got != nil || err != nil {
-				t.Fatalf("got %v, %v", got, err)
-			}
-			var out strings.Builder
-			dumpOwnLog(&out)
-			if want := "cannot compare the CA bundles with apk's records"; !strings.Contains(out.String(), want) {
-				t.Errorf("%q is not in the log:\n%s", want, out.String())
-			}
-		})
-	}
-}
-
-// A database the step grew past what a real one holds fails the step rather
-// than being read into memory to give the records back.
-func TestInjectFailsOnADatabaseTheStepGrewTooLarge(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustSparseFile(t, dbPath(rootfs), maxCustomDirBytes+1)
-	if err := restore.finish(); !errors.Is(err, errDatabaseTooLarge) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-// Keystores and the NSS database are not files apk records.
-func TestAPKChecksumsForSkipsKeystoresAndTheNSSDatabase(t *testing.T) {
-	sums, err := apkChecksumsFor([]byte(apkDB("Q1ANY")), []*dirBind{
-		{keystore: true, hostDir: "/nonexistent", bundleFiles: []string{"cacerts"}},
-		{nssBase: "/nonexistent", hostDir: "/nonexistent", bundleFiles: []string{"pkcs11.txt"}},
-	})
-	if err != nil || sums != nil {
-		t.Fatalf("got %v, %v", sums, err)
-	}
-}
-
-func TestGuardedAccessRefusesWhatIsNotAFile(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		broken brokenFile
-		write  bool
-	}{
-		{"read, failed stat", brokenFile{failStat: true}, false},
-		{"read, not a file", brokenFile{notRegular: true}, false},
-		{"write, failed stat", brokenFile{failStat: true}, true},
-		{"write, not a file", brokenFile{notRegular: true}, true},
-		{"write, failed truncate", brokenFile{failTruncate: true}, true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "installed")
-			mustWriteFile(t, path, "x")
-			useBrokenBundleFile(t, &tc.broken)
-			var err error
-			if tc.write {
-				err = writeDatabase(path, []byte("y"))
-			} else {
-				_, err = readDatabase(path)
-			}
-			if err == nil {
-				t.Fatal("succeeded")
-			}
-			if got := mustRead(t, path); got != "x" {
-				t.Errorf("the file was written: %q", got)
-			}
-		})
-	}
-}
-
-func TestGuardedAccessRefusesASymlink(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "installed")
+func TestAPKChecksumOfFileRefusesWhatIsNotAFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bundle")
 	mustWriteFile(t, path, "x")
 	link := filepath.Join(t.TempDir(), "link")
 	mustSymlink(t, path, link)
-	if err := writeDatabase(link, []byte("y")); !errors.Is(err, errNotRegular) {
-		t.Errorf("write: got %v", err)
+	if _, err := apkChecksumOfFile(link, false); !errors.Is(err, errNotRegular) {
+		t.Errorf("symlink: got %v", err)
 	}
-	if _, err := apkChecksumOfFile(link); !errors.Is(err, errNotRegular) {
-		t.Errorf("checksum: got %v", err)
-	}
-	if got := mustRead(t, path); got != "x" {
-		t.Errorf("the file was written: %q", got)
-	}
-}
-
-func TestAPKChecksumOfFileReportsAFailedRead(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "bundle")
-	mustWriteFile(t, path, "x")
-	useBrokenBundleFile(t, &brokenFile{failReadAt: 1})
-	if _, err := apkChecksumOfFile(path); !errors.Is(err, errBrokenFile) {
-		t.Fatalf("got %v", err)
+	for _, tc := range []struct {
+		name   string
+		broken brokenFile
+		want   error
+	}{
+		{"failed stat", brokenFile{failStat: true}, errBrokenFile},
+		{"not a file", brokenFile{notRegular: true}, errNotRegular},
+		{"failed read", brokenFile{failReadAt: 1}, errBrokenFile},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			useBrokenBundleFile(t, &tc.broken)
+			if _, err := apkChecksumOfFile(path, false); !errors.Is(err, tc.want) {
+				t.Fatalf("got %v", err)
+			}
+		})
 	}
 }
 
@@ -538,107 +143,230 @@ func TestReadDatabaseRefusesOneTooLargeToHold(t *testing.T) {
 	}
 }
 
-// What apk does on a reinstall: keep the bundle carrying the CA and write the
-// package's copy beside it. Without the CA it would have rewritten the bundle
-// with that same content.
-func TestInjectRemovesAnAPKNewHoldingWhatTheBundleHoldsWithoutTheCA(t *testing.T) {
-	useTempLog(t)
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-
+// stepLeaves runs inject, lets the step leave content at each name in the
+// store's mirror, and finishes.
+func stepLeaves(t *testing.T, bundle string, files map[string]string) error {
+	t.Helper()
 	restore, err := inject(bundle, testCA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustWriteFile(t, filepath.Join(mountSource(t, bundle, "/etc/ssl/certs"), "ca-certificates.crt.apk-new"), "ORIGINAL-ROOTS\n")
-	if err := restore.finish(); err != nil {
+	mirror := mountSource(t, bundle, "/etc/ssl/certs")
+	for name, content := range files {
+		mustWriteFile(t, filepath.Join(mirror, name), content)
+	}
+	return restore.finish()
+}
+
+// An upgrade under any engine replaces a bundle that matches apk's record; the
+// CA kept it from matching, so its .apk-new goes into place.
+func TestInjectMovesTheAPKNewOfAnUpgradeIntoPlace(t *testing.T) {
+	useTempLog(t)
+	useFakeRsync(t)
+	bundle, rootfs := newAPKBundle(t)
+
+	if err := stepLeaves(t, bundle, map[string]string{"ca-certificates.crt.apk-new": "NEW-ROOTS\n"}); err != nil {
 		t.Fatal(err)
 	}
 
-	certs := filepath.Join(rootfs, "etc", "ssl", "certs")
-	if _, err := os.Lstat(filepath.Join(certs, "ca-certificates.crt.apk-new")); !os.IsNotExist(err) {
-		t.Errorf("the .apk-new is still there: %v", err)
-	}
-	if got := mustRead(t, filepath.Join(certs, "ca-certificates.crt")); got != "ORIGINAL-ROOTS\n" {
+	if got := mustRead(t, filepath.Join(certsOf(rootfs), "ca-certificates.crt")); got != "NEW-ROOTS\n" {
 		t.Errorf("store: %q", got)
 	}
-	var out strings.Builder
-	dumpOwnLog(&out)
-	if want := "removed /etc/ssl/certs/ca-certificates.crt.apk-new"; !strings.Contains(out.String(), want) {
-		t.Errorf("%q is not in the log:\n%s", want, out.String())
+	if _, err := os.Lstat(filepath.Join(certsOf(rootfs), "ca-certificates.crt.apk-new")); !os.IsNotExist(err) {
+		t.Errorf("the .apk-new is still there: %v", err)
+	}
+	if want := "moved /etc/ssl/certs/ca-certificates.crt.apk-new over /etc/ssl/certs/ca-certificates.crt"; !strings.Contains(ownLogText(), want) {
+		t.Errorf("%q is not in the log:\n%s", want, ownLogText())
 	}
 }
 
-// An .apk-new apk would have left without the CA too, one the image already
-// had, and one that is not a file all stay.
-func TestInjectKeepsAnAPKNewApkWouldHaveLeftAnyway(t *testing.T) {
+// A package built as apk v3 records truncated SHA-256 values.
+func TestInjectMatchesATruncatedSHA256Record(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newAPKBundle(t)
+	full := sha256.Sum256([]byte("ORIGINAL-ROOTS\n"))
+	db := strings.Replace(apkDB("Q1"+base64.StdEncoding.EncodeToString(full[:20])), "V:20260909-r0\n", "V:20260909-r0\nf:S\n", 1)
+	mustWriteFile(t, dbPath(rootfs), db)
+
+	if err := stepLeaves(t, bundle, map[string]string{"ca-certificates.crt.apk-new": "NEW-ROOTS\n"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustRead(t, filepath.Join(certsOf(rootfs), "ca-certificates.crt")); got != "NEW-ROOTS\n" {
+		t.Errorf("store: %q", got)
+	}
+}
+
+// A reinstall compares the bundle with the package's file, which the .apk-new
+// holds, so with no record to match the .apk-new still goes into place when
+// it holds what the bundle held.
+func TestInjectMovesTheAPKNewOfAReinstallIntoPlace(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+
+	if err := stepLeaves(t, bundle, map[string]string{"ca-certificates.crt.apk-new": "ORIGINAL-ROOTS\n"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustRead(t, filepath.Join(certsOf(rootfs), "ca-certificates.crt")); got != "ORIGINAL-ROOTS\n" {
+		t.Errorf("store: %q", got)
+	}
+	if _, err := os.Lstat(filepath.Join(certsOf(rootfs), "ca-certificates.crt.apk-new")); !os.IsNotExist(err) {
+		t.Errorf("the .apk-new is still there: %v", err)
+	}
+}
+
+// apk keeps these under any engine, so they stay.
+func TestInjectLeavesAnAPKNewApkWouldHaveLeftAnyway(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
-		before  func(t *testing.T, certs string)
-		arrange func(t *testing.T, mirror string)
+		arrange func(t *testing.T, rootfs string)
+		step    func(t *testing.T, mirror string)
 	}{
-		{"different content", nil, func(t *testing.T, mirror string) {
-			mustWriteFile(t, filepath.Join(mirror, "ca-certificates.crt.apk-new"), "NEW-ROOTS\n")
+		{"a bundle the image changed", func(t *testing.T, rootfs string) {
+			mustAppendFile(t, filepath.Join(certsOf(rootfs), "ca-certificates.crt"), "COMPANY-CA\n")
+		}, nil},
+		{"a bundle the step changed", nil, func(t *testing.T, mirror string) {
+			mustAppendFile(t, filepath.Join(mirror, "ca-certificates.crt"), "COMPANY-CA\n")
 		}},
-		{"already in the image", func(t *testing.T, certs string) {
-			mustWriteFile(t, filepath.Join(certs, "ca-certificates.crt.apk-new"), "ORIGINAL-ROOTS\n")
+		{"an .apk-new the image had", func(t *testing.T, rootfs string) {
+			mustWriteFile(t, filepath.Join(certsOf(rootfs), "ca-certificates.crt.apk-new"), "NEW-ROOTS\n")
 		}, func(t *testing.T, mirror string) {
 			mustWriteFile(t, filepath.Join(mirror, "other"), "")
 		}},
-		{"a symlink", nil, func(t *testing.T, mirror string) {
-			mustSymlink(t, "ca-certificates.crt", filepath.Join(mirror, "ca-certificates.crt.apk-new"))
+		{"a bundle the step removed", nil, func(t *testing.T, mirror string) {
+			if err := os.Remove(filepath.Join(mirror, "ca-certificates.crt")); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"a bundle the step left as a symlink", nil, func(t *testing.T, mirror string) {
+			mustSymlink(t, "ca-certificates.crt.apk-new", filepath.Join(mirror, "ca-certificates.crt"))
+		}},
+		{"an .apk-new that is a symlink", nil, func(t *testing.T, mirror string) {
+			mustSymlink(t, "elsewhere", filepath.Join(mirror, "ca-certificates.crt.apk-new"))
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			useFakeRsync(t)
 			bundle, rootfs := newAPKBundle(t)
-			certs := filepath.Join(rootfs, "etc", "ssl", "certs")
-			if tc.before != nil {
-				tc.before(t, certs)
+			if tc.arrange != nil {
+				tc.arrange(t, rootfs)
 			}
 			restore, err := inject(bundle, testCA)
 			if err != nil {
 				t.Fatal(err)
 			}
-			tc.arrange(t, mountSource(t, bundle, "/etc/ssl/certs"))
+			mirror := mountSource(t, bundle, "/etc/ssl/certs")
+			if _, err := os.Lstat(filepath.Join(mirror, "ca-certificates.crt.apk-new")); os.IsNotExist(err) {
+				mustWriteFile(t, filepath.Join(mirror, "ca-certificates.crt.apk-new"), "NEW-ROOTS\n")
+			}
+			if tc.step != nil {
+				tc.step(t, mirror)
+			}
 			if err := restore.finish(); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := os.Lstat(filepath.Join(certs, "ca-certificates.crt.apk-new")); err != nil {
+			if _, err := os.Lstat(filepath.Join(certsOf(rootfs), "ca-certificates.crt.apk-new")); err != nil {
 				t.Errorf("the .apk-new is gone: %v", err)
 			}
 		})
 	}
 }
 
-// The step removed the bundle and left only the .apk-new: nothing to compare.
-func TestInjectKeepsAnAPKNewBesideARemovedBundle(t *testing.T) {
-	useFakeRsync(t)
-	bundle, rootfs := newAPKBundle(t)
-
-	restore, err := inject(bundle, testCA)
-	if err != nil {
+// A bundle the image shipped as something other than a file, or did not ship,
+// is not one apk would replace either.
+func TestPromoteAPKNewLeavesABundleThatWasNotAFile(t *testing.T) {
+	scratch := t.TempDir()
+	mustWriteFile(t, filepath.Join(scratch, "bundle.pem.apk-new"), "NEW\n")
+	mustWriteFile(t, filepath.Join(scratch, "absent.pem.apk-new"), "NEW\n")
+	b := &dirBind{scratchDir: scratch, bundleFiles: []string{"bundle.pem", "absent.pem"},
+		apkRecorded: map[string]bool{"bundle.pem": true, "absent.pem": true},
+		original:    []fileEntry{{path: "bundle.pem", mode: os.ModeSymlink}}}
+	if err := b.promoteAPKNew(); err != nil {
 		t.Fatal(err)
 	}
-	mirror := mountSource(t, bundle, "/etc/ssl/certs")
-	if err := os.Remove(filepath.Join(mirror, "ca-certificates.crt")); err != nil {
-		t.Fatal(err)
-	}
-	mustWriteFile(t, filepath.Join(mirror, "ca-certificates.crt.apk-new"), "ORIGINAL-ROOTS\n")
-	if err := restore.finish(); err != nil {
-		t.Fatal(err)
-	}
-	if got := mustRead(t, filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt.apk-new")); got != "ORIGINAL-ROOTS\n" {
-		t.Errorf("got %q", got)
+	for _, name := range []string{"bundle.pem.apk-new", "absent.pem.apk-new"} {
+		if got := mustRead(t, filepath.Join(scratch, name)); got != "NEW\n" {
+			t.Errorf("%s: got %q", name, got)
+		}
 	}
 }
 
-func TestDropRedundantAPKNewReportsWhatItCannotRead(t *testing.T) {
+func TestNoteAPKRecordsSkipsWhatItCannotRead(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		arrange func(t *testing.T, rootfs string)
+		want    string
+	}{
+		{"unresolvable path", func(t *testing.T, rootfs string) {
+			if err := os.RemoveAll(filepath.Join(rootfs, "lib")); err != nil {
+				t.Fatal(err)
+			}
+			mustSymlink(t, "lib-loop", filepath.Join(rootfs, "lib"))
+			mustSymlink(t, "lib", filepath.Join(rootfs, "lib-loop"))
+		}, "cannot resolve " + apkDBPath},
+		{"unreadable database", func(t *testing.T, rootfs string) {
+			if err := os.Remove(dbPath(rootfs)); err != nil {
+				t.Fatal(err)
+			}
+			mustMkdirAll(t, dbPath(rootfs))
+		}, "cannot read apk's database"},
+		{"unreadable bundle", func(t *testing.T, rootfs string) {
+			path := filepath.Join(certsOf(rootfs), "ca-certificates.crt")
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			mustMkdirAll(t, path)
+		}, "cannot compare /etc/ssl/certs/ca-certificates.crt with apk's record"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			useTempLog(t)
+			_, rootfs := newAPKBundle(t)
+			tc.arrange(t, rootfs)
+			b := &dirBind{hostDir: certsOf(rootfs), containerDir: "/etc/ssl/certs", bundleFiles: []string{"ca-certificates.crt"}}
+
+			noteAPKRecords(rootfs, []*dirBind{b})
+			if b.apkRecorded != nil {
+				t.Errorf("recorded %v", b.apkRecorded)
+			}
+			if !strings.Contains(ownLogText(), tc.want) {
+				t.Errorf("%q is not in the log:\n%s", tc.want, ownLogText())
+			}
+		})
+	}
+}
+
+// Keystores, the NSS database, a file apk has no record of, a bundle that does
+// not match its record and one the image does not ship are not marked.
+func TestNoteAPKRecordsMarksOnlyBundlesMatchingTheirRecord(t *testing.T) {
+	useTempLog(t)
+	_, rootfs := newAPKBundle(t)
+	mustWriteFile(t, filepath.Join(certsOf(rootfs), "other.pem"), "OTHER\n")
+	mustWriteFile(t, filepath.Join(certsOf(rootfs), "changed.pem"), "CHANGED\n")
+	mustWriteFile(t, dbPath(rootfs), apkDB(sha1Record(t, "ORIGINAL-ROOTS\n"))+
+		"P:x\nF:etc/ssl/certs\nR:gone.pem\nZ:Q1GONE\nR:changed.pem\nZ:Q1SHIPPED\n")
+	store := &dirBind{hostDir: certsOf(rootfs), containerDir: "/etc/ssl/certs",
+		bundleFiles: []string{"ca-certificates.crt", "other.pem", "gone.pem", "changed.pem"}}
+	keystore := &dirBind{keystore: true, hostDir: certsOf(rootfs), containerDir: "/etc/ssl/certs", bundleFiles: []string{"ca-certificates.crt"}}
+	nss := &dirBind{nssBase: "/n", hostDir: certsOf(rootfs), containerDir: "/etc/ssl/certs", bundleFiles: []string{"ca-certificates.crt"}}
+
+	noteAPKRecords(rootfs, []*dirBind{store, keystore, nss})
+	if len(store.apkRecorded) != 1 || !store.apkRecorded["ca-certificates.crt"] {
+		t.Errorf("store: %v", store.apkRecorded)
+	}
+	if keystore.apkRecorded != nil || nss.apkRecorded != nil {
+		t.Errorf("keystore %v, nss %v", keystore.apkRecorded, nss.apkRecorded)
+	}
+	if strings.Contains(ownLogText(), "cannot compare") {
+		t.Errorf("a missing bundle was logged:\n%s", ownLogText())
+	}
+}
+
+func TestPromoteAPKNewReportsWhatItCannotRead(t *testing.T) {
 	t.Run("a path through a file", func(t *testing.T) {
 		scratch := t.TempDir()
 		mustWriteFile(t, filepath.Join(scratch, "sub"), "")
-		b := &dirBind{scratchDir: scratch, bundleFiles: []string{"sub/bundle.pem"}}
-		if err := b.dropRedundantAPKNew(); err == nil {
+		b := &dirBind{scratchDir: scratch, bundleFiles: []string{"sub/bundle.pem"},
+			original: []fileEntry{{path: "sub/bundle.pem"}}}
+		if err := b.promoteAPKNew(); err == nil {
 			t.Fatal("succeeded")
 		}
 	})
@@ -647,82 +375,33 @@ func TestDropRedundantAPKNewReportsWhatItCannotRead(t *testing.T) {
 			skipIfRoot(t)
 			scratch := t.TempDir()
 			mustWriteFile(t, filepath.Join(scratch, "bundle.pem"), "x")
-			mustWriteFile(t, filepath.Join(scratch, "bundle.pem.apk-new"), "x")
+			mustWriteFile(t, filepath.Join(scratch, "bundle.pem.apk-new"), "y")
+			before, err := hashFile(filepath.Join(scratch, "bundle.pem"))
+			if err != nil {
+				t.Fatal(err)
+			}
 			if err := os.Chmod(filepath.Join(scratch, unreadable), 0); err != nil {
 				t.Fatal(err)
 			}
-			b := &dirBind{scratchDir: scratch, bundleFiles: []string{"bundle.pem"}}
-			if err := b.dropRedundantAPKNew(); !errors.Is(err, os.ErrPermission) {
+			b := &dirBind{scratchDir: scratch, bundleFiles: []string{"bundle.pem"},
+				original: []fileEntry{{path: "bundle.pem", sha256: before}}}
+			if err := b.promoteAPKNew(); !errors.Is(err, os.ErrPermission) {
 				t.Fatalf("got %v", err)
 			}
 		})
 	}
 }
 
-// A failure removing the .apk-new fails the step, which would otherwise commit
-// the bundle beside a copy apk would not have left.
-func TestInjectFailsWhenItCannotRemoveTheAPKNew(t *testing.T) {
+// A failed move fails the step, which would otherwise commit the bundle apk
+// would have replaced.
+func TestInjectFailsWhenItCannotMoveTheAPKNew(t *testing.T) {
 	useFakeRsync(t)
 	bundle, _ := newAPKBundle(t)
+	old := renameFile
+	renameFile = func(string, string) error { return errBrokenFile }
+	t.Cleanup(func() { renameFile = old })
 
-	restore, err := inject(bundle, testCA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	apkNew := filepath.Join(mountSource(t, bundle, "/etc/ssl/certs"), "ca-certificates.crt.apk-new")
-	mustWriteFile(t, apkNew, "ORIGINAL-ROOTS\n")
-	failed := false
-	old := removeFile
-	removeFile = func(path string) error {
-		if path == apkNew && !failed {
-			failed = true
-			return errBrokenFile
-		}
-		return old(path)
-	}
-	t.Cleanup(func() { removeFile = old })
-
-	if err := restore.finish(); !errors.Is(err, errBrokenFile) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-// Swapping a record is not apk rewriting the database, so its mtime stays for
-// the write-back to tell the two apart.
-func TestWriteDatabaseKeepsTheMtime(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "installed")
-	mustWriteFile(t, path, "Z:Q1OLD\n")
-	then := time.Date(2001, 2, 3, 4, 5, 6, 7, time.UTC)
-	if err := os.Chtimes(path, then, then); err != nil {
-		t.Fatal(err)
-	}
-	if err := writeDatabase(path, []byte("Z:Q1NEW\n")); err != nil {
-		t.Fatal(err)
-	}
-	if got := mustRead(t, path); got != "Z:Q1NEW\n" {
-		t.Errorf("content: %q", got)
-	}
-	if got := mustStatMtime(t, path); !got.Equal(then) {
-		t.Errorf("mtime %v, want %v", got, then)
-	}
-}
-
-func TestWriteDatabaseReportsAFailedWrite(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "installed")
-	mustWriteFile(t, path, "x")
-	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
-	if err := writeDatabase(path, []byte("y")); !errors.Is(err, errBrokenFile) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestWriteDatabaseReportsAnMtimeItCannotKeep(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "installed")
-	mustWriteFile(t, path, "x")
-	old := changeTimes
-	changeTimes = func(string, time.Time, time.Time) error { return errBrokenFile }
-	t.Cleanup(func() { changeTimes = old })
-	if err := writeDatabase(path, []byte("y")); !errors.Is(err, errBrokenFile) {
+	if err := stepLeaves(t, bundle, map[string]string{"ca-certificates.crt.apk-new": "NEW-ROOTS\n"}); !errors.Is(err, errBrokenFile) {
 		t.Fatalf("got %v", err)
 	}
 }

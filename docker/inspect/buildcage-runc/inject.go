@@ -188,8 +188,6 @@ type injection struct {
 	created  createdDirs
 	// What the NSS mirror's pkcs11.txt gained, if there is one.
 	nssAppended []byte
-	// apk's database, when its records of the bundles were set for the step.
-	apkRecords *apkRecords
 	// The step's layer as found when the injection began, kept rather than
 	// recomputed at finish: a transient mount-table read failure there would
 	// otherwise report no layer and commit the anchors' scattered copies unswept.
@@ -218,14 +216,6 @@ func (in *injection) finish() error {
 	}
 	if in.ownCADir != "" {
 		removeScratchDir(in.ownCADir)
-	}
-	if in.apkRecords != nil {
-		if err := in.apkRecords.restore(); err != nil {
-			logf("setting back apk's records failed: %v", err)
-			if firstErr == nil {
-				firstErr = err
-			}
-		}
 	}
 	// After the write-back, whose own result lands in the layer.
 	sweepErr := tolerateResidue(stripLayer(in.rootfs, in.upper, in.ca, in.nssAppended))
@@ -310,23 +300,15 @@ keystores:
 		upper: upper,
 	}
 	// Before the spec is saved, so a step that will not run leaves it as it was.
-	refuse := func(err error) (*injection, error) {
+	if halfWritten != nil {
 		if err := in.abandon(); err != nil {
 			logf("undoing the CA injection: %v", err)
 		}
-		return nil, err
-	}
-	if halfWritten != nil {
-		return refuse(halfWritten.halfWritten)
+		return nil, halfWritten.halfWritten
 	}
 
-	// After the bundles are mirrored, so their records can be matched with the
-	// CA in them.
-	records, err := placeAPKRecords(s, in.binds)
-	if err != nil {
-		return refuse(err)
-	}
-	in.apkRecords = records
+	// Before the step, which may change both the bundles and apk's records.
+	noteAPKRecords(s.rootfs, in.binds)
 
 	// Chromium reads neither the store nor any variable (see nssdb.go).
 	nssMirror, nssCreated := placeNSSDB(s, bundle, ca)
