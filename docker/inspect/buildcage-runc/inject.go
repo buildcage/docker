@@ -307,6 +307,9 @@ keystores:
 		return nil, halfWritten.halfWritten
 	}
 
+	// Before the step, which may change both the bundles and apk's records.
+	noteAPKRecords(s.rootfs, in.binds)
+
 	// Chromium reads neither the store nor any variable (see nssdb.go).
 	nssMirror, nssCreated := placeNSSDB(s, bundle, ca)
 	if nssMirror != nil {
