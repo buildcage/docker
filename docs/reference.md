@@ -1005,9 +1005,9 @@ anchor directory:
   certificate)
 - the EFI signature database RHEL's `update-ca-trust` writes
 
-A bundle p11-kit rebuilt from the anchors, as `update-ca-trust` does on RHEL, Fedora and Arch,
-loses the label line written above the CA along with it, and the links left pointing at the
-removed copy of the CA, such as the hash links in `/etc/pki/tls/certs`, are removed too.
+Where p11-kit rebuilt a bundle from the anchors, as `update-ca-trust` does on RHEL, Fedora and
+Arch, the label line it wrote above the CA goes with the CA. So do the links left pointing at the
+CA's own copy, such as the hash links in `/etc/pki/tls/certs`.
 
 Two things fail the build by default, pointing at `fail-on-ca-residue`:
 

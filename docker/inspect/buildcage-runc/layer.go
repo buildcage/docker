@@ -195,9 +195,9 @@ func fileHoldsCA(path string, needles [][]byte) (bool, error) {
 }
 
 // sweepDir takes the certificate out of every file under listing that holds
-// one, and returns how many files it read. removed is the paths already taken
-// away elsewhere, so a link here left pointing at one goes too; the sweep adds
-// what it takes away to it. A nil one starts empty.
+// one, and returns how many files it read. removed holds paths already taken
+// away elsewhere, so links here pointing at them go too, and the sweep adds
+// its own removals to it. A nil one starts empty.
 //
 // The two directories differ for the layer: what to look at comes from the
 // overlay's upper directory, but each removal goes through the rootfs, because
@@ -223,8 +223,8 @@ func sweepDir(listing, root string, ca []byte, marks caMarks, removed map[string
 		}
 		// A file the strip emptied held nothing but the certificate, which is
 		// generated per build, so the file is one the injection put there: it
-		// goes, rather than staying behind as an empty trace. One p11-kit wrote
-		// the CA into under its label is a bundle that is empty without it.
+		// goes, rather than staying behind as an empty trace. A file that held
+		// the CA under p11-kit's label is a bundle, and stays empty.
 		if info, err := os.Stat(target); err == nil && info.Size() == 0 && !labelled {
 			if err := os.Remove(target); err != nil {
 				return err

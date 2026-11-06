@@ -391,8 +391,8 @@ func findCertificates(w *fileWindow, ders [][]byte) ([]span, bool, error) {
 	return cuts, labelled, nil
 }
 
-// labelLinesOf is the comment line p11-kit's trust extract writes above each
-// certificate it draws from an anchor, which names it by its common name.
+// labelLinesOf returns the comment line p11-kit's trust extract writes above
+// each certificate taken from an anchor, naming it by its common name.
 func labelLinesOf(ders [][]byte) [][]byte {
 	var lines [][]byte
 	for _, der := range ders {
@@ -403,10 +403,10 @@ func labelLinesOf(ders [][]byte) [][]byte {
 	return lines
 }
 
-// withLabelLine widens a cut to the label line right above it and one of the
-// blank lines p11-kit puts between entries, the one before it or, for the first
-// entry, the one after, so the bundle is left as p11-kit writes it without the
-// CA. Nothing before floor, where the previous cut ends, is taken.
+// withLabelLine widens a cut to the label line right above it and to one of
+// the blank lines p11-kit puts between entries: the one before it, or the one
+// after for the first entry. The bundle is then as p11-kit writes it without
+// the CA. Nothing before floor, where the previous cut ends, is taken.
 func withLabelLine(w *fileWindow, cut span, labels [][]byte, floor int64) (span, error) {
 	longest := 0
 	for _, label := range labels {
