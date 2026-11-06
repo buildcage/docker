@@ -247,6 +247,8 @@ func certificateDERs(armoured []byte) [][]byte {
 type caMarks struct {
 	// What removal takes out.
 	ders [][]byte
+	// The label lines p11-kit writes above them, which removal takes too.
+	labels [][]byte
 	// What detection searches for: ders, plus traces removal cannot take out,
 	// which fail the build. The subject is the issuer of every certificate
 	// the proxy forged. The base64 prefix includes the random serial and
@@ -265,6 +267,11 @@ func caMarksOf(ca []byte) caMarks {
 	for _, der := range marks.ders {
 		if cert, err := x509.ParseCertificate(der); err == nil {
 			marks.needles = append(marks.needles, cert.RawSubject)
+			// p11-kit's trust extract names a certificate from an anchor by its
+			// common name, in a comment line above it.
+			if cert.Subject.CommonName != "" {
+				marks.labels = append(marks.labels, []byte("# "+cert.Subject.CommonName+"\n"))
+			}
 		}
 		line := base64.StdEncoding.EncodeToString(der)
 		marks.needles = append(marks.needles, []byte(line[:min(len(line), base64PrefixLength)]))
@@ -289,70 +296,73 @@ func holdsAnyDER(b []byte, ders [][]byte) bool {
 type span struct{ start, end int64 }
 
 // removeCA deletes every copy of the certificate, leaving anything else in
-// place.
+// place, and reports whether one came with p11-kit's label line, which makes
+// the file a bundle p11-kit wrote rather than a copy of the CA alone.
 //
 // Returns without error when there is none, since the step may have rewritten
 // the file itself, or when the file is binary. The find and the strip share one
 // handle, opened the same guarded way as appendCA, so they can't land on
 // different files.
-func removeCA(path string, ca []byte) error {
-	ders := certificateDERs(ca)
-	if len(ders) == 0 {
-		return nil
+func removeCA(path string, marks caMarks) (bool, error) {
+	if len(marks.ders) == 0 {
+		return false, nil
 	}
 
 	f, err := openBundle(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return false, nil
 		}
-		return asNotRegular(path, err)
+		return false, asNotRegular(path, err)
 	}
 	defer f.Close()
 
 	info, err := f.Stat()
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !info.Mode().IsRegular() {
-		return fmt.Errorf("%s: %w", path, errNotRegular)
+		return false, fmt.Errorf("%s: %w", path, errNotRegular)
 	}
 
 	size := info.Size()
 	w := newFileWindow(f, size)
-	cuts, err := findCertificates(w, ders)
+	cuts, labelled, err := findCertificates(w, marks)
 	if err != nil || len(cuts) == 0 {
-		return err
+		return false, err
 	}
 	// Closing the gap shifts every later byte, which breaks a binary's offsets
 	// and checksums. Binaries hold a NUL and PEM bundles never do, so a binary is
 	// left for the caller to refuse.
 	nul, err := findInFile(w, []byte{0}, 0)
 	if err != nil || nul != -1 {
-		return err
+		return false, err
 	}
 	kept, err := closeGaps(f, cuts, size)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return f.Truncate(kept)
+	return labelled, f.Truncate(kept)
 }
 
 // findCertificates returns, in order, the range each armoured copy of the
-// certificate occupies, including the line break that closes it.
-func findCertificates(w *fileWindow, ders [][]byte) ([]span, error) {
+// certificate occupies, including the line break that closes it and, in a
+// bundle p11-kit wrote, the label line and blank line that go with it. It
+// also reports whether any copy had a label line.
+func findCertificates(w *fileWindow, marks caMarks) ([]span, bool, error) {
 	var cuts []span
+	labelled := false
 	for off := int64(0); off < w.size; {
 		begin, err := findInFile(w, beginPEM, off)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if begin == -1 {
-			return cuts, nil
+			return cuts, labelled, nil
 		}
 		block, end, err := readPEMBlock(w, begin)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if block == nil {
 			// Nothing here to resume past: an opening line the step left
@@ -365,15 +375,66 @@ func findCertificates(w *fileWindow, ders [][]byte) ([]span, error) {
 		// A block that was read has no opening line inside it, so resuming at
 		// its end skips nothing and saves reading it all again.
 		off = end
-		if !holdsAnyDER(block.Bytes, ders) {
+		if !holdsAnyDER(block.Bytes, marks.ders) {
 			continue
 		}
-		if end, err = withBlankLineAfter(w, begin, end); err != nil {
-			return nil, err
+		floor := int64(0)
+		if len(cuts) > 0 {
+			floor = cuts[len(cuts)-1].end
 		}
-		cuts = append(cuts, span{begin, end})
+		cut, err := withLabelLine(w, span{begin, end}, marks.labels, floor)
+		if err != nil {
+			return nil, false, err
+		}
+		if cut.start < begin {
+			labelled = true
+		} else if cut.end, err = withBlankLineAfter(w, begin, end); err != nil {
+			return nil, false, err
+		}
+		cuts = append(cuts, cut)
 	}
-	return cuts, nil
+	return cuts, labelled, nil
+}
+
+// withLabelLine widens a cut to the label line right above it and to one of
+// the blank lines p11-kit puts between entries: the one before it, or the one
+// after for the first entry. The bundle is then as p11-kit writes it without
+// the CA. Nothing before floor, where the previous cut ends, is taken.
+func withLabelLine(w *fileWindow, cut span, labels [][]byte, floor int64) (span, error) {
+	longest := 0
+	for _, label := range labels {
+		longest = max(longest, len(label))
+	}
+	if longest == 0 {
+		return cut, nil
+	}
+	// The label, the two bytes before it and the byte after the cut, in one read.
+	from := max(cut.start-int64(longest)-2, floor)
+	buf, err := w.at(from, int(cut.end-from)+1)
+	if err != nil || len(buf) < int(cut.end-from) {
+		return cut, err
+	}
+	before, after := buf[:cut.start-from], buf[cut.end-from:]
+	for _, label := range labels {
+		head, ok := bytes.CutSuffix(before, label)
+		// The label starts a line. Nothing before it means the window was cut
+		// short at the file's start or the previous cut's end, both line starts.
+		if !ok || len(head) > 0 && head[len(head)-1] != '\n' {
+			continue
+		}
+		cut.start -= int64(len(label))
+		// A window cut short starts on a line, so a lone line break there is a
+		// blank line too.
+		blankBefore := bytes.HasSuffix(head, []byte("\n\n")) || from == floor && string(head) == "\n"
+		switch {
+		case blankBefore:
+			cut.start--
+		case len(after) > 0 && after[0] == '\n':
+			cut.end++
+		}
+		return cut, nil
+	}
+	return cut, nil
 }
 
 // withBlankLineAfter extends a cut to the blank line after it when a blank

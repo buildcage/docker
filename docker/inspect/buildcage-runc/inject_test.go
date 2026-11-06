@@ -495,6 +495,35 @@ func TestInjectFinishLeavesAnUntouchedStoreAlone(t *testing.T) {
 	}
 }
 
+// A rebuild writes a copy of the CA alone into the store and links to it from
+// outside, as Arch links /etc/ssl/certs into its extracted directory. The
+// write-back removes the copy, and the layer sweep then drops the link.
+func TestInjectFinishDropsALinkOutsideTheStoreToTheRemovedCopy(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mount := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")
+	scratchDir, _ := mount["source"].(string)
+	mustWriteFile(t, filepath.Join(scratchDir, "buildcage_proxy_CA.pem"), string(testCA))
+	link := filepath.Join(rootfs, "etc", "ssl", "18be0bc0.0")
+	mustSymlink(t, "certs/buildcage_proxy_CA.pem", link)
+
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(rootfs, "etc", "ssl", "certs", "buildcage_proxy_CA.pem")); !os.IsNotExist(err) {
+		t.Fatal("the copy of the CA was written back")
+	}
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Fatal("the link to the removed copy was left behind")
+	}
+}
+
 // A step that regenerates the store (e.g. apt-get install --reinstall
 // ca-certificates) gets its change mirrored back onto the real rootfs.
 func TestInjectWritesBackWhenTheStepChangesTheStore(t *testing.T) {

@@ -84,7 +84,7 @@ func stripLayerWithALeftover(t *testing.T) error {
 	mustMkdirAll(t, upper)
 	mustWriteFile(t, filepath.Join(upper, "bundle.pem"), string(testCA))
 	useMountInfo(t, overlayLine(rootfs, upper))
-	return stripLayer(rootfs, upperDirOf(rootfs), testCA, nil)
+	return stripLayer(rootfs, upperDirOf(rootfs), testCA, nil, nil)
 }
 
 // A copy the step leaves in a mirrored store goes back to the rootfs with the
@@ -167,7 +167,7 @@ func TestStripLayerGoesOnPastACopyItCannotStrip(t *testing.T) {
 			mustMkdirAll(t, big)
 			mustWriteFile(t, filepath.Join(big, "pkcs11.txt"), string(nssSlot)+strings.Repeat("#", maxPKCS11TxtBytes))
 
-			err := stripLayer(rootfs, rootfs, testCA, nil)
+			err := stripLayer(rootfs, rootfs, testCA, nil, nil)
 			if !errors.Is(err, errUnstrippableCA) || !errors.Is(err, errNSSSlotLeftInLayer) || errors.Is(err, errCALeftInLayer) {
 				t.Fatalf("got %v, want the copy and the unread slot reported, the copy once", err)
 			}
@@ -192,7 +192,7 @@ func TestStripLayerStopsOnAFailedSweep(t *testing.T) {
 	useTempLog(t)
 	rootfs := t.TempDir()
 	failWalkOn(t, rootfs, 1)
-	if err := stripLayer(rootfs, rootfs, testCA, nil); !errors.Is(err, errBrokenWalk) || isCAResidue(err) {
+	if err := stripLayer(rootfs, rootfs, testCA, nil, nil); !errors.Is(err, errBrokenWalk) || isCAResidue(err) {
 		t.Fatalf("got %v, want the failed walk alone", err)
 	}
 }

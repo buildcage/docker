@@ -178,7 +178,7 @@ func TestSweepDirTakesOutEveryShapeOfCopy(t *testing.T) {
 			dir := t.TempDir()
 			mustWriteFile(t, filepath.Join(dir, "copy"), content)
 
-			if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+			if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 				t.Fatal(err)
 			}
 			left, err := verifyLayer(dir, caMarksOf(testCA).needles)
@@ -201,7 +201,7 @@ func TestSweepDirFindsACopyBehindAnUnfinishedBlock(t *testing.T) {
 	truncated := beginTestBlock + "\nVFJVTkNBVEVE\n"
 	mustWriteFile(t, path, truncated+string(testCA))
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -220,7 +220,7 @@ func TestSweepDirLeavesTheRestOfACopyIntact(t *testing.T) {
 	path := filepath.Join(dir, "bundle.pem")
 	mustWriteFile(t, path, string(otherCA)+string(testCA))
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)
@@ -242,7 +242,7 @@ func TestSweepDirRemovesAFileTheStripEmpties(t *testing.T) {
 	mustWriteFile(t, anchor, string(testCA))
 	mustWriteFile(t, bundle, string(otherCA)+string(testCA))
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(anchor); !os.IsNotExist(err) {
@@ -266,7 +266,7 @@ func TestSweepDirDropsLinksLeftDangling(t *testing.T) {
 	// a second pass once the named link has.
 	mustSymlink(t, "buildcage.0", filepath.Join(dir, "deadbeef.0"))
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"buildcage.pem", "buildcage.0", "deadbeef.0"} {
@@ -288,7 +288,7 @@ func TestSweepDirKeepsLinksToWhatItDidNotRemove(t *testing.T) {
 	mustSymlink(t, "theirs.pem", filepath.Join(dir, "theirs.0"))
 	mustSymlink(t, "gone.pem", filepath.Join(dir, "broken.0"))
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Lstat(filepath.Join(dir, "ours.0")); !os.IsNotExist(err) {
@@ -298,6 +298,51 @@ func TestSweepDirKeepsLinksToWhatItDidNotRemove(t *testing.T) {
 		if _, err := os.Lstat(filepath.Join(dir, name)); err != nil {
 			t.Fatalf("%s, none of the sweep's business, was taken away", name)
 		}
+	}
+}
+
+// A bundle p11-kit wrote holding only the CA, under its label, is empty
+// without it, as Arch's objsign-ca-bundle.pem is: the sweep leaves it empty
+// rather than removing it as a copy of the CA alone.
+func TestSweepDirKeepsABundleP11KitWroteOnlyTheCAInto(t *testing.T) {
+	dir := t.TempDir()
+	ca := labelledCA(t, "buildcage proxy CA")
+	mustWriteFile(t, filepath.Join(dir, "objsign-ca-bundle.pem"), p11KitEntry("buildcage proxy CA", ca))
+	mustWriteFile(t, filepath.Join(dir, "buildcage_proxy_CA.pem"), string(ca))
+
+	if _, _, err := sweepDir(dir, dir, caMarksOf(ca), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustReadFile(t, filepath.Join(dir, "objsign-ca-bundle.pem")); got != "" {
+		t.Fatalf("the bundle holds %q, want it empty", got)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "buildcage_proxy_CA.pem")); !os.IsNotExist(err) {
+		t.Fatal("the copy of the CA alone was left behind")
+	}
+}
+
+// A rebuild links to its copy from outside the mirror too, as Arch does from
+// /etc/ssl/certs into /etc/ca-certificates/extracted/cadir. The mirror's
+// write-back removed that copy, so the sweep is handed it and drops the links.
+func TestSweepDirDropsLinksToWhatItWasHanded(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdirAll(t, filepath.Join(dir, "certs"))
+	gone := filepath.Join(dir, "cadir", "buildcage_proxy_CA.pem")
+	mustSymlink(t, "../cadir/buildcage_proxy_CA.pem", filepath.Join(dir, "certs", "buildcage_proxy_CA.pem"))
+	mustSymlink(t, "../cadir/buildcage_proxy_CA.pem", filepath.Join(dir, "certs", "18be0bc0.0"))
+	// The image's own broken link points at nothing anyone removed.
+	mustSymlink(t, "../cadir/gone.pem", filepath.Join(dir, "certs", "broken.0"))
+
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), map[string]bool{gone: true}); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"buildcage_proxy_CA.pem", "18be0bc0.0"} {
+		if _, err := os.Lstat(filepath.Join(dir, "certs", name)); !os.IsNotExist(err) {
+			t.Fatalf("%s was left behind", name)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "certs", "broken.0")); err != nil {
+		t.Fatal("the image's own broken link was taken away")
 	}
 }
 
@@ -320,7 +365,7 @@ func TestSweepDirDropsAnAbsoluteLinkThroughTheRoot(t *testing.T) {
 	mustSymlink(t, "/etc/ssl/certs/buildcage.pem", filepath.Join(upper, link))
 	mustSymlink(t, "/etc/ssl/certs/buildcage.pem", filepath.Join(root, link))
 
-	if _, err := sweepDir(upper, root, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(upper, root, caMarksOf(testCA), nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Lstat(filepath.Join(root, link)); !os.IsNotExist(err) {
@@ -334,7 +379,7 @@ func TestSweepDirFailsOnAContainerItCannotRewrite(t *testing.T) {
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "store.db"), "SQLite format 3\x00"+string(testDER)+"\x00")
 
-	_, err := sweepDir(dir, dir, testCA, caMarksOf(testCA))
+	_, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil)
 	if !errors.Is(err, errUnstrippableCA) {
 		t.Fatalf("got %v, want the container to be reported", err)
 	}
@@ -351,7 +396,7 @@ func TestSweepDirFailsOnABinaryEmbeddingTheBundle(t *testing.T) {
 	content := "\x7fELF\x02\x01\x01\x00" + string(otherCA) + string(testCA) + "\x00TRAILER"
 	mustWriteFile(t, path, content)
 
-	_, err := sweepDir(dir, dir, testCA, caMarksOf(testCA))
+	_, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil)
 	if !errors.Is(err, errUnstrippableCA) {
 		t.Fatalf("got %v, want the binary to be reported", err)
 	}
@@ -379,7 +424,7 @@ func TestSweepDirLeavesWhatDoesNotHoldTheCertificate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	files, err := sweepDir(dir, dir, testCA, caMarksOf(testCA))
+	files, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,7 +453,7 @@ func TestSweepDirReadsOnlyRegularFiles(t *testing.T) {
 	}
 	mustWriteFile(t, filepath.Join(dir, "copy"), string(testCA))
 
-	files, err := sweepDir(dir, dir, testCA, caMarksOf(testCA))
+	files, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +473,7 @@ func TestSweepDirReportsAPathItCannotResolveUnderTheRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := sweepDir(upper, root, testCA, caMarksOf(testCA)); !errors.Is(err, errTooManySymlinks) {
+	if _, _, err := sweepDir(upper, root, caMarksOf(testCA), nil); !errors.Is(err, errTooManySymlinks) {
 		t.Fatalf("got %v, want the unresolvable path to be reported", err)
 	}
 }
@@ -437,7 +482,7 @@ func TestSweepDirReportsADirectoryItCannotRead(t *testing.T) {
 	dir := t.TempDir()
 	failWalkOn(t, dir, 1)
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); !errors.Is(err, errBrokenWalk) {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); !errors.Is(err, errBrokenWalk) {
 		t.Fatalf("got %v, want the failed listing to be reported", err)
 	}
 }
@@ -451,7 +496,7 @@ func TestSweepDirReportsAFileItCannotRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err == nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err == nil {
 		t.Fatal("expected the unreadable file to be reported")
 	}
 }
@@ -461,7 +506,7 @@ func TestSweepDirReportsAFileItCannotStat(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "copy"), string(testCA))
 	useBrokenBundleFile(t, &brokenFile{failStat: true})
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); !errors.Is(err, errBrokenFile) {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); !errors.Is(err, errBrokenFile) {
 		t.Fatalf("got %v, want the stat failure to be reported", err)
 	}
 }
@@ -474,7 +519,7 @@ func TestSweepDirReportsAFileItCannotRemove(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "buildcage.pem"), string(testCA))
 	mustMakeReadOnly(t, dir)
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err == nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err == nil {
 		t.Fatal("expected the failed removal to be reported")
 	}
 }
@@ -488,7 +533,7 @@ func TestSweepDirReportsADirectoryTheLinkPassCannotRead(t *testing.T) {
 	// Walk 1 is the file pass, walk 2 the link pass; fail the second.
 	failWalkOn(t, dir, 2)
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); !errors.Is(err, errBrokenWalk) {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); !errors.Is(err, errBrokenWalk) {
 		t.Fatalf("got %v, want the failed link listing to be reported", err)
 	}
 }
@@ -505,7 +550,7 @@ func TestSweepDirReportsALinkItCannotRemove(t *testing.T) {
 	mustSymlink(t, "/a/buildcage.pem", filepath.Join(root, "b", "hash.0"))
 	mustMakeReadOnly(t, filepath.Join(root, "b"))
 
-	if _, err := sweepDir(root, root, testCA, caMarksOf(testCA)); err == nil {
+	if _, _, err := sweepDir(root, root, caMarksOf(testCA), nil); err == nil {
 		t.Fatal("expected the failed link removal to be reported")
 	}
 }
@@ -524,7 +569,7 @@ func TestSweepDirReportsALinkWhoseDirectoryCannotBeResolved(t *testing.T) {
 	// In the rootfs, a file stands where that subdirectory's parent should be.
 	mustWriteFile(t, filepath.Join(root, "sub"), "")
 
-	if _, err := sweepDir(upper, root, testCA, caMarksOf(testCA)); !errors.Is(err, syscall.ENOTDIR) {
+	if _, _, err := sweepDir(upper, root, caMarksOf(testCA), nil); !errors.Is(err, syscall.ENOTDIR) {
 		t.Fatalf("got %v, want the unresolvable link directory to be reported", err)
 	}
 }
@@ -540,7 +585,7 @@ func TestSweepDirLeavesALinkWhoseTargetDoesNotResolve(t *testing.T) {
 	mustSymlink(t, "loop", filepath.Join(dir, "loop"))
 	mustSymlink(t, "loop/bundle.pem", filepath.Join(dir, "unresolvable.0"))
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 		t.Fatalf("an unresolvable link should be left alone, got %v", err)
 	}
 	if _, err := os.Lstat(filepath.Join(dir, "unresolvable.0")); err != nil {
@@ -562,7 +607,7 @@ func TestSweepDirSkipsALinkThatVanished(t *testing.T) {
 		d:    realEntry(t, dir, "real.0"),
 	})
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 		t.Fatalf("a vanished link should be skipped, got %v", err)
 	}
 }
@@ -583,7 +628,7 @@ func TestStripLayerSweepsAndThenChecksItself(t *testing.T) {
 	mustHardLink(t, filepath.Join(upper, "roots.pem"), filepath.Join(rootfs, "roots.pem"))
 	useMountInfo(t, overlayLine(rootfs, upper))
 
-	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil); err != nil {
+	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(filepath.Join(upper, "bundle.pem"))
@@ -602,7 +647,7 @@ func TestStripLayerReportsWhatIsNotAnOverlay(t *testing.T) {
 	mustWriteFile(t, filepath.Join(rootfs, "bundle.pem"), string(testCA))
 	useMountInfo(t, mountLine(rootfs, "ext4", "rw"))
 
-	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil); !errors.Is(err, errLayerUnread) {
+	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil, nil); !errors.Is(err, errLayerUnread) {
 		t.Fatalf("got %v, want the layer reported as unread", err)
 	}
 	got, err := os.ReadFile(filepath.Join(rootfs, "bundle.pem"))
@@ -625,7 +670,7 @@ func TestStripLayerFailsOnACopyItCouldNotRemove(t *testing.T) {
 	mustHardLink(t, filepath.Join(upper, "store.db"), filepath.Join(rootfs, "store.db"))
 	useMountInfo(t, overlayLine(rootfs, upper))
 
-	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil); !errors.Is(err, errUnstrippableCA) {
+	if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil, nil); !errors.Is(err, errUnstrippableCA) {
 		t.Fatalf("got %v, want the build to be failed", err)
 	}
 }
@@ -649,7 +694,7 @@ func TestStripLayerFailsOnATraceItCannotRemove(t *testing.T) {
 	}
 	useMountInfo(t, overlayLine(rootfs, upper))
 
-	err := stripLayer(rootfs, upperDirOf(rootfs), caPEM, nil)
+	err := stripLayer(rootfs, upperDirOf(rootfs), caPEM, nil, nil)
 	if !errors.Is(err, errUnstrippableCA) {
 		t.Fatalf("got %v, want the build to be failed", err)
 	}
@@ -675,7 +720,7 @@ func TestStripLayerReportsADirectoryItCannotReadBack(t *testing.T) {
 			useMountInfo(t, overlayLine(rootfs, upper))
 			failWalkOn(t, upper, nth)
 
-			if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil); !errors.Is(err, errBrokenWalk) {
+			if err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil, nil); !errors.Is(err, errBrokenWalk) {
 				t.Fatalf("got %v, want the failed listing to be reported", err)
 			}
 		})
@@ -694,7 +739,7 @@ func TestStripLayerFailsOnWhatTheSweepMissed(t *testing.T) {
 	// the layer keeps its copy and only the reading back notices.
 	useMountInfo(t, overlayLine(rootfs, upper))
 
-	err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil)
+	err := stripLayer(rootfs, upperDirOf(rootfs), testCA, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "still in the step's layer") {
 		t.Fatalf("got %v, want the leftover copy to fail the build", err)
 	}
@@ -715,7 +760,7 @@ func TestSweepDirReportsAFailedRead(t *testing.T) {
 			mustWriteFile(t, filepath.Join(dir, "copy"), string(testCA))
 			useBrokenBundleFile(t, broken)
 
-			if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); !errors.Is(err, errBrokenFile) {
+			if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); !errors.Is(err, errBrokenFile) {
 				t.Fatalf("got %v, want the read failure to be reported", err)
 			}
 		})
@@ -733,7 +778,7 @@ func TestSweepDirReportsAKeystoreItCannotReseal(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "cacerts"), string(sealed))
 	mustWriteFile(t, filepath.Join(dir, "zz-bundle.pem"), string(testCA))
 
-	_, err := sweepDir(dir, dir, testCA, caMarksOf(testCA))
+	_, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil)
 	if !errors.Is(err, errUnstrippableCA) || !strings.Contains(err.Error(), "cacerts") {
 		t.Fatalf("got %v, want the keystore reported as a copy it cannot strip", err)
 	}
@@ -749,7 +794,7 @@ func TestStripCARewritesPKCS12(t *testing.T) {
 	root := testCert(t, "digicert")
 	caPEM := certPEM(ca)
 	path := mustWritePKCS12(t, passwordlessStore(t, root, ca))
-	left, err := stripCA(path, caPEM, caMarksOf(caPEM))
+	left, _, err := stripCA(path, caMarksOf(caPEM))
 	if err != nil {
 		t.Fatalf("stripCA: %v", err)
 	}
@@ -767,7 +812,7 @@ func TestStripCAUnstrippableWhenUndecodable(t *testing.T) {
 	ca := testCert(t, "buildcage")
 	caPEM := certPEM(ca)
 	path := mustWritePKCS12(t, append([]byte{0x30, 0x82}, ca.Raw...))
-	left, err := stripCA(path, caPEM, caMarksOf(caPEM))
+	left, _, err := stripCA(path, caMarksOf(caPEM))
 	if err != nil {
 		t.Fatalf("stripCA: %v", err)
 	}
@@ -785,7 +830,7 @@ func TestStripCAPropagatesPKCS12Error(t *testing.T) {
 	caPEM := certPEM(ca)
 	path := mustWritePKCS12(t, passwordlessStore(t, root, ca))
 	useBrokenBundleFile(t, &brokenFile{failWriteAt: 1})
-	if _, err := stripCA(path, caPEM, caMarksOf(caPEM)); !errors.Is(err, errBrokenFile) {
+	if _, _, err := stripCA(path, caMarksOf(caPEM)); !errors.Is(err, errBrokenFile) {
 		t.Fatalf("want the write failure propagated, got %v", err)
 	}
 }
@@ -796,7 +841,7 @@ func TestStripCAStripsAChangeitSealedPKCS12(t *testing.T) {
 	root := testCert(t, "digicert")
 	caPEM := certPEM(ca)
 	path := mustWritePKCS12(t, mustEncodeTrustStore(t, pkcs12.Modern, keystorePassword, root, ca))
-	left, err := stripCA(path, caPEM, caMarksOf(caPEM))
+	left, _, err := stripCA(path, caMarksOf(caPEM))
 	if err != nil {
 		t.Fatalf("stripCA: %v", err)
 	}
@@ -816,7 +861,7 @@ func TestStripCAReportsAnEncryptedPKCS12ItCannotRewrite(t *testing.T) {
 	root := testCert(t, "digicert")
 	caPEM := certPEM(ca)
 	store := mustEncodeTrustStore(t, pkcs12.Modern, keystorePassword, root, leaf)
-	left, err := stripCA(mustWritePKCS12(t, store), caPEM, caMarksOf(caPEM))
+	left, _, err := stripCA(mustWritePKCS12(t, store), caMarksOf(caPEM))
 	if err != nil {
 		t.Fatalf("stripCA: %v", err)
 	}

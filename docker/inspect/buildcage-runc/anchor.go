@@ -33,6 +33,8 @@ var anchorDirs = []struct{ dir, owner string }{
 	{"/etc/pki/ca-trust/source/anchors", "/etc/pki/ca-trust/extracted"},
 	// SUSE
 	{"/etc/pki/trust/anchors", "/var/lib/ca-certificates"},
+	// Arch
+	{"/etc/ca-certificates/trust-source/anchors", "/etc/ca-certificates/extracted"},
 }
 
 // What the certificate is called in each of them. Debian's

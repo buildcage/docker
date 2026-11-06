@@ -112,6 +112,31 @@ func TestRemoveCreatedDirsTakesBackWhatIsNotAdopted(t *testing.T) {
 		}
 	}
 	// The intermediate directories the injection made go with them.
+	for _, dir := range []string{"pki", "ca-certificates"} {
+		if _, err := os.Stat(filepath.Join(rootfs, "etc", dir)); !os.IsNotExist(err) {
+			t.Fatalf("/etc/%s was left behind", dir)
+		}
+	}
+}
+
+// Arch's anchor directory sits beside extracted/ under /etc/ca-certificates, so
+// a step that installs its package keeps the directory and the parents the
+// injection made for the other anchors still go.
+func TestRemoveCreatedDirsKeepsArchsAnchorDirOnceItsPackageIsInstalled(t *testing.T) {
+	rootfs := t.TempDir()
+	mustMkdirAll(t, filepath.Join(rootfs, "etc"))
+	created := placeAnchors(rootfs, testCA)
+
+	mustMkdirAll(t, filepath.Join(rootfs, "etc", "ca-certificates", "extracted"))
+	for _, anchor := range anchorDirs {
+		_ = os.Remove(resolvedAnchor(rootfs, anchor.dir))
+	}
+
+	removeCreatedDirs(rootfs, created)
+
+	if _, err := os.Stat(filepath.Join(rootfs, "etc", "ca-certificates", "trust-source", "anchors")); err != nil {
+		t.Fatalf("removed Arch's adopted anchor directory: %v", err)
+	}
 	if _, err := os.Stat(filepath.Join(rootfs, "etc", "pki")); !os.IsNotExist(err) {
 		t.Fatal("/etc/pki was left behind")
 	}

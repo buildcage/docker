@@ -504,7 +504,7 @@ func stripNSSSlotLayer(t *testing.T, name, content string) (string, error) {
 	path := filepath.Join(rootfs, "backup", name)
 	mustMkdirAll(t, filepath.Dir(path))
 	mustWriteFile(t, path, content)
-	err := stripLayer(rootfs, rootfs, testCA, nil)
+	err := stripLayer(rootfs, rootfs, testCA, nil, nil)
 	got, readErr := os.ReadFile(path)
 	if os.IsNotExist(readErr) {
 		return "<removed>", err
@@ -611,7 +611,7 @@ func TestStripLayerReportsAPkcs11TxtTheRootfsDoesNotReach(t *testing.T) {
 			mustMkdirAll(t, filepath.Join(upper, "backup"))
 			mustWriteFile(t, filepath.Join(upper, "backup", "pkcs11.txt"), string(nssSlot))
 			lay(t, rootfs)
-			if err := stripLayer(rootfs, upper, testCA, nil); err == nil {
+			if err := stripLayer(rootfs, upper, testCA, nil, nil); err == nil {
 				t.Fatal("expected the copy to be reported")
 			}
 		})
@@ -657,7 +657,7 @@ func TestStripLayerFollowsAPkcs11TxtSymlink(t *testing.T) {
 			mustWriteFile(t, target, own+string(nssSlot))
 			mustSymlink(t, link, filepath.Join(rootfs, "backup", "pkcs11.txt"))
 
-			if err := stripLayer(rootfs, rootfs, testCA, nil); err != nil {
+			if err := stripLayer(rootfs, rootfs, testCA, nil, nil); err != nil {
 				t.Fatal(err)
 			}
 			if got := mustRead(t, target); got != own {
@@ -676,7 +676,7 @@ func TestStripLayerReportsALinkedPkcs11TxtOnce(t *testing.T) {
 	mustWriteFile(t, filepath.Join(rootfs, "elsewhere", "pkcs11.txt"), string(nssSlot)+strings.Repeat("#", maxPKCS11TxtBytes))
 	mustSymlink(t, "/elsewhere/pkcs11.txt", filepath.Join(rootfs, "backup", "pkcs11.txt"))
 
-	err := stripLayer(rootfs, rootfs, testCA, nil)
+	err := stripLayer(rootfs, rootfs, testCA, nil, nil)
 	if !errors.Is(err, errNSSSlotLeftInLayer) || strings.Count(err.Error(), "/elsewhere/pkcs11.txt") != 1 {
 		t.Fatalf("got %v, want the linked file reported once", err)
 	}
@@ -710,7 +710,7 @@ func TestStripLayerLeavesAPkcs11TxtSymlinkOutOfTheLayer(t *testing.T) {
 			mustMkdirAll(t, filepath.Join(upper, "backup"))
 			lay(t, rootfs, upper)
 
-			if err := stripLayer(rootfs, upper, testCA, nil); err != nil {
+			if err := stripLayer(rootfs, upper, testCA, nil, nil); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := os.Stat(filepath.Join(rootfs, "lower", "p.txt")); err == nil {

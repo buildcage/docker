@@ -87,6 +87,11 @@ type dirBind struct {
 	// (errKeystoreHalfWritten); inject then abandons the injection.
 	halfWritten error
 
+	// What the write-back took out of hostDir for holding nothing but the CA,
+	// such as the copy a rebuild puts in a hash directory. stripLayer drops
+	// the links elsewhere in the layer that point at these.
+	removed map[string]bool
+
 	// Set for Chromium's NSS database (nssdb.go): what was appended to the
 	// mirror's pkcs11.txt, whether the directory had one before, and the
 	// scratch directory holding both the mirror and the CA-only database
@@ -444,7 +449,8 @@ func (b *dirBind) finish() error {
 	// for stripLayer to find: it only gets there when the write-back below
 	// copies it up. A copy it cannot strip goes back with the rest, for
 	// stripLayer to report once.
-	if _, err := sweepDir(b.scratchDir, b.scratchDir, b.ca, caMarksOf(b.ca)); err != nil && !errors.Is(err, errUnstrippableCA) {
+	_, removed, err := sweepDir(b.scratchDir, b.scratchDir, caMarksOf(b.ca), nil)
+	if err != nil && !errors.Is(err, errUnstrippableCA) {
 		return err
 	}
 
@@ -488,6 +494,10 @@ func (b *dirBind) finish() error {
 	}
 	for _, dir := range dropped {
 		b.apk.removeEmptiedDirs(dir)
+	}
+	b.removed = map[string]bool{}
+	for path := range removed {
+		b.removed[filepath.Join(b.hostDir, strings.TrimPrefix(path, b.scratchDir))] = true
 	}
 	return nil
 }

@@ -156,7 +156,7 @@ func TestSweepDirRewritesAnEFISignatureDatabase(t *testing.T) {
 	path := filepath.Join(dir, "cacerts.bin")
 	mustWriteFile(t, path, string(concat(x509List(otherDER), x509List(testDER))))
 
-	if _, err := sweepDir(dir, dir, testCA, caMarksOf(testCA)); err != nil {
+	if _, _, err := sweepDir(dir, dir, caMarksOf(testCA), nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(path)

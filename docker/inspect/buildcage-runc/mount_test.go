@@ -352,6 +352,22 @@ func TestFinishWritesBackWhenTheTargetStillResolves(t *testing.T) {
 	}
 }
 
+// A CA-only file a rebuild put in the mirror is gone once written back, and
+// finish names it at its place in the rootfs for the layer sweep's links.
+func TestFinishRecordsWhatTheWriteBackRemoved(t *testing.T) {
+	useFakeRsync(t)
+	b, rootfs := newCAStoreBind(t)
+	mustWriteFile(t, filepath.Join(b.scratchDir, "buildcage_proxy_CA.pem"), string(testCA))
+
+	if err := b.finish(); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(rootfs, "etc/ssl/certs/buildcage_proxy_CA.pem")
+	if !b.removed[want] || len(b.removed) != 1 {
+		t.Fatalf("removed = %v, want only %s", b.removed, want)
+	}
+}
+
 // An untouched store returns before the check, so a build that never writes
 // to the store cannot start failing on it.
 func TestFinishSkipsTheCheckWhenTheStoreIsUnchanged(t *testing.T) {

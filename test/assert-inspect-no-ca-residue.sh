@@ -31,7 +31,8 @@ elif docker run --rm -e CA_LINE="$CA_LINE" "$IMAGE" sh -c '
            /etc/ssl/ca-bundle.pem /etc/pki/tls/cacert.pem /etc/ssl/cert.pem \
            /usr/local/share/ca-certificates/buildcage.crt \
            /etc/pki/ca-trust/source/anchors/buildcage.crt \
-           /etc/pki/trust/anchors/buildcage.crt; do
+           /etc/pki/trust/anchors/buildcage.crt \
+           /etc/ca-certificates/trust-source/anchors/buildcage.crt; do
     [ -f "$f" ] && grep -qF "$CA_LINE" "$f" && exit 0
   done
   exit 1
@@ -42,9 +43,9 @@ else
 fi
 
 # An anchor directory the injection created goes with the anchor. No fixture's
-# base image ships /etc/pki at all, so anything left there is the injection's,
-# empty directory included.
-if docker run --rm "$IMAGE" sh -c 'test -d /etc/pki'; then
+# base image ships /etc/pki or /etc/ca-certificates/trust-source at all, so
+# anything left there is the injection's, empty directory included.
+if docker run --rm "$IMAGE" sh -c 'test -d /etc/pki || test -d /etc/ca-certificates/trust-source'; then
   fail "an anchor directory the injection created is still in the built image"
 else
   pass "no anchor directory left in the built image"
