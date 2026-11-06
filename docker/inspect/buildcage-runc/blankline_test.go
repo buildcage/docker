@@ -18,24 +18,30 @@ func TestRemoveCAKeepsOneBlankLineBetweenSeparatedCertificates(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
 		bundle, wants string
+		inBundle      bool
 	}{
-		{"last", other + "\n" + string(testCA) + "\n", other + "\n"},
-		{"between", other + "\n" + string(testCA) + "\n" + other + "\n", other + "\n" + other + "\n"},
-		{"appended after a blank line", other + "\n" + string(testCA), other + "\n"},
-		{"no blank line after", other + "\n" + string(testCA) + other, other + "\n" + other},
-		{"no blank line before", other + string(testCA) + "\n" + other, other + "\n" + other},
-		{"first", string(testCA) + "\n" + other, other},
-		{"after a single byte", "\n" + string(testCA) + "\n" + other, "\n\n" + other},
-		{"only", string(testCA) + "\n", ""},
+		{"last", other + "\n" + string(testCA) + "\n", other + "\n", true},
+		{"between", other + "\n" + string(testCA) + "\n" + other + "\n", other + "\n" + other + "\n", true},
+		{"appended after a blank line", other + "\n" + string(testCA), other + "\n", false},
+		{"no blank line after", other + "\n" + string(testCA) + other, other + "\n" + other, false},
+		{"no blank line before", other + string(testCA) + "\n" + other, other + "\n" + other, false},
+		{"first", string(testCA) + "\n" + other, other, true},
+		{"after a single byte", "\n" + string(testCA) + "\n" + other, "\n\n" + other, false},
+		{"only", string(testCA) + "\n", "", true},
+		{"a copy alone", string(testCA), "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "bundle.pem")
 			mustWriteFile(t, path, tc.bundle)
-			if _, err := removeCA(path, caMarksOf(testCA)); err != nil {
+			inBundle, err := removeCA(path, caMarksOf(testCA))
+			if err != nil {
 				t.Fatal(err)
 			}
 			if got := mustRead(t, path); got != tc.wants {
 				t.Fatalf("got %q, want %q", got, tc.wants)
+			}
+			if inBundle != tc.inBundle {
+				t.Fatalf("reported in a bundle: %v, want %v", inBundle, tc.inBundle)
 			}
 		})
 	}

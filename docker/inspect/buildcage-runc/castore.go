@@ -296,9 +296,9 @@ func holdsAnyDER(b []byte, ders [][]byte) bool {
 type span struct{ start, end int64 }
 
 // removeCA deletes every copy of the certificate, leaving anything else in
-// place, and reports whether one came with a bundle's separator (p11-kit's
-// label line or a blank line after it), which makes the file a bundle a tool
-// wrote rather than a copy of the CA alone.
+// place, and reports whether one came with the label line or blank line a
+// tool writes between a bundle's entries, which makes the file a bundle rather
+// than a copy of the CA alone.
 //
 // Returns without error when there is none, since the step may have rewritten
 // the file itself, or when the file is binary. The find and the strip share one
