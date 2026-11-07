@@ -644,6 +644,7 @@ Apache License
 
 The following npm packages may be included in this product:
 
+ - @pkgjs/parseargs@0.11.0
  - b4a@1.9.0
  - bare-events@2.9.2
  - bare-fs@4.8.4
@@ -4319,11 +4320,13 @@ The following npm packages may be included in this product:
 
  - ansi-regex@5.0.1
  - ansi-styles@4.3.0
+ - has-flag@4.0.0
  - is-fullwidth-code-point@3.0.0
  - path-key@3.1.1
  - shebang-regex@3.0.0
  - string-width@4.2.3
  - strip-ansi@6.0.1
+ - supports-color@7.2.0
 
 These packages each contain the following license:
 
