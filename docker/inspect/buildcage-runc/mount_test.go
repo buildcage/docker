@@ -215,6 +215,77 @@ func TestCheckMirrorable(t *testing.T) {
 	}
 }
 
+// A rewrite with the same content counts even when the step sets the mtime
+// back, and so does a rename over the file; an untouched file does not.
+func TestStepWritesFindsRewritesWithTheSameContent(t *testing.T) {
+	dir := t.TempDir()
+	past := time.Now().Add(-time.Hour).Truncate(time.Second)
+	for _, name := range []string{"untouched", "rewritten", "renamed"} {
+		mustWriteFile(t, filepath.Join(dir, name), "same")
+		if err := os.Chtimes(filepath.Join(dir, name), past, past); err != nil {
+			t.Fatal(err)
+		}
+	}
+	baseline, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mustWriteFile(t, filepath.Join(dir, "rewritten"), "same")
+	mustWriteFile(t, filepath.Join(dir, "renamed.tmp"), "same")
+	if err := os.Rename(filepath.Join(dir, "renamed.tmp"), filepath.Join(dir, "renamed")); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"rewritten", "renamed"} {
+		if err := os.Chtimes(filepath.Join(dir, name), past, past); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustWriteFile(t, filepath.Join(dir, "created"), "new")
+	current, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	written := stepWrites(baseline, current)
+	for _, name := range []string{"rewritten", "renamed", "created"} {
+		if _, ok := written[name]; !ok {
+			t.Errorf("%s is not counted as written", name)
+		}
+	}
+	if _, ok := written["untouched"]; ok {
+		t.Error("untouched is counted as written")
+	}
+}
+
+// An entry the step wrote gets the mtime it left, though its content matches
+// the original.
+func TestRestoreMtimesGivesAWrittenEntryTheStepsMtime(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "bundle"), "same")
+	past := time.Now().Add(-2 * time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(filepath.Join(dir, "bundle"), past, past); err != nil {
+		t.Fatal(err)
+	}
+	original, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(dir, "bundle"), "same")
+	current, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stepTime := past.Add(time.Hour)
+	if err := restoreMtimes(original, current, map[string]time.Time{"bundle": stepTime}, dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustStatMtime(t, filepath.Join(dir, "bundle")); !got.Equal(stepTime) {
+		t.Errorf("mtime = %v, want the step's %v", got, stepTime)
+	}
+}
+
 func TestRestoreUnchangedMtimesLeavesChangedFilesAlone(t *testing.T) {
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "untouched"), "same")
@@ -242,7 +313,7 @@ func TestRestoreUnchangedMtimesLeavesChangedFilesAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := restoreUnchangedMtimes(original, current, dir); err != nil {
+	if err := restoreMtimes(original, current, nil, dir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -610,7 +681,7 @@ func TestRestoreUnchangedMtimesReportsAFileItCannotTouch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := restoreUnchangedMtimes(manifest, manifest, dir); err == nil {
+	if err := restoreMtimes(manifest, manifest, nil, dir); err == nil {
 		t.Fatal("expected the missing file to be reported")
 	}
 }

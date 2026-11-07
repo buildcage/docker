@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func loadEnv(t *testing.T, bundle string) map[string]string {
@@ -492,6 +493,53 @@ func TestInjectFinishLeavesAnUntouchedStoreAlone(t *testing.T) {
 	}
 	if string(store) != "ORIGINAL-ROOTS\n" {
 		t.Fatalf("the real store was written to even though nothing changed: %q", store)
+	}
+}
+
+// A step that rewrites the store with the content it had is written back
+// with the step's mtime, as a rebuild that changes nothing reaches the layer
+// under any engine.
+func TestInjectFinishWritesBackARewriteWithTheSameContent(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	hostBundle := filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt")
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratchDir, _ := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")["source"].(string)
+	scratchBundle := filepath.Join(scratchDir, "ca-certificates.crt")
+	mustWriteFile(t, scratchBundle, mustRead(t, scratchBundle))
+	stepTime := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(scratchBundle, stepTime, stepTime); err != nil {
+		t.Fatal(err)
+	}
+
+	// The fake rsync does not carry mtimes, so the mirror's is read as the
+	// write-back starts.
+	var sent time.Time
+	wroteBack := false
+	runRsync = func(args []string) ([]byte, error) {
+		if isRsyncWriteBack(args) && !isRsyncDryRun(args) {
+			wroteBack = true
+			sent = mustStatMtime(t, scratchBundle)
+		}
+		return fakeRsyncCopy(args)
+	}
+
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if !wroteBack {
+		t.Fatal("the rewrite was not written back")
+	}
+	if got := mustRead(t, hostBundle); got != "ORIGINAL-ROOTS\n" {
+		t.Fatalf("the store was written back as %q", got)
+	}
+	if !sent.Equal(stepTime) {
+		t.Errorf("the bundle was written back with mtime %v, want the step's %v", sent, stepTime)
 	}
 }
 

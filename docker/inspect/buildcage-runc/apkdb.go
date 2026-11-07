@@ -383,7 +383,7 @@ func (b *dirBind) dropRemovedBundles(current []fileEntry) ([]string, error) {
 		}
 		now, _ := entryFor(current, name)
 		injected, _ := entryFor(b.baseline, name)
-		if !now.sameExceptMtime(injected) || !now.mtime.Equal(injected.mtime) {
+		if !now.sameExceptMtime(injected) || now.writtenSince(injected) {
 			continue
 		}
 		before, _ := entryFor(b.original, name)

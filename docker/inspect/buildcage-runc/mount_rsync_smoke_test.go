@@ -103,7 +103,7 @@ func TestRealRsyncWriteBackLeavesSpecialFilesBehind(t *testing.T) {
 }
 
 // Same content under a new mtime is not rewritten, but the mtime still
-// crosses over, which is why restoreUnchangedMtimes puts the original back
+// crosses over, which is why restoreMtimes puts the original back
 // before the write-back compares anything.
 func TestRealRsyncWriteBackCarriesAnMtimeOnlyChangeWithoutRewriting(t *testing.T) {
 	requireRealRsync(t)
