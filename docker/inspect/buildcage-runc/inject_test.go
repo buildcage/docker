@@ -496,9 +496,8 @@ func TestInjectFinishLeavesAnUntouchedStoreAlone(t *testing.T) {
 	}
 }
 
-// A step that rewrites the store with the content it had is written back
-// with the step's mtime, as a rebuild that changes nothing reaches the layer
-// under any engine.
+// A bundle the step rewrote with the content it had goes back to the rootfs
+// with the step's mtime.
 func TestInjectFinishWritesBackARewriteWithTheSameContent(t *testing.T) {
 	useFakeRsync(t)
 	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
@@ -517,29 +516,89 @@ func TestInjectFinishWritesBackARewriteWithTheSameContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The fake rsync does not carry mtimes, so the mirror's is read as the
-	// write-back starts.
-	var sent time.Time
-	wroteBack := false
+	if err := restore.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustRead(t, hostBundle); got != "ORIGINAL-ROOTS\n" {
+		t.Fatalf("the store was written back as %q", got)
+	}
+	if got := mustStatMtime(t, hostBundle); !got.Equal(stepTime) {
+		t.Errorf("the bundle has mtime %v, want the step's %v", got, stepTime)
+	}
+}
+
+// finish fails when it cannot set a written entry's mtime on the rootfs.
+func TestInjectFinishReportsAWrittenEntryItCannotTouch(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratchDir, _ := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")["source"].(string)
+	mustMkdirAll(t, filepath.Join(scratchDir, "sub"))
+	mustWriteFile(t, filepath.Join(scratchDir, "sub", "added.pem"), "ADDED\n")
+	// Replaces the written-back sub/ with a file, so sub/added.pem is gone.
 	runRsync = func(args []string) ([]byte, error) {
-		if isRsyncWriteBack(args) && !isRsyncDryRun(args) {
-			wroteBack = true
-			sent = mustStatMtime(t, scratchBundle)
+		out, err := fakeRsyncCopy(args)
+		if err == nil && isRsyncWriteBack(args) && !isRsyncDryRun(args) {
+			sub := filepath.Join(rsyncDst(args), "sub")
+			if err := os.RemoveAll(sub); err != nil {
+				return nil, err
+			}
+			mustWriteFile(t, sub, "")
 		}
-		return fakeRsyncCopy(args)
+		return out, err
+	}
+
+	if err := restore.finish(); err == nil {
+		t.Fatal("expected the entry finish cannot touch to be reported")
+	}
+}
+
+// A bundle the step only chmodded is still written to on the rootfs, with the
+// mtime it had before the step, so overlayfs copies it into the layer.
+func TestInjectFinishTouchesABundleTheStepOnlyChmodded(t *testing.T) {
+	useFakeRsync(t)
+	bundle, rootfs := newBundle(t, []string{"PATH=/usr/bin"})
+	useMountInfo(t, overlayLine(rootfs, rootfs))
+	hostBundle := filepath.Join(rootfs, "etc", "ssl", "certs", "ca-certificates.crt")
+	orig := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(hostBundle, orig, orig); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(hostBundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The mirror keeps the bundle's mtime, as rsync -a does and the fake does not.
+	runRsync = func(args []string) ([]byte, error) {
+		out, err := fakeRsyncCopy(args)
+		if err == nil && !isRsyncWriteBack(args) {
+			err = os.Chtimes(filepath.Join(rsyncDst(args), "ca-certificates.crt"), orig, orig)
+		}
+		return out, err
+	}
+
+	restore, err := inject(bundle, testCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratchDir, _ := findMount(t, loadMounts(t, bundle), "/etc/ssl/certs")["source"].(string)
+	if err := os.Chmod(filepath.Join(scratchDir, "ca-certificates.crt"), info.Mode().Perm()); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := restore.finish(); err != nil {
 		t.Fatal(err)
 	}
-	if !wroteBack {
-		t.Fatal("the rewrite was not written back")
-	}
 	if got := mustRead(t, hostBundle); got != "ORIGINAL-ROOTS\n" {
 		t.Fatalf("the store was written back as %q", got)
 	}
-	if !sent.Equal(stepTime) {
-		t.Errorf("the bundle was written back with mtime %v, want the step's %v", sent, stepTime)
+	if got := mustStatMtime(t, hostBundle); !got.Equal(orig) {
+		t.Errorf("the bundle has mtime %v, want the one it had before the step, %v", got, orig)
 	}
 }
 

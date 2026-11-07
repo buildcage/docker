@@ -242,19 +242,88 @@ func TestStepWritesFindsRewritesWithTheSameContent(t *testing.T) {
 		}
 	}
 	mustWriteFile(t, filepath.Join(dir, "created"), "new")
+	mustSymlink(t, "untouched", filepath.Join(dir, "link"))
 	current, err := captureManifest(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	written := stepWrites(baseline, current)
+	written := stepWrites(baseline, baseline, current)
 	for _, name := range []string{"rewritten", "renamed", "created"} {
 		if _, ok := written[name]; !ok {
 			t.Errorf("%s is not counted as written", name)
 		}
 	}
-	if _, ok := written["untouched"]; ok {
-		t.Error("untouched is counted as written")
+	for _, name := range []string{"untouched", "link"} {
+		if _, ok := written[name]; ok {
+			t.Errorf("%s is counted as written", name)
+		}
+	}
+}
+
+// A write that keeps the mtime the step found, as a chmod does, carries the
+// original mtime rather than the one the injection left; a write that moves it
+// carries the step's.
+func TestStepWritesPicksTheMtimeEachWriteLeaves(t *testing.T) {
+	dir := t.TempDir()
+	orig := time.Now().Add(-3 * time.Hour).Truncate(time.Second)
+	injected := orig.Add(time.Hour)
+	stepTime := orig.Add(2 * time.Hour)
+	for _, name := range []string{"chmodded", "rewritten"} {
+		mustWriteFile(t, filepath.Join(dir, name), "same")
+		if err := os.Chtimes(filepath.Join(dir, name), orig, orig); err != nil {
+			t.Fatal(err)
+		}
+	}
+	original, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"chmodded", "rewritten"} {
+		if err := os.Chtimes(filepath.Join(dir, name), injected, injected); err != nil {
+			t.Fatal(err)
+		}
+	}
+	baseline, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Chmod(filepath.Join(dir, "chmodded"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(dir, "rewritten"), "same")
+	if err := os.Chtimes(filepath.Join(dir, "rewritten"), stepTime, stepTime); err != nil {
+		t.Fatal(err)
+	}
+	current, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	written := stepWrites(original, baseline, current)
+	if got := written["chmodded"]; !got.Equal(orig) {
+		t.Errorf("chmodded carries %v, want the original %v", got, orig)
+	}
+	if got := written["rewritten"]; !got.Equal(stepTime) {
+		t.Errorf("rewritten carries %v, want the step's %v", got, stepTime)
+	}
+}
+
+// An entry the write-back removed is skipped; any other failure is reported.
+func TestTouchWritten(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "kept"), "x")
+	mtime := time.Now().Add(-time.Hour).Truncate(time.Second)
+
+	if err := touchWritten(dir, map[string]time.Time{"kept": mtime, "removed": mtime}); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustStatMtime(t, filepath.Join(dir, "kept")); !got.Equal(mtime) {
+		t.Errorf("kept has mtime %v, want %v", got, mtime)
+	}
+	if err := touchWritten(dir, map[string]time.Time{"kept/under-a-file": mtime}); err == nil {
+		t.Fatal("expected a path under a regular file to be reported")
 	}
 }
 
@@ -286,7 +355,7 @@ func TestRestoreMtimesGivesAWrittenEntryTheStepsMtime(t *testing.T) {
 	}
 }
 
-func TestRestoreUnchangedMtimesLeavesChangedFilesAlone(t *testing.T) {
+func TestRestoreMtimesLeavesChangedFilesAlone(t *testing.T) {
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "untouched"), "same")
 	mustWriteFile(t, filepath.Join(dir, "changed"), "before")
@@ -670,7 +739,7 @@ func TestHashFileReportsAFileItCannotOpen(t *testing.T) {
 
 // The mtime reset walks the manifest, not the directory, so an entry naming
 // something no longer there is a real possibility rather than a guard.
-func TestRestoreUnchangedMtimesReportsAFileItCannotTouch(t *testing.T) {
+func TestRestoreMtimesReportsAFileItCannotTouch(t *testing.T) {
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "a"), "same")
 	manifest, err := captureManifest(dir)

@@ -309,17 +309,48 @@ func (e fileEntry) writtenSince(base fileEntry) bool {
 	return !e.mtime.Equal(base.mtime) || !e.ctime.Equal(base.ctime) || e.ino != base.ino
 }
 
-// stepWrites maps each entry the step created or wrote to the mtime it left,
-// so a rewrite with the same content still reaches the layer as it would under
-// any engine.
-func stepWrites(baseline, current []fileEntry) map[string]time.Time {
+func entriesByPath(entries []fileEntry) map[string]fileEntry {
+	byPath := make(map[string]fileEntry, len(entries))
+	for _, e := range entries {
+		byPath[e.path] = e
+	}
+	return byPath
+}
+
+// stepWrites returns the mtime each entry the step created or wrote should
+// carry, symlinks aside: the one the step left, or the original when the step
+// kept the mtime it found, as a chown or a hard link does.
+func stepWrites(original, baseline, current []fileEntry) map[string]time.Time {
+	before, base := entriesByPath(original), entriesByPath(baseline)
 	written := map[string]time.Time{}
 	for _, c := range current {
-		if base, ok := entryFor(baseline, c.path); !ok || c.writtenSince(base) {
-			written[c.path] = c.mtime
+		if c.mode&os.ModeSymlink != 0 {
+			continue
+		}
+		b, ok := base[c.path]
+		if ok && !c.writtenSince(b) {
+			continue
+		}
+		written[c.path] = c.mtime
+		if o, existed := before[c.path]; ok && existed && c.mtime.Equal(b.mtime) {
+			written[c.path] = o.mtime
 		}
 	}
 	return written
+}
+
+// touchWritten sets each written entry's mtime on the rootfs once more. rsync
+// skips a file that already matches, and overlayfs copies a file into the
+// step's layer only when something writes to it. An entry the write-back
+// removed is skipped.
+func touchWritten(hostDir string, written map[string]time.Time) error {
+	for rel, mtime := range written {
+		err := os.Chtimes(filepath.Join(hostDir, rel), mtime, mtime)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkMirrorable fails when root holds more than maxFiles files or maxBytes
@@ -350,15 +381,12 @@ func checkMirrorable(root string, maxBytes int64, maxFiles int) error {
 }
 
 // restoreMtimes undoes what mirroring and the CA round trip did to each
-// entry's mtime: one the step wrote gets the mtime the step left, and one it
+// entry's mtime: one the step wrote gets the mtime stepWrites chose, and one it
 // never touched gets its original back. --checksum keeps the write-back from
 // rewriting a file whose content is the same, but -a still carries the mtime
 // over to the rootfs.
 func restoreMtimes(original, current []fileEntry, written map[string]time.Time, scratchDir string) error {
-	byPath := make(map[string]fileEntry, len(original))
-	for _, e := range original {
-		byPath[e.path] = e
-	}
+	byPath := entriesByPath(original)
 	for _, c := range current {
 		if c.mode&os.ModeSymlink != 0 {
 			continue // no portable Lutimes in the standard library; harmless to skip
@@ -453,7 +481,7 @@ func (b *dirBind) finish() error {
 	if err != nil {
 		return err
 	}
-	written := stepWrites(b.baseline, current)
+	written := stepWrites(b.original, b.baseline, current)
 	// Removing the bundle's package leaves the mirror as it was, since apk
 	// keeps the bundle the CA changed.
 	if manifestsEqual(current, b.baseline) && len(written) == 0 && !b.bundlePackageRemoved() {
@@ -519,6 +547,9 @@ func (b *dirBind) finish() error {
 	}
 
 	if err := writeBack(b.scratchDir, b.hostDir); err != nil {
+		return err
+	}
+	if err := touchWritten(b.hostDir, written); err != nil {
 		return err
 	}
 	for _, dir := range dropped {
