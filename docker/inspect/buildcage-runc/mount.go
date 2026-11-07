@@ -218,6 +218,8 @@ type fileEntry struct {
 	mode      fs.FileMode
 	uid, gid  uint32
 	mtime     time.Time
+	ctime     time.Time
+	ino       uint64
 	symlinkTo string
 	sha256    [32]byte
 }
@@ -245,6 +247,7 @@ func captureManifest(root string) ([]fileEntry, error) {
 		fe := fileEntry{path: rel, mode: info.Mode(), mtime: info.ModTime()}
 		if st, ok := info.Sys().(*syscall.Stat_t); ok {
 			fe.uid, fe.gid = st.Uid, st.Gid
+			fe.ctime, fe.ino = changeTime(st), st.Ino
 		}
 		switch {
 		case info.Mode()&os.ModeSymlink != 0:
@@ -299,6 +302,57 @@ func manifestsEqual(a, b []fileEntry) bool {
 	return slices.EqualFunc(a, b, fileEntry.sameExceptMtime)
 }
 
+// writtenSince reports whether e was written after base was captured, even
+// with the same content. A step cannot set ctime back, and a rename over the
+// file shows as a new inode.
+func (e fileEntry) writtenSince(base fileEntry) bool {
+	return !e.mtime.Equal(base.mtime) || !e.ctime.Equal(base.ctime) || e.ino != base.ino
+}
+
+func entriesByPath(entries []fileEntry) map[string]fileEntry {
+	byPath := make(map[string]fileEntry, len(entries))
+	for _, e := range entries {
+		byPath[e.path] = e
+	}
+	return byPath
+}
+
+// stepWrites returns the mtime each entry the step created or wrote should
+// carry, symlinks aside: the one the step left, or the original when the step
+// kept the mtime it found, as a chown or a hard link does.
+func stepWrites(original, baseline, current []fileEntry) map[string]time.Time {
+	before, base := entriesByPath(original), entriesByPath(baseline)
+	written := map[string]time.Time{}
+	for _, c := range current {
+		if c.mode&os.ModeSymlink != 0 {
+			continue
+		}
+		b, ok := base[c.path]
+		if ok && !c.writtenSince(b) {
+			continue
+		}
+		written[c.path] = c.mtime
+		if o, existed := before[c.path]; ok && existed && c.mtime.Equal(b.mtime) {
+			written[c.path] = o.mtime
+		}
+	}
+	return written
+}
+
+// touchWritten sets each written entry's mtime on the rootfs once more. rsync
+// skips a file that already matches, and overlayfs copies a file into the
+// step's layer only when something writes to it. An entry the write-back
+// removed is skipped.
+func touchWritten(hostDir string, written map[string]time.Time) error {
+	for rel, mtime := range written {
+		err := os.Chtimes(filepath.Join(hostDir, rel), mtime, mtime)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
+}
+
 // checkMirrorable fails when root holds more than maxFiles files or maxBytes
 // bytes. It stops counting there, since root can be as large as the image
 // makes it.
@@ -326,24 +380,26 @@ func checkMirrorable(root string, maxBytes int64, maxFiles int) error {
 	return err
 }
 
-// restoreUnchangedMtimes resets an untouched entry's mtime to what it was
-// before mirroring. --checksum keeps the write-back from rewriting a file
-// whose content is the same, but -a still carries the mtime the injection
-// round trip left on it over to the rootfs, for a file the step never touched.
-func restoreUnchangedMtimes(original, current []fileEntry, scratchDir string) error {
-	byPath := make(map[string]fileEntry, len(original))
-	for _, e := range original {
-		byPath[e.path] = e
-	}
+// restoreMtimes undoes what mirroring and the CA round trip did to each
+// entry's mtime: one the step wrote gets the mtime stepWrites chose, and one it
+// never touched gets its original back. --checksum keeps the write-back from
+// rewriting a file whose content is the same, but -a still carries the mtime
+// over to the rootfs.
+func restoreMtimes(original, current []fileEntry, written map[string]time.Time, scratchDir string) error {
+	byPath := entriesByPath(original)
 	for _, c := range current {
 		if c.mode&os.ModeSymlink != 0 {
 			continue // no portable Lutimes in the standard library; harmless to skip
 		}
-		o, ok := byPath[c.path]
-		if !ok || !o.sameExceptMtime(c) {
-			continue
+		mtime, ok := written[c.path]
+		if !ok {
+			o, existed := byPath[c.path]
+			if !existed || !o.sameExceptMtime(c) {
+				continue
+			}
+			mtime = o.mtime
 		}
-		if err := os.Chtimes(filepath.Join(scratchDir, c.path), o.mtime, o.mtime); err != nil {
+		if err := os.Chtimes(filepath.Join(scratchDir, c.path), mtime, mtime); err != nil {
 			return err
 		}
 	}
@@ -425,9 +481,10 @@ func (b *dirBind) finish() error {
 	if err != nil {
 		return err
 	}
+	written := stepWrites(b.original, b.baseline, current)
 	// Removing the bundle's package leaves the mirror as it was, since apk
 	// keeps the bundle the CA changed.
-	if manifestsEqual(current, b.baseline) && !b.bundlePackageRemoved() {
+	if manifestsEqual(current, b.baseline) && len(written) == 0 && !b.bundlePackageRemoved() {
 		return nil
 	}
 
@@ -471,7 +528,7 @@ func (b *dirBind) finish() error {
 		return err
 	}
 	stripped = slices.DeleteFunc(stripped, func(e fileEntry) bool { return b.apkReplaced[e.path] })
-	if err := restoreUnchangedMtimes(b.original, stripped, b.scratchDir); err != nil {
+	if err := restoreMtimes(b.original, stripped, written, b.scratchDir); err != nil {
 		return err
 	}
 
@@ -490,6 +547,9 @@ func (b *dirBind) finish() error {
 	}
 
 	if err := writeBack(b.scratchDir, b.hostDir); err != nil {
+		return err
+	}
+	if err := touchWritten(b.hostDir, written); err != nil {
 		return err
 	}
 	for _, dir := range dropped {

@@ -215,7 +215,147 @@ func TestCheckMirrorable(t *testing.T) {
 	}
 }
 
-func TestRestoreUnchangedMtimesLeavesChangedFilesAlone(t *testing.T) {
+// A rewrite with the same content counts even when the step sets the mtime
+// back, and so does a rename over the file; an untouched file does not.
+func TestStepWritesFindsRewritesWithTheSameContent(t *testing.T) {
+	dir := t.TempDir()
+	past := time.Now().Add(-time.Hour).Truncate(time.Second)
+	for _, name := range []string{"untouched", "rewritten", "renamed"} {
+		mustWriteFile(t, filepath.Join(dir, name), "same")
+		if err := os.Chtimes(filepath.Join(dir, name), past, past); err != nil {
+			t.Fatal(err)
+		}
+	}
+	baseline, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mustWriteFile(t, filepath.Join(dir, "rewritten"), "same")
+	mustWriteFile(t, filepath.Join(dir, "renamed.tmp"), "same")
+	if err := os.Rename(filepath.Join(dir, "renamed.tmp"), filepath.Join(dir, "renamed")); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"rewritten", "renamed"} {
+		if err := os.Chtimes(filepath.Join(dir, name), past, past); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustWriteFile(t, filepath.Join(dir, "created"), "new")
+	mustSymlink(t, "untouched", filepath.Join(dir, "link"))
+	current, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	written := stepWrites(baseline, baseline, current)
+	for _, name := range []string{"rewritten", "renamed", "created"} {
+		if _, ok := written[name]; !ok {
+			t.Errorf("%s is not counted as written", name)
+		}
+	}
+	for _, name := range []string{"untouched", "link"} {
+		if _, ok := written[name]; ok {
+			t.Errorf("%s is counted as written", name)
+		}
+	}
+}
+
+// A write that keeps the mtime the step found, as a chmod does, carries the
+// original mtime rather than the one the injection left; a write that moves it
+// carries the step's.
+func TestStepWritesPicksTheMtimeEachWriteLeaves(t *testing.T) {
+	dir := t.TempDir()
+	orig := time.Now().Add(-3 * time.Hour).Truncate(time.Second)
+	injected := orig.Add(time.Hour)
+	stepTime := orig.Add(2 * time.Hour)
+	for _, name := range []string{"chmodded", "rewritten"} {
+		mustWriteFile(t, filepath.Join(dir, name), "same")
+		if err := os.Chtimes(filepath.Join(dir, name), orig, orig); err != nil {
+			t.Fatal(err)
+		}
+	}
+	original, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"chmodded", "rewritten"} {
+		if err := os.Chtimes(filepath.Join(dir, name), injected, injected); err != nil {
+			t.Fatal(err)
+		}
+	}
+	baseline, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Chmod(filepath.Join(dir, "chmodded"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(dir, "rewritten"), "same")
+	if err := os.Chtimes(filepath.Join(dir, "rewritten"), stepTime, stepTime); err != nil {
+		t.Fatal(err)
+	}
+	current, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	written := stepWrites(original, baseline, current)
+	if got := written["chmodded"]; !got.Equal(orig) {
+		t.Errorf("chmodded carries %v, want the original %v", got, orig)
+	}
+	if got := written["rewritten"]; !got.Equal(stepTime) {
+		t.Errorf("rewritten carries %v, want the step's %v", got, stepTime)
+	}
+}
+
+// An entry the write-back removed is skipped; any other failure is reported.
+func TestTouchWritten(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "kept"), "x")
+	mtime := time.Now().Add(-time.Hour).Truncate(time.Second)
+
+	if err := touchWritten(dir, map[string]time.Time{"kept": mtime, "removed": mtime}); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustStatMtime(t, filepath.Join(dir, "kept")); !got.Equal(mtime) {
+		t.Errorf("kept has mtime %v, want %v", got, mtime)
+	}
+	if err := touchWritten(dir, map[string]time.Time{"kept/under-a-file": mtime}); err == nil {
+		t.Fatal("expected a path under a regular file to be reported")
+	}
+}
+
+// An entry the step wrote gets the mtime it left, though its content matches
+// the original.
+func TestRestoreMtimesGivesAWrittenEntryTheStepsMtime(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "bundle"), "same")
+	past := time.Now().Add(-2 * time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(filepath.Join(dir, "bundle"), past, past); err != nil {
+		t.Fatal(err)
+	}
+	original, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(dir, "bundle"), "same")
+	current, err := captureManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stepTime := past.Add(time.Hour)
+	if err := restoreMtimes(original, current, map[string]time.Time{"bundle": stepTime}, dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustStatMtime(t, filepath.Join(dir, "bundle")); !got.Equal(stepTime) {
+		t.Errorf("mtime = %v, want the step's %v", got, stepTime)
+	}
+}
+
+func TestRestoreMtimesLeavesChangedFilesAlone(t *testing.T) {
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "untouched"), "same")
 	mustWriteFile(t, filepath.Join(dir, "changed"), "before")
@@ -242,7 +382,7 @@ func TestRestoreUnchangedMtimesLeavesChangedFilesAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := restoreUnchangedMtimes(original, current, dir); err != nil {
+	if err := restoreMtimes(original, current, nil, dir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -599,7 +739,7 @@ func TestHashFileReportsAFileItCannotOpen(t *testing.T) {
 
 // The mtime reset walks the manifest, not the directory, so an entry naming
 // something no longer there is a real possibility rather than a guard.
-func TestRestoreUnchangedMtimesReportsAFileItCannotTouch(t *testing.T) {
+func TestRestoreMtimesReportsAFileItCannotTouch(t *testing.T) {
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "a"), "same")
 	manifest, err := captureManifest(dir)
@@ -610,7 +750,7 @@ func TestRestoreUnchangedMtimesReportsAFileItCannotTouch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := restoreUnchangedMtimes(manifest, manifest, dir); err == nil {
+	if err := restoreMtimes(manifest, manifest, nil, dir); err == nil {
 		t.Fatal("expected the missing file to be reported")
 	}
 }

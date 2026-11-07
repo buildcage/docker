@@ -7,6 +7,13 @@ FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4c
 # apk's log carries the time.
 RUN apk add --no-cache ca-certificates && rm /var/log/apk.log
 
+# Rebuilds the bundle with the content it already has; the rewrite alone puts
+# it in the layer.
+RUN update-ca-certificates
+
+# Changes only the bundle's metadata, which also puts it in the layer.
+RUN chmod 644 /etc/ssl/certs/ca-certificates.crt
+
 # Records an older version, so the upgrade below happens whatever the
 # repository holds by the time this runs.
 RUN sed -i '/^P:ca-certificates-bundle$/,/^$/ s/^V:.*/V:0-r0/' /lib/apk/db/installed
