@@ -1,4 +1,4 @@
-//#region \0rolldown/runtime.js
+// \0rolldown/runtime.js
 var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDesc = Object.getOwnPropertyDescriptor, __getOwnPropNames = Object.getOwnPropertyNames, __getProtoOf = Object.getPrototypeOf, __hasOwnProp = Object.prototype.hasOwnProperty, __copyProps = (to, from, except, desc) => {
 	if (from && typeof from == "object" || typeof from == "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) key = keys[i], !__hasOwnProp.call(to, key) && key !== except && __defProp(to, key, {
 		get: ((k) => from[k]).bind(null, key),
@@ -9,7 +9,6 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 	value: mod,
 	enumerable: !0
 }) : target, mod));
-//#endregion
 let node_child_process = require("node:child_process"), node_fs = require("node:fs"), node_url = require("node:url"), os = require("os");
 os = __toESM(os, 1);
 let fs = require("fs");
@@ -21,8 +20,7 @@ events = __toESM(events, 1);
 let node_crypto = require("node:crypto"), child_process = require("child_process");
 child_process = __toESM(child_process, 1), require("timers");
 let node_path = require("node:path");
-//#endregion
-//#region node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/summary.js
+// node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/summary.js
 var __awaiter$6 = function(thisArg, _arguments, P, generator) {
 	function adopt(value) {
 		return value instanceof P ? value : new P(function(resolve) {
@@ -173,8 +171,7 @@ function info(message) {
 function getState(name) {
 	return process.env[`STATE_${name}`] || "";
 }
-//#endregion
-//#region src/core/lib/errors.ts
+// src/core/lib/errors.ts
 var ActionError = class extends Error {
 	code;
 	constructor(message, code) {
@@ -184,8 +181,7 @@ var ActionError = class extends Error {
 function errorMessage(e) {
 	return e instanceof Error ? e.message : String(e);
 }
-//#endregion
-//#region src/core/lib/actions/annotation.ts
+// src/core/lib/actions/annotation.ts
 function escapeData(message) {
 	return message.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 }
@@ -207,15 +203,13 @@ function createAnnotation(enabled) {
 	};
 }
 const annotate = createAnnotation(!0);
-//#endregion
-//#region src/core/lib/actions/fatal.ts
+// src/core/lib/actions/fatal.ts
 function exitOnFatalError(context) {
 	return (err) => {
 		err instanceof ActionError ? annotate.error(err.message) : annotate.error(`Unexpected error in ${context}: ${errorMessage(err)}`), process.exit(1);
 	};
 }
-//#endregion
-//#region src/core/lib/actions/input-names.ts
+// src/core/lib/actions/input-names.ts
 function inputEnvName(name) {
 	return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
 }
@@ -234,15 +228,13 @@ function normalizeInputNames(env, names, lists = []) {
 	}
 	return warnings;
 }
-//#endregion
-//#region src/core/lib/actions/inputs.ts
+// src/core/lib/actions/inputs.ts
 var InvalidInputError = class extends ActionError {
 	constructor(message, code) {
 		super(message, code);
 	}
 };
-//#endregion
-//#region src/report/report-source.ts
+// src/report/report-source.ts
 const BUILDER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
 function resolveBuilderName(value) {
 	if (value === "") return "buildcage";
@@ -273,13 +265,11 @@ const LIST_INPUTS = [
 function withComposeOverlay(composeFile, overlay) {
 	return overlay ? [composeFile, overlay] : [composeFile];
 }
-//#endregion
-//#region src/lib/local-image.ts
+// src/lib/local-image.ts
 async function readLocalImageOverride(env, log = console.log) {
 	return null;
 }
-//#endregion
-//#region src/core/lib/docker/args.ts
+// src/core/lib/docker/args.ts
 function fileArgs(composeFiles) {
 	return composeFiles.flatMap((file) => ["-f", file]);
 }
@@ -295,20 +285,17 @@ function buildComposeDownArgs({ composeFiles, projectName }) {
 		"-v"
 	];
 }
-//#endregion
-//#region src/core/lib/docker/compose-project-name.ts
+// src/core/lib/docker/compose-project-name.ts
 function deriveProjectName(containerName) {
 	return `buildcage-${(0, node_crypto.createHash)("sha256").update(containerName).digest("hex").slice(0, 12)}`;
 }
 function resolveProjectName(builderName, composeProjectNameOverride) {
 	return composeProjectNameOverride || deriveProjectName(builderName);
 }
-//#endregion
-//#region src/core/lib/acl/ipv4.ts
+// src/core/lib/acl/ipv4.ts
 const OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])", PREFIX = "(3[0-2]|[12]?[0-9])", IPV4 = `${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}`;
 RegExp(`^${OCTET}$`), RegExp(`^${IPV4}(?:/${PREFIX})?$`), RegExp(`^${IPV4}/${PREFIX}$`);
-//#endregion
-//#region src/lib/inputs.ts
+// src/lib/inputs.ts
 function readBuilderName(getInput$3 = getInput) {
 	return resolveBuilderName(getInput$3("builder-name"));
 }
@@ -333,8 +320,7 @@ function planPostCleanup(composeFile, projectNameOverride, env, { savedBuilderNa
 		}
 	};
 }
-//#endregion
-//#region src/post.ts
+// src/post.ts
 async function main() {
 	normalizeInputNames(process.env, INPUT_NAMES, CONFIG_FILE_INPUTS.lists);
 	let localOverride = await readLocalImageOverride(process.env, () => {}), plan = planPostCleanup(COMPOSE_FILE, void 0, process.env, {
@@ -347,4 +333,3 @@ async function main() {
 	}) : info("No builder to remove: the setup step stopped before it named one.");
 }
 process.argv[1] && (0, node_fs.realpathSync)(process.argv[1]) === (0, node_url.fileURLToPath)(require("url").pathToFileURL(__filename).href) && main().catch(exitOnFatalError("post"));
-//#endregion
