@@ -26836,7 +26836,7 @@ var init_xml = __esmMin((() => {
 		function run(args) {
 			if (args ||= arguments_, runDependencies > 0 || (stackCheckInit(), preRun(), runDependencies > 0)) return;
 			function doRun() {
-				calledRun || (calledRun = !0, Module.calledRun = !0, !ABORT && (initRuntime(), readyPromiseResolve(Module), Module.onRuntimeInitialized && Module.onRuntimeInitialized(), assert(!Module._main, "compiled without a main, but one is present. if you added it from JS, use Module[\"onRuntimeInitialized\"]"), postRun()));
+				calledRun || (calledRun = !0, Module.calledRun = !0, ABORT || (initRuntime(), readyPromiseResolve(Module), Module.onRuntimeInitialized && Module.onRuntimeInitialized(), assert(!Module._main, "compiled without a main, but one is present. if you added it from JS, use Module[\"onRuntimeInitialized\"]"), postRun()));
 			}
 			Module.setStatus ? (Module.setStatus("Running..."), setTimeout(function() {
 				setTimeout(function() {
@@ -45507,7 +45507,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			}
 			_this.push(null);
 		}), stream.on("data", function(chunk) {
-			debug("wrapped data"), state.decoder && (chunk = state.decoder.write(chunk)), !(state.objectMode && chunk == null) && (state.objectMode || chunk && chunk.length) && (_this.push(chunk) || (paused = !0, stream.pause()));
+			debug("wrapped data"), state.decoder && (chunk = state.decoder.write(chunk)), state.objectMode && chunk == null || (state.objectMode || chunk && chunk.length) && (_this.push(chunk) || (paused = !0, stream.pause()));
 		}), stream) this[i] === void 0 && typeof stream[i] == "function" && (this[i] = function(method) {
 			return function() {
 				return stream[method].apply(stream, arguments);
@@ -47128,7 +47128,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	function construct(stream, cb) {
 		if (typeof stream._construct != "function") return;
 		let r = stream._readableState, w = stream._writableState;
-		r && (r.constructed = !1), w && (w.constructed = !1), stream.once(kConstruct, cb), !(stream.listenerCount(kConstruct) > 1) && process.nextTick(constructNT, stream);
+		r && (r.constructed = !1), w && (w.constructed = !1), stream.once(kConstruct, cb), stream.listenerCount(kConstruct) > 1 || process.nextTick(constructNT, stream);
 	}
 	function constructNT(stream) {
 		let called = !1;
@@ -59579,7 +59579,7 @@ var init_github = __esmMin((() => {
 })), require_Set = __commonJSMin(((exports, module) => {
 	var $TypeError = require_type(), isObject = require_isObject$1(), isPropertyKey = require_isPropertyKey$1(), SameValue = require_SameValue(), noThrowOnStrictViolation = function() {
 		try {
-			return !0;
+			return delete [].length, !0;
 		} catch {
 			return !1;
 		}
