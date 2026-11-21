@@ -12500,7 +12500,7 @@ var require_envelope = __commonJSMin(((exports) => {
 	function verifyTLogInclusion(entry, tlogAuthorities) {
 		let inclusionVerified = !1;
 		if (isTLogEntryWithInclusionPromise(entry) && ((0, set_1.verifyTLogSET)(entry, tlogAuthorities), inclusionVerified = !0), isTLogEntryWithInclusionProof(entry)) {
-			let checkpoint = (0, checkpoint_1.verifyCheckpoint)(entry, tlogAuthorities);
+			let matchingAuthorities = tlogAuthorities.filter((tlog) => tlog.logID.equals(entry.logId.keyId)), checkpoint = (0, checkpoint_1.verifyCheckpoint)(entry, matchingAuthorities);
 			(0, merkle_1.verifyMerkleInclusion)(entry, checkpoint), inclusionVerified = !0;
 		}
 		if (!inclusionVerified) throw new error_1.VerificationError({
@@ -12576,7 +12576,7 @@ var require_envelope = __commonJSMin(((exports) => {
 			if (tlogEntries.forEach((entry) => {
 				(0, tlog_1.verifyTLogInclusion)(entry, this.trustMaterial.tlogs), (0, tlog_1.verifyTLogBody)(entry, content), entryIDs.push({
 					logID: entry.logId.keyId,
-					logIndex: entry.logIndex
+					body: entry.canonicalizedBody
 				});
 			}), containsDupes(entryIDs)) throw new error_1.VerificationError({
 				code: "TLOG_ERROR",
