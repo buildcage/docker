@@ -15469,7 +15469,7 @@ function runReportScript(scriptPath, containerId, { trafficFile, env = process.e
 	}
 	return 0;
 }
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/config.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/config.js
 function getUploadChunkSize() {
 	return 8388608;
 }
@@ -19354,7 +19354,7 @@ var init_config = __esmMin((() => {
 })), init_generated = __esmMin((() => {
 	init_timestamp(), init_wrappers(), init_artifact$1(), init_artifact_twirp_client$1();
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/retention.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/retention.js
 function getExpiration(retentionDays) {
 	if (!retentionDays) return;
 	let maxRetentionDays = getRetentionDays();
@@ -19371,7 +19371,7 @@ function getRetentionDays() {
 var init_retention = __esmMin((() => {
 	init_generated(), init_core();
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/path-and-artifact-name-validation.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/path-and-artifact-name-validation.js
 function validateArtifactName(name) {
 	if (!name) throw Error("Provided artifact name input during validation is empty");
 	for (let [invalidCharacterKey, errorMessageForCharacter] of invalidArtifactNameCharacters) if (name.includes(invalidCharacterKey)) throw Error(`The artifact name is not valid: ${name}. Contains the following character: ${errorMessageForCharacter}
@@ -19478,7 +19478,7 @@ var invalidArtifactFilePathCharacters, invalidArtifactNameCharacters, init_path_
 })), require_package_version = __commonJSMin(((exports, module) => {
 	module.exports = { version: require_package().version };
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/user-agent.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/user-agent.js
 function getUserAgentString$1() {
 	return `@actions/artifact-${import_package_version.version}`;
 }
@@ -19564,7 +19564,7 @@ function jwtDecode(token, options) {
 var InvalidTokenError, init_esm$13 = __esmMin((() => {
 	InvalidTokenError = class extends Error {}, InvalidTokenError.prototype.name = "InvalidTokenError";
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/util.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/util.js
 function getBackendIdsFromToken() {
 	let decoded = jwtDecode(getRuntimeToken());
 	if (!decoded.scp) throw InvalidJwtError;
@@ -19596,7 +19596,7 @@ function maskSecretUrls(body) {
 var InvalidJwtError, init_util$3 = __esmMin((() => {
 	init_core(), init_config(), init_esm$13(), InvalidJwtError = Error("Failed to get backend IDs: The provided JWT token is invalid and/or missing claims");
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/artifact-twirp-client.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/artifact-twirp-client.js
 function internalArtifactTwirpClient(options) {
 	let client = new ArtifactHttpClient(getUserAgentString$1(), options?.maxAttempts, options?.retryIntervalMs, options?.retryMultiplier);
 	return new ArtifactServiceClientJSON(client);
@@ -19711,7 +19711,7 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 		}
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
 function validateRootDirectory(rootDirectory) {
 	if (!fs.existsSync(rootDirectory)) throw Error(`The provided rootDirectory ${rootDirectory} does not exist`);
 	if (!fs.statSync(rootDirectory).isDirectory()) throw Error(`The provided rootDirectory ${rootDirectory} is not a valid directory`);
@@ -23427,7 +23427,7 @@ var init_httpClientAdapter = __esmMin((() => {
 })), init_esm$4 = __esmMin((() => {
 	init_extendedClient(), init_response(), init_requestPolicyFactoryPolicy(), init_disableKeepAlivePolicy(), init_httpClientAdapter(), init_util$2();
 }));
-// node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/util.js
+// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/util.js
 function getAllMatches(string, regex) {
 	let matches = [], match = regex.exec(string);
 	for (; match;) {
@@ -23459,7 +23459,7 @@ var regexName, isName, DANGEROUS_PROPERTY_NAMES, criticalProperties, init_util$1
 		"prototype"
 	];
 }));
-// node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/validator.js
+// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/validator.js
 function validate(xmlData, options) {
 	options = Object.assign({}, defaultOptions$2, options);
 	let tags = [], tagFound = !1, reachedRoot = !1;
@@ -23895,7 +23895,7 @@ var ENTITY_ACTION, SPECIAL_CHARS, LIMIT_TIER_EXTERNAL, LIMIT_TIER_BASE, LIMIT_TI
 })), init_src$4 = __esmMin((() => {
 	init_EntityDecoder(), init_entities();
 }));
-// node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
+// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
 function validatePropertyName(propertyName, optionName) {
 	if (typeof propertyName != "string") return;
 	let normalized = propertyName.toLowerCase();
@@ -24049,7 +24049,7 @@ var defaultOnDangerousProperty, defaultOptions$1, buildOptions, init_OptionsBuil
 		}, validator;
 	};
 }));
-// node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
+// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
 function hasSeq(data, seq, i) {
 	for (let j = 0; j < seq.length; j++) if (seq[j] !== data[i + j + 1]) return !1;
 	return !0;
@@ -24440,7 +24440,7 @@ var hexRegex, binRegex, octRegex, numRegex, consider, eNotationRegx, init_strnum
 		unicode: !1
 	}, eNotationRegx = /^([-+])?(0*)(\d*(\.\d*)?[eE][-\+]?\d+)$/;
 }));
-// node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/ignoreAttributes.js
+// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/ignoreAttributes.js
 function getIgnoreAttributesFn$1(ignoreAttributes) {
 	return typeof ignoreAttributes == "function" ? ignoreAttributes : Array.isArray(ignoreAttributes) ? (attrName) => {
 		for (let pattern of ignoreAttributes) if (typeof pattern == "string" && attrName === pattern || pattern instanceof RegExp && pattern.test(attrName)) return !0;
@@ -25378,7 +25378,22 @@ var init_ignoreAttributes$1 = __esmMin((() => {})), Expression, init_Expression 
 		}
 	], SQL_STRICT_PATTERNS = [...SQL_PATTERNS, ...SQL_STRICT_EXTRA];
 }));
-// node_modules/.pnpm/is-unsafe@2.0.2/node_modules/is-unsafe/src/index.js
+// node_modules/.pnpm/is-unsafe@2.0.3/node_modules/is-unsafe/src/util/decode-entities.js
+function decodeEntities(input) {
+	return input.indexOf("&") === -1 ? input : input.replace(ENTITY_RE, (match, hex, dec, name) => {
+		if (name !== void 0) return Object.prototype.hasOwnProperty.call(NAMED, name) ? NAMED[name] : match;
+		let cp = hex === void 0 ? parseInt(dec, 10) : parseInt(hex, 16);
+		return !Number.isFinite(cp) || cp > 1114111 ? match : String.fromCodePoint(cp);
+	});
+}
+var NAMED, ENTITY_RE, init_decode_entities = __esmMin((() => {
+	NAMED = Object.freeze({
+		colon: ":",
+		Tab: "	",
+		NewLine: "\n"
+	}), ENTITY_RE = /&(?:#[xX]0*([0-9a-fA-F]{1,6});?|#0*([0-9]{1,7});?|([a-zA-Z][a-zA-Z0-9]{1,15});)/g;
+}));
+// node_modules/.pnpm/is-unsafe@2.0.3/node_modules/is-unsafe/src/index.js
 function assertString(value) {
 	if (typeof value != "string") throw TypeError(`is-unsafe: first argument must be a string, got ${typeof value}`);
 }
@@ -25404,9 +25419,14 @@ function normalise(context) {
 		regex: null
 	};
 }
+function decodedCopy(value, list) {
+	if (!list.decodeEntities) return null;
+	let decoded = decodeEntities(value);
+	return decoded === value ? null : decoded;
+}
 function matchList(value, list) {
-	let label = list.label ?? "CUSTOM";
-	for (let rule of list) if (rule.pattern.test(value)) return {
+	let label = list.label ?? "CUSTOM", decoded = decodedCopy(value, list);
+	for (let rule of list) if (rule.pattern.test(value) || decoded !== null && rule.pattern.test(decoded)) return {
 		context: label,
 		id: rule.id,
 		description: rule.description,
@@ -25422,7 +25442,7 @@ function isUnsafe(value, context) {
 	return !1;
 }
 var init_src$1 = __esmMin((() => {
-	init_html(), init_xml$1(), init_svg(), init_sql(), init_shell(), init_redos(), init_nosql(), init_log$2(), init_sql_strict(), HTML_PATTERNS.label = "HTML", XML_PATTERNS.label = "XML", SVG_PATTERNS.label = "SVG", SQL_PATTERNS.label = "SQL", SQL_STRICT_PATTERNS.label = "SQL-STRICT", SHELL_PATTERNS.label = "SHELL", REDOS_PATTERNS.label = "REDOS", NOSQL_PATTERNS.label = "NOSQL", LOG_PATTERNS.label = "LOG", Object.freeze({
+	init_html(), init_xml$1(), init_svg(), init_sql(), init_shell(), init_redos(), init_nosql(), init_log$2(), init_sql_strict(), init_decode_entities(), HTML_PATTERNS.label = "HTML", XML_PATTERNS.label = "XML", SVG_PATTERNS.label = "SVG", HTML_PATTERNS.decodeEntities = !0, XML_PATTERNS.decodeEntities = !0, SVG_PATTERNS.decodeEntities = !0, SQL_PATTERNS.label = "SQL", SQL_STRICT_PATTERNS.label = "SQL-STRICT", SHELL_PATTERNS.label = "SHELL", REDOS_PATTERNS.label = "REDOS", NOSQL_PATTERNS.label = "NOSQL", LOG_PATTERNS.label = "LOG", Object.freeze({
 		HTML: HTML_PATTERNS,
 		XML: XML_PATTERNS,
 		SVG: SVG_PATTERNS,
@@ -25434,7 +25454,7 @@ var init_src$1 = __esmMin((() => {
 		LOG: LOG_PATTERNS
 	});
 }));
-// node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
+// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
 function extractRawAttributes(prefixedAttrs, options) {
 	if (!prefixedAttrs) return {};
 	let attrs = options.attributesGroupName ? prefixedAttrs[options.attributesGroupName] : prefixedAttrs;
@@ -25501,6 +25521,14 @@ function buildAttributesMap(attrStr, jPath, tagName, force = !1) {
 		}
 		return attrs;
 	}
+}
+function getOriginalIndex(index, crlfPositions) {
+	let low = 0, high = crlfPositions.length;
+	for (; low < high;) {
+		let middle = Math.floor((low + high) / 2);
+		crlfPositions[middle] < index ? low = middle + 1 : high = middle;
+	}
+	return index + low;
 }
 function addChild(currentNode, childNode, matcher, startIndex) {
 	this.options.captureMetaData || (startIndex = void 0);
@@ -25574,7 +25602,7 @@ function readTagExp(xmlData, i, removeNSPrefix, closingChar = ">") {
 	};
 }
 function readStopNodeData(xmlData, tagName, i) {
-	let startIndex = i, openTagCount = 1, xmllen = xmlData.length;
+	let startIndex = i, openTagCount = 1, lenient = !1, nextGt = -1, xmllen = xmlData.length;
 	for (; i < xmllen; i++) if (xmlData[i] === "<") {
 		let c1 = xmlData.charCodeAt(i + 1);
 		if (c1 === 47) {
@@ -25588,8 +25616,16 @@ function readStopNodeData(xmlData, tagName, i) {
 		else if (c1 === 33 && xmlData.charCodeAt(i + 2) === 45 && xmlData.charCodeAt(i + 3) === 45) i = findClosingIndex(xmlData, "-->", i + 3, "StopNode is not closed.");
 		else if (c1 === 33 && xmlData.charCodeAt(i + 2) === 91) i = findClosingIndex(xmlData, "]]>", i, "StopNode is not closed.") - 2;
 		else {
-			let tagData = readTagExp(xmlData, i, !1);
-			tagData && ((tagData && tagData.tagName) === tagName && tagData.tagExp[tagData.tagExp.length - 1] !== "/" && openTagCount++, i = tagData.closeIndex);
+			let tagData = lenient ? void 0 : readTagExp(xmlData, i, !1);
+			if (tagData) tagData.tagName === tagName && tagData.tagExp[tagData.tagExp.length - 1] !== "/" && openTagCount++, i = tagData.closeIndex;
+			else {
+				if (lenient = !0, nextGt < i && (nextGt = xmlData.indexOf(">", i), nextGt === -1)) return;
+				let nextLt = xmlData.indexOf("<", i + 1);
+				if (nextLt === -1 || nextLt > nextGt) {
+					let exp = xmlData.substring(i + 1, nextGt), sep = exp.search(/\s/);
+					(sep === -1 ? exp : exp.substring(0, sep)) === tagName && exp[exp.length - 1] !== "/" && openTagCount++, i = nextGt;
+				}
+			}
 		}
 	}
 }
@@ -25645,10 +25681,11 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 			}
 		}
 	}, attrsRegx = RegExp("([^\\s=]+)\\s*(=\\s*(['\"])([\\s\\S]*?)\\3)?", "gm"), parseXml = function(xmlData) {
-		xmlData = xmlData.replace(/\r\n?/g, "\n");
+		let options = this.options, crlfPositions = options.captureMetaData ? [] : void 0;
+		xmlData = xmlData.replace(/\r\n?/g, options.captureMetaData ? (newline, index) => (newline.length === 2 && crlfPositions.push(index - crlfPositions.length), "\n") : "\n");
 		let xmlObj = new XmlNode("!xml"), currentNode = xmlObj, textData = "";
 		this.matcher.reset(), this.entityDecoder.reset(), this.entityExpansionCount = 0, this.currentExpandedLength = 0, this.doctypefound = !1;
-		let options = this.options, docTypeReader = new DocTypeReader(options.processEntities), xmlLen = xmlData.length;
+		let docTypeReader = new DocTypeReader(options.processEntities), xmlLen = xmlData.length;
 		for (let i = 0; i < xmlLen; i++) if (xmlData[i] === "<") {
 			let c1 = xmlData.charCodeAt(i + 1);
 			if (c1 === 47) {
@@ -25660,7 +25697,7 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 				tagName = transformTagName(options.transformTagName, tagName, "", options).tagName, currentNode && (textData = this.saveTextToParentTag(textData, currentNode, this.readonlyMatcher));
 				let lastTagName = this.matcher.getCurrentTag();
 				if (tagName && options.unpairedTagsSet.has(tagName)) throw Error(`Unpaired tag can not be used as closing tag: </${tagName}>`);
-				lastTagName && options.unpairedTagsSet.has(lastTagName) && (this.matcher.pop(), this.tagsNodeStack.pop()), this.matcher.pop(), this.isCurrentNodeStopNode = !1, currentNode = this.tagsNodeStack.pop() || xmlObj, options.captureMetaData && currentNode && currentNode.addEndIndex(closeIndex + 1), textData = "", i = closeIndex;
+				lastTagName && options.unpairedTagsSet.has(lastTagName) && (this.matcher.pop(), this.tagsNodeStack.pop()), this.matcher.pop(), this.isCurrentNodeStopNode = !1, currentNode = this.tagsNodeStack.pop() || xmlObj, options.captureMetaData && currentNode && currentNode.addEndIndex(getOriginalIndex(closeIndex + 1, crlfPositions)), textData = "", i = closeIndex;
 			} else if (c1 === 63) {
 				let tagData = readTagExp(xmlData, i, !1, "?>");
 				if (!tagData) throw Error("Pi Tag is not closed.");
@@ -25672,7 +25709,9 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 				}
 				if (!(options.ignoreDeclaration && tagData.tagName === "?xml" || options.ignorePiTags)) {
 					let childNode = new XmlNode(tagData.tagName);
-					childNode.add(options.textNodeName, ""), tagData.tagName !== tagData.tagExp && tagData.attrExpPresent && options.ignoreAttributes !== !0 && (childNode[":@"] = attsMap), this.addChild(currentNode, childNode, this.readonlyMatcher, i), options.captureMetaData && currentNode.addEndIndex(tagData.closeIndex + 2);
+					childNode.add(options.textNodeName, ""), tagData.tagName !== tagData.tagExp && tagData.attrExpPresent && options.ignoreAttributes !== !0 && (childNode[":@"] = attsMap);
+					let startIndex = options.captureMetaData ? getOriginalIndex(i, crlfPositions) : i;
+					this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex), options.captureMetaData && currentNode.addEndIndex(getOriginalIndex(tagData.closeIndex + 2, crlfPositions));
 				}
 				i = tagData.closeIndex + 1;
 			} else if (c1 === 33 && xmlData.charCodeAt(i + 2) === 45 && xmlData.charCodeAt(i + 3) === 45) {
@@ -25707,7 +25746,7 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 				tagExp.length > 0 && tagExp.lastIndexOf("/") === tagExp.length - 1 && (isSelfClosing = !0, tagName[tagName.length - 1] === "/" ? (tagName = tagName.substr(0, tagName.length - 1), tagExp = tagName) : tagExp = tagExp.substr(0, tagExp.length - 1), attrExpPresent = tagName !== tagExp);
 				let prefixedAttrs = null, namespace;
 				namespace = extractNamespace(rawTagName), tagName !== xmlObj.tagname && this.matcher.push(tagName, {}, namespace), tagName !== tagExp && attrExpPresent && (prefixedAttrs = this.buildAttributesMap(tagExp, this.matcher, tagName), prefixedAttrs && extractRawAttributes(prefixedAttrs, options)), tagName !== xmlObj.tagname && (this.isCurrentNodeStopNode = this.isItStopNode());
-				let startIndex = i;
+				let startIndex = options.captureMetaData ? getOriginalIndex(i, crlfPositions) : i;
 				if (this.isCurrentNodeStopNode) {
 					let tagContent = "";
 					if (isSelfClosing) i = result.closeIndex;
@@ -25718,15 +25757,15 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 						i = result.i, tagContent = result.tagContent;
 					}
 					let childNode = new XmlNode(tagName);
-					prefixedAttrs && (childNode[":@"] = prefixedAttrs), childNode.add(options.textNodeName, tagContent), this.matcher.pop(), this.isCurrentNodeStopNode = !1, this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex), options.captureMetaData && currentNode.addEndIndex(i + 1);
+					prefixedAttrs && (childNode[":@"] = prefixedAttrs), childNode.add(options.textNodeName, tagContent), this.matcher.pop(), this.isCurrentNodeStopNode = !1, this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex), options.captureMetaData && currentNode.addEndIndex(getOriginalIndex(i + 1, crlfPositions));
 				} else {
 					if (isSelfClosing) {
 						({tagName, tagExp} = transformTagName(options.transformTagName, tagName, tagExp, options));
 						let childNode = new XmlNode(tagName);
-						prefixedAttrs && (childNode[":@"] = prefixedAttrs), this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex), options.captureMetaData && currentNode.addEndIndex(closeIndex + 1), this.matcher.pop(), this.isCurrentNodeStopNode = !1;
+						prefixedAttrs && (childNode[":@"] = prefixedAttrs), this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex), options.captureMetaData && currentNode.addEndIndex(getOriginalIndex(closeIndex + 1, crlfPositions)), this.matcher.pop(), this.isCurrentNodeStopNode = !1;
 					} else if (options.unpairedTagsSet.has(tagName)) {
 						let childNode = new XmlNode(tagName);
-						prefixedAttrs && (childNode[":@"] = prefixedAttrs), this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex), options.captureMetaData && currentNode.addEndIndex(result.closeIndex + 1), this.matcher.pop(), this.isCurrentNodeStopNode = !1, i = result.closeIndex;
+						prefixedAttrs && (childNode[":@"] = prefixedAttrs), this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex), options.captureMetaData && currentNode.addEndIndex(getOriginalIndex(result.closeIndex + 1, crlfPositions)), this.matcher.pop(), this.isCurrentNodeStopNode = !1, i = result.closeIndex;
 						continue;
 					} else {
 						let childNode = new XmlNode(tagName);
@@ -25740,7 +25779,7 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 		return xmlObj.child;
 	};
 }));
-// node_modules/.pnpm/fast-xml-parser@5.11.2/node_modules/fast-xml-parser/src/xmlparser/node2json.js
+// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/node2json.js
 function stripAttributePrefix(attrs, prefix) {
 	if (!attrs || typeof attrs != "object") return {};
 	if (!prefix) return attrs;
@@ -42325,7 +42364,7 @@ var fsStat, fsCreateReadStream, init_utils$2 = __esmMin((() => {
 })), init_BlobBatch = __esmMin((() => {})), init_BlobBatchClient = __esmMin((() => {})), init_ContainerClient = __esmMin((() => {})), init_AccountSASPermissions = __esmMin((() => {})), init_AccountSASResourceTypes = __esmMin((() => {})), init_AccountSASServices = __esmMin((() => {})), init_BlobServiceClient = __esmMin((() => {})), init_generatedModels = __esmMin((() => {})), init_esm = __esmMin((() => {
 	init_esm$7(), init_BlobServiceClient(), init_Clients(), init_ContainerClient(), init_BlobLeaseClient(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_SASQueryParameters(), init_constants(), init_utils_common$1(), init_BlobBatch(), init_BlobBatchClient(), init_BlobSASPermissions(), init_BlobSASSignatureValues(), init_ContainerSASPermissions(), init_models(), init_esm$2(), init_Pipeline(), init_SASQueryParameters(), init_generatedModels(), init_log$1();
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
 function uploadToBlobStorage(authenticatedUploadURL, uploadStream, contentType) {
 	return __awaiter$9(this, void 0, void 0, function* () {
 		let uploadByteCount = 0, lastProgressTime = Date.now(), abortController = new AbortController(), chunkTimer = (interval) => __awaiter$9(this, void 0, void 0, function* () {
@@ -55401,7 +55440,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		return !!formats[format];
 	}, vending.registerFormat("zip", require_zip()), vending.registerFormat("tar", require_tar()), vending.registerFormat("json", require_json()), module.exports = vending;
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/stream.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/stream.js
 function createRawFileUploadStream(filePath) {
 	return __awaiter$8(this, void 0, void 0, function* () {
 		debug(`Creating raw file upload stream for: ${filePath}`);
@@ -55449,7 +55488,7 @@ var __awaiter$8, WaterMarkedUploadStream, init_stream = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/zip.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/zip.js
 function createZipUploadStream(uploadSpecification_1) {
 	return __awaiter$7(this, arguments, void 0, function* (uploadSpecification, compressionLevel = 6) {
 		debug(`Creating Artifact archive with compressionLevel: ${compressionLevel}`);
@@ -55503,7 +55542,7 @@ var import_archiver, __awaiter$7, zipErrorCallback, zipWarningCallback, zipFinis
 		debug("Zip stream for upload has ended.");
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/types.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/types.js
 function getMimeType(filePath) {
 	let ext = path.extname(filePath).toLowerCase();
 	return mimeTypes[ext] || "application/octet-stream";
@@ -55560,7 +55599,7 @@ var mimeTypes, init_types = __esmMin((() => {
 		".eot": "application/vnd.ms-fontobject"
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-artifact.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-artifact.js
 function uploadArtifact(name, files, rootDirectory, options) {
 	return __awaiter$6(this, void 0, void 0, function* () {
 		let artifactFileName = `${name}.zip`;
@@ -61970,7 +62009,7 @@ var init_github = __esmMin((() => {
 })), require_unzip = __commonJSMin(((exports) => {
 	exports.Parse = require_parser_stream(), exports.Extract = require_extract();
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/download/download-artifact.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/download/download-artifact.js
 function exists(path) {
 	return __awaiter$4(this, void 0, void 0, function* () {
 		try {
@@ -62113,7 +62152,7 @@ var import_unzip, __awaiter$4, scrubQueryParameters, init_download_artifact = __
 		return parsed.search = "", parsed.toString();
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/retry-options.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/retry-options.js
 function getRetryOptions(defaultOptions, retries = defaultMaxRetryNumber, exemptStatusCodes = defaultExemptStatusCodes) {
 	if (retries <= 0) return [{ enabled: !1 }, defaultOptions.request];
 	let retryOptions = { enabled: !0 };
@@ -62901,7 +62940,7 @@ function retry(octokit, octokitOptions) {
 var import_light, VERSION, init_dist_bundle = __esmMin((() => {
 	import_light = __toESM(require_light(), 1), init_dist_src$3(), VERSION = "0.0.0-development", retry.VERSION = VERSION;
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/get-artifact.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/get-artifact.js
 function getArtifactPublic(artifactName, workflowRunId, repositoryOwner, repositoryName, token) {
 	return __awaiter$3(this, void 0, void 0, function* () {
 		let [retryOpts, requestOpts] = getRetryOptions(defaults), getArtifactResp = yield getOctokit(token, {
@@ -62979,7 +63018,7 @@ var __awaiter$3, init_get_artifact = __esmMin((() => {
 		});
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/delete/delete-artifact.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/delete/delete-artifact.js
 function deleteArtifactPublic(artifactName, workflowRunId, repositoryOwner, repositoryName, token) {
 	return __awaiter$2(this, void 0, void 0, function* () {
 		let [retryOpts, requestOpts] = getRetryOptions(defaults), github = getOctokit(token, {
@@ -63044,7 +63083,7 @@ var __awaiter$2, init_delete_artifact = __esmMin((() => {
 		});
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/list-artifacts.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/list-artifacts.js
 function listArtifactsPublic(workflowRunId_1, repositoryOwner_1, repositoryName_1, token_1) {
 	return __awaiter$1(this, arguments, void 0, function* (workflowRunId, repositoryOwner, repositoryName, token, latest = !1) {
 		info(`Fetching artifact list for workflow run ${workflowRunId} in repository ${repositoryOwner}/${repositoryName}`);
