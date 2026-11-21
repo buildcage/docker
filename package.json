@@ -30,13 +30,13 @@
   "devDependencies": {
     "@sigstore/protobuf-specs": "^0.5.2",
     "@types/node": "^24.13.3",
-    "@vitest/coverage-v8": "5.0.5",
-    "@vitest/expect": "5.0.5",
+    "@vitest/coverage-v8": "5.1.0",
+    "@vitest/expect": "5.1.0",
     "fast-check": "^4.9.0",
     "generate-license-file": "^4.2.5",
     "rolldown": "^1.2.0",
     "typescript": "^7.0.2",
-    "vite-plus": "^1.4.0"
+    "vite-plus": "1.5.0"
   },
   "devEngines": {
     "packageManager": {
