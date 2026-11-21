@@ -64,7 +64,7 @@
       "schedule": ["at any time"]
     },
     {
-      "description": "@vitest/coverage-v8 and @vitest/expect must equal the vitest that vite-plus bundles, which Renovate cannot see, so pin them by hand when upgrading vite-plus instead of letting Renovate bump them.",
+      "description": "@vitest/coverage-v8 and @vitest/expect must equal the vitest that vite-plus bundles, which Renovate cannot see, so pin them by hand when upgrading vite-plus instead of letting Renovate bump them. vite-plus itself is pinned exactly so lock file maintenance cannot move it away from them.",
       "matchPackageNames": ["@vitest/coverage-v8", "@vitest/expect"],
       "enabled": false
     },
