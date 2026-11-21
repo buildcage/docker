@@ -6,13 +6,13 @@ var __create = Object.create, __defProp = Object.defineProperty, __getOwnPropDes
 	} catch (e) {
 		throw err = [e], e;
 	}
-}, __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod, mod.exports), cb = null), mod.exports), __exportAll = (all, no_symbols) => {
-	let target = {};
+}, __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod, mod.exports), cb = null), mod.exports), __exportAll = (all, flags) => {
+	let target = Object.setPrototypeOf({}, null);
 	for (var name in all) __defProp(target, name, {
 		get: all[name],
 		enumerable: !0
 	});
-	return no_symbols || __defProp(target, Symbol.toStringTag, { value: "Module" }), target;
+	return flags & 1 || __defProp(target, Symbol.toStringTag, { value: "Module" }), flags & 2 ? target : Object.preventExtensions(target);
 }, __copyProps = (to, from, except, desc) => {
 	if (from && typeof from == "object" || typeof from == "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) key = keys[i], !__hasOwnProp.call(to, key) && key !== except && __defProp(to, key, {
 		get: ((k) => from[k]).bind(null, key),
