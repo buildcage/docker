@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { COMPOSE_FILE } from "../compose-file.ts";
 import { SetupError } from "./errors.ts";
 import { runSetupStep, type SetupStepDeps } from "./setup-step.ts";
+import { ACTION_VERSION } from "./version.ts";
 
 // Every collaborator is tested in its own file; what is left to check here is
 // the order they run in, what each one is handed, and which of them still run
@@ -170,7 +171,7 @@ describe("runSetupStep", () => {
 
   // The image tag is per-engine, so the engine has to be known before
   // anything resolves an image.
-  it("reads the engine before it resolves the image", async () => {
+  it("reads the engine before it resolves this version's image", async () => {
     await runSetupStep(ENV, deps);
 
     expect(orderOf(mocks.readSetupInputs)).toBeLessThan(orderOf(mocks.readLocalImageOverride));
@@ -178,6 +179,7 @@ describe("runSetupStep", () => {
     expect(mocks.verifyImageDigestOrThrow).toHaveBeenCalledWith({
       actionRef: "v3.2.1",
       actionRepo: "buildcage/docker",
+      actionVersion: ACTION_VERSION,
       proxyEngine: "universal",
     });
   });

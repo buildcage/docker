@@ -1,7 +1,7 @@
 /**
  * Covers the orchestration-level pure functions only (toProvenanceError,
- * requireDigest); imageTagFromRef and buildVerifyOptions have their own test
- * files (image-tag.test.ts, verify-policy.test.ts). verifyImageDigest and
+ * requireDigest); imageTagForCommit, releaseTarget, buildVerifyOptions and
+ * resolveReleaseCommit have their own test files. verifyImageDigest and
  * verifyImageDigestOrThrow chain live registry and TUF calls and are left to
  * the end-to-end tests; each call they make has its own test file.
  */
