@@ -1,0 +1,53 @@
+name: Download an artifact
+description: Run actions/download-artifact, retrying while GitHub does not list a just-uploaded artifact yet
+# GitHub's artifact list can miss an artifact for a while after its upload,
+# even after showing it once, so a download in the same job can fail.
+
+inputs:
+  name:
+    description: Name of the artifact
+    required: true
+  path:
+    description: Directory to download it into
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: try1
+      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - if: steps.try1.outcome == 'failure'
+      shell: bash
+      run: sleep 10
+    - id: try2
+      if: steps.try1.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - if: steps.try2.outcome == 'failure'
+      shell: bash
+      run: sleep 30
+    - id: try3
+      if: steps.try2.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - if: steps.try3.outcome == 'failure'
+      shell: bash
+      run: sleep 60
+    - if: steps.try3.outcome == 'failure'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
