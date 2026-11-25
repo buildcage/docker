@@ -63313,9 +63313,20 @@ If the error persists, please check whether Actions and API requests are operati
 function artifactName(builderName) {
 	return builderName === "buildcage" ? "buildcage-traffic" : `buildcage-traffic-${builderName}`;
 }
+async function waitUntilListed(name, find, { timeoutMs = 3e4, intervalMs = 1e3, now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+	let deadline = now() + timeoutMs;
+	for (;;) {
+		try {
+			return await find(name), !0;
+		} catch {
+			if (now() >= deadline) return !1;
+		}
+		await sleep(intervalMs);
+	}
+}
 const uploadViaActionsArtifact = async (name, files, rootDirectory, options) => {
-	let { DefaultArtifactClient } = await Promise.resolve().then(() => (init_artifact(), artifact_exports));
-	return new DefaultArtifactClient().uploadArtifact(name, files, rootDirectory, options);
+	let { DefaultArtifactClient } = await Promise.resolve().then(() => (init_artifact(), artifact_exports)), client = new DefaultArtifactClient(), uploaded = await client.uploadArtifact(name, files, rootDirectory, options);
+	return await waitUntilListed(name, (n) => client.getArtifact(n)) || console.log(`GitHub does not list ${name} yet; downloading it in this job may fail`), uploaded;
 };
 async function uploadTrafficArtifact(file, builderName, warn, { retentionDays, fileExists = node_fs.existsSync, upload = uploadViaActionsArtifact } = {}) {
 	if (!fileExists(file)) return;

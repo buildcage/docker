@@ -802,6 +802,9 @@ sees neither the request nor where a name resolved, so under it `method`, `url`,
 `destination` are absent and the rows are name lookups and a connection-level view (host, port and
 bytes).
 
+The step waits, up to 30 seconds, until GitHub lists the artifact, so `actions/download-artifact`
+can fetch it by name later in the same job.
+
 | Field         | Always | Notes                                                                                    |
 | ------------- | ------ | ---------------------------------------------------------------------------------------- |
 | `time`        | yes    | ISO 8601 UTC                                                                             |
