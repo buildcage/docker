@@ -1,0 +1,30 @@
+name: Download an artifact
+description: Download an artifact of this run with gh, retrying while GitHub does not list a just-uploaded artifact yet
+# GitHub's artifact list can miss an artifact for a while after its upload,
+# even after showing it once, so a download in the same job can fail.
+
+inputs:
+  name:
+    description: Name of the artifact
+    required: true
+  path:
+    description: Directory to download it into
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        NAME: ${{ inputs.name }}
+        DEST: ${{ inputs.path }}
+      run: |
+        for wait in 0 10 30 60; do
+          sleep "$wait"
+          if gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$NAME" --dir "$DEST"; then
+            exit 0
+          fi
+        done
+        echo "::error::Artifact $NAME of this run could not be downloaded"
+        exit 1
