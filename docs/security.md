@@ -446,9 +446,9 @@ and replaces none of them.
 
 Buildcage's source is open to read at any time. Releases are immutable, and each image is built
 from the release commit by the release workflow and signed by that run, so an image built anywhere
-else fails verification. Before it runs, the action verifies that signature against the commit or
-tag the workflow pins, so changing what Buildcage does means publishing a release from its public
-source first.
+else fails verification. Before it runs, the action verifies that signature against the release
+commit of its own version, so changing what Buildcage does means publishing a release from its
+public source first. Once a workflow pins a release, its image cannot change.
 
 The signature is a [Sigstore](https://sigstore.dev) keyless one, which binds each release's image to
 the CI workflow run that built it and to the exact source commit SHA, so a tampered or substituted
@@ -466,11 +466,24 @@ and one blocked host is never signed, and an unsigned image is one the setup act
 **At action startup** (the `main` phase, so `docker/login-action` has already stored registry
 credentials), the setup action verifies the image entirely in-process using `@sigstore/verify`,
 `@sigstore/tuf` and `@sigstore/bundle`. No external binary such as cosign is downloaded or required.
-It resolves the tag to a manifest digest and fetches the bundle for that digest from the Referrers
-API. A single `verifyBundle()` call then enforces every identity check at once: the OIDC issuer, the
-signing workflow and its ref or version, and the source commit SHA carried in Fulcio OID
-`1.3.6.1.4.1.57264.1.13`. That is the equivalent of cosign's `--certificate-oidc-issuer`,
-`--certificate-identity-regexp` and `--certificate-github-workflow-sha`.
+It first settles the commit the image must be built from (see
+[Identity matching by reference type](#identity-matching-by-reference-type)), then resolves that
+commit's image tag, `sha-<commit>-<engine>`, to a manifest digest and fetches the bundle for that
+digest from the Referrers API. A single `verifyBundle()` call then enforces every identity check at
+once:
+
+- the OIDC issuer is GitHub Actions;
+- the signing workflow is `docker-publish.yml` run on the release tag, `refs/tags/v<version>`,
+  exactly;
+- the source commit (Fulcio OID `1.3.6.1.4.1.57264.1.13`) and the commit of the workflow that ran
+  (`1.3.6.1.4.1.57264.1.19`) are both the release commit, which rules out a reusable workflow
+  signing on another workflow's behalf;
+- the source ref (`1.3.6.1.4.1.57264.1.14`) is the release tag;
+- the runner (`1.3.6.1.4.1.57264.1.11`) is GitHub-hosted, not a self-hosted runner whoever controls
+  the repository could register.
+
+That covers cosign's `--certificate-oidc-issuer` and `--certificate-identity-regexp`, plus a match
+on each of those certificate extensions.
 
 Two assertions then run against the verified bundle, both fail-closed:
 
@@ -485,12 +498,22 @@ Two assertions then run against the verified bundle, both fail-closed:
 
 ### Identity matching by reference type
 
-| How the action is pinned       | Identity check                                              | Mechanism                                                              |
-| ------------------------------ | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `@<40-char SHA>`               | Source Repository Digest **strictly equals** the pinned SHA | `certificateOIDs`: Fulcio OID `1.3.6.1.4.1.57264.1.13`, raw byte match |
-| `@v4.0.0` (exact version)      | SAN matches `...@refs/tags/v4\.0\.0(\.\|$)`                 | `certificateIdentityURI` regexp                                        |
-| `@v4` (major-floating)         | SAN matches `...@refs/tags/v4(\.\|$)`                       | `certificateIdentityURI` regexp                                        |
-| A branch name, or a local path | **Hard fail**: pin to a version tag or commit SHA           |                                                                        |
+The version is the one the action's own code carries, not one read from the ref: under a workflow
+lockfile the runner runs the locked commit while the ref still reads `@v4`, so only the code knows
+which release it is. Every release commit is the one that set that version, which the release
+workflow checks before it tags.
+
+| How the action is pinned       | Commit the image must be built from                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
+| `@<40-char SHA>`               | The pinned SHA                                                                       |
+| `@v4.0.0` (exact version)      | The commit of tag `v4.0.0`, when the action's version is `4.0.0`                     |
+| `@v4`, `@v4.0` (floating)      | The commit of tag `v<version>`, when the version falls under it and is no prerelease |
+| A branch name, or a local path | **Hard fail**: pin to a version tag or commit SHA                                    |
+
+For a version ref, the action reads the tag's commit with `git ls-remote`, which needs no token but
+does need `git` on the runner. Releases are immutable, so that tag cannot be moved, even by the
+repository's owner. A ref that does not cover the action's version, such as `@v4` on a commit
+carrying `5.0.0` or a prerelease, fails.
 
 The owner and repository in the SAN are matched ignoring case, since GitHub resolves `uses:` that
 way and passes the name on as written. The workflow path and the tag must match exactly.
@@ -520,19 +543,21 @@ Verification establishes where the image came from, and leaves the following unc
   the damage: with a commit-SHA pin, a new release cannot reach your workflow until you change the
   pin yourself, and every signature is recorded in the Rekor transparency log, so an unintended
   release is discoverable after the fact.
-- **A floating tag is a pointer someone else moves.** Under `@v4` the signing identity accepts any
-  release in that series, so the tag can also be moved back to an older one. Both the
-  registry tag and the git tag are writable by whoever publishes releases, which is the reason to
-  prefer a commit SHA: the image changes only when you change the pin.
-- **The registry decides which signed image gets verified.** Everything after the tag lookup is
-  bound to the digest it returned, so content substituted later makes verification **fail** rather
-  than falsely pass, and there is no time-of-check/time-of-use gap. What remains is the tag lookup
-  itself: an attacker with write access to the registry could repoint the tag, but only at an image
-  this repository's release workflow signed.
-- **Sigstore has to be reachable.** Verification depends on the Rekor transparency log and the
-  Fulcio CA, and fetches the TUF trust root at verification time. An outage there fails the action
-  rather than skipping the check. Each fetch starts from the root embedded in the action, never
-  from one an earlier job left on a persistent runner.
+- **A floating tag is a pointer someone else moves.** Under `@v4` with no lockfile, whoever
+  publishes releases decides which release runs, the code and its image together, and can move the
+  tag back to an older one. A commit SHA, an exact version or a lockfile fixes the code, and with it
+  the image: the image changes only when you change the pin.
+- **The registry decides which signed image of the commit gets verified.** Everything after the tag
+  lookup is bound to the digest it returned, so content substituted later makes verification
+  **fail** rather than falsely pass, and there is no time-of-check/time-of-use gap. What remains is
+  the tag lookup itself: an attacker with write access to the registry could repoint the tag, but
+  only at an image the release workflow built and signed from the same commit, such as a rebuild.
+- **GitHub is trusted to keep releases immutable.** A version ref relies on GitHub refusing to move
+  an immutable release's tag. A commit-SHA pin does not: it reads no tag at all.
+- **Sigstore, and for a version ref GitHub, have to be reachable.** Verification depends on
+  the Rekor transparency log and the Fulcio CA, and fetches the TUF trust root at verification
+  time. An outage there fails the action rather than skipping the check. Each fetch starts from the
+  root embedded in the action, never from one an earlier job left on a persistent runner.
 - **A build-time test hook exists, but not in what you run.**
   `BUILDCAGE_BUILD_TEST_HOOKS=1 vp run build` produces a `dist/` where a `BUILDCAGE_LOCAL_IMAGE_REF`
   override can point the action at an unpublished image, used only by this repo's own CI and local

@@ -1,5 +1,6 @@
 {
   "name": "buildcage",
+  "version": "4.4.3",
   "private": true,
   "type": "module",
   "imports": {

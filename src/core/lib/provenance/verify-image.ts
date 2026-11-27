@@ -1,6 +1,11 @@
 /**
  * Verifies the Docker image's Sigstore provenance bundle.
  *
+ * The image must be built from a release commit: the pinned SHA, or the
+ * commit of this build's own release tag. It is looked up by its commit, never
+ * by a version tag, so a lockfile-pinned build cannot be paired with a newer
+ * release's image.
+ *
  * Fail-closed:
  *   - any failure for a verifiable ref (version tag, 40-char SHA) throws
  *     VerifyImageError, and the caller is responsible for printing ::error::
@@ -11,15 +16,20 @@ import { errorMessage } from "../errors.ts";
 import { readGhcrBasicAuth } from "./docker-credentials.ts";
 import { checkImageEngine } from "./engine-label.ts";
 import { ProvenanceError, VerifyImageError } from "./errors.ts";
-import { imageTagFromRef } from "./image-tag.ts";
+import { imageTagForCommit } from "./image-tag.ts";
 import { fetchBundle } from "./oci-bundle.ts";
 import { fetchManifestDigest, fetchRegistryToken, fetchImageConfigLabels } from "./oci-registry.ts";
+import { resolveReleaseCommit } from "./release-commit.ts";
 import { verifyBundle } from "./sigstore.ts";
-import { buildVerifyOptions, type VerifyImageIdentity } from "./verify-policy.ts";
+import { buildVerifyOptions, releaseTarget } from "./verify-policy.ts";
 
 const REGISTRY = "ghcr.io";
 
-export interface VerifyImageDigestOptions extends VerifyImageIdentity {
+export interface VerifyImageDigestOptions {
+  actionRef: string;
+  actionRepo: string;
+  /** This build's version, from package.json. */
+  actionVersion: string;
   proxyEngine?: string;
 }
 
@@ -39,14 +49,20 @@ export interface ResolvedImage {
 export async function verifyImageDigest({
   actionRef,
   actionRepo,
+  actionVersion,
   proxyEngine = "inspect",
 }: VerifyImageDigestOptions): Promise<string | null> {
   const repoPath = actionRepo.toLowerCase();
 
-  const verifyOptions = buildVerifyOptions({ actionRef, actionRepo });
-  if (!verifyOptions) return null;
+  const target = releaseTarget({ actionRef, actionVersion });
+  if (!target) return null;
+  const commit =
+    target.kind === "commit"
+      ? target.commit
+      : await resolveReleaseCommit({ actionRepo, actionVersion });
+  const verifyOptions = buildVerifyOptions({ actionRepo, actionVersion, commit });
 
-  const tag = imageTagFromRef(actionRef, proxyEngine);
+  const tag = imageTagForCommit(commit, proxyEngine);
   const regToken = await fetchRegistryToken(REGISTRY, repoPath, readGhcrBasicAuth());
   const digest = await fetchManifestDigest(REGISTRY, repoPath, tag, regToken);
   const bundle = await fetchBundle(REGISTRY, repoPath, digest, regToken);
@@ -90,14 +106,11 @@ export function requireDigest(digest: string | null, actionRef: string): string 
  * Untested by design: toProvenanceError and requireDigest are tested directly.
  */
 /* v8 ignore start */
-export async function verifyImageDigestOrThrow({
-  actionRef,
-  actionRepo,
-  proxyEngine,
-}: VerifyImageDigestOptions): Promise<string> {
+export async function verifyImageDigestOrThrow(options: VerifyImageDigestOptions): Promise<string> {
+  const { actionRef } = options;
   let digest;
   try {
-    digest = await verifyImageDigest({ actionRef, actionRepo, proxyEngine });
+    digest = await verifyImageDigest(options);
   } catch (e) {
     throw toProvenanceError(e);
   }

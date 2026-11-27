@@ -40,6 +40,7 @@ import { SetupError } from "./errors.ts";
 import { readSetupInputs } from "./inputs.ts";
 import { readLocalImageOverride } from "./local-image.ts";
 import { BUILDER_NAME_STATE } from "./post-cleanup.ts";
+import { ACTION_VERSION } from "./version.ts";
 
 /**
  * The steps this function sequences. Declared rather than imported straight
@@ -103,10 +104,11 @@ const realDeps: SetupStepDeps = {
  * performed (branch ref, local ./), printed by the top-level catch.
  */
 async function resolveVerifiedImage(
-  { actionRef, actionRepo, proxyEngine }: VerifyImageDigestOptions,
+  options: VerifyImageDigestOptions,
   { verifyImageDigestOrThrow, log }: Pick<SetupStepDeps, "verifyImageDigestOrThrow" | "log">,
 ): Promise<ResolvedImage> {
-  const digest = await verifyImageDigestOrThrow({ actionRef, actionRepo, proxyEngine });
+  const { actionRef, actionRepo } = options;
+  const digest = await verifyImageDigestOrThrow(options);
   log(`Image provenance verified for ref: ${JSON.stringify(actionRef)} (digest ${digest}).`);
   return {
     imageRef: resolveBuildcageImageRef({ imageDigest: digest, actionRepository: actionRepo }),
@@ -203,7 +205,7 @@ export async function runSetupStep(
   const { imageRef, pullPolicy } =
     localOverride ??
     (await resolveVerifiedImage(
-      { actionRef, actionRepo, proxyEngine },
+      { actionRef, actionRepo, actionVersion: ACTION_VERSION, proxyEngine },
       { verifyImageDigestOrThrow, log },
     ));
   log(`buildcage: image: ${imageRef}`);

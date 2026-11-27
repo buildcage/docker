@@ -60,6 +60,22 @@ jobs:
             exit 1
           fi
 
+      # The action finds its image through the version its own code carries,
+      # so a release has to be the commit that set that version.
+      - name: Check the tag is package.json's version
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          VERSION=$(jq -r .version package.json)
+          if [ "v$VERSION" != "$TAG" ]; then
+            echo "::error::package.json's version is $VERSION, so this commit can only be released as v$VERSION"
+            exit 1
+          fi
+          if [ "$(git show HEAD^:package.json | jq -r .version)" = "$VERSION" ]; then
+            echo "::error::HEAD did not set package.json's version; release the commit that set it to $VERSION"
+            exit 1
+          fi
+
       - name: Check tag does not exist
         env:
           TAG: ${{ inputs.tag }}
