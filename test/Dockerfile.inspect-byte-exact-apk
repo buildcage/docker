@@ -2,7 +2,7 @@
 # apk keeps a bundle under /etc that differs from its record, and inspect adds
 # its CA to the bundle for each step, so an upgrade must still replace it as it
 # would under any engine.
-FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
 # Records an older version, so the upgrade below happens whatever the
 # repository holds by the time this runs.
