@@ -1,9 +1,9 @@
 # renovate: datasource=github-release-attachments depName=containernetworking/plugins
-ARG CNI_VERSION=v1.9.1
-# renovate: datasource=github-release-attachments depName=containernetworking/plugins digestVersion=v1.9.1
-ARG CNI_SHA256_AMD64=b98f74a0f8522f0a83867178729c1aa70f2158f90c45a2ca8fa791db1c76b303
-# renovate: datasource=github-release-attachments depName=containernetworking/plugins digestVersion=v1.9.1
-ARG CNI_SHA256_ARM64=56171987d3947707c3563db2f4001bccaf50fd63468611b9f3cbecb1375ee7ec
+ARG CNI_VERSION=v1.10.0
+# renovate: datasource=github-release-attachments depName=containernetworking/plugins digestVersion=v1.10.0
+ARG CNI_SHA256_AMD64=ce8603d6a1bd448efba5bd6dc44f38dce349f821aa57e1bb354b52628ebf1853
+# renovate: datasource=github-release-attachments depName=containernetworking/plugins digestVersion=v1.10.0
+ARG CNI_SHA256_ARM64=4f25d7f136be368746185fba6557d799cf3e1890f7556d450744ea20d300d68c
 
 # renovate: datasource=github-release-attachments depName=coredns/coredns
 ARG COREDNS_VERSION=v1.15.0
