@@ -4,7 +4,7 @@
 # FROM is deliberately not governed by this engine
 # (see docs/security.md#what-buildkitd-fetches-itself), so this pull
 # succeeds whatever the rules say.
-FROM python:3.13-alpine@sha256:79e7a9b9ff1cbceff819f856fb374477792a5967759d94df266de7b7b4120e6f
+FROM python:3.15-alpine@sha256:0f9552bb28711333da16915ec146f5e6bb44a7fdac9ced15dc17c2e0206346dd
 
 SHELL ["/bin/sh", "-c"]
 
