@@ -7787,9 +7787,9 @@ var require_envelope = __commonJSMin(((exports) => {
 		return result;
 	};
 })), require_commonjs$1 = __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.EXPANSION_MAX_REWRITES = exports.EXPANSION_MAX_DEPTH = exports.EXPANSION_MAX_LENGTH = exports.EXPANSION_MAX = void 0, exports.expand = expand;
-	let balanced_match_1 = require_commonjs$2(), escSlash = "\0SLASH" + Math.random() + "\0", escOpen = "\0OPEN" + Math.random() + "\0", escClose = "\0CLOSE" + Math.random() + "\0", escComma = "\0COMMA" + Math.random() + "\0", escPeriod = "\0PERIOD" + Math.random() + "\0", escSlashPattern = new RegExp(escSlash, "g"), escOpenPattern = new RegExp(escOpen, "g"), escClosePattern = new RegExp(escClose, "g"), escCommaPattern = new RegExp(escComma, "g"), escPeriodPattern = new RegExp(escPeriod, "g"), slashPattern = /\\\\/g, openPattern = /\\{/g, closePattern = /\\}/g, commaPattern = /\\,/g, periodPattern = /\\\./g;
-	exports.EXPANSION_MAX = 1e5, exports.EXPANSION_MAX_LENGTH = 4e6, exports.EXPANSION_MAX_DEPTH = 1e3, exports.EXPANSION_MAX_REWRITES = 1e3;
+	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.EXPANSION_MAX_STEPS = exports.EXPANSION_MAX_REWRITES = exports.EXPANSION_MAX_DEPTH = exports.EXPANSION_MAX_LENGTH = exports.EXPANSION_MAX = void 0, exports.expand = expand;
+	let balanced_match_1 = require_commonjs$2(), escSlash = "\0SLASH" + Math.random().toFixed(16) + "\0", escOpen = "\0OPEN" + Math.random().toFixed(16) + "\0", escClose = "\0CLOSE" + Math.random().toFixed(16) + "\0", escComma = "\0COMMA" + Math.random().toFixed(16) + "\0", escPeriod = "\0PERIOD" + Math.random().toFixed(16) + "\0", escSlashPattern = new RegExp(escSlash, "g"), escOpenPattern = new RegExp(escOpen, "g"), escClosePattern = new RegExp(escClose, "g"), escCommaPattern = new RegExp(escComma, "g"), escPeriodPattern = new RegExp(escPeriod, "g"), slashPattern = /\\\\/g, openPattern = /\\{/g, closePattern = /\\}/g, commaPattern = /\\,/g, periodPattern = /\\\./g;
+	exports.EXPANSION_MAX = 1e5, exports.EXPANSION_MAX_LENGTH = 4e6, exports.EXPANSION_MAX_DEPTH = 1e3, exports.EXPANSION_MAX_REWRITES = 1e3, exports.EXPANSION_MAX_STEPS = 2e7;
 	function numeric(str) {
 		return isNaN(str) ? str.charCodeAt(0) : parseInt(str, 10);
 	}
@@ -7802,10 +7802,47 @@ var require_envelope = __commonJSMin(((exports) => {
 	function pushAll(target, items) {
 		for (let i = 0; i < items.length; i++) target.push(items[i]);
 	}
-	function parseCommaParts(str) {
+	function balancedWithBudget(str, masked, budget) {
+		if (budget.remaining < 0) return;
+		let r = (0, balanced_match_1.range)("{", "}", masked), unmatched = r !== void 0 && masked.indexOf("{") < r[0];
+		if (budget.remaining -= r && !unmatched ? r[1] + 1 : str.length, !(!r || budget.remaining < 0)) return {
+			end: r[1],
+			pre: str.slice(0, r[0]),
+			body: str.slice(r[0] + 1, r[1]),
+			post: str.slice(r[1] + 1),
+			unmatched
+		};
+	}
+	function maskUnmatchedOpens(masked, budget) {
+		budget.remaining -= masked.length;
+		let open = [];
+		for (let i = 0; i < masked.length; i++) {
+			let c = masked.charCodeAt(i);
+			c === 123 ? open.push(i) : c === 125 && open.length && open.pop();
+		}
+		let out = "", last = 0;
+		for (let i = 0; i < open.length; i++) {
+			let at = open[i];
+			out += masked.slice(last, at) + "\0", last = at + 1;
+		}
+		return out + masked.slice(last);
+	}
+	function commaSetFollows(str, budget) {
+		if (budget.remaining -= str.length, budget.remaining < 0) return !1;
+		let close = !1;
+		for (let i = str.length - 1; i >= 0; i--) {
+			let c = str.charCodeAt(i);
+			if (c === 125) close = !0;
+			else if (c === 10 || c === 13 || c === 8232 || c === 8233) close = !1;
+			else if (c === 44 && close && str.charCodeAt(i + 1) !== 44) return !0;
+		}
+		return !1;
+	}
+	function parseCommaParts(str, budget) {
 		let parts = [], carry = "";
 		for (;;) {
-			let m = (0, balanced_match_1.balanced)("{", "}", str);
+			let m = balancedWithBudget(str, str, budget);
+			if (budget.remaining < 0) return;
 			if (!m) {
 				let tail = str.split(",");
 				return tail[0] = carry + tail[0], pushAll(parts, tail), parts;
@@ -7815,10 +7852,13 @@ var require_envelope = __commonJSMin(((exports) => {
 			carry = p.pop(), pushAll(parts, p), str = post;
 		}
 	}
+	function bound(value, fallback) {
+		return value === void 0 || isNaN(value) ? fallback : value;
+	}
 	function expand(str, options = {}) {
 		if (!str) return [];
-		let { max = exports.EXPANSION_MAX, maxLength = exports.EXPANSION_MAX_LENGTH, maxDepth = exports.EXPANSION_MAX_DEPTH, maxRewrites = exports.EXPANSION_MAX_REWRITES } = options;
-		return str.slice(0, 2) === "{}" && (str = "\\{\\}" + str.slice(2)), expand_(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, !0).map(unescapeBraces);
+		let max = bound(options.max, exports.EXPANSION_MAX), maxLength = bound(options.maxLength, exports.EXPANSION_MAX_LENGTH), maxDepth = bound(options.maxDepth, exports.EXPANSION_MAX_DEPTH), maxRewrites = bound(options.maxRewrites, exports.EXPANSION_MAX_REWRITES), maxSteps = bound(options.maxSteps, exports.EXPANSION_MAX_STEPS);
+		return str.slice(0, 2) === "{}" && (str = "\\{\\}" + str.slice(2)), expand_(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, { remaining: maxSteps }, !0).map(unescapeBraces);
 	}
 	function embrace(str) {
 		return "{" + str + "}";
@@ -7832,25 +7872,28 @@ var require_envelope = __commonJSMin(((exports) => {
 	function gte(i, y) {
 		return i >= y;
 	}
-	function combine(acc, pre, values, max, maxLength, dropEmpties) {
-		let out = [], length = 0;
-		for (let a = 0; a < acc.length; a++) for (let v = 0; v < values.length; v++) {
-			if (out.length >= max) return out;
-			let expansion = acc[a] + pre + values[v];
-			if (!dropEmpties || expansion) {
-				if (length + expansion.length > maxLength) return out;
+	function combine(acc, pre, values, max, maxLength, dropEmpties, budget) {
+		let out = [], length = 0, nonEmpty;
+		outer: for (let a = 0; a < acc.length; a++) {
+			let prefix = acc[a] + pre, vs = values;
+			dropEmpties && !prefix && (nonEmpty ||= values.filter((v) => v), vs = nonEmpty);
+			for (let v = 0; v < vs.length; v++) {
+				if (out.length >= max) break outer;
+				let expansion = prefix + vs[v];
+				if (length + expansion.length > maxLength) break outer;
 				out.push(expansion), length += expansion.length;
 			}
 		}
-		return out;
+		return budget.remaining -= out.length, out;
 	}
-	function expandSequence(body, isAlphaSequence, max, maxLength) {
+	function expandSequence(body, isAlphaSequence, max, maxLength, budget) {
 		let n = body.split(/\.\./), N = [];
 		if (n[0] === void 0 || n[1] === void 0) return N;
 		let x = numeric(n[0]), y = numeric(n[1]), width = Math.max(n[0].length, n[1].length), incr = n.length === 3 && n[2] !== void 0 ? Math.max(Math.abs(numeric(n[2])), 1) : 1, test = lte;
 		y < x && (incr *= -1, test = gte);
-		let pad = n.some(isPadded), length = 0;
+		let pad = n.some(isPadded), cost = pad ? width : 1, length = 0;
 		for (let i = x; test(i, y) && N.length < max; i += incr) {
+			if (budget.remaining -= cost, budget.remaining < 0) return;
 			let c;
 			if (isAlphaSequence) c = String.fromCharCode(i), c === "\\" && (c = "");
 			else if (c = String(i), pad) {
@@ -7865,42 +7908,51 @@ var require_envelope = __commonJSMin(((exports) => {
 		}
 		return N;
 	}
-	function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
-		if (depth > maxDepth) return [str];
-		let acc = [""], rewrites = 0, dropEmpties = !1, firstGroup = !0;
+	function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, budget, isTop) {
+		if (budget.remaining -= 16, depth > maxDepth) return [str];
+		let acc = [""], rewrites = 0, dropEmpties = !1, firstGroup = !0, masked = str;
 		for (;;) {
-			let m = (0, balanced_match_1.balanced)("{", "}", str);
-			if (!m) return combine(acc, str, [""], max, maxLength, dropEmpties);
-			let pre = m.pre;
+			let m = balancedWithBudget(str, masked, budget);
+			if (!m) return combine(acc, str, [""], max, maxLength, dropEmpties, budget);
+			m.unmatched && (masked = maskUnmatchedOpens(masked, budget));
+			let pre = m.pre, literal = () => combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties, budget);
 			if (/\$$/.test(pre)) {
-				if (acc = combine(acc, pre + "{" + m.body + "}", [""], max, maxLength, dropEmpties && !m.post.length), firstGroup = !1, !m.post.length) break;
-				str = m.post;
+				if (acc = combine(acc, pre + "{" + m.body + "}", [""], max, maxLength, dropEmpties && !m.post.length, budget), firstGroup = !1, !m.post.length) break;
+				str = m.post, masked = masked.slice(m.end + 1);
 				continue;
 			}
 			let isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body), isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body), isSequence = isNumericSequence || isAlphaSequence, isOptions = m.body.indexOf(",") >= 0;
 			if (!isSequence && !isOptions) {
-				if (rewrites < maxRewrites && m.post.match(/,(?!,).*\}/)) {
-					rewrites++, str = m.pre + "{" + m.body + escClose + m.post, isTop = !0;
+				if (rewrites < maxRewrites && commaSetFollows(m.post, budget)) {
+					rewrites++, str = m.pre + "{" + m.body + escClose + m.post, masked = masked.slice(0, m.end) + escClose + masked.slice(m.end + 1), isTop = !0;
 					continue;
 				}
-				return combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties);
+				return literal();
 			}
 			firstGroup &&= (dropEmpties = isTop && !isSequence, !1);
 			let values;
-			if (isSequence) values = expandSequence(m.body, isAlphaSequence, max, maxLength);
-			else {
-				let n = parseCommaParts(m.body);
-				if (n.length === 1 && n[0] !== void 0 && (n = expand_(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, !1).map(embrace), n.length === 1)) {
-					if (acc = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
-					str = m.post;
-					continue;
+			if (isSequence) {
+				if (values = expandSequence(m.body, isAlphaSequence, max, maxLength, budget), !values) return literal();
+			} else {
+				let n = parseCommaParts(m.body, budget);
+				if (!n) return literal();
+				if (n.length === 1 && n[0] !== void 0) {
+					if (n = expand_(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, budget, !1).map(embrace), budget.remaining < 0) return literal();
+					if (n.length === 1) {
+						let next = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length, budget);
+						if (budget.remaining < 0) return literal();
+						if (acc = next, !m.post.length) break;
+						str = m.post, masked = masked.slice(m.end + 1);
+						continue;
+					}
 				}
 				let dropsEmpties = dropEmpties && !m.post.length && !pre;
 				for (let d = 0; dropsEmpties && d < acc.length; d++) acc[d] && (dropsEmpties = !1);
 				values = [];
 				let valuesLength = 0;
 				outer: for (let j = 0; j < n.length; j++) {
-					let expanded = expand_(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, !1);
+					let expanded = expand_(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, budget, !1);
+					if (budget.remaining < 0) return literal();
 					for (let k = 0; k < expanded.length; k++) {
 						let v = expanded[k];
 						if (!dropsEmpties || v) {
@@ -7910,8 +7962,10 @@ var require_envelope = __commonJSMin(((exports) => {
 					}
 				}
 			}
-			if (acc = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
-			str = m.post;
+			let next = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length, budget);
+			if (budget.remaining < 0) return literal();
+			if (acc = next, !m.post.length) break;
+			str = m.post, masked = masked.slice(m.end + 1);
 		}
 		return acc;
 	}
