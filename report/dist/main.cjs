@@ -39,8 +39,14 @@ let http = require("http");
 http = __toESM(http, 1);
 let https = require("https");
 https = __toESM(https, 1);
+let net = require("net");
+net = __toESM(net, 1);
+let tls = require("tls");
+tls = __toESM(tls, 1);
 let events = require("events");
 events = __toESM(events, 1);
+let assert = require("assert");
+assert = __toESM(assert, 1);
 let node_http = require("node:http");
 node_http = __toESM(node_http, 1);
 let node_stream = require("node:stream");
@@ -57,7 +63,7 @@ let node_child_process = require("node:child_process"), node_readline = require(
 node_process = __toESM(node_process, 1);
 let node_https = require("node:https");
 node_https = __toESM(node_https, 1);
-let stream = require("stream");
+let url = require("url"), stream = require("stream");
 stream = __toESM(stream, 1);
 let fs_promises = require("fs/promises");
 fs_promises = __toESM(fs_promises, 1);
@@ -4423,7 +4429,7 @@ var require_identity$1 = __commonJSMin(((exports) => {
 		return identity.isDocument(value) && !_replacer ? value.toString(options) : new Document.Document(value, _replacer, options).toString(options);
 	}
 	exports.parse = parse, exports.parseAllDocuments = parseAllDocuments, exports.parseDocument = parseDocument, exports.stringify = stringify;
-})), import_dist$2 = __commonJSMin(((exports) => {
+})), import_dist = __commonJSMin(((exports) => {
 	var composer = require_composer(), Document = require_Document(), Schema = require_Schema(), errors = require_errors$3(), Alias = require_Alias(), identity = require_identity$1(), Pair = require_Pair(), Scalar = require_Scalar(), YAMLMap = require_YAMLMap(), YAMLSeq = require_YAMLSeq();
 	require_cst();
 	var lexer = require_lexer(), lineCounter = require_line_counter(), parser = require_parser(), publicApi = require_public_api(), visit = require_visit();
@@ -14998,7 +15004,7 @@ function getInput(name, options) {
 	if (options && options.required && !val) throw Error(`Input required and not supplied: ${name}`);
 	return options && options.trimWhitespace === !1 ? val : val.trim();
 }
-function debug(message) {
+function debug$3(message) {
 	issueCommand("debug", {}, message);
 }
 function error(message, properties = {}) {
@@ -15072,9 +15078,9 @@ function resolveConfigPath(path, env, baseDir) {
 	if (isOutside(realWorkspace, real)) throw outside(real);
 	return real;
 }
-const resolved = (node, doc) => (0, import_dist$2.isAlias)(node) ? node.resolve(doc) : node;
+const resolved = (node, doc) => (0, import_dist.isAlias)(node) ? node.resolve(doc) : node;
 function isMergeKey(key, doc) {
-	if (!(0, import_dist$2.isScalar)(key) || key.type && key.type !== import_dist$2.Scalar.PLAIN) return !1;
+	if (!(0, import_dist.isScalar)(key) || key.type && key.type !== import_dist.Scalar.PLAIN) return !1;
 	let { value } = key;
 	return (value === "<<" || typeof value == "symbol" && value.description === "<<") && doc.schema.tags.some((tag) => tag.tag === "tag:yaml.org,2002:merge" && tag.default);
 }
@@ -15085,10 +15091,10 @@ function valueNodes(doc) {
 		let nodes = new Map(), merged = [];
 		for (let { key, value } of map.items) if (isMergeKey(key, doc)) {
 			let source = resolved(value, doc);
-			merged.push(...(0, import_dist$2.isSeq)(source) ? source.items : [source]);
+			merged.push(...(0, import_dist.isSeq)(source) ? source.items : [source]);
 		} else {
 			let name = resolved(key, doc);
-			(0, import_dist$2.isScalar)(name) && nodes.set(String(name.value), value);
+			(0, import_dist.isScalar)(name) && nodes.set(String(name.value), value);
 		}
 		for (let source of merged.map((node) => resolved(node, doc))) for (let [key, value] of nodesOf(source)) nodes.has(key) || nodes.set(key, value);
 		return read.set(map, nodes), nodes;
@@ -15096,7 +15102,7 @@ function valueNodes(doc) {
 	return nodesOf(doc.contents);
 }
 function parseConfig(text, path, { known, stepOnly = [] }) {
-	let invalid = (reason) => new ConfigFileError(`Invalid config-file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist$2.LineCounter(), doc = (0, import_dist$2.parseDocument)(text, { lineCounter });
+	let invalid = (reason) => new ConfigFileError(`Invalid config-file ${JSON.stringify(path)}: ${reason}`, "CONFIG_FILE_INVALID"), lineCounter = new import_dist.LineCounter(), doc = (0, import_dist.parseDocument)(text, { lineCounter });
 	for (let warning of doc.warnings) process.emitWarning(warning);
 	if (doc.errors.length > 0) throw invalid(doc.errors[0].message);
 	let js;
@@ -15109,9 +15115,9 @@ function parseConfig(text, path, { known, stepOnly = [] }) {
 	if (typeof js != "object" || Array.isArray(js)) throw invalid("the top level must be a mapping of input names to values.");
 	let nodes = valueNodes(doc), lineOf = (key, value) => {
 		let node = resolved(nodes.get(key), doc), [start, end] = node.range, at = lineCounter.linePos(start).line;
-		if (node.type === import_dist$2.Scalar.BLOCK_LITERAL) return at + 1;
-		if (node.type !== import_dist$2.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
-	}, own = new Set(doc.contents.items.filter(({ key }) => !isMergeKey(key, doc)).map(({ key }) => resolved(key, doc)).filter(import_dist$2.isScalar).map((key) => String(key.value))), keys = new Map();
+		if (node.type === import_dist.Scalar.BLOCK_LITERAL) return at + 1;
+		if (node.type !== import_dist.Scalar.BLOCK_FOLDED) return value.includes("\n") || lineCounter.linePos(end).line !== at ? void 0 : at;
+	}, own = new Set(doc.contents.items.filter(({ key }) => !isMergeKey(key, doc)).map(({ key }) => resolved(key, doc)).filter(import_dist.isScalar).map((key) => String(key.value))), keys = new Map();
 	for (let key of Object.keys(js)) {
 		let spells = (input) => key === input || key === legacyInputName(input), name = known.find(spells);
 		if (!name) throw invalid(`${stepOnly.some(spells) ? `${JSON.stringify(key)} can be set only on the step` : `unknown key ${JSON.stringify(key)}`}. Allowed keys: ${known.join(", ")}.`);
@@ -15468,7 +15474,7 @@ function runReportScript(scriptPath, containerId, { trafficFile, env = process.e
 	}
 	return 0;
 }
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/config.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/config.js
 function getUploadChunkSize() {
 	return 8388608;
 }
@@ -18021,8 +18027,8 @@ var init_config = __esmMin((() => {
 			} else state.q.push(result);
 		}
 	};
-})), require_unary_call = __commonJSMin(((exports, module, this$16) => {
-	var __awaiter = this$16 && this$16.__awaiter || function(thisArg, _arguments, P, generator) {
+})), require_unary_call = __commonJSMin(((exports, module, this$11) => {
+	var __awaiter = this$11 && this$11.__awaiter || function(thisArg, _arguments, P, generator) {
 		function adopt(value) {
 			return value instanceof P ? value : new P(function(resolve) {
 				resolve(value);
@@ -18076,8 +18082,8 @@ var init_config = __esmMin((() => {
 			});
 		}
 	};
-})), require_server_streaming_call = __commonJSMin(((exports, module, this$15) => {
-	var __awaiter = this$15 && this$15.__awaiter || function(thisArg, _arguments, P, generator) {
+})), require_server_streaming_call = __commonJSMin(((exports, module, this$10) => {
+	var __awaiter = this$10 && this$10.__awaiter || function(thisArg, _arguments, P, generator) {
 		function adopt(value) {
 			return value instanceof P ? value : new P(function(resolve) {
 				resolve(value);
@@ -18129,8 +18135,8 @@ var init_config = __esmMin((() => {
 			});
 		}
 	};
-})), require_client_streaming_call = __commonJSMin(((exports, module, this$14) => {
-	var __awaiter = this$14 && this$14.__awaiter || function(thisArg, _arguments, P, generator) {
+})), require_client_streaming_call = __commonJSMin(((exports, module, this$9) => {
+	var __awaiter = this$9 && this$9.__awaiter || function(thisArg, _arguments, P, generator) {
 		function adopt(value) {
 			return value instanceof P ? value : new P(function(resolve) {
 				resolve(value);
@@ -18183,8 +18189,8 @@ var init_config = __esmMin((() => {
 			});
 		}
 	};
-})), require_duplex_streaming_call = __commonJSMin(((exports, module, this$13) => {
-	var __awaiter = this$13 && this$13.__awaiter || function(thisArg, _arguments, P, generator) {
+})), require_duplex_streaming_call = __commonJSMin(((exports, module, this$8) => {
+	var __awaiter = this$8 && this$8.__awaiter || function(thisArg, _arguments, P, generator) {
 		function adopt(value) {
 			return value instanceof P ? value : new P(function(resolve) {
 				resolve(value);
@@ -18235,8 +18241,8 @@ var init_config = __esmMin((() => {
 			});
 		}
 	};
-})), require_test_transport = __commonJSMin(((exports, module, this$12) => {
-	var __awaiter = this$12 && this$12.__awaiter || function(thisArg, _arguments, P, generator) {
+})), require_test_transport = __commonJSMin(((exports, module, this$7) => {
+	var __awaiter = this$7 && this$7.__awaiter || function(thisArg, _arguments, P, generator) {
 		function adopt(value) {
 			return value instanceof P ? value : new P(function(resolve) {
 				resolve(value);
@@ -19359,7 +19365,7 @@ var init_config = __esmMin((() => {
 })), init_generated = __esmMin((() => {
 	init_timestamp(), init_wrappers(), init_artifact$1(), init_artifact_twirp_client$1();
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/retention.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/retention.js
 function getExpiration(retentionDays) {
 	if (!retentionDays) return;
 	let maxRetentionDays = getRetentionDays();
@@ -19376,7 +19382,7 @@ function getRetentionDays() {
 var init_retention = __esmMin((() => {
 	init_generated(), init_core();
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/path-and-artifact-name-validation.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/path-and-artifact-name-validation.js
 function validateArtifactName(name) {
 	if (!name) throw Error("Provided artifact name input during validation is empty");
 	for (let [invalidCharacterKey, errorMessageForCharacter] of invalidArtifactNameCharacters) if (name.includes(invalidCharacterKey)) throw Error(`The artifact name is not valid: ${name}. Contains the following character: ${errorMessageForCharacter}
@@ -19483,7 +19489,7 @@ var invalidArtifactFilePathCharacters, invalidArtifactNameCharacters, init_path_
 })), require_package_version = __commonJSMin(((exports, module) => {
 	module.exports = { version: require_package().version };
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/user-agent.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/user-agent.js
 function getUserAgentString$1() {
 	return `@actions/artifact-${import_package_version.version}`;
 }
@@ -19569,7 +19575,7 @@ function jwtDecode(token, options) {
 var InvalidTokenError, init_esm$13 = __esmMin((() => {
 	InvalidTokenError = class extends Error {}, InvalidTokenError.prototype.name = "InvalidTokenError";
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/util.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/util.js
 function getBackendIdsFromToken() {
 	let decoded = jwtDecode(getRuntimeToken());
 	if (!decoded.scp) throw InvalidJwtError;
@@ -19583,7 +19589,7 @@ function getBackendIdsFromToken() {
 			workflowRunBackendId: scopeParts[1],
 			workflowJobRunBackendId: scopeParts[2]
 		};
-		return debug(`Workflow Run Backend ID: ${ids.workflowRunBackendId}`), debug(`Workflow Job Run Backend ID: ${ids.workflowJobRunBackendId}`), ids;
+		return debug$3(`Workflow Run Backend ID: ${ids.workflowRunBackendId}`), debug$3(`Workflow Job Run Backend ID: ${ids.workflowJobRunBackendId}`), ids;
 	}
 	throw InvalidJwtError;
 }
@@ -19592,16 +19598,16 @@ function maskSigUrl(url) {
 		let signature = new URL(url).searchParams.get("sig");
 		signature && (setSecret(signature), setSecret(encodeURIComponent(signature)));
 	} catch (error) {
-		debug(`Failed to parse URL: ${url} ${error instanceof Error ? error.message : String(error)}`);
+		debug$3(`Failed to parse URL: ${url} ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
 function maskSecretUrls(body) {
-	typeof body != "object" || !body ? debug("body is not an object or is null") : ("signed_upload_url" in body && typeof body.signed_upload_url == "string" && maskSigUrl(body.signed_upload_url), "signed_url" in body && typeof body.signed_url == "string" && maskSigUrl(body.signed_url));
+	typeof body != "object" || !body ? debug$3("body is not an object or is null") : ("signed_upload_url" in body && typeof body.signed_upload_url == "string" && maskSigUrl(body.signed_upload_url), "signed_url" in body && typeof body.signed_url == "string" && maskSigUrl(body.signed_url));
 }
 var InvalidJwtError, init_util$3 = __esmMin((() => {
 	init_core(), init_config(), init_esm$13(), InvalidJwtError = Error("Failed to get backend IDs: The provided JWT token is invalid and/or missing claims");
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/artifact-twirp-client.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/shared/artifact-twirp-client.js
 function internalArtifactTwirpClient(options) {
 	let client = new ArtifactHttpClient(getUserAgentString$1(), options?.maxAttempts, options?.retryIntervalMs, options?.retryMultiplier);
 	return new ArtifactServiceClientJSON(client);
@@ -19642,7 +19648,7 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 		request(service, method, contentType, data) {
 			return __awaiter$10(this, void 0, void 0, function* () {
 				let url = new URL(`/twirp/${service}/${method}`, this.baseUrl).href;
-				debug(`[Request] ${method} ${url}`);
+				debug$3(`[Request] ${method} ${url}`);
 				let headers = { "Content-Type": contentType };
 				try {
 					let { body } = yield this.retryableRequest(() => __awaiter$10(this, void 0, void 0, function* () {
@@ -19661,9 +19667,9 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 					let isRetryable = !1, retryAfterSeconds;
 					try {
 						let response = yield operation(), statusCode = response.message.statusCode;
-						statusCode === HttpCodes.TooManyRequests && (retryAfterSeconds = this.getRetryAfterSeconds(response)), rawBody = yield response.readBody(), debug(`[Response] - ${response.message.statusCode}`), debug(`Headers: ${JSON.stringify(response.message.headers, null, 2)}`);
+						statusCode === HttpCodes.TooManyRequests && (retryAfterSeconds = this.getRetryAfterSeconds(response)), rawBody = yield response.readBody(), debug$3(`[Response] - ${response.message.statusCode}`), debug$3(`Headers: ${JSON.stringify(response.message.headers, null, 2)}`);
 						let body = JSON.parse(rawBody);
-						if (maskSecretUrls(body), debug(`Body: ${JSON.stringify(body, null, 2)}`), this.isSuccessStatusCode(statusCode)) return {
+						if (maskSecretUrls(body), debug$3(`Body: ${JSON.stringify(body, null, 2)}`), this.isSuccessStatusCode(statusCode)) return {
 							response,
 							body
 						};
@@ -19672,7 +19678,7 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 							errorMessage = `${errorMessage}: ${body.msg}`;
 						}
 					} catch (error) {
-						if (error instanceof SyntaxError && debug(`Raw Body: ${rawBody}`), error instanceof UsageError) throw error;
+						if (error instanceof SyntaxError && debug$3(`Raw Body: ${rawBody}`), error instanceof UsageError) throw error;
 						if (NetworkError.isNetworkErrorCode(error?.code)) throw new NetworkError(error?.code);
 						isRetryable = !0, errorMessage = error.message;
 					}
@@ -19716,7 +19722,7 @@ var __awaiter$10, ArtifactHttpClient, init_artifact_twirp_client = __esmMin((() 
 		}
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
 function validateRootDirectory(rootDirectory) {
 	if (!fs.existsSync(rootDirectory)) throw Error(`The provided rootDirectory ${rootDirectory} does not exist`);
 	if (!fs.statSync(rootDirectory).isDirectory()) throw Error(`The provided rootDirectory ${rootDirectory} is not a valid directory`);
@@ -19756,32 +19762,32 @@ var init_upload_zip_specification = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/log.js
-function log(message, ...args) {
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/log.js
+function log$1(message, ...args) {
 	node_process.default.stderr.write(`${node_util.default.format(message, ...args)}${node_os.EOL}`);
 }
-var init_log$6 = __esmMin((() => {}));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/env.js
-function getEnvironmentVariable(name) {
+var init_log$7 = __esmMin((() => {}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/env.js
+function getEnvironmentVariable$1(name) {
 	return node_process.default.env[name];
 }
-var init_env = __esmMin((() => {
+var init_env$1 = __esmMin((() => {
 	typeof node_process.default.versions.deno == "string" && node_process.default.versions.deno.length, typeof node_process.default.versions.bun == "string" && node_process.default.versions.bun.length;
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/debug.js
-function enable(namespaces) {
-	enabledString = namespaces, enabledNamespaces = [], skippedNamespaces = [];
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/debug.js
+function enable$1(namespaces) {
+	enabledString$1 = namespaces, enabledNamespaces$1 = [], skippedNamespaces$1 = [];
 	let namespaceList = namespaces.split(",").map((ns) => ns.trim());
-	for (let ns of namespaceList) ns.startsWith("-") ? skippedNamespaces.push(ns.substring(1)) : enabledNamespaces.push(ns);
-	for (let instance of debuggers) instance.enabled = enabled(instance.namespace);
+	for (let ns of namespaceList) ns.startsWith("-") ? skippedNamespaces$1.push(ns.substring(1)) : enabledNamespaces$1.push(ns);
+	for (let instance of debuggers$1) instance.enabled = enabled$1(instance.namespace);
 }
-function enabled(namespace) {
+function enabled$1(namespace) {
 	if (namespace.endsWith("*")) return !0;
-	for (let skipped of skippedNamespaces) if (namespaceMatches(namespace, skipped)) return !1;
-	for (let enabledNamespace of enabledNamespaces) if (namespaceMatches(namespace, enabledNamespace)) return !0;
+	for (let skipped of skippedNamespaces$1) if (namespaceMatches$1(namespace, skipped)) return !1;
+	for (let enabledNamespace of enabledNamespaces$1) if (namespaceMatches$1(namespace, enabledNamespace)) return !0;
 	return !1;
 }
-function namespaceMatches(namespace, patternToMatch) {
+function namespaceMatches$1(namespace, patternToMatch) {
 	if (patternToMatch.indexOf("*") === -1) return namespace === patternToMatch;
 	let pattern = patternToMatch;
 	if (patternToMatch.indexOf("**") !== -1) {
@@ -19806,69 +19812,69 @@ function namespaceMatches(namespace, patternToMatch) {
 	let namespaceDone = namespaceIndex === namespace.length, patternDone = patternIndex === pattern.length, trailingWildCard = patternIndex === pattern.length - 1 && pattern[patternIndex] === "*";
 	return namespaceDone && (patternDone || trailingWildCard);
 }
-function disable() {
-	let result = enabledString || "";
-	return enable(""), result;
+function disable$1() {
+	let result = enabledString$1 || "";
+	return enable$1(""), result;
 }
-function createDebugger(namespace) {
+function createDebugger$1(namespace) {
 	let newDebugger = Object.assign(debug, {
-		enabled: enabled(namespace),
-		destroy,
-		log: debugObj.log,
+		enabled: enabled$1(namespace),
+		destroy: destroy$1,
+		log: debugObj$1.log,
 		namespace,
-		extend
+		extend: extend$1
 	});
 	function debug(...args) {
 		newDebugger.enabled && (args.length > 0 && (args[0] = `${namespace} ${args[0]}`), newDebugger.log(...args));
 	}
-	return debuggers.push(newDebugger), newDebugger;
+	return debuggers$1.push(newDebugger), newDebugger;
 }
-function destroy() {
-	let index = debuggers.indexOf(this);
-	return index >= 0 && (debuggers.splice(index, 1), !0);
+function destroy$1() {
+	let index = debuggers$1.indexOf(this);
+	return index >= 0 && (debuggers$1.splice(index, 1), !0);
 }
-function extend(namespace) {
-	let newDebugger = createDebugger(`${this.namespace}:${namespace}`);
+function extend$1(namespace) {
+	let newDebugger = createDebugger$1(`${this.namespace}:${namespace}`);
 	return newDebugger.log = this.log, newDebugger;
 }
-var debugEnvVariable, enabledString, enabledNamespaces, skippedNamespaces, debuggers, debugObj, init_debug = __esmMin((() => {
-	init_log$6(), init_env(), debugEnvVariable = getEnvironmentVariable("DEBUG"), enabledNamespaces = [], skippedNamespaces = [], debuggers = [], debugEnvVariable && enable(debugEnvVariable), debugObj = Object.assign((namespace) => createDebugger(namespace), {
-		enable,
-		enabled,
-		disable,
-		log
+var debugEnvVariable$1, enabledString$1, enabledNamespaces$1, skippedNamespaces$1, debuggers$1, debugObj$1, init_debug$1 = __esmMin((() => {
+	init_log$7(), init_env$1(), debugEnvVariable$1 = getEnvironmentVariable$1("DEBUG"), enabledNamespaces$1 = [], skippedNamespaces$1 = [], debuggers$1 = [], debugEnvVariable$1 && enable$1(debugEnvVariable$1), debugObj$1 = Object.assign((namespace) => createDebugger$1(namespace), {
+		enable: enable$1,
+		enabled: enabled$1,
+		disable: disable$1,
+		log: log$1
 	});
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/logger.js
-function patchLogMethod(parent, child) {
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/logger.js
+function patchLogMethod$1(parent, child) {
 	child.log = (...args) => {
 		parent.log(...args);
 	};
 }
-function isTypeSpecRuntimeLogLevel(level) {
-	return TYPESPEC_RUNTIME_LOG_LEVELS.includes(level);
+function isTypeSpecRuntimeLogLevel$1(level) {
+	return TYPESPEC_RUNTIME_LOG_LEVELS$1.includes(level);
 }
-function createLoggerContext(options) {
-	let registeredLoggers = new Set(), logLevelFromEnv = getEnvironmentVariable(options.logLevelEnvVarName), logLevel, clientLogger = debugObj(options.namespace);
+function createLoggerContext$1(options) {
+	let registeredLoggers = new Set(), logLevelFromEnv = getEnvironmentVariable$1(options.logLevelEnvVarName), logLevel, clientLogger = debugObj$1(options.namespace);
 	clientLogger.log = (...args) => {
-		debugObj.log(...args);
+		debugObj$1.log(...args);
 	};
 	function contextSetLogLevel(level) {
-		if (level && !isTypeSpecRuntimeLogLevel(level)) throw Error(`Unknown log level '${level}'. Acceptable values: ${TYPESPEC_RUNTIME_LOG_LEVELS.join(",")}`);
+		if (level && !isTypeSpecRuntimeLogLevel$1(level)) throw Error(`Unknown log level '${level}'. Acceptable values: ${TYPESPEC_RUNTIME_LOG_LEVELS$1.join(",")}`);
 		logLevel = level;
 		let enabledNamespaces = [];
 		for (let logger of registeredLoggers) shouldEnable(logger) && enabledNamespaces.push(logger.namespace);
-		debugObj.enable(enabledNamespaces.join(","));
+		debugObj$1.enable(enabledNamespaces.join(","));
 	}
-	logLevelFromEnv && (isTypeSpecRuntimeLogLevel(logLevelFromEnv) ? contextSetLogLevel(logLevelFromEnv) : console.error(`${options.logLevelEnvVarName} set to unknown log level '${logLevelFromEnv}'; logging is not enabled. Acceptable values: ${TYPESPEC_RUNTIME_LOG_LEVELS.join(", ")}.`));
+	logLevelFromEnv && (isTypeSpecRuntimeLogLevel$1(logLevelFromEnv) ? contextSetLogLevel(logLevelFromEnv) : console.error(`${options.logLevelEnvVarName} set to unknown log level '${logLevelFromEnv}'; logging is not enabled. Acceptable values: ${TYPESPEC_RUNTIME_LOG_LEVELS$1.join(", ")}.`));
 	function shouldEnable(logger) {
-		return !!(logLevel && levelMap[logger.level] <= levelMap[logLevel]);
+		return !!(logLevel && levelMap$1[logger.level] <= levelMap$1[logLevel]);
 	}
 	function createLogger(parent, level) {
 		let logger = Object.assign(parent.extend(level), { level });
-		if (patchLogMethod(parent, logger), shouldEnable(logger)) {
-			let enabledNamespaces = debugObj.disable();
-			debugObj.enable(enabledNamespaces + "," + logger.namespace);
+		if (patchLogMethod$1(parent, logger), shouldEnable(logger)) {
+			let enabledNamespaces = debugObj$1.disable();
+			debugObj$1.enable(enabledNamespaces + "," + logger.namespace);
 		}
 		return registeredLoggers.add(logger), logger;
 	}
@@ -19877,7 +19883,7 @@ function createLoggerContext(options) {
 	}
 	function contextCreateClientLogger(namespace) {
 		let clientRootLogger = clientLogger.extend(namespace);
-		return patchLogMethod(clientLogger, clientRootLogger), {
+		return patchLogMethod$1(clientLogger, clientRootLogger), {
 			error: createLogger(clientRootLogger, "error"),
 			warning: createLogger(clientRootLogger, "warning"),
 			info: createLogger(clientRootLogger, "info"),
@@ -19892,25 +19898,25 @@ function createLoggerContext(options) {
 	};
 }
 function createClientLogger$1(namespace) {
-	return context$3.createClientLogger(namespace);
+	return context$4.createClientLogger(namespace);
 }
-var TYPESPEC_RUNTIME_LOG_LEVELS, levelMap, context$3, init_logger = __esmMin((() => {
-	init_debug(), init_env(), TYPESPEC_RUNTIME_LOG_LEVELS = [
+var TYPESPEC_RUNTIME_LOG_LEVELS$1, levelMap$1, context$4, init_logger$1 = __esmMin((() => {
+	init_debug$1(), init_env$1(), TYPESPEC_RUNTIME_LOG_LEVELS$1 = [
 		"verbose",
 		"info",
 		"warning",
 		"error"
-	], levelMap = {
+	], levelMap$1 = {
 		verbose: 400,
 		info: 300,
 		warning: 200,
 		error: 100
-	}, context$3 = createLoggerContext({
+	}, context$4 = createLoggerContext$1({
 		logLevelEnvVarName: "TYPESPEC_RUNTIME_LOG_LEVEL",
 		namespace: "typeSpecRuntime"
-	}), context$3.logger;
+	}), context$4.logger;
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/httpHeaders.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/httpHeaders.js
 function normalizeName(name) {
 	return name.toLowerCase();
 }
@@ -19958,11 +19964,11 @@ var HttpHeadersImpl, init_httpHeaders$1 = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/uuidUtils.js
-function randomUUID$1() {
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/uuidUtils.js
+function randomUUID$2() {
 	return globalThis.crypto.randomUUID();
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/pipelineRequest.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/pipelineRequest.js
 function createPipelineRequest$1(options) {
 	return new PipelineRequestImpl(options);
 }
@@ -19988,11 +19994,11 @@ var PipelineRequestImpl, init_pipelineRequest$1 = __esmMin((() => {
 		requestOverrides;
 		authSchemes;
 		constructor(options) {
-			this.url = options.url, this.body = options.body, this.headers = options.headers ?? createHttpHeaders$1(), this.method = options.method ?? "GET", this.timeout = options.timeout ?? 0, this.multipartBody = options.multipartBody, this.formData = options.formData, this.disableKeepAlive = options.disableKeepAlive ?? !1, this.proxySettings = options.proxySettings, this.streamResponseStatusCodes = options.streamResponseStatusCodes, this.withCredentials = options.withCredentials ?? !1, this.abortSignal = options.abortSignal, this.onUploadProgress = options.onUploadProgress, this.onDownloadProgress = options.onDownloadProgress, this.requestId = options.requestId || randomUUID$1(), this.allowInsecureConnection = options.allowInsecureConnection ?? !1, this.enableBrowserStreams = options.enableBrowserStreams ?? !1, this.requestOverrides = options.requestOverrides, this.authSchemes = options.authSchemes;
+			this.url = options.url, this.body = options.body, this.headers = options.headers ?? createHttpHeaders$1(), this.method = options.method ?? "GET", this.timeout = options.timeout ?? 0, this.multipartBody = options.multipartBody, this.formData = options.formData, this.disableKeepAlive = options.disableKeepAlive ?? !1, this.proxySettings = options.proxySettings, this.streamResponseStatusCodes = options.streamResponseStatusCodes, this.withCredentials = options.withCredentials ?? !1, this.abortSignal = options.abortSignal, this.onUploadProgress = options.onUploadProgress, this.onDownloadProgress = options.onDownloadProgress, this.requestId = options.requestId || randomUUID$2(), this.allowInsecureConnection = options.allowInsecureConnection ?? !1, this.enableBrowserStreams = options.enableBrowserStreams ?? !1, this.requestOverrides = options.requestOverrides, this.authSchemes = options.authSchemes;
 		}
 	};
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/pipeline.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/pipeline.js
 function createEmptyPipeline$1() {
 	return HttpPipeline.create();
 }
@@ -20102,22 +20108,22 @@ var ValidPhaseNames, HttpPipeline, init_pipeline$2 = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/object.js
-function isObject(input) {
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/object.js
+function isObject$1(input) {
 	return typeof input == "object" && !!input && !Array.isArray(input) && !(input instanceof RegExp) && !(input instanceof Date);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/error.js
-function isError$1(e) {
-	if (isObject(e)) {
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/error.js
+function isError$2(e) {
+	if (isObject$1(e)) {
 		let hasName = typeof e.name == "string", hasMessage = typeof e.message == "string";
 		return hasName && hasMessage;
 	}
 	return !1;
 }
-var init_error$1 = __esmMin((() => {})), custom, init_inspect = __esmMin((() => {
+var init_error$2 = __esmMin((() => {})), custom, init_inspect = __esmMin((() => {
 	custom = node_util.inspect.custom;
 })), RedactedString, defaultAllowedHeaderNames, defaultAllowedQueryParameters, Sanitizer, init_sanitizer = __esmMin((() => {
-	RedactedString = "REDACTED", defaultAllowedHeaderNames = "x-ms-client-request-id.x-ms-return-client-request-id.x-ms-useragent.x-ms-correlation-request-id.x-ms-request-id.client-request-id.ms-cv.return-client-request-id.traceparent.Access-Control-Allow-Credentials.Access-Control-Allow-Headers.Access-Control-Allow-Methods.Access-Control-Allow-Origin.Access-Control-Expose-Headers.Access-Control-Max-Age.Access-Control-Request-Headers.Access-Control-Request-Method.Origin.Accept.Accept-Encoding.Cache-Control.Connection.Content-Length.Content-Type.Date.ETag.Expires.If-Match.If-Modified-Since.If-None-Match.If-Unmodified-Since.Last-Modified.Pragma.Request-Id.Retry-After.Server.Transfer-Encoding.User-Agent.WWW-Authenticate".split("."), defaultAllowedQueryParameters = ["api-version"], Sanitizer = class {
+	RedactedString = "REDACTED", defaultAllowedHeaderNames = "x-ms-client-request-id.x-ms-return-client-request-id.x-ms-useragent.x-ms-correlation-request-id.x-ms-request-id.client-request-id.ms-cv.return-client-request-id.traceparent.azure-deprecating.Access-Control-Allow-Credentials.Access-Control-Allow-Headers.Access-Control-Allow-Methods.Access-Control-Allow-Origin.Access-Control-Expose-Headers.Access-Control-Max-Age.Access-Control-Request-Headers.Access-Control-Request-Method.Origin.Accept.Accept-Encoding.Cache-Control.Connection.Content-Length.Content-Type.Date.ETag.Expires.If-Match.If-Modified-Since.If-None-Match.If-Unmodified-Since.Last-Modified.Pragma.Request-Id.Retry-After.Server.Transfer-Encoding.User-Agent.WWW-Authenticate".split("."), defaultAllowedQueryParameters = ["api-version"], Sanitizer = class {
 		allowedHeaderNames;
 		allowedQueryParameters;
 		constructor({ additionalAllowedHeaderNames: allowedHeaderNames = [], additionalAllowedQueryParameters: allowedQueryParameters = [] } = {}) {
@@ -20131,11 +20137,11 @@ var init_error$1 = __esmMin((() => {})), custom, init_inspect = __esmMin((() => 
 					name: value.name,
 					message: value.message
 				};
-				if (key === "headers" && isObject(value)) return this.sanitizeHeaders(value);
+				if (key === "headers" && isObject$1(value)) return this.sanitizeHeaders(value);
 				if (key === "url" && typeof value == "string") return this.sanitizeUrl(value);
-				if (key === "query" && isObject(value)) return this.sanitizeQuery(value);
+				if (key === "query" && isObject$1(value)) return this.sanitizeQuery(value);
 				if (key !== "body" && key !== "response" && key !== "operationSpec") {
-					if (Array.isArray(value) || isObject(value)) {
+					if (Array.isArray(value) || isObject$1(value)) {
 						if (seen.has(value)) return "[Circular]";
 						seen.add(value);
 					}
@@ -20163,12 +20169,12 @@ var init_error$1 = __esmMin((() => {})), custom, init_inspect = __esmMin((() => 
 		}
 	};
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/restError.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/restError.js
 function isRestError$1(e) {
-	return e instanceof RestError$1 || isError$1(e) && e.name === "RestError";
+	return e instanceof RestError$1 || isError$2(e) && e.name === "RestError";
 }
 var errorSanitizer, RestError$1, init_restError$1 = __esmMin((() => {
-	init_error$1(), init_inspect(), init_sanitizer(), errorSanitizer = new Sanitizer(), RestError$1 = class RestError$1 extends Error {
+	init_error$2(), init_inspect(), init_sanitizer(), errorSanitizer = new Sanitizer(), RestError$1 = class RestError$1 extends Error {
 		static REQUEST_SEND_ERROR = "REQUEST_SEND_ERROR";
 		static PARSE_ERROR = "PARSE_ERROR";
 		code;
@@ -20202,19 +20208,261 @@ var errorSanitizer, RestError$1, init_restError$1 = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/bytesEncoding.js
-function uint8ArrayToString$1(bytes, format) {
-	return Buffer.from(bytes).toString(format);
-}
-function stringToUint8Array$1(value, format) {
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/bytesEncoding.js
+function stringToUint8Array$2(value, format) {
 	return Buffer.from(value, format);
 }
-var logger$4, init_log$5 = __esmMin((() => {
-	init_logger(), logger$4 = createClientLogger$1("ts-http-runtime");
+var logger$4, init_log$6 = __esmMin((() => {
+	init_logger$1(), logger$4 = createClientLogger$1("ts-http-runtime");
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/requestBodyHeaders.js
+function getHeaderPairs(headers) {
+	return Array.isArray(headers[0]) ? headers : Array.from({ length: Math.ceil(headers.length / 2) }, (_, index) => [headers[index * 2], headers[index * 2 + 1]]);
+}
+function isIterable(value) {
+	return Symbol.iterator in value && typeof value[Symbol.iterator] == "function";
+}
+function removeContinueToken(value) {
+	if (typeof value == "string") {
+		let tokens = value.split(","), remaining = tokens.filter((token) => token.trim().toLowerCase() !== "100-continue");
+		return remaining.length === tokens.length ? value : remaining.map((token) => token.trim()).filter(Boolean).join(", ") || void 0;
+	}
+	if (Array.isArray(value)) {
+		let remaining = value.map(removeContinueToken).filter((entry) => entry !== void 0);
+		return remaining.length > 0 ? remaining : void 0;
+	}
+	return value;
+}
+function stripRequestBodyHeaders(request, removeFraming) {
+	let stripHeaderValue = (name, value) => {
+		let lowerName = name.toLowerCase();
+		if (!removeFraming || lowerName !== "content-length" && lowerName !== "transfer-encoding" && lowerName !== "trailer") return lowerName === "expect" ? removeContinueToken(value) : value;
+	}, stripHeaderPairs = (pairs) => pairs.flatMap(([name, value]) => {
+		let updated = typeof name == "string" ? stripHeaderValue(name, value) : value;
+		return updated === void 0 ? [] : [[name, updated]];
+	});
+	for (let [name, value] of request.headers) {
+		let updated = stripHeaderValue(name, value);
+		updated === void 0 ? request.headers.delete(name) : typeof updated == "string" && updated !== value && request.headers.set(name, updated);
+	}
+	let overrides = request.requestOverrides;
+	if (!overrides || !("headers" in overrides)) return;
+	let headers = overrides.headers;
+	if (Array.isArray(headers)) {
+		let updatedPairs = stripHeaderPairs(getHeaderPairs(headers));
+		request.requestOverrides = {
+			...overrides,
+			headers: Array.isArray(headers[0]) ? updatedPairs : updatedPairs.flat()
+		};
+	} else if (headers && typeof headers == "object" && isIterable(headers)) {
+		let pairs = Array.from(headers, (entry) => {
+			if (!Array.isArray(entry) || entry.length !== 2) throw TypeError("Header entry must be a name/value pair");
+			return entry;
+		});
+		request.requestOverrides = {
+			...overrides,
+			headers: stripHeaderPairs(pairs)
+		};
+	} else if (headers && typeof headers == "object") {
+		let updatedHeaders = {};
+		for (let [name, value] of Object.entries(headers)) {
+			let updated = stripHeaderValue(name, value);
+			updated !== void 0 && (updatedHeaders[name] = updated);
+		}
+		request.requestOverrides = {
+			...overrides,
+			headers: updatedHeaders
+		};
+	}
+}
+function removeExpectContinueHeader(request) {
+	stripRequestBodyHeaders(request, !1);
+}
+function removeRequestBodyHeaders(request) {
+	stripRequestBodyHeaders(request, !0);
+}
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/nodeExpectContinue.js
+function getHeaderValues(headers, name) {
+	if (Array.isArray(headers)) return getHeaderPairs(headers).filter(([key]) => typeof key == "string" && key.toLowerCase() === name).flatMap(([, value]) => Array.isArray(value) ? value : [value]);
+	if (headers && typeof headers == "object") {
+		if ("get" in headers && typeof headers.get == "function") {
+			let value = headers.get(name);
+			return value == null ? [] : [value];
+		}
+		let value;
+		for (let [key, entry] of Object.entries(headers)) key.toLowerCase() === name && (value = entry);
+		return value === void 0 ? [] : Array.isArray(value) ? value : [value];
+	}
+	return [];
+}
+function getEffectiveHeaderValues(request, name) {
+	return getHeaderValues(request.requestOverrides && "headers" in request.requestOverrides ? request.requestOverrides.headers : request.headers, name.toLowerCase());
+}
+function hasExpectContinue(request) {
+	return getEffectiveHeaderValues(request, "expect").some((value) => typeof value == "string" && value.split(",").some((token) => token.trim().toLowerCase() === "100-continue"));
+}
+function addHeader(headers, name, value) {
+	return Array.isArray(headers) ? Array.isArray(headers[0]) ? [...headers, [name, value]] : [
+		...headers,
+		name,
+		value
+	] : {
+		...headers,
+		[name]: value
+	};
+}
+function hasHeader(headers, name) {
+	return Array.isArray(headers) ? getHeaderPairs(headers).some(([key]) => typeof key == "string" && key.toLowerCase() === name) : Object.keys(headers ?? {}).some((key) => key.toLowerCase() === name);
+}
+function addExpectContinueFraming(options, bodyLength) {
+	hasHeader(options.headers, "content-length") || hasHeader(options.headers, "transfer-encoding") || (options.headers = addHeader(options.headers, bodyLength === null ? "Transfer-Encoding" : "Content-Length", bodyLength === null ? "chunked" : String(bodyLength)));
+}
+function createExpectContinueRequest(options) {
+	let fallback, waiting = !0, bodyStarted = !1, errorReported = !1, request, bodyError, bodyStream = options.bodyStream;
+	if (bodyStream?.once("error", onBodyError), bodyStream && "errored" in bodyStream && bodyStream.errored instanceof Error) {
+		process.nextTick(onBodyError, bodyStream.errored);
+		return;
+	}
+	try {
+		request = options.createRequest(onResponse);
+	} catch (error) {
+		onError(error);
+		return;
+	}
+	function stopWaiting(keepBodyObserved = !1) {
+		waiting = !1, fallback !== void 0 && (clearTimeout(fallback), fallback = void 0), request?.removeListener("continue", sendBody), request?.removeListener("socket", onSocket), keepBodyObserved || bodyStream?.removeListener("error", onBodyError);
+	}
+	function onError(error) {
+		let requestError = error instanceof Error ? error : Error(String(error));
+		return errorReported || (errorReported = !0, stopWaiting(), options.onError(requestError)), requestError;
+	}
+	function onBodyError(error) {
+		errorReported || !waiting && !bodyStarted || (errorReported = !0, bodyError = error instanceof Error ? error : Error(String(error)), stopWaiting(), options.onBodyError(error), request?.destroy(bodyError));
+	}
+	function sendBody() {
+		if (waiting) {
+			bodyStarted = !0, stopWaiting(!0);
+			try {
+				options.sendBody(request);
+			} catch (error) {
+				onBodyError(error);
+			} finally {
+				bodyStream?.removeListener("error", onBodyError);
+			}
+		}
+	}
+	function onAbort() {
+		stopWaiting(), options.onAbort(request);
+	}
+	function onSocket() {
+		if (waiting) try {
+			if (request.flushHeaders(), !waiting) return;
+			request.write("", (error) => {
+				error ? request.destroy(onError(error)) : waiting && (fallback = setTimeout(sendBody, EXPECT_CONTINUE_TIMEOUT_IN_MS));
+			});
+		} catch (error) {
+			request.destroy(onError(error));
+		}
+	}
+	function onResponse(response) {
+		if (stopWaiting(), !bodyStarted) {
+			request.shouldKeepAlive = !1;
+			let destroyRequest = () => {
+				response.removeListener("end", destroyRequest), response.removeListener("close", destroyRequest), request.destroy();
+			};
+			response.once("end", destroyRequest), response.once("close", destroyRequest), (response.readableEnded || response.destroyed) && destroyRequest();
+		}
+		options.onResponse(response);
+	}
+	request.once("error", onError), bodyError ? request.destroy(bodyError) : options.abortSignal.aborted ? onAbort() : (options.abortSignal.addEventListener("abort", onAbort, { once: !0 }), request.once("close", () => stopWaiting()), (request.destroyed || request.closed) && stopWaiting(), waiting && (request.once("continue", sendBody), request.socket ? onSocket() : request.once("socket", onSocket)));
+}
+var EXPECT_CONTINUE_TIMEOUT_IN_MS, init_nodeExpectContinue = __esmMin((() => {
+	EXPECT_CONTINUE_TIMEOUT_IN_MS = 1e3;
+}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/responseBody.js
+function setRequestCompletion(response, completion) {
+	requestCompletions.set(response, completion), completion.then(() => requestCompletions.get(response) === completion && requestCompletions.delete(response)).catch((error) => {
+		logger$4.warning("Error tracking request completion", error);
+	});
+}
+function getRequestCompletion(response) {
+	return requestCompletions.get(response);
+}
+function getResponseBodyCompletion(response) {
+	return responseBodyCompletions.get(response);
+}
+function isNodeResponseBody(value) {
+	return typeof value == "object" && !!value && "resume" in value && typeof value.resume == "function";
+}
+function isNodeEventEmitterBody(value) {
+	return "on" in value && typeof value.on == "function" && "once" in value && typeof value.once == "function" && "removeListener" in value && typeof value.removeListener == "function";
+}
+function isBrowserResponseBody(value) {
+	return typeof value == "object" && !!value && "cancel" in value && typeof value.cancel == "function";
+}
+function setResponseBodySource(body, source) {
+	isNodeResponseBody(body) && isNodeResponseBody(source) && responseBodySources.set(body, source);
+}
+function setResponseBodyDisposer(response, dispose) {
+	return responseBodyDisposers.set(response, dispose), () => {
+		responseBodyDisposers.get(response) === dispose && responseBodyDisposers.delete(response);
+	};
+}
+function disposeNodeResponseBody(readableStream, disposed = new Set()) {
+	if (disposed.has(readableStream)) return;
+	disposed.add(readableStream);
+	let source = responseBodySources.get(readableStream);
+	if (responseBodySources.delete(readableStream), readableStream.closed !== !0) {
+		if (readableStream.destroy) {
+			if (isNodeEventEmitterBody(readableStream)) {
+				let onError = (error) => {
+					logger$4.warning("Error disposing Node stream", error);
+				}, onClose = () => {
+					readableStream.removeListener("error", onError);
+				};
+				readableStream.on("error", onError), readableStream.once("close", onClose);
+				try {
+					readableStream.destroy();
+				} catch (error) {
+					throw readableStream.removeListener("error", onError), readableStream.removeListener("close", onClose), error;
+				}
+			} else readableStream.destroy();
+		} else readableStream.resume();
+	}
+	source && disposeNodeResponseBody(source, disposed);
+}
+function disposeNodeStream(stream) {
+	try {
+		disposeNodeResponseBody(stream);
+	} catch (error) {
+		logger$4.warning("Error disposing Node stream", error);
+	}
+}
+async function disposeResponseBody(response) {
+	try {
+		let dispose = responseBodyDisposers.get(response);
+		responseBodyDisposers.delete(response);
+		try {
+			let readableStream = response.readableStreamBody;
+			if (isNodeResponseBody(readableStream)) {
+				disposeNodeStream(readableStream);
+				return;
+			}
+			let browserStream = response.browserStreamBody;
+			isBrowserResponseBody(browserStream) && await browserStream.cancel();
+		} finally {
+			dispose?.();
+		}
+	} catch (error) {
+		logger$4.warning("Error disposing response body", error);
+	}
+}
+var responseBodySources, responseBodyDisposers, requestCompletions, responseBodyCompletions, init_responseBody = __esmMin((() => {
+	init_log$6(), responseBodySources = new WeakMap(), responseBodyDisposers = new WeakMap(), requestCompletions = new WeakMap(), responseBodyCompletions = new WeakMap();
+}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
 function isReadableStream(body) {
-	return body && typeof body.pipe == "function";
+	return typeof body == "object" && !!body && "pipe" in body && typeof body.pipe == "function";
 }
 function isStreamComplete(stream) {
 	return stream.readable === !1 ? Promise.resolve() : new Promise((resolve) => {
@@ -20225,7 +20473,64 @@ function isStreamComplete(stream) {
 	});
 }
 function isArrayBuffer(body) {
-	return body && typeof body.byteLength == "number";
+	return node_util.types.isArrayBuffer(body) || ArrayBuffer.isView(body);
+}
+function arrayBufferToBuffer(body) {
+	return Buffer.isBuffer(body) ? body : ArrayBuffer.isView(body) ? Buffer.from(body.buffer, body.byteOffset, body.byteLength) : Buffer.from(body);
+}
+function createRequestLifecycle(request, options, isInsecure, resolve, reject) {
+	let clientRequest, response, requestDone = !1, resolveRequestComplete, requestComplete = new Promise((_resolve) => {
+		resolveRequestComplete = _resolve;
+	}), onComplete = () => {
+		requestDone = !0, clientRequest.removeListener("finish", onComplete), clientRequest.removeListener("close", onComplete), resolveRequestComplete();
+	}, onResponse = (incomingResponse) => {
+		response = incomingResponse, resolve({
+			response: incomingResponse,
+			requestComplete,
+			isRequestComplete: () => requestDone,
+			disposeRequest: () => {
+				requestDone || clientRequest.destroy();
+			}
+		});
+	};
+	return {
+		createRequest: (onResponseCallback = onResponse) => (clientRequest = isInsecure ? node_http.default.request(options, onResponseCallback) : node_https.default.request(options, onResponseCallback), clientRequest.once("finish", onComplete), clientRequest.once("close", onComplete), clientRequest),
+		onResponse,
+		rejectRequest: (error) => {
+			reject(toRequestSendError(error, request));
+		},
+		abortRequest: (req) => {
+			let abortError = new AbortError$1("The operation was aborted. Rejecting from abort signal callback while making request.");
+			response?.destroy(abortError), req.destroy(abortError), reject(abortError);
+		}
+	};
+}
+function toRequestSendError(error, request) {
+	if (isRestError$1(error)) return error;
+	let prematureClose = error.code === "ERR_STREAM_PREMATURE_CLOSE";
+	return new RestError$1(prematureClose ? "Request body stream closed before ending" : error.message, {
+		code: prematureClose ? RestError$1.REQUEST_SEND_ERROR : error.code ?? RestError$1.REQUEST_SEND_ERROR,
+		request
+	});
+}
+function sendRequestBody(clientRequest, body, request, onError) {
+	if (body && isReadableStream(body)) pipeUploadStream(body, clientRequest, request, onError);
+	else if (body) {
+		if (typeof body == "string" || Buffer.isBuffer(body)) clientRequest.end(body);
+		else throw logger$4.error("Unrecognized body type", body), new RestError$1("Unrecognized body type", { request });
+	} else clientRequest.end();
+}
+function prepareRequestBody(request, useExpectContinue) {
+	let requestBody = request.body, resolvedBody = typeof requestBody == "function" ? requestBody() : requestBody, body = resolvedBody && isArrayBuffer(resolvedBody) ? arrayBufferToBuffer(resolvedBody) : resolvedBody;
+	if (!useExpectContinue && body && !request.headers.has("Content-Length")) {
+		let bodyLength = getBodyLength(body);
+		bodyLength !== null && request.headers.set("Content-Length", bodyLength);
+	}
+	if (!body || !request.onUploadProgress) return body;
+	let uploadReportStream = new ReportTransform(request.onUploadProgress);
+	return uploadReportStream.on("error", (e) => {
+		logger$4.error("Error in upload progress", e);
+	}), isReadableStream(body) ? pipeUploadStream(body, uploadReportStream, request) : uploadReportStream.end(body), uploadReportStream;
 }
 function getResponseHeaders(res) {
 	let headers = createHttpHeaders$1();
@@ -20235,38 +20540,52 @@ function getResponseHeaders(res) {
 	}
 	return headers;
 }
-function getDecodedResponseStream(stream, headers) {
+function getDecodedResponseStream(stream, headers, abortSignal) {
 	let contentEncoding = headers.get("Content-Encoding");
-	if (contentEncoding === "gzip") {
-		let unzip = node_zlib.default.createGunzip();
-		return stream.pipe(unzip), unzip;
+	return contentEncoding === "gzip" ? pipeResponseStream(stream, node_zlib.default.createGunzip(), abortSignal) : contentEncoding === "deflate" ? pipeResponseStream(stream, node_zlib.default.createInflate(), abortSignal) : stream;
+}
+function pipeUploadStream(source, destination, request, onError) {
+	let tearingDown = !1, cleanupFinished = (0, node_stream.finished)(source, { writable: !1 }, onSourceComplete);
+	function onSourceComplete(error) {
+		if (cleanupFinished(), destination.removeListener("close", onDestinationClose), error && !tearingDown) {
+			let requestError = toRequestSendError(error, request);
+			destination.destroy(requestError), onError?.(requestError);
+		}
 	}
-	if (contentEncoding === "deflate") {
-		let inflate = node_zlib.default.createInflate();
-		return stream.pipe(inflate), inflate;
+	function onDestinationClose() {
+		tearingDown = !0, source.unpipe(destination), disposeNodeStream(source);
 	}
-	return stream;
+	destination.once("close", onDestinationClose), source.pipe(destination);
+}
+function pipeResponseStream(source, destination, abortSignal) {
+	setResponseBodySource(destination, source);
+	let cleanupSource = () => {}, cleanupDestination = () => {};
+	return cleanupSource = (0, node_stream.finished)(source, { writable: !1 }, (error) => {
+		cleanupSource(), error && destination.destroy(abortSignal.aborted ? new AbortError$1() : error);
+	}), cleanupDestination = (0, node_stream.finished)(destination, { writable: !1 }, () => {
+		cleanupDestination(), source.unpipe(destination), source.readable && disposeNodeStream(source);
+	}), source.pipe(destination);
 }
 function streamToText(stream) {
 	return new Promise((resolve, reject) => {
-		let buffer = [];
-		stream.on("data", (chunk) => {
+		let buffer = [], cleanupFinished = (0, node_stream.finished)(stream, { writable: !1 }, onComplete);
+		function onData(chunk) {
 			Buffer.isBuffer(chunk) ? buffer.push(chunk) : buffer.push(Buffer.from(chunk));
-		}), stream.on("end", () => {
-			resolve(Buffer.concat(buffer).toString("utf8"));
-		}), stream.on("error", (e) => {
-			e && e?.name === "AbortError" ? reject(e) : reject(new RestError$1(`Error reading response as text: ${e.message}`, { code: RestError$1.PARSE_ERROR }));
-		});
+		}
+		function onComplete(error) {
+			cleanupFinished(), stream.removeListener("data", onData), error?.name === "AbortError" ? reject(error) : error ? reject(new RestError$1(`Error reading response as text: ${error.message}`, { code: RestError$1.PARSE_ERROR })) : resolve(Buffer.concat(buffer).toString("utf8"));
+		}
+		stream.on("data", onData);
 	});
 }
 function getBodyLength(body) {
-	return body ? Buffer.isBuffer(body) ? body.length : isReadableStream(body) ? null : isArrayBuffer(body) ? body.byteLength : typeof body == "string" ? Buffer.from(body).length : null : 0;
+	return body ? Buffer.isBuffer(body) ? body.length : isReadableStream(body) ? null : isArrayBuffer(body) ? body.byteLength : typeof body == "string" ? Buffer.byteLength(body) : null : 0;
 }
 function createNodeHttpClient() {
 	return new NodeHttpClient();
 }
 var DEFAULT_TLS_SETTINGS, ReportTransform, NodeHttpClient, init_nodeHttpClient = __esmMin((() => {
-	init_AbortError$1(), init_httpHeaders$1(), init_restError$1(), init_log$5(), init_sanitizer(), DEFAULT_TLS_SETTINGS = {}, ReportTransform = class extends node_stream.Transform {
+	init_AbortError$1(), init_httpHeaders$1(), init_restError$1(), init_log$6(), init_sanitizer(), init_nodeExpectContinue(), init_responseBody(), DEFAULT_TLS_SETTINGS = {}, ReportTransform = class extends node_stream.Transform {
 		loadedBytes = 0;
 		progressCallback;
 		_transform(chunk, _encoding, callback) {
@@ -20284,53 +20603,59 @@ var DEFAULT_TLS_SETTINGS, ReportTransform, NodeHttpClient, init_nodeHttpClient =
 		cachedHttpAgent;
 		cachedHttpsAgents = new WeakMap();
 		async sendRequest(request) {
-			let abortController = new AbortController(), abortListener;
-			if (request.abortSignal) {
-				if (request.abortSignal.aborted) throw new AbortError$1("The operation was aborted. Request has already been canceled.");
+			let requestBody = request.body, abortController = new AbortController(), abortListener, requestAbortSignal = request.abortSignal;
+			if (requestAbortSignal) {
+				if (requestAbortSignal.aborted) throw new AbortError$1("The operation was aborted. Request has already been canceled.");
 				abortListener = (event) => {
 					event.type === "abort" && abortController.abort();
-				}, request.abortSignal.addEventListener("abort", abortListener);
+				}, requestAbortSignal.addEventListener("abort", abortListener);
 			}
 			let timeoutId;
 			request.timeout > 0 && (timeoutId = setTimeout(() => {
 				let sanitizer = new Sanitizer();
 				logger$4.info(`request to '${sanitizer.sanitizeUrl(request.url)}' timed out. canceling...`), abortController.abort();
 			}, request.timeout));
-			let acceptEncoding = request.headers.get("Accept-Encoding"), shouldDecompress = acceptEncoding?.includes("gzip") || acceptEncoding?.includes("deflate"), body = typeof request.body == "function" ? request.body() : request.body;
-			if (body && !request.headers.has("Content-Length")) {
-				let bodyLength = getBodyLength(body);
-				bodyLength !== null && request.headers.set("Content-Length", bodyLength);
-			}
-			let responseStream;
+			let acceptEncoding = request.headers.get("Accept-Encoding"), shouldDecompress = acceptEncoding?.includes("gzip") || acceptEncoding?.includes("deflate"), body, responseStream, requestComplete = Promise.resolve();
 			try {
-				if (body && request.onUploadProgress) {
-					let onUploadProgress = request.onUploadProgress, uploadReportStream = new ReportTransform(onUploadProgress);
-					uploadReportStream.on("error", (e) => {
-						logger$4.error("Error in upload progress", e);
-					}), isReadableStream(body) ? body.pipe(uploadReportStream) : uploadReportStream.end(body), body = uploadReportStream;
-				}
-				let res = await this.makeRequest(request, abortController, body), headers = getResponseHeaders(res), response = {
+				let useExpectContinue = hasExpectContinue(request), knownBodyLength = useExpectContinue && typeof requestBody != "function" ? getBodyLength(requestBody ?? null) : null;
+				knownBodyLength === 0 && (removeExpectContinueHeader(request), useExpectContinue = !1), useExpectContinue || (body = prepareRequestBody(request, !1));
+				let result = useExpectContinue ? await this.makeRequestWithExpectContinue(request, abortController, () => (body = prepareRequestBody(request, !0), body), knownBodyLength) : await this.makeRequest(request, abortController, body);
+				requestComplete = result.requestComplete;
+				let res = result.response, headers = getResponseHeaders(res), response = {
 					status: res.statusCode ?? 0,
 					headers,
 					request
 				};
-				if (request.method === "HEAD") return res.resume(), response;
-				responseStream = shouldDecompress ? getDecodedResponseStream(res, headers) : res;
+				if (!result.isRequestComplete()) {
+					setRequestCompletion(response, result.requestComplete);
+					let clearDisposer = setResponseBodyDisposer(response, result.disposeRequest);
+					result.requestComplete.then(clearDisposer).catch((error) => {
+						logger$4.warning("Error disposing request", error);
+					});
+				}
+				if ((typeof request.requestOverrides?.method == "string" ? request.requestOverrides.method.toUpperCase() : request.method) === "HEAD") return res.resume(), response;
+				responseStream = shouldDecompress ? getDecodedResponseStream(res, headers, abortController.signal) : res;
 				let onDownloadProgress = request.onDownloadProgress;
 				if (onDownloadProgress) {
 					let downloadReportStream = new ReportTransform(onDownloadProgress);
 					downloadReportStream.on("error", (e) => {
 						logger$4.error("Error in download progress", e);
-					}), responseStream.pipe(downloadReportStream), responseStream = downloadReportStream;
+					}), responseStream = pipeResponseStream(responseStream, downloadReportStream, abortController.signal);
 				}
 				return request.streamResponseStatusCodes?.has(1e400) || request.streamResponseStatusCodes?.has(response.status) ? response.readableStreamBody = responseStream : response.bodyAsText = await streamToText(responseStream), response;
+			} catch (error) {
+				throw isReadableStream(body) && disposeNodeStream(body), responseStream && disposeNodeStream(responseStream), error;
 			} finally {
-				if (timeoutId !== void 0 && clearTimeout(timeoutId), request.abortSignal && abortListener) {
+				if (timeoutId !== void 0 && clearTimeout(timeoutId), requestAbortSignal && abortListener) {
 					let uploadStreamDone = Promise.resolve();
 					isReadableStream(body) && (uploadStreamDone = isStreamComplete(body));
 					let downloadStreamDone = Promise.resolve();
-					isReadableStream(responseStream) && (downloadStreamDone = isStreamComplete(responseStream)), Promise.all([uploadStreamDone, downloadStreamDone]).then(() => {
-						abortListener && request.abortSignal?.removeEventListener("abort", abortListener);
+					isReadableStream(responseStream) && (downloadStreamDone = isStreamComplete(responseStream)), Promise.all([
+						requestComplete,
+						uploadStreamDone,
+						downloadStreamDone
+					]).then(() => {
+						abortListener && requestAbortSignal.removeEventListener("abort", abortListener);
 					}).catch((e) => {
 						logger$4.warning("Error when cleaning up abortListener on httpRequest", e);
 					});
@@ -20338,29 +20663,45 @@ var DEFAULT_TLS_SETTINGS, ReportTransform, NodeHttpClient, init_nodeHttpClient =
 			}
 		}
 		makeRequest(request, abortController, body) {
+			let { options, isInsecure } = this.getRequestOptions(request);
+			return new Promise((resolve, reject) => {
+				let { createRequest, rejectRequest, abortRequest } = createRequestLifecycle(request, options, isInsecure, resolve, reject), req = createRequest();
+				req.once("error", rejectRequest), abortController.signal.addEventListener("abort", () => abortRequest(req)), sendRequestBody(req, body, request, rejectRequest);
+			});
+		}
+		makeRequestWithExpectContinue(request, abortController, prepareBody, knownBodyLength) {
+			let { options, isInsecure } = this.getRequestOptions(request);
+			return addExpectContinueFraming(options, knownBodyLength), new Promise((resolve, reject) => {
+				let { createRequest, onResponse, rejectRequest, abortRequest } = createRequestLifecycle(request, options, isInsecure, resolve, reject);
+				createExpectContinueRequest({
+					abortSignal: abortController.signal,
+					bodyStream: isReadableStream(request.body) ? request.body : void 0,
+					createRequest,
+					onAbort: abortRequest,
+					onError: rejectRequest,
+					onBodyError: reject,
+					onResponse,
+					sendBody: (clientRequest) => {
+						sendRequestBody(clientRequest, prepareBody(), request, rejectRequest);
+					}
+				});
+			});
+		}
+		getRequestOptions(request) {
 			let url = new URL(request.url), isInsecure = url.protocol !== "https:";
 			if (isInsecure && !request.allowInsecureConnection) throw Error(`Cannot connect to ${request.url} while allowInsecureConnection is false.`);
-			let options = {
-				agent: request.agent ?? this.getOrCreateAgent(request, isInsecure),
-				hostname: url.hostname,
-				path: `${url.pathname}${url.search}`,
-				port: url.port,
-				method: request.method,
-				headers: request.headers.toJSON({ preserveCase: !0 }),
-				...request.requestOverrides
+			return {
+				isInsecure,
+				options: {
+					agent: request.agent ?? this.getOrCreateAgent(request, isInsecure),
+					hostname: url.hostname,
+					path: `${url.pathname}${url.search}`,
+					port: url.port,
+					method: request.method,
+					headers: request.headers.toJSON({ preserveCase: !0 }),
+					...request.requestOverrides
+				}
 			};
-			return new Promise((resolve, reject) => {
-				let req = isInsecure ? node_http.default.request(options, resolve) : node_https.default.request(options, resolve);
-				req.once("error", (err) => {
-					reject(new RestError$1(err.message, {
-						code: err.code ?? RestError$1.REQUEST_SEND_ERROR,
-						request
-					}));
-				}), abortController.signal.addEventListener("abort", () => {
-					let abortError = new AbortError$1("The operation was aborted. Rejecting from abort signal callback while making request.");
-					req.destroy(abortError), reject(abortError);
-				}), body && isReadableStream(body) ? body.pipe(req) : body ? typeof body == "string" || Buffer.isBuffer(body) ? req.end(body) : isArrayBuffer(body) ? req.end(ArrayBuffer.isView(body) ? Buffer.from(body.buffer, body.byteOffset, body.byteLength) : Buffer.from(body)) : (logger$4.error("Unrecognized body type", body), reject(new RestError$1("Unrecognized body type"))) : req.end();
-			});
 		}
 		getOrCreateAgent(request, isInsecure) {
 			let disableKeepAlive = request.disableKeepAlive;
@@ -20376,14 +20717,14 @@ var DEFAULT_TLS_SETTINGS, ReportTransform, NodeHttpClient, init_nodeHttpClient =
 		}
 	};
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/defaultHttpClient.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/defaultHttpClient.js
 function createDefaultHttpClient$1() {
 	return createNodeHttpClient();
 }
 var init_defaultHttpClient$1 = __esmMin((() => {
 	init_nodeHttpClient();
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/logPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/logPolicy.js
 function logPolicy$1(options = {}) {
 	let logger = options.logger ?? logger$4.info, sanitizer = new Sanitizer({
 		additionalAllowedHeaderNames: options.additionalAllowedHeaderNames,
@@ -20400,19 +20741,19 @@ function logPolicy$1(options = {}) {
 	};
 }
 var logPolicyName, init_logPolicy$1 = __esmMin((() => {
-	init_log$5(), init_sanitizer(), logPolicyName = "logPolicy";
+	init_log$6(), init_sanitizer(), logPolicyName = "logPolicy";
 })), init_constants$3 = __esmMin((() => {}));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/random.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/random.js
 function getRandomIntegerInclusive(min, max) {
 	return min = Math.ceil(min), max = Math.floor(max), Math.floor(Math.random() * (max - min + 1)) + min;
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/delay.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/delay.js
 function calculateRetryDelay(retryAttempt, config) {
 	let exponentialDelay = config.retryDelayInMs * 2 ** retryAttempt, clampedDelay = Math.min(config.maxRetryDelayInMs, exponentialDelay);
 	return { retryAfterInMs: clampedDelay / 2 + getRandomIntegerInclusive(0, clampedDelay / 2) };
 }
 var init_delay$1 = __esmMin((() => {}));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/helpers.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/helpers.js
 function delay$2(delayInMs, value, options) {
 	return new Promise((resolve, reject) => {
 		let timer, onAborted, rejectOnAbort = () => reject(new AbortError$1(options?.abortErrorMsg ? options?.abortErrorMsg : StandardAbortMessage$1)), removeListeners = () => {
@@ -20430,10 +20771,10 @@ function parseHeaderValueAsNumber(response, headerName) {
 	let valueAsNum = Number(value);
 	if (!Number.isNaN(valueAsNum)) return valueAsNum;
 }
-var StandardAbortMessage$1, init_helpers = __esmMin((() => {
+var StandardAbortMessage$1, init_helpers$1 = __esmMin((() => {
 	init_AbortError$1(), StandardAbortMessage$1 = "The operation was aborted.";
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/throttlingRetryStrategy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/throttlingRetryStrategy.js
 function getRetryAfterInMs(response) {
 	if (response && [429, 503].includes(response.status)) try {
 		for (let header of AllRetryAfterHeaders) {
@@ -20461,13 +20802,13 @@ function throttlingRetryStrategy() {
 	};
 }
 var RetryAfterHeader, AllRetryAfterHeaders, init_throttlingRetryStrategy = __esmMin((() => {
-	init_helpers(), RetryAfterHeader = "Retry-After", AllRetryAfterHeaders = [
+	init_helpers$1(), RetryAfterHeader = "Retry-After", AllRetryAfterHeaders = [
 		"retry-after-ms",
 		"x-ms-retry-after-ms",
 		RetryAfterHeader
 	];
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/exponentialRetryStrategy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/exponentialRetryStrategy.js
 function exponentialRetryStrategy(options = {}) {
 	let retryInterval = options.retryDelayInMs ?? DEFAULT_CLIENT_RETRY_INTERVAL, maxRetryInterval = options.maxRetryDelayInMs ?? DEFAULT_CLIENT_MAX_RETRY_INTERVAL;
 	return {
@@ -20490,7 +20831,7 @@ function isSystemError(err) {
 var DEFAULT_CLIENT_RETRY_INTERVAL, DEFAULT_CLIENT_MAX_RETRY_INTERVAL, init_exponentialRetryStrategy = __esmMin((() => {
 	init_delay$1(), init_throttlingRetryStrategy(), DEFAULT_CLIENT_RETRY_INTERVAL = 1e3, DEFAULT_CLIENT_MAX_RETRY_INTERVAL = 64e3;
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/retryPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/retryPolicy.js
 function retryPolicy(strategies, options = { maxRetries: 3 }) {
 	let logger = options.logger || retryPolicyLogger;
 	return {
@@ -20527,11 +20868,11 @@ function retryPolicy(strategies, options = { maxRetries: 3 }) {
 					let { errorToThrow, retryAfterInMs, redirectTo } = modifiers;
 					if (errorToThrow) throw strategyLogger.error(`Retry ${retryCount}: Retry strategy ${strategy.name} throws error:`, errorToThrow), errorToThrow;
 					if (retryAfterInMs || retryAfterInMs === 0) {
-						strategyLogger.info(`Retry ${retryCount}: Retry strategy ${strategy.name} retries after ${retryAfterInMs}`), await delay$2(retryAfterInMs, void 0, { abortSignal: request.abortSignal });
+						strategyLogger.info(`Retry ${retryCount}: Retry strategy ${strategy.name} retries after ${retryAfterInMs}`), response && await disposeResponseBody(response), await delay$2(retryAfterInMs, void 0, { abortSignal: request.abortSignal });
 						continue retryRequest;
 					}
 					if (redirectTo) {
-						strategyLogger.info(`Retry ${retryCount}: Retry strategy ${strategy.name} redirects to ${redirectTo}`), request.url = redirectTo;
+						strategyLogger.info(`Retry ${retryCount}: Retry strategy ${strategy.name} redirects to ${redirectTo}`), response && await disposeResponseBody(response), request.url = redirectTo;
 						continue retryRequest;
 					}
 				}
@@ -20542,9 +20883,9 @@ function retryPolicy(strategies, options = { maxRetries: 3 }) {
 	};
 }
 var retryPolicyLogger, retryPolicyName, init_retryPolicy = __esmMin((() => {
-	init_helpers(), init_restError$1(), init_AbortError$1(), init_logger(), init_constants$3(), retryPolicyLogger = createClientLogger$1("ts-http-runtime retryPolicy"), retryPolicyName = "retryPolicy";
+	init_helpers$1(), init_restError$1(), init_AbortError$1(), init_logger$1(), init_constants$3(), init_responseBody(), retryPolicyLogger = createClientLogger$1("ts-http-runtime retryPolicy"), retryPolicyName = "retryPolicy";
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/defaultRetryPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/defaultRetryPolicy.js
 function defaultRetryPolicy$1(options = {}) {
 	return {
 		name: defaultRetryPolicyName,
@@ -20554,7 +20895,7 @@ function defaultRetryPolicy$1(options = {}) {
 var defaultRetryPolicyName, init_defaultRetryPolicy$1 = __esmMin((() => {
 	init_exponentialRetryStrategy(), init_throttlingRetryStrategy(), init_retryPolicy(), init_constants$3(), defaultRetryPolicyName = "defaultRetryPolicy";
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/formData.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/formData.js
 function convertBodyToFormDataMap(body) {
 	if (typeof FormData < "u" && body instanceof FormData) {
 		let formDataMap = {};
@@ -20565,7 +20906,7 @@ function convertBodyToFormDataMap(body) {
 		return formDataMap;
 	}
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/formDataPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/formDataPolicy.js
 function formDataPolicy$1() {
 	return {
 		name: formDataPolicyName,
@@ -20592,7 +20933,7 @@ async function prepareFormData(formData, request) {
 	let parts = [];
 	for (let [fieldName, values] of Object.entries(formData)) for (let value of Array.isArray(values) ? values : [values]) if (typeof value == "string") parts.push({
 		headers: createHttpHeaders$1({ "Content-Disposition": `form-data; name="${fieldName}"` }),
-		body: stringToUint8Array$1(value, "utf-8")
+		body: stringToUint8Array$2(value, "utf-8")
 	});
 	else if (typeof value != "object" || !value) throw Error(`Unexpected value for key ${fieldName}: ${value}. Value should be serialized to string first.`);
 	else {
@@ -20607,7 +20948,7 @@ async function prepareFormData(formData, request) {
 var formDataPolicyName, init_formDataPolicy$1 = __esmMin((() => {
 	init_httpHeaders$1(), formDataPolicyName = "formDataPolicy";
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/agentPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/agentPolicy.js
 function agentPolicy$1(agent) {
 	return {
 		name: agentPolicyName,
@@ -20617,7 +20958,7 @@ function agentPolicy$1(agent) {
 var agentPolicyName, init_agentPolicy$1 = __esmMin((() => {
 	agentPolicyName = "agentPolicy";
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/tlsPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/tlsPolicy.js
 function tlsPolicy$1(tlsSettings) {
 	return {
 		name: tlsPolicyName,
@@ -20996,88 +21337,8 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 	};
 })), require_src = __commonJSMin(((exports, module) => {
 	module.exports = typeof process > "u" || process.type === "renderer" || process.browser === !0 || process.__nwjs ? require_browser() : require_node$1();
-})), require_helpers$1 = __commonJSMin(((exports, module, this$11) => {
-	var __createBinding = this$11 && this$11.__createBinding || (Object.create ? (function(o, m, k, k2) {
-		k2 === void 0 && (k2 = k);
-		var desc = Object.getOwnPropertyDescriptor(m, k);
-		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
-			enumerable: !0,
-			get: function() {
-				return m[k];
-			}
-		}), Object.defineProperty(o, k2, desc);
-	}) : (function(o, m, k, k2) {
-		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = this$11 && this$11.__setModuleDefault || (Object.create ? (function(o, v) {
-		Object.defineProperty(o, "default", {
-			enumerable: !0,
-			value: v
-		});
-	}) : function(o, v) {
-		o.default = v;
-	}), __importStar = this$11 && this$11.__importStar || function(mod) {
-		if (mod && mod.__esModule) return mod;
-		var result = {};
-		if (mod != null) for (var k in mod) k !== "default" && Object.prototype.hasOwnProperty.call(mod, k) && __createBinding(result, mod, k);
-		return __setModuleDefault(result, mod), result;
-	};
-	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.req = exports.json = exports.toBuffer = void 0;
-	let http = __importStar(require("http")), https = __importStar(require("https"));
-	async function toBuffer(stream) {
-		let length = 0, chunks = [];
-		for await (let chunk of stream) length += chunk.length, chunks.push(chunk);
-		return Buffer.concat(chunks, length);
-	}
-	exports.toBuffer = toBuffer;
-	async function json(stream) {
-		let str = (await toBuffer(stream)).toString("utf8");
-		try {
-			return JSON.parse(str);
-		} catch (_err) {
-			let err = _err;
-			throw err.message += ` (input: ${str})`, err;
-		}
-	}
-	exports.json = json;
-	function req(url, opts = {}) {
-		let req = ((typeof url == "string" ? url : url.href).startsWith("https:") ? https : http).request(url, opts), promise = new Promise((resolve, reject) => {
-			req.once("response", resolve).once("error", reject).end();
-		});
-		return req.then = promise.then.bind(promise), req;
-	}
-	exports.req = req;
-})), require_dist$3 = __commonJSMin(((exports, module, this$10) => {
-	var __createBinding = this$10 && this$10.__createBinding || (Object.create ? (function(o, m, k, k2) {
-		k2 === void 0 && (k2 = k);
-		var desc = Object.getOwnPropertyDescriptor(m, k);
-		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
-			enumerable: !0,
-			get: function() {
-				return m[k];
-			}
-		}), Object.defineProperty(o, k2, desc);
-	}) : (function(o, m, k, k2) {
-		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = this$10 && this$10.__setModuleDefault || (Object.create ? (function(o, v) {
-		Object.defineProperty(o, "default", {
-			enumerable: !0,
-			value: v
-		});
-	}) : function(o, v) {
-		o.default = v;
-	}), __importStar = this$10 && this$10.__importStar || function(mod) {
-		if (mod && mod.__esModule) return mod;
-		var result = {};
-		if (mod != null) for (var k in mod) k !== "default" && Object.prototype.hasOwnProperty.call(mod, k) && __createBinding(result, mod, k);
-		return __setModuleDefault(result, mod), result;
-	}, __exportStar = this$10 && this$10.__exportStar || function(m, exports) {
-		for (var p in m) p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p) && __createBinding(exports, m, p);
-	};
-	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.Agent = void 0;
-	let net = __importStar(require("net")), http = __importStar(require("http")), https_1 = require("https");
-	__exportStar(require_helpers$1(), exports);
-	let INTERNAL = Symbol("AgentBaseInternalState");
-	exports.Agent = class extends http.Agent {
+})), init_helpers = __esmMin((() => {})), INTERNAL, Agent, init_dist$4 = __esmMin((() => {
+	init_helpers(), INTERNAL = Symbol("AgentBaseInternalState"), Agent = class extends http.Agent {
 		constructor(opts) {
 			super(opts), this[INTERNAL] = {};
 		}
@@ -21101,7 +21362,7 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 			index !== -1 && (sockets.splice(index, 1), this.totalSocketCount--, sockets.length === 0 && delete this.sockets[name]);
 		}
 		getName(options) {
-			return this.isSecureEndpoint(options) ? https_1.Agent.prototype.getName.call(this, options) : super.getName(options);
+			return this.isSecureEndpoint(options) ? https.Agent.prototype.getName.call(this, options) : super.getName(options);
 		}
 		createSocket(req, options, cb) {
 			let connectOpts = {
@@ -21109,7 +21370,7 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 				secureEndpoint: this.isSecureEndpoint(options)
 			}, name = this.getName(connectOpts), fakeSocket = this.incrementSockets(name);
 			Promise.resolve().then(() => this.connect(req, connectOpts)).then((socket) => {
-				if (this.decrementSockets(name, fakeSocket), socket instanceof http.Agent) try {
+				if (this.decrementSockets(name, fakeSocket), typeof socket.addRequest == "function") try {
 					return socket.addRequest(req, connectOpts);
 				} catch (err) {
 					return cb(err);
@@ -21137,97 +21398,93 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 			this[INTERNAL] && (this[INTERNAL].protocol = v);
 		}
 	};
-})), require_parse_proxy_response = __commonJSMin(((exports, module, this$9) => {
-	var __importDefault = this$9 && this$9.__importDefault || function(mod) {
-		return mod && mod.__esModule ? mod : { default: mod };
+}));
+// node_modules/.pnpm/https-proxy-agent@9.1.0_supports-color@7.2.0/node_modules/https-proxy-agent/dist/parse-proxy-response.js
+function parseProxyResponse(socket) {
+	return new Promise((resolve, reject) => {
+		let buffersLength = 0, buffers = [];
+		function read() {
+			let b = socket.read();
+			b ? ondata(b) : socket.once("readable", read);
+		}
+		function cleanup() {
+			socket.removeListener("end", onend), socket.removeListener("error", onerror), socket.removeListener("readable", read);
+		}
+		function onend() {
+			cleanup(), debug$2("onend"), reject(Error("Proxy connection ended before receiving CONNECT response"));
+		}
+		function onerror(err) {
+			cleanup(), debug$2("onerror %o", err), reject(err);
+		}
+		function ondata(b) {
+			buffers.push(b), buffersLength += b.length;
+			let buffered = Buffer.concat(buffers, buffersLength), endOfHeaders = buffered.indexOf("\r\n\r\n");
+			if (endOfHeaders === -1) {
+				debug$2("have not received end of HTTP headers yet..."), read();
+				return;
+			}
+			let headerParts = buffered.slice(0, endOfHeaders).toString("ascii").split("\r\n"), firstLine = headerParts.shift();
+			if (!firstLine) return socket.destroy(), reject(Error("No header received from proxy CONNECT response"));
+			let firstLineParts = firstLine.split(" "), statusCode = +firstLineParts[1], statusText = firstLineParts.slice(2).join(" "), headers = {};
+			for (let header of headerParts) {
+				if (!header) continue;
+				let firstColon = header.indexOf(":");
+				if (firstColon === -1) return socket.destroy(), reject(Error(`Invalid header from proxy CONNECT response: "${header}"`));
+				let key = header.slice(0, firstColon).toLowerCase(), value = header.slice(firstColon + 1).trimStart(), current = headers[key];
+				typeof current == "string" ? headers[key] = [current, value] : Array.isArray(current) ? current.push(value) : headers[key] = value;
+			}
+			debug$2("got proxy server response: %o %o", firstLine, headers), cleanup(), resolve({
+				connect: {
+					statusCode,
+					statusText,
+					headers
+				},
+				buffered
+			});
+		}
+		socket.on("error", onerror), socket.on("end", onend), read();
+	});
+}
+var import_src$2, debug$2, init_parse_proxy_response = __esmMin((() => {
+	import_src$2 = __toESM(require_src(), 1), debug$2 = (0, import_src$2.default)("https-proxy-agent:parse-proxy-response");
+}));
+// node_modules/.pnpm/proxy-agent-negotiate@1.1.0/node_modules/proxy-agent-negotiate/dist/index.js
+function createNegotiateAuth() {
+	return async ({ response, scheme }) => {
+		if (scheme.toLowerCase() !== "negotiate") throw Error(`Expected Negotiate scheme but got "${scheme}"`);
+		let kerberos;
+		try {
+			kerberos = await import("kerberos");
+		} catch {
+			throw Error("The \"kerberos\" package is required for Negotiate proxy authentication. Install it with: npm install kerberos");
+		}
+		let proxyAuthenticate = response.headers["proxy-authenticate"] || "", challengeHeader = Array.isArray(proxyAuthenticate) ? proxyAuthenticate[0] : proxyAuthenticate, serverToken = typeof challengeHeader == "string" && challengeHeader.includes(" ") ? challengeHeader.split(" ").slice(1).join(" ") : void 0, token = await (await kerberos.initializeClient("HTTP@proxy", { mechOID: kerberos.GSS_MECH_OID_SPNEGO })).step(serverToken || "");
+		if (!token) throw Error("Kerberos client.step() returned no token");
+		return { headers: { "Proxy-Authorization": `Negotiate ${token}` } };
 	};
-	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.parseProxyResponse = void 0;
-	let debug = (0, __importDefault(require_src()).default)("https-proxy-agent:parse-proxy-response");
-	function parseProxyResponse(socket) {
-		return new Promise((resolve, reject) => {
-			let buffersLength = 0, buffers = [];
-			function read() {
-				let b = socket.read();
-				b ? ondata(b) : socket.once("readable", read);
-			}
-			function cleanup() {
-				socket.removeListener("end", onend), socket.removeListener("error", onerror), socket.removeListener("readable", read);
-			}
-			function onend() {
-				cleanup(), debug("onend"), reject(Error("Proxy connection ended before receiving CONNECT response"));
-			}
-			function onerror(err) {
-				cleanup(), debug("onerror %o", err), reject(err);
-			}
-			function ondata(b) {
-				buffers.push(b), buffersLength += b.length;
-				let buffered = Buffer.concat(buffers, buffersLength), endOfHeaders = buffered.indexOf("\r\n\r\n");
-				if (endOfHeaders === -1) {
-					debug("have not received end of HTTP headers yet..."), read();
-					return;
-				}
-				let headerParts = buffered.slice(0, endOfHeaders).toString("ascii").split("\r\n"), firstLine = headerParts.shift();
-				if (!firstLine) return socket.destroy(), reject(Error("No header received from proxy CONNECT response"));
-				let firstLineParts = firstLine.split(" "), statusCode = +firstLineParts[1], statusText = firstLineParts.slice(2).join(" "), headers = {};
-				for (let header of headerParts) {
-					if (!header) continue;
-					let firstColon = header.indexOf(":");
-					if (firstColon === -1) return socket.destroy(), reject(Error(`Invalid header from proxy CONNECT response: "${header}"`));
-					let key = header.slice(0, firstColon).toLowerCase(), value = header.slice(firstColon + 1).trimStart(), current = headers[key];
-					typeof current == "string" ? headers[key] = [current, value] : Array.isArray(current) ? current.push(value) : headers[key] = value;
-				}
-				debug("got proxy server response: %o %o", firstLine, headers), cleanup(), resolve({
-					connect: {
-						statusCode,
-						statusText,
-						headers
-					},
-					buffered
-				});
-			}
-			socket.on("error", onerror), socket.on("end", onend), read();
-		});
-	}
-	exports.parseProxyResponse = parseProxyResponse;
-})), require_dist$2 = __commonJSMin(((exports, module, this$8) => {
-	var __createBinding = this$8 && this$8.__createBinding || (Object.create ? (function(o, m, k, k2) {
-		k2 === void 0 && (k2 = k);
-		var desc = Object.getOwnPropertyDescriptor(m, k);
-		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
-			enumerable: !0,
-			get: function() {
-				return m[k];
-			}
-		}), Object.defineProperty(o, k2, desc);
-	}) : (function(o, m, k, k2) {
-		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = this$8 && this$8.__setModuleDefault || (Object.create ? (function(o, v) {
-		Object.defineProperty(o, "default", {
-			enumerable: !0,
-			value: v
-		});
-	}) : function(o, v) {
-		o.default = v;
-	}), __importStar = this$8 && this$8.__importStar || function(mod) {
-		if (mod && mod.__esModule) return mod;
-		var result = {};
-		if (mod != null) for (var k in mod) k !== "default" && Object.prototype.hasOwnProperty.call(mod, k) && __createBinding(result, mod, k);
-		return __setModuleDefault(result, mod), result;
-	}, __importDefault = this$8 && this$8.__importDefault || function(mod) {
-		return mod && mod.__esModule ? mod : { default: mod };
-	};
-	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.HttpsProxyAgent = void 0;
-	let net = __importStar(require("net")), tls = __importStar(require("tls")), assert_1 = __importDefault(require("assert")), debug_1 = __importDefault(require_src()), agent_base_1 = require_dist$3(), url_1 = require("url"), parse_proxy_response_1 = require_parse_proxy_response(), debug = (0, debug_1.default)("https-proxy-agent"), setServernameFromNonIpHost = (options) => options.servername === void 0 && options.host && !net.isIP(options.host) ? {
+}
+// node_modules/.pnpm/https-proxy-agent@9.1.0_supports-color@7.2.0/node_modules/https-proxy-agent/dist/index.js
+function resume(socket) {
+	setImmediate(() => {
+		socket.resume();
+	});
+}
+function omit$2(obj, ...keys) {
+	let ret = {}, key;
+	for (key in obj) keys.includes(key) || (ret[key] = obj[key]);
+	return ret;
+}
+var import_src$1, debug$1, setServernameFromNonIpHost, HttpsProxyAgent, init_dist$2 = __esmMin((() => {
+	import_src$1 = __toESM(require_src(), 1), init_dist$4(), init_parse_proxy_response(), debug$1 = (0, import_src$1.default)("https-proxy-agent"), setServernameFromNonIpHost = (options) => options.servername === void 0 && options.host && !net.isIP(options.host) ? {
 		...options,
 		servername: options.host
-	} : options;
-	var HttpsProxyAgent = class extends agent_base_1.Agent {
+	} : options, HttpsProxyAgent = class extends Agent {
 		constructor(proxy, opts) {
-			super(opts), this.options = { path: void 0 }, this.proxy = typeof proxy == "string" ? new url_1.URL(proxy) : proxy, this.proxyHeaders = opts?.headers ?? {}, debug("Creating new HttpsProxyAgent instance: %o", this.proxy.href);
+			super(opts), this.options = { path: void 0 }, this.proxy = typeof proxy == "string" ? new url.URL(proxy) : proxy, this.proxyHeaders = opts?.headers ?? {}, debug$1("Creating new HttpsProxyAgent instance: %o", this.proxy.href), opts?.negotiate ? this.onProxyAuth = createNegotiateAuth() : opts?.onProxyAuth && (this.onProxyAuth = opts.onProxyAuth);
 			let host = (this.proxy.hostname || this.proxy.host).replace(/^\[|\]$/g, ""), port = this.proxy.port ? parseInt(this.proxy.port, 10) : this.proxy.protocol === "https:" ? 443 : 80;
 			this.connectOpts = {
 				ALPNProtocols: ["http/1.1"],
-				...opts ? omit(opts, "headers") : null,
+				...opts ? omit$2(opts, "headers", "onProxyAuth", "negotiate") : null,
 				host,
 				port
 			};
@@ -21236,7 +21493,7 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 			let { proxy } = this;
 			if (!opts.host) throw TypeError("No \"host\" provided");
 			let socket;
-			proxy.protocol === "https:" ? (debug("Creating `tls.Socket`: %o", this.connectOpts), socket = tls.connect(setServernameFromNonIpHost(this.connectOpts))) : (debug("Creating `net.Socket`: %o", this.connectOpts), socket = net.connect(this.connectOpts));
+			proxy.protocol === "https:" ? (debug$1("Creating `tls.Socket`: %o", this.connectOpts), socket = tls.connect(setServernameFromNonIpHost(this.connectOpts))) : (debug$1("Creating `net.Socket`: %o", this.connectOpts), socket = net.connect(this.connectOpts));
 			let headers = typeof this.proxyHeaders == "function" ? this.proxyHeaders() : { ...this.proxyHeaders }, host = net.isIPv6(opts.host) ? `[${opts.host}]` : opts.host, payload = `CONNECT ${host}:${opts.port} HTTP/1.1\r\n`;
 			if (proxy.username || proxy.password) {
 				let auth = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
@@ -21244,64 +21501,64 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 			}
 			headers.Host = `${host}:${opts.port}`, headers["Proxy-Connection"] ||= this.keepAlive ? "Keep-Alive" : "close";
 			for (let name of Object.keys(headers)) payload += `${name}: ${headers[name]}\r\n`;
-			let proxyResponsePromise = (0, parse_proxy_response_1.parseProxyResponse)(socket);
+			let proxyResponsePromise = parseProxyResponse(socket);
 			socket.write(`${payload}\r\n`);
 			let { connect, buffered } = await proxyResponsePromise;
-			if (req.emit("proxyConnect", connect), this.emit("proxyConnect", connect, req), connect.statusCode === 200) return req.once("socket", resume), opts.secureEndpoint ? (debug("Upgrading socket connection to TLS"), tls.connect({
-				...omit(setServernameFromNonIpHost(opts), "host", "path", "port"),
+			if (req.emit("proxyConnect", connect), this.emit("proxyConnect", connect, req), req.emit("proxy", {
+				proxy: this.proxy.href,
+				socket
+			}), connect.statusCode === 200) return req.once("socket", resume), opts.secureEndpoint ? (debug$1("Upgrading socket connection to TLS"), tls.connect({
+				...omit$2(setServernameFromNonIpHost(opts), "host", "path", "port"),
 				socket
 			})) : socket;
+			if (connect.statusCode === 407 && this.onProxyAuth) {
+				debug$1("Got 407 response, invoking onProxyAuth callback"), socket.destroy();
+				let proxyAuthenticate = connect.headers["proxy-authenticate"] || "", scheme = Array.isArray(proxyAuthenticate) ? proxyAuthenticate[0].split(/\s/)[0] : proxyAuthenticate.split(/\s/)[0], authResponse = await this.onProxyAuth({
+					response: connect,
+					scheme
+				});
+				return this._connectWithAuth(req, opts, authResponse.headers);
+			}
 			socket.destroy();
 			let fakeSocket = new net.Socket({ writable: !1 });
 			return fakeSocket.readable = !0, req.once("socket", (s) => {
-				debug("Replaying proxy buffer for failed request"), (0, assert_1.default)(s.listenerCount("data") > 0), s.push(buffered), s.push(null);
+				debug$1("Replaying proxy buffer for failed request"), (0, assert.default)(s.listenerCount("data") > 0), s.push(buffered), s.push(null);
 			}), fakeSocket;
 		}
-	};
-	HttpsProxyAgent.protocols = ["http", "https"], exports.HttpsProxyAgent = HttpsProxyAgent;
-	function resume(socket) {
-		socket.resume();
-	}
-	function omit(obj, ...keys) {
-		let ret = {}, key;
-		for (key in obj) keys.includes(key) || (ret[key] = obj[key]);
-		return ret;
-	}
-})), require_dist$1 = __commonJSMin(((exports, module, this$7) => {
-	var __createBinding = this$7 && this$7.__createBinding || (Object.create ? (function(o, m, k, k2) {
-		k2 === void 0 && (k2 = k);
-		var desc = Object.getOwnPropertyDescriptor(m, k);
-		(!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) && (desc = {
-			enumerable: !0,
-			get: function() {
-				return m[k];
+		async _connectWithAuth(req, opts, authHeaders) {
+			let { proxy } = this, socket;
+			socket = proxy.protocol === "https:" ? tls.connect(setServernameFromNonIpHost(this.connectOpts)) : net.connect(this.connectOpts);
+			let headers = typeof this.proxyHeaders == "function" ? this.proxyHeaders() : { ...this.proxyHeaders }, host = net.isIPv6(opts.host) ? `[${opts.host}]` : opts.host, payload = `CONNECT ${host}:${opts.port} HTTP/1.1\r\n`;
+			if (proxy.username || proxy.password) {
+				let auth = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
+				headers["Proxy-Authorization"] = `Basic ${Buffer.from(auth).toString("base64")}`;
 			}
-		}), Object.defineProperty(o, k2, desc);
-	}) : (function(o, m, k, k2) {
-		k2 === void 0 && (k2 = k), o[k2] = m[k];
-	})), __setModuleDefault = this$7 && this$7.__setModuleDefault || (Object.create ? (function(o, v) {
-		Object.defineProperty(o, "default", {
-			enumerable: !0,
-			value: v
-		});
-	}) : function(o, v) {
-		o.default = v;
-	}), __importStar = this$7 && this$7.__importStar || function(mod) {
-		if (mod && mod.__esModule) return mod;
-		var result = {};
-		if (mod != null) for (var k in mod) k !== "default" && Object.prototype.hasOwnProperty.call(mod, k) && __createBinding(result, mod, k);
-		return __setModuleDefault(result, mod), result;
-	}, __importDefault = this$7 && this$7.__importDefault || function(mod) {
-		return mod && mod.__esModule ? mod : { default: mod };
-	};
-	Object.defineProperty(exports, "__esModule", { value: !0 }), exports.HttpProxyAgent = void 0;
-	let net = __importStar(require("net")), tls = __importStar(require("tls")), debug_1 = __importDefault(require_src()), events_1 = require("events"), agent_base_1 = require_dist$3(), url_1 = require("url"), debug = (0, debug_1.default)("http-proxy-agent");
-	var HttpProxyAgent = class extends agent_base_1.Agent {
+			Object.assign(headers, authHeaders), headers.Host = `${host}:${opts.port}`, headers["Proxy-Connection"] ||= this.keepAlive ? "Keep-Alive" : "close";
+			for (let name of Object.keys(headers)) payload += `${name}: ${headers[name]}\r\n`;
+			let proxyResponsePromise = parseProxyResponse(socket);
+			socket.write(`${payload}\r\n`);
+			let { connect } = await proxyResponsePromise;
+			if (req.emit("proxyConnect", connect), this.emit("proxyConnect", connect, req), connect.statusCode === 200) return req.once("socket", resume), opts.secureEndpoint ? (debug$1("Upgrading socket connection to TLS"), tls.connect({
+				...omit$2(setServernameFromNonIpHost(opts), "host", "path", "port"),
+				socket
+			})) : socket;
+			throw socket.destroy(), Error(`Proxy authentication failed with status ${connect.statusCode} after retry`);
+		}
+	}, HttpsProxyAgent.protocols = ["http", "https"];
+}));
+// node_modules/.pnpm/http-proxy-agent@9.1.0_supports-color@7.2.0/node_modules/http-proxy-agent/dist/index.js
+function omit$1(obj, ...keys) {
+	let ret = {}, key;
+	for (key in obj) keys.includes(key) || (ret[key] = obj[key]);
+	return ret;
+}
+var import_src, debug, HttpProxyAgent, init_dist$1 = __esmMin((() => {
+	import_src = __toESM(require_src(), 1), init_dist$4(), debug = (0, import_src.default)("http-proxy-agent"), HttpProxyAgent = class extends Agent {
 		constructor(proxy, opts) {
-			super(opts), this.proxy = typeof proxy == "string" ? new url_1.URL(proxy) : proxy, this.proxyHeaders = opts?.headers ?? {}, debug("Creating new HttpProxyAgent instance: %o", this.proxy.href);
+			super(opts), this.proxy = typeof proxy == "string" ? new url.URL(proxy) : proxy, this.proxyHeaders = opts?.headers ?? {}, debug("Creating new HttpProxyAgent instance: %o", this.proxy.href), opts?.negotiate ? this.onProxyAuth = createNegotiateAuth() : opts?.onProxyAuth && (this.onProxyAuth = opts.onProxyAuth);
 			let host = (this.proxy.hostname || this.proxy.host).replace(/^\[|\]$/g, ""), port = this.proxy.port ? parseInt(this.proxy.port, 10) : this.proxy.protocol === "https:" ? 443 : 80;
 			this.connectOpts = {
-				...opts ? omit(opts, "headers") : null,
+				...opts ? omit$1(opts, "headers", "onProxyAuth", "negotiate") : null,
 				host,
 				port
 			};
@@ -21310,8 +21567,8 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 			req._header = null, this.setRequestProps(req, opts), super.addRequest(req, opts);
 		}
 		setRequestProps(req, opts) {
-			let { proxy } = this, base = `${opts.secureEndpoint ? "https:" : "http:"}//${req.getHeader("host") || "localhost"}`, url = new url_1.URL(req.path, base);
-			opts.port !== 80 && (url.port = String(opts.port)), req.path = String(url);
+			let { proxy } = this, base = `${opts.secureEndpoint ? "https:" : "http:"}//${req.getHeader("host") || "localhost"}`, url$2 = new url.URL(req.path, base);
+			opts.port !== 80 && (url$2.port = String(opts.port)), req.path = String(url$2);
 			let headers = typeof this.proxyHeaders == "function" ? this.proxyHeaders() : { ...this.proxyHeaders };
 			if (proxy.username || proxy.password) {
 				let auth = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
@@ -21328,17 +21585,16 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 			let first, endOfHeaders;
 			debug("Regenerating stored HTTP header string for request"), req._implicitHeader(), req.outputData && req.outputData.length > 0 && (debug("Patching connection write() output buffer with updated header"), first = req.outputData[0].data, endOfHeaders = first.indexOf("\r\n\r\n") + 4, req.outputData[0].data = req._header + first.substring(endOfHeaders), debug("Output buffer: %o", req.outputData[0].data));
 			let socket;
-			return this.proxy.protocol === "https:" ? (debug("Creating `tls.Socket`: %o", this.connectOpts), socket = tls.connect(this.connectOpts)) : (debug("Creating `net.Socket`: %o", this.connectOpts), socket = net.connect(this.connectOpts)), await (0, events_1.once)(socket, "connect"), socket;
+			this.proxy.protocol === "https:" ? (debug("Creating `tls.Socket`: %o", this.connectOpts), socket = tls.connect(this.connectOpts)) : (debug("Creating `net.Socket`: %o", this.connectOpts), socket = net.connect(this.connectOpts)), await (0, events.once)(socket, "connect");
+			let connect = { socket };
+			return req.emit("proxyConnect", connect), this.emit("proxyConnect", connect, req), req.emit("proxy", {
+				proxy: this.proxy.href,
+				socket
+			}), socket;
 		}
-	};
-	HttpProxyAgent.protocols = ["http", "https"], exports.HttpProxyAgent = HttpProxyAgent;
-	function omit(obj, ...keys) {
-		let ret = {}, key;
-		for (key in obj) keys.includes(key) || (ret[key] = obj[key]);
-		return ret;
-	}
+	}, HttpProxyAgent.protocols = ["http", "https"];
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/proxyPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/proxyPolicy.js
 function getEnvironmentValue(name) {
 	if (process.env[name]) return process.env[name];
 	if (process.env[name.toLowerCase()]) return process.env[name.toLowerCase()];
@@ -21386,7 +21642,7 @@ function getUrlFromProxySettings(settings) {
 function setProxyAgentOnRequest(request, cachedAgents, proxyUrl) {
 	if (request.agent) return;
 	let isInsecure = new URL(request.url).protocol !== "https:";
-	request.tlsSettings && logger$4.warning("TLS settings are not supported in combination with custom Proxy, certificates provided to the client will be ignored."), isInsecure ? (cachedAgents.httpProxyAgent ||= new import_dist$1.HttpProxyAgent(proxyUrl), request.agent = cachedAgents.httpProxyAgent) : (cachedAgents.httpsProxyAgent ||= new import_dist.HttpsProxyAgent(proxyUrl), request.agent = cachedAgents.httpsProxyAgent);
+	request.tlsSettings && logger$4.warning("TLS settings are not supported in combination with custom Proxy, certificates provided to the client will be ignored."), isInsecure ? (cachedAgents.httpProxyAgent ||= new HttpProxyAgent(proxyUrl), request.agent = cachedAgents.httpProxyAgent) : (cachedAgents.httpsProxyAgent ||= new HttpsProxyAgent(proxyUrl), request.agent = cachedAgents.httpsProxyAgent);
 }
 function proxyPolicy$1(proxySettings, options) {
 	noProxyListLoaded || globalNoProxyList.push(...loadNoProxy());
@@ -21398,10 +21654,10 @@ function proxyPolicy$1(proxySettings, options) {
 		}
 	};
 }
-var import_dist, import_dist$1, HTTPS_PROXY, HTTP_PROXY, ALL_PROXY, NO_PROXY, proxyPolicyName, globalNoProxyList, noProxyListLoaded, globalBypassedMap, init_proxyPolicy$1 = __esmMin((() => {
-	import_dist = require_dist$2(), import_dist$1 = require_dist$1(), init_log$5(), HTTPS_PROXY = "HTTPS_PROXY", HTTP_PROXY = "HTTP_PROXY", ALL_PROXY = "ALL_PROXY", NO_PROXY = "NO_PROXY", proxyPolicyName = "proxyPolicy", globalNoProxyList = [], noProxyListLoaded = !1, globalBypassedMap = new Map();
+var HTTPS_PROXY, HTTP_PROXY, ALL_PROXY, NO_PROXY, proxyPolicyName, globalNoProxyList, noProxyListLoaded, globalBypassedMap, init_proxyPolicy$1 = __esmMin((() => {
+	init_dist$2(), init_dist$1(), init_log$6(), HTTPS_PROXY = "HTTPS_PROXY", HTTP_PROXY = "HTTP_PROXY", ALL_PROXY = "ALL_PROXY", NO_PROXY = "NO_PROXY", proxyPolicyName = "proxyPolicy", globalNoProxyList = [], noProxyListLoaded = !1, globalBypassedMap = new Map();
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/decompressResponsePolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/decompressResponsePolicy.js
 function decompressResponsePolicy$1() {
 	return {
 		name: decompressResponsePolicyName$1,
@@ -21413,7 +21669,7 @@ function decompressResponsePolicy$1() {
 var decompressResponsePolicyName$1, init_decompressResponsePolicy$1 = __esmMin((() => {
 	decompressResponsePolicyName$1 = "decompressResponsePolicy";
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/redirectPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/redirectPolicy.js
 function redirectPolicy$1(options = {}) {
 	let { maxRetries = 20, allowCrossOriginRedirects = !1 } = options;
 	return {
@@ -21431,19 +21687,22 @@ async function handleRedirect(next, response, maxRetries, allowCrossOriginRedire
 			let originalUrl = new URL(request.url);
 			if (url.origin !== originalUrl.origin) return logger$4.verbose(`Skipping cross-origin redirect from ${originalUrl.origin} to ${url.origin}.`), response;
 		}
-		return request.url = url.toString(), status === 303 && (request.method = "GET", request.headers.delete("Content-Length"), delete request.body), request.headers.delete("Authorization"), handleRedirect(next, await next(request), maxRetries, allowCrossOriginRedirects, currentRetries + 1);
+		return request.url = url.toString(), status === 303 && (request.method = "GET", request.requestOverrides && "method" in request.requestOverrides && (request.requestOverrides = {
+			...request.requestOverrides,
+			method: "GET"
+		}), removeRequestBodyHeaders(request), delete request.body), request.headers.delete("Authorization"), await disposeResponseBody(response), handleRedirect(next, await next(request), maxRetries, allowCrossOriginRedirects, currentRetries + 1);
 	}
 	return response;
 }
 var redirectPolicyName$1, allowedRedirect, init_redirectPolicy$1 = __esmMin((() => {
-	init_log$5(), redirectPolicyName$1 = "redirectPolicy", allowedRedirect = ["GET", "HEAD"];
+	init_log$6(), init_responseBody(), redirectPolicyName$1 = "redirectPolicy", allowedRedirect = ["GET", "HEAD"];
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/typeGuards.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/typeGuards.js
 function isBlob(x) {
 	return x instanceof Blob;
 }
 var init_typeGuards = __esmMin((() => {}));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/concat.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/concat.js
 async function* streamAsyncIterator() {
 	let reader = this.getReader();
 	try {
@@ -21476,9 +21735,9 @@ async function concat(sources) {
 var init_concat = __esmMin((() => {
 	init_typeGuards();
 }));
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/multipartPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/multipartPolicy.js
 function generateBoundary() {
-	return `----AzSDKFormBoundary${randomUUID$1()}`;
+	return `----AzSDKFormBoundary${randomUUID$2()}`;
 }
 function encodeHeaders(headers) {
 	let result = "";
@@ -21500,15 +21759,15 @@ function getTotalLength(sources) {
 }
 async function buildRequestBody(request, parts, boundary) {
 	let sources = [
-		stringToUint8Array$1(`--${boundary}`, "utf-8"),
+		stringToUint8Array$2(`--${boundary}`, "utf-8"),
 		...parts.flatMap((part) => [
-			stringToUint8Array$1("\r\n", "utf-8"),
-			stringToUint8Array$1(encodeHeaders(part.headers), "utf-8"),
-			stringToUint8Array$1("\r\n", "utf-8"),
+			stringToUint8Array$2("\r\n", "utf-8"),
+			stringToUint8Array$2(encodeHeaders(part.headers), "utf-8"),
+			stringToUint8Array$2("\r\n", "utf-8"),
 			part.body,
-			stringToUint8Array$1(`\r\n--${boundary}`, "utf-8")
+			stringToUint8Array$2(`\r\n--${boundary}`, "utf-8")
 		]),
-		stringToUint8Array$1("--\r\n\r\n", "utf-8")
+		stringToUint8Array$2("--\r\n\r\n", "utf-8")
 	], contentLength = getTotalLength(sources);
 	contentLength && request.headers.set("Content-Length", contentLength), request.body = await concat(sources);
 }
@@ -21533,15 +21792,166 @@ function multipartPolicy$1() {
 var multipartPolicyName$1, maxBoundaryLength, validBoundaryCharacters, init_multipartPolicy$1 = __esmMin((() => {
 	init_typeGuards(), init_concat(), multipartPolicyName$1 = "multipartPolicy", maxBoundaryLength = 70, validBoundaryCharacters = new Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'()+,-./:=?");
 })), init_esm$12 = __esmMin((() => {
-	init_AbortError$1(), init_logger(), init_httpHeaders$1(), init_pipelineRequest$1(), init_pipeline$2(), init_restError$1(), init_defaultHttpClient$1(), init_logPolicy$1(), init_constants$3(), init_defaultRetryPolicy$1(), init_formDataPolicy$1(), init_agentPolicy$1(), init_tlsPolicy$1(), init_proxyPolicy$1(), init_decompressResponsePolicy$1(), init_redirectPolicy$1(), init_multipartPolicy$1(), init_log$5(), init_env(), init_typeGuards();
+	init_AbortError$1(), init_logger$1(), init_httpHeaders$1(), init_pipelineRequest$1(), init_pipeline$2(), init_restError$1(), init_defaultHttpClient$1(), init_logPolicy$1(), init_constants$3(), init_defaultRetryPolicy$1(), init_formDataPolicy$1(), init_agentPolicy$1(), init_tlsPolicy$1(), init_proxyPolicy$1(), init_decompressResponsePolicy$1(), init_redirectPolicy$1(), init_multipartPolicy$1(), init_log$6(), init_env$1(), init_typeGuards();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/pipeline.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/pipeline.js
 function createEmptyPipeline() {
 	return createEmptyPipeline$1();
 }
 var init_pipeline$1 = __esmMin((() => {
 	init_esm$12();
-})), init_internal$2 = __esmMin((() => {
+}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/log.js
+function log(message, ...args) {
+	node_process.default.stderr.write(`${node_util.default.format(message, ...args)}${node_os.EOL}`);
+}
+var init_log$5 = __esmMin((() => {}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/env.js
+function getEnvironmentVariable(name) {
+	return node_process.default.env[name];
+}
+var init_env = __esmMin((() => {
+	typeof node_process.default.versions.deno == "string" && node_process.default.versions.deno.length, typeof node_process.default.versions.bun == "string" && node_process.default.versions.bun.length;
+}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/debug.js
+function enable(namespaces) {
+	enabledString = namespaces, enabledNamespaces = [], skippedNamespaces = [];
+	let namespaceList = namespaces.split(",").map((ns) => ns.trim());
+	for (let ns of namespaceList) ns.startsWith("-") ? skippedNamespaces.push(ns.substring(1)) : enabledNamespaces.push(ns);
+	for (let instance of debuggers) instance.enabled = enabled(instance.namespace);
+}
+function enabled(namespace) {
+	if (namespace.endsWith("*")) return !0;
+	for (let skipped of skippedNamespaces) if (namespaceMatches(namespace, skipped)) return !1;
+	for (let enabledNamespace of enabledNamespaces) if (namespaceMatches(namespace, enabledNamespace)) return !0;
+	return !1;
+}
+function namespaceMatches(namespace, patternToMatch) {
+	if (patternToMatch.indexOf("*") === -1) return namespace === patternToMatch;
+	let pattern = patternToMatch;
+	if (patternToMatch.indexOf("**") !== -1) {
+		let patternParts = [], lastCharacter = "";
+		for (let character of patternToMatch) if (character === "*" && lastCharacter === "*") continue;
+		else lastCharacter = character, patternParts.push(character);
+		pattern = patternParts.join("");
+	}
+	let namespaceIndex = 0, patternIndex = 0, patternLength = pattern.length, namespaceLength = namespace.length, lastWildcard = -1, lastWildcardNamespace = -1;
+	for (; namespaceIndex < namespaceLength && patternIndex < patternLength;) if (pattern[patternIndex] === "*") {
+		if (lastWildcard = patternIndex, patternIndex++, patternIndex === patternLength) return !0;
+		for (; namespace[namespaceIndex] !== pattern[patternIndex];) if (namespaceIndex++, namespaceIndex === namespaceLength) return !1;
+		lastWildcardNamespace = namespaceIndex, namespaceIndex++, patternIndex++;
+		continue;
+	} else if (pattern[patternIndex] === namespace[namespaceIndex]) patternIndex++, namespaceIndex++;
+	else if (lastWildcard >= 0) {
+		if (patternIndex = lastWildcard + 1, namespaceIndex = lastWildcardNamespace + 1, namespaceIndex === namespaceLength) return !1;
+		for (; namespace[namespaceIndex] !== pattern[patternIndex];) if (namespaceIndex++, namespaceIndex === namespaceLength) return !1;
+		lastWildcardNamespace = namespaceIndex, namespaceIndex++, patternIndex++;
+		continue;
+	} else return !1;
+	let namespaceDone = namespaceIndex === namespace.length, patternDone = patternIndex === pattern.length, trailingWildCard = patternIndex === pattern.length - 1 && pattern[patternIndex] === "*";
+	return namespaceDone && (patternDone || trailingWildCard);
+}
+function disable() {
+	let result = enabledString || "";
+	return enable(""), result;
+}
+function createDebugger(namespace) {
+	let newDebugger = Object.assign(debug, {
+		enabled: enabled(namespace),
+		destroy,
+		log: debugObj.log,
+		namespace,
+		extend
+	});
+	function debug(...args) {
+		newDebugger.enabled && (args.length > 0 && (args[0] = `${namespace} ${args[0]}`), newDebugger.log(...args));
+	}
+	return debuggers.push(newDebugger), newDebugger;
+}
+function destroy() {
+	let index = debuggers.indexOf(this);
+	return index >= 0 && (debuggers.splice(index, 1), !0);
+}
+function extend(namespace) {
+	let newDebugger = createDebugger(`${this.namespace}:${namespace}`);
+	return newDebugger.log = this.log, newDebugger;
+}
+var debugEnvVariable, enabledString, enabledNamespaces, skippedNamespaces, debuggers, debugObj, init_debug = __esmMin((() => {
+	init_log$5(), init_env(), debugEnvVariable = getEnvironmentVariable("DEBUG"), enabledNamespaces = [], skippedNamespaces = [], debuggers = [], debugEnvVariable && enable(debugEnvVariable), debugObj = Object.assign((namespace) => createDebugger(namespace), {
+		enable,
+		enabled,
+		disable,
+		log
+	});
+}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/logger/logger.js
+function patchLogMethod(parent, child) {
+	child.log = (...args) => {
+		parent.log(...args);
+	};
+}
+function isTypeSpecRuntimeLogLevel(level) {
+	return TYPESPEC_RUNTIME_LOG_LEVELS.includes(level);
+}
+function createLoggerContext(options) {
+	let registeredLoggers = new Set(), logLevelFromEnv = getEnvironmentVariable(options.logLevelEnvVarName), logLevel, clientLogger = debugObj(options.namespace);
+	clientLogger.log = (...args) => {
+		debugObj.log(...args);
+	};
+	function contextSetLogLevel(level) {
+		if (level && !isTypeSpecRuntimeLogLevel(level)) throw Error(`Unknown log level '${level}'. Acceptable values: ${TYPESPEC_RUNTIME_LOG_LEVELS.join(",")}`);
+		logLevel = level;
+		let enabledNamespaces = [];
+		for (let logger of registeredLoggers) shouldEnable(logger) && enabledNamespaces.push(logger.namespace);
+		debugObj.enable(enabledNamespaces.join(","));
+	}
+	logLevelFromEnv && (isTypeSpecRuntimeLogLevel(logLevelFromEnv) ? contextSetLogLevel(logLevelFromEnv) : console.error(`${options.logLevelEnvVarName} set to unknown log level '${logLevelFromEnv}'; logging is not enabled. Acceptable values: ${TYPESPEC_RUNTIME_LOG_LEVELS.join(", ")}.`));
+	function shouldEnable(logger) {
+		return !!(logLevel && levelMap[logger.level] <= levelMap[logLevel]);
+	}
+	function createLogger(parent, level) {
+		let logger = Object.assign(parent.extend(level), { level });
+		if (patchLogMethod(parent, logger), shouldEnable(logger)) {
+			let enabledNamespaces = debugObj.disable();
+			debugObj.enable(enabledNamespaces + "," + logger.namespace);
+		}
+		return registeredLoggers.add(logger), logger;
+	}
+	function contextGetLogLevel() {
+		return logLevel;
+	}
+	function contextCreateClientLogger(namespace) {
+		let clientRootLogger = clientLogger.extend(namespace);
+		return patchLogMethod(clientLogger, clientRootLogger), {
+			error: createLogger(clientRootLogger, "error"),
+			warning: createLogger(clientRootLogger, "warning"),
+			info: createLogger(clientRootLogger, "info"),
+			verbose: createLogger(clientRootLogger, "verbose")
+		};
+	}
+	return {
+		setLogLevel: contextSetLogLevel,
+		getLogLevel: contextGetLogLevel,
+		createClientLogger: contextCreateClientLogger,
+		logger: clientLogger
+	};
+}
+var TYPESPEC_RUNTIME_LOG_LEVELS, levelMap, context$3, init_logger = __esmMin((() => {
+	init_debug(), init_env(), TYPESPEC_RUNTIME_LOG_LEVELS = [
+		"verbose",
+		"info",
+		"warning",
+		"error"
+	], levelMap = {
+		verbose: 400,
+		info: 300,
+		warning: 200,
+		error: 100
+	}, context$3 = createLoggerContext({
+		logLevelEnvVarName: "TYPESPEC_RUNTIME_LOG_LEVEL",
+		namespace: "typeSpecRuntime"
+	}), context$3.logger;
+})), init_internal$3 = __esmMin((() => {
 	init_logger();
 }));
 // node_modules/.pnpm/@azure+logger@1.4.0_supports-color@7.2.0/node_modules/@azure/logger/dist/esm/index.js
@@ -21549,16 +21959,16 @@ function createClientLogger(namespace) {
 	return context$2.createClientLogger(namespace);
 }
 var context$2, init_esm$11 = __esmMin((() => {
-	init_internal$2(), context$2 = createLoggerContext({
+	init_internal$3(), context$2 = createLoggerContext({
 		logLevelEnvVarName: "AZURE_LOG_LEVEL",
 		namespace: "azure"
 	}), context$2.logger;
 })), logger$3, init_log$4 = __esmMin((() => {
 	init_esm$11(), logger$3 = createClientLogger("core-rest-pipeline");
-})), init_internal$1 = __esmMin((() => {
+})), init_internal$2 = __esmMin((() => {
 	init_agentPolicy$1(), init_decompressResponsePolicy$1(), init_defaultRetryPolicy$1(), init_exponentialRetryStrategy(), init_retryPolicy(), init_constants$3(), init_throttlingRetryStrategy(), init_formDataPolicy$1(), init_logPolicy$1(), init_multipartPolicy$1(), init_proxyPolicy$1(), init_redirectPolicy$1(), init_tlsPolicy$1();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/logPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/logPolicy.js
 function logPolicy(options = {}) {
 	return logPolicy$1({
 		logger: logger$3.info,
@@ -21566,16 +21976,16 @@ function logPolicy(options = {}) {
 	});
 }
 var init_logPolicy = __esmMin((() => {
-	init_log$4(), init_internal$1();
+	init_log$4(), init_internal$2();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/redirectPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/redirectPolicy.js
 function redirectPolicy(options = {}) {
 	return redirectPolicy$1(options);
 }
 var redirectPolicyName, init_redirectPolicy = __esmMin((() => {
-	init_internal$1(), redirectPolicyName = redirectPolicyName$1;
+	init_internal$2(), redirectPolicyName = redirectPolicyName$1;
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/userAgentPlatform.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/userAgentPlatform.js
 function getHeaderName() {
 	return "User-Agent";
 }
@@ -21586,9 +21996,9 @@ async function setPlatformSpecificData(map) {
 	}
 }
 var init_userAgentPlatform = __esmMin((() => {})), SDK_VERSION$1, init_constants$2 = __esmMin((() => {
-	SDK_VERSION$1 = "1.25.0";
+	SDK_VERSION$1 = "1.25.1";
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/userAgent.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/userAgent.js
 function getUserAgentString(telemetryInfo) {
 	let parts = [];
 	for (let [key, value] of telemetryInfo) {
@@ -21609,7 +22019,7 @@ async function getUserAgentValue(prefix) {
 var init_userAgent = __esmMin((() => {
 	init_userAgentPlatform(), init_constants$2();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/userAgentPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/userAgentPolicy.js
 function userAgentPolicy(options = {}) {
 	let userAgentValue = getUserAgentValue(options.userAgentPrefix);
 	return {
@@ -21622,7 +22032,7 @@ function userAgentPolicy(options = {}) {
 var UserAgentHeaderName, userAgentPolicyName, init_userAgentPolicy = __esmMin((() => {
 	init_userAgent(), UserAgentHeaderName = getUserAgentHeaderName(), userAgentPolicyName = "userAgentPolicy";
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/file.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/file.js
 function hasRawContent(x) {
 	return typeof x[rawContent] == "function";
 }
@@ -21632,7 +22042,7 @@ function getRawContent$1(blob) {
 var rawContent, init_file = __esmMin((() => {
 	init_file(), rawContent = Symbol("rawContent");
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/multipartPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/multipartPolicy.js
 function multipartPolicy() {
 	let tspPolicy = multipartPolicy$1();
 	return {
@@ -21644,30 +22054,55 @@ function multipartPolicy() {
 	};
 }
 var multipartPolicyName, init_multipartPolicy = __esmMin((() => {
-	init_internal$1(), init_file(), multipartPolicyName = multipartPolicyName$1;
+	init_internal$2(), init_file(), multipartPolicyName = multipartPolicyName$1;
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/decompressResponsePolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/decompressResponsePolicy.js
 function decompressResponsePolicy() {
 	return decompressResponsePolicy$1();
 }
 var decompressResponsePolicyName, init_decompressResponsePolicy = __esmMin((() => {
-	init_internal$1(), decompressResponsePolicyName = decompressResponsePolicyName$1;
+	init_internal$2(), decompressResponsePolicyName = decompressResponsePolicyName$1;
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/defaultRetryPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/defaultRetryPolicy.js
 function defaultRetryPolicy(options = {}) {
 	return defaultRetryPolicy$1(options);
 }
 var init_defaultRetryPolicy = __esmMin((() => {
-	init_internal$1();
+	init_internal$2();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/formDataPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/formDataPolicy.js
 function formDataPolicy() {
 	return formDataPolicy$1();
 }
 var init_formDataPolicy = __esmMin((() => {
-	init_internal$1();
-})), init_internal = __esmMin((() => {
-	init_delay$1(), init_error$1(), init_env(), init_sanitizer();
+	init_internal$2();
+}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/object.js
+function isObject(input) {
+	return typeof input == "object" && !!input && !Array.isArray(input) && !(input instanceof RegExp) && !(input instanceof Date);
+}
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/error.js
+function isError$1(e) {
+	if (isObject(e)) {
+		let hasName = typeof e.name == "string", hasMessage = typeof e.message == "string";
+		return hasName && hasMessage;
+	}
+	return !1;
+}
+var init_error$1 = __esmMin((() => {}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/uuidUtils.js
+function randomUUID$1() {
+	return globalThis.crypto.randomUUID();
+}
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/bytesEncoding.js
+function uint8ArrayToString$1(bytes, format) {
+	return Buffer.from(bytes).toString(format);
+}
+function stringToUint8Array$1(value, format) {
+	return Buffer.from(value, format);
+}
+var init_internal$1 = __esmMin((() => {
+	init_error$1(), init_env();
 })), AbortError, init_AbortError = __esmMin((() => {
 	AbortError = class extends Error {
 		constructor(message) {
@@ -21734,7 +22169,7 @@ function getErrorMessage(e) {
 	}
 }
 var init_error = __esmMin((() => {
-	init_internal();
+	init_internal$1();
 }));
 // node_modules/.pnpm/@azure+core-util@1.14.0_supports-color@7.2.0/node_modules/@azure/core-util/dist/esm/index.js
 function isError(e) {
@@ -21750,9 +22185,9 @@ function stringToUint8Array(value, format) {
 	return stringToUint8Array$1(value, format);
 }
 var isNodeLike, init_esm$9 = __esmMin((() => {
-	init_internal(), init_createAbortablePromise(), init_delay(), init_error(), isNodeLike = !0;
+	init_internal$1(), init_createAbortablePromise(), init_delay(), init_error(), isNodeLike = !0;
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/proxyPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/proxyPolicy.js
 function getDefaultProxySettings(proxyUrl) {
 	return getDefaultProxySettings$1(proxyUrl);
 }
@@ -21760,9 +22195,9 @@ function proxyPolicy(proxySettings, options) {
 	return proxyPolicy$1(proxySettings, options);
 }
 var init_proxyPolicy = __esmMin((() => {
-	init_internal$1();
+	init_internal$2();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/setClientRequestIdPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/setClientRequestIdPolicy.js
 function setClientRequestIdPolicy(requestIdHeaderName = "x-ms-client-request-id") {
 	return {
 		name: setClientRequestIdPolicyName,
@@ -21774,19 +22209,19 @@ function setClientRequestIdPolicy(requestIdHeaderName = "x-ms-client-request-id"
 var setClientRequestIdPolicyName, init_setClientRequestIdPolicy = __esmMin((() => {
 	setClientRequestIdPolicyName = "setClientRequestIdPolicy";
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/agentPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/agentPolicy.js
 function agentPolicy(agent) {
 	return agentPolicy$1(agent);
 }
 var init_agentPolicy = __esmMin((() => {
-	init_internal$1();
+	init_internal$2();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/tlsPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/tlsPolicy.js
 function tlsPolicy(tlsSettings) {
 	return tlsPolicy$1(tlsSettings);
 }
 var init_tlsPolicy = __esmMin((() => {
-	init_internal$1();
+	init_internal$2();
 }));
 // node_modules/.pnpm/@azure+core-tracing@1.4.0/node_modules/@azure/core-tracing/dist/esm/tracingContext.js
 function createTracingContext(options = {}) {
@@ -21903,14 +22338,16 @@ var init_tracingClient = __esmMin((() => {
 })), init_esm$8 = __esmMin((() => {
 	init_instrumenter(), init_tracingClient();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/restError.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/restError.js
 function isRestError(e) {
 	return isRestError$1(e);
 }
 var RestError, init_restError = __esmMin((() => {
 	init_esm$12(), RestError = RestError$1;
+})), init_internal = __esmMin((() => {
+	init_delay$1(), init_error$2(), init_env$1(), init_sanitizer(), init_responseBody();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/tracingPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/tracingPolicy.js
 function tracingPolicy(options = {}) {
 	let userAgentPromise = getUserAgentValue(options.userAgentPrefix), sanitizer = new Sanitizer({ additionalAllowedQueryParameters: options.additionalAllowedQueryParameters }), tracingClient = tryCreateTracingClient();
 	return {
@@ -21990,7 +22427,7 @@ function tryProcessResponse(span, response) {
 var tracingPolicyName, init_tracingPolicy = __esmMin((() => {
 	init_esm$8(), init_constants$2(), init_userAgent(), init_log$4(), init_esm$9(), init_restError(), init_internal(), tracingPolicyName = "tracingPolicy";
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/wrapAbortSignal.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/wrapAbortSignal.js
 function wrapAbortSignalLike(abortSignalLike) {
 	if (abortSignalLike instanceof AbortSignal) return { abortSignal: abortSignalLike };
 	if (abortSignalLike.aborted) return { abortSignal: AbortSignal.abort("reason" in abortSignalLike ? abortSignalLike.reason : void 0) };
@@ -22006,26 +22443,48 @@ function wrapAbortSignalLike(abortSignalLike) {
 		cleanup
 	};
 }
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/wrapAbortSignalLikePolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/cleanupOnCompletion.js
+function cleanupOnRequestResponseCompletion(response, cleanup) {
+	let stream = response?.readableStreamBody, requestCompletion = response ? getRequestCompletion(response) : void 0, browserResponseCompletion = response ? getResponseBodyCompletion(response) : void 0, requestDone = requestCompletion === void 0, nodeResponseDone = !stream || !stream.readable, browserResponseDone = browserResponseCompletion === void 0, cleanedUp = !1, cleanupIfComplete = () => {
+		!cleanedUp && requestDone && nodeResponseDone && browserResponseDone && (cleanedUp = !0, cleanup());
+	}, onResponseComplete = () => {
+		stream?.removeListener("end", onResponseComplete), stream?.removeListener("close", onResponseComplete), stream?.removeListener("error", onResponseComplete), nodeResponseDone = !0;
+		try {
+			cleanupIfComplete();
+		} catch (error) {
+			logger$3.warning("Error cleaning up after response stream completion", error);
+		}
+	};
+	!nodeResponseDone && stream && (stream.once("end", onResponseComplete), stream.once("close", onResponseComplete), stream.once("error", onResponseComplete)), requestCompletion && requestCompletion.then(() => (requestDone = !0, cleanupIfComplete())).catch((error) => {
+		logger$3.warning("Error cleaning up after request completion", error);
+	}), browserResponseCompletion && browserResponseCompletion.then(() => (browserResponseDone = !0, cleanupIfComplete())).catch((error) => {
+		logger$3.warning("Error cleaning up after response body completion", error);
+	}), cleanupIfComplete();
+}
+var init_cleanupOnCompletion = __esmMin((() => {
+	init_internal(), init_log$4();
+}));
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/wrapAbortSignalLikePolicy.js
 function wrapAbortSignalLikePolicy() {
 	return {
 		name: wrapAbortSignalLikePolicyName,
 		sendRequest: async (request, next) => {
 			if (!request.abortSignal) return next(request);
-			let { abortSignal, cleanup } = wrapAbortSignalLike(request.abortSignal);
+			let originalAbortSignal = request.abortSignal, { abortSignal, cleanup } = wrapAbortSignalLike(originalAbortSignal);
 			request.abortSignal = abortSignal;
+			let response;
 			try {
-				return await next(request);
+				return response = await next(request), response;
 			} finally {
-				cleanup?.();
+				request.abortSignal = originalAbortSignal, cleanup && cleanupOnRequestResponseCompletion(response, cleanup);
 			}
 		}
 	};
 }
 var wrapAbortSignalLikePolicyName, init_wrapAbortSignalLikePolicy = __esmMin((() => {
-	wrapAbortSignalLikePolicyName = "wrapAbortSignalLikePolicy";
+	init_cleanupOnCompletion(), wrapAbortSignalLikePolicyName = "wrapAbortSignalLikePolicy";
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/createPipelineFromOptions.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/createPipelineFromOptions.js
 function createPipelineFromOptions(options) {
 	let pipeline = createEmptyPipeline();
 	return isNodeLike && (options.agent && pipeline.addPolicy(agentPolicy(options.agent)), options.tlsOptions && pipeline.addPolicy(tlsPolicy(options.tlsOptions)), pipeline.addPolicy(proxyPolicy(options.proxyOptions)), pipeline.addPolicy(decompressResponsePolicy())), pipeline.addPolicy(wrapAbortSignalLikePolicy()), pipeline.addPolicy(formDataPolicy(), { beforePolicies: [multipartPolicyName] }), pipeline.addPolicy(userAgentPolicy(options.userAgentOptions)), pipeline.addPolicy(setClientRequestIdPolicy(options.telemetryOptions?.clientRequestIdHeaderName)), pipeline.addPolicy(multipartPolicy(), { afterPhase: "Deserialize" }), pipeline.addPolicy(defaultRetryPolicy(options.retryOptions), { phase: "Retry" }), pipeline.addPolicy(tracingPolicy({
@@ -22036,36 +22495,36 @@ function createPipelineFromOptions(options) {
 var init_createPipelineFromOptions = __esmMin((() => {
 	init_logPolicy(), init_pipeline$1(), init_redirectPolicy(), init_userAgentPolicy(), init_multipartPolicy(), init_decompressResponsePolicy(), init_defaultRetryPolicy(), init_formDataPolicy(), init_esm$9(), init_proxyPolicy(), init_setClientRequestIdPolicy(), init_agentPolicy(), init_tlsPolicy(), init_tracingPolicy(), init_wrapAbortSignalLikePolicy();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/defaultHttpClient.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/defaultHttpClient.js
 function createDefaultHttpClient() {
 	let client = createDefaultHttpClient$1();
 	return { async sendRequest(request) {
-		let { abortSignal, cleanup } = request.abortSignal ? wrapAbortSignalLike(request.abortSignal) : {};
+		let originalAbortSignal = request.abortSignal, { abortSignal, cleanup } = originalAbortSignal ? wrapAbortSignalLike(originalAbortSignal) : {}, response;
 		try {
-			return request.abortSignal = abortSignal, await client.sendRequest(request);
+			return request.abortSignal = abortSignal, response = await client.sendRequest(request), response;
 		} finally {
-			cleanup?.();
+			request.abortSignal = originalAbortSignal, cleanup && cleanupOnRequestResponseCompletion(response, cleanup);
 		}
 	} };
 }
 var init_defaultHttpClient = __esmMin((() => {
-	init_esm$12();
+	init_esm$12(), init_cleanupOnCompletion();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/httpHeaders.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/httpHeaders.js
 function createHttpHeaders(rawHeaders) {
 	return createHttpHeaders$1(rawHeaders);
 }
 var init_httpHeaders = __esmMin((() => {
 	init_esm$12();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/pipelineRequest.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/pipelineRequest.js
 function createPipelineRequest(options) {
 	return createPipelineRequest$1(options);
 }
 var init_pipelineRequest = __esmMin((() => {
 	init_esm$12();
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/tokenCycler.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/tokenCycler.js
 async function beginRefresh(getAccessToken, retryIntervalInMs, refreshTimeout) {
 	async function tryGetAccessToken() {
 		if (Date.now() < refreshTimeout) try {
@@ -22115,7 +22574,7 @@ var DEFAULT_CYCLER_OPTIONS, init_tokenCycler = __esmMin((() => {
 		refreshWindowInMs: 12e4
 	};
 }));
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/bearerTokenAuthenticationPolicy.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/bearerTokenAuthenticationPolicy.js
 async function trySendRequest(request, next) {
 	try {
 		return [await next(request), void 0];
@@ -22173,14 +22632,14 @@ function bearerTokenAuthenticationPolicy(options) {
 						request,
 						getAccessToken,
 						logger
-					}, parsedClaim), shouldSendRequest && ([response, error] = await trySendRequest(request, next));
+					}, parsedClaim), shouldSendRequest && (await disposeResponseBody(response), [response, error] = await trySendRequest(request, next));
 				} else if (callbacks.authorizeRequestOnChallenge && (shouldSendRequest = await callbacks.authorizeRequestOnChallenge({
 					scopes: Array.isArray(scopes) ? scopes : [scopes],
 					request,
 					response,
 					getAccessToken,
 					logger
-				}), shouldSendRequest && ([response, error] = await trySendRequest(request, next)), isChallengeResponse(response) && (claims = getCaeChallengeClaims(response.headers.get("WWW-Authenticate") ?? ""), claims))) {
+				}), shouldSendRequest && (await disposeResponseBody(response), [response, error] = await trySendRequest(request, next)), isChallengeResponse(response) && (claims = getCaeChallengeClaims(response.headers.get("WWW-Authenticate") ?? ""), claims))) {
 					let parsedClaim;
 					try {
 						parsedClaim = atob(claims);
@@ -22193,7 +22652,7 @@ function bearerTokenAuthenticationPolicy(options) {
 						request,
 						getAccessToken,
 						logger
-					}, parsedClaim), shouldSendRequest && ([response, error] = await trySendRequest(request, next));
+					}, parsedClaim), shouldSendRequest && (await disposeResponseBody(response), [response, error] = await trySendRequest(request, next));
 				}
 			}
 			if (error) throw error;
@@ -22217,9 +22676,9 @@ function getCaeChallengeClaims(challenges) {
 	if (challenges) return parseChallenges(challenges).find((x) => x.scheme === "Bearer" && x.params.claims && x.params.error === "insufficient_claims")?.params.claims;
 }
 var bearerTokenAuthenticationPolicyName, init_bearerTokenAuthenticationPolicy = __esmMin((() => {
-	init_tokenCycler(), init_log$4(), init_restError(), bearerTokenAuthenticationPolicyName = "bearerTokenAuthenticationPolicy";
+	init_tokenCycler(), init_log$4(), init_restError(), init_internal(), bearerTokenAuthenticationPolicyName = "bearerTokenAuthenticationPolicy";
 })), init_esm$7 = __esmMin((() => {
-	init_pipeline$1(), init_createPipelineFromOptions(), init_defaultHttpClient(), init_httpHeaders(), init_pipelineRequest(), init_restError(), init_decompressResponsePolicy(), init_internal$1(), init_setClientRequestIdPolicy(), init_logPolicy(), init_multipartPolicy(), init_proxyPolicy(), init_redirectPolicy(), init_esm$11(), init_constants$2(), init_tracingPolicy(), init_defaultRetryPolicy(), init_userAgentPolicy(), init_tlsPolicy(), init_formDataPolicy(), init_bearerTokenAuthenticationPolicy(), init_tokenCycler(), init_log$4(), init_agentPolicy(), init_file();
+	init_pipeline$1(), init_createPipelineFromOptions(), init_defaultHttpClient(), init_httpHeaders(), init_pipelineRequest(), init_restError(), init_decompressResponsePolicy(), init_internal$2(), init_setClientRequestIdPolicy(), init_logPolicy(), init_multipartPolicy(), init_proxyPolicy(), init_redirectPolicy(), init_esm$11(), init_constants$2(), init_tracingPolicy(), init_defaultRetryPolicy(), init_userAgentPolicy(), init_tlsPolicy(), init_formDataPolicy(), init_bearerTokenAuthenticationPolicy(), init_tokenCycler(), init_log$4(), init_agentPolicy(), init_file();
 }));
 // node_modules/.pnpm/@azure+core-auth@1.11.0_supports-color@7.2.0/node_modules/@azure/core-auth/dist/esm/tokenCredential.js
 function isTokenCredential(credential) {
@@ -22229,7 +22688,7 @@ function isTokenCredential(credential) {
 var init_esm$6 = __esmMin((() => {
 	init_esm$9();
 }));
-// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__@azure+co_3cf5eb9a54062b72e4ef3d91ae6a8e59/node_modules/@azure/core-http-compat/dist/esm/policies/disableKeepAlivePolicy.js
+// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__@azure+co_60115f48130831ee43d699bfec6e2f45/node_modules/@azure/core-http-compat/dist/esm/policies/disableKeepAlivePolicy.js
 function createDisableKeepAlivePolicy() {
 	return {
 		name: disableKeepAlivePolicyName,
@@ -22244,7 +22703,7 @@ function pipelineContainsDisableKeepAlivePolicy(pipeline) {
 var disableKeepAlivePolicyName, init_disableKeepAlivePolicy = __esmMin((() => {
 	disableKeepAlivePolicyName = "DisableKeepAlivePolicy";
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/base64.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/base64.js
 function encodeByteArray(value) {
 	return uint8ArrayToString(value, "base64");
 }
@@ -22254,7 +22713,7 @@ function decodeString(value) {
 var init_base64 = __esmMin((() => {
 	init_esm$9();
 })), init_interfaces$1 = __esmMin((() => {}));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/utils.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/utils.js
 function isPrimitiveBody(value, mapperTypeName) {
 	return mapperTypeName !== "Composite" && mapperTypeName !== "Dictionary" && (typeof value == "string" || typeof value == "number" || typeof value == "boolean" || mapperTypeName?.match(/^(Date|DateTime|DateTimeRfc1123|UnixTime|ByteArray|Base64Url)$/i) !== null || value == null);
 }
@@ -22303,7 +22762,7 @@ function flattenResponse(fullResponse, responseSpec) {
 var validateISODuration, validUuidRegex, init_utils$3 = __esmMin((() => {
 	validateISODuration = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/, validUuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i;
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/serializer.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/serializer.js
 function createSerializer(modelMappers = {}, isXML = !1) {
 	return new SerializerImpl(modelMappers, isXML);
 }
@@ -22412,7 +22871,15 @@ function serializeDictionaryType(serializer, mapper, object, objectName, isXml, 
 	let valueType = mapper.type.value;
 	if (!valueType || typeof valueType != "object") throw Error(`"value" metadata for a Dictionary must be defined in the mapper and it must of type "object" in ${objectName}.`);
 	let tempDictionary = {};
-	for (let key of Object.keys(object)) tempDictionary[key] = getXmlObjectValue(valueType, serializer.serialize(valueType, object[key], objectName, options), isXml, options);
+	for (let key of Object.keys(object)) {
+		let serializedValue = serializer.serialize(valueType, object[key], objectName, options);
+		Object.defineProperty(tempDictionary, key, {
+			value: getXmlObjectValue(valueType, serializedValue, isXml, options),
+			enumerable: !0,
+			configurable: !0,
+			writable: !0
+		});
+	}
 	if (isXml && mapper.xmlNamespace) {
 		let xmlnsKey = mapper.xmlNamespacePrefix ? `xmlns:${mapper.xmlNamespacePrefix}` : "xmlns", result = tempDictionary;
 		return result.$ = { [xmlnsKey]: mapper.xmlNamespace }, result;
@@ -22509,7 +22976,12 @@ function deserializeCompositeType(serializer, mapper, responseBody, objectName, 
 		let headerCollectionPrefix = propertyMapper.headerCollectionPrefix;
 		if (headerCollectionPrefix) {
 			let dictionary = {};
-			for (let headerKey of Object.keys(responseBody)) headerKey.startsWith(headerCollectionPrefix) && (dictionary[headerKey.substring(headerCollectionPrefix.length)] = serializer.deserialize(propertyMapper.type.value, responseBody[headerKey], propertyObjectName, options)), handledPropertyNames.push(headerKey);
+			for (let headerKey of Object.keys(responseBody)) headerKey.startsWith(headerCollectionPrefix) && Object.defineProperty(dictionary, headerKey.substring(headerCollectionPrefix.length), {
+				value: serializer.deserialize(propertyMapper.type.value, responseBody[headerKey], propertyObjectName, options),
+				enumerable: !0,
+				configurable: !0,
+				writable: !0
+			}), handledPropertyNames.push(headerKey);
 			instance[key] = dictionary;
 		} else if (serializer.isXML) {
 			if (propertyMapper.xmlIsAttribute && responseBody.$) instance[key] = serializer.deserialize(propertyMapper, responseBody.$[xmlName], propertyObjectName, options);
@@ -22575,7 +23047,12 @@ function deserializeDictionaryType(serializer, mapper, responseBody, objectName,
 	if (!value || typeof value != "object") throw Error(`"value" metadata for a Dictionary must be defined in the mapper and it must of type "object" in ${objectName}`);
 	if (responseBody) {
 		let tempDictionary = {};
-		for (let key of Object.keys(responseBody)) tempDictionary[key] = serializer.deserialize(value, responseBody[key], objectName, options);
+		for (let key of Object.keys(responseBody)) Object.defineProperty(tempDictionary, key, {
+			value: serializer.deserialize(value, responseBody[key], objectName, options),
+			enumerable: !0,
+			configurable: !0,
+			writable: !0
+		});
 		return tempDictionary;
 	}
 	return responseBody;
@@ -22697,7 +23174,7 @@ var SerializerImpl, MapperTypeNames, init_serializer = __esmMin((() => {
 })), import_state_cjs, state, init_state = __esmMin((() => {
 	import_state_cjs = require_state_cjs(), state = import_state_cjs.state;
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/operationHelpers.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/operationHelpers.js
 function getOperationArgumentValueFromParameter(operationArguments, parameter, fallbackObject) {
 	let parameterPath = parameter.parameterPath, parameterMapper = parameter.mapper, value;
 	if (typeof parameterPath == "string" && (parameterPath = [parameterPath]), Array.isArray(parameterPath)) {
@@ -22747,7 +23224,7 @@ function getOperationRequestInfo(request) {
 var originalRequestSymbol$1, init_operationHelpers = __esmMin((() => {
 	init_state(), originalRequestSymbol$1 = Symbol.for("@azure/core-client original request");
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/deserializationPolicy.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/deserializationPolicy.js
 function deserializationPolicy(options = {}) {
 	let jsonContentTypes = options.expectedContentTypes?.json ?? defaultJsonContentTypes, xmlContentTypes = options.expectedContentTypes?.xml ?? defaultXmlContentTypes, parseXML = options.parseXML, serializerOptions = options.serializerOptions, updatedOptions = { xml: {
 		rootName: serializerOptions?.xml.rootName ?? "",
@@ -22871,7 +23348,7 @@ async function parse$2(jsonContentTypes, xmlContentTypes, operationResponse, opt
 var defaultJsonContentTypes, defaultXmlContentTypes, deserializationPolicyName, init_deserializationPolicy = __esmMin((() => {
 	init_interfaces$1(), init_esm$7(), init_serializer(), init_operationHelpers(), defaultJsonContentTypes = ["application/json", "text/json"], defaultXmlContentTypes = ["application/xml", "application/atom+xml"], deserializationPolicyName = "deserializationPolicy";
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/interfaceHelpers.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/interfaceHelpers.js
 function getStreamingResponseStatusCodes(operationSpec) {
 	let result = new Set();
 	for (let [statusCode, operationResponse] of Object.entries(operationSpec.responses)) operationResponse.bodyMapper && operationResponse.bodyMapper.type.name === MapperTypeNames.Stream && result.add(Number(statusCode));
@@ -22884,7 +23361,7 @@ function getPathStringFromParameter(parameter) {
 var init_interfaceHelpers = __esmMin((() => {
 	init_serializer();
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/serializationPolicy.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/serializationPolicy.js
 function serializationPolicy(options = {}) {
 	let stringifyXML = options.stringifyXML;
 	return {
@@ -22969,7 +23446,7 @@ function prepareXMLRootList(obj, elementName, xmlNamespaceKey, xmlNamespace) {
 var serializationPolicyName, init_serializationPolicy = __esmMin((() => {
 	init_interfaces$1(), init_operationHelpers(), init_serializer(), init_interfaceHelpers(), serializationPolicyName = "serializationPolicy";
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/pipeline.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/pipeline.js
 function createClientPipeline(options = {}) {
 	let pipeline = createPipelineFromOptions(options ?? {});
 	return options.credentialOptions && pipeline.addPolicy(bearerTokenAuthenticationPolicy({
@@ -22980,14 +23457,14 @@ function createClientPipeline(options = {}) {
 var init_pipeline = __esmMin((() => {
 	init_deserializationPolicy(), init_esm$7(), init_serializationPolicy();
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/httpClientCache.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/httpClientCache.js
 function getCachedDefaultHttpClient$1() {
 	return cachedHttpClient ||= createDefaultHttpClient(), cachedHttpClient;
 }
 var cachedHttpClient, init_httpClientCache = __esmMin((() => {
 	init_esm$7();
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/urlHelpers.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/urlHelpers.js
 function getRequestUrl(baseUri, operationSpec, operationArguments, fallbackObject) {
 	let urlReplacements = calculateUrlReplacements(operationSpec, operationArguments, fallbackObject), isAbsolutePath = !1, requestUrl = replaceAll(baseUri, urlReplacements);
 	if (operationSpec.path) {
@@ -23082,7 +23559,7 @@ var CollectionFormatToDelimiterMap, init_urlHelpers = __esmMin((() => {
 })), logger$2, init_log$3 = __esmMin((() => {
 	init_esm$11(), logger$2 = createClientLogger("core-client");
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/serviceClient.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/serviceClient.js
 function createDefaultPipeline(options) {
 	let credentialScopes = getCredentialScopes(options), credentialOptions = options.credential && credentialScopes ? {
 		credentialScopes,
@@ -23143,7 +23620,7 @@ var ServiceClient, init_serviceClient = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/authorizeRequestOnTenantChallenge.js
+// node_modules/.pnpm/@azure+core-client@1.11.2_supports-color@7.2.0/node_modules/@azure/core-client/dist/esm/authorizeRequestOnTenantChallenge.js
 function isUuid(text) {
 	return /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/.test(text);
 }
@@ -23193,7 +23670,7 @@ var Constants, authorizeRequestOnTenantChallenge, init_authorizeRequestOnTenantC
 })), init_esm$5 = __esmMin((() => {
 	init_serializer(), init_serviceClient(), init_pipeline(), init_interfaces$1(), init_deserializationPolicy(), init_serializationPolicy(), init_log$3(), init_base64(), init_authorizeRequestOnTenantChallenge();
 }));
-// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__@azure+co_3cf5eb9a54062b72e4ef3d91ae6a8e59/node_modules/@azure/core-http-compat/dist/esm/util.js
+// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__@azure+co_60115f48130831ee43d699bfec6e2f45/node_modules/@azure/core-http-compat/dist/esm/util.js
 function toPipelineRequest(webResource, options = {}) {
 	let request = webResource[originalRequestSymbol], headers = createHttpHeaders(webResource.headers.toJson({ preserveCase: !0 }));
 	if (request) return request.headers = headers, request;
@@ -23344,7 +23821,7 @@ var originalRequestSymbol, originalClientRequestSymbol, passThroughProps, HttpHe
 		}
 	};
 }));
-// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__@azure+co_3cf5eb9a54062b72e4ef3d91ae6a8e59/node_modules/@azure/core-http-compat/dist/esm/response.js
+// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__@azure+co_60115f48130831ee43d699bfec6e2f45/node_modules/@azure/core-http-compat/dist/esm/response.js
 function toCompatResponse(response, options) {
 	let request = toWebResourceLike(response.request), headers = toHttpHeadersLike(response.headers);
 	return options?.createProxy ? new Proxy(response, {
@@ -23389,7 +23866,7 @@ var originalResponse, init_response = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__@azure+co_3cf5eb9a54062b72e4ef3d91ae6a8e59/node_modules/@azure/core-http-compat/dist/esm/policies/requestPolicyFactoryPolicy.js
+// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__@azure+co_60115f48130831ee43d699bfec6e2f45/node_modules/@azure/core-http-compat/dist/esm/policies/requestPolicyFactoryPolicy.js
 function createRequestPolicyFactoryPolicy(factories) {
 	let orderedFactories = factories.slice().reverse();
 	return {
@@ -23414,7 +23891,7 @@ var HttpPipelineLogLevel, mockRequestPolicyOptions, requestPolicyFactoryPolicyNa
 		}
 	}, requestPolicyFactoryPolicyName = "RequestPolicyFactoryPolicy";
 }));
-// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__@azure+co_3cf5eb9a54062b72e4ef3d91ae6a8e59/node_modules/@azure/core-http-compat/dist/esm/httpClientAdapter.js
+// node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__@azure+co_60115f48130831ee43d699bfec6e2f45/node_modules/@azure/core-http-compat/dist/esm/httpClientAdapter.js
 function convertHttpClient(requestPolicyClient) {
 	return { sendRequest: async (request) => toPipelineResponse(await requestPolicyClient.sendRequest(toWebResourceLike(request, { createProxy: !0 }))) };
 }
@@ -23423,7 +23900,7 @@ var init_httpClientAdapter = __esmMin((() => {
 })), init_esm$4 = __esmMin((() => {
 	init_extendedClient(), init_response(), init_requestPolicyFactoryPolicy(), init_disableKeepAlivePolicy(), init_httpClientAdapter(), init_util$2();
 }));
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/util.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/util.js
 function getAllMatches(string, regex) {
 	let matches = [], match = regex.exec(string);
 	for (; match;) {
@@ -23455,7 +23932,7 @@ var regexName, isName, DANGEROUS_PROPERTY_NAMES, criticalProperties, init_util$1
 		"prototype"
 	];
 }));
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/validator.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/validator.js
 function validate(xmlData, options) {
 	options = Object.assign({}, defaultOptions$2, options);
 	let tags = [], tagFound = !1, reachedRoot = !1;
@@ -23588,7 +24065,7 @@ function scanAttributeTokens(attrStr) {
 		for (; i < len && isWhiteSpace(attrStr[i]);) i++;
 		if (i >= len) break;
 		if (attrStr[i] === "=") {
-			i = tokenStart + 1;
+			i++;
 			continue;
 		}
 		let leadingWs = attrStr.slice(tokenStart, i), nameStart = i;
@@ -23891,7 +24368,7 @@ var ENTITY_ACTION, SPECIAL_CHARS, LIMIT_TIER_EXTERNAL, LIMIT_TIER_BASE, LIMIT_TI
 })), init_src$4 = __esmMin((() => {
 	init_EntityDecoder(), init_entities();
 }));
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
 function validatePropertyName(propertyName, optionName) {
 	if (typeof propertyName != "string") return;
 	let normalized = propertyName.toLowerCase();
@@ -24045,7 +24522,7 @@ var defaultOnDangerousProperty, defaultOptions$1, buildOptions, init_OptionsBuil
 		}, validator;
 	};
 }));
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
 function hasSeq(data, seq, i) {
 	for (let j = 0; j < seq.length; j++) if (seq[j] !== data[i + j + 1]) return !1;
 	return !0;
@@ -24436,7 +24913,7 @@ var hexRegex, binRegex, octRegex, numRegex, consider, eNotationRegx, init_strnum
 		unicode: !1
 	}, eNotationRegx = /^([-+])?(0*)(\d*(\.\d*)?[eE][-\+]?\d+)$/;
 }));
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/ignoreAttributes.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/ignoreAttributes.js
 function getIgnoreAttributesFn$1(ignoreAttributes) {
 	return typeof ignoreAttributes == "function" ? ignoreAttributes : Array.isArray(ignoreAttributes) ? (attrName) => {
 		for (let pattern of ignoreAttributes) if (typeof pattern == "string" && attrName === pattern || pattern instanceof RegExp && pattern.test(attrName)) return !0;
@@ -25450,7 +25927,7 @@ var init_src$1 = __esmMin((() => {
 		LOG: LOG_PATTERNS
 	});
 }));
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
 function extractRawAttributes(prefixedAttrs, options) {
 	if (!prefixedAttrs) return {};
 	let attrs = options.attributesGroupName ? prefixedAttrs[options.attributesGroupName] : prefixedAttrs;
@@ -25486,12 +25963,15 @@ function resolveNameSpace(tagname) {
 	}
 	return tagname;
 }
+function attrValue(match) {
+	return match[3] === void 0 ? match[4] : match[3];
+}
 function buildAttributesMap(attrStr, jPath, tagName, force = !1) {
 	let options = this.options;
 	if (force === !0 || options.ignoreAttributes !== !0 && typeof attrStr == "string") {
 		let matches = getAllMatches(attrStr, attrsRegx), len = matches.length, attrs = {}, processedVals = Array(len), hasRawAttrs = !1, rawAttrsForMatcher = {};
 		for (let i = 0; i < len; i++) {
-			let attrName = this.resolveNameSpace(matches[i][1]), oldVal = matches[i][4];
+			let attrName = this.resolveNameSpace(matches[i][1]), oldVal = attrValue(matches[i]);
 			if (attrName.length && oldVal !== void 0) {
 				let val = oldVal;
 				options.trimValues && (val = val.trim()), val = this.replaceEntitiesValue(val, tagName, this.readonlyMatcher), processedVals[i] = val, rawAttrsForMatcher[attrName] = val, hasRawAttrs = !0;
@@ -25504,7 +25984,7 @@ function buildAttributesMap(attrStr, jPath, tagName, force = !1) {
 			if (this.ignoreAttributesFn(attrName, jPathStr)) continue;
 			let aName = options.attributeNamePrefix + attrName;
 			if (attrName.length) {
-				if (options.transformAttributeName && (aName = options.transformAttributeName(aName)), aName = sanitizeName(aName, options), matches[i][4] !== void 0) {
+				if (options.transformAttributeName && (aName = options.transformAttributeName(aName)), aName = sanitizeName(aName, options), attrValue(matches[i]) !== void 0) {
 					let oldVal = processedVals[i], newVal = options.attributeValueProcessor(attrName, oldVal, jPathStr);
 					newVal == null ? attrs[aName] = oldVal : typeof newVal != typeof oldVal || newVal !== oldVal ? attrs[aName] = newVal : attrs[aName] = parseValue(oldVal, options.parseAttributeValue, options.numberParseOptions), hasAttrs = !0;
 				} else options.allowBooleanAttributes && (attrs[aName] = !0, hasAttrs = !0);
@@ -25551,12 +26031,12 @@ function isItStopNode() {
 	return this.stopNodeExpressionsSet.size !== 0 && this.matcher.matchesAny(this.stopNodeExpressionsSet);
 }
 function tagExpWithClosingIndex(xmlData, i, closingChar = ">") {
-	let attrBoundary = 0, len = xmlData.length, closeCode0 = closingChar.charCodeAt(0), closeCode1 = closingChar.length > 1 ? closingChar.charCodeAt(1) : -1, result = "", segmentStart = i;
+	let len = xmlData.length, closeCode0 = closingChar.charCodeAt(0), closeCode1 = closingChar.length > 1 ? closingChar.charCodeAt(1) : -1, result = "", segmentStart = i;
 	for (let index = i; index < len; index++) {
 		let code = xmlData.charCodeAt(index);
-		if (attrBoundary) code === attrBoundary && (attrBoundary = 0);
-		else if (code === 34 || code === 39) attrBoundary = code;
-		else if (code === closeCode0) {
+		if (code === 34 || code === 39) {
+			if (index = xmlData.indexOf(xmlData[index], index + 1), index === -1) return;
+		} else if (code === closeCode0) {
 			if (closeCode1 !== -1) {
 				if (xmlData.charCodeAt(index + 1) === closeCode1) return result += xmlData.substring(segmentStart, index), {
 					data: result,
@@ -25566,7 +26046,7 @@ function tagExpWithClosingIndex(xmlData, i, closingChar = ">") {
 				data: result,
 				index
 			};
-		} else code === 9 && !attrBoundary && (result += xmlData.substring(segmentStart, index) + " ", segmentStart = index + 1);
+		} else code === 9 && (result += xmlData.substring(segmentStart, index) + " ", segmentStart = index + 1);
 	}
 }
 function findClosingIndex(xmlData, str, i, errMsg) {
@@ -25676,7 +26156,7 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 				this.stopNodeExpressionsSet.seal();
 			}
 		}
-	}, attrsRegx = RegExp("([^\\s=]+)\\s*(=\\s*(['\"])([\\s\\S]*?)\\3)?", "gm"), parseXml = function(xmlData) {
+	}, attrsRegx = /([^\s=]+)\s*(=\s*(?:"([^"]*)"|'([^']*)'))?/gm, parseXml = function(xmlData) {
 		let options = this.options, crlfPositions = options.captureMetaData ? [] : void 0;
 		xmlData = xmlData.replace(/\r\n?/g, options.captureMetaData ? (newline, index) => (newline.length === 2 && crlfPositions.push(index - crlfPositions.length), "\n") : "\n");
 		let xmlObj = new XmlNode("!xml"), currentNode = xmlObj, textData = "";
@@ -25775,7 +26255,7 @@ var OrderedObjParser, attrsRegx, parseXml, init_OrderedObjParser = __esmMin((() 
 		return xmlObj.child;
 	};
 }));
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/node2json.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/node2json.js
 function stripAttributePrefix(attrs, prefix) {
 	if (!attrs || typeof attrs != "object") return {};
 	if (!prefix) return attrs;
@@ -25860,7 +26340,7 @@ var METADATA_SYMBOL, init_node2json = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/util.js
+// node_modules/.pnpm/fast-xml-builder@1.3.2/node_modules/fast-xml-builder/src/util.js
 function valToStr(val) {
 	return typeof val == "number" && Object.is(val, -0) ? "-0" : String(val);
 }
@@ -25873,7 +26353,18 @@ function safeCdata(val) {
 function escapeAttribute(val) {
 	return valToStr(val).replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
-// node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/orderedJs2Xml.js
+function resolveName(name, isAttribute, options, matcher, validator) {
+	if (!options.sanitizeName) return name;
+	let isPI = !isAttribute && name[0] === "?", bare = isPI ? name.slice(1) : name;
+	if (validator(bare)) return name;
+	let result = options.sanitizeName(bare, {
+		isAttribute,
+		matcher: matcher.readOnly()
+	});
+	if (typeof result != "string" || !validator(result)) throw Error(`sanitizeName returned an invalid XML name for "${bare}"`);
+	return isPI ? "?" + result : result;
+}
+// node_modules/.pnpm/fast-xml-builder@1.3.2/node_modules/fast-xml-builder/src/orderedJs2Xml.js
 function detectXmlVersionFromArray(jArray, options) {
 	if (!Array.isArray(jArray) || jArray.length === 0) return "1.0";
 	let first = jArray[0];
@@ -25885,12 +26376,6 @@ function detectXmlVersionFromArray(jArray, options) {
 		}
 	}
 	return "1.0";
-}
-function resolveTagName$1(name, isAttribute, options, matcher, qNameValidator) {
-	return !options.sanitizeName || qNameValidator(name) ? name : options.sanitizeName(name, {
-		isAttribute,
-		matcher: matcher.readOnly()
-	});
 }
 function toXml(jArray, options) {
 	let indentation = "";
@@ -25916,7 +26401,7 @@ function arrToStr(arr, options, indentation, matcher, stopNodeExpressions, qName
 	for (let i = 0; i < arr.length; i++) {
 		let tagObj = arr[i], rawTagName = propName(tagObj);
 		if (rawTagName === void 0) continue;
-		let tagName = rawTagName === options.textNodeName || rawTagName === options.cdataPropName || rawTagName === options.commentPropName || rawTagName[0] === "?" ? rawTagName : resolveTagName$1(rawTagName, !1, options, matcher, qNameValidator), attrValues = extractAttributeValues(tagObj[":@"], options);
+		let tagName = rawTagName === options.textNodeName || rawTagName === options.cdataPropName || rawTagName === options.commentPropName ? rawTagName : resolveName(rawTagName, !1, options, matcher, qNameValidator), attrValues = extractAttributeValues(tagObj[":@"], options);
 		matcher.push(tagName, attrValues);
 		let isStopNode = checkStopNode(matcher, stopNodeExpressions);
 		if (tagName === options.textNodeName) {
@@ -25943,7 +26428,7 @@ function arrToStr(arr, options, indentation, matcher, stopNodeExpressions, qName
 		let newIdentation = indentation;
 		newIdentation !== "" && (newIdentation += options.indentBy);
 		let tagStart = indentation + `<${tagName}${attr_to_str(tagObj[":@"], options, isStopNode, matcher, qNameValidator)}`, tagValue;
-		tagValue = isStopNode ? getRawContent(tagObj[rawTagName], options) : arrToStr(tagObj[rawTagName], options, newIdentation, matcher, stopNodeExpressions, qNameValidator), options.unpairedTags.indexOf(tagName) === -1 ? (!tagValue || tagValue.length === 0) && options.suppressEmptyNode ? xmlStr += tagStart + "/>" : tagValue && tagValue.endsWith(">") ? xmlStr += tagStart + `>${tagValue}${indentation}</${tagName}>` : (xmlStr += tagStart + ">", tagValue && indentation !== "" && (tagValue.includes("/>") || tagValue.includes("</")) ? xmlStr += indentation + options.indentBy + tagValue + indentation : xmlStr += tagValue, xmlStr += `</${tagName}>`) : options.suppressUnpairedNode ? xmlStr += tagStart + ">" : xmlStr += tagStart + "/>", isPreviousElementTag = !0, matcher.pop();
+		tagValue = isStopNode ? getRawContent(tagObj[rawTagName], options, matcher.getDepth()) : arrToStr(tagObj[rawTagName], options, newIdentation, matcher, stopNodeExpressions, qNameValidator), options.unpairedTags.indexOf(tagName) === -1 ? (!tagValue || tagValue.length === 0) && options.suppressEmptyNode ? xmlStr += tagStart + "/>" : tagValue && tagValue.endsWith(">") ? xmlStr += tagStart + `>${tagValue}${indentation}</${tagName}>` : (xmlStr += tagStart + ">", tagValue && indentation !== "" && (tagValue.includes("/>") || tagValue.includes("</")) ? xmlStr += indentation + options.indentBy + tagValue + indentation : xmlStr += tagValue, xmlStr += `</${tagName}>`) : options.suppressUnpairedNode ? xmlStr += tagStart + ">" : xmlStr += tagStart + "/>", isPreviousElementTag = !0, matcher.pop();
 	}
 	return xmlStr;
 }
@@ -25957,7 +26442,8 @@ function extractAttributeValues(attrMap, options) {
 	}
 	return hasAttrs ? attrValues : null;
 }
-function getRawContent(arr, options) {
+function getRawContent(arr, options, depth = 0) {
+	if (options.maxNestedTags && depth > options.maxNestedTags) throw Error("Maximum nested tags exceeded");
 	if (!Array.isArray(arr)) return arr == null ? "" : valToStr(arr);
 	let content = "";
 	for (let i = 0; i < arr.length; i++) {
@@ -25967,7 +26453,7 @@ function getRawContent(arr, options) {
 		else if (tagName === options.commentPropName) content += item[tagName][0][options.textNodeName];
 		else if (tagName && tagName[0] === "?") continue;
 		else if (tagName) {
-			let attStr = attr_to_str_raw(item[":@"], options), nestedContent = getRawContent(item[tagName], options);
+			let attStr = attr_to_str_raw(item[":@"], options), nestedContent = getRawContent(item[tagName], options, depth + 1);
 			!nestedContent || nestedContent.length === 0 ? content += `<${tagName}${attStr}/>` : content += `<${tagName}${attStr}>${nestedContent}</${tagName}>`;
 		}
 	}
@@ -25993,7 +26479,7 @@ function attr_to_str(attrMap, options, isStopNode, matcher, qNameValidator) {
 	let attrStr = "";
 	if (attrMap && !options.ignoreAttributes) for (let attr in attrMap) {
 		if (!Object.prototype.hasOwnProperty.call(attrMap, attr)) continue;
-		let cleanAttrName = attr.substr(options.attributeNamePrefix.length), resolvedAttrName = isStopNode ? cleanAttrName : resolveTagName$1(cleanAttrName, !0, options, matcher, qNameValidator), attrVal;
+		let cleanAttrName = attr.substr(options.attributeNamePrefix.length), resolvedAttrName = isStopNode ? cleanAttrName : resolveName(cleanAttrName, !0, options, matcher, qNameValidator), attrVal;
 		isStopNode ? attrVal = attrMap[attr] : (attrVal = options.attributeValueProcessor(attr, attrMap[attr]), attrVal = replaceEntitiesValue(attrVal, options)), attrVal === !0 && options.suppressBooleanAttributes ? attrStr += ` ${resolvedAttrName}` : attrStr += ` ${resolvedAttrName}="${escapeAttribute(attrVal)}"`;
 	}
 	return attrStr;
@@ -26013,14 +26499,14 @@ function replaceEntitiesValue(textValue, options) {
 var EOL$1, init_orderedJs2Xml = __esmMin((() => {
 	init_src$2(), init_src$3(), EOL$1 = "\n";
 }));
-// node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/ignoreAttributes.js
+// node_modules/.pnpm/fast-xml-builder@1.3.2/node_modules/fast-xml-builder/src/ignoreAttributes.js
 function getIgnoreAttributesFn(ignoreAttributes) {
 	return typeof ignoreAttributes == "function" ? ignoreAttributes : Array.isArray(ignoreAttributes) ? (attrName) => {
 		for (let pattern of ignoreAttributes) if (typeof pattern == "string" && attrName === pattern || pattern instanceof RegExp && pattern.test(attrName)) return !0;
 	} : () => !1;
 }
 var init_ignoreAttributes = __esmMin((() => {}));
-// node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/fxb.js
+// node_modules/.pnpm/fast-xml-builder@1.3.2/node_modules/fast-xml-builder/src/fxb.js
 function Builder(options) {
 	if (this.options = Object.assign({}, defaultOptions, options), this.options.stopNodes && Array.isArray(this.options.stopNodes) && (this.options.stopNodes = this.options.stopNodes.map((node) => typeof node == "string" && node.startsWith("*.") ? ".." + node.substring(2) : node)), this.stopNodeExpressions = [], this.options.stopNodes && Array.isArray(this.options.stopNodes)) for (let i = 0; i < this.options.stopNodes.length; i++) {
 		let node = this.options.stopNodes[i];
@@ -26044,16 +26530,10 @@ function detectXmlVersionFromObj(jObj, options) {
 	}
 	return "1.0";
 }
-function resolveTagName(name, isAttribute, options, matcher, qNameValidator) {
-	return !options.sanitizeName || qNameValidator(name) ? name : options.sanitizeName(name, {
-		isAttribute,
-		matcher: matcher.readOnly()
-	});
-}
 function processTextOrObjNode(object, key, level, matcher, qNameValidator) {
 	let attrValues = this.extractAttributes(object);
 	if (matcher.push(key, attrValues), this.checkStopNode(matcher)) {
-		let rawContent = this.buildRawContent(object), attrStr = this.buildAttributesForStopNode(object);
+		let rawContent = this.buildRawContent(object, matcher.getDepth()), attrStr = this.buildAttributesForStopNode(object);
 		return matcher.pop(), this.buildObjectNode(rawContent, key, attrStr, level);
 	}
 	let result = this.j2x(object, level + 1, matcher, qNameValidator);
@@ -26127,14 +26607,14 @@ var defaultOptions, init_fxb = __esmMin((() => {
 		let jPath = this.options.jPath ? matcher.toString() : matcher, isCurrentStopNode = this.checkStopNode(matcher);
 		for (let key in jObj) {
 			if (!Object.prototype.hasOwnProperty.call(jObj, key)) continue;
-			let resolvedKey = key === this.options.textNodeName || key === this.options.cdataPropName || key === this.options.commentPropName || this.options.attributesGroupName && key === this.options.attributesGroupName || this.isAttribute(key) || key[0] === "?" ? key : resolveTagName(key, !1, this.options, matcher, qNameValidator);
+			let resolvedKey = key === this.options.textNodeName || key === this.options.cdataPropName || key === this.options.commentPropName || this.options.attributesGroupName && key === this.options.attributesGroupName || this.isAttribute(key) ? key : resolveName(key, !1, this.options, matcher, qNameValidator);
 			if (jObj[key] === void 0) this.isAttribute(key) && (val += "");
 			else if (jObj[key] === null) this.isAttribute(key) || resolvedKey === this.options.cdataPropName || resolvedKey === this.options.commentPropName ? val += "" : resolvedKey[0] === "?" ? val += this.indentate(level) + "<" + resolvedKey + "?" + this.tagEndChar : val += this.indentate(level) + "<" + resolvedKey + "/" + this.tagEndChar;
 			else if (jObj[key] instanceof Date) val += this.buildTextValNode(jObj[key], resolvedKey, "", level, matcher);
 			else if (typeof jObj[key] != "object") {
 				let attr = this.isAttribute(key);
 				if (attr && !this.ignoreAttributesFn(attr, jPath)) {
-					let resolvedAttr = resolveTagName(attr, !0, this.options, matcher, qNameValidator);
+					let resolvedAttr = resolveName(attr, !0, this.options, matcher, qNameValidator);
 					attrStr += this.buildAttrPairStr(resolvedAttr, valToStr(jObj[key]), isCurrentStopNode);
 				} else if (!attr) {
 					if (key === this.options.textNodeName) {
@@ -26178,7 +26658,7 @@ var defaultOptions, init_fxb = __esmMin((() => {
 			} else if (this.options.attributesGroupName && key === this.options.attributesGroupName) {
 				let Ks = Object.keys(jObj[key]), L = Ks.length;
 				for (let j = 0; j < L; j++) {
-					let resolvedAttr = resolveTagName(Ks[j], !0, this.options, matcher, qNameValidator);
+					let resolvedAttr = resolveName(Ks[j], !0, this.options, matcher, qNameValidator);
 					attrStr += this.buildAttrPairStr(resolvedAttr, valToStr(jObj[key][Ks[j]]), isCurrentStopNode);
 				}
 			} else val += this.processTextOrObjNode(jObj[key], resolvedKey, level, matcher, qNameValidator);
@@ -26205,7 +26685,8 @@ var defaultOptions, init_fxb = __esmMin((() => {
 			attr && (attrValues[attr] = escapeAttribute(obj[key]), hasAttrs = !0);
 		}
 		return hasAttrs ? attrValues : null;
-	}, Builder.prototype.buildRawContent = function(obj) {
+	}, Builder.prototype.buildRawContent = function(obj, depth = 0) {
+		if (this.options.maxNestedTags && depth >= this.options.maxNestedTags) throw Error("Maximum nested tags exceeded");
 		if (typeof obj == "string") return obj;
 		if (typeof obj != "object" || !obj) return String(obj);
 		if (obj[this.options.textNodeName] !== void 0) return obj[this.options.textNodeName];
@@ -26217,11 +26698,11 @@ var defaultOptions, init_fxb = __esmMin((() => {
 			else if (Array.isArray(value)) {
 				for (let item of value) if (typeof item == "string" || typeof item == "number") content += `<${key}>${item}</${key}>`;
 				else if (typeof item == "object" && item) {
-					let nestedContent = this.buildRawContent(item), nestedAttrs = this.buildAttributesForStopNode(item);
+					let nestedContent = this.buildRawContent(item, depth + 1), nestedAttrs = this.buildAttributesForStopNode(item);
 					content += nestedContent === "" ? `<${key}${nestedAttrs}/>` : `<${key}${nestedAttrs}>${nestedContent}</${key}>`;
 				}
 			} else if (typeof value == "object" && value) {
-				let nestedContent = this.buildRawContent(value), nestedAttrs = this.buildAttributesForStopNode(value);
+				let nestedContent = this.buildRawContent(value, depth + 1), nestedAttrs = this.buildAttributesForStopNode(value);
 				content += nestedContent === "" ? `<${key}${nestedAttrs}/>` : `<${key}${nestedAttrs}>${nestedContent}</${key}>`;
 			} else content += `<${key}>${value}</${key}>`;
 		}
@@ -26285,7 +26766,7 @@ var defaultOptions, init_fxb = __esmMin((() => {
 })), XMLValidator, init_fxp = __esmMin((() => {
 	init_validator(), init_XMLParser(), init_json2xml(), XMLValidator = { validate };
 })), init_xml_common = __esmMin((() => {}));
-// node_modules/.pnpm/@azure+core-xml@1.6.0/node_modules/@azure/core-xml/dist/esm/xml.js
+// node_modules/.pnpm/@azure+core-xml@1.6.1/node_modules/@azure/core-xml/dist/esm/xml.js
 function getCommonOptions(options) {
 	return {
 		attributesGroupName: "$",
@@ -26993,7 +27474,7 @@ var init_xml = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/streamHelpers.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/streamHelpers.js
 function signalStreamEnd(pushData) {
 	pushData(null);
 }
@@ -27054,7 +27535,7 @@ var MAX_SEGMENT_CONTENT_LENGTH, SMRegion$1, StructuredMessageEncoding, init_Stru
 		}
 	};
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/StructuredMessageEncodingStream.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/StructuredMessageEncodingStream.js
 function isNodeReadableStream(source) {
 	return source !== null && source instanceof node_stream.default && typeof source._read == "function" && typeof source._readableState == "object" && typeof source.pipe == "function";
 }
@@ -27252,7 +27733,7 @@ var StructuredMessageEncodingStream, init_StructuredMessageEncodingStream = __es
 		}
 	};
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/StructuredMessageDecodingStream.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/StructuredMessageDecodingStream.js
 async function structuredMessageDecodingBrowser(source) {
 	throw Error("structuredMessageDecodingBrowser is only for Browser");
 }
@@ -27296,7 +27777,7 @@ var StructuredMessageDecodingStream, init_StructuredMessageDecodingStream = __es
 		}
 	};
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/cache.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/cache.js
 function getCachedDefaultHttpClient() {
 	return _defaultHttpClient ||= createDefaultHttpClient(), _defaultHttpClient;
 }
@@ -27392,7 +27873,7 @@ var _defaultHttpClient, init_cache = __esmMin((() => {
 		X_MS_CopySourceErrorCode: "x-ms-copy-source-error-code"
 	};
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/utils/utils.common.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/utils/utils.common.js
 function setURLParameter$1(url, name, value) {
 	let urlParsed = new URL(url), encodedName = encodeURIComponent(name), encodedValue = value ? encodeURIComponent(value) : void 0, searchString = urlParsed.search === "" ? "?" : urlParsed.search, searchPieces = [];
 	for (let pair of searchString.slice(1).split("&")) if (pair) {
@@ -27439,7 +27920,7 @@ async function delay(timeInMs, aborter, abortError) {
 	});
 }
 var init_utils_common$2 = __esmMin((() => {}));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/utils/SharedKeyComparator.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/utils/SharedKeyComparator.js
 function compareHeader(lhs, rhs) {
 	return isLessThan(lhs, rhs) ? -1 : 1;
 }
@@ -28010,7 +28491,7 @@ var table_lv0, table_lv2, table_lv4, init_SharedKeyComparator = __esmMin((() => 
 		}
 	};
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageBrowserPolicyV2.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageBrowserPolicyV2.js
 function storageBrowserPolicy() {
 	return {
 		name: storageBrowserPolicyName,
@@ -28022,7 +28503,7 @@ function storageBrowserPolicy() {
 var storageBrowserPolicyName, init_StorageBrowserPolicyV2 = __esmMin((() => {
 	storageBrowserPolicyName = "storageBrowserPolicy";
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageCorrectContentLengthPolicy.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageCorrectContentLengthPolicy.js
 function storageCorrectContentLengthPolicy() {
 	function correctContentLength(request) {
 		request.body && (typeof request.body == "string" || Buffer.isBuffer(request.body)) && request.body.length > 0 && request.headers.set(HeaderConstants.CONTENT_LENGTH, Buffer.byteLength(request.body));
@@ -28037,7 +28518,7 @@ function storageCorrectContentLengthPolicy() {
 var storageCorrectContentLengthPolicyName, init_StorageCorrectContentLengthPolicy = __esmMin((() => {
 	init_constants$1(), storageCorrectContentLengthPolicyName = "StorageCorrectContentLengthPolicy";
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageRetryPolicyV2.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageRetryPolicyV2.js
 function storageRetryPolicy(options = {}) {
 	let retryPolicyType = options.retryPolicyType ?? DEFAULT_RETRY_OPTIONS.retryPolicyType, maxTries = options.maxTries ?? DEFAULT_RETRY_OPTIONS.maxTries, retryDelayInMs = options.retryDelayInMs ?? DEFAULT_RETRY_OPTIONS.retryDelayInMs, maxRetryDelayInMs = options.maxRetryDelayInMs ?? DEFAULT_RETRY_OPTIONS.maxRetryDelayInMs, secondaryHost = options.secondaryHost ?? DEFAULT_RETRY_OPTIONS.secondaryHost, tryTimeoutInMs = options.tryTimeoutInMs ?? DEFAULT_RETRY_OPTIONS.tryTimeoutInMs;
 	function shouldRetry({ isPrimaryRetry, attempt, response, error }) {
@@ -28122,7 +28603,7 @@ var storageRetryPolicyName, DEFAULT_RETRY_OPTIONS, retriableErrors, RETRY_ABORT_
 		"REQUEST_SEND_ERROR"
 	], RETRY_ABORT_ERROR = new AbortError("The operation was aborted.");
 }));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageSharedKeyCredentialPolicyV2.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageSharedKeyCredentialPolicyV2.js
 function storageSharedKeyCredentialPolicy(options) {
 	function signRequest(request) {
 		request.headers.set(HeaderConstants.X_MS_DATE, new Date().toUTCString()), request.body && (typeof request.body == "string" || Buffer.isBuffer(request.body)) && request.body.length > 0 && request.headers.set(HeaderConstants.CONTENT_LENGTH, Buffer.byteLength(request.body));
@@ -28183,7 +28664,7 @@ function storageSharedKeyCredentialPolicy(options) {
 var storageSharedKeyCredentialPolicyName, init_StorageSharedKeyCredentialPolicyV2 = __esmMin((() => {
 	init_constants$1(), init_utils_common$2(), init_SharedKeyComparator(), storageSharedKeyCredentialPolicyName = "storageSharedKeyCredentialPolicy";
 })), init_StorageRedirectRangeHeaderPolicy = __esmMin((() => {}));
-// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageRequestFailureDetailsParserPolicy.js
+// node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2_supports-color@7.2.0__supports-color@7.2.0/node_modules/@azure/storage-common/dist/esm/policies/StorageRequestFailureDetailsParserPolicy.js
 function storageRequestFailureDetailsParserPolicy() {
 	return {
 		name: storageRequestFailureDetailsParserPolicyName,
@@ -35183,7 +35664,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			} }
 		}
 	};
-})), contentType, blobServiceProperties, accept, url, restype, comp, timeoutInSeconds, version, requestId, accept1, comp1, comp2, prefix, marker, maxPageSize, include, keyInfo, comp3, restype1, body, comp4, contentLength, multipartContentType, comp5, where, restype2, metadata, access, defaultEncryptionScope, preventEncryptionScopeOverride, leaseId, ifModifiedSince, ifUnmodifiedSince, comp6, comp7, containerAcl, comp8, deletedContainerName, deletedContainerVersion, comp9, sourceContainerName, sourceLeaseId, comp10, action, duration, proposedLeaseId, action1, leaseId1, action2, action3, breakPeriod, action4, proposedLeaseId1, include1, startFrom, accept2, endBefore, delimiter, snapshot, versionId, range, rangeGetContentMD5, rangeGetContentCRC64, structuredBodyType, encryptionKey, encryptionKeySha256, encryptionAlgorithm, ifMatch, ifNoneMatch, ifTags, deleteSnapshots, blobDeleteType, accessTierIfModifiedSince, accessTierIfUnmodifiedSince, comp11, expiryOptions, expiresOn, blobCacheControl, blobContentType, blobContentMD5, blobContentEncoding, blobContentLanguage, blobContentDisposition, comp12, immutabilityPolicyExpiry, immutabilityPolicyMode, comp13, legalHold, encryptionScope, comp14, tier, rehydratePriority, sourceIfModifiedSince, sourceIfUnmodifiedSince, sourceIfMatch, sourceIfNoneMatch, sourceIfTags, copySource, blobTagsString, sealBlob, legalHold1, xMsRequiresSync, sourceContentMD5, copySourceAuthorization, copySourceTags, fileRequestIntent, comp15, copyActionAbortConstant, copyId, comp16, tier1, queryRequest, comp17, comp18, ifModifiedSince1, ifUnmodifiedSince1, ifMatch1, ifNoneMatch1, tags, transactionalContentMD5, transactionalContentCrc64, blobType, blobContentLength, blobSequenceNumber, contentType1, body1, accept3, comp19, pageWrite, ifSequenceNumberLessThanOrEqualTo, ifSequenceNumberLessThan, ifSequenceNumberEqualTo, structuredContentLength, pageWrite1, sourceUrl, sourceRange, sourceContentCrc64, range1, sourceEncryptionKey, sourceEncryptionKeySha256, sourceEncryptionAlgorithm, comp20, prevsnapshot, prevSnapshotUrl, sequenceNumberAction, comp21, blobType1, comp22, maxSize, appendPosition, sourceRange1, comp23, blobType2, copySourceBlobProperties, comp24, blockId, blocks, comp25, listType, init_parameters = __esmMin((() => {
+})), contentType, blobServiceProperties, accept, url$1, restype, comp, timeoutInSeconds, version, requestId, accept1, comp1, comp2, prefix, marker, maxPageSize, include, keyInfo, comp3, restype1, body, comp4, contentLength, multipartContentType, comp5, where, restype2, metadata, access, defaultEncryptionScope, preventEncryptionScopeOverride, leaseId, ifModifiedSince, ifUnmodifiedSince, comp6, comp7, containerAcl, comp8, deletedContainerName, deletedContainerVersion, comp9, sourceContainerName, sourceLeaseId, comp10, action, duration, proposedLeaseId, action1, leaseId1, action2, action3, breakPeriod, action4, proposedLeaseId1, include1, startFrom, accept2, endBefore, delimiter, snapshot, versionId, range, rangeGetContentMD5, rangeGetContentCRC64, structuredBodyType, encryptionKey, encryptionKeySha256, encryptionAlgorithm, ifMatch, ifNoneMatch, ifTags, deleteSnapshots, blobDeleteType, accessTierIfModifiedSince, accessTierIfUnmodifiedSince, comp11, expiryOptions, expiresOn, blobCacheControl, blobContentType, blobContentMD5, blobContentEncoding, blobContentLanguage, blobContentDisposition, comp12, immutabilityPolicyExpiry, immutabilityPolicyMode, comp13, legalHold, encryptionScope, comp14, tier, rehydratePriority, sourceIfModifiedSince, sourceIfUnmodifiedSince, sourceIfMatch, sourceIfNoneMatch, sourceIfTags, copySource, blobTagsString, sealBlob, legalHold1, xMsRequiresSync, sourceContentMD5, copySourceAuthorization, copySourceTags, fileRequestIntent, comp15, copyActionAbortConstant, copyId, comp16, tier1, queryRequest, comp17, comp18, ifModifiedSince1, ifUnmodifiedSince1, ifMatch1, ifNoneMatch1, tags, transactionalContentMD5, transactionalContentCrc64, blobType, blobContentLength, blobSequenceNumber, contentType1, body1, accept3, comp19, pageWrite, ifSequenceNumberLessThanOrEqualTo, ifSequenceNumberLessThan, ifSequenceNumberEqualTo, structuredContentLength, pageWrite1, sourceUrl, sourceRange, sourceContentCrc64, range1, sourceEncryptionKey, sourceEncryptionKeySha256, sourceEncryptionAlgorithm, comp20, prevsnapshot, prevSnapshotUrl, sequenceNumberAction, comp21, blobType1, comp22, maxSize, appendPosition, sourceRange1, comp23, blobType2, copySourceBlobProperties, comp24, blockId, blocks, comp25, listType, init_parameters = __esmMin((() => {
 	init_mappers(), contentType = {
 		parameterPath: ["options", "contentType"],
 		mapper: {
@@ -35203,7 +35684,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			serializedName: "Accept",
 			type: { name: "String" }
 		}
-	}, url = {
+	}, url$1 = {
 		parameterPath: "url",
 		mapper: {
 			serializedName: "url",
@@ -36661,7 +37142,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp,
 			timeoutInSeconds
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			contentType,
 			accept,
@@ -36690,7 +37171,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp,
 			timeoutInSeconds
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -36716,7 +37197,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			timeoutInSeconds,
 			comp1
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -36745,7 +37226,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			maxPageSize,
 			include
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -36772,7 +37253,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			timeoutInSeconds,
 			comp3
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			contentType,
 			accept,
@@ -36798,7 +37279,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			timeoutInSeconds,
 			restype1
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -36824,7 +37305,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		},
 		requestBody: body,
 		queryParameters: [timeoutInSeconds, comp4],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			accept,
 			version,
@@ -36856,7 +37337,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp5,
 			where
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -36966,7 +37447,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, restype2],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -36989,7 +37470,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, restype2],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37009,7 +37490,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, restype2],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37035,7 +37516,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp6
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37076,7 +37557,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp7
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37101,7 +37582,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp7
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			contentType,
 			accept,
@@ -37131,7 +37612,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp8
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37156,7 +37637,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp9
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37188,7 +37669,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp4,
 			restype2
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			accept,
 			version,
@@ -37221,7 +37702,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			where,
 			restype2
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37244,7 +37725,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp10
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37272,7 +37753,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp10
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37299,7 +37780,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp10
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37326,7 +37807,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp10
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37353,7 +37834,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			restype2,
 			comp10
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37389,7 +37870,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			include1,
 			startFrom
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37424,7 +37905,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			startFrom,
 			endBefore
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37456,7 +37937,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			startFrom,
 			delimiter
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37492,7 +37973,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			endBefore,
 			delimiter
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37515,7 +37996,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			timeoutInSeconds,
 			restype1
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37658,7 +38139,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			snapshot,
 			versionId
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37694,7 +38175,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			snapshot,
 			versionId
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37727,7 +38208,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			versionId,
 			blobDeleteType
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37755,7 +38236,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp8],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37774,7 +38255,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp11],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37795,7 +38276,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [comp, timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37831,7 +38312,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			versionId,
 			comp12
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37858,7 +38339,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			versionId,
 			comp12
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37882,7 +38363,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			versionId,
 			comp13
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37902,7 +38383,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp6],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37932,7 +38413,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp10],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37959,7 +38440,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp10],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -37985,7 +38466,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp10],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38011,7 +38492,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp10],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38038,7 +38519,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp10],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38064,7 +38545,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp14],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38094,7 +38575,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38133,7 +38614,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38179,7 +38660,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp15,
 			copyId
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38206,7 +38687,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			versionId,
 			comp16
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38233,7 +38714,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			timeoutInSeconds,
 			restype1
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38270,7 +38751,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			snapshot,
 			comp17
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			contentType,
 			accept,
@@ -38309,7 +38790,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			versionId,
 			comp18
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38339,7 +38820,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			versionId,
 			comp18
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			contentType,
 			accept,
@@ -38429,7 +38910,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38475,7 +38956,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		},
 		requestBody: body1,
 		queryParameters: [timeoutInSeconds, comp19],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38517,7 +38998,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp19],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38552,7 +39033,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp19],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38609,7 +39090,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			snapshot,
 			comp20
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38645,7 +39126,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp20,
 			prevsnapshot
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38672,7 +39153,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [comp, timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38702,7 +39183,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [comp, timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38729,7 +39210,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp21],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38784,7 +39265,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38827,7 +39308,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		},
 		requestBody: body1,
 		queryParameters: [timeoutInSeconds, comp22],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38866,7 +39347,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp22],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38912,7 +39393,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds, comp23],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -38987,7 +39468,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		},
 		requestBody: body1,
 		queryParameters: [timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -39037,7 +39518,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			}
 		},
 		queryParameters: [timeoutInSeconds],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -39097,7 +39578,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp24,
 			blockId
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -39133,7 +39614,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp24,
 			blockId
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -39172,7 +39653,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		},
 		requestBody: blocks,
 		queryParameters: [timeoutInSeconds, comp25],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			contentType,
 			accept,
@@ -39226,7 +39707,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 			comp25,
 			listType
 		],
-		urlParameters: [url],
+		urlParameters: [url$1],
 		headerParameters: [
 			version,
 			requestId,
@@ -42357,7 +42838,7 @@ var fsStat, fsCreateReadStream, init_utils$2 = __esmMin((() => {
 })), init_BlobBatch = __esmMin((() => {})), init_BlobBatchClient = __esmMin((() => {})), init_ContainerClient = __esmMin((() => {})), init_AccountSASPermissions = __esmMin((() => {})), init_AccountSASResourceTypes = __esmMin((() => {})), init_AccountSASServices = __esmMin((() => {})), init_BlobServiceClient = __esmMin((() => {})), init_generatedModels = __esmMin((() => {})), init_esm = __esmMin((() => {
 	init_esm$7(), init_BlobServiceClient(), init_Clients(), init_ContainerClient(), init_BlobLeaseClient(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_AccountSASPermissions(), init_AccountSASResourceTypes(), init_AccountSASServices(), init_SASQueryParameters(), init_constants(), init_utils_common$1(), init_BlobBatch(), init_BlobBatchClient(), init_BlobSASPermissions(), init_BlobSASSignatureValues(), init_ContainerSASPermissions(), init_models(), init_esm$2(), init_Pipeline(), init_SASQueryParameters(), init_generatedModels(), init_log$1();
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
 function uploadToBlobStorage(authenticatedUploadURL, uploadStream, contentType) {
 	return __awaiter$9(this, void 0, void 0, function* () {
 		let uploadByteCount = 0, lastProgressTime = Date.now(), abortController = new AbortController(), chunkTimer = (interval) => __awaiter$9(this, void 0, void 0, function* () {
@@ -42370,7 +42851,7 @@ function uploadToBlobStorage(authenticatedUploadURL, uploadStream, contentType) 
 				});
 			});
 		}), maxConcurrency = getConcurrency(), bufferSize = getUploadChunkSize(), blockBlobClient = new BlobClient(authenticatedUploadURL).getBlockBlobClient();
-		debug(`Uploading artifact to blob storage with maxConcurrency: ${maxConcurrency}, bufferSize: ${bufferSize}, contentType: ${contentType}`);
+		debug$3(`Uploading artifact to blob storage with maxConcurrency: ${maxConcurrency}, bufferSize: ${bufferSize}, contentType: ${contentType}`);
 		let options = {
 			blobHTTPHeaders: { blobContentType: contentType },
 			onProgress: (progress) => {
@@ -42452,7 +42933,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 })), require_brace_expansion = __commonJSMin(((exports, module) => {
 	var balanced = require_balanced_match();
 	module.exports = expandTop;
-	var escSlash = "\0SLASH" + Math.random() + "\0", escOpen = "\0OPEN" + Math.random() + "\0", escClose = "\0CLOSE" + Math.random() + "\0", escComma = "\0COMMA" + Math.random() + "\0", escPeriod = "\0PERIOD" + Math.random() + "\0", EXPANSION_MAX = 1e5, EXPANSION_MAX_LENGTH = 4e6, EXPANSION_MAX_DEPTH = 1e3, EXPANSION_MAX_REWRITES = 1e3;
+	var escSlash = "\0SLASH" + Math.random().toFixed(16) + "\0", escOpen = "\0OPEN" + Math.random().toFixed(16) + "\0", escClose = "\0CLOSE" + Math.random().toFixed(16) + "\0", escComma = "\0COMMA" + Math.random().toFixed(16) + "\0", escPeriod = "\0PERIOD" + Math.random().toFixed(16) + "\0", EXPANSION_MAX = 1e5, EXPANSION_MAX_LENGTH = 4e6, EXPANSION_MAX_DEPTH = 1e3, EXPANSION_MAX_REWRITES = 1e3, EXPANSION_MAX_STEPS = 2e7, CALL_STEPS = 16;
 	function numeric(str) {
 		return parseInt(str, 10) == str ? parseInt(str, 10) : str.charCodeAt(0);
 	}
@@ -42465,9 +42946,41 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	function pushAll(target, items) {
 		for (var i = 0; i < items.length; i++) target.push(items[i]);
 	}
-	function parseCommaParts(str) {
+	function balancedWithBudget(str, masked, budget) {
+		if (!(budget.remaining < 0)) {
+			var r = balanced.range("{", "}", masked), unmatched = r !== void 0 && masked.indexOf("{") < r[0];
+			if (budget.remaining -= r && !unmatched ? r[1] + 1 : str.length, !(!r || budget.remaining < 0)) return {
+				end: r[1],
+				pre: str.slice(0, r[0]),
+				body: str.slice(r[0] + 1, r[1]),
+				post: str.slice(r[1] + 1),
+				unmatched
+			};
+		}
+	}
+	function maskUnmatchedOpens(masked, budget) {
+		budget.remaining -= masked.length;
+		for (var open = [], i = 0; i < masked.length; i++) {
+			var c = masked.charCodeAt(i);
+			c === 123 ? open.push(i) : c === 125 && open.length && open.pop();
+		}
+		for (var out = "", last = 0, j = 0; j < open.length; j++) out += masked.slice(last, open[j]) + "\0", last = open[j] + 1;
+		return out + masked.slice(last);
+	}
+	function commaSetFollows(str, budget) {
+		if (budget.remaining -= str.length, budget.remaining < 0) return !1;
+		for (var close = !1, i = str.length - 1; i >= 0; i--) {
+			var c = str.charCodeAt(i);
+			if (c === 125) close = !0;
+			else if (c === 10 || c === 13 || c === 8232 || c === 8233) close = !1;
+			else if (c === 44 && close && str.charCodeAt(i + 1) !== 44) return !0;
+		}
+		return !1;
+	}
+	function parseCommaParts(str, budget) {
 		for (var parts = [], carry = "";;) {
-			var m = balanced("{", "}", str);
+			var m = balancedWithBudget(str, str, budget);
+			if (budget.remaining < 0) return;
 			if (!m) {
 				var tail = str.split(",");
 				return tail[0] = carry + tail[0], pushAll(parts, tail), parts;
@@ -42477,11 +42990,14 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			carry = p.pop(), pushAll(parts, p), str = post;
 		}
 	}
+	function bound(value, fallback) {
+		return value == null || isNaN(value) ? fallback : value;
+	}
 	function expandTop(str, options) {
 		if (!str) return [];
 		options ||= {};
-		var max = options.max == null ? EXPANSION_MAX : options.max, maxLength = options.maxLength == null ? EXPANSION_MAX_LENGTH : options.maxLength, maxDepth = options.maxDepth == null ? EXPANSION_MAX_DEPTH : options.maxDepth, maxRewrites = options.maxRewrites == null ? EXPANSION_MAX_REWRITES : options.maxRewrites;
-		return str.substr(0, 2) === "{}" && (str = "\\{\\}" + str.substr(2)), expand(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, !0).map(unescapeBraces);
+		var max = bound(options.max, EXPANSION_MAX), maxLength = bound(options.maxLength, EXPANSION_MAX_LENGTH), maxDepth = bound(options.maxDepth, EXPANSION_MAX_DEPTH), maxRewrites = bound(options.maxRewrites, EXPANSION_MAX_REWRITES), maxSteps = bound(options.maxSteps, EXPANSION_MAX_STEPS);
+		return str.substr(0, 2) === "{}" && (str = "\\{\\}" + str.substr(2)), expand(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, { remaining: maxSteps }, !0).map(unescapeBraces);
 	}
 	function embrace(str) {
 		return "{" + str + "}";
@@ -42495,23 +43011,27 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 	function gte(i, y) {
 		return i >= y;
 	}
-	function combine(acc, pre, values, max, maxLength, dropEmpties) {
-		for (var out = [], length = 0, a = 0; a < acc.length; a++) for (var v = 0; v < values.length; v++) {
-			if (out.length >= max) return out;
-			var expansion = acc[a] + pre + values[v];
-			if (!dropEmpties || expansion) {
-				if (length + expansion.length > maxLength) return out;
+	function combine(acc, pre, values, max, maxLength, dropEmpties, budget) {
+		var out = [], length = 0, nonEmpty;
+		outer: for (var a = 0; a < acc.length; a++) {
+			var prefix = acc[a] + pre, vs = values;
+			dropEmpties && !prefix && (nonEmpty ||= values.filter(Boolean), vs = nonEmpty);
+			for (var v = 0; v < vs.length; v++) {
+				if (out.length >= max) break outer;
+				var expansion = prefix + vs[v];
+				if (length + expansion.length > maxLength) break outer;
 				out.push(expansion), length += expansion.length;
 			}
 		}
-		return out;
+		return budget.remaining -= out.length, out;
 	}
-	function expandSequence(body, isAlphaSequence, max, maxLength) {
+	function expandSequence(body, isAlphaSequence, max, maxLength, budget) {
 		var n = body.split(/\.\./), N = [];
 		if (n[0] === void 0 || n[1] === void 0) return N;
 		var x = numeric(n[0]), y = numeric(n[1]), width = Math.max(n[0].length, n[1].length), incr = n.length === 3 && n[2] !== void 0 ? Math.max(Math.abs(numeric(n[2])), 1) : 1, test = lte;
 		y < x && (incr *= -1, test = gte);
-		for (var pad = n.some(isPadded), length = 0, i = x; test(i, y) && N.length < max; i += incr) {
+		for (var pad = n.some(isPadded), cost = pad ? width : 1, length = 0, i = x; test(i, y) && N.length < max; i += incr) {
+			if (budget.remaining -= cost, budget.remaining < 0) return;
 			var c;
 			if (isAlphaSequence) c = String.fromCharCode(i), c === "\\" && (c = "");
 			else if (c = String(i), pad) {
@@ -42526,47 +43046,64 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		}
 		return N;
 	}
-	function expand(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
-		if (depth > maxDepth) return [str];
-		for (var acc = [""], rewrites = 0, dropEmpties = !1, firstGroup = !0;;) {
-			let m = balanced("{", "}", str);
-			if (!m) return combine(acc, str, [""], max, maxLength, dropEmpties);
+	function expand(str, max, maxLength, maxDepth, depth, maxRewrites, budget, isTop) {
+		if (budget.remaining -= CALL_STEPS, depth > maxDepth) return [str];
+		for (var acc = [""], rewrites = 0, dropEmpties = !1, firstGroup = !0, masked = str;;) {
+			let m = balancedWithBudget(str, masked, budget);
+			if (!m) return combine(acc, str, [""], max, maxLength, dropEmpties, budget);
+			m.unmatched && (masked = maskUnmatchedOpens(masked, budget));
 			let pre = m.pre;
+			var literal = function() {
+				return combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties, budget);
+			};
 			if (/\$$/.test(pre)) {
-				if (acc = combine(acc, pre + "{" + m.body + "}", [""], max, maxLength, dropEmpties && !m.post.length), firstGroup = !1, !m.post.length) break;
-				str = m.post;
+				if (acc = combine(acc, pre + "{" + m.body + "}", [""], max, maxLength, dropEmpties && !m.post.length, budget), firstGroup = !1, !m.post.length) break;
+				str = m.post, masked = masked.slice(m.end + 1);
 			} else {
 				var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body), isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body), isSequence = isNumericSequence || isAlphaSequence, isOptions = m.body.indexOf(",") >= 0;
 				if (!isSequence && !isOptions) {
-					if (rewrites < maxRewrites && m.post.match(/,(?!,).*\}/)) {
-						rewrites++, str = m.pre + "{" + m.body + escClose + m.post, isTop = !0;
+					if (rewrites < maxRewrites && commaSetFollows(m.post, budget)) {
+						rewrites++, str = m.pre + "{" + m.body + escClose + m.post, masked = masked.slice(0, m.end) + escClose + masked.slice(m.end + 1), isTop = !0;
 						continue;
 					}
-					return combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties);
+					return literal();
 				}
 				firstGroup &&= (dropEmpties = isTop && !isSequence, !1);
 				var values;
-				if (isSequence) values = expandSequence(m.body, isAlphaSequence, max, maxLength);
-				else {
-					var n = parseCommaParts(m.body);
-					if (n.length === 1 && n[0] !== void 0 && (n = expand(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, !1).map(embrace), n.length === 1)) {
-						if (acc = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
-						str = m.post;
-						continue;
+				if (isSequence) {
+					if (values = expandSequence(m.body, isAlphaSequence, max, maxLength, budget), !values) return literal();
+				} else {
+					var n = parseCommaParts(m.body, budget);
+					if (!n) return literal();
+					if (n.length === 1 && n[0] !== void 0) {
+						if (n = expand(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, budget, !1).map(embrace), budget.remaining < 0) return literal();
+						if (n.length === 1) {
+							var single = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length, budget);
+							if (budget.remaining < 0) return literal();
+							if (acc = single, !m.post.length) break;
+							str = m.post, masked = masked.slice(m.end + 1);
+							continue;
+						}
 					}
 					for (var dropsEmpties = dropEmpties && !m.post.length && !pre, d = 0; dropsEmpties && d < acc.length; d++) acc[d] && (dropsEmpties = !1);
 					values = [];
 					var valuesLength = 0;
-					outer: for (var j = 0; j < n.length; j++) for (var expanded = expand(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, !1), k = 0; k < expanded.length; k++) {
-						var v = expanded[k];
-						if (!dropsEmpties || v) {
-							if (values.length >= max || valuesLength + v.length > maxLength) break outer;
-							values.push(v), valuesLength += v.length;
+					outer: for (var j = 0; j < n.length; j++) {
+						var expanded = expand(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, budget, !1);
+						if (budget.remaining < 0) return literal();
+						for (var k = 0; k < expanded.length; k++) {
+							var v = expanded[k];
+							if (!dropsEmpties || v) {
+								if (values.length >= max || valuesLength + v.length > maxLength) break outer;
+								values.push(v), valuesLength += v.length;
+							}
 						}
 					}
 				}
-				if (acc = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length), !m.post.length) break;
-				str = m.post;
+				var next = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length, budget);
+				if (budget.remaining < 0) return literal();
+				if (acc = next, !m.post.length) break;
+				str = m.post, masked = masked.slice(m.end + 1);
 			}
 		}
 		return acc;
@@ -55433,10 +55970,10 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		return !!formats[format];
 	}, vending.registerFormat("zip", require_zip()), vending.registerFormat("tar", require_tar()), vending.registerFormat("json", require_json()), module.exports = vending;
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/stream.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/stream.js
 function createRawFileUploadStream(filePath) {
 	return __awaiter$8(this, void 0, void 0, function* () {
-		debug(`Creating raw file upload stream for: ${filePath}`);
+		debug$3(`Creating raw file upload stream for: ${filePath}`);
 		let bufferSize = getUploadChunkSize(), uploadStream = new WaterMarkedUploadStream(bufferSize), sourcePath = filePath;
 		(yield fs.promises.lstat(filePath)).isSymbolicLink() && (sourcePath = yield (0, fs_promises.realpath)(filePath));
 		let fileStream = fs.createReadStream(sourcePath, { highWaterMark: bufferSize });
@@ -55481,10 +56018,10 @@ var __awaiter$8, WaterMarkedUploadStream, init_stream = __esmMin((() => {
 		}
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/zip.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/zip.js
 function createZipUploadStream(uploadSpecification_1) {
 	return __awaiter$7(this, arguments, void 0, function* (uploadSpecification, compressionLevel = 6) {
-		debug(`Creating Artifact archive with compressionLevel: ${compressionLevel}`);
+		debug$3(`Creating Artifact archive with compressionLevel: ${compressionLevel}`);
 		let zip = import_archiver.default.create("zip", {
 			highWaterMark: getUploadChunkSize(),
 			zlib: { level: compressionLevel }
@@ -55495,7 +56032,7 @@ function createZipUploadStream(uploadSpecification_1) {
 			file.stats.isSymbolicLink() && (sourcePath = yield (0, fs_promises.realpath)(file.sourcePath)), zip.file(sourcePath, { name: file.destinationPath });
 		} else zip.append("", { name: file.destinationPath });
 		let bufferSize = getUploadChunkSize(), zipUploadStream = new WaterMarkedUploadStream(bufferSize);
-		return debug(`Zip write high watermark value ${zipUploadStream.writableHighWaterMark}`), debug(`Zip read high watermark value ${zipUploadStream.readableHighWaterMark}`), zip.pipe(zipUploadStream), zip.finalize(), zipUploadStream;
+		return debug$3(`Zip write high watermark value ${zipUploadStream.writableHighWaterMark}`), debug$3(`Zip read high watermark value ${zipUploadStream.readableHighWaterMark}`), zip.pipe(zipUploadStream), zip.finalize(), zipUploadStream;
 	});
 }
 var import_archiver, __awaiter$7, zipErrorCallback, zipWarningCallback, zipFinishCallback, zipEndCallback, init_zip = __esmMin((() => {
@@ -55530,12 +56067,12 @@ var import_archiver, __awaiter$7, zipErrorCallback, zipWarningCallback, zipFinis
 	}, zipWarningCallback = (error) => {
 		error.code === "ENOENT" ? (warning("ENOENT warning during artifact zip creation. No such file or directory"), info(error)) : (warning(`A non-blocking warning has occurred during artifact zip creation: ${error.code}`), info(error));
 	}, zipFinishCallback = () => {
-		debug("Zip stream for upload has finished.");
+		debug$3("Zip stream for upload has finished.");
 	}, zipEndCallback = () => {
-		debug("Zip stream for upload has ended.");
+		debug$3("Zip stream for upload has ended.");
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/types.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/types.js
 function getMimeType(filePath) {
 	let ext = path.extname(filePath).toLowerCase();
 	return mimeTypes[ext] || "application/octet-stream";
@@ -55592,7 +56129,7 @@ var mimeTypes, init_types = __esmMin((() => {
 		".eot": "application/vnd.ms-fontobject"
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-artifact.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/upload/upload-artifact.js
 function uploadArtifact(name, files, rootDirectory, options) {
 	return __awaiter$6(this, void 0, void 0, function* () {
 		let artifactFileName = `${name}.zip`;
@@ -61998,7 +62535,7 @@ var init_github = __esmMin((() => {
 })), require_unzip = __commonJSMin(((exports) => {
 	exports.Parse = require_parser_stream(), exports.Extract = require_extract();
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/download/download-artifact.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/download/download-artifact.js
 function exists(path) {
 	return __awaiter$4(this, void 0, void 0, function* () {
 		try {
@@ -62015,7 +62552,7 @@ function streamExtract(url, directory, skipDecompress) {
 		for (; retryCount < 5;) try {
 			return yield streamExtractExternal(url, directory, { skipDecompress });
 		} catch (error) {
-			retryCount++, debug(`Failed to download artifact after ${retryCount} retries due to ${error.message}. Retrying in 5 seconds...`), yield new Promise((resolve) => setTimeout(resolve, 5e3));
+			retryCount++, debug$3(`Failed to download artifact after ${retryCount} retries due to ${error.message}. Retrying in 5 seconds...`), yield new Promise((resolve) => setTimeout(resolve, 5e3));
 		}
 		throw Error(`Artifact download failed after ${retryCount} retries.`);
 	});
@@ -62025,14 +62562,14 @@ function streamExtractExternal(url_1, directory_1) {
 		let { timeout = 3e4, skipDecompress = !1 } = opts, response = yield new HttpClient(getUserAgentString$1()).get(url);
 		if (response.message.statusCode !== 200) throw Error(`Unexpected HTTP response from blob storage: ${response.message.statusCode} ${response.message.statusMessage}`);
 		let contentType = response.message.headers["content-type"] || "", mimeType = contentType.split(";", 1)[0].trim().toLowerCase(), urlEndsWithZip = new URL(url).pathname.toLowerCase().endsWith(".zip"), isZip = mimeType === "application/zip" || mimeType === "application/x-zip-compressed" || mimeType === "application/zip-compressed" || urlEndsWithZip, contentDisposition = response.message.headers["content-disposition"] || "", fileName = "artifact", filenameStar = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;\r\n]*)/i), filenamePlain = contentDisposition.match(/(?<!\*)filename\s*=\s*['"]?([^;\r\n"']*)['"]?/i), rawName = filenameStar?.[1] || filenamePlain?.[1];
-		rawName && (fileName = path.basename(decodeURIComponent(rawName.trim()))), debug(`Content-Type: ${contentType}, mimeType: ${mimeType}, urlEndsWithZip: ${urlEndsWithZip}, isZip: ${isZip}, skipDecompress: ${skipDecompress}`), debug(`Content-Disposition: ${contentDisposition}, fileName: ${fileName}`);
+		rawName && (fileName = path.basename(decodeURIComponent(rawName.trim()))), debug$3(`Content-Type: ${contentType}, mimeType: ${mimeType}, urlEndsWithZip: ${urlEndsWithZip}, isZip: ${isZip}, skipDecompress: ${skipDecompress}`), debug$3(`Content-Disposition: ${contentDisposition}, fileName: ${fileName}`);
 		let sha256Digest;
 		return new Promise((resolve, reject) => {
 			let timer = setTimeout(() => {
 				let timeoutError = Error(`Blob storage chunk did not respond in ${timeout}ms`);
 				response.message.destroy(timeoutError), reject(timeoutError);
 			}, timeout), onError = (error) => {
-				debug(`response.message: Artifact download failed: ${error.message}`), clearTimeout(timer), reject(error);
+				debug$3(`response.message: Artifact download failed: ${error.message}`), clearTimeout(timer), reject(error);
 			}, hashStream = crypto.createHash("sha256").setEncoding("hex"), passThrough = new stream.PassThrough().on("data", () => {
 				timer.refresh();
 			}).on("error", onError);
@@ -62066,7 +62603,7 @@ function downloadArtifactPublic(artifactId, repositoryOwner, repositoryName, tok
 		try {
 			info(`Starting download of artifact to: ${downloadPath}`);
 			let extractResponse = yield streamExtract(location, downloadPath, options?.skipDecompress);
-			info("Artifact download completed successfully."), options?.expectedHash && options?.expectedHash !== extractResponse.sha256Digest && (digestMismatch = !0, debug(`Computed digest: ${extractResponse.sha256Digest}`), debug(`Expected digest: ${options.expectedHash}`));
+			info("Artifact download completed successfully."), options?.expectedHash && options?.expectedHash !== extractResponse.sha256Digest && (digestMismatch = !0, debug$3(`Computed digest: ${extractResponse.sha256Digest}`), debug$3(`Expected digest: ${options.expectedHash}`));
 		} catch (error) {
 			throw Error(`Unable to download and extract artifact: ${error.message}`);
 		}
@@ -62094,7 +62631,7 @@ function downloadArtifactInternal(artifactId, options) {
 		try {
 			info(`Starting download of artifact to: ${downloadPath}`);
 			let extractResponse = yield streamExtract(signedUrl, downloadPath, options?.skipDecompress);
-			info("Artifact download completed successfully."), options?.expectedHash && options?.expectedHash !== extractResponse.sha256Digest && (digestMismatch = !0, debug(`Computed digest: ${extractResponse.sha256Digest}`), debug(`Expected digest: ${options.expectedHash}`));
+			info("Artifact download completed successfully."), options?.expectedHash && options?.expectedHash !== extractResponse.sha256Digest && (digestMismatch = !0, debug$3(`Computed digest: ${extractResponse.sha256Digest}`), debug$3(`Expected digest: ${options.expectedHash}`));
 		} catch (error) {
 			throw Error(`Unable to download and extract artifact: ${error.message}`);
 		}
@@ -62106,7 +62643,7 @@ function downloadArtifactInternal(artifactId, options) {
 }
 function resolveOrCreateDirectory() {
 	return __awaiter$4(this, arguments, void 0, function* (downloadPath = getGitHubWorkspaceDir()) {
-		return (yield exists(downloadPath)) ? debug(`Artifact destination folder already exists: ${downloadPath}`) : (debug(`Artifact destination folder does not exist, creating: ${downloadPath}`), yield fs_promises.default.mkdir(downloadPath, { recursive: !0 })), downloadPath;
+		return (yield exists(downloadPath)) ? debug$3(`Artifact destination folder already exists: ${downloadPath}`) : (debug$3(`Artifact destination folder does not exist, creating: ${downloadPath}`), yield fs_promises.default.mkdir(downloadPath, { recursive: !0 })), downloadPath;
 	});
 }
 var import_unzip, __awaiter$4, scrubQueryParameters, init_download_artifact = __esmMin((() => {
@@ -62141,13 +62678,13 @@ var import_unzip, __awaiter$4, scrubQueryParameters, init_download_artifact = __
 		return parsed.search = "", parsed.toString();
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/retry-options.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/retry-options.js
 function getRetryOptions(defaultOptions, retries = defaultMaxRetryNumber, exemptStatusCodes = defaultExemptStatusCodes) {
 	if (retries <= 0) return [{ enabled: !1 }, defaultOptions.request];
 	let retryOptions = { enabled: !0 };
 	exemptStatusCodes.length > 0 && (retryOptions.doNotRetry = exemptStatusCodes);
 	let requestOptions = Object.assign(Object.assign({}, defaultOptions.request), { retries });
-	return debug(`GitHub client configured with: (retries: ${requestOptions.retries}, retry-exempt-status-code: ${retryOptions.doNotRetry ?? "octokit default: [400, 401, 403, 404, 422]"})`), [retryOptions, requestOptions];
+	return debug$3(`GitHub client configured with: (retries: ${requestOptions.retries}, retry-exempt-status-code: ${retryOptions.doNotRetry ?? "octokit default: [400, 401, 403, 404, 422]"})`), [retryOptions, requestOptions];
 }
 var defaultMaxRetryNumber, defaultExemptStatusCodes, init_retry_options = __esmMin((() => {
 	init_core(), defaultMaxRetryNumber = 5, defaultExemptStatusCodes = [
@@ -62929,7 +63466,7 @@ function retry(octokit, octokitOptions) {
 var import_light, VERSION, init_dist_bundle = __esmMin((() => {
 	import_light = __toESM(require_light(), 1), init_dist_src$3(), VERSION = "0.0.0-development", retry.VERSION = VERSION;
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/get-artifact.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/get-artifact.js
 function getArtifactPublic(artifactName, workflowRunId, repositoryOwner, repositoryName, token) {
 	return __awaiter$3(this, void 0, void 0, function* () {
 		let [retryOpts, requestOpts] = getRetryOptions(defaults), getArtifactResp = yield getOctokit(token, {
@@ -62949,7 +63486,7 @@ function getArtifactPublic(artifactName, workflowRunId, repositoryOwner, reposit
         Please ensure that your artifact is not expired and the artifact was uploaded using a compatible version of toolkit/upload-artifact.
         For more information, visit the GitHub Artifacts FAQ: https://github.com/actions/toolkit/blob/main/packages/artifact/docs/faq.md`);
 		let artifact = getArtifactResp.data.artifacts[0];
-		return getArtifactResp.data.artifacts.length > 1 && (artifact = getArtifactResp.data.artifacts.sort((a, b) => b.id - a.id)[0], debug(`More than one artifact found for a single name, returning newest (id: ${artifact.id})`)), { artifact: {
+		return getArtifactResp.data.artifacts.length > 1 && (artifact = getArtifactResp.data.artifacts.sort((a, b) => b.id - a.id)[0], debug$3(`More than one artifact found for a single name, returning newest (id: ${artifact.id})`)), { artifact: {
 			name: artifact.name,
 			id: artifact.id,
 			size: artifact.size_in_bytes,
@@ -62969,7 +63506,7 @@ function getArtifactInternal(artifactName) {
         Please ensure that your artifact is not expired and the artifact was uploaded using a compatible version of toolkit/upload-artifact.
         For more information, visit the GitHub Artifacts FAQ: https://github.com/actions/toolkit/blob/main/packages/artifact/docs/faq.md`);
 		let artifact = res.artifacts[0];
-		return res.artifacts.length > 1 && (artifact = res.artifacts.sort((a, b) => Number(b.databaseId) - Number(a.databaseId))[0], debug(`More than one artifact found for a single name, returning newest (id: ${artifact.databaseId})`)), { artifact: {
+		return res.artifacts.length > 1 && (artifact = res.artifacts.sort((a, b) => Number(b.databaseId) - Number(a.databaseId))[0], debug$3(`More than one artifact found for a single name, returning newest (id: ${artifact.databaseId})`)), { artifact: {
 			name: artifact.name,
 			id: Number(artifact.databaseId),
 			size: Number(artifact.size),
@@ -63007,7 +63544,7 @@ var __awaiter$3, init_get_artifact = __esmMin((() => {
 		});
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/delete/delete-artifact.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/delete/delete-artifact.js
 function deleteArtifactPublic(artifactName, workflowRunId, repositoryOwner, repositoryName, token) {
 	return __awaiter$2(this, void 0, void 0, function* () {
 		let [retryOpts, requestOpts] = getRetryOptions(defaults), github = getOctokit(token, {
@@ -63034,7 +63571,7 @@ function deleteArtifactInternal(artifactName) {
 		}, listRes = yield artifactClient.ListArtifacts(listReq);
 		if (listRes.artifacts.length === 0) throw new ArtifactNotFoundError(`Artifact not found for name: ${artifactName}`);
 		let artifact = listRes.artifacts[0];
-		listRes.artifacts.length > 1 && (artifact = listRes.artifacts.sort((a, b) => Number(b.databaseId) - Number(a.databaseId))[0], debug(`More than one artifact found for a single name, returning newest (id: ${artifact.databaseId})`));
+		listRes.artifacts.length > 1 && (artifact = listRes.artifacts.sort((a, b) => Number(b.databaseId) - Number(a.databaseId))[0], debug$3(`More than one artifact found for a single name, returning newest (id: ${artifact.databaseId})`));
 		let req = {
 			workflowRunBackendId: artifact.workflowRunBackendId,
 			workflowJobRunBackendId: artifact.workflowJobRunBackendId,
@@ -63072,7 +63609,7 @@ var __awaiter$2, init_delete_artifact = __esmMin((() => {
 		});
 	};
 }));
-// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.1_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/list-artifacts.js
+// node_modules/.pnpm/@actions+artifact@6.3.1_bare-buffer@3.7.2_supports-color@7.2.0/node_modules/@actions/artifact/lib/internal/find/list-artifacts.js
 function listArtifactsPublic(workflowRunId_1, repositoryOwner_1, repositoryName_1, token_1) {
 	return __awaiter$1(this, arguments, void 0, function* (workflowRunId, repositoryOwner, repositoryName, token, latest = !1) {
 		info(`Fetching artifact list for workflow run ${workflowRunId} in repository ${repositoryOwner}/${repositoryName}`);
@@ -63098,7 +63635,7 @@ function listArtifactsPublic(workflowRunId_1, repositoryOwner_1, repositoryName_
 			digest: artifact.digest
 		});
 		for (currentPageNumber++; currentPageNumber <= numberOfPages; currentPageNumber++) {
-			debug(`Fetching page ${currentPageNumber} of artifact list`);
+			debug$3(`Fetching page ${currentPageNumber} of artifact list`);
 			let { data: listArtifactResponse } = yield github.request("GET /repos/{owner}/{repo}/actions/runs/{run_id}/artifacts", {
 				owner: repositoryOwner,
 				repo: repositoryName,
