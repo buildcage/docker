@@ -1895,7 +1895,7 @@ var require_identity = __commonJSMin(((exports) => {
 		default: !0,
 		tag: "tag:yaml.org,2002:float",
 		test: /^(?:[-+]?\.(?:inf|Inf|INF)|\.nan|\.NaN|\.NAN)$/,
-		resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? -Infinity : Infinity,
+		resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? -1e400 : 1e400,
 		stringify: stringifyNumber.stringifyNumber
 	};
 	exports.float = {
@@ -2169,7 +2169,7 @@ var require_identity = __commonJSMin(((exports) => {
 		default: !0,
 		tag: "tag:yaml.org,2002:float",
 		test: /^(?:[-+]?\.(?:inf|Inf|INF)|\.nan|\.NaN|\.NAN)$/,
-		resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? -Infinity : Infinity,
+		resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? -1e400 : 1e400,
 		stringify: stringifyNumber.stringifyNumber
 	};
 	exports.float = {
@@ -9804,7 +9804,7 @@ var require_envelope = __commonJSMin(((exports) => {
 		#timer = null;
 		#unref;
 		constructor(timeouts, options = {}) {
-			this.#originalTimeouts = [...timeouts], this.#timeouts = [...timeouts], this.#unref = options.unref, this.#maxRetryTime = options.maxRetryTime || Infinity, options.forever && (this.#cachedTimeouts = [...this.#timeouts]);
+			this.#originalTimeouts = [...timeouts], this.#timeouts = [...timeouts], this.#unref = options.unref, this.#maxRetryTime = options.maxRetryTime || 1e400, options.forever && (this.#cachedTimeouts = [...this.#timeouts]);
 		}
 		get timeouts() {
 			return [...this.#timeouts];
@@ -9853,12 +9853,12 @@ var require_envelope = __commonJSMin(((exports) => {
 		let timeouts = [];
 		if (options instanceof Array) timeouts = [...options];
 		else {
-			options.retries === Infinity && (options.forever = !0, delete options.retries);
+			options.retries === 1e400 && (options.forever = !0, delete options.retries);
 			let opts = {
 				retries: 10,
 				factor: 2,
 				minTimeout: 1e3,
-				maxTimeout: Infinity,
+				maxTimeout: 1e400,
 				randomize: !1,
 				...options
 			};

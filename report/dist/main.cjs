@@ -1370,7 +1370,7 @@ var require_identity$1 = __commonJSMin(((exports) => {
 		default: !0,
 		tag: "tag:yaml.org,2002:float",
 		test: /^(?:[-+]?\.(?:inf|Inf|INF)|\.nan|\.NaN|\.NAN)$/,
-		resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? -Infinity : Infinity,
+		resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? -1e400 : 1e400,
 		stringify: stringifyNumber.stringifyNumber
 	};
 	exports.float = {
@@ -1644,7 +1644,7 @@ var require_identity$1 = __commonJSMin(((exports) => {
 		default: !0,
 		tag: "tag:yaml.org,2002:float",
 		test: /^(?:[-+]?\.(?:inf|Inf|INF)|\.nan|\.NaN|\.NAN)$/,
-		resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? -Infinity : Infinity,
+		resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? -1e400 : 1e400,
 		stringify: stringifyNumber.stringifyNumber
 	};
 	exports.float = {
@@ -4448,7 +4448,6 @@ function toCommandProperties(annotationProperties) {
 		endColumn: annotationProperties.endColumn
 	} : {};
 }
-var init_utils$4 = __esmMin((() => {}));
 // node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/command.js
 function issueCommand(command, properties, message) {
 	let cmd = new Command(command, properties, message);
@@ -4461,7 +4460,7 @@ function escapeProperty(s) {
 	return toCommandValue(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A").replace(/:/g, "%3A").replace(/,/g, "%2C");
 }
 var CMD_STRING, Command, init_command = __esmMin((() => {
-	init_utils$4(), CMD_STRING = "::", Command = class {
+	CMD_STRING = "::", Command = class {
 		constructor(command, properties, message) {
 			command ||= "missing.command", this.command = command, this.properties = properties, this.message = message;
 		}
@@ -6512,7 +6511,7 @@ var DecodedURL, init_proxy = __esmMin((() => {
 		bitLength === 64 ? (upperBound = 2 ** 53 - 1, lowerBound = signedness === "unsigned" ? 0 : (-2) ** 53 + 1) : signedness === "unsigned" ? (lowerBound = 0, upperBound = 2 ** bitLength - 1) : (lowerBound = (-2) ** bitLength - 1, upperBound = 2 ** (bitLength - 1) - 1);
 		let x = Number(V);
 		if (x === 0 && (x = 0), opts?.enforceRange === !0) {
-			if (Number.isNaN(x) || x === Infinity || x === -Infinity) throw webidl.errors.exception({
+			if (Number.isNaN(x) || x === 1e400 || x === -1e400) throw webidl.errors.exception({
 				header: "Integer conversion",
 				message: `Could not convert ${webidl.util.Stringify(V)} to an integer.`
 			});
@@ -6522,7 +6521,7 @@ var DecodedURL, init_proxy = __esmMin((() => {
 			});
 			return x;
 		}
-		return !Number.isNaN(x) && opts?.clamp === !0 ? (x = Math.min(Math.max(x, lowerBound), upperBound), x = Math.floor(x) % 2 == 0 ? Math.floor(x) : Math.ceil(x), x) : Number.isNaN(x) || x === 0 && Object.is(0, x) || x === Infinity || x === -Infinity ? 0 : (x = webidl.util.IntegerPart(x), x %= 2 ** bitLength, signedness === "signed" && x >= 2 ** bitLength - 1 ? x - 2 ** bitLength : x);
+		return !Number.isNaN(x) && opts?.clamp === !0 ? (x = Math.min(Math.max(x, lowerBound), upperBound), x = Math.floor(x) % 2 == 0 ? Math.floor(x) : Math.ceil(x), x) : Number.isNaN(x) || x === 0 && Object.is(0, x) || x === 1e400 || x === -1e400 ? 0 : (x = webidl.util.IntegerPart(x), x %= 2 ** bitLength, signedness === "signed" && x >= 2 ** bitLength - 1 ? x - 2 ** bitLength : x);
 	}, webidl.util.IntegerPart = function(n) {
 		let r = Math.floor(Math.abs(n));
 		return n < 0 ? -1 * r : r;
@@ -8146,7 +8145,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 			closed = !0;
 		}), {
 			version: "h2",
-			defaultPipelining: Infinity,
+			defaultPipelining: 1e400,
 			write(...args) {
 				return writeH2(client, ...args);
 			},
@@ -10301,7 +10300,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r\n\r\n`);
 				"Status code": statusCode,
 				Persistent: persist ? PERSISTENT : NOT_PERSISTENT,
 				Invocations: timesInvoked,
-				Remaining: persist ? Infinity : times - timesInvoked
+				Remaining: persist ? 1e400 : times - timesInvoked
 			}));
 			return this.logger.table(withPrettyHeaders), this.transform.read().toString();
 		}
@@ -10627,7 +10626,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 			pick: interceptorOpts?.pick ?? null,
 			dualStack,
 			affinity,
-			maxItems: interceptorOpts?.maxItems ?? Infinity
+			maxItems: interceptorOpts?.maxItems ?? 1e400
 		});
 		return (dispatch) => function(origDispatchOpts, handler) {
 			let origin = origDispatchOpts.origin.constructor === URL ? origDispatchOpts.origin : new URL(origDispatchOpts.origin);
@@ -12737,7 +12736,7 @@ ${pendingInterceptorsFormatter.format(pending)}
 			for (let fieldValue of fieldValues) if (fieldValue === "*" || request.headersList.get(fieldValue) !== requestQuery.headersList.get(fieldValue)) return !1;
 			return !0;
 		}
-		#internalMatchAll(request, options, maxResponses = Infinity) {
+		#internalMatchAll(request, options, maxResponses = 1e400) {
 			let r = null;
 			if (request !== void 0) {
 				if (request instanceof Request) {
@@ -15012,7 +15011,7 @@ function info(message) {
 	process.stdout.write(message + os.EOL);
 }
 var ExitCode, init_core = __esmMin((() => {
-	init_command(), init_utils$4(), init_oidc_utils(), init_summary(), init_platform(), (function(ExitCode) {
+	init_command(), init_oidc_utils(), init_summary(), init_platform(), (function(ExitCode) {
 		ExitCode[ExitCode.Success = 0] = "Success", ExitCode[ExitCode.Failure = 1] = "Failure";
 	})(ExitCode ||= {});
 }));
@@ -15263,7 +15262,7 @@ async function* streamDockerLines(spawnDocker, args, operation) {
 	});
 	let rl = (0, node_readline.createInterface)({
 		input: child.stdout,
-		crlfDelay: Infinity
+		crlfDelay: 1e400
 	}), exhausted = !1;
 	try {
 		for await (let line of rl) yield line;
@@ -16376,8 +16375,8 @@ var init_config = __esmMin((() => {
 					case reflection_info_1.ScalarType.FLOAT:
 						if (json === null) return 0;
 						if (json === "NaN") return NaN;
-						if (json === "Infinity") return Infinity;
-						if (json === "-Infinity") return -Infinity;
+						if (json === "Infinity") return 1e400;
+						if (json === "-Infinity") return -1e400;
 						if (json === "") {
 							e = "empty string";
 							break;
@@ -16425,6 +16424,12 @@ var init_config = __esmMin((() => {
 						if (json === null) return "";
 						if (typeof json != "string") {
 							e = "extra whitespace";
+							break;
+						}
+						try {
+							encodeURIComponent(json);
+						} catch (e) {
+							e = "invalid UTF8";
 							break;
 						}
 						return json;
@@ -16547,7 +16552,7 @@ var init_config = __esmMin((() => {
 				case reflection_info_1.ScalarType.FIXED32:
 				case reflection_info_1.ScalarType.UINT32: return value === 0 ? ed ? 0 : void 0 : (assert_1.assertUInt32(value), value);
 				case reflection_info_1.ScalarType.FLOAT: assert_1.assertFloat32(value);
-				case reflection_info_1.ScalarType.DOUBLE: return value === 0 ? ed ? 0 : void 0 : (assert_1.assert(typeof value == "number"), Number.isNaN(value) ? "NaN" : value === Infinity ? "Infinity" : value === -Infinity ? "-Infinity" : value);
+				case reflection_info_1.ScalarType.DOUBLE: return value === 0 ? ed ? 0 : void 0 : (assert_1.assert(typeof value == "number"), Number.isNaN(value) ? "NaN" : value === 1e400 ? "Infinity" : value === -1e400 ? "-Infinity" : value);
 				case reflection_info_1.ScalarType.STRING: return value === "" ? ed ? "" : void 0 : (assert_1.assert(typeof value == "string"), value);
 				case reflection_info_1.ScalarType.BOOL: return value === !1 ? !ed && void 0 : (assert_1.assert(typeof value == "boolean"), value);
 				case reflection_info_1.ScalarType.UINT64:
@@ -19957,13 +19962,12 @@ var HttpHeadersImpl, init_httpHeaders$1 = __esmMin((() => {
 function randomUUID$1() {
 	return globalThis.crypto.randomUUID();
 }
-var init_uuidUtils = __esmMin((() => {}));
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/pipelineRequest.js
 function createPipelineRequest$1(options) {
 	return new PipelineRequestImpl(options);
 }
 var PipelineRequestImpl, init_pipelineRequest$1 = __esmMin((() => {
-	init_httpHeaders$1(), init_uuidUtils(), PipelineRequestImpl = class {
+	init_httpHeaders$1(), PipelineRequestImpl = class {
 		url;
 		method;
 		headers;
@@ -20102,7 +20106,6 @@ var ValidPhaseNames, HttpPipeline, init_pipeline$2 = __esmMin((() => {
 function isObject(input) {
 	return typeof input == "object" && !!input && !Array.isArray(input) && !(input instanceof RegExp) && !(input instanceof Date);
 }
-var init_object = __esmMin((() => {}));
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/error.js
 function isError$1(e) {
 	if (isObject(e)) {
@@ -20111,12 +20114,10 @@ function isError$1(e) {
 	}
 	return !1;
 }
-var init_error$1 = __esmMin((() => {
-	init_object();
-})), custom, init_inspect = __esmMin((() => {
+var init_error$1 = __esmMin((() => {})), custom, init_inspect = __esmMin((() => {
 	custom = node_util.inspect.custom;
 })), RedactedString, defaultAllowedHeaderNames, defaultAllowedQueryParameters, Sanitizer, init_sanitizer = __esmMin((() => {
-	init_object(), RedactedString = "REDACTED", defaultAllowedHeaderNames = "x-ms-client-request-id.x-ms-return-client-request-id.x-ms-useragent.x-ms-correlation-request-id.x-ms-request-id.client-request-id.ms-cv.return-client-request-id.traceparent.Access-Control-Allow-Credentials.Access-Control-Allow-Headers.Access-Control-Allow-Methods.Access-Control-Allow-Origin.Access-Control-Expose-Headers.Access-Control-Max-Age.Access-Control-Request-Headers.Access-Control-Request-Method.Origin.Accept.Accept-Encoding.Cache-Control.Connection.Content-Length.Content-Type.Date.ETag.Expires.If-Match.If-Modified-Since.If-None-Match.If-Unmodified-Since.Last-Modified.Pragma.Request-Id.Retry-After.Server.Transfer-Encoding.User-Agent.WWW-Authenticate".split("."), defaultAllowedQueryParameters = ["api-version"], Sanitizer = class {
+	RedactedString = "REDACTED", defaultAllowedHeaderNames = "x-ms-client-request-id.x-ms-return-client-request-id.x-ms-useragent.x-ms-correlation-request-id.x-ms-request-id.client-request-id.ms-cv.return-client-request-id.traceparent.Access-Control-Allow-Credentials.Access-Control-Allow-Headers.Access-Control-Allow-Methods.Access-Control-Allow-Origin.Access-Control-Expose-Headers.Access-Control-Max-Age.Access-Control-Request-Headers.Access-Control-Request-Method.Origin.Accept.Accept-Encoding.Cache-Control.Connection.Content-Length.Content-Type.Date.ETag.Expires.If-Match.If-Modified-Since.If-None-Match.If-Unmodified-Since.Last-Modified.Pragma.Request-Id.Retry-After.Server.Transfer-Encoding.User-Agent.WWW-Authenticate".split("."), defaultAllowedQueryParameters = ["api-version"], Sanitizer = class {
 		allowedHeaderNames;
 		allowedQueryParameters;
 		constructor({ additionalAllowedHeaderNames: allowedHeaderNames = [], additionalAllowedQueryParameters: allowedQueryParameters = [] } = {}) {
@@ -20208,7 +20209,7 @@ function uint8ArrayToString$1(bytes, format) {
 function stringToUint8Array$1(value, format) {
 	return Buffer.from(value, format);
 }
-var init_bytesEncoding = __esmMin((() => {})), logger$4, init_log$5 = __esmMin((() => {
+var logger$4, init_log$5 = __esmMin((() => {
 	init_logger(), logger$4 = createClientLogger$1("ts-http-runtime");
 }));
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
@@ -20322,7 +20323,7 @@ var DEFAULT_TLS_SETTINGS, ReportTransform, NodeHttpClient, init_nodeHttpClient =
 						logger$4.error("Error in download progress", e);
 					}), responseStream.pipe(downloadReportStream), responseStream = downloadReportStream;
 				}
-				return request.streamResponseStatusCodes?.has(Infinity) || request.streamResponseStatusCodes?.has(response.status) ? response.readableStreamBody = responseStream : response.bodyAsText = await streamToText(responseStream), response;
+				return request.streamResponseStatusCodes?.has(1e400) || request.streamResponseStatusCodes?.has(response.status) ? response.readableStreamBody = responseStream : response.bodyAsText = await streamToText(responseStream), response;
 			} finally {
 				if (timeoutId !== void 0 && clearTimeout(timeoutId), request.abortSignal && abortListener) {
 					let uploadStreamDone = Promise.resolve();
@@ -20405,15 +20406,12 @@ var logPolicyName, init_logPolicy$1 = __esmMin((() => {
 function getRandomIntegerInclusive(min, max) {
 	return min = Math.ceil(min), max = Math.floor(max), Math.floor(Math.random() * (max - min + 1)) + min;
 }
-var init_random = __esmMin((() => {}));
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/delay.js
 function calculateRetryDelay(retryAttempt, config) {
 	let exponentialDelay = config.retryDelayInMs * 2 ** retryAttempt, clampedDelay = Math.min(config.maxRetryDelayInMs, exponentialDelay);
 	return { retryAfterInMs: clampedDelay / 2 + getRandomIntegerInclusive(0, clampedDelay / 2) };
 }
-var init_delay$1 = __esmMin((() => {
-	init_random();
-}));
+var init_delay$1 = __esmMin((() => {}));
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/util/helpers.js
 function delay$2(delayInMs, value, options) {
 	return new Promise((resolve, reject) => {
@@ -20567,7 +20565,6 @@ function convertBodyToFormDataMap(body) {
 		return formDataMap;
 	}
 }
-var init_formData = __esmMin((() => {}));
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/formDataPolicy.js
 function formDataPolicy$1() {
 	return {
@@ -20608,7 +20605,7 @@ async function prepareFormData(formData, request) {
 	request.multipartBody = { parts };
 }
 var formDataPolicyName, init_formDataPolicy$1 = __esmMin((() => {
-	init_bytesEncoding(), init_formData(), init_httpHeaders$1(), formDataPolicyName = "formDataPolicy";
+	init_httpHeaders$1(), formDataPolicyName = "formDataPolicy";
 }));
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/dist/esm/policies/agentPolicy.js
 function agentPolicy$1(agent) {
@@ -21093,7 +21090,7 @@ var tlsPolicyName, init_tlsPolicy$1 = __esmMin((() => {
 			return typeof stack == "string" && stack.split("\n").some((l) => l.indexOf("(https.js:") !== -1 || l.indexOf("node:https:") !== -1);
 		}
 		incrementSockets(name) {
-			if (this.maxSockets === Infinity && this.maxTotalSockets === Infinity) return null;
+			if (this.maxSockets === 1e400 && this.maxTotalSockets === 1e400) return null;
 			this.sockets[name] || (this.sockets[name] = []);
 			let fakeSocket = new net.Socket({ writable: !1 });
 			return this.sockets[name].push(fakeSocket), this.totalSocketCount++, fakeSocket;
@@ -21534,7 +21531,7 @@ function multipartPolicy$1() {
 	};
 }
 var multipartPolicyName$1, maxBoundaryLength, validBoundaryCharacters, init_multipartPolicy$1 = __esmMin((() => {
-	init_bytesEncoding(), init_typeGuards(), init_uuidUtils(), init_concat(), multipartPolicyName$1 = "multipartPolicy", maxBoundaryLength = 70, validBoundaryCharacters = new Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'()+,-./:=?");
+	init_typeGuards(), init_concat(), multipartPolicyName$1 = "multipartPolicy", maxBoundaryLength = 70, validBoundaryCharacters = new Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'()+,-./:=?");
 })), init_esm$12 = __esmMin((() => {
 	init_AbortError$1(), init_logger(), init_httpHeaders$1(), init_pipelineRequest$1(), init_pipeline$2(), init_restError$1(), init_defaultHttpClient$1(), init_logPolicy$1(), init_constants$3(), init_defaultRetryPolicy$1(), init_formDataPolicy$1(), init_agentPolicy$1(), init_tlsPolicy$1(), init_proxyPolicy$1(), init_decompressResponsePolicy$1(), init_redirectPolicy$1(), init_multipartPolicy$1(), init_log$5(), init_env(), init_typeGuards();
 }));
@@ -21670,7 +21667,7 @@ function formDataPolicy() {
 var init_formDataPolicy = __esmMin((() => {
 	init_internal$1();
 })), init_internal = __esmMin((() => {
-	init_delay$1(), init_error$1(), init_uuidUtils(), init_env(), init_bytesEncoding(), init_sanitizer();
+	init_delay$1(), init_error$1(), init_env(), init_sanitizer();
 })), AbortError, init_AbortError = __esmMin((() => {
 	AbortError = class extends Error {
 		constructor(message) {
@@ -22009,7 +22006,6 @@ function wrapAbortSignalLike(abortSignalLike) {
 		cleanup
 	};
 }
-var init_wrapAbortSignal = __esmMin((() => {}));
 // node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/wrapAbortSignalLikePolicy.js
 function wrapAbortSignalLikePolicy() {
 	return {
@@ -22027,7 +22023,7 @@ function wrapAbortSignalLikePolicy() {
 	};
 }
 var wrapAbortSignalLikePolicyName, init_wrapAbortSignalLikePolicy = __esmMin((() => {
-	init_wrapAbortSignal(), wrapAbortSignalLikePolicyName = "wrapAbortSignalLikePolicy";
+	wrapAbortSignalLikePolicyName = "wrapAbortSignalLikePolicy";
 }));
 // node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/createPipelineFromOptions.js
 function createPipelineFromOptions(options) {
@@ -22053,7 +22049,7 @@ function createDefaultHttpClient() {
 	} };
 }
 var init_defaultHttpClient = __esmMin((() => {
-	init_esm$12(), init_wrapAbortSignal();
+	init_esm$12();
 }));
 // node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/dist/esm/httpHeaders.js
 function createHttpHeaders(rawHeaders) {
@@ -22230,8 +22226,8 @@ function isTokenCredential(credential) {
 	let castCredential = credential;
 	return castCredential && typeof castCredential.getToken == "function" && (castCredential.signRequest === void 0 || castCredential.getToken.length > 0);
 }
-var init_tokenCredential = __esmMin((() => {})), init_esm$6 = __esmMin((() => {
-	init_esm$9(), init_tokenCredential();
+var init_esm$6 = __esmMin((() => {
+	init_esm$9();
 }));
 // node_modules/.pnpm/@azure+core-http-compat@2.5.0_@azure+core-client@1.11.1_supports-color@7.2.0__@azure+co_3cf5eb9a54062b72e4ef3d91ae6a8e59/node_modules/@azure/core-http-compat/dist/esm/policies/disableKeepAlivePolicy.js
 function createDisableKeepAlivePolicy() {
@@ -23906,7 +23902,7 @@ function normalizeProcessEntities(value, htmlEntities) {
 		enabled: value,
 		maxEntitySize: 1e4,
 		maxExpansionDepth: 1e4,
-		maxTotalExpansions: Infinity,
+		maxTotalExpansions: 1e400,
 		maxExpandedLength: 1e5,
 		maxEntityCount: 1e3,
 		allowedTags: null,
@@ -23916,7 +23912,7 @@ function normalizeProcessEntities(value, htmlEntities) {
 		enabled: value.enabled !== !1,
 		maxEntitySize: Math.max(1, value.maxEntitySize ?? 1e4),
 		maxExpansionDepth: Math.max(1, value.maxExpansionDepth ?? 1e4),
-		maxTotalExpansions: Math.max(1, value.maxTotalExpansions ?? Infinity),
+		maxTotalExpansions: Math.max(1, value.maxTotalExpansions ?? 1e400),
 		maxExpandedLength: Math.max(1, value.maxExpandedLength ?? 1e5),
 		maxEntityCount: Math.max(1, value.maxEntityCount ?? 1e3),
 		allowedTags: value.allowedTags ?? null,
@@ -24420,7 +24416,7 @@ function parse_int(numStr, base) {
 	throw Error("parseInt, Number.parseInt, window.parseInt are not supported");
 }
 function handleInfinity(str, num, options) {
-	let isPositive = num === Infinity;
+	let isPositive = num === 1e400;
 	switch (options.infinity.toLowerCase()) {
 		case "null": return null;
 		case "infinity": return num;
@@ -25877,7 +25873,6 @@ function safeCdata(val) {
 function escapeAttribute(val) {
 	return valToStr(val).replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
-var init_util = __esmMin((() => {}));
 // node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/orderedJs2Xml.js
 function detectXmlVersionFromArray(jArray, options) {
 	if (!Array.isArray(jArray) || jArray.length === 0) return "1.0";
@@ -26016,7 +26011,7 @@ function replaceEntitiesValue(textValue, options) {
 	return textValue;
 }
 var EOL$1, init_orderedJs2Xml = __esmMin((() => {
-	init_src$2(), init_util(), init_src$3(), EOL$1 = "\n";
+	init_src$2(), init_src$3(), EOL$1 = "\n";
 }));
 // node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/ignoreAttributes.js
 function getIgnoreAttributesFn(ignoreAttributes) {
@@ -26071,7 +26066,7 @@ function isAttribute(name) {
 	return name.startsWith(this.options.attributeNamePrefix) && name !== this.options.textNodeName ? name.substr(this.attrPrefixLen) : !1;
 }
 var defaultOptions, init_fxb = __esmMin((() => {
-	init_orderedJs2Xml(), init_ignoreAttributes(), init_src$2(), init_util(), init_src$3(), defaultOptions = {
+	init_orderedJs2Xml(), init_ignoreAttributes(), init_src$2(), init_src$3(), defaultOptions = {
 		attributeNamePrefix: "@_",
 		attributesGroupName: !1,
 		textNodeName: "#text",
@@ -26490,7 +26485,7 @@ var init_xml = __esmMin((() => {
 			this.incoming.push(buffer), !this.isError && this.resolveData() && !this.isStreamEnd && this.readable.resume();
 		}
 	};
-})), init_bufferHelpers = __esmMin((() => {})), NativeCRC64, init_crc64 = __esmMin((() => {
+})), NativeCRC64, init_crc64 = __esmMin((() => {
 	NativeCRC64 = (typeof document < "u" && document.currentScript && document.currentScript.src, (function(NativeCRC64) {
 		NativeCRC64 ||= {};
 		var Module = NativeCRC64 === void 0 ? {} : NativeCRC64, readyPromiseResolve, readyPromiseReject;
@@ -27002,8 +26997,8 @@ var init_xml = __esmMin((() => {
 function signalStreamEnd(pushData) {
 	pushData(null);
 }
-var init_streamHelpers = __esmMin((() => {})), MAX_SEGMENT_CONTENT_LENGTH, SMRegion$1, StructuredMessageEncoding, init_StructuredMessageEncoding = __esmMin((() => {
-	init_StorageCRC64Calculator(), init_streamHelpers(), MAX_SEGMENT_CONTENT_LENGTH = 4194304, (function(SMRegion) {
+var MAX_SEGMENT_CONTENT_LENGTH, SMRegion$1, StructuredMessageEncoding, init_StructuredMessageEncoding = __esmMin((() => {
+	init_StorageCRC64Calculator(), MAX_SEGMENT_CONTENT_LENGTH = 4194304, (function(SMRegion) {
 		SMRegion[SMRegion.StreamHeader = 0] = "StreamHeader", SMRegion[SMRegion.StreamFooter = 1] = "StreamFooter", SMRegion[SMRegion.SegmentHeader = 2] = "SegmentHeader", SMRegion[SMRegion.SegmentFooter = 3] = "SegmentFooter", SMRegion[SMRegion.SegmentContent = 4] = "SegmentContent", SMRegion[SMRegion.Completed = 5] = "Completed";
 	})(SMRegion$1 ||= {}), StructuredMessageEncoding = class {
 		pushData;
@@ -28217,7 +28212,7 @@ var storageRequestFailureDetailsParserPolicyName, init_StorageRequestFailureDeta
 		}
 	};
 })), init_indexPlatform = __esmMin((() => {
-	init_BufferScheduler(), init_bufferHelpers(), init_StructuredMessageEncodingStream(), init_StructuredMessageDecodingStream(), init_StorageCRC64Calculator(), init_cache(), init_StorageResponseFormat(), init_StorageBrowserPolicyFactory(), init_AnonymousCredential(), init_Credential(), init_StorageSharedKeyCredential(), init_StorageRetryPolicyFactory(), init_RequestPolicy(), init_AnonymousCredentialPolicy(), init_CredentialPolicy(), init_StorageBrowserPolicyV2(), init_StorageCorrectContentLengthPolicy(), init_StorageRetryPolicyV2(), init_StorageSharedKeyCredentialPolicy(), init_StorageSharedKeyCredentialPolicyV2(), init_StorageRedirectRangeHeaderPolicy(), init_StorageRequestFailureDetailsParserPolicy(), init_UserDelegationKeyCredential();
+	init_BufferScheduler(), init_StructuredMessageEncodingStream(), init_StructuredMessageDecodingStream(), init_StorageCRC64Calculator(), init_cache(), init_StorageResponseFormat(), init_StorageBrowserPolicyFactory(), init_AnonymousCredential(), init_Credential(), init_StorageSharedKeyCredential(), init_StorageRetryPolicyFactory(), init_RequestPolicy(), init_AnonymousCredentialPolicy(), init_CredentialPolicy(), init_StorageBrowserPolicyV2(), init_StorageCorrectContentLengthPolicy(), init_StorageRetryPolicyV2(), init_StorageSharedKeyCredentialPolicy(), init_StorageSharedKeyCredentialPolicyV2(), init_StorageRedirectRangeHeaderPolicy(), init_StorageRequestFailureDetailsParserPolicy(), init_UserDelegationKeyCredential();
 })), init_esm$2 = __esmMin((() => {
 	init_indexPlatform();
 })), SDK_VERSION, SERVICE_VERSION, BLOCK_BLOB_MAX_UPLOAD_BLOB_BYTES, BLOCK_BLOB_MAX_STAGE_BLOCK_BYTES, BLOCK_BLOB_MAX_BLOCKS, DEFAULT_BLOCK_BUFFER_SIZE_BYTES, DEFAULT_BLOB_DOWNLOAD_BLOCK_BYTES, REQUEST_TIMEOUT, URLConstants, EncryptionAlgorithmAES25, DevelopmentConnectionString, StorageBlobLoggingAllowedHeaderNames, StorageBlobLoggingAllowedQueryParameters, PathStylePorts, init_constants = __esmMin((() => {
@@ -39266,9 +39261,7 @@ var Pipeline, init_Pipeline = __esmMin((() => {
 		appendBlob;
 		blockBlob;
 	};
-})), init_service = __esmMin((() => {})), init_container = __esmMin((() => {})), init_blob = __esmMin((() => {})), init_pageBlob = __esmMin((() => {})), init_appendBlob = __esmMin((() => {})), init_blockBlob = __esmMin((() => {})), init_operationsInterfaces = __esmMin((() => {
-	init_service(), init_container(), init_blob(), init_pageBlob(), init_appendBlob(), init_blockBlob();
-})), init_src = __esmMin((() => {
+})), init_operationsInterfaces = __esmMin((() => {})), init_src = __esmMin((() => {
 	init_models$1(), init_storageClient(), init_operationsInterfaces();
 })), StorageContextClient, init_StorageContextClient = __esmMin((() => {
 	init_src(), StorageContextClient = class extends StorageClient$1 {
@@ -39673,8 +39666,8 @@ var accountNameSuffixes, init_utils_common$1 = __esmMin((() => {
 function ipRangeToString(ipRange) {
 	return ipRange.end ? `${ipRange.start}-${ipRange.end}` : ipRange.start;
 }
-var init_SasIPRange = __esmMin((() => {})), SASProtocol, SASQueryParameters, init_SASQueryParameters = __esmMin((() => {
-	init_SasIPRange(), init_utils_common$1(), (function(SASProtocol) {
+var SASProtocol, SASQueryParameters, init_SASQueryParameters = __esmMin((() => {
+	init_utils_common$1(), (function(SASProtocol) {
 		SASProtocol.Https = "https", SASProtocol.HttpsAndHttp = "https,http";
 	})(SASProtocol ||= {}), SASQueryParameters = class {
 		version;
@@ -40175,7 +40168,7 @@ function trimBlobName(blobName) {
 	return internalName;
 }
 var init_BlobSASSignatureValues = __esmMin((() => {
-	init_BlobSASPermissions(), init_ContainerSASPermissions(), init_esm$2(), init_SasIPRange(), init_SASQueryParameters(), init_constants(), init_utils_common$1();
+	init_BlobSASPermissions(), init_ContainerSASPermissions(), init_esm$2(), init_SASQueryParameters(), init_constants(), init_utils_common$1();
 })), BlobLeaseClient, init_BlobLeaseClient = __esmMin((() => {
 	init_esm$9(), init_constants(), init_tracing(), init_utils_common$1(), BlobLeaseClient = class {
 		_leaseId;
@@ -40662,8 +40655,8 @@ function arraysEqual(a, b) {
 	for (let i = 0; i < a.length; ++i) if (a[i] !== b[i]) return !1;
 	return !0;
 }
-var init_utils_common = __esmMin((() => {})), AvroReader, init_AvroReader = __esmMin((() => {
-	init_AvroConstants(), init_AvroParser(), init_utils_common(), AvroReader = class {
+var AvroReader, init_AvroReader = __esmMin((() => {
+	init_AvroConstants(), init_AvroParser(), AvroReader = class {
 		_dataStream;
 		_headerStream;
 		_syncMarker;
@@ -40971,7 +40964,7 @@ function rangeResponseFromModel(response) {
 		}
 	};
 }
-var init_PageBlobRangeResponse = __esmMin((() => {})), PollerStoppedError, PollerCancelledError, Poller, init_poller = __esmMin((() => {
+var PollerStoppedError, PollerCancelledError, Poller, init_poller = __esmMin((() => {
 	PollerStoppedError = class PollerStoppedError extends Error {
 		constructor(message) {
 			super(message), this.name = "PollerStoppedError", Object.setPrototypeOf(this, PollerStoppedError.prototype);
@@ -41054,8 +41047,8 @@ var init_PageBlobRangeResponse = __esmMin((() => {})), PollerStoppedError, Polle
 	};
 })), init_lroEngine = __esmMin((() => {
 	init_esm$11(), init_poller();
-})), init_pollOperation = __esmMin((() => {})), init_esm$1 = __esmMin((() => {
-	init_esm$11(), init_esm$9(), init_lroEngine(), init_poller(), init_pollOperation();
+})), init_esm$1 = __esmMin((() => {
+	init_esm$11(), init_esm$9(), init_lroEngine(), init_poller();
 }));
 // node_modules/.pnpm/@azure+storage-blob@12.34.0_supports-color@7.2.0/node_modules/@azure/storage-blob/dist/esm/pollers/BlobStartCopyFromUrlPoller.js
 function makeBlobBeginCopyFromURLPollOperation(state) {
@@ -41111,7 +41104,7 @@ function rangeToString(iRange) {
 	if (iRange.count && iRange.count <= 0) throw RangeError("Range.count must be larger than 0. Leave it undefined if you want a range from offset to the end.");
 	return iRange.count ? `bytes=${iRange.offset}-${iRange.offset + iRange.count - 1}` : `bytes=${iRange.offset}-`;
 }
-var init_Range = __esmMin((() => {})), BatchStates, Batch, init_Batch = __esmMin((() => {
+var BatchStates, Batch, init_Batch = __esmMin((() => {
 	(function(BatchStates) {
 		BatchStates[BatchStates.Good = 0] = "Good", BatchStates[BatchStates.Error = 1] = "Error";
 	})(BatchStates ||= {}), Batch = class {
@@ -41196,7 +41189,7 @@ async function readStreamToLocalFile(rs, file) {
 var fsStat, fsCreateReadStream, init_utils$2 = __esmMin((() => {
 	init_constants(), fsStat = node_util.default.promisify(node_fs.default.stat), fsCreateReadStream = node_fs.default.createReadStream;
 })), BlobClient, AppendBlobClient, BlockBlobClient, PageBlobClient, init_Clients = __esmMin((() => {
-	init_esm$7(), init_esm$6(), init_esm$9(), init_BlobDownloadResponse(), init_BlobQueryResponse(), init_esm$2(), init_models(), init_PageBlobRangeResponse(), init_Pipeline(), init_BlobStartCopyFromUrlPoller(), init_Range(), init_StorageClient(), init_Batch(), init_constants(), init_tracing(), init_utils_common$1(), init_utils$2(), init_BlobSASSignatureValues(), init_BlobLeaseClient(), BlobClient = class BlobClient extends StorageClient {
+	init_esm$7(), init_esm$6(), init_esm$9(), init_BlobDownloadResponse(), init_BlobQueryResponse(), init_esm$2(), init_models(), init_Pipeline(), init_BlobStartCopyFromUrlPoller(), init_StorageClient(), init_Batch(), init_constants(), init_tracing(), init_utils_common$1(), init_utils$2(), init_BlobSASSignatureValues(), init_BlobLeaseClient(), BlobClient = class BlobClient extends StorageClient {
 		blobContext;
 		_name;
 		_containerName;
@@ -42025,7 +42018,7 @@ var fsStat, fsCreateReadStream, init_utils$2 = __esmMin((() => {
 				let size = (await fsStat(filePath)).size;
 				return this.uploadSeekableInternal((offset, count) => () => fsCreateReadStream(filePath, {
 					autoClose: !0,
-					end: count ? offset + count - 1 : Infinity,
+					end: count ? offset + count - 1 : 1e400,
 					start: offset
 				}), size, {
 					...options,
@@ -43262,7 +43255,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			for (; index < length; index++) iteratee(coll[index], index, onlyOnce(iteratorCallback));
 		}
 		function eachOfGeneric(coll, iteratee, callback) {
-			return eachOfLimit$1(coll, Infinity, iteratee, callback);
+			return eachOfLimit$1(coll, 1e400, iteratee, callback);
 		}
 		function eachOf(coll, iteratee, callback) {
 			return (isArrayLike(coll) ? eachOfArrayLike : eachOfGeneric)(coll, wrapAsync(iteratee), callback);
@@ -43640,7 +43633,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		}
 		var concatLimit$1 = awaitify(concatLimit, 4);
 		function concat(coll, iteratee, callback) {
-			return concatLimit$1(coll, Infinity, iteratee, callback);
+			return concatLimit$1(coll, 1e400, iteratee, callback);
 		}
 		var concat$1 = awaitify(concat, 3);
 		function concatSeries(coll, iteratee, callback) {
@@ -43813,7 +43806,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		}
 		var groupByLimit$1 = awaitify(groupByLimit, 4);
 		function groupBy(coll, iteratee, callback) {
-			return groupByLimit$1(coll, Infinity, iteratee, callback);
+			return groupByLimit$1(coll, 1e400, iteratee, callback);
 		}
 		function groupBySeries(coll, iteratee, callback) {
 			return groupByLimit$1(coll, 1, iteratee, callback);
@@ -43831,7 +43824,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		}
 		var mapValuesLimit$1 = awaitify(mapValuesLimit, 4);
 		function mapValues(obj, iteratee, callback) {
-			return mapValuesLimit$1(obj, Infinity, iteratee, callback);
+			return mapValuesLimit$1(obj, 1e400, iteratee, callback);
 		}
 		function mapValuesSeries(obj, iteratee, callback) {
 			return mapValuesLimit$1(obj, 1, iteratee, callback);
@@ -44089,7 +44082,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			return mapLimit$1(range(count), limit, _iteratee, callback);
 		}
 		function times(n, iteratee, callback) {
-			return timesLimit(n, Infinity, iteratee, callback);
+			return timesLimit(n, 1e400, iteratee, callback);
 		}
 		function timesSeries(n, iteratee, callback) {
 			return timesLimit(n, 1, iteratee, callback);
@@ -44431,7 +44424,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			}
 			if (this.encoding && this.setEncoding(this.encoding), this.start !== void 0) {
 				if (typeof this.start != "number") throw TypeError("start must be a Number");
-				if (this.end === void 0) this.end = Infinity;
+				if (this.end === void 0) this.end = 1e400;
 				else if (typeof this.end != "number") throw TypeError("end must be a Number");
 				if (this.start > this.end) throw Error("start must be <= end");
 				this.pos = this.start;
@@ -50566,7 +50559,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			}
 		}
 		getRemainingTTL(key) {
-			return this.#keyMap.has(key) ? Infinity : 0;
+			return this.#keyMap.has(key) ? 1e400 : 0;
 		}
 		#initializeTTLTracking() {
 			let ttls = new ZeroArray(this.#max), starts = new ZeroArray(this.#max);
@@ -50599,7 +50592,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 				let index = this.#keyMap.get(key);
 				if (index === void 0) return 0;
 				let ttl = ttls[index], start = starts[index];
-				return !ttl || !start ? Infinity : ttl - ((cachedNow || getNow()) - start);
+				return !ttl || !start ? 1e400 : ttl - ((cachedNow || getNow()) - start);
 			}, this.#isStale = (index) => {
 				let s = starts[index], t = ttls[index];
 				return !!t && !!s && (cachedNow || getNow()) - s > t;
@@ -52424,7 +52417,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		includeChildMatches;
 		constructor(patterns, path, opts) {
 			if (this.patterns = patterns, this.path = path, this.opts = opts, this.#sep = !opts.posix && opts.platform === "win32" ? "\\" : "/", this.includeChildMatches = opts.includeChildMatches !== !1, (opts.ignore || !this.includeChildMatches) && (this.#ignore = makeIgnore(opts.ignore ?? [], opts), !this.includeChildMatches && typeof this.#ignore.add != "function")) throw Error("cannot ignore child matches, ignore lacks add() method.");
-			this.maxDepth = opts.maxDepth || Infinity, opts.signal && (this.signal = opts.signal, this.signal.addEventListener("abort", () => {
+			this.maxDepth = opts.maxDepth || 1e400, opts.signal && (this.signal = opts.signal, this.signal.addEventListener("abort", () => {
 				this.#onResume.length = 0;
 			}));
 		}
@@ -52461,7 +52454,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			return this.matchCheckTest(s, ifDir);
 		}
 		matchCheckTest(e, ifDir) {
-			return e && (this.maxDepth === Infinity || e.depth() <= this.maxDepth) && (!ifDir || e.canReaddir()) && (!this.opts.nodir || !e.isDirectory()) && (!this.opts.nodir || !this.opts.follow || !e.isSymbolicLink() || !e.realpathCached()?.isDirectory()) && !this.#ignored(e) ? e : void 0;
+			return e && (this.maxDepth === 1e400 || e.depth() <= this.maxDepth) && (!ifDir || e.canReaddir()) && (!this.opts.nodir || !e.isDirectory()) && (!this.opts.nodir || !this.opts.follow || !e.isSymbolicLink() || !e.realpathCached()?.isDirectory()) && !this.#ignored(e) ? e : void 0;
 		}
 		matchCheckSync(e, ifDir) {
 			if (ifDir && this.opts.nodir) return;
@@ -52518,7 +52511,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			};
 			for (let [m, absolute, ifDir] of processor.matches.entries()) this.#ignored(m) || (tasks++, this.match(m, absolute, ifDir).then(() => next()));
 			for (let t of processor.subwalkTargets()) {
-				if (this.maxDepth !== Infinity && t.depth() >= this.maxDepth) continue;
+				if (this.maxDepth !== 1e400 && t.depth() >= this.maxDepth) continue;
 				tasks++;
 				let childrenCached = t.readdirCached();
 				t.calledReaddir() ? this.walkCB3(t, childrenCached, processor, next) : t.readdirCB((_, entries) => this.walkCB3(t, entries, processor, next), !0);
@@ -52549,7 +52542,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 			};
 			for (let [m, absolute, ifDir] of processor.matches.entries()) this.#ignored(m) || this.matchSync(m, absolute, ifDir);
 			for (let t of processor.subwalkTargets()) {
-				if (this.maxDepth !== Infinity && t.depth() >= this.maxDepth) continue;
+				if (this.maxDepth !== 1e400 && t.depth() >= this.maxDepth) continue;
 				tasks++;
 				let children = t.readdirSync();
 				this.walkCB3Sync(t, children, processor, next);
@@ -52642,7 +52635,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		patterns;
 		constructor(pattern, opts) {
 			if (!opts) throw TypeError("glob options required");
-			if (this.withFileTypes = !!opts.withFileTypes, this.signal = opts.signal, this.follow = !!opts.follow, this.dot = !!opts.dot, this.dotRelative = !!opts.dotRelative, this.nodir = !!opts.nodir, this.mark = !!opts.mark, opts.cwd ? (opts.cwd instanceof URL || opts.cwd.startsWith("file://")) && (opts.cwd = (0, node_url_1.fileURLToPath)(opts.cwd)) : this.cwd = "", this.cwd = opts.cwd || "", this.root = opts.root, this.magicalBraces = !!opts.magicalBraces, this.nobrace = !!opts.nobrace, this.noext = !!opts.noext, this.realpath = !!opts.realpath, this.absolute = opts.absolute, this.includeChildMatches = opts.includeChildMatches !== !1, this.noglobstar = !!opts.noglobstar, this.matchBase = !!opts.matchBase, this.maxDepth = typeof opts.maxDepth == "number" ? opts.maxDepth : Infinity, this.stat = !!opts.stat, this.ignore = opts.ignore, this.withFileTypes && this.absolute !== void 0) throw Error("cannot set absolute and withFileTypes:true");
+			if (this.withFileTypes = !!opts.withFileTypes, this.signal = opts.signal, this.follow = !!opts.follow, this.dot = !!opts.dot, this.dotRelative = !!opts.dotRelative, this.nodir = !!opts.nodir, this.mark = !!opts.mark, opts.cwd ? (opts.cwd instanceof URL || opts.cwd.startsWith("file://")) && (opts.cwd = (0, node_url_1.fileURLToPath)(opts.cwd)) : this.cwd = "", this.cwd = opts.cwd || "", this.root = opts.root, this.magicalBraces = !!opts.magicalBraces, this.nobrace = !!opts.nobrace, this.noext = !!opts.noext, this.realpath = !!opts.realpath, this.absolute = opts.absolute, this.includeChildMatches = opts.includeChildMatches !== !1, this.noglobstar = !!opts.noglobstar, this.matchBase = !!opts.matchBase, this.maxDepth = typeof opts.maxDepth == "number" ? opts.maxDepth : 1e400, this.stat = !!opts.stat, this.ignore = opts.ignore, this.withFileTypes && this.absolute !== void 0) throw Error("cannot set absolute and withFileTypes:true");
 			if (typeof pattern == "string" && (pattern = [pattern]), this.windowsPathsNoEscape = !!opts.windowsPathsNoEscape || opts.allowWindowsEscape === !1, this.windowsPathsNoEscape && (pattern = pattern.map((p) => p.replace(/\\/g, "/"))), this.matchBase) {
 				if (opts.noglobstar) throw TypeError("base matching requires globstar");
 				pattern = pattern.map((p) => p.includes("/") ? p : `./**/${p}`);
@@ -52684,7 +52677,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		async walk() {
 			return [...await new walker_js_1.GlobWalker(this.patterns, this.scurry.cwd, {
 				...this.opts,
-				maxDepth: this.maxDepth === Infinity ? Infinity : this.maxDepth + this.scurry.cwd.depth(),
+				maxDepth: this.maxDepth === 1e400 ? 1e400 : this.maxDepth + this.scurry.cwd.depth(),
 				platform: this.platform,
 				nocase: this.nocase,
 				includeChildMatches: this.includeChildMatches
@@ -52693,7 +52686,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		walkSync() {
 			return [...new walker_js_1.GlobWalker(this.patterns, this.scurry.cwd, {
 				...this.opts,
-				maxDepth: this.maxDepth === Infinity ? Infinity : this.maxDepth + this.scurry.cwd.depth(),
+				maxDepth: this.maxDepth === 1e400 ? 1e400 : this.maxDepth + this.scurry.cwd.depth(),
 				platform: this.platform,
 				nocase: this.nocase,
 				includeChildMatches: this.includeChildMatches
@@ -52702,7 +52695,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		stream() {
 			return new walker_js_1.GlobStream(this.patterns, this.scurry.cwd, {
 				...this.opts,
-				maxDepth: this.maxDepth === Infinity ? Infinity : this.maxDepth + this.scurry.cwd.depth(),
+				maxDepth: this.maxDepth === 1e400 ? 1e400 : this.maxDepth + this.scurry.cwd.depth(),
 				platform: this.platform,
 				nocase: this.nocase,
 				includeChildMatches: this.includeChildMatches
@@ -52711,7 +52704,7 @@ var __awaiter$9, init_blob_upload = __esmMin((() => {
 		streamSync() {
 			return new walker_js_1.GlobStream(this.patterns, this.scurry.cwd, {
 				...this.opts,
-				maxDepth: this.maxDepth === Infinity ? Infinity : this.maxDepth + this.scurry.cwd.depth(),
+				maxDepth: this.maxDepth === 1e400 ? 1e400 : this.maxDepth + this.scurry.cwd.depth(),
 				platform: this.platform,
 				nocase: this.nocase,
 				includeChildMatches: this.includeChildMatches
@@ -56185,13 +56178,11 @@ var import_lib, import_undici, __awaiter$5, init_utils$1 = __esmMin((() => {
 function getUserAgent() {
 	return typeof navigator == "object" && "userAgent" in navigator ? navigator.userAgent : typeof process == "object" && process.version !== void 0 ? `Node.js/${process.version.substr(1)} (${process.platform}; ${process.arch})` : "<environment undetectable>";
 }
-var init_universal_user_agent = __esmMin((() => {}));
 // node_modules/.pnpm/before-after-hook@4.0.0/node_modules/before-after-hook/lib/register.js
 function register(state, name, method, options) {
 	if (typeof method != "function") throw Error("method for before hook must be a function");
 	return options ||= {}, Array.isArray(name) ? name.reverse().reduce((callback, name) => register.bind(null, state, name, callback, options), method)() : Promise.resolve().then(() => state.registry[name] ? state.registry[name].reduce((method, registered) => registered.hook.bind(null, method, options), method)() : method(options));
 }
-var init_register = __esmMin((() => {}));
 // node_modules/.pnpm/before-after-hook@4.0.0/node_modules/before-after-hook/lib/add.js
 function addHook(state, kind, name, hook) {
 	let orig = hook;
@@ -56203,14 +56194,12 @@ function addHook(state, kind, name, hook) {
 		orig
 	});
 }
-var init_add = __esmMin((() => {}));
 // node_modules/.pnpm/before-after-hook@4.0.0/node_modules/before-after-hook/lib/remove.js
 function removeHook(state, name, method) {
 	if (!state.registry[name]) return;
 	let index = state.registry[name].map((registered) => registered.orig).indexOf(method);
 	index !== -1 && state.registry[name].splice(index, 1);
 }
-var init_remove = __esmMin((() => {}));
 // node_modules/.pnpm/before-after-hook@4.0.0/node_modules/before-after-hook/index.js
 function bindApi(hook, state, name) {
 	let removeHookRef = bindable(removeHook, null).apply(null, name ? [state, name] : [state]);
@@ -56237,7 +56226,7 @@ function Collection() {
 	return bindApi(hook, state), hook;
 }
 var bind, bindable, before_after_hook_default, init_before_after_hook = __esmMin((() => {
-	init_register(), init_add(), init_remove(), bind = Function.bind, bindable = bind.bind(bind), before_after_hook_default = {
+	bind = Function.bind, bindable = bind.bind(bind), before_after_hook_default = {
 		Singular,
 		Collection
 	};
@@ -56388,7 +56377,7 @@ function withDefaults$2(oldDefaults, newDefaults) {
 	});
 }
 var DEFAULTS, urlVariableRegex, endpoint, init_dist_bundle$5 = __esmMin((() => {
-	init_universal_user_agent(), DEFAULTS = {
+	DEFAULTS = {
 		method: "GET",
 		baseUrl: "https://api.github.com",
 		headers: {
@@ -56746,7 +56735,7 @@ function withDefaults$1(oldEndpoint, newDefaults) {
 	});
 }
 var defaults_default, noop$1, request, init_dist_bundle$4 = __esmMin((() => {
-	init_dist_bundle$5(), init_universal_user_agent(), init_dist(), init_json_with_bigint(), init_dist_src$3(), defaults_default = { headers: { "user-agent": `octokit-request.js/10.0.16 ${getUserAgent()}` } }, noop$1 = () => "", request = withDefaults$1(endpoint, defaults_default);
+	init_dist_bundle$5(), init_dist(), init_json_with_bigint(), init_dist_src$3(), defaults_default = { headers: { "user-agent": `octokit-request.js/10.0.16 ${getUserAgent()}` } }, noop$1 = () => "", request = withDefaults$1(endpoint, defaults_default);
 }));
 // node_modules/.pnpm/@octokit+graphql@9.0.5/node_modules/@octokit/graphql/dist-bundle/index.js
 function _buildMessageForResponseErrors(data) {
@@ -56781,7 +56770,7 @@ function withCustomRequest(customRequest) {
 	});
 }
 var VERSION$5, GraphqlResponseError, NON_VARIABLE_OPTIONS, FORBIDDEN_VARIABLE_OPTIONS, GHES_V3_SUFFIX_REGEX, init_dist_bundle$3 = __esmMin((() => {
-	init_dist_bundle$4(), init_universal_user_agent(), VERSION$5 = "0.0.0-development", GraphqlResponseError = class extends Error {
+	init_dist_bundle$4(), VERSION$5 = "0.0.0-development", GraphqlResponseError = class extends Error {
 		constructor(request2, headers, response) {
 			super(_buildMessageForResponseErrors(response)), this.request = request2, this.headers = headers, this.response = response, this.errors = response.errors, this.data = response.data, Error.captureStackTrace && Error.captureStackTrace(this, this.constructor);
 		}
@@ -56840,7 +56829,7 @@ function createLogger(logger = {}) {
 	return typeof logger.debug != "function" && (logger.debug = noop), typeof logger.info != "function" && (logger.info = noop), typeof logger.warn != "function" && (logger.warn = consoleWarn), typeof logger.error != "function" && (logger.error = consoleError), logger;
 }
 var noop, consoleWarn, consoleError, userAgentTrail, Octokit, init_dist_src$2 = __esmMin((() => {
-	init_universal_user_agent(), init_before_after_hook(), init_dist_bundle$4(), init_dist_bundle$3(), init_dist_bundle$2(), init_version$2(), noop = () => {}, consoleWarn = console.warn.bind(console), consoleError = console.error.bind(console), userAgentTrail = `octokit-core.js/${VERSION$4} ${getUserAgent()}`, Octokit = class {
+	init_before_after_hook(), init_dist_bundle$4(), init_dist_bundle$3(), init_dist_bundle$2(), init_version$2(), noop = () => {}, consoleWarn = console.warn.bind(console), consoleError = console.error.bind(console), userAgentTrail = `octokit-core.js/${VERSION$4} ${getUserAgent()}`, Octokit = class {
 		static VERSION = VERSION$4;
 		static defaults(defaults) {
 			return class extends this {
@@ -59068,7 +59057,7 @@ var init_github = __esmMin((() => {
 		return O.__proto__;
 	} : null);
 	function addNumericSeparator(num, str) {
-		if (num === Infinity || num === -Infinity || num !== num || num && num > -1e3 && num < 1e3 || $test.call(/e/, str)) return str;
+		if (num === 1e400 || num === -1e400 || num !== num || num && num > -1e3 && num < 1e3 || $test.call(/e/, str)) return str;
 		var sepRegex = /[0-9](?=(?:[0-9]{3})+(?![0-9]))/g;
 		if (typeof num == "number") {
 			var int = num < 0 ? -$floor(-num) : $floor(num);
@@ -59091,7 +59080,7 @@ var init_github = __esmMin((() => {
 	module.exports = function inspect_(obj, options, depth, seen) {
 		var opts = options || {};
 		if (has(opts, "quoteStyle") && !has(quotes, opts.quoteStyle)) throw TypeError("option \"quoteStyle\" must be \"single\" or \"double\"");
-		if (has(opts, "maxStringLength") && (typeof opts.maxStringLength == "number" ? opts.maxStringLength < 0 && opts.maxStringLength !== Infinity : opts.maxStringLength !== null)) throw TypeError("option \"maxStringLength\", if provided, must be a positive integer, Infinity, or `null`");
+		if (has(opts, "maxStringLength") && (typeof opts.maxStringLength == "number" ? opts.maxStringLength < 0 && opts.maxStringLength !== 1e400 : opts.maxStringLength !== null)) throw TypeError("option \"maxStringLength\", if provided, must be a positive integer, Infinity, or `null`");
 		var customInspect = !has(opts, "customInspect") || opts.customInspect;
 		if (typeof customInspect != "boolean" && customInspect !== "symbol") throw TypeError("option \"customInspect\", if provided, must be `true`, `false`, or `'symbol'`");
 		if (has(opts, "indent") && opts.indent !== null && opts.indent !== "	" && !(parseInt(opts.indent, 10) === opts.indent && opts.indent > 0)) throw TypeError("option \"indent\" must be \"\\t\", an integer > 0, or `null`");
@@ -59102,7 +59091,7 @@ var init_github = __esmMin((() => {
 		if (typeof obj == "boolean") return obj ? "true" : "false";
 		if (typeof obj == "string") return inspectString(obj, opts);
 		if (typeof obj == "number") {
-			if (obj === 0) return Infinity / obj > 0 ? "0" : "-0";
+			if (obj === 0) return 1e400 / obj > 0 ? "0" : "-0";
 			var str = String(obj);
 			return numericSeparator ? addNumericSeparator(obj, str) : str;
 		}
@@ -59382,7 +59371,7 @@ var init_github = __esmMin((() => {
 })), require_isFinite = __commonJSMin(((exports, module) => {
 	var $isNaN = require_isNaN$1();
 	module.exports = function(x) {
-		return (typeof x == "number" || typeof x == "bigint") && !$isNaN(x) && x !== Infinity && x !== -Infinity;
+		return (typeof x == "number" || typeof x == "bigint") && !$isNaN(x) && x !== 1e400 && x !== -1e400;
 	};
 })), require_isInteger$1 = __commonJSMin(((exports, module) => {
 	var $abs = require_abs(), $floor = require_floor$1(), $isNaN = require_isNaN$1(), $isFinite = require_isFinite();
@@ -59460,19 +59449,19 @@ var init_github = __esmMin((() => {
 	var $pow = require_pow();
 	module.exports = function(rawBytes) {
 		var bits = rawBytes[1] << 8 | rawBytes[0], sign = bits & 32768 ? -1 : 1, exponent = (bits & 31744) >> 10, mantissa = bits & 1023;
-		return exponent === 0 && mantissa === 0 ? sign === 1 ? 0 : -0 : exponent === 31 && mantissa === 0 ? sign === 1 ? Infinity : -Infinity : exponent === 31 && mantissa !== 0 ? NaN : (exponent -= 15, exponent === -15 ? sign * mantissa * $pow(2, -24) : sign * (1 + mantissa * $pow(2, -10)) * $pow(2, exponent));
+		return exponent === 0 && mantissa === 0 ? sign === 1 ? 0 : -0 : exponent === 31 && mantissa === 0 ? sign === 1 ? 1e400 : -1e400 : exponent === 31 && mantissa !== 0 ? NaN : (exponent -= 15, exponent === -15 ? sign * mantissa * $pow(2, -24) : sign * (1 + mantissa * $pow(2, -10)) * $pow(2, exponent));
 	};
 })), require_bytesAsFloat32 = __commonJSMin(((exports, module) => {
 	var $pow = require_pow();
 	module.exports = function(rawBytes) {
 		var sign = rawBytes[3] & 128 ? -1 : 1, exponent = (rawBytes[3] & 127) << 1 | rawBytes[2] >> 7, mantissa = (rawBytes[2] & 127) << 16 | rawBytes[1] << 8 | rawBytes[0];
-		return exponent === 0 && mantissa === 0 ? sign === 1 ? 0 : -0 : exponent === 255 && mantissa === 0 ? sign === 1 ? Infinity : -Infinity : exponent === 255 && mantissa !== 0 ? NaN : (exponent -= 127, exponent === -127 ? sign * mantissa * $pow(2, -149) : sign * (1 + mantissa * $pow(2, -23)) * $pow(2, exponent));
+		return exponent === 0 && mantissa === 0 ? sign === 1 ? 0 : -0 : exponent === 255 && mantissa === 0 ? sign === 1 ? 1e400 : -1e400 : exponent === 255 && mantissa !== 0 ? NaN : (exponent -= 127, exponent === -127 ? sign * mantissa * $pow(2, -149) : sign * (1 + mantissa * $pow(2, -23)) * $pow(2, exponent));
 	};
 })), require_bytesAsFloat64 = __commonJSMin(((exports, module) => {
 	var $pow = require_pow();
 	module.exports = function(rawBytes) {
 		var sign = rawBytes[7] & 128 ? -1 : 1, exponent = (rawBytes[7] & 127) << 4 | (rawBytes[6] & 240) >> 4, mantissa = (rawBytes[6] & 15) * 281474976710656 + rawBytes[5] * 1099511627776 + rawBytes[4] * 4294967296 + rawBytes[3] * 16777216 + rawBytes[2] * 65536 + rawBytes[1] * 256 + rawBytes[0];
-		return exponent === 0 && mantissa === 0 ? sign * 0 : exponent === 2047 && mantissa !== 0 ? NaN : exponent === 2047 && mantissa === 0 ? sign * Infinity : (exponent -= 1023, exponent === -1023 ? sign * mantissa * 5e-324 : sign * (1 + mantissa / 4503599627370496) * $pow(2, exponent));
+		return exponent === 0 && mantissa === 0 ? sign * 0 : exponent === 2047 && mantissa !== 0 ? NaN : exponent === 2047 && mantissa === 0 ? sign * 1e400 : (exponent -= 1023, exponent === -1023 ? sign * mantissa * 5e-324 : sign * (1 + mantissa / 4503599627370496) * $pow(2, exponent));
 	};
 })), require_bytesAsInteger = __commonJSMin(((exports, module) => {
 	var GetIntrinsic = require_get_intrinsic(), $pow = require_pow(), $Number = GetIntrinsic("%Number%"), $BigInt = GetIntrinsic("%BigInt%", !0);
@@ -59948,7 +59937,7 @@ var init_github = __esmMin((() => {
 	};
 })), require_isNegativeZero = __commonJSMin(((exports, module) => {
 	module.exports = function(x) {
-		return x === 0 && 1 / x == -Infinity;
+		return x === 0 && 1 / x == -1e400;
 	};
 })), require_valueToFloat16Bytes = __commonJSMin(((exports, module) => {
 	var $abs = require_abs(), $floor = require_floor$1(), $pow = require_pow(), isFinite = require_isFinite(), isNaN = require_isNaN$1(), isNegativeZero = require_isNegativeZero(), maxFiniteFloat16 = 65504;
@@ -60773,7 +60762,7 @@ var init_github = __esmMin((() => {
 	module.exports = function(start, end) {
 		var O = this;
 		ValidateTypedArray(O, "SEQ-CST");
-		var len = O.length, relativeStart = ToIntegerOrInfinity(start), k = relativeStart === -Infinity ? 0 : relativeStart < 0 ? max(len + relativeStart, 0) : min(relativeStart, len), relativeEnd = end === void 0 ? len : ToIntegerOrInfinity(end), final = relativeEnd === -Infinity ? 0 : relativeEnd < 0 ? max(len + relativeEnd, 0) : min(relativeEnd, len), count = max(final - k, 0), A = TypedArraySpeciesCreate(O, [count]);
+		var len = O.length, relativeStart = ToIntegerOrInfinity(start), k = relativeStart === -1e400 ? 0 : relativeStart < 0 ? max(len + relativeStart, 0) : min(relativeStart, len), relativeEnd = end === void 0 ? len : ToIntegerOrInfinity(end), final = relativeEnd === -1e400 ? 0 : relativeEnd < 0 ? max(len + relativeEnd, 0) : min(relativeEnd, len), count = max(final - k, 0), A = TypedArraySpeciesCreate(O, [count]);
 		if (count > 0) {
 			if (IsDetachedBuffer(typedArrayBuffer(O))) throw new $TypeError("Cannot use a Typed Array with an underlying ArrayBuffer that is detached");
 			if (TypedArrayElementType(O) === TypedArrayElementType(A)) for (var srcBuffer = typedArrayBuffer(O), targetBuffer = typedArrayBuffer(A), elementSize = TypedArrayElementSize(O), srcByteOffset = typedArrayByteOffset(O), srcByteIndex = k * elementSize + srcByteOffset, targetByteIndex = typedArrayByteOffset(A), limit = targetByteIndex + count * elementSize; targetByteIndex < limit;) {
@@ -63297,7 +63286,7 @@ If the error persists, please check whether Actions and API requests are operati
 			});
 		}
 	};
-})), init_interfaces = __esmMin((() => {})), artifact_exports = __exportAll({
+})), artifact_exports = __exportAll({
 	ArtifactNotFoundError: () => ArtifactNotFoundError,
 	DefaultArtifactClient: () => DefaultArtifactClient,
 	FilesNotFoundError: () => FilesNotFoundError,
@@ -63307,7 +63296,7 @@ If the error persists, please check whether Actions and API requests are operati
 	UsageError: () => UsageError,
 	default: () => client
 }), client, init_artifact = __esmMin((() => {
-	init_client(), init_interfaces(), init_errors(), init_client(), client = new DefaultArtifactClient();
+	init_client(), init_errors(), init_client(), client = new DefaultArtifactClient();
 }));
 // report/src/lib/traffic-artifact.ts
 function artifactName(builderName) {
